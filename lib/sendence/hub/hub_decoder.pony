@@ -3,7 +3,7 @@ use "collections"
 use "wallaroo/metrics"
 
 primitive HubProtocolDecoder
-  fun apply(data: Array[U8 val] val): HubProtocolMsg val ? =>
+  fun apply(data: Array[U8 val] val): HubProtocolMsg ? =>
     match _decode(data)
     | (_Join(), let d: Array[U8 val] val) =>
       HubJoinMsg
@@ -56,7 +56,7 @@ primitive HubPayloadMsg is HubProtocolMsg
       HubOtherMsg
     end
 
-class HubMetricsMsg is HubProtocolMsg
+class val HubMetricsMsg is HubProtocolMsg
   var name: String = ""
   var category: String = ""
   var pipeline_name: String = ""

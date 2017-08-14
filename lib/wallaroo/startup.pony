@@ -385,7 +385,7 @@ actor Startup
       StartupHelp(_env)
     end
 
-  be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg val) =>
+  be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg) =>
     try
       let auth = _env.root as AmbientAuth
 

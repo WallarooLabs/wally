@@ -31,7 +31,7 @@ actor DataReceivers
 
   let _data_receivers: Map[_BoundaryId, DataReceiver] =
     _data_receivers.create()
-  var _data_router: DataRouter val =
+  var _data_router: DataRouter =
     DataRouter(recover Map[U128, Consumer] end)
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
@@ -86,7 +86,7 @@ actor DataReceivers
       dr.start_normal_message_processing()
     end
 
-  be update_data_router(dr: DataRouter val) =>
+  be update_data_router(dr: DataRouter) =>
     _data_router = dr
     for data_receiver in _data_receivers.values() do
       data_receiver.update_router(_data_router)

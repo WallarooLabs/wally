@@ -1,4 +1,4 @@
-class ProxyAddress
+class val ProxyAddress
   let worker: String
   let step_id: U128
 

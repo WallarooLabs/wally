@@ -72,7 +72,7 @@ actor WActorWithState is WActorWrapper
   var _creating_actor: Bool = false
   var _actor_being_created: WActorWrapper tag
 
-  new create(worker: String, id: U128, w_actor_builder: WActorBuilder val,
+  new create(worker: String, id: U128, w_actor_builder: WActorBuilder,
     event_log: EventLog, r: CentralWActorRegistry,
     actor_to_worker_map: Map[U128, String] val, connections: Connections,
     broadcast_variables: BroadcastVariables,
@@ -285,9 +285,9 @@ interface val WActorWrapperBuilder
 
 class val StatefulWActorWrapperBuilder
   let _id: U128
-  let _w_actor_builder: WActorBuilder val
+  let _w_actor_builder: WActorBuilder
 
-  new val create(id': U128, wab: WActorBuilder val) =>
+  new val create(id': U128, wab: WActorBuilder) =>
     _id = id'
     _w_actor_builder = wab
 
@@ -415,7 +415,7 @@ actor _DummyActorProducer is Producer
   fun ref flush(low_watermark: SeqId) =>
     None
 
-  fun ref update_router(router: Router val) =>
+  fun ref update_router(router: Router) =>
     None
 
   be request_ack() =>

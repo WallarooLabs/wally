@@ -94,7 +94,7 @@ class WActorSourceNotify is TCPSourceNotify
       end
     end
 
-  fun ref update_router(router: Router val) =>
+  fun ref update_router(router: Router) =>
     None
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>

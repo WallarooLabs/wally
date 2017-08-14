@@ -51,7 +51,7 @@ class BoundaryRoute is Route
     Fail()
     true
 
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,
     msg_uid: U128, latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64): Bool
@@ -76,7 +76,7 @@ class BoundaryRoute is Route
       worker_ingress_ts)
     true
 
-  fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
+  fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref, msg_uid: U128,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)

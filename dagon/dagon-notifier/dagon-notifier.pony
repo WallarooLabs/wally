@@ -128,7 +128,7 @@ class DagonNotify is TCPConnectionNotify
       try
         let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: ExternalGilesSendersStartedMsg val =>
+        | let m: ExternalGilesSendersStartedMsg =>
           _env.out.print("Giles Senders started")
           _notifier.shutdown()
         else

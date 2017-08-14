@@ -30,7 +30,7 @@ actor TCPSource is Producer
   """
   let _guid: GuidGenerator = GuidGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
-  let _route_builder: RouteBuilder val
+  let _route_builder: RouteBuilder
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
@@ -64,11 +64,11 @@ actor TCPSource is Producer
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
-    routes: Array[Consumer] val, route_builder: RouteBuilder val,
-    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
+    routes: Array[Consumer] val, route_builder: RouteBuilder,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     fd: U32, default_target: (Consumer | None) = None,
-    forward_route_builder: (RouteBuilder val | None) = None,
+    forward_route_builder: (RouteBuilder | None) = None,
     init_size: USize = 64, max_size: USize = 16384,
     metrics_reporter: MetricsReporter iso)
   =>
@@ -119,7 +119,7 @@ actor TCPSource is Producer
     match default_target
     | let r: Consumer =>
       match forward_route_builder
-      | let frb: RouteBuilder val =>
+      | let frb: RouteBuilder =>
         _routes(r) = frb(this, r, _metrics_reporter)
       end
     end
@@ -137,12 +137,12 @@ actor TCPSource is Producer
 
     _mute()
 
-  be update_router(router: PartitionRouter val) =>
+  be update_router(router: PartitionRouter) =>
     let new_router = router.update_boundaries(_outgoing_boundaries)
     _notify.update_router(new_router)
 
   be add_boundary_builders(
-    boundary_builders: Map[String, OutgoingBoundaryBuilder val] val)
+    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   =>
     """
     Build a new boundary for each builder that corresponds to a worker we

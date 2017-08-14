@@ -18,7 +18,7 @@ actor DataReceiver is Producer
   let _worker_name: String
   var _sender_name: String
   var _sender_step_id: U128 = 0
-  var _router: DataRouter val =
+  var _router: DataRouter =
     DataRouter(recover Map[U128, Consumer] end)
   var _last_id_seen: SeqId = 0
   var _last_id_acked: SeqId = 0
@@ -144,7 +144,7 @@ actor DataReceiver is Producer
       _watermarker.sent(route_id, seq_id)
     end
 
-  be update_router(router: DataRouter val) =>
+  be update_router(router: DataRouter) =>
     // TODO: This commented line conflicts with invariant downstream. The
     // idea is to unregister if we've registered but not otherwise.
     // The invariant says you can only call this method on a step if
@@ -163,7 +163,7 @@ actor DataReceiver is Producer
       _watermarker.add_route(id)
     end
 
-  be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: SeqId,
+  be received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _timer_init(this)
@@ -178,7 +178,7 @@ actor DataReceiver is Producer
       _maybe_ack()
     end
 
-  be received_actor_data(d: ActorDeliveryMsg val, seq_id: SeqId) =>
+  be received_actor_data(d: ActorDeliveryMsg, seq_id: SeqId) =>
     _timer_init(this)
     ifdef "trace" then
       @printf[I32]("Rcvd actor msg at DataReceiver\n".cstring())
@@ -199,7 +199,7 @@ actor DataReceiver is Producer
     _router.request_ack(_watermarker.unacked_route_ids())
     _last_request = _ack_counter
 
-  be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+  be replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if seq_id > _last_id_seen then

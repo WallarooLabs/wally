@@ -1,4 +1,4 @@
-class InitFile
+class val InitFile
   let filename: String
   let msg_size: (USize | None)
 

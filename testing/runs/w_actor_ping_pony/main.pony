@@ -1,7 +1,6 @@
 use "assert"
 use "buffered"
 use "collections"
-use pers = "collections/persistent"
 use "debug"
 use "net"
 use "options"
@@ -13,7 +12,6 @@ use "sendence/guid"
 use "sendence/hub"
 use "sendence/new_fix"
 use "sendence/rand"
-use "sendence/wall_clock"
 use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/metrics"
@@ -51,7 +49,7 @@ class Ping is WActor
     _id = id
     h.register_as_role(_role)
 
-  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
+  fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
     | let hit: Hit =>
       @printf[I32]("Ping: hit\n".cstring())
@@ -80,7 +78,7 @@ class Pong is WActor
     _id = id
     h.register_as_role(_role)
 
-  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
+  fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
     | let hit: Hit =>
       @printf[I32]("Pong: hit\n".cstring())

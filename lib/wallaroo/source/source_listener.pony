@@ -12,12 +12,12 @@ interface val SourceListenerBuilder
   fun apply(): SourceListener
 
 interface val SourceListenerBuilderBuilder
-  fun apply(source_builder: SourceBuilder, router: Router val,
-    router_registry: RouterRegistry, route_builder: RouteBuilder val,
-    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
+  fun apply(source_builder: SourceBuilder, router: Router,
+    router_registry: RouterRegistry, route_builder: RouteBuilder,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder val | None) = None,
-    target_router: Router val = EmptyRouter): SourceListenerBuilder
+    default_in_route_builder: (RouteBuilder | None) = None,
+    target_router: Router = EmptyRouter): SourceListenerBuilder

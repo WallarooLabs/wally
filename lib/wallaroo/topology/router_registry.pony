@@ -16,12 +16,12 @@ actor RouterRegistry
   let _data_receivers: DataReceivers
   let _worker_name: String
   let _connections: Connections
-  var _data_router: DataRouter val =
+  var _data_router: DataRouter =
     DataRouter(recover Map[U128, Consumer] end)
-  var _pre_state_data: (Array[PreStateData val] val | None) = None
-  let _partition_routers: Map[String, PartitionRouter val] =
+  var _pre_state_data: (Array[PreStateData] val | None) = None
+  let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()
-  var _omni_router: (OmniRouter val | None) = None
+  var _omni_router: (OmniRouter | None) = None
   var _actor_data_router: ActorSystemDataRouter = EmptyActorSystemDataRouter
 
   var _application_ready_to_work: Bool = false
@@ -40,7 +40,7 @@ actor RouterRegistry
   // Boundary builders are used by new TCPSources to create their own
   // individual boundaries to other workers (to allow for increased
   // throughput).
-  let _outgoing_boundaries_builders: Map[String, OutgoingBoundaryBuilder val] =
+  let _outgoing_boundaries_builders: Map[String, OutgoingBoundaryBuilder] =
     _outgoing_boundaries_builders.create()
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
@@ -81,18 +81,18 @@ actor RouterRegistry
   be application_ready_to_work() =>
     _application_ready_to_work = true
 
-  be set_data_router(dr: DataRouter val) =>
+  be set_data_router(dr: DataRouter) =>
     _data_router = dr
     _actor_data_router = dr.actor_system_data_router()
     _distribute_data_router()
 
-  be set_pre_state_data(psd: Array[PreStateData val] val) =>
+  be set_pre_state_data(psd: Array[PreStateData] val) =>
     _pre_state_data = psd
 
-  be set_partition_router(state_name: String, pr: PartitionRouter val) =>
+  be set_partition_router(state_name: String, pr: PartitionRouter) =>
     _partition_routers(state_name) = pr
 
-  be set_omni_router(o: OmniRouter val) =>
+  be set_omni_router(o: OmniRouter) =>
     _omni_router = o
 
   be update_actor_data_router(adr: ActorSystemDataRouter) =>
@@ -136,7 +136,7 @@ actor RouterRegistry
     _omni_router_steps.set(s)
 
   be register_boundaries(bs: Map[String, OutgoingBoundary] val,
-    bbs: Map[String, OutgoingBoundaryBuilder val] val)
+    bbs: Map[String, OutgoingBoundaryBuilder] val)
   =>
     // Boundaries
     let new_boundaries: Map[String, OutgoingBoundary] trn =
@@ -163,8 +163,8 @@ actor RouterRegistry
     end
 
     // Boundary builders
-    let new_boundary_builders: Map[String, OutgoingBoundaryBuilder val] trn =
-      recover Map[String, OutgoingBoundaryBuilder val] end
+    let new_boundary_builders: Map[String, OutgoingBoundaryBuilder] trn =
+      recover Map[String, OutgoingBoundaryBuilder] end
     for (worker, builder) in bbs.pairs() do
       // Boundary builders should always be registered after the canonical
       // boundary for each builder. The canonical is used on all Steps.
@@ -179,7 +179,7 @@ actor RouterRegistry
     end
 
     let new_boundary_builders_sendable:
-      Map[String, OutgoingBoundaryBuilder val] val =
+      Map[String, OutgoingBoundaryBuilder] val =
         consume new_boundary_builders
 
     for source_listener in _source_listeners.values() do
@@ -211,7 +211,7 @@ actor RouterRegistry
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
 
-  fun _distribute_partition_router(partition_router: PartitionRouter val) =>
+  fun _distribute_partition_router(partition_router: PartitionRouter) =>
       for step in _partition_router_steps.values() do
         step.update_router(partition_router)
       end
@@ -412,7 +412,7 @@ actor RouterRegistry
   /////
   // Step moved off this worker or new step added to another worker
   /////
-  be move_step_to_proxy(id: U128, proxy_address: ProxyAddress val) =>
+  be move_step_to_proxy(id: U128, proxy_address: ProxyAddress) =>
     """
     Called when a stateless step has been migrated off this worker to another
     worker
@@ -420,7 +420,7 @@ actor RouterRegistry
     _move_step_to_proxy(id, proxy_address)
 
   be move_stateful_step_to_proxy[K: (Hashable val & Equatable[K] val)](
-    id: U128, proxy_address: ProxyAddress val, key: K, state_name: String)
+    id: U128, proxy_address: ProxyAddress, key: K, state_name: String)
   =>
     """
     Called when a stateful step has been migrated off this worker to another
@@ -429,7 +429,7 @@ actor RouterRegistry
     _add_state_proxy_to_partition_router[K](proxy_address, key, state_name)
     _move_step_to_proxy(id, proxy_address)
 
-  fun ref _move_step_to_proxy(id: U128, proxy_address: ProxyAddress val) =>
+  fun ref _move_step_to_proxy(id: U128, proxy_address: ProxyAddress) =>
     """
     Called when a step has been migrated off this worker to another worker
     """
@@ -437,7 +437,7 @@ actor RouterRegistry
     _add_proxy_to_omni_router(id, proxy_address)
 
   be add_state_proxy[K: (Hashable val & Equatable[K] val)](id: U128,
-    proxy_address: ProxyAddress val, key: K, state_name: String)
+    proxy_address: ProxyAddress, key: K, state_name: String)
   =>
     """
     Called when a stateful step has been added to another worker
@@ -446,7 +446,7 @@ actor RouterRegistry
     _add_proxy_to_omni_router(id, proxy_address)
 
   fun ref _add_state_proxy_to_partition_router[
-    K: (Hashable val & Equatable[K] val)](proxy_address: ProxyAddress val,
+    K: (Hashable val & Equatable[K] val)](proxy_address: ProxyAddress,
     key: K, state_name: String)
   =>
     try
@@ -472,10 +472,10 @@ actor RouterRegistry
     end
 
   fun ref _add_proxy_to_omni_router(id: U128,
-    proxy_address: ProxyAddress val)
+    proxy_address: ProxyAddress)
   =>
     match _omni_router
-    | let o: OmniRouter val =>
+    | let o: OmniRouter =>
       let new_omni_router = o.update_route_to_proxy(id, proxy_address)
       for step in _omni_router_steps.values() do
         step.update_omni_router(new_omni_router)
@@ -509,7 +509,7 @@ actor RouterRegistry
       match target
       | let step: Step =>
         match _omni_router
-        | let omni_router: OmniRouter val =>
+        | let omni_router: OmniRouter =>
           step.update_omni_router(omni_router)
         else
           Fail()
@@ -519,7 +519,7 @@ actor RouterRegistry
         _distribute_partition_router(partition_router)
         // Add routes to state computation targets to state step
         match _pre_state_data
-        | let psds: Array[PreStateData val] val =>
+        | let psds: Array[PreStateData] val =>
           for psd in psds.values() do
             if psd.state_name() == state_name then
               match psd.target_id()
@@ -555,7 +555,7 @@ actor RouterRegistry
     _distribute_data_router()
 
     match _omni_router
-    | let o: OmniRouter val =>
+    | let o: OmniRouter =>
       let new_omni_router = o.update_route_to_step(id, target)
       for step in _omni_router_steps.values() do
         step.update_omni_router(new_omni_router)

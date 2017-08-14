@@ -9,7 +9,7 @@ class InitFileReader
   let _file: File
   let _auth: AmbientAuth
 
-  new create(init_file: InitFile val, auth: AmbientAuth) ? =>
+  new create(init_file: InitFile, auth: AmbientAuth) ? =>
     _filename = init_file.filename
     match init_file.msg_size
     | let ms: USize =>

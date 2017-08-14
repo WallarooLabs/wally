@@ -93,7 +93,7 @@ actor ClusterInitializer
       end
     end
 
-  be distribute_local_topologies(ts: Map[String, LocalTopology val] val) =>
+  be distribute_local_topologies(ts: Map[String, LocalTopology] val) =>
     if _worker_names.size() != ts.size() then
       @printf[I32]("We need one local topology for each worker\n".cstring())
     else

@@ -18,14 +18,14 @@ interface FramedSourceHandler[In: Any val]
 interface SourceNotify
   fun ref routes(): Array[Consumer] val
 
-  fun ref update_router(router: Router val)
+  fun ref update_router(router: Router)
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
 
 interface val SourceNotifyBuilder[In: Any val, SH: SourceHandler[In] val]
   fun apply(pipeline_name: String, auth: AmbientAuth,
     handler: SH,
-    runner_builder: RunnerBuilder val, router: Router val,
+    runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router val, pre_state_target_id: (U128 | None) = None):
+    target_router: Router, pre_state_target_id: (U128 | None) = None):
     SourceNotify iso^

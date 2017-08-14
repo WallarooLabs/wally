@@ -24,29 +24,29 @@ use "wallaroo/source"
 use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
-class LocalTopology
+class val LocalTopology
   let _app_name: String
   let _worker_name: String
-  let _graph: Dag[StepInitializer val] val
-  let _step_map: Map[U128, (ProxyAddress val | U128)] val
+  let _graph: Dag[StepInitializer] val
+  let _step_map: Map[U128, (ProxyAddress | U128)] val
   // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, StateSubpartition val] val
-  let _pre_state_data: Array[PreStateData val] val
+  let _state_builders: Map[String, StateSubpartition] val
+  let _pre_state_data: Array[PreStateData] val
   let _proxy_ids: Map[String, U128] val
   // TODO: Replace this default strategy with a better one after POC
-  let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
+  let default_target: (Array[StepBuilder] val | ProxyAddress | None)
   let default_state_name: String
   let default_target_id: U128
   // resilience
   let worker_names: Array[String] val
 
   new val create(name': String, worker_name': String,
-    graph': Dag[StepInitializer val] val,
-    step_map': Map[U128, (ProxyAddress val | U128)] val,
-    state_builders': Map[String, StateSubpartition val] val,
-    pre_state_data': Array[PreStateData val] val,
+    graph': Dag[StepInitializer] val,
+    step_map': Map[U128, (ProxyAddress | U128)] val,
+    state_builders': Map[String, StateSubpartition] val,
+    pre_state_data': Array[PreStateData] val,
     proxy_ids': Map[String, U128] val,
-    default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
+    default_target': (Array[StepBuilder] val | ProxyAddress | None) =
       None,
     default_state_name': String = "", default_target_id': U128 = 0,
     worker_names': Array[String] val)
@@ -65,17 +65,17 @@ class LocalTopology
     //resilience
     worker_names = worker_names'
 
-  fun state_builders(): Map[String, StateSubpartition val] val =>
+  fun state_builders(): Map[String, StateSubpartition] val =>
     _state_builders
 
   fun update_state_map(state_name: String,
-    state_map: Map[String, Router val],
+    state_map: Map[String, Router],
     metrics_conn: MetricsSink, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer tag],
-    default_router: (Router val | None)) ?
+    default_router: (Router | None)) ?
   =>
     let subpartition =
       try
@@ -94,11 +94,11 @@ class LocalTopology
          initializables, data_routes, default_router)
     end
 
-  fun graph(): Dag[StepInitializer val] val => _graph
+  fun graph(): Dag[StepInitializer] val => _graph
 
-  fun pre_state_data(): Array[PreStateData val] val => _pre_state_data
+  fun pre_state_data(): Array[PreStateData] val => _pre_state_data
 
-  fun step_map(): Map[U128, (ProxyAddress val | U128)] val => _step_map
+  fun step_map(): Map[U128, (ProxyAddress | U128)] val => _step_map
 
   fun name(): String => _app_name
 
@@ -111,11 +111,11 @@ class LocalTopology
 
   fun update_proxy_address_for_state_key[Key: (Hashable val &
     Equatable[Key] val)](
-    state_name: String, key: Key, pa: ProxyAddress val): LocalTopology val ?
+    state_name: String, key: Key, pa: ProxyAddress): LocalTopology ?
   =>
     let new_subpartition = _state_builders(state_name).update_key[Key](key, pa)
-    let new_state_builders: Map[String, StateSubpartition val] trn =
-      recover Map[String, StateSubpartition val] end
+    let new_state_builders: Map[String, StateSubpartition] trn =
+      recover Map[String, StateSubpartition] end
     for (k, v) in _state_builders.pairs() do
       new_state_builders(k) = v
     end
@@ -124,7 +124,7 @@ class LocalTopology
       consume new_state_builders, _pre_state_data, _proxy_ids, default_target,
       default_state_name, default_target_id, worker_names)
 
-  fun val add_worker_name(w: String): LocalTopology val =>
+  fun val add_worker_name(w: String): LocalTopology =>
     if not worker_names.contains(w) then
       let new_worker_names: Array[String] trn = recover Array[String] end
       for n in worker_names.values() do
@@ -138,7 +138,7 @@ class LocalTopology
       this
     end
 
-  fun val for_new_worker(new_worker: String): LocalTopology val ? =>
+  fun val for_new_worker(new_worker: String): LocalTopology ? =>
     let w_names =
       if not worker_names.contains(new_worker) then
         add_worker_name(new_worker).worker_names
@@ -146,11 +146,11 @@ class LocalTopology
         worker_names
       end
 
-    let g = Dag[StepInitializer val]
+    let g = Dag[StepInitializer]
     // Pick up sinks, which are shared across workers
     for node in _graph.nodes() do
       match node.value
-      | let egress: EgressBuilder val =>
+      | let egress: EgressBuilder =>
         g.add_node(egress, node.id)
       end
     end
@@ -166,9 +166,9 @@ class LocalTopology
     (_app_name == that._app_name) and
       (_worker_name == that._worker_name) and
       (_graph is that._graph) and
-      MapEquality2[U128, ProxyAddress val, U128](_step_map, that._step_map)
+      MapEquality2[U128, ProxyAddress, U128](_step_map, that._step_map)
         and
-      MapEquality[String, StateSubpartition val](_state_builders,
+      MapEquality[String, StateSubpartition](_state_builders,
         that._state_builders) and
       (_pre_state_data is that._pre_state_data) and
       MapEquality[String, U128](_proxy_ids, that._proxy_ids) and
@@ -195,11 +195,11 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _recovery_replayer: RecoveryReplayer
   var _is_initializer: Bool
   var _outgoing_boundary_builders:
-    Map[String, OutgoingBoundaryBuilder val] val =
-      recover Map[String, OutgoingBoundaryBuilder val] end
+    Map[String, OutgoingBoundaryBuilder] val =
+      recover Map[String, OutgoingBoundaryBuilder] end
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
     recover Map[String, OutgoingBoundary] end
-  var _topology: (LocalTopology val | None) = None
+  var _topology: (LocalTopology | None) = None
   let _local_topology_file: String
   var _cluster_initializer: (ClusterInitializer | None) = None
   let _data_channel_file: String
@@ -213,7 +213,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _guid: GuidGenerator = GuidGenerator
 
   // Lifecycle
-  var _omni_router: (OmniRouter val | None) = None
+  var _omni_router: (OmniRouter | None) = None
   var _created: SetIs[Initializable] = _created.create()
   var _initialized: SetIs[Initializable] = _initialized.create()
   var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
@@ -259,7 +259,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _cluster_manager = cluster_manager
     _is_joining = is_joining
 
-  be update_topology(t: LocalTopology val) =>
+  be update_topology(t: LocalTopology) =>
     _topology = t
 
   be add_new_worker(w: String, joining_host: String,
@@ -280,7 +280,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be add_boundary_to_new_worker(w: String, boundary: OutgoingBoundary,
-    builder: OutgoingBoundaryBuilder val)
+    builder: OutgoingBoundaryBuilder)
   =>
     _add_boundary(w, boundary, builder)
     _router_registry.register_boundaries(_outgoing_boundaries,
@@ -292,7 +292,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   fun ref _add_worker_name(w: String) =>
     match _topology
-    | let t: LocalTopology val =>
+    | let t: LocalTopology =>
       _topology = t.add_worker_name(w)
       ifdef "resilience" then
         _save_local_topology()
@@ -303,7 +303,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   fun ref _add_boundary(target_worker: String, boundary: OutgoingBoundary,
-    builder: OutgoingBoundaryBuilder val)
+    builder: OutgoingBoundaryBuilder)
   =>
     // Boundaries
     let bs: Map[String, OutgoingBoundary] trn =
@@ -314,8 +314,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     bs(target_worker) = boundary
 
     // Boundary builders
-    let bbs: Map[String, OutgoingBoundaryBuilder val] trn =
-      recover Map[String, OutgoingBoundaryBuilder val] end
+    let bbs: Map[String, OutgoingBoundaryBuilder] trn =
+      recover Map[String, OutgoingBoundaryBuilder] end
     for (w, b) in _outgoing_boundary_builders.pairs() do
       bbs(w) = b
     end
@@ -326,7 +326,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _initializables.set(boundary)
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val,
-    bbs: Map[String, OutgoingBoundaryBuilder val] val)
+    bbs: Map[String, OutgoingBoundaryBuilder] val)
   =>
     // This should only be called during initialization
     if (_outgoing_boundaries.size() > 0) or
@@ -456,7 +456,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     """
     try
       match _topology
-      | let t: LocalTopology val =>
+      | let t: LocalTopology =>
         @printf[I32](("Saving worker names to file: " + _worker_names_file +
           "\n").cstring())
         let worker_names_filepath = FilePath(_auth, _worker_names_file)
@@ -479,7 +479,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   fun ref _save_local_topology() =>
     match _topology
-    | let t: LocalTopology val =>
+    | let t: LocalTopology =>
       @printf[I32]("Saving topology!\n".cstring())
       try
         let local_topology_file = FilePath(_auth, _local_topology_file)
@@ -535,7 +535,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             end
             match Serialised.input(InputSerialisedAuth(_auth), data)(
               DeserialiseAuth(_auth))
-            | let t: LocalTopology val =>
+            | let t: LocalTopology =>
               _topology = t
             else
               @printf[I32]("error restoring previous topology!".cstring())
@@ -547,7 +547,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
 
       match _topology
-      | let t: LocalTopology val =>
+      | let t: LocalTopology =>
         _router_registry.set_pre_state_data(t.pre_state_data())
 
         ifdef "resilience" then
@@ -565,7 +565,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         @printf[I32]((graph.string() + "\n").cstring())
 
         // Make sure we only create shared state once and reuse it
-        let state_map: Map[String, Router val] = state_map.create()
+        let state_map: Map[String, Router] = state_map.create()
 
         @printf[I32](("\nInitializing " + t.name() +
           " application locally:\n\n").cstring())
@@ -590,7 +590,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         // Keep track of routers to the steps we've built
-        let built_routers = Map[U128, Router val]
+        let built_routers = Map[U128, Router]
 
         // Keep track of steps we've built that we'll use for the OmniRouter.
         // Unlike data_routes, these will not include state steps, which will
@@ -601,14 +601,14 @@ actor LocalTopologyInitializer is LayoutInitializer
         // TODO: Replace this when we move past the temporary POC based default
         // target strategy. There can currently only be one partition default
         // target per topology.
-        var default_step_initializer: (StepInitializer val | None) = None
-        var default_in_route_builder: (RouteBuilder val | None) = None
+        var default_step_initializer: (StepInitializer | None) = None
+        var default_in_route_builder: (RouteBuilder | None) = None
         var default_target: (Step | None) = None
         var default_target_id: U128 = t.default_target_id
         var default_target_state_step_id: U128 = 0
         var default_target_state_step: (Step | None) = None
         match t.default_target
-        | let targets: Array[StepBuilder val] val =>
+        | let targets: Array[StepBuilder] val =>
           @printf[I32]("A default target exists!\n".cstring())
           let pre_state_initializer =
             try
@@ -643,7 +643,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           let state_step_router = DirectRouter(state_step)
           built_routers(default_target_state_step_id) = state_step_router
           state_map(t.default_state_name) = state_step_router
-        | let proxy_target: ProxyAddress val =>
+        | let proxy_target: ProxyAddress =>
           let proxy_router = ProxyRouter(_worker_name,
             _outgoing_boundaries(proxy_target.worker), proxy_target,
             _auth)
@@ -659,7 +659,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         //   III. No direct chains of different partitions
         /////////
 
-        let frontier = Array[DagNode[StepInitializer val] val]
+        let frontier = Array[DagNode[StepInitializer] val]
 
         /////////
         // 1. Find graph sinks and add to frontier queue.
@@ -671,11 +671,11 @@ actor LocalTopologyInitializer is LayoutInitializer
         // since we're pushing onto a stack). On the other hand, we
         // put all source data nodes on the bottom of the stack since
         // sources should be processed last.
-        let non_partitions = Array[DagNode[StepInitializer val] val]
-        let source_data_nodes = Array[DagNode[StepInitializer val] val]
+        let non_partitions = Array[DagNode[StepInitializer] val]
+        let source_data_nodes = Array[DagNode[StepInitializer] val]
         for node in graph.nodes() do
           match node.value
-          | let sd: SourceData val =>
+          | let sd: SourceData =>
             source_data_nodes.push(node)
           else
             if node.is_sink() and node.value.is_prestate() then
@@ -726,11 +726,11 @@ actor LocalTopologyInitializer is LayoutInitializer
           if _is_ready_for_building(next_node, built_routers) then
             @printf[I32](("Handling " + next_node.value.name() + " node\n")
               .cstring())
-            let next_initializer: StepInitializer val = next_node.value
+            let next_initializer: StepInitializer = next_node.value
 
             // ...match kind of initializer and go from there...
             match next_initializer
-            | let builder: StepBuilder val =>
+            | let builder: StepBuilder =>
             ///////////////
             // STEP BUILDER
             ///////////////
@@ -749,7 +749,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let dsn = builder.default_state_name()
                 let default_router =
                   match default_step_initializer
-                  | let dsinit: StepBuilder val =>
+                  | let dsinit: StepBuilder =>
                     if (dsn != "") and (dsn == t.default_state_name) then
                       // We need a default router
                       let default_state_router = state_map(dsn)
@@ -909,7 +909,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // prestate builder, so we're going to build them all
                 for in_node in next_node.ins() do
                   match in_node.value
-                  | let b: StepBuilder val =>
+                  | let b: StepBuilder =>
                     @printf[I32](("----Spinning up " + b.name() + "----\n")
                       .cstring())
 
@@ -957,7 +957,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   end
                 end
               end
-            | let egress_builder: EgressBuilder val =>
+            | let egress_builder: EgressBuilder =>
             ////////////////////////////////////
             // EGRESS BUILDER (Sink or Boundary)
             ////////////////////////////////////
@@ -980,7 +980,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   match sink
                   | let ob: OutgoingBoundary =>
                     match egress_builder.target_address()
-                    | let pa: ProxyAddress val =>
+                    | let pa: ProxyAddress =>
                       ProxyRouter(_worker_name, ob, pa, _auth)
                     else
                       @printf[I32]("No ProxyAddress for proxy!\n".cstring())
@@ -1016,8 +1016,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                   // the partition and proxy routers for any steps that
                   // exist on other workers.
                   let partition_routes:
-                    Map[U64, (Step | ProxyRouter val)] trn =
-                    recover Map[U64, (Step | ProxyRouter val)] end
+                    Map[U64, (Step | ProxyRouter)] trn =
+                    recover Map[U64, (Step | ProxyRouter)] end
 
                   for (p_id, step_id) in
                     pre_stateless_data.partition_id_to_step_id.pairs()
@@ -1059,7 +1059,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   .cstring())
                 Fail()
               end
-            | let source_data: SourceData val =>
+            | let source_data: SourceData =>
             /////////////////
             // SOURCE DATA
             /////////////////
@@ -1071,7 +1071,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               let dsn = source_data.default_state_name()
               let default_router =
                 match default_step_initializer
-                | let dsinit: StepBuilder val =>
+                | let dsinit: StepBuilder =>
                   if (dsn != "") and (dsn == t.default_state_name) then
                     // We need a default router
                     let default_state_router = state_map(dsn)
@@ -1231,7 +1231,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 end
               let target_router = built_routers(tid)
               match partition_router
-              | let pr: PartitionRouter val =>
+              | let pr: PartitionRouter =>
                 _router_registry.set_partition_router(psd.state_name(), pr)
                 pr.register_routes(target_router, psd.forward_route_builder())
                 @printf[I32](("Registered routes on state steps for " + psd.pre_state_name() + "\n").cstring())
@@ -1311,19 +1311,19 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n".cstring())
     try
-      let built_routers = Map[U128, Router val]
+      let built_routers = Map[U128, Router]
       let data_routes: Map[U128, Consumer] trn =
         recover Map[U128, Consumer] end
       let built_stateless_steps: Map[U128, Consumer] trn =
         recover Map[U128, Consumer] end
 
       match _topology
-      | let t: LocalTopology val =>
+      | let t: LocalTopology =>
         _router_registry.set_pre_state_data(t.pre_state_data())
         // Create sinks
         for node in t.graph().nodes() do
           match node.value
-          | let egress_builder: EgressBuilder val =>
+          | let egress_builder: EgressBuilder =>
             let next_id = egress_builder.id()
             if not built_routers.contains(next_id) then
               let sink_reporter = MetricsReporter(t.name(),
@@ -1342,7 +1342,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 match sink
                 | let ob: OutgoingBoundary =>
                   match egress_builder.target_address()
-                  | let pa: ProxyAddress val =>
+                  | let pa: ProxyAddress =>
                     ProxyRouter(_worker_name, ob, pa, _auth)
                   else
                     @printf[I32]("No ProxyAddress for proxy!\n".cstring())
@@ -1404,10 +1404,10 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be update_state_step_entry[Key: (Hashable val & Equatable[Key] val)](
-    state_name: String, key: Key, pa: ProxyAddress val) =>
+    state_name: String, key: Key, pa: ProxyAddress) =>
     try
       match _topology
-      | let t: LocalTopology val =>
+      | let t: LocalTopology =>
         _topology = t.update_proxy_address_for_state_key[Key](state_name,
         key, pa)
         // TODO: We should find a way to batch changes before writing out.
@@ -1417,10 +1417,10 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  be receive_immigrant_step(msg: StepMigrationMsg val) =>
+  be receive_immigrant_step(msg: StepMigrationMsg) =>
     try
       match _topology
-      | let t: LocalTopology val =>
+      | let t: LocalTopology =>
         let subpartition = t.state_builders()(msg.state_name())
         let runner_builder = subpartition.runner_builder()
         let reporter = MetricsReporter(t.name(), t.worker_name(),
@@ -1440,7 +1440,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   be report_created(initializable: Initializable) =>
     if not _created.contains(initializable) then
       match _omni_router
-      | let o_router: OmniRouter val =>
+      | let o_router: OmniRouter =>
         _created.set(initializable)
         if _created.size() == _initializables.size() then
           @printf[I32]("|~~ INIT PHASE I: Application is created! ~~|\n"
@@ -1483,7 +1483,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       if _ready_to_work.size() == _initializables.size() then
         if _recovering then
           match _topology
-          | let t: LocalTopology val =>
+          | let t: LocalTopology =>
             _recovery.start_recovery(this, t.worker_names)
           else
             Fail()
@@ -1531,7 +1531,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   be inform_joining_worker(conn: TCPConnection, worker_name: String) =>
     match _topology
-    | let t: LocalTopology val =>
+    | let t: LocalTopology =>
       match _connections
       | let c: Connections =>
         c.inform_joining_worker(conn, worker_name, t)
@@ -1542,8 +1542,8 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  fun _is_ready_for_building(node: DagNode[StepInitializer val] val,
-    built_routers: Map[U128, Router val]): Bool
+  fun _is_ready_for_building(node: DagNode[StepInitializer] val,
+    built_routers: Map[U128, Router]): Bool
   =>
     var is_ready = true
     for out in node.outs() do
@@ -1557,7 +1557,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
     is_ready
 
-  fun _get_output_node_id(node: DagNode[StepInitializer val] val,
+  fun _get_output_node_id(node: DagNode[StepInitializer] val,
     default_target_id: U128, default_target_state_step_id: U128):
     (U128 | None) ?
   =>
@@ -1572,7 +1572,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
     // Make sure this is not a sink or proxy node.
     match node.value
-    | let eb: EgressBuilder val =>
+    | let eb: EgressBuilder =>
       @printf[I32]("Sinks and Proxies have no output nodes in the local graph!\n".cstring())
       error
     end

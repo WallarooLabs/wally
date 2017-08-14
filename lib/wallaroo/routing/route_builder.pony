@@ -4,7 +4,7 @@ use "wallaroo/core"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 
-trait RouteBuilder
+trait val RouteBuilder
   fun apply(step: Producer ref, consumer: Consumer,
     metrics_reporter: MetricsReporter ref): Route
 

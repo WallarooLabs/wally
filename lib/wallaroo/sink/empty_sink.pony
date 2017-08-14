@@ -28,7 +28,7 @@ actor EmptySink is Consumer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter val)
+    omni_router: OmniRouter)
   =>
     initializer.report_initialized(this)
 

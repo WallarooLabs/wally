@@ -17,15 +17,15 @@ class val TCPSourceListenerBuilderBuilder
     _host = host
     _service = service
 
-  fun apply(source_builder: SourceBuilder, router: Router val,
-    router_registry: RouterRegistry, route_builder: RouteBuilder val,
-    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
+  fun apply(source_builder: SourceBuilder, router: Router,
+    router_registry: RouterRegistry, route_builder: RouteBuilder,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder val | None) = None,
-    target_router: Router val = EmptyRouter): TCPSourceListenerBuilder val
+    default_in_route_builder: (RouteBuilder | None) = None,
+    target_router: Router = EmptyRouter): TCPSourceListenerBuilder
   =>
     TCPSourceListenerBuilder(source_builder, router, router_registry,
       route_builder,
@@ -33,31 +33,31 @@ class val TCPSourceListenerBuilderBuilder
       layout_initializer, consume metrics_reporter, default_target,
       default_in_route_builder, target_router, _host, _service)
 
-class TCPSourceListenerBuilder
+class val TCPSourceListenerBuilder
   let _source_builder: SourceBuilder
-  let _router: Router val
+  let _router: Router
   let _router_registry: RouterRegistry
-  let _route_builder: RouteBuilder val
-  let _default_in_route_builder: (RouteBuilder val | None)
-  let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
+  let _route_builder: RouteBuilder
+  let _default_in_route_builder: (RouteBuilder | None)
+  let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
   let _auth: AmbientAuth
   let _default_target: (Step | None)
-  let _target_router: Router val
+  let _target_router: Router
   let _host: String
   let _service: String
   let _metrics_reporter: MetricsReporter
 
-  new val create(source_builder: SourceBuilder, router: Router val,
-    router_registry: RouterRegistry, route_builder: RouteBuilder val,
-    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
+  new val create(source_builder: SourceBuilder, router: Router,
+    router_registry: RouterRegistry, route_builder: RouteBuilder,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder val | None) = None,
-    target_router: Router val = EmptyRouter,
+    default_in_route_builder: (RouteBuilder | None) = None,
+    target_router: Router = EmptyRouter,
     host: String = "", service: String = "0")
   =>
     _source_builder = source_builder
@@ -88,11 +88,11 @@ actor TCPSourceListener is SourceListener
   """
 
   var _notify: TCPSourceListenerNotify
-  let _router: Router val
+  let _router: Router
   let _router_registry: RouterRegistry
-  let _route_builder: RouteBuilder val
-  let _default_in_route_builder: (RouteBuilder val | None)
-  var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
+  let _route_builder: RouteBuilder
+  let _default_in_route_builder: (RouteBuilder | None)
+  var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
   let _default_target: (Step | None)
   var _fd: U32
@@ -104,15 +104,15 @@ actor TCPSourceListener is SourceListener
   var _max_size: USize
   let _metrics_reporter: MetricsReporter
 
-  new create(source_builder: SourceBuilder, router: Router val,
-    router_registry: RouterRegistry, route_builder: RouteBuilder val,
-    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
+  new create(source_builder: SourceBuilder, router: Router,
+    router_registry: RouterRegistry, route_builder: RouteBuilder,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder val | None) = None,
-    target_router: Router val = EmptyRouter,
+    default_in_route_builder: (RouteBuilder | None) = None,
+    target_router: Router = EmptyRouter,
     host: String = "", service: String = "0", limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
   =>
@@ -139,17 +139,17 @@ actor TCPSourceListener is SourceListener
       + host + ":" + service + "\n").cstring())
     _notify_listening()
 
-  be update_router(router: PartitionRouter val) =>
+  be update_router(router: PartitionRouter) =>
     _notify.update_router(router)
 
   be remove_route_for(moving_step: Consumer) =>
     None
 
   be add_boundary_builders(
-    boundary_builders: Map[String, OutgoingBoundaryBuilder val] val)
+    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   =>
-    let new_builders: Map[String, OutgoingBoundaryBuilder val] trn =
-      recover Map[String, OutgoingBoundaryBuilder val] end
+    let new_builders: Map[String, OutgoingBoundaryBuilder] trn =
+      recover Map[String, OutgoingBoundaryBuilder] end
     // TODO: A persistent map on the field would be much more efficient here
     for (target_worker_name, builder) in _outgoing_boundary_builders.pairs() do
       new_builders(target_worker_name) = builder

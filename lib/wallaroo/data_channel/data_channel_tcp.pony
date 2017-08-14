@@ -170,7 +170,7 @@ class DataChannelConnectNotifier is DataChannelNotify
         @printf[I32]("Rcvd msg on data channel\n".cstring())
       end
       match ChannelMsgDecoder(consume data, _auth)
-      | let data_msg: DataMsg val =>
+      | let data_msg: DataMsg =>
         ifdef "trace" then
           @printf[I32]("Received DataMsg on Data Channel\n".cstring())
         end
@@ -181,12 +181,12 @@ class DataChannelConnectNotifier is DataChannelNotify
             data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
             data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
             my_latest_ts)
-      | let data_msg: ActorDataMsg val =>
+      | let data_msg: ActorDataMsg =>
         ifdef "trace" then
           @printf[I32]("Received ActorDataMsg on Data Channel\n".cstring())
         end
         _receiver.received_actor_data(data_msg.delivery_msg, data_msg.seq_id)
-      | let dc: DataConnectMsg val =>
+      | let dc: DataConnectMsg =>
         ifdef "trace" then
           @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
         end
@@ -196,31 +196,31 @@ class DataChannelConnectNotifier is DataChannelNotify
         conn._mute(this)
         _data_receivers.request_data_receiver(dc.sender_name,
           dc.sender_boundary_id, conn)
-      | let sm: StepMigrationMsg val =>
+      | let sm: StepMigrationMsg =>
         ifdef "trace" then
           @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
         end
         _layout_initializer.receive_immigrant_step(sm)
-      | let m: MigrationBatchCompleteMsg val =>
+      | let m: MigrationBatchCompleteMsg =>
         ifdef "trace" then
           @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
         end
         // Go through router_registry to make sure pending messages on
         // registry are processed first
         _router_registry.ack_migration_batch_complete(m.sender_name)
-      | let aw: AckWatermarkMsg val =>
+      | let aw: AckWatermarkMsg =>
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
         end
         Fail()
         // _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
-      | let r: ReplayMsg val =>
+      | let r: ReplayMsg =>
         ifdef "trace" then
           @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
         end
         try
           match r.data_msg(_auth)
-          | let data_msg: DataMsg val =>
+          | let data_msg: DataMsg =>
             _metrics_reporter.step_metric(data_msg.metric_name,
               "Before replay receive on data channel (network time)",
               data_msg.metrics_id, data_msg.latest_ts, ingest_ts)
@@ -228,7 +228,7 @@ class DataChannelConnectNotifier is DataChannelNotify
               data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
               data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
               my_latest_ts)
-          | let ad: ActorDataMsg val =>
+          | let ad: ActorDataMsg =>
             // TODO: When we introduce wactor message replay, add
             // functionality here
             None
@@ -238,16 +238,16 @@ class DataChannelConnectNotifier is DataChannelNotify
         else
           Fail()
         end
-      | let c: ReplayCompleteMsg val =>
+      | let c: ReplayCompleteMsg =>
         ifdef "trace" then
           @printf[I32]("Received ReplayCompleteMsg on Data Channel\n"
             .cstring())
         end
         _recovery_replayer.add_boundary_replay_complete(c.sender_name,
           c.boundary_id)
-      | let m: SpinUpLocalTopologyMsg val =>
+      | let m: SpinUpLocalTopologyMsg =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
-      | let m: UnknownChannelMsg val =>
+      | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
           .cstring())
       else
@@ -279,27 +279,27 @@ class DataChannelConnectNotifier is DataChannelNotify
 
 trait _DataReceiverWrapper
   fun data_connect(sender_step_id: U128, conn: DataChannel)
-  fun received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
+  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun received_actor_data(d: ActorDeliveryMsg val, seq_id: U64)
+  fun received_actor_data(d: ActorDeliveryMsg, seq_id: U64)
 
 class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: U128, conn: DataChannel) =>
     Fail()
 
-  fun received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
+  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
 
-  fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
 
-  fun received_actor_data(d: ActorDeliveryMsg val, seq_id: U64) =>
+  fun received_actor_data(d: ActorDeliveryMsg, seq_id: U64) =>
     Fail()
 
   fun upstream_replay_finished() =>
@@ -314,17 +314,17 @@ class _DataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: U128, conn: DataChannel) =>
     data_receiver.data_connect(sender_step_id, conn)
 
-  fun received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
+  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     data_receiver.received(d, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
-  fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
-  fun received_actor_data(d: ActorDeliveryMsg val, seq_id: U64) =>
+  fun received_actor_data(d: ActorDeliveryMsg, seq_id: U64) =>
     data_receiver.received_actor_data(d, seq_id)

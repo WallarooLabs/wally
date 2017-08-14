@@ -39,8 +39,8 @@ actor WActorInitializer is LayoutInitializer
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
     recover Map[String, OutgoingBoundary] end
   var _outgoing_boundary_builders:
-    Map[String, OutgoingBoundaryBuilder val] val =
-      recover Map[String, OutgoingBoundaryBuilder val] end
+    Map[String, OutgoingBoundaryBuilder] val =
+      recover Map[String, OutgoingBoundaryBuilder] end
   let _is_initializer: Bool
   let _connections: Connections
   let _router_registry: RouterRegistry
@@ -217,7 +217,7 @@ actor WActorInitializer is LayoutInitializer
     end
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val,
-    bbs: Map[String, OutgoingBoundaryBuilder val] val)
+    bbs: Map[String, OutgoingBoundaryBuilder] val)
   =>
     // This should only be called during initialization
     if (_outgoing_boundaries.size() > 0) or
@@ -380,7 +380,7 @@ actor WActorInitializer is LayoutInitializer
       _system = las.add_actor(b, _worker_name)
     end
 
-  be receive_immigrant_step(msg: StepMigrationMsg val) =>
+  be receive_immigrant_step(msg: StepMigrationMsg) =>
     None
 
 class val ActorSystemSourceBuilder is SourceBuilder
@@ -400,11 +400,11 @@ class val ActorSystemSourceBuilder is SourceBuilder
   fun name(): String =>
     _app_name + " source"
 
-  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router val):
+  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router):
     TCPSourceNotify iso^
   =>
     WActorSourceNotify(auth, _handler, _actor_router,
       _central_actor_registry, event_log)
 
-  fun val update_router(router: Router val): SourceBuilder =>
+  fun val update_router(router: Router): SourceBuilder =>
     this
