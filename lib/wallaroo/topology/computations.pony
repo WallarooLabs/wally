@@ -1,6 +1,5 @@
 use "buffered"
 use "collections"
-use per = "collections/persistent"
 use "time"
 use "wallaroo"
 use "wallaroo/core"
@@ -100,14 +99,23 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
           for (frac_id, output) in outputs.pairs() do
             let o_frac_ids = match frac_ids
             | None =>
-              per.Lists[USize].empty().prepend(frac_id)
-            | let x: per.List[USize] =>
-              x.prepend(frac_id)
+              recover val
+                Array[U32].init(frac_id.u32(), 1)
+              end
+            | let x: Array[U32 val] val =>
+              recover val
+                let z = Array[U32](x.size() + 1)
+                for xi in x.values() do
+                  z.push(xi)
+                end
+                z.push(frac_id.u32())
+                z
+              end
             else
               // TODO: this can go away when we upgrade to
               // exhaustive match pony
-              None
               Fail()
+              None
             end
 
             (let f, let s, let ts) =

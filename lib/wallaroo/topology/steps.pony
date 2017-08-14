@@ -1,7 +1,6 @@
 use "assert"
 use "buffered"
 use "collections"
-use p = "collections/persistent"
 use "net"
 use "time"
 use "sendence/guid"
@@ -283,12 +282,25 @@ actor Step is (Producer & Consumer)
         match (e._3, frac_ids)
         | (None, None) =>
           return true
-        | (let x: p.List[USize], let y: p.List[USize]) =>
-          try
-            return p.Lists[USize].eq[USize](x, y)
-          else
-            Fail()
+        | (let x: Array[U32] val, let y: Array[U32] val) =>
+          if x.size() != y.size() then
+            return false
           end
+
+          var i = USize(0)
+          while (i < x.size()) do
+            try
+              if x(i) != y(i) then
+                return false
+              end
+            else
+              // unreachable
+              Fail()
+            end
+            i = i + 1
+          end
+
+          return true
         else
           Fail()
         end
