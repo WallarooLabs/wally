@@ -1,11 +1,14 @@
+# include root makefile
+ifndef ROOT_MAKEFILE_MK
+include ../../../../Makefile
+endif
+
 # prevent rules from being evaluated/included multiple times
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
-rules_mk_path := ../../../../rules.mk
-
 # uncomment to disable generate test related targets in this directory
-#TEST_TARGET := false
+TEST_TARGET := false
 
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
 PONY_TARGET := false
@@ -19,19 +22,18 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-MARKET_SPREAD_PY_PATH = $(buffy_path)/book/examples/python/market_spread
+MARKET_SPREAD_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-build-book-examples-python-market_spread-all += build-machida-all
-test-book-examples-python-market_spread-all += build-book-examples-python-market_spread-all
-test-book-examples-python-market_spread-all += market_spread_py_test
-clean-book-examples-python-market_spread-all += market_spread_py_clean
+# standard rules generation makefile
+include $(rules_mk_path)
 
-market_spread_py_clean:
-	$(QUIET)rm -f $(MARKET_SPREAD_PY_PATH)/received.txt $(MARKET_SPREAD_PY_PATH)/_expected.txt $(MARKET_SPREAD_PY_PATH)/_orders.txt $(MARKET_SPREAD_PY_PATH)/_market.txt
+build-book-examples-python-market_spread: build-machida
+test-book-examples-python-market_spread: build-book-examples-python-market_spread
+
+test-book-examples-python-market_spread: market_spread_py_test
 
 market_spread_py_test:
 	cd $(MARKET_SPREAD_PY_PATH) && \
-	export PYTHONPATH="$(PYTHONPATH)" && \
 	python _test/gen.py && \
 	integration_test --framed-file-sender _market.txt 1 \
 		--framed-file-sender _orders.txt 0 \
@@ -43,15 +45,10 @@ market_spread_py_test:
 		--sources 2 \
 		--sink-expect 1000
 
-#########################################################################################
-#### don't change after this line unless to disable standard rules generation makefile
-MY_NAME := $(lastword $(MAKEFILE_LIST))
-$(MY_NAME)_PATH := $(dir $(MY_NAME))
+clean-book-examples-python-market_spread: market_spread_py_clean
 
-include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
-#### don't change before this line unless to disable standard rules generation makefile
-#########################################################################################
-
+market_spread_py_clean:
+	$(QUIET)rm -f $(MARKET_SPREAD_PY_PATH)/received.txt $(MARKET_SPREAD_PY_PATH)/_expected.txt $(MARKET_SPREAD_PY_PATH)/_orders.txt $(MARKET_SPREAD_PY_PATH)/_market.txt
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)

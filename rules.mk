@@ -21,7 +21,7 @@ RULES_MK := 1
 RULES_MK_PATH := $(dir $(lastword $(MAKEFILE_LIST)))
 
 # path of original makefile
-ROOT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),x $(MAKEFILE_LIST))
+ROOT_MAKEFILE := $(word 1, $(MAKEFILE_LIST))
 ROOT_PATH := $(dir $(ROOT_MAKEFILE))
 
 # if debug shell command output requested
@@ -45,8 +45,8 @@ integration_bin_path := $(integration_path)/integration
 wallaroo_lib :=  $(buffy_path)/lib
 wallaroo_python_path := $(buffy_path)/machida
 machida_bin_path := $(buffy_path)/machida/build
-PYTHONPATH := .:$(integration_path):$(wallaroo_python_path)
-PATH := $(PATH):$(integration_bin_path):$(machida_bin_path)
+export PYTHONPATH := .:$(integration_path):$(wallaroo_python_path)
+export PATH := $(PATH):$(integration_bin_path):$(machida_bin_path)
 
 # initialize default for some normal targets and variables
 build-buffyroot-all :=
@@ -61,6 +61,10 @@ endif
 
 ifndef PONY_TARGET
   PONY_TARGET :=
+endif
+
+ifndef PONYC_TARGET
+  PONYC_TARGET :=
 endif
 
 ifndef DOCKER_TARGET
@@ -239,12 +243,13 @@ define PONYC
     $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
     $(debug_arg) $(PONYCFLAGS) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
-  $(QUIET)cd $(1) && echo "$@:" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
+  $(QUIET)cd $(1) && echo "$@: $(abspath $(1))/bundle.json" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
     $(debug_arg) $(PONYCFLAGS) . --pass import --files $(if $(filter \
     $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_buffy_dir).*.pony" \
     | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \
     >> $(notdir $(abspath $(1:%/=%))).d
+  $(QUIET)cd $(1) && echo "$(abspath $(1))/bundle.json:" >> $(notdir $(abspath $(1:%/=%))).d
 endef
 
 # function call for compiling monhub projects
@@ -451,7 +456,7 @@ endef
 # rule to generate targets for build-docker-* for devs to use
 define build-docker-goal
 build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): docker-arch-check $(if $(wildcard $($(PREV_MAKEFILE)_PATH)/package.json),release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))),)
+build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): docker-arch-check $(if $(wildcard $(PREV_PATH)/package.json),release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))),)
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))).$(arch):$(docker_image_version) \
           $(abspath $1)
@@ -475,9 +480,12 @@ $(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_buffy_dir),$(abspath $1)),buffyro
 $(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
 $(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
 $(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
-$(eval build-$(MY_TARGET_SUFFIX): $(build-$(MY_TARGET_SUFFIX)))
-$(eval test-$(MY_TARGET_SUFFIX): $(test-$(MY_TARGET_SUFFIX)))
-$(eval clean-$(MY_TARGET_SUFFIX): $(clean-$(MY_TARGET_SUFFIX)))
+$(eval build-$(MY_TARGET_SUFFIX:%-all=%):)
+$(eval test-$(MY_TARGET_SUFFIX:%-all=%):)
+$(eval clean-$(MY_TARGET_SUFFIX:%-all=%):)
+$(eval build-$(MY_TARGET_SUFFIX): build-$(MY_TARGET_SUFFIX:%-all=%) $(build-$(MY_TARGET_SUFFIX)))
+$(eval test-$(MY_TARGET_SUFFIX): test-$(MY_TARGET_SUFFIX:%-all=%) $(test-$(MY_TARGET_SUFFIX)))
+$(eval clean-$(MY_TARGET_SUFFIX): clean-$(MY_TARGET_SUFFIX:%-all=%) $(clean-$(MY_TARGET_SUFFIX)))
 
 $(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
 $(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
@@ -492,7 +500,6 @@ ROOT_TARGET_SUFFIX := $(if $(filter $(abs_buffy_dir),$(abspath $(ROOT_PATH))),bu
 
 # phony targets
 .PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony dagon-spike-test dagon-test list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help build-docker-pony push-docker-pony build-docker-monhub push-docker-monhub dagon-docker-test dagon-docker-spike-test
-
 
 # default targets
 .DEFAULT_GOAL := build
@@ -653,32 +660,34 @@ endif # RULES_MK
 
 # if there's a pony source file, create the appropriate rules for it unless disabled
 ifneq ($(PONY_TARGET),false)
-  ifneq ($(wildcard $($(PREV_MAKEFILE)_PATH)/*.pony),)
-    $(eval $(call ponyc-goal,$($(PREV_MAKEFILE)_PATH)))
-    $(eval $(call pony-build-goal,$($(PREV_MAKEFILE)_PATH)))
-    $(eval $(call pony-test-goal,$($(PREV_MAKEFILE)_PATH)))
-    $(eval $(call pony-clean-goal,$($(PREV_MAKEFILE)_PATH)))
+  ifneq ($(wildcard $(PREV_PATH)/*.pony),)
+    ifneq ($(PONYC_TARGET),false)
+      $(eval $(call ponyc-goal,$(PREV_PATH)))
+    endif
+    $(eval $(call pony-build-goal,$(PREV_PATH)))
+    $(eval $(call pony-test-goal,$(PREV_PATH)))
+    $(eval $(call pony-clean-goal,$(PREV_PATH)))
   endif
 endif
 
 # if there's a exs source file, create the appropriate rules for it unless disabled
 ifneq ($(EXS_TARGET),false)
-  ifneq ($(wildcard $($(PREV_MAKEFILE)_PATH)/*.exs),)
-    $(eval $(call monhub-goal,$($(PREV_MAKEFILE)_PATH)))
-    $(eval $(call monhub-build-goal,$($(PREV_MAKEFILE)_PATH)))
-    $(eval $(call monhub-test-goal,$($(PREV_MAKEFILE)_PATH)))
-    $(eval $(call monhub-clean-goal,$($(PREV_MAKEFILE)_PATH)))
-    ifneq ($(wildcard $($(PREV_MAKEFILE)_PATH)/package.json),)
-      $(eval $(call monhub-release-goal,$($(PREV_MAKEFILE)_PATH)))
+  ifneq ($(wildcard $(PREV_PATH)/*.exs),)
+    $(eval $(call monhub-goal,$(PREV_PATH)))
+    $(eval $(call monhub-build-goal,$(PREV_PATH)))
+    $(eval $(call monhub-test-goal,$(PREV_PATH)))
+    $(eval $(call monhub-clean-goal,$(PREV_PATH)))
+    ifneq ($(wildcard $(PREV_PATH)/package.json),)
+      $(eval $(call monhub-release-goal,$(PREV_PATH)))
     endif
   endif
 endif
 
 # if there's a Dockerfile, create the appropriate rules for it unless disabled
 ifneq ($(DOCKER_TARGET),false)
-  ifneq ($(wildcard $($(PREV_MAKEFILE)_PATH)/Dockerfile),)
-    $(eval $(call build-docker-goal,$($(PREV_MAKEFILE)_PATH)))
-    $(eval $(call push-docker-goal,$($(PREV_MAKEFILE)_PATH)))
+  ifneq ($(wildcard $(PREV_PATH)/Dockerfile),)
+    $(eval $(call build-docker-goal,$(PREV_PATH)))
+    $(eval $(call push-docker-goal,$(PREV_PATH)))
   endif
 endif
 
@@ -688,6 +697,7 @@ $(eval $(call subdir-goal,$(PREV_PATH)))
 # reset variables before including sub-makefiles
 TEST_TARGET :=
 PONY_TARGET :=
+PONYC_TARGET :=
 DOCKER_TARGET :=
 EXS_TARGET :=
 RECURSE_SUBMAKEFILES :=

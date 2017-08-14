@@ -1,8 +1,11 @@
+# include root makefile
+ifndef ROOT_MAKEFILE_MK
+include ../../../../Makefile
+endif
+
 # prevent rules from being evaluated/included multiple times
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
-
-rules_mk_path := ../../../../rules.mk
 
 # uncomment to disable generate test related targets in this directory
 TEST_TARGET := false
@@ -20,10 +23,12 @@ DOCKER_TARGET := false
 #RECURSE_SUBMAKEFILES := false
 
 
-CELSIUS_PONY_PATH = $(buffy_path)/book/examples/pony/celsius
+CELSIUS_PONY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-test-book-examples-pony-celsius-all += build-book-examples-pony-celsius-all
-test-book-examples-pony-celsius-all += celsius_pony_test
+# standard rules generation makefile
+include $(rules_mk_path)
+
+test-book-examples-pony-celsius: celsius_pony_test
 
 celsius_pony_test:
 	cd $(CELSIUS_PONY_PATH) && \
@@ -33,16 +38,6 @@ celsius_pony_test:
 		--log-level error \
 		--command './celsius' \
 		--sink-expect 100
-
-#########################################################################################
-#### don't change after this line unless to disable standard rules generation makefile
-MY_NAME := $(lastword $(MAKEFILE_LIST))
-$(MY_NAME)_PATH := $(dir $(MY_NAME))
-
-include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
-#### don't change before this line unless to disable standard rules generation makefile
-#########################################################################################
-
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)

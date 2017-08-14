@@ -1,11 +1,17 @@
+# include root makefile
+ifndef ROOT_MAKEFILE_MK
+include ../../../../Makefile
+endif
+
 # prevent rules from being evaluated/included multiple times
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
-rules_mk_path := ../../../../rules.mk
-
 # uncomment to disable generate test related targets in this directory
-#TEST_TARGET := false
+TEST_TARGET := false
+
+# uncomment to disable generate of PONYC command
+PONYC_TARGET := false
 
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
 #PONY_TARGET := false
@@ -19,31 +25,33 @@ rules_mk_path := ../../../../rules.mk
 # uncomment to disable generate recursing into Makefiles of subdirectories
 #RECURSE_SUBMAKEFILES := false
 
-build-testing-correctness-apps-sequence_window-all += build-testing-correctness-apps-sequence_window-validator-all
-test-testing-correctness-apps-sequence_window-all += build-testing-correctness-apps-sequence_window-all
-test-testing-correctness-apps-sequence_window-all += sequence_window_test
-clean-testing-correctness-apps-sequence_window-all = sequence_window_clean
+SEQUENCE_WINDOW_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
+# standard rules generation makefile
+include $(rules_mk_path)
 
 
-SEQUENCE_WINDOW_PATH := $(dir $(lastword $(MAKEFILE_LIST)))
-SEQUENCE_WINDOW_ABS_PATH = $(buffy_path)/testing/correctness/apps/sequence_window
+build-testing-correctness-apps-sequence_window: build-testing-correctness-apps-sequence_window-validator
 
-sequence_window_clean:
-	$(QUIET)rm -fr $(SEQUENCE_WINDOW_PATH)/bin*
-	$(QUIET)rm -fr $(SEQUENCE_WINDOW_PATH)/sequence_window*
+# This will build three different binaries of sequence_window, but respect PONYCFLAGS passed
+# to Make
+$(subst $(abs_buffy_dir)/,,$(SEQUENCE_WINDOW_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))):
+	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
+	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace)
+	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_PATH:%/=%)))
+	mv $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window_resilience
+	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D spike -D spiketrace)
+	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_PATH:%/=%)))
+	mv $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window_spike
+	$(eval PONYCFLAGS := $(original_PONYCFLAGS))
+	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_PATH:%/=%)))
 
-#sequence_window_build:
-#	cd $(SEQUENCE_WINDOW_PATH) && \
-#	stable env ponyc -d -o bin && \
-#	stable env ponyc -d -D resilience -D spike -D spiketrace -o bin_resilience && \
-#	stable env ponyc -d -D spike -D spiketrace -o bin_spike && \
-#	mv -f bin/sequence_window sequence_window && \
-#	mv -f bin_spike/sequence_window sequence_window_spike && \
-#	mv -f bin_resilience/sequence_window sequence_window_resilience && \
-#	rmdir bin*
+test-testing-correctness-apps-sequence_window: build-testing-correctness-apps-sequence_window
+
+test-testing-correctness-apps-sequence_window: sequence_window_test
 
 sequence_window_test:
-	cd $(SEQUENCE_WINDOW_ABS_PATH) && \
+	cd $(SEQUENCE_WINDOW_PATH) && \
 	integration_test --sequence-sender '(0,1000]' \
 	  --log-level error \
 		--command './sequence_window' \
@@ -54,27 +62,11 @@ sequence_window_test:
 		--batch-size 10 \
 		--sink-expect 1000
 
-#########################################################################################
-#### don't change after this line unless to disable standard rules generation makefile
-MY_NAME := $(lastword $(MAKEFILE_LIST))
-$(MY_NAME)_PATH := $(dir $(MY_NAME))
+clean-testing-correctness-apps-sequence_window: sequence_window_clean
 
-include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
-#### don't change before this line unless to disable standard rules generation makefile
-#########################################################################################
-
-# This will build three different binaries of sequence_window, but respect PONYCFLAGS passed
-# to Make
-$(SEQUENCE_WINDOW_PATH:%/=%)/$(notdir $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))):
-	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace)
-	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_PATH:%/=%)))
-	mv $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window_resilience
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D spike -D spiketrace)
-	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_PATH:%/=%)))
-	mv $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window_spike
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS))
-	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_PATH:%/=%)))
+sequence_window_clean:
+	$(QUIET)rm -fr $(SEQUENCE_WINDOW_PATH)/bin*
+	$(QUIET)rm -fr $(SEQUENCE_WINDOW_PATH)/sequence_window*
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)

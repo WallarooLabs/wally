@@ -1,8 +1,11 @@
+# include root makefile
+ifndef ROOT_MAKEFILE_MK
+include ../../../../../Makefile
+endif
+
 # prevent rules from being evaluated/included multiple times
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
-
-rules_mk_path := ../../../../../rules.mk
 
 # uncomment to disable generate test related targets in this directory
 TEST_TARGET := false
@@ -19,15 +22,14 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 # RECURSE_SUBMAKEFILES := false
 
-INTEGRATION_PATH = $(buffy_path)/testing/tools
-INTEGRATION_BIN_PATH = $(INTEGRATION_PATH)/integration
-SINGLE_STREAM_STATELESS_STATEFUL_STATELESS_APP_PATH = $(buffy_path)/testing/topology_layouts/apps/single_stream/stateless_stateful_stateless_app
+SINGLE_STREAM_STATELESS_STATEFUL_STATELESS_APP_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-test-testing-topology_layouts-apps-single_stream-stateless_stateful_stateless_app-all = build-testing-topology_layouts-apps-single_stream-stateless_stateful_stateless_app-all single_stream_stateless_stateful_stateless_app_test
+# standard rules generation makefile
+include $(rules_mk_path)
+
+test-testing-topology_layouts-apps-single_stream-stateless_stateful_stateless_app: single_stream_stateless_stateful_stateless_app_test
 
 single_stream_stateless_stateful_stateless_app_test:
-	export PYTHONPATH=".:$(INTEGRATION_PATH)" && \
-	export PATH="$(PATH):$(INTEGRATION_BIN_PATH)" && \
 	cd $(SINGLE_STREAM_STATELESS_STATEFUL_STATELESS_APP_PATH) && \
 	integration_test --framed-file-sender ../../data_gen/_test.msg \
 	--validation-cmp \
@@ -42,8 +44,6 @@ single_stream_stateless_stateful_stateless_app_test:
 # See Issue: 947
 
 two_worker_single_stream_stateless_stateful_stateless_app_test:
-	export PYTHONPATH=".:$(INTEGRATION_PATH)" && \
-	export PATH="$(PATH):$(INTEGRATION_BIN_PATH)" && \
 	cd $(SINGLE_STREAM_STATELESS_STATEFUL_STATELESS_APP_PATH) && \
 	integration_test --framed-file-sender ../../data_gen/_test.msg \
 	--validation-cmp \
@@ -54,8 +54,6 @@ two_worker_single_stream_stateless_stateful_stateless_app_test:
 	--sink-expect 100
 
 three_worker_single_stream_stateless_stateful_stateless_app_test:
-	export PYTHONPATH=".:$(INTEGRATION_PATH)" && \
-	export PATH="$(PATH):$(INTEGRATION_BIN_PATH)" && \
 	cd $(SINGLE_STREAM_STATELESS_STATEFUL_STATELESS_APP_PATH) && \
 	integration_test --framed-file-sender ../../data_gen/_test.msg \
 	--validation-cmp \
@@ -64,16 +62,6 @@ three_worker_single_stream_stateless_stateful_stateless_app_test:
 	--log-level error \
 	--command './stateless_stateful_stateless_app' \
 	--sink-expect 100
-
-#########################################################################################
-#### don't change after this line unless to disable standard rules generation makefile
-MY_NAME := $(lastword $(MAKEFILE_LIST))
-$(MY_NAME)_PATH := $(dir $(MY_NAME))
-
-include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
-#### don't change before this line unless to disable standard rules generation makefile
-#########################################################################################
-
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)

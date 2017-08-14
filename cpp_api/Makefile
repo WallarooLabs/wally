@@ -1,8 +1,11 @@
+# include root makefile
+ifndef ROOT_MAKEFILE_MK
+include ../Makefile
+endif
+
 # prevent rules from being evaluated/included multiple times
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
-
-rules_mk_path := ../rules.mk
 
 # uncomment to disable generate test related targets in this directory
 TEST_TARGET := false
@@ -19,13 +22,16 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 #RECURSE_SUBMAKEFILES := false
 
+# standard rules generation makefile
+include $(rules_mk_path)
+
 #
 CPPAPI_PATH = $(buffy_path)/cpp_api/cpp/cppapi
 CPPAPI_BUILD_PATH = $(CPPAPI_PATH)/build
 
-build-cpp_api-all = cpp_api_clean cpp_api_build
-test-cpp_api-all = cpp_api_clean cpp_api_build cpp_api_test
-clean-cpp_api-all = cpp_api_clean
+build-cpp_api: cpp_api_clean cpp_api_build
+test-cpp_api: build-cpp_api
+clean-cpp_api = cpp_api_clean
 
 cpp_api_build:
 	mkdir -p $(CPPAPI_BUILD_PATH)
@@ -38,16 +44,6 @@ cpp_api_clean:
 
 cpp_api_test:
 	$(QUIET)echo "cpp_api tests"
-
-#########################################################################################
-#### don't change after this line unless to disable standard rules generation makefile
-MY_NAME := $(lastword $(MAKEFILE_LIST))
-$(MY_NAME)_PATH := $(dir $(MY_NAME))
-
-include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
-#### don't change before this line unless to disable standard rules generation makefile
-#########################################################################################
-
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)
