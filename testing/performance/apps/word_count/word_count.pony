@@ -27,9 +27,7 @@ actor Main
         Application("Word Count App")
           .new_pipeline[String, RunningTotal]("Word Count",
             TCPSourceConfig[String].from_options(StringFrameHandler,
-              TCPSourceConfigCLIParser(env.args)(0))
-            where coalescing = false)
-            // .to[String](SplitBuilder)
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to_parallel[String](SplitBuilder)
             .to_state_partition[String, String, RunningTotal, WordTotals](
               AddCount, WordTotalsBuilder, "word-totals",
@@ -174,6 +172,8 @@ primitive WordPartitionFunction
 
 primitive RunningTotalEncoder
   fun apply(t: RunningTotal, wb: Writer = Writer): Array[ByteSeq] val =>
+    ////////////////////////////////////////
+    // Option A: Write out output as String
     let result =
       recover val
         String().append(t.word).append(", ").append(t.count.string())
@@ -181,7 +181,11 @@ primitive RunningTotalEncoder
       end
     @printf[I32]("!!%s".cstring(), result.cstring())
     wb.write(result)
+
+    ///////////////////////////////////////////////
+    // Option B: Write out output as encoded bytes
     // wb.u32_be(t.word.size().u32())
     // wb.write(t.word)
     // wb.u64_be(t.count)
+
     wb.done()
