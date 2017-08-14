@@ -98,7 +98,7 @@ class FileBackend is Backend
             // save last watermark read from file
             watermarks(origin_id) = seq_id
           else
-            r.append(_file.read(32))
+            r.append(_file.read(24))
             let uid = r.u128_be()
             let fractional_size = r.u64_be()
             let frac_ids = recover val
