@@ -279,7 +279,6 @@ actor Step is (Producer & Consumer)
   fun _is_duplicate(msg_uid: U128, frac_ids: FractionalMessageId): Bool =>
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
-      // todo frac_ids
       if e._2 == msg_uid then
         match (e._3, frac_ids)
         | (None, None) =>
