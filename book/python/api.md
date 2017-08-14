@@ -138,7 +138,11 @@ Return the name of the computaiton as a string.
 
 Use `data` to perform a computation and return a new output. `data` is the python object the previous step in the pipeline returned.
 
-#### Example Computation
+##### `compute_multi(data)`
+
+Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects. Each item in the list will arrive individually at the next step; i.e. not as a list.
+
+#### Example Computations
 
 A Computation that doubles an integer, or returns 0 if its input was not an int:
 
@@ -152,6 +156,20 @@ class Computation(object):
             return data*2
         else
             return 0
+```
+
+A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, we filter aka drop the message by returning `None`.
+
+```python
+class Computation(object):
+    def name(self):
+        return "double"
+
+    def compute_multi(data):
+        if isinstance(data, int):
+            return [data, data*2]
+        else
+            return None
 ```
 
 ### Data
@@ -318,12 +336,16 @@ Return the name of the computation as a string.
 
 `data` is anything that was returned by the previous step in the pipeline, and `state` is provided by the [StateBuilder](#statebuilder) that was defined for this step in the pipeline definition.
 
-Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. The second element, is a boolean value instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
+Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. Returning `None` will stop processing and no messages will be sent to the next step. The second element is a boolean value instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
 
 Why wouldn't we always return `True`? There are two answers:
 
 1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
+
+##### `compute_multi(data, state)`
+
+Same as `compute` but the first element of the return tuple is a list of messages to send on to our next step. Allows taking a single input message and creating multiple outputs. Each item in the list will arrive individually at the next step; i.e. not as a list.
 
 #### Example StateComputation
 
