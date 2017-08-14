@@ -179,8 +179,8 @@ actor WActorWithState is WActorWrapper
       _central_actor_registry.send_to_role(role, sender, data)
     end
 
-  be replay_log_entry(uid: U128, statechange_id: U64,
-    payload: ByteSeq)
+  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq)
   =>
     try
       _w_actor = Unpickle[WActor](payload, _auth)
@@ -196,7 +196,7 @@ actor WActorWithState is WActorWrapper
       let pickled = Pickle[WActor](_w_actor, _auth)
       let payload: Array[ByteSeq] iso =
         recover [pickled] end
-      _event_log.queue_log_entry(_id, _guid_gen.u128(),
+      _event_log.queue_log_entry(_id, _guid_gen.u128(), None,
         U64.max_value(), _seq_id, consume payload)
       _event_log.flush_buffer(_id, _seq_id)
     else
@@ -239,7 +239,7 @@ actor WActorWithState is WActorWrapper
       // using the pipeline metadata?  Or do we create the same metadata
       // for actor system messages.
       _sinks(sink_id).run[Out]("", 0, output, _dummy_actor_producer,
-        0, 0, 0, 0, 0, 0)
+        0, None, 0, 0, 0, 0, 0)
     else
       @printf[I32]("Attempting to send to nonexistent sink id!\n".cstring())
       Fail()

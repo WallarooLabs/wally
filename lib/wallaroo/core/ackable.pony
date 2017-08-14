@@ -10,7 +10,9 @@ trait tag Ackable
   // TO DO: temporary one to many change to make this public
   fun ref flush(low_watermark: SeqId)
 
-  be replay_log_entry(uid: U128, statechange_id: U64, payload: ByteSeq) =>
+  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq)
+  =>
     None
 
   be log_flushed(low_watermark: SeqId) =>

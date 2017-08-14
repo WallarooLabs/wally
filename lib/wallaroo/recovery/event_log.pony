@@ -2,6 +2,7 @@ use "buffered"
 use "collections"
 use "files"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
@@ -11,11 +12,13 @@ use "wallaroo/w_actor"
 use "debug"
 
 interface tag Resilient
-  be replay_log_entry(uid: U128, statechange_id: U64, payload: ByteSeq)
+  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq)
   be log_flushed(low_watermark: SeqId)
 
 //TODO: explain in comment
-type LogEntry is (Bool, U128, U128, U64, U64, Array[ByteSeq] iso)
+type LogEntry is (Bool, U128, U128, FractionalMessageId, U64, U64,
+  Array[ByteSeq] iso)
 
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
@@ -95,8 +98,25 @@ class FileBackend is Backend
             // save last watermark read from file
             watermarks(origin_id) = seq_id
           else
-            r.append(_file.read(32))
+            r.append(_file.read(24))
             let uid = r.u128_be()
+            let fractional_size = r.u64_be()
+            let frac_ids = recover val
+              if fractional_size > 0 then
+                let bytes_to_read = fractional_size.usize() * 4
+                r.append(_file.read(bytes_to_read))
+                let l = Array[U32]
+                for i in Range(0,fractional_size.usize()) do
+                  l.push(r.u32_be())
+                end
+                l
+              else
+                //None is faster if we have no frac_ids, which will probably be
+                //true most of the time
+                None
+              end
+            end
+            r.append(_file.read(16))
             let statechange_id = r.u64_be()
             let payload_length = r.u64_be()
             let payload = recover val
@@ -126,7 +146,8 @@ class FileBackend is Backend
           // only replay if at or below watermark
           if entry._5 <= watermarks.get_or_else(entry._1, 0) then
             num_replayed = num_replayed + 1
-            _event_log.replay_log_entry(entry._1, entry._2, entry._4, entry._6)
+            _event_log.replay_log_entry(entry._1, entry._2, entry._3,
+              entry._4, entry._6)
           else
             num_skipped = num_skipped + 1
           end
@@ -156,7 +177,8 @@ class FileBackend is Backend
 
   fun ref encode_entry(entry: LogEntry)
   =>
-    (let is_watermark: Bool, let origin_id: U128, let uid: U128,
+    (let is_watermark: Bool, let origin_id: U128,
+     let uid: U128, let frac_ids: FractionalMessageId,
      let statechange_id: U64, let seq_id: U64,
      let payload: Array[ByteSeq] val) = consume entry
 
@@ -174,6 +196,20 @@ class FileBackend is Backend
 
     if not is_watermark then
       _writer.u128_be(uid)
+
+      match frac_ids
+      | None =>
+        _writer.u64_be(0)
+      | let x: Array[U32] val =>
+        let fractional_size = x.size().u64()
+        _writer.u64_be(fractional_size)
+
+        for frac_id in x.values() do
+          _writer.u32_be(frac_id)
+        end
+      else
+        Fail()
+      end
 
       _writer.u64_be(statechange_id)
       var payload_size: USize = 0
@@ -253,11 +289,13 @@ actor EventLog
       Fail()
     end
 
-  be replay_log_entry(origin_id: U128, uid: U128, statechange_id: U64,
-    payload: ByteSeq val)
+  be replay_log_entry(origin_id: U128,
+    uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq val)
   =>
     try
-      _origins(origin_id).replay_log_entry(uid, statechange_id, payload)
+      _origins(origin_id).replay_log_entry(uid, frac_ids,
+        statechange_id, payload)
     else
       @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
       Fail()
@@ -266,7 +304,7 @@ actor EventLog
   be register_origin(origin: Resilient, id: U128) =>
     _origins(id) = origin
 
-  be queue_log_entry(origin_id: U128, uid: U128,
+  be queue_log_entry(origin_id: U128, uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] iso)
   =>
@@ -274,7 +312,7 @@ actor EventLog
       // add to backend buffer after encoding
       // encode right away to amortize encoding cost per entry when received
       // as opposed to when writing a batch to disk
-      _backend.encode_entry((false, origin_id, uid, statechange_id,
+      _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id,
         seq_id, consume payload))
 
       num_encoded = num_encoded + 1
@@ -305,8 +343,8 @@ actor EventLog
 
     try
       // Add low watermark ack to buffer
-      _backend.encode_entry((true, origin_id, 0, 0, low_watermark
-                       , recover Array[ByteSeq] end))
+      _backend.encode_entry((true, origin_id, 0, None, 0, low_watermark,
+        recover Array[ByteSeq] end))
 
       num_encoded = num_encoded + 1
       _flush_waiting = _flush_waiting + 1
