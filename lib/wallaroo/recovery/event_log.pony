@@ -115,6 +115,7 @@ class FileBackend is Backend
                 None
               end
             end
+            r.append(_file.read(16))
             let statechange_id = r.u64_be()
             let payload_length = r.u64_be()
             let payload = recover val
