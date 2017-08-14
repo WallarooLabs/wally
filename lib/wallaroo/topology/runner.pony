@@ -1,6 +1,5 @@
 use "buffered"
 use "collections"
-use per = "collections/persistent"
 use "net"
 use "time"
 use "serialise"
@@ -500,14 +499,23 @@ class ComputationRunner[In: Any val, Out: Any val]
           for (frac_id, output) in outputs.pairs() do
             let o_frac_ids = match frac_ids
             | None =>
-              per.Lists[USize].empty().prepend(frac_id)
-            | let x: per.List[USize] =>
-              x.prepend(frac_id)
+              recover val
+                Array[U32].init(frac_id.u32(), 1)
+              end
+            | let x: Array[U32 val] val =>
+              recover val
+                let z = Array[U32](x.size() + 1)
+                for xi in x.values() do
+                  z.push(xi)
+                end
+                z.push(frac_id.u32())
+                z
+              end
             else
               // TODO: this can go away when we upgrade to
               // exhaustive match pony
-              None
               Fail()
+              None
             end
 
             (let f, let s, let ts) = _next.run[Out](metric_name,
@@ -711,7 +719,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
           match _id
           | let buffer_id: U128 =>
 
-            _event_log.queue_log_entry(buffer_id, i_msg_uid,
+            _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
               sc.id(), producer.current_sequence_id(), consume payload)
           else
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
@@ -725,7 +733,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
           | let buffer_id: U128 =>
             _state.write_log_entry(_wb, _auth)
             let payload = _wb.done()
-            _event_log.queue_log_entry(buffer_id, i_msg_uid,
+            _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
               U64.max_value(), producer.current_sequence_id(), consume payload)
           end
         end

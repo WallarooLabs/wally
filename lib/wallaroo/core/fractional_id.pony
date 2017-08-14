@@ -1,3 +1,3 @@
-use "collections/persistent"
+use "collections"
 
-type FractionalMessageId is (List[USize] | None)
+type FractionalMessageId is (Array[U32] val | None)
