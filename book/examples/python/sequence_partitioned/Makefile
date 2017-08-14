@@ -1,8 +1,11 @@
+# include root makefile
+ifndef ROOT_MAKEFILE_MK
+include ../../../../Makefile
+endif
+
 # prevent rules from being evaluated/included multiple times
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
-
-rules_mk_path := ../../../../rules.mk
 
 # uncomment to disable generate test related targets in this directory
 #TEST_TARGET := false
@@ -19,20 +22,21 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-SEQUENCE_PART_PATH = $(buffy_path)/book/examples/python/sequence_partitioned
+SEQUENCE_PART_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-build-book-examples-python-sequence_partitioned-all += build-machida-all
-build-book-examples-python-sequence_partitioned-all += build-testing-correctness-apps-sequence_window-validator-all
-test-book-examples-python-sequence_partitioned-all += build-book-examples-python-sequence_partitioned-all
-test-book-examples-python-sequence_partitioned-all += sequence_partitioned_py_test
-clean-book-examples-python-sequence_partitioned-all += sequence_partitioned_py_clean
 
-sequence_partitioned_py_clean:
-	$(QUIET)rm -f $(SEQUENCE_PART_PATH)/received.txt
+# standard rules generation makefile
+include $(rules_mk_path)
+
+
+build-book-examples-python-sequence_partitioned: build-machida
+build-book-examples-python-sequence_partitioned: build-testing-correctness-apps-sequence_window-validator
+test-book-examples-python-sequence_partitioned: build-book-examples-python-sequence_partitioned
+
+test-book-examples-python-sequence_partitioned: sequence_partitioned_py_test
 
 sequence_partitioned_py_test:
 	cd $(SEQUENCE_PART_PATH) && \
-	export PYTHONPATH="$(PYTHONPATH)" && \
 	integration_test --sequence-sender '(0,1000]' \
 	  --log-level error \
 		--command 'machida --application-module sequence_partitioned' \
@@ -42,16 +46,10 @@ sequence_partitioned_py_test:
 		--giles-mode \
 		--sink-expect 1000
 
+clean-book-examples-python-sequence_partitioned: sequence_partitioned_py_clean
 
-#########################################################################################
-#### don't change after this line unless to disable standard rules generation makefile
-MY_NAME := $(lastword $(MAKEFILE_LIST))
-$(MY_NAME)_PATH := $(dir $(MY_NAME))
-
-include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
-#### don't change before this line unless to disable standard rules generation makefile
-#########################################################################################
-
+sequence_partitioned_py_clean:
+	$(QUIET)rm -f $(SEQUENCE_PART_PATH)/received.txt
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)
