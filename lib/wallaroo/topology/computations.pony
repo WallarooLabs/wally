@@ -1,7 +1,10 @@
 use "buffered"
+use "collections"
+use per = "collections/persistent"
 use "time"
 use "wallaroo"
 use "wallaroo/core"
+use "wallaroo/fail"
 use "wallaroo/routing"
 use "wallaroo/state"
 
@@ -84,11 +87,23 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
           // https://github.com/Sendence/wallaroo/issues/1010 is addressed
           let this_keep_sending = true
 
-          for output in outputs.values() do
+          for (frac_id, output) in outputs.pairs() do
+            let o_frac_ids = match frac_ids
+            | None =>
+              per.Lists[USize].empty().prepend(frac_id)
+            | let x: per.List[USize] =>
+              x.prepend(frac_id)
+            else
+              // TODO: this can go away when we upgrade to
+              // exhaustive match pony
+              None
+              Fail()
+            end
+
             (let f, let s, let ts) =
               omni_router.route_with_target_id[Out](
                 _target_id, metric_name, pipeline_time_spent, output, producer,
-                i_msg_uid, frac_ids,
+                i_msg_uid, o_frac_ids,
                 computation_end, metrics_id, worker_ingress_ts)
 
             // we are sending multiple messages, only mark this message as
