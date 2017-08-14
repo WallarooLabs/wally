@@ -1,6 +1,7 @@
 use "assert"
 use "buffered"
 use "collections"
+use p = "collections/persistent"
 use "net"
 use "time"
 use "sendence/guid"
@@ -280,7 +281,18 @@ actor Step is (Producer & Consumer)
       //TODO: Bloom filter maybe?
       // todo frac_ids
       if e._2 == msg_uid then
-        return true
+        match (e._3, frac_ids)
+        | (None, None) =>
+          return true
+        | (let x: p.List[USize], let y: p.List[USize]) =>
+          try
+            return p.Lists[USize].eq[USize](x, y)
+          else
+            Fail()
+          end
+        else
+          Fail()
+        end
       end
     end
     false
