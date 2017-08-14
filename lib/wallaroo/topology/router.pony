@@ -778,8 +778,14 @@ class LocalPartitionRouter[In: Any val,
               i_msg_uid, latest_ts, metrics_id, worker_ingress_ts)
           else
             ifdef debug then
-              @printf[I32](("LocalPartitionRouter.route: No entry for this " +
-                "key and no default\n\n").cstring())
+              match key
+              | let k: Stringable val =>
+                @printf[I32](("LocalPartitionRouter.route: No entry for " +
+                "key %s and no default\n\n").cstring(), k.string().cstring())
+              else
+                @printf[I32](("LocalPartitionRouter.route: No entry for " +
+                "this key and no default\n\n").cstring())
+              end
             end
             (true, true, latest_ts)
           end
