@@ -2,6 +2,7 @@ use "buffered"
 use "collections"
 use "files"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
@@ -11,7 +12,8 @@ use "wallaroo/w_actor"
 use "debug"
 
 interface tag Resilient
-  be replay_log_entry(uid: U128, statechange_id: U64, payload: ByteSeq)
+  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq)
   be log_flushed(low_watermark: SeqId)
 
 //TODO: explain in comment
@@ -126,7 +128,8 @@ class FileBackend is Backend
           // only replay if at or below watermark
           if entry._5 <= watermarks.get_or_else(entry._1, 0) then
             num_replayed = num_replayed + 1
-            _event_log.replay_log_entry(entry._1, entry._2, entry._4, entry._6)
+            _event_log.replay_log_entry(entry._1, entry._2, entry._3,
+              entry._4, entry._6)
           else
             num_skipped = num_skipped + 1
           end
@@ -253,11 +256,13 @@ actor EventLog
       Fail()
     end
 
-  be replay_log_entry(origin_id: U128, uid: U128, statechange_id: U64,
-    payload: ByteSeq val)
+  be replay_log_entry(origin_id: U128,
+    uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq val)
   =>
     try
-      _origins(origin_id).replay_log_entry(uid, statechange_id, payload)
+      _origins(origin_id).replay_log_entry(uid, frac_ids,
+        statechange_id, payload)
     else
       @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
       Fail()

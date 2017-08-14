@@ -146,7 +146,7 @@ actor TCPSink is Consumer
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_origin: Producer, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -195,14 +195,14 @@ actor TCPSink is Consumer
     None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_origin: Producer, msg_uid: U128,
+    data: D, i_origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     //TODO: deduplication like in the Step <- this is pointless if the Sink
     //doesn't have state, because on recovery we won't have a list of "seen
     //messages", which we would normally get from the eventlog.
-    run[D](metric_name, pipeline_time_spent, data, i_origin, msg_uid,
+    run[D](metric_name, pipeline_time_spent, data, i_origin, msg_uid, frac_ids,
       i_seq_id, i_route_id, latest_ts, metrics_id, worker_ingress_ts)
 
   be update_router(router: Router) =>

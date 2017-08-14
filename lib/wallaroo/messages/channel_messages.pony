@@ -76,10 +76,11 @@ primitive ChannelMsgEncoder
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, msg_data: D,
     metric_name: String, auth: AmbientAuth,
-    proxy_address: ProxyAddress, msg_uid: U128): Array[ByteSeq] val ?
+    proxy_address: ProxyAddress, msg_uid: U128,
+    frac_ids: FractionalMessageId): Array[ByteSeq] val ?
   =>
     _encode(ForwardMsg[D](target_id, from_worker_name,
-      msg_data, metric_name, proxy_address, msg_uid), auth)
+      msg_data, metric_name, proxy_address, msg_uid, frac_ids), auth)
 
   fun identify_control_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -594,13 +595,20 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _metric_name: String
   let _proxy_address: ProxyAddress
   let _msg_uid: U128
+  let _frac_ids: FractionalMessageId
 
   fun input(): Any val => _data
   fun metric_name(): String => _metric_name
   fun msg_uid(): U128 => _msg_uid
+  fun frac_ids(): FractionalMessageId => _frac_ids
 
   new val create(t_id: U128, from: String,
+<<<<<<< HEAD
     m_data: D, m_name: String, proxy_address: ProxyAddress, msg_uid': U128)
+=======
+    m_data: D, m_name: String, proxy_address: ProxyAddress val,
+    msg_uid': U128, frac_ids': FractionalMessageId)
+>>>>>>> Readd fractional id everywhere except event log
   =>
     _target_id = t_id
     _sender_name = from
@@ -608,6 +616,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     _metric_name = m_name
     _proxy_address = proxy_address
     _msg_uid = msg_uid'
+    _frac_ids = frac_ids'
 
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name
@@ -617,7 +626,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     target_step.run[D](_metric_name, pipeline_time_spent, _data, origin,
-      _msg_uid, seq_id, route_id, latest_ts, metrics_id,
+      _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
     false
 
@@ -626,7 +635,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, origin,
-      _msg_uid, seq_id, route_id, latest_ts, metrics_id,
+      _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
     false
 

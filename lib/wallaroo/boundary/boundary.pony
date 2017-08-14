@@ -241,7 +241,7 @@ actor OutgoingBoundary is Consumer
     _step_id = step_id
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    origin: Producer, msg_uid: U128,
+    origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -249,7 +249,7 @@ actor OutgoingBoundary is Consumer
     Fail()
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, origin: Producer, msg_uid: U128,
+    data: D, origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -262,6 +262,7 @@ actor OutgoingBoundary is Consumer
     metrics_id: U16, worker_ingress_ts: U64)
   =>
     let metric_name = delivery_msg.metric_name()
+    // TODO: delete
     let msg_uid = delivery_msg.msg_uid()
 
     ifdef "trace" then
