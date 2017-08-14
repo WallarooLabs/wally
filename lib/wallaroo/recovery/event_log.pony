@@ -103,7 +103,7 @@ class FileBackend is Backend
             let fractional_size = r.u64_be()
             let frac_ids = recover val
               if fractional_size > 0 then
-                r.append(_file.read(fractional_size.usize() * 4))
+                r.append(_file.read(fractional_size.usize()))
                 let l = Array[U32]
                 for i in Range(0,fractional_size.usize()) do
                   l.push(r.u32_be())
