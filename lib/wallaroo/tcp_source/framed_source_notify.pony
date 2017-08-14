@@ -97,7 +97,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
               " source\n").cstring())
           end
           _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-            conn, _router, _omni_router, _guid_gen.u128(),
+            conn, _router, _omni_router, _guid_gen.u128(), None,
             decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
         else
           @printf[I32](("Unable to decode message at " + _pipeline_name +

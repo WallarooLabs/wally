@@ -179,8 +179,8 @@ actor WActorWithState is WActorWrapper
       _central_actor_registry.send_to_role(role, sender, data)
     end
 
-  be replay_log_entry(uid: U128, statechange_id: U64,
-    payload: ByteSeq)
+  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq)
   =>
     try
       _w_actor = Unpickle[WActor](payload, _auth)
@@ -239,7 +239,7 @@ actor WActorWithState is WActorWrapper
       // using the pipeline metadata?  Or do we create the same metadata
       // for actor system messages.
       _sinks(sink_id).run[Out]("", 0, output, _dummy_actor_producer,
-        0, 0, 0, 0, 0, 0)
+        0, None, 0, 0, 0, 0, 0)
     else
       @printf[I32]("Attempting to send to nonexistent sink id!\n".cstring())
       Fail()
