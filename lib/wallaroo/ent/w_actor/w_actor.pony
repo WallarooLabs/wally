@@ -1,4 +1,4 @@
-use "wallaroo/broadcast"
+use "wallaroo/ent/w_actor/broadcast"
 use "wallaroo/fail"
 
 primitive BasicRoles
