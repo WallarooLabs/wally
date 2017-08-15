@@ -44,7 +44,7 @@ class BoundaryRoute is Route
     _route.dispose()
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: U128,
+    cfp: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     // Run should never be called on a BoundaryRoute
@@ -53,7 +53,7 @@ class BoundaryRoute is Route
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,
-    msg_uid: U128, latest_ts: U64, metrics_id: U16,
+    latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64): Bool
   =>
     ifdef debug then
@@ -69,7 +69,6 @@ class BoundaryRoute is Route
     _send_message_on_route(delivery_msg,
       pipeline_time_spent,
       cfp,
-      msg_uid,
       latest_ts,
       metrics_id,
       metric_name,
@@ -77,7 +76,7 @@ class BoundaryRoute is Route
     true
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg,
-    pipeline_time_spent: U64, cfp: Producer ref, msg_uid: U128,
+    pipeline_time_spent: U64, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)
   =>
