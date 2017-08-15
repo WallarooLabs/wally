@@ -1,7 +1,7 @@
 use "sendence/connemara"
 use "wallaroo/boundary"
 use "wallaroo/metrics"
-use "wallaroo/network"
+use "wallaroo/ent/network"
 use "wallaroo/topology"
 
 actor Main is TestList

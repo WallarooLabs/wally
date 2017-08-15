@@ -1,4 +1,4 @@
-use "wallaroo/network"
+use "wallaroo/ent/network"
 
 primitive SpikeWrapper
   fun apply(letter: WallarooOutgoingNetworkActorNotify iso,
