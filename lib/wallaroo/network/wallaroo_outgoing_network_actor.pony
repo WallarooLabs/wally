@@ -1,3 +1,4 @@
+use "wallaroo/core"
 use "wallaroo/routing"
 
 interface WallarooOutgoingNetworkActor

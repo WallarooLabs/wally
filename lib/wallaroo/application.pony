@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "sendence/guid"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"

@@ -1,4 +1,5 @@
 use "sendence/connemara"
+use "wallaroo/core"
 use "wallaroo/routing"
 
 actor _TestStepSeqIdGenerator is TestList

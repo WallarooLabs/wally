@@ -1,4 +1,5 @@
 use "time"
+use "wallaroo/core"
 use "wallaroo/invariant"
 use "wallaroo/routing"
 
