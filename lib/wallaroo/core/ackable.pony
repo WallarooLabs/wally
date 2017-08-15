@@ -2,7 +2,7 @@ use "collections"
 use "wallaroo/boundary"
 use "wallaroo/routing"
 use "wallaroo/topology"
-use "wallaroo/watermarking"
+use "wallaroo/ent/watermarking"
 
 trait tag Ackable
   fun ref _acker(): Acker

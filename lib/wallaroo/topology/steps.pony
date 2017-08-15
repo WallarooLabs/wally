@@ -15,7 +15,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
-use "wallaroo/watermarking"
+use "wallaroo/ent/watermarking"
 
 actor Step is (Producer & Consumer)
   var _id: U128

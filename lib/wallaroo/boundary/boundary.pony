@@ -14,7 +14,7 @@ use "wallaroo/network"
 use "wallaroo/routing"
 use "wallaroo/spike"
 use "wallaroo/topology"
-use "wallaroo/watermarking"
+use "wallaroo/ent/watermarking"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
