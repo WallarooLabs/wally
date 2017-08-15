@@ -8,7 +8,7 @@ use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/routing"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 use "debug"
 
 interface tag Resilient

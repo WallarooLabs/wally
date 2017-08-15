@@ -15,7 +15,7 @@ use "wallaroo/metrics"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/state"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 
 
 interface Runner

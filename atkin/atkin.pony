@@ -6,7 +6,7 @@ use "sendence/rand"
 use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/messages"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 

@@ -17,7 +17,7 @@ use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 
 primitive Roles
   fun ping(): String => "ping"

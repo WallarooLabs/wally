@@ -8,7 +8,7 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/topology"
 use "wallaroo/recovery"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 
 actor ClusterInitializer
   let _auth: AmbientAuth
