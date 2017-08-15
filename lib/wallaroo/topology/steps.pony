@@ -218,6 +218,15 @@ actor Step is (Producer & Consumer)
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    _run[D](metric_name, pipeline_time_spent, data, i_origin,
+      msg_uid, frac_ids, i_seq_id, i_route_id,
+      latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref _run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
+    i_origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
     _seq_id_generator.new_incoming_message()
 
     let my_latest_ts = ifdef "detailed-metrics" then
@@ -238,10 +247,12 @@ actor Step is (Producer & Consumer)
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
     end
+
     (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
       pipeline_time_spent, data, this, _router, _omni_router,
       msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
       _metrics_reporter)
+
     if is_finished then
       ifdef "resilience" then
         ifdef "trace" then
@@ -313,44 +324,25 @@ actor Step is (Producer & Consumer)
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _seq_id_generator.new_incoming_message()
     if not _is_duplicate(msg_uid, frac_ids) then
       _deduplication_list.push((i_origin, msg_uid, frac_ids, i_seq_id,
         i_route_id))
-      (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
-        pipeline_time_spent, data, this, _router, _omni_router,
-        msg_uid, frac_ids,
-        latest_ts, metrics_id, worker_ingress_ts, _metrics_reporter)
 
-      if is_finished then
-        ifdef "resilience" then
-          _acker_x.filtered(this, current_sequence_id())
-        end
-        let end_ts = Time.nanos()
-        let time_spent = end_ts - worker_ingress_ts
-
-        ifdef "detailed-metrics" then
-          _metrics_reporter.step_metric(metric_name,
-            "Before end at Step replay", 9999, last_ts, end_ts)
-        end
-
-        _metrics_reporter.pipeline_metric(metric_name,
-          time_spent + pipeline_time_spent)
-        _metrics_reporter.worker_metric(metric_name, time_spent)
-      end
+      _run[D](metric_name, pipeline_time_spent, data, i_origin,
+        msg_uid, frac_ids, i_seq_id, i_route_id,
+        latest_ts, metrics_id, worker_ingress_ts)
     else
-      ifdef "resilience" then
-        ifdef "trace" then
-          @printf[I32]("Filtering a dupe in replay\n".cstring())
-        end
-
-        _acker_x.filtered(this, current_sequence_id())
+      ifdef "trace" then
+        @printf[I32]("Filtering a dupe in replay\n".cstring())
       end
-    end
 
-    ifdef "resilience" then
-      _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_origin,
-        i_route_id, i_seq_id)
+      _seq_id_generator.new_incoming_message()
+
+      ifdef "resilience" then
+        _acker_x.filtered(this, current_sequence_id())
+        _acker_x.track_incoming_to_outgoing(current_sequence_id(),
+          i_origin, i_route_id, i_seq_id)
+      end
     end
 
   //////////////////////
