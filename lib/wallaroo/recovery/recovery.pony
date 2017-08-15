@@ -1,7 +1,7 @@
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
-use "wallaroo/network"
+use "wallaroo/ent/network"
 use "wallaroo/ent/w_actor"
 
 actor Recovery

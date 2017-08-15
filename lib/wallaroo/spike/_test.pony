@@ -1,6 +1,6 @@
 use "sendence/connemara"
 use "wallaroo/core"
-use "wallaroo/network"
+use "wallaroo/ent/network"
 use "wallaroo/routing"
 
 actor Main is TestList

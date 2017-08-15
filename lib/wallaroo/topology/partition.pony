@@ -7,7 +7,7 @@ use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
-use "wallaroo/network"
+use "wallaroo/ent/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 

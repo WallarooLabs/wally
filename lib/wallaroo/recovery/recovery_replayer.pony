@@ -4,7 +4,7 @@ use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
-use "wallaroo/network"
+use "wallaroo/ent/network"
 use "wallaroo/topology"
 
 

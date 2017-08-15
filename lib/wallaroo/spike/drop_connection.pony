@@ -1,6 +1,6 @@
 use "collections"
 use "random"
-use "wallaroo/network"
+use "wallaroo/ent/network"
 
 class DropConnection is WallarooOutgoingNetworkActorNotify
   let _letter: WallarooOutgoingNetworkActorNotify

@@ -4,7 +4,7 @@ use "sendence/equality"
 use "wallaroo/boundary"
 use "wallaroo/core"
 use "wallaroo/metrics"
-use "wallaroo/network"
+use "wallaroo/ent/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 
