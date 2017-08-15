@@ -60,7 +60,7 @@ use "wallaroo/source"
 use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 
 actor Main
   new create(env: Env) =>

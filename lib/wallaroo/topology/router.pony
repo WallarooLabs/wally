@@ -9,7 +9,7 @@ use "wallaroo/messages"
 use "wallaroo/rebalancing"
 use "wallaroo/routing"
 use "wallaroo/sink"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 
 interface val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,

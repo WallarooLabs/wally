@@ -8,7 +8,7 @@ use "wallaroo/core"
 use "wallaroo/initialization"
 use "wallaroo/routing"
 use "wallaroo/topology"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 
 primitive ChannelMsgEncoder
   fun _encode(msg: ChannelMsg, auth: AmbientAuth,

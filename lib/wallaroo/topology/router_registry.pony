@@ -9,7 +9,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/source"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 
 actor RouterRegistry
   let _auth: AmbientAuth

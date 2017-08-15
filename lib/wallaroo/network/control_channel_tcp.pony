@@ -12,7 +12,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/recovery"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
 
 class ControlChannelListenNotifier is TCPListenNotify
   let _auth: AmbientAuth
