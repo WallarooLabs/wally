@@ -603,12 +603,8 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun frac_ids(): FractionalMessageId => _frac_ids
 
   new val create(t_id: U128, from: String,
-<<<<<<< HEAD
-    m_data: D, m_name: String, proxy_address: ProxyAddress, msg_uid': U128)
-=======
-    m_data: D, m_name: String, proxy_address: ProxyAddress val,
+    m_data: D, m_name: String, proxy_address: ProxyAddress,
     msg_uid': U128, frac_ids': FractionalMessageId)
->>>>>>> Readd fractional id everywhere except event log
   =>
     _target_id = t_id
     _sender_name = from

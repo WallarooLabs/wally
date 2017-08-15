@@ -178,28 +178,18 @@ trait val OmniRouter is Equatable[OmniRouter]
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
-<<<<<<< HEAD
+
   fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter
+
   fun val update_route_to_proxy(id: U128,
     pa: ProxyAddress): OmniRouter
+
   fun val update_route_to_step(id: U128,
     step: Consumer): OmniRouter
+
   fun routes(): Array[Consumer] val
+
   fun routes_not_in(router: OmniRouter): Array[Consumer] val
-=======
-
-  fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter val
-
-  fun val update_route_to_proxy(id: U128,
-    pa: ProxyAddress val): OmniRouter val
-
-  fun val update_route_to_step(id: U128,
-    step: Consumer): OmniRouter val
-
-  fun routes(): Array[Consumer] val
-
-  fun routes_not_in(router: OmniRouter val): Array[Consumer] val
->>>>>>> Readd fractional id everywhere except event log
 
 class val EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
