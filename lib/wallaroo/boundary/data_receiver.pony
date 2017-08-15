@@ -10,7 +10,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
-use "wallaroo/watermarking"
+use "wallaroo/ent/watermarking"
 
 
 actor DataReceiver is Producer

@@ -13,7 +13,7 @@ use initialization = "initialization"
 use rebalancing = "rebalancing"
 use spike = "spike"
 use topology = "topology"
-use watermarking = "watermarking"
+use watermarking = "ent/watermarking"
 
 actor Main is TestList
   new create(env: Env) =>

@@ -9,7 +9,7 @@ use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/sink"
 use "wallaroo/topology"
-use "wallaroo/watermarking"
+use "wallaroo/ent/watermarking"
 
 trait WActorWrapper
   be receive(msg: WMessage val)
