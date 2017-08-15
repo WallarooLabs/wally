@@ -61,7 +61,7 @@ class EnhancedRandom
     while idxs.size() < k do
       idxs.set(usize_between(0, a_size - 1))
     end
-    let result: Array[V] trn = recover Array[V] end
+    let result = recover trn Array[V] end
     for i in idxs.values() do
       result.push(a(i))
     end

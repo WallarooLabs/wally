@@ -139,8 +139,7 @@ actor RouterRegistry
     bbs: Map[String, OutgoingBoundaryBuilder] val)
   =>
     // Boundaries
-    let new_boundaries: Map[String, OutgoingBoundary] trn =
-      recover Map[String, OutgoingBoundary] end
+    let new_boundaries = recover trn Map[String, OutgoingBoundary] end
     for (worker, boundary) in bs.pairs() do
       if not _outgoing_boundaries.contains(worker) then
         _outgoing_boundaries(worker) = boundary
@@ -163,8 +162,8 @@ actor RouterRegistry
     end
 
     // Boundary builders
-    let new_boundary_builders: Map[String, OutgoingBoundaryBuilder] trn =
-      recover Map[String, OutgoingBoundaryBuilder] end
+    let new_boundary_builders =
+      recover trn Map[String, OutgoingBoundaryBuilder] end
     for (worker, builder) in bbs.pairs() do
       // Boundary builders should always be registered after the canonical
       // boundary for each builder. The canonical is used on all Steps.

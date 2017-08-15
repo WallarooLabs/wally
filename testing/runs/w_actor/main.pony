@@ -166,7 +166,7 @@ class A is WActor
     wh.register_as_role(BasicRoles.ingress())
     _all_message_types =
       try
-        let ts: Array[AMsgBuilder val] trn = recover Array[AMsgBuilder val] end
+        let ts = recover trn Array[AMsgBuilder val] end
         ts.push(SetActorProbability as AMsgBuilder val)
         ts.push(SetNumberOfMessagesToSend as AMsgBuilder val)
         ts.push(ChangeMessageTypesToSend as AMsgBuilder val)

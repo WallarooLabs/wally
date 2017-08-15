@@ -51,7 +51,7 @@ primitive HubProtocol
   fun payload_into_array(event: String, topic: String, data: Array[U8] iso):
     Array[ByteSeq] val
   =>
-    let encoded: Array[ByteSeq] trn = recover Array[ByteSeq](2) end
+    let encoded = recover trn Array[ByteSeq](2) end
 
     // Determine sizes
     let event_size = event.size().u32()

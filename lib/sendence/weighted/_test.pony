@@ -14,7 +14,7 @@ class iso _TestWeighted is UnitTest
   fun name(): String => "weighted/Weighted"
 
   fun apply(h: TestHelper) ? =>
-    let items: Array[(USize, USize)] trn = recover Array[(USize, USize)] end
+    let items = recover trn Array[(USize, USize)] end
     items.push((0, 1000))
     items.push((1, 150))
     items.push((2, 40))

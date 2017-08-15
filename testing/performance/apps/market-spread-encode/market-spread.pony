@@ -98,8 +98,7 @@ actor Main
 
       let init_file = InitFile(initial_nbbo_file_path, 46)
 
-      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn =
-        recover Array[Array[ByteSeq] val] end
+      let initial_report_msgs_trn = recover trn Array[Array[ByteSeq] val] end
       let connect_msg = HubProtocol.connect()
       let join_msg = HubProtocol.join("reports:market-spread")
       initial_report_msgs_trn.push(connect_msg)
@@ -388,7 +387,7 @@ class LegalSymbols
   let symbols: Array[String] val
 
   new create() =>
-    let padded: Array[String] trn = recover Array[String] end
+    let padded = recover trn Array[String] end
     for symbol in RawSymbols().values() do
       padded.push(RawSymbols.pad_symbol(symbol))
     end

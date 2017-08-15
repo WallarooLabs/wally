@@ -57,7 +57,7 @@ class Dag[V: Any val]
   fun is_empty(): Bool => _nodes.size() == 0
 
   fun clone(): Dag[V] val ? =>
-    let c: Dag[V] trn = recover Dag[V] end
+    let c = recover trn Dag[V] end
     for (id, node) in _nodes.pairs() do
       c.add_node(node.value, node.id)
     end

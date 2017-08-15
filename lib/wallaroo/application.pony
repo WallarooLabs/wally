@@ -56,8 +56,7 @@ class Application
   =>
     default_state_name = default_name
 
-    let builders: Array[RunnerBuilder] trn =
-      recover Array[RunnerBuilder] end
+    let builders = recover trn Array[RunnerBuilder] end
 
     let pre_state_builder = PreStateRunnerBuilder[In, Out, In, U8, S](
       s_comp, default_name, SingleStepPartitionFunction[In],
@@ -90,9 +89,9 @@ class Application
 
   fun state_builder(state_name: String): PartitionBuilder ? =>
     _state_builders(state_name)
+
   fun state_builders(): Map[String, PartitionBuilder] val =>
-    let builders: Map[String, PartitionBuilder] trn =
-      recover Map[String, PartitionBuilder] end
+    let builders = recover trn Map[String, PartitionBuilder] end
     for (k, v) in _state_builders.pairs() do
       builders(k) = v
     end
@@ -210,7 +209,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let guid_gen = GuidGenerator
     let single_step_partition = Partition[Last, U8](
       SingleStepPartitionFunction[Last], recover [0] end)
-    let step_id_map: Map[U8, U128] trn = recover Map[U8, U128] end
+    let step_id_map = recover trn Map[U8, U128] end
 
     step_id_map(0) = guid_gen.u128()
 
@@ -245,7 +244,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     ): PipelineBuilder[In, Out, Next]
   =>
     let guid_gen = GuidGenerator
-    let step_id_map: Map[Key, U128] trn = recover Map[Key, U128] end
+    let step_id_map = recover trn Map[Key, U128] end
 
     match partition.keys()
     | let wks: Array[WeightedKey[Key]] val =>

@@ -260,7 +260,7 @@ class val PMap[K: (Hashable val & Equatable[K] val), V: Any val]
   fun apply(k: K): V ? => _s(k)
 
   fun val update(k: K, v: V): PMap[K, V] =>
-    let m: Map[K, V] trn = recover Map[K, V] end
+    let m = recover trn Map[K, V] end
     for (k', v') in _s.pairs() do
       m(k') = v'
     end

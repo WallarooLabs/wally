@@ -54,7 +54,7 @@ actor ApplicationDistributor is Distributor
     @printf[I32]("vvvvvv|Initializing Topologies for Workers|vvvvvv\n\n".cstring())
 
     try
-      let all_workers_trn: Array[String] trn = recover Array[String] end
+      let all_workers_trn = recover trn Array[String] end
       all_workers_trn.push(initializer_name)
       for w in worker_names.values() do all_workers_trn.push(w) end
       let all_workers: Array[String] val = consume all_workers_trn
@@ -64,16 +64,14 @@ actor ApplicationDistributor is Distributor
       // directly to a source. For a sink, we don't keep a proxy address but
       // a step id (U128), since every worker will have its own instance of
       // that sink.
-      let step_map: Map[U128, (ProxyAddress | U128)] trn =
-        recover Map[U128, (ProxyAddress | U128)] end
+      let step_map = recover trn Map[U128, (ProxyAddress | U128)] end
 
       // Keep track of shared state so that it's only created once
-      let state_partition_map: Map[String, PartitionAddresses val] trn =
-        recover Map[String, PartitionAddresses val] end
+      let state_partition_map =
+        recover trn Map[String, PartitionAddresses val] end
 
       // Keep track of all prestate data so we can register routes
-      let pre_state_data: Array[PreStateData] trn =
-        recover Array[PreStateData] end
+      let pre_state_data = recover trn Array[PreStateData] end
 
       // This will be incremented as we move through pipelines
       var pipeline_id: USize = 0
@@ -88,8 +86,8 @@ actor ApplicationDistributor is Distributor
           = default_targets.create()
 
       // We use these graphs to build the local graphs for each worker
-      var local_graphs: Map[String, Dag[StepInitializer] trn] trn =
-        recover Map[String, Dag[StepInitializer] trn] end
+      var local_graphs =
+        recover trn Map[String, Dag[StepInitializer] trn] end
 
       // Initialize values for local graphs
       local_graphs(initializer_name) = Dag[StepInitializer]
@@ -108,8 +106,8 @@ actor ApplicationDistributor is Distributor
       end
 
       // Create StateSubpartitions
-      let ssb_trn: Map[String, StateSubpartition] trn =
-        recover Map[String, StateSubpartition] end
+
+      let ssb_trn = recover trn Map[String, StateSubpartition] end
       for (s_name, p_builder) in application.state_builders().pairs() do
         ssb_trn(s_name) = p_builder.state_subpartition(all_workers)
       end
@@ -182,19 +180,16 @@ actor ApplicationDistributor is Distributor
         // computations as we accumulate them to eventually turn into a
         // RunnerSequenceBuilder. When coalescing is off, we only put a
         // single runner builder here.
-        var source_runner_builders: Array[RunnerBuilder] trn =
-          recover Array[RunnerBuilder] end
+        var source_runner_builders = recover trn Array[RunnerBuilder] end
 
         // We'll use this array when creating StepInitializers
-        let step_runner_builders: Array[RunnerBuilder] trn =
-          recover Array[RunnerBuilder] end
+        let step_runner_builders = recover trn Array[RunnerBuilder] end
 
         // Used to temporarily store contiguous stateless computations as
         // we accumulate them to eventually turn into a RunnerSequenceBuilder.
         // When coalescing is off, we do not use this since each computation
         // will correspond to a step.
-        var latest_runner_builders: Array[RunnerBuilder] trn =
-          recover Array[RunnerBuilder] end
+        var latest_runner_builders = recover trn Array[RunnerBuilder] end
 
         // If any in a series of contiguous stateless computations is
         // to be parallelized and coalescing is on, we coalesce and
@@ -624,12 +619,12 @@ actor ApplicationDistributor is Distributor
                 // local graphs.
                 let pony_thread_count = @ponyint_sched_cores[I32]().usize()
                 let partition_count = worker_count * pony_thread_count
-                let partition_id_to_worker_trn: Map[U64, String] trn =
-                  recover Map[U64, String] end
-                let partition_id_to_step_id_trn: Map[U64, U128] trn =
-                  recover Map[U64, U128] end
-                let worker_to_step_id_trn: Map[String, Array[U128] trn] trn =
-                  recover Map[String, Array[U128] trn] end
+                let partition_id_to_worker_trn =
+                  recover trn Map[U64, String] end
+                let partition_id_to_step_id_trn =
+                  recover trn Map[U64, U128] end
+                let worker_to_step_id_trn =
+                  recover trn Map[String, Array[U128] trn] end
                 for w in all_workers.values() do
                   worker_to_step_id_trn(w) = recover Array[U128] end
                 end
@@ -644,9 +639,8 @@ actor ApplicationDistributor is Distributor
                   consume partition_id_to_worker_trn
                 let partition_id_to_step_id: Map[U64, U128] val =
                   consume partition_id_to_step_id_trn
-                let worker_to_step_id_collector:
-                  Map[String, Array[U128] val] trn =
-                  recover Map[String, Array[U128] val] end
+                let worker_to_step_id_collector =
+                  recover trn Map[String, Array[U128] val] end
                 for (k, v) in worker_to_step_id_trn.pairs() do
                   match worker_to_step_id_trn(k) = recover Array[U128] end
                   | let arr: Array[U128] trn =>
@@ -921,8 +915,7 @@ actor ApplicationDistributor is Distributor
               steps(pre_state_id) = pipeline_default_target_worker
               steps(state_id) = pipeline_default_target_worker
 
-              let next_default_targets: Array[StepBuilder] trn =
-                recover Array[StepBuilder] end
+              let next_default_targets = recover trn Array[StepBuilder] end
 
               next_default_targets.push(pre_state_builder)
               next_default_targets.push(state_builder)
@@ -961,8 +954,7 @@ actor ApplicationDistributor is Distributor
 
       // Keep track of LocalTopologies that we need to send to other
       // (non-"initializer") workers
-      let other_local_topologies: Map[String, LocalTopology] trn =
-        recover Map[String, LocalTopology] end
+      let other_local_topologies = recover trn Map[String, LocalTopology] end
 
       // Add unbuilt edges
       for (w, edges) in unbuilt_edges.pairs() do
@@ -1003,7 +995,7 @@ actor ApplicationDistributor is Distributor
 
       // For each worker, generate a LocalTopology from its LocalGraph
       for (w, g) in local_graphs.pairs() do
-        let p_ids: Map[String, U128] trn = recover Map[String, U128] end
+        let p_ids = recover trn Map[String, U128] end
         for (target, p_id) in proxy_ids(w).pairs() do
           p_ids(target) = p_id
         end

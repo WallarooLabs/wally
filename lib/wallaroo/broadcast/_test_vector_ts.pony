@@ -21,25 +21,25 @@ class iso _TestGreaterThanLessThan is UnitTest
     "vector_ts/GreaterThanLessThan"
 
   fun ref apply(h: TestHelper) =>
-    let v1_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v1_map = recover trn Map[String, U64] end
     v1_map("w1") = 0
     v1_map("w2") = 2
     v1_map("w3") = 1
     let v1 = VectorTimestamp("w1", consume v1_map)
 
-    let v2_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v2_map = recover trn Map[String, U64] end
     v2_map("w1") = 0
     v2_map("w2") = 3
     v2_map("w3") = 1
     let v2 = VectorTimestamp("w2", consume v2_map)
 
-    let v3_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v3_map = recover trn Map[String, U64] end
     v3_map("w1") = 0
     v3_map("w2") = 1
     v3_map("w3") = 1
     let v3 = VectorTimestamp("w3", consume v3_map)
 
-    let v4_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v4_map = recover trn Map[String, U64] end
     v4_map("w1") = 0
     v4_map("w2") = 2
     v4_map("w3") = 0
@@ -75,37 +75,37 @@ class iso _TestGreaterThanEqualLessThanEqual is UnitTest
     "vector_ts/GreaterThanEqualLessThanEqual"
 
   fun ref apply(h: TestHelper) =>
-    let v1_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v1_map = recover trn Map[String, U64] end
     v1_map("w1") = 0
     v1_map("w2") = 2
     v1_map("w3") = 1
     let v1 = VectorTimestamp("w1", consume v1_map)
 
-    let v2_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v2_map = recover trn Map[String, U64] end
     v2_map("w1") = 0
     v2_map("w2") = 3
     v2_map("w3") = 1
     let v2 = VectorTimestamp("w1", consume v2_map)
 
-    let v3_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v3_map = recover trn Map[String, U64] end
     v3_map("w1") = 0
     v3_map("w2") = 1
     v3_map("w3") = 1
     let v3 = VectorTimestamp("w1", consume v3_map)
 
-    let v4_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v4_map = recover trn Map[String, U64] end
     v4_map("w1") = 0
     v4_map("w2") = 2
     v4_map("w3") = 0
     let v4 = VectorTimestamp("w1", consume v4_map)
 
-    let v5_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v5_map = recover trn Map[String, U64] end
     v5_map("w1") = 0
     v5_map("w2") = 3
     v5_map("w3") = 1
     let v5 = VectorTimestamp("w1", consume v5_map)
 
-    let v6_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v6_map = recover trn Map[String, U64] end
     v6_map("w1") = 0
     v6_map("w2") = 2
     v6_map("w3") = 0
@@ -146,25 +146,25 @@ class iso _TestComparability is UnitTest
     "vector_ts/Comparability"
 
   fun ref apply(h: TestHelper) =>
-    let v1_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v1_map = recover trn Map[String, U64] end
     v1_map("w1") = 0
     v1_map("w2") = 2
     v1_map("w3") = 1
     let v1 = VectorTimestamp("w1", consume v1_map)
 
-    let v2_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v2_map = recover trn Map[String, U64] end
     v2_map("w1") = 0
     v2_map("w2") = 3
     v2_map("w3") = 1
     let v2 = VectorTimestamp("w2", consume v2_map)
 
-    let v3_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v3_map = recover trn Map[String, U64] end
     v3_map("w1") = 1
     v3_map("w2") = 2
     v3_map("w3") = 2
     let v3 = VectorTimestamp("w3", consume v3_map)
 
-    let v4_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v4_map = recover trn Map[String, U64] end
     v4_map("w1") = 0
     v4_map("w2") = 3
     v4_map("w3") = 0
@@ -199,25 +199,25 @@ class iso _TestIsSubset is UnitTest
     "vector_ts/IsSubset"
 
   fun ref apply(h: TestHelper) =>
-    let v1_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v1_map = recover trn Map[String, U64] end
     v1_map("w1") = 0
     v1_map("w2") = 2
     let v1 = VectorTimestamp("w1", consume v1_map)
 
-    let v2_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v2_map = recover trn Map[String, U64] end
     v2_map("w1") = 0
     v2_map("w2") = 3
     v2_map("w3") = 1
     let v2 = VectorTimestamp("w1", consume v2_map)
 
-    let v3_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v3_map = recover trn Map[String, U64] end
     v3_map("w1") = 1
     v3_map("w2") = 2
     v3_map("w3") = 2
     v3_map("w4") = 3
     let v3 = VectorTimestamp("w1", consume v3_map)
 
-    let v4_map: Map[String, U64] trn = recover Map[String, U64] end
+    let v4_map = recover trn Map[String, U64] end
     v4_map("w3") = 0
     v4_map("w4") = 3
     let v4 = VectorTimestamp("w4", consume v4_map)

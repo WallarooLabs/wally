@@ -13,7 +13,7 @@ class val VectorTimestamp
     _vs = vs
 
   fun inc(): VectorTimestamp =>
-    let new_map: Map[String, U64] trn = recover Map[String, U64] end
+    let new_map = recover trn Map[String, U64] end
     for (k, v) in _vs.pairs() do
       new_map(k) = v
     end
@@ -28,7 +28,7 @@ class val VectorTimestamp
     VectorTimestamp(w, _vs)
 
   fun merge(other: VectorTimestamp): VectorTimestamp =>
-    let new_map: Map[String, U64] trn = recover Map[String, U64] end
+    let new_map = recover trn Map[String, U64] end
     for (k, v) in _vs.pairs() do
       new_map(k) = v
     end

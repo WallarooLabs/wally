@@ -314,15 +314,13 @@ actor Connections is Cluster
   fun _update_boundaries(layout_initializer: LayoutInitializer,
     recovering: Bool = false)
   =>
-    let out_bs: Map[String, OutgoingBoundary] trn =
-      recover Map[String, OutgoingBoundary] end
+    let out_bs = recover trn Map[String, OutgoingBoundary] end
 
     for (target, boundary) in _data_conns.pairs() do
       out_bs(target) = boundary
     end
 
-    let out_bbs: Map[String, OutgoingBoundaryBuilder] trn =
-      recover Map[String, OutgoingBoundaryBuilder] end
+    let out_bbs = recover trn Map[String, OutgoingBoundaryBuilder] end
 
     for (target, builder) in _data_conn_builders.pairs() do
       out_bbs(target) = builder
@@ -387,15 +385,12 @@ actor Connections is Cluster
   =>
     @printf[I32]("Saving connection addresses!\n".cstring())
 
-    let map: Map[String, Map[String, (String, String)]] trn =
-      recover Map[String, Map[String, (String, String)]] end
-    let control_map: Map[String, (String, String)] trn =
-      recover Map[String, (String, String)] end
+    let map = recover trn Map[String, Map[String, (String, String)]] end
+    let control_map = recover trn Map[String, (String, String)] end
     for (key, value) in control_addrs.pairs() do
       control_map(key) = value
     end
-    let data_map: Map[String, (String, String)] trn =
-      recover Map[String, (String, String)] end
+    let data_map = recover trn Map[String, (String, String)] end
     for (key, value) in data_addrs.pairs() do
       data_map(key) = value
     end
@@ -545,15 +540,13 @@ actor Connections is Cluster
   be inform_joining_worker(conn: TCPConnection, worker: String,
     local_topology: LocalTopology)
   =>
-    let c_addrs: Map[String, (String, String)] trn =
-      recover Map[String, (String, String)] end
+    let c_addrs = recover trn Map[String, (String, String)] end
     for (w, addr) in _control_addrs.pairs() do
       c_addrs(w) = addr
     end
     c_addrs(_worker_name) = _my_control_addr
 
-    let d_addrs: Map[String, (String, String)] trn =
-      recover Map[String, (String, String)] end
+    let d_addrs = recover trn Map[String, (String, String)] end
     for (w, addr) in _data_addrs.pairs() do
       d_addrs(w) = addr
     end

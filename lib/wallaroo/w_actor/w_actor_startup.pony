@@ -37,8 +37,6 @@ actor ActorSystemStartup
   var _control_channel_file: String = ""
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
-  var _o_addrs_write: Array[Array[String]] trn =
-    recover Array[Array[String]] end
   // DEMO fields
   var _iterations: USize = 100
 
@@ -305,7 +303,7 @@ actor ActorSystemStartup
     """
     Read in a list of the names of all workers after recovery.
     """
-    let ws: Array[String] trn = recover Array[String] end
+    let ws = recover trn Array[String] end
 
     let file = File(worker_names_filepath)
     for worker_name in file.lines() do
