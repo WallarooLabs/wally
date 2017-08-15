@@ -138,9 +138,9 @@ primitive AddCount is StateComputation[String, RunningTotal, WordTotals]
 
     (RunningTotal(word, new_count), state_change)
 
-  fun state_change_builders(): Array[StateChangeBuilder[WordTotals] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[WordTotals]] val =>
     recover val
-      let scbs = Array[StateChangeBuilder[WordTotals] val]
+      let scbs = Array[StateChangeBuilder[WordTotals]]
       scbs.push(recover WordTotalsStateChangeBuilder end)
     end
 

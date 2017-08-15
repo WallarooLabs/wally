@@ -225,9 +225,9 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     state_change.update(should_reject_trades, msg.bid_px(), msg.offer_px())
     (None, state_change)
 
-  fun state_change_builders(): Array[StateChangeBuilder[SymbolData] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[SymbolData]] val =>
     recover val
-      let scbs = Array[StateChangeBuilder[SymbolData] val]
+      let scbs = Array[StateChangeBuilder[SymbolData]]
       scbs.push(recover val SymbolDataStateChangeBuilder end)
     end
 
@@ -248,9 +248,9 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
       (None, None)
     end
 
-  fun state_change_builders(): Array[StateChangeBuilder[SymbolData] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[SymbolData]] val =>
     recover val
-      Array[StateChangeBuilder[SymbolData] val]
+      Array[StateChangeBuilder[SymbolData]]
     end
 
 primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]

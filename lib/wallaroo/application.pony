@@ -19,8 +19,7 @@ class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
   // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, PartitionBuilder] =
-    _state_builders.create()
+  let _state_builders: Map[String, PartitionBuilder] = _state_builders.create()
   // Map from source id to filename
   let init_files: Map[USize, InitFile] = init_files.create()
   // TODO: Replace this default strategy with a better one after POC
@@ -53,7 +52,7 @@ class Application
     pipeline_name: String,
     default_name: String,
     s_comp: StateComputation[In, Out, S] val,
-    s_initializer: StateBuilder[S] val): Application
+    s_initializer: StateBuilder[S]): Application
   =>
     default_state_name = default_name
 
@@ -61,7 +60,7 @@ class Application
 
     let pre_state_builder = PreStateRunnerBuilder[In, Out, In, U8, S](
       s_comp, default_name, SingleStepPartitionFunction[In],
-      TypedRouteBuilder[StateProcessor[S] val],
+      TypedRouteBuilder[StateProcessor[S]],
       TypedRouteBuilder[Out], TypedRouteBuilder[In])
     builders.push(pre_state_builder)
 
@@ -182,7 +181,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p = p
 
   fun ref to[Next: Any val](
-    comp_builder: ComputationBuilder[Last, Next] val,
+    comp_builder: ComputationBuilder[Last, Next],
     id: U128 = 0): PipelineBuilder[In, Out, Next]
   =>
     let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder,
@@ -191,7 +190,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     PipelineBuilder[In, Out, Next](_a, _p)
 
   fun ref to_parallel[Next: Any val](
-    comp_builder: ComputationBuilder[Last, Next] val,
+    comp_builder: ComputationBuilder[Last, Next],
     id: U128 = 0): PipelineBuilder[In, Out, Next]
   =>
     let next_builder = ComputationRunnerBuilder[Last, Next](
@@ -201,7 +200,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
   fun ref to_stateful[Next: Any val, S: State ref](
     s_comp: StateComputation[Last, Next, S] val,
-    s_initializer: StateBuilder[S] val,
+    s_initializer: StateBuilder[S],
     state_name: String): PipelineBuilder[In, Out, Next]
   =>
     // TODO: This is a shortcut. Non-partitioned state is being treated as a
@@ -217,7 +216,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     let next_builder = PreStateRunnerBuilder[Last, Next, Last, U8, S](
       s_comp, state_name, SingleStepPartitionFunction[Last],
-      TypedRouteBuilder[StateProcessor[S] val],
+      TypedRouteBuilder[StateProcessor[S]],
       TypedRouteBuilder[Next])
 
     _p.add_runner_builder(next_builder)
@@ -226,7 +225,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       state_name, consume step_id_map, single_step_partition,
       StateRunnerBuilder[S](s_initializer, state_name,
         s_comp.state_change_builders()),
-      TypedRouteBuilder[StateProcessor[S] val],
+      TypedRouteBuilder[StateProcessor[S]],
       TypedRouteBuilder[Next])
 
     _a.add_state_builder(state_name, state_builder)
@@ -237,9 +236,9 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     Key: (Hashable val & Equatable[Key]), Next: Any val = PIn,
     S: State ref](
       s_comp: StateComputation[Last, Next, S] val,
-      s_initializer: StateBuilder[S] val,
+      s_initializer: StateBuilder[S],
       state_name: String,
-      partition: Partition[PIn, Key] val,
+      partition: Partition[PIn, Key],
       multi_worker: Bool = false,
       default_state_name: String = ""
     ): PipelineBuilder[In, Out, Next]
@@ -260,7 +259,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     let next_builder = PreStateRunnerBuilder[Last, Next, PIn, Key, S](
       s_comp, state_name, partition.function(),
-      TypedRouteBuilder[StateProcessor[S] val],
+      TypedRouteBuilder[StateProcessor[S]],
       TypedRouteBuilder[Next] where multi_worker = multi_worker,
       default_state_name' = default_state_name)
 
@@ -270,7 +269,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       Key](_p.name(), state_name, consume step_id_map, partition,
         StateRunnerBuilder[S](s_initializer, state_name,
           s_comp.state_change_builders()),
-        TypedRouteBuilder[StateProcessor[S] val],
+        TypedRouteBuilder[StateProcessor[S]],
         TypedRouteBuilder[Next]
         where multi_worker = multi_worker, default_state_name' =
         default_state_name)

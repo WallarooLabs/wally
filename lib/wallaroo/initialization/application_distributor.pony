@@ -86,8 +86,7 @@ actor ApplicationDistributor is Distributor
           = default_targets.create()
 
       // We use these graphs to build the local graphs for each worker
-      var local_graphs =
-        recover trn Map[String, Dag[StepInitializer] trn] end
+      var local_graphs = recover trn Map[String, Dag[StepInitializer] trn] end
 
       // Initialize values for local graphs
       local_graphs(initializer_name) = Dag[StepInitializer]
@@ -121,12 +120,14 @@ actor ApplicationDistributor is Distributor
       let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
 
 
-      @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
+      @printf[I32](("Found " + application.pipelines.size().string() +
+        " pipelines in application\n").cstring())
 
       // Add stepbuilders for each pipeline into LocalGraphs to distribute to // workers
       for pipeline in application.pipelines.values() do
         if not pipeline.is_coalesced() then
-          @printf[I32](("Coalescing is off for " + pipeline.name() + " pipeline\n").cstring())
+          @printf[I32](("Coalescing is off for " + pipeline.name() +
+            " pipeline\n").cstring())
         end
 
         // Since every worker will have an instance of the sink, we record
@@ -143,7 +144,9 @@ actor ApplicationDistributor is Distributor
         var pipeline_default_state_name = ""
         var pipeline_default_target_worker = ""
 
-        @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " uncoalesced runner builders\n").cstring())
+        @printf[I32](("The " + pipeline.name() + " pipeline has " +
+          pipeline.size().string() + " uncoalesced runner builders\n")
+          .cstring())
 
 
         ///////////
@@ -376,8 +379,7 @@ actor ApplicationDistributor is Distributor
         // doesn't need to know its immediate cross-worker predecessor.
         // If the source has a prestate runner on it, then we set this
         // to None since it won't send directly to anything.
-        var last_initializer: (U128 | Array[U128] | None)
-        =
+        var last_initializer: (U128 | Array[U128] | None) =
           if source_seq_builder.state_name() == "" then
             (source_node_id)
           else

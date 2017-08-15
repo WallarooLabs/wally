@@ -160,5 +160,5 @@ primitive UpdateCounter
     @printf[I32]("UpdateCounter\n".cstring())
     (state(c), None)
 
-  fun state_change_builders(): Array[StateChangeBuilder[Counter] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[Counter]] val =>
     recover Array[StateChangeBuilder[Counter] val] end

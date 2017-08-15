@@ -345,7 +345,7 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
   fun name(): String =>
     _name
 
-  fun state_change_builders(): Array[StateChangeBuilder[PyState] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[PyState]] val =>
     recover val Array[StateChangeBuilder[PyState] val] end
 
   fun _serialise_space(): USize =>

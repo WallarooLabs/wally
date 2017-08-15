@@ -133,6 +133,6 @@ primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
     (state.string(), DirectStateChange)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[WindowState] val] val
+    Array[StateChangeBuilder[WindowState]] val
   =>
-    recover Array[StateChangeBuilder[WindowState] val] end
+    recover Array[StateChangeBuilder[WindowState]] end

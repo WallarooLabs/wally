@@ -14,7 +14,7 @@ use "wallaroo/routing"
 type WeightedKey[Key: (Hashable val & Equatable[Key])] is
   (Key, USize)
 
-class Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
+class val Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
   let _function: PartitionFunction[In, Key] val
   let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
 
