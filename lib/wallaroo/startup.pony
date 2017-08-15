@@ -468,10 +468,8 @@ actor Startup
       // Prepare control and data addresses, but sub in correct host for
       // the worker that sent inform message (since it didn't know its
       // host string as seen externally)
-      let control_addrs: Map[String, (String, String)] trn =
-        recover Map[String, (String, String)] end
-      let data_addrs: Map[String, (String, String)] trn =
-        recover Map[String, (String, String)] end
+      let control_addrs = recover trn Map[String, (String, String)] end
+      let data_addrs = recover trn Map[String, (String, String)] end
       for (worker, addr) in m.control_addrs.pairs() do
         if m.sender_name == worker then
           control_addrs(worker) = (info_sending_host, addr._2)
@@ -531,7 +529,7 @@ actor Startup
     """
     Read in a list of the names of all workers after recovery.
     """
-    let ws: Array[String] trn = recover Array[String] end
+    let ws = recover trn Array[String] end
 
     let file = File(worker_names_filepath)
     for worker_name in file.lines() do

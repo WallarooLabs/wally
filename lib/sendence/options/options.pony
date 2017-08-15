@@ -116,7 +116,7 @@ class Options is Iterator[(ParsedOption | ParseError | None)]
     this will only include positional arguments, potentially unrecognised and
     ambiguous options and invalid arguments.
     """
-    let out: Array[String] trn = recover Array[String] end
+    let out = recover trn Array[String] end
     for arg in _arguments.values() do
       out.push(arg.clone())
     end

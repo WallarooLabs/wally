@@ -113,7 +113,7 @@ actor ClusterInitializer
       _connections_ready_workers.set(worker_name)
       _interconnected = _interconnected + 1
       if _interconnected == _expected then
-        let names: Array[String] trn = recover Array[String] end
+        let names = recover trn Array[String] end
         for name in _worker_names.values() do
           names.push(name)
         end
@@ -148,7 +148,7 @@ actor ClusterInitializer
   //   _connections.register_proxy(worker, proxy)
 
   fun _create_data_channel_listeners() =>
-    let ws: Array[String] trn = recover Array[String] end
+    let ws = recover trn Array[String] end
 
     if not _worker_names.contains(_initializer_name) then
       ws.push(_initializer_name)
@@ -192,15 +192,12 @@ actor ClusterInitializer
   fun _generate_addresses_map(): (Map[String, (String, String)] val,
     Map[String, (String, String)] val)
   =>
-    let map: Map[String, Map[String, (String, String)]] trn =
-      recover Map[String, Map[String, (String, String)]] end
-    let control_map: Map[String, (String, String)] trn =
-      recover Map[String, (String, String)] end
+    let map = recover trn Map[String, Map[String, (String, String)]] end
+    let control_map = recover trn Map[String, (String, String)] end
     for (key, value) in _control_addrs.pairs() do
       control_map(key) = value
     end
-    let data_map: Map[String, (String, String)] trn =
-      recover Map[String, (String, String)] end
+    let data_map = recover trn Map[String, (String, String)] end
     for (key, value) in _data_addrs.pairs() do
       data_map(key) = value
     end

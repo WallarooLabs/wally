@@ -68,8 +68,7 @@ primitive _DagGenerator
 
 primitive _StepMapGenerator
   fun apply(): Map[U128, (ProxyAddress | U128)] val =>
-    let m: Map[U128, (ProxyAddress | U128)] trn =
-      recover Map[U128, (ProxyAddress | U128)] end
+    let m = recover trn Map[U128, (ProxyAddress | U128)] end
     m(1) = ProxyAddress("w1", 10)
     m(2) = ProxyAddress("w2", 20)
     m(3) = ProxyAddress("w3", 30)
@@ -79,8 +78,7 @@ primitive _BaseStateBuildersGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
     Map[String, StateSubpartition] val
   =>
-    let m: Map[String, StateSubpartition] trn =
-      recover Map[String, StateSubpartition] end
+    let m = recover trn Map[String, StateSubpartition] end
     m("state") = _BaseStateSubpartitionGenerator(rb, pf)
     consume m
 
@@ -88,8 +86,7 @@ primitive _TargetStateBuildersGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
     Map[String, StateSubpartition] val
   =>
-    let m: Map[String, StateSubpartition] trn =
-      recover Map[String, StateSubpartition] end
+    let m = recover trn Map[String, StateSubpartition] end
     m("state") = _TargetStateSubpartitionGenerator(rb, pf)
     consume m
 
@@ -111,8 +108,7 @@ primitive _TargetStateSubpartitionGenerator
 
 primitive _BaseKeyedPartitionAddressesGenerator
   fun apply(): KeyedPartitionAddresses[String] val =>
-    let m: Map[String, ProxyAddress] trn =
-      recover Map[String, ProxyAddress] end
+    let m = recover trn Map[String, ProxyAddress] end
     m("k1") = ProxyAddress("w1", 10)
     m("k2") = ProxyAddress("w2", 20)
     m("k3") = ProxyAddress("w3", 30)
@@ -120,8 +116,7 @@ primitive _BaseKeyedPartitionAddressesGenerator
 
 primitive _TargetKeyedPartitionAddressesGenerator
   fun apply(): KeyedPartitionAddresses[String] val =>
-    let m: Map[String, ProxyAddress] trn =
-      recover Map[String, ProxyAddress] end
+    let m = recover trn Map[String, ProxyAddress] end
     m("k1") = ProxyAddress("w2", 10)
     m("k2") = ProxyAddress("w2", 20)
     m("k3") = ProxyAddress("w3", 30)
@@ -129,7 +124,7 @@ primitive _TargetKeyedPartitionAddressesGenerator
 
 primitive _IdMapGenerator
   fun apply(): Map[String, U128] val =>
-    let m: Map[String, U128] trn = recover Map[String, U128] end
+    let m = recover trn Map[String, U128] end
     m("k1") = 10
     m("k2") = 20
     m("k3") = 30

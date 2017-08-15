@@ -47,8 +47,7 @@ actor ActorSystemDistributor is Distributor
       (worker_count / actor_count) actors. The last worker also gets the
       remaining actors after all those have been distributed.
       */
-      let actor_to_worker_map: Map[U128, String] trn =
-        recover Map[U128, String] end
+      let actor_to_worker_map = recover trn Map[U128, String] end
       let actor_builders = _system.actor_builders()
       let actor_count = actor_builders.size()
       let base_share = actor_count / worker_count
@@ -56,8 +55,7 @@ actor ActorSystemDistributor is Distributor
       var actor_idx: USize = 0
       var worker_idx: USize = 0
       var cur_worker_share: USize = 0
-      var cur_actors: Array[WActorWrapperBuilder] trn =
-        recover Array[WActorWrapperBuilder] end
+      var cur_actors = recover trn Array[WActorWrapperBuilder] end
       while actor_idx < actor_count do
         let next_actor = actor_builders(actor_idx)
         actor_to_worker_map(next_actor.id()) = workers(worker_idx)

@@ -148,8 +148,7 @@ actor TCPSourceListener is SourceListener
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   =>
-    let new_builders: Map[String, OutgoingBoundaryBuilder] trn =
-      recover Map[String, OutgoingBoundaryBuilder] end
+    let new_builders = recover trn Map[String, OutgoingBoundaryBuilder] end
     // TODO: A persistent map on the field would be much more efficient here
     for (target_worker_name, builder) in _outgoing_boundary_builders.pairs() do
       new_builders(target_worker_name) = builder

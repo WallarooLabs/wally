@@ -20,7 +20,7 @@ class iso _TestExternalUpdateDecision is UnitTest
     // Incomparable timestamps mean we go by lexicographic ordering of
     // worker names.  In this case, the source of the external update
     // has a lower name, so we don't update.
-    let cur_ts1_map: Map[String, U64] trn = recover Map[String, U64] end
+    let cur_ts1_map = recover trn Map[String, U64] end
     cur_ts1_map("w1") = 0
     cur_ts1_map("w2") = 2
     cur_ts1_map("w3") = 1
@@ -29,7 +29,7 @@ class iso _TestExternalUpdateDecision is UnitTest
     map1("k1") = (cur_ts1, U64(0))
     map1("k2") = (cur_ts1, U64(0))
     map1("k4") = (cur_ts1, U64(0))
-    let ext_ts1_map: Map[String, U64] trn = recover Map[String, U64] end
+    let ext_ts1_map = recover trn Map[String, U64] end
     ext_ts1_map("w1") = 0
     ext_ts1_map("w2") = 2
     ext_ts1_map("w3") = 1
@@ -41,7 +41,7 @@ class iso _TestExternalUpdateDecision is UnitTest
     // Incomparable timestamps mean we go by lexicographic ordering of
     // worker names.  In this case, the source of the external update
     // has a higher name, so we do update.
-    let cur_ts2_map: Map[String, U64] trn = recover Map[String, U64] end
+    let cur_ts2_map = recover trn Map[String, U64] end
     cur_ts2_map("w1") = 0
     cur_ts2_map("w2") = 2
     cur_ts2_map("w3") = 1
@@ -50,7 +50,7 @@ class iso _TestExternalUpdateDecision is UnitTest
     map2("k1") = (cur_ts2, U64(0))
     map2("k2") = (cur_ts2, U64(0))
     map1("k4") = (cur_ts2, U64(0))
-    let ext_ts2_map: Map[String, U64] trn = recover Map[String, U64] end
+    let ext_ts2_map = recover trn Map[String, U64] end
     ext_ts2_map("w1") = 0
     ext_ts2_map("w2") = 3
     ext_ts2_map("w4") = 1
@@ -61,7 +61,7 @@ class iso _TestExternalUpdateDecision is UnitTest
 
     // If timestamps are comparable and the source of the external update
     // is greater, then update.
-    let cur_ts3_map: Map[String, U64] trn = recover Map[String, U64] end
+    let cur_ts3_map = recover trn Map[String, U64] end
     cur_ts3_map("w1") = 0
     cur_ts3_map("w2") = 2
     cur_ts3_map("w3") = 1
@@ -69,7 +69,7 @@ class iso _TestExternalUpdateDecision is UnitTest
     let map3 = Map[String, (VectorTimestamp, Any val)]
     map3("k1") = (cur_ts3, U64(0))
     map3("k2") = (cur_ts3, U64(0))
-    let ext_ts3_map: Map[String, U64] trn = recover Map[String, U64] end
+    let ext_ts3_map = recover trn Map[String, U64] end
     ext_ts3_map("w1") = 1
     ext_ts3_map("w2") = 2
     ext_ts3_map("w3") = 2
@@ -80,7 +80,7 @@ class iso _TestExternalUpdateDecision is UnitTest
 
     // If timestamps are comparable and the source of the external update
     // is <, then do not update.
-    let cur_ts4_map: Map[String, U64] trn = recover Map[String, U64] end
+    let cur_ts4_map = recover trn Map[String, U64] end
     cur_ts4_map("w1") = 3
     cur_ts4_map("w2") = 2
     cur_ts4_map("w3") = 4
@@ -88,7 +88,7 @@ class iso _TestExternalUpdateDecision is UnitTest
     let map4 = Map[String, (VectorTimestamp, Any val)]
     map4("k1") = (cur_ts4, U64(0))
     map4("k2") = (cur_ts4, U64(0))
-    let ext_ts4_map: Map[String, U64] trn = recover Map[String, U64] end
+    let ext_ts4_map = recover trn Map[String, U64] end
     ext_ts4_map("w1") = 1
     ext_ts4_map("w2") = 1
     ext_ts4_map("w3") = 1
@@ -100,7 +100,7 @@ class iso _TestExternalUpdateDecision is UnitTest
 
     // If timestamps are comparable and the source of the external update
     // is ==, then do not update.
-    let cur_ts5_map: Map[String, U64] trn = recover Map[String, U64] end
+    let cur_ts5_map = recover trn Map[String, U64] end
     cur_ts5_map("w1") = 1
     cur_ts5_map("w2") = 1
     cur_ts5_map("w3") = 1
@@ -108,7 +108,7 @@ class iso _TestExternalUpdateDecision is UnitTest
     let map5 = Map[String, (VectorTimestamp, Any val)]
     map5("k1") = (cur_ts5, U64(0))
     map5("k2") = (cur_ts5, U64(0))
-    let ext_ts5_map: Map[String, U64] trn = recover Map[String, U64] end
+    let ext_ts5_map = recover trn Map[String, U64] end
     ext_ts5_map("w1") = 1
     ext_ts5_map("w2") = 1
     ext_ts5_map("w3") = 1

@@ -393,8 +393,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
   fun partition_addresses(workers: (String | Array[String] val)):
     KeyedPartitionAddresses[Key] val
   =>
-    let m: Map[Key, ProxyAddress] trn =
-      recover Map[Key, ProxyAddress] end
+    let m = recover trn Map[Key, ProxyAddress] end
 
     match workers
     | let w: String =>

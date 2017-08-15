@@ -40,7 +40,7 @@ actor Recovery
     initializer: (LocalTopologyInitializer | WActorInitializer),
     workers: Array[String] val)
   =>
-    let other_workers: Array[String] trn = recover Array[String] end
+    let other_workers = recover trn Array[String] end
     for w in workers.values() do
       if w != _worker_name then other_workers.push(w) end
     end

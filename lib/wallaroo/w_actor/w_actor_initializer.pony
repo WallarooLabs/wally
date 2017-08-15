@@ -99,7 +99,7 @@ actor WActorInitializer is LayoutInitializer
 
   be update_local_actor_system(las: LocalActorSystem) =>
     _system = las
-    let sinks: Array[Sink] trn = recover Array[Sink] end
+    let sinks = recover trn Array[Sink] end
     for (idx, sink_builder) in las.sinks().pairs() do
       let empty_metrics_reporter =
         MetricsReporter(_app_name, "",

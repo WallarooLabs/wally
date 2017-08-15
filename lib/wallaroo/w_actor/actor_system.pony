@@ -106,15 +106,13 @@ class val LocalActorSystem
     LocalActorSystem
   =>
     //TODO: Use persistent vector once it's available to improve perf here
-    let arr: Array[WActorWrapperBuilder] trn =
-      recover Array[WActorWrapperBuilder] end
+    let arr = recover trn Array[WActorWrapperBuilder] end
     for a in _actor_builders.values() do
       arr.push(a)
     end
     arr.push(builder)
     //TODO: Use persistent map here to improve perf
-    let new_actor_to_worker: Map[U128, String] trn =
-      recover Map[U128, String] end
+    let new_actor_to_worker = recover trn Map[U128, String] end
     for (k, v) in _actor_to_worker_map.pairs() do
       new_actor_to_worker(k) = v
     end
@@ -125,8 +123,7 @@ class val LocalActorSystem
 
   fun register_as_role(role: String, id: U128): LocalActorSystem =>
     //TODO: Use persistent map to improve perf
-    let new_roles: Map[String, Role box] trn =
-      recover Map[String, Role box] end
+    let new_roles = recover trn Map[String, Role box] end
     for (k, v) in _roles.pairs() do
       if k == role then
         let old_role_actors = v.actors()

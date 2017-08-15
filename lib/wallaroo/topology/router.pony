@@ -322,8 +322,7 @@ class val StepIdRouter is OmniRouter
   fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
-    let new_outgoing_boundaries: Map[String, OutgoingBoundary] trn =
-      recover Map[String, OutgoingBoundary] end
+    let new_outgoing_boundaries = recover trn Map[String, OutgoingBoundary] end
     for (k, v) in _outgoing_boundaries.pairs() do
       new_outgoing_boundaries(k) = v
     end
@@ -334,14 +333,11 @@ class val StepIdRouter is OmniRouter
   fun val update_route_to_proxy(id: U128, pa: ProxyAddress): OmniRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
-    let new_data_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
-    let new_step_map: Map[U128, (ProxyAddress | U128)] trn =
-      recover Map[U128, (ProxyAddress | U128)] end
+    let new_data_routes = recover trn Map[U128, Consumer] end
+    let new_step_map = recover trn Map[U128, (ProxyAddress | U128)] end
     for (k, v) in _data_routes.pairs() do
       if k != id then new_data_routes(k) = v end
     end
-
     for (k, v) in _step_map.pairs() do
       new_step_map(k) = v
     end
@@ -353,10 +349,8 @@ class val StepIdRouter is OmniRouter
   fun val update_route_to_step(id: U128, step: Consumer): OmniRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
-    let new_data_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
-    let new_step_map: Map[U128, (ProxyAddress | U128)] trn =
-      recover Map[U128, (ProxyAddress | U128)] end
+    let new_data_routes = recover trn Map[U128, Consumer] end
+    let new_step_map = recover trn Map[U128, (ProxyAddress | U128)] end
     for (k, v) in _data_routes.pairs() do
       if k != id then new_data_routes(k) = v end
     end
@@ -371,14 +365,14 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries)
 
   fun routes(): Array[Consumer] val =>
-    let diff: Array[Consumer] trn = recover Array[Consumer] end
+    let diff = recover trn Array[Consumer] end
     for r in _data_routes.values() do
       diff.push(r)
     end
     consume diff
 
   fun routes_not_in(router: OmniRouter): Array[Consumer] val =>
-    let diff: Array[Consumer] trn = recover Array[Consumer] end
+    let diff = recover trn Array[Consumer] end
     let other_routes = router.routes()
     for r in _data_routes.values() do
       if not other_routes.contains(r) then diff.push(r) end
@@ -473,10 +467,8 @@ class val DataRouter is Equatable[DataRouter]
     _data_routes = data_routes
     var route_id: RouteId = 0
     let keys: Array[U128] = keys.create()
-    let tid_map: Map[U128, RouteId] trn =
-      recover Map[U128, RouteId] end
-    let rid_map: Map[RouteId, U128] trn =
-      recover Map[RouteId, U128] end
+    let tid_map = recover trn Map[U128, RouteId] end
+    let rid_map = recover trn Map[RouteId, U128] end
     for step_id in _data_routes.keys() do
       keys.push(step_id)
     end
@@ -589,7 +581,7 @@ class val DataRouter is Equatable[DataRouter]
     ids
 
   fun routes(): Array[Consumer] val =>
-    let rs: Array[Consumer] trn = recover Array[Consumer] end
+    let rs = recover trn Array[Consumer] end
     for step in _data_routes.values() do
       rs.push(step)
     end
@@ -598,18 +590,15 @@ class val DataRouter is Equatable[DataRouter]
   fun remove_route(id: U128): DataRouter =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
-    let new_data_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
+    let new_data_routes = recover trn Map[U128, Consumer] end
     for (k, v) in _data_routes.pairs() do
       if k != id then new_data_routes(k) = v end
     end
-    let new_tid_map: Map[U128, RouteId] trn =
-      recover Map[U128, RouteId] end
+    let new_tid_map = recover trn Map[U128, RouteId] end
     for (k, v) in _target_ids_to_route_ids.pairs() do
       if k != id then new_tid_map(k) = v end
     end
-    let new_rid_map: Map[RouteId, U128] trn =
-      recover Map[RouteId, U128] end
+    let new_rid_map = recover trn Map[RouteId, U128] end
     for (k, v) in _route_ids_to_target_ids.pairs() do
       if v != id then new_rid_map(k) = v end
     end
@@ -619,15 +608,13 @@ class val DataRouter is Equatable[DataRouter]
   fun add_route(id: U128, target: Consumer): DataRouter =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
-    let new_data_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
+    let new_data_routes = recover trn Map[U128, Consumer] end
     for (k, v) in _data_routes.pairs() do
       new_data_routes(k) = v
     end
     new_data_routes(id) = target
 
-    let new_tid_map: Map[U128, RouteId] trn =
-      recover Map[U128, RouteId] end
+    let new_tid_map = recover trn Map[U128, RouteId] end
     var highest_route_id: RouteId = 0
     for (k, v) in _target_ids_to_route_ids.pairs() do
       new_tid_map(k) = v
@@ -636,8 +623,7 @@ class val DataRouter is Equatable[DataRouter]
     let new_route_id = highest_route_id + 1
     new_tid_map(id) = new_route_id
 
-    let new_rid_map: Map[RouteId, U128] trn =
-      recover Map[RouteId, U128] end
+    let new_rid_map = recover trn Map[RouteId, U128] end
     for (k, v) in _route_ids_to_target_ids.pairs() do
       new_rid_map(k) = v
     end
@@ -814,8 +800,7 @@ class val LocalPartitionRouter[In: Any val,
     end
 
   fun routes(): Array[Consumer] val =>
-    let cs: Array[Consumer] trn =
-      recover Array[Consumer] end
+    let cs = recover trn Array[Consumer] end
 
     for s in _partition_routes.values() do
       match s
@@ -827,7 +812,7 @@ class val LocalPartitionRouter[In: Any val,
     consume cs
 
   fun routes_not_in(router: Router): Array[Consumer] val =>
-    let diff: Array[Consumer] trn = recover Array[Consumer] end
+    let diff = recover trn Array[Consumer] end
     let other_routes = router.routes()
     for r in routes().values() do
       if not other_routes.contains(r) then diff.push(r) end
@@ -844,9 +829,8 @@ class val LocalPartitionRouter[In: Any val,
     match raw_k
     | let key: Key =>
       let target_id = _step_ids(key)
-      let new_local_map: Map[U128, Step] trn = recover Map[U128, Step] end
-      let new_partition_routes: Map[Key, (Step | ProxyRouter)] trn =
-        recover Map[Key, (Step | ProxyRouter)] end
+      let new_local_map = recover trn Map[U128, Step] end
+      let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
       match target
       | let step: Step =>
         for (id, s) in _local_map.pairs() do
@@ -885,8 +869,7 @@ class val LocalPartitionRouter[In: Any val,
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     PartitionRouter
   =>
-    let new_partition_routes: Map[Key, (Step | ProxyRouter)] trn =
-      recover Map[Key, (Step | ProxyRouter)] end
+    let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
     for (k, target) in _partition_routes.pairs() do
       match target
       | let pr: ProxyRouter =>
@@ -1062,7 +1045,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       end
     end
 
-    let to_send: Array[Consumer] trn = recover Array[Consumer] end
+    let to_send = recover trn Array[Consumer] end
     for c in cs.values() do
       to_send.push(c)
     end
@@ -1070,7 +1053,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     consume to_send
 
   fun routes_not_in(router: Router): Array[Consumer] val =>
-    let diff: Array[Consumer] trn = recover Array[Consumer] end
+    let diff = recover trn Array[Consumer] end
     let other_routes = router.routes()
     for r in routes().values() do
       if not other_routes.contains(r) then diff.push(r) end
@@ -1083,8 +1066,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
     let target_id = _step_ids(partition_id)
-    let new_partition_routes: Map[U64, (Step | ProxyRouter)] trn =
-      recover Map[U64, (Step | ProxyRouter)] end
+    let new_partition_routes = recover trn Map[U64, (Step | ProxyRouter)] end
     match target
     | let step: Step =>
       for (p_id, t) in _partition_routes.pairs() do
@@ -1113,8 +1095,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     StatelessPartitionRouter
   =>
-    let new_partition_routes: Map[U64, (Step | ProxyRouter)] trn =
-      recover Map[U64, (Step | ProxyRouter)] end
+    let new_partition_routes = recover trn Map[U64, (Step | ProxyRouter)] end
     for (p_id, target) in _partition_routes.pairs() do
       match target
       | let pr: ProxyRouter =>

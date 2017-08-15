@@ -40,15 +40,15 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
 
-    let base_local_map: Map[U128, Step] trn = recover Map[U128, Step] end
+    let base_local_map = recover trn Map[U128, Step] end
     base_local_map(1) = step1
     let target_local_map: Map[U128, Step] val = recover Map[U128, Step] end
 
-    let base_step_ids: Map[String, U128] trn = recover Map[String, U128] end
+    let base_step_ids = recover trn Map[String, U128] end
     base_step_ids("k1") = 1
     base_step_ids("k2") = 2
     base_step_ids("k3") = 3
-    let target_step_ids: Map[String, U128] trn = recover Map[String, U128] end
+    let target_step_ids = recover trn Map[String, U128] end
     target_step_ids("k1") = 1
     target_step_ids("k2") = 2
     target_step_ids("k3") = 3
@@ -97,30 +97,24 @@ class iso _TestOmniRouterEquality is UnitTest
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
 
-    let base_data_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
+    let base_data_routes = recover trn Map[U128, Consumer] end
     base_data_routes(1) = step1
 
-    let target_data_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
+    let target_data_routes = recover trn Map[U128, Consumer] end
     target_data_routes(2) = step2
 
-    let base_step_map: Map[U128, (ProxyAddress | U128)] trn =
-      recover Map[U128, (ProxyAddress | U128)] end
+    let base_step_map = recover trn Map[U128, (ProxyAddress | U128)] end
     base_step_map(1) = ProxyAddress("w1", 1)
     base_step_map(2) = ProxyAddress("w2", 2)
 
-    let target_step_map: Map[U128, (ProxyAddress | U128)] trn =
-      recover Map[U128, (ProxyAddress | U128)] end
+    let target_step_map = recover trn Map[U128, (ProxyAddress | U128)] end
     target_step_map(1) = ProxyAddress("w2", 1)
     target_step_map(2) = ProxyAddress("w1", 2)
 
-    let base_boundaries: Map[String, OutgoingBoundary] trn =
-      recover Map[String, OutgoingBoundary] end
+    let base_boundaries = recover trn Map[String, OutgoingBoundary] end
     base_boundaries("w2") = boundary2
 
-    let target_boundaries: Map[String, OutgoingBoundary] trn =
-      recover Map[String, OutgoingBoundary] end
+    let target_boundaries = recover trn Map[String, OutgoingBoundary] end
     target_boundaries("w2") = boundary2
     target_boundaries("w3") = boundary3
 
@@ -157,13 +151,11 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     let step1 = _StepGenerator(event_log, recovery_replayer)
     let step2 = _StepGenerator(event_log, recovery_replayer)
 
-    let base_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
+    let base_routes = recover trn Map[U128, Consumer] end
     base_routes(1) = step1
     base_routes(2) = step2
 
-    let target_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
+    let target_routes = recover trn Map[U128, Consumer] end
     target_routes(1) = step1
 
     var base_router = DataRouter(consume base_routes)
@@ -192,12 +184,10 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     let step1 = _StepGenerator(event_log, recovery_replayer)
     let step2 = _StepGenerator(event_log, recovery_replayer)
 
-    let base_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
+    let base_routes = recover trn Map[U128, Consumer] end
     base_routes(1) = step1
 
-    let target_routes: Map[U128, Consumer] trn =
-      recover Map[U128, Consumer] end
+    let target_routes = recover trn Map[U128, Consumer] end
     target_routes(1) = step1
     target_routes(2) = step2
 
@@ -215,8 +205,7 @@ primitive _BasePartitionRoutesGenerator
     boundary2: OutgoingBoundary, boundary3: OutgoingBoundary):
     Map[String, (Step | ProxyRouter)] val
   =>
-    let m: Map[String, (Step | ProxyRouter)] trn =
-      recover Map[String, (Step | ProxyRouter)] end
+    let m = recover trn Map[String, (Step | ProxyRouter)] end
     m("k1") = step1
     m("k2") = ProxyRouter("w1", boundary2,
       ProxyAddress("w2", 2), auth)
@@ -229,8 +218,7 @@ primitive _TargetPartitionRoutesGenerator
     new_proxy_router: ProxyRouter, boundary2: OutgoingBoundary,
     boundary3: OutgoingBoundary): Map[String, (Step | ProxyRouter)] val
   =>
-    let m: Map[String, (Step | ProxyRouter)] trn =
-      recover Map[String, (Step | ProxyRouter)] end
+    let m = recover trn Map[String, (Step | ProxyRouter)] end
     m("k1") = new_proxy_router
     m("k2") = ProxyRouter("w1", boundary2,
       ProxyAddress("w2", 2), auth)

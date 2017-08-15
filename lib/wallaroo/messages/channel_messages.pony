@@ -553,7 +553,7 @@ class val ReplayMsg is ChannelMsg
       size = size + bytes.size()
     end
 
-    let buffer: Array[U8] trn = recover Array[U8](size) end
+    let buffer = recover trn Array[U8](size) end
     for bytes in data_bytes.values() do
       buffer.append(bytes)
     end

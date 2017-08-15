@@ -82,8 +82,7 @@ primitive WallarooConfig
       match option
       | ("metrics", let arg: String) => so.m_arg = arg.split(":")
       | ("in", let arg: String) =>
-        let i_addrs_write: Array[Array[String]] trn =
-          recover Array[Array[String]] end
+        let i_addrs_write = recover trn Array[Array[String]] end
         for addr in arg.split(",").values() do
           i_addrs_write.push(addr.split(":"))
         end
@@ -94,7 +93,7 @@ primitive WallarooConfig
         so.c_service = so.c_addr(1)
       | ("data", let arg: String) =>
         let d_addr_ref = arg.split(":")
-        let d_addr_trn: Array[String] trn = recover Array[String] end
+        let d_addr_trn = recover trn Array[String] end
         d_addr_trn.push(d_addr_ref(0))
         d_addr_trn.push(d_addr_ref(1))
         so.d_addr = consume d_addr_trn

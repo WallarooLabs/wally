@@ -50,8 +50,7 @@ class WActorRegistry
 
   fun ref register_actor_for_worker(id: U128, worker: String) =>
     //TODO: Use persistent map to improve perf
-    let new_actor_to_worker: Map[U128, String] trn =
-      recover Map[U128, String] end
+    let new_actor_to_worker = recover trn Map[U128, String] end
     for (k, v) in _actor_to_worker_map.pairs() do
       new_actor_to_worker(k) = v
     end
@@ -80,8 +79,7 @@ class WActorRegistry
     let new_builder = StatefulWActorWrapperBuilder(new_id, builder)
 
     //TODO: Use persistent map to improve perf
-    let new_actor_to_worker: Map[U128, String] trn =
-      recover Map[U128, String] end
+    let new_actor_to_worker = recover trn Map[U128, String] end
     for (k, v) in _actor_to_worker_map.pairs() do
       new_actor_to_worker(k) = v
     end
@@ -236,8 +234,7 @@ actor CentralWActorRegistry
 
   fun ref _remove_actor_from_worker_map(id: U128) =>
     //TODO: Use persistent map to improve perf
-    let new_actor_to_worker: Map[U128, String] trn =
-      recover Map[U128, String] end
+    let new_actor_to_worker = recover trn Map[U128, String] end
     for (k, v) in _actor_to_worker_map.pairs() do
       if k != id then
         new_actor_to_worker(k) = v
@@ -257,8 +254,7 @@ actor CentralWActorRegistry
         (_actor_to_worker_map(id) == worker))
       then
         //TODO: Use persistent map to improve perf
-        let new_actor_to_worker: Map[U128, String] trn =
-          recover Map[U128, String] end
+        let new_actor_to_worker = recover trn Map[U128, String] end
         for (k, v) in _actor_to_worker_map.pairs() do
           new_actor_to_worker(k) = v
         end
@@ -448,8 +444,7 @@ actor CentralWActorRegistry
     end
 
   be send_digest(worker: String) =>
-    let role_sets: Map[String, SetIs[U128]] trn =
-      recover Map[String, SetIs[U128]] end
+    let role_sets = recover trn Map[String, SetIs[U128]] end
     for (k, v) in _role_sets.pairs() do
       let next_set = recover SetIs[U128] end
       for id in v.values() do
@@ -457,8 +452,7 @@ actor CentralWActorRegistry
       end
       role_sets(k) = consume next_set
     end
-    let actor_to_worker_map: Map[U128, String] trn =
-      recover Map[U128, String] end
+    let actor_to_worker_map = recover trn Map[U128, String] end
     for (k, v) in _actor_to_worker_map.pairs() do
       actor_to_worker_map(k) = v
     end

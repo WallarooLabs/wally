@@ -62,8 +62,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   fun update_key[K: (Hashable val & Equatable[K] val)](key: K,
     pa: ProxyAddress): PartitionAddresses val ?
   =>
-    let new_addresses: Map[Key, ProxyAddress] trn =
-      recover Map[Key, ProxyAddress] end
+    let new_addresses = recover trn Map[Key, ProxyAddress] end
     // TODO: This would be much more efficient with a persistent map, since
     // we wouldn't have to copy everything to make a small change.
     for (k, v) in _addresses.pairs() do
@@ -119,8 +118,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
     end
 
   fun steps(): Array[Consumer] val =>
-    let ss: Array[Consumer] trn =
-      recover Array[Consumer] end
+    let ss = recover trn Array[Consumer] end
     for s in _addresses.values() do
       match s
       | let cfcs: Consumer =>
@@ -175,10 +173,9 @@ class val KeyedStateSubpartition[PIn: Any val,
     default_router: (Router | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>
-    let routes: Map[Key, (Step | ProxyRouter)] trn =
-      recover Map[Key, (Step | ProxyRouter)] end
+    let routes = recover trn Map[Key, (Step | ProxyRouter)] end
 
-    let m: Map[U128, Step] trn = recover Map[U128, Step] end
+    let m = recover trn Map[U128, Step] end
 
     var partition_count: USize = 0
 
@@ -254,8 +251,7 @@ primitive PartitionFileReader
   fun apply(filename: String, auth: AmbientAuth):
     Array[WeightedKey[String]] val
   =>
-    let keys: Array[WeightedKey[String]] trn =
-      recover Array[WeightedKey[String]] end
+    let keys = recover trn Array[WeightedKey[String]] end
 
     try
       let file = File(FilePath(auth, filename))

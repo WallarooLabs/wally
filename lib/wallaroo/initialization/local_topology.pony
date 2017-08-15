@@ -114,8 +114,7 @@ class val LocalTopology
     state_name: String, key: Key, pa: ProxyAddress): LocalTopology ?
   =>
     let new_subpartition = _state_builders(state_name).update_key[Key](key, pa)
-    let new_state_builders: Map[String, StateSubpartition] trn =
-      recover Map[String, StateSubpartition] end
+    let new_state_builders = recover trn Map[String, StateSubpartition] end
     for (k, v) in _state_builders.pairs() do
       new_state_builders(k) = v
     end
@@ -126,7 +125,7 @@ class val LocalTopology
 
   fun val add_worker_name(w: String): LocalTopology =>
     if not worker_names.contains(w) then
-      let new_worker_names: Array[String] trn = recover Array[String] end
+      let new_worker_names = recover trn Array[String] end
       for n in worker_names.values() do
         new_worker_names.push(n)
       end
@@ -306,16 +305,14 @@ actor LocalTopologyInitializer is LayoutInitializer
     builder: OutgoingBoundaryBuilder)
   =>
     // Boundaries
-    let bs: Map[String, OutgoingBoundary] trn =
-      recover Map[String, OutgoingBoundary] end
+    let bs = recover trn Map[String, OutgoingBoundary] end
     for (w, b) in _outgoing_boundaries.pairs() do
       bs(w) = b
     end
     bs(target_worker) = boundary
 
     // Boundary builders
-    let bbs: Map[String, OutgoingBoundaryBuilder] trn =
-      recover Map[String, OutgoingBoundaryBuilder] end
+    let bbs = recover trn Map[String, OutgoingBoundaryBuilder] end
     for (w, b) in _outgoing_boundary_builders.pairs() do
       bbs(w) = b
     end
@@ -576,8 +573,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         // Keep track of all Consumers by id so we can create a
         // DataRouter for the data channel boundary
-        var data_routes: Map[U128, Consumer] trn =
-          recover Map[U128, Consumer] end
+        var data_routes = recover trn Map[U128, Consumer] end
 
         // Update the step ids for all OutgoingBoundaries
         if _worker_count > 1 then
@@ -595,8 +591,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         // Keep track of steps we've built that we'll use for the OmniRouter.
         // Unlike data_routes, these will not include state steps, which will
         // never be direct targets for state computation outputs.
-        let built_stateless_steps: Map[U128, Consumer] trn =
-          recover Map[U128, Consumer] end
+        let built_stateless_steps = recover trn Map[U128, Consumer] end
 
         // TODO: Replace this when we move past the temporary POC based default
         // target strategy. There can currently only be one partition default
@@ -1015,9 +1010,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                   // Populate partition routes with all local steps in
                   // the partition and proxy routers for any steps that
                   // exist on other workers.
-                  let partition_routes:
-                    Map[U64, (Step | ProxyRouter)] trn =
-                    recover Map[U64, (Step | ProxyRouter)] end
+                  let partition_routes =
+                    recover trn Map[U64, (Step | ProxyRouter)] end
 
                   for (p_id, step_id) in
                     pre_stateless_data.partition_id_to_step_id.pairs()
@@ -1312,10 +1306,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n".cstring())
     try
       let built_routers = Map[U128, Router]
-      let data_routes: Map[U128, Consumer] trn =
-        recover Map[U128, Consumer] end
-      let built_stateless_steps: Map[U128, Consumer] trn =
-        recover Map[U128, Consumer] end
+      let data_routes = recover trn Map[U128, Consumer] end
+      let built_stateless_steps = recover trn Map[U128, Consumer] end
 
       match _topology
       | let t: LocalTopology =>
