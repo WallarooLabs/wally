@@ -1,6 +1,7 @@
 use "collections"
 use "sendence/connemara"
 use "sendence/dag"
+use "wallaroo/core"
 use "wallaroo/routing"
 use "wallaroo/topology"
 
