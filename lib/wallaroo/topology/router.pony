@@ -249,23 +249,28 @@ class val StepIdRouter is OmniRouter
       @printf[I32]("Rcvd msg at OmniRouter\n".cstring())
     end
 
-    try
-      // Try as though this target_id step exists on this worker
-      let target = _data_routes(target_id)
+    if _data_routes.contains(target_id) then
+      try
+        let target = _data_routes(target_id)
 
-      let might_be_route = producer.route_to(target)
-      match might_be_route
-      | let r: Route =>
-        ifdef "trace" then
-          @printf[I32]("OmniRouter found Route to Step\n".cstring())
+        let might_be_route = producer.route_to(target)
+        match might_be_route
+        | let r: Route =>
+          ifdef "trace" then
+            @printf[I32]("OmniRouter found Route to Step\n".cstring())
+          end
+          let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
+            producer, msg_uid, frac_ids,
+            latest_ts, metrics_id, worker_ingress_ts)
+
+          (false, keep_sending, latest_ts)
+        else
+          // No route for this target
+          Fail()
+          (true, true, latest_ts)
         end
-        let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
-          producer, msg_uid, frac_ids,
-          latest_ts, metrics_id, worker_ingress_ts)
-
-        (false, keep_sending, latest_ts)
       else
-        // No route for this target
+        // unreachable. we did a contains on our map before doing a lookup
         Fail()
         (true, true, latest_ts)
       end
