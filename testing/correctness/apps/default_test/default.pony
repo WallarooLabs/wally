@@ -202,10 +202,10 @@ primitive UpdateDefaultState is StateComputation[String, Result val,
     (res, state_change)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[DefaultState] val] val
+    Array[StateChangeBuilder[DefaultState]] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[DefaultState] val]
+      let scbs = Array[StateChangeBuilder[DefaultState]]
       scbs.push(recover val DefaultStateChangeBuilder end)
     end
 

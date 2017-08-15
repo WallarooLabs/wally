@@ -144,9 +144,6 @@ actor ClusterInitializer
       @printf[I32]("Duplicate topology ready sent to worker initializer!\n".cstring())
     end
 
-  // be register_proxy(worker: String, proxy: Step tag) =>
-  //   _connections.register_proxy(worker, proxy)
-
   fun _create_data_channel_listeners() =>
     let ws = recover trn Array[String] end
 

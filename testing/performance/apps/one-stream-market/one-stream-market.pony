@@ -189,9 +189,9 @@ primitive ProcessNbbo is StateComputation[FixNbboMessage val, NbboResult val,
     let res = NbboResult(msg, state.last_bid, state.last_offer, Time.nanos())
     (res, state_change)
 
-  fun state_change_builders(): Array[StateChangeBuilder[SymbolData] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[SymbolData]] val =>
     recover val
-      let scbs = Array[StateChangeBuilder[SymbolData] val]
+      let scbs = Array[StateChangeBuilder[SymbolData]]
       scbs.push(recover val SymbolDataStateChangeBuilder end)
     end
 

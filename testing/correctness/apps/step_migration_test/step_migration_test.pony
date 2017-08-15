@@ -43,7 +43,7 @@ actor Main
       for i in Range(0,10) do
         let wrapper = StateComputationWrapper[U64, U64, CountState](i.u64(),
               comp, 1001)
-        step_a.run[StateProcessor[CountState] val]("step a", 0, wrapper, step_a, i.u128(), None, i.u64(), 0, 0, 0, 0)
+        step_a.run[StateProcessor[CountState]]("step a", 0, wrapper, step_a, i.u128(), None, i.u64(), 0, 0, 0, 0)
       end
 
       //MIGRATE STATE
@@ -56,7 +56,7 @@ actor Main
       for i in Range(0,10) do
         let wrapper = StateComputationWrapper[U64, U64, CountState](i.u64(),
               comp, 1001)
-        step_b.run[StateProcessor[CountState] val]("step a", 0, wrapper, step_b, i.u128(), None, i.u64(), 0, 0, 0, 0)
+        step_b.run[StateProcessor[CountState]]("step a", 0, wrapper, step_b, i.u128(), None, i.u64(), 0, 0, 0, 0)
       end
     end
 
@@ -119,10 +119,10 @@ primitive CountComputation is StateComputation[U64, U64, CountState]
     (new_count, state_change)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[CountState] val] val
+    Array[StateChangeBuilder[CountState]] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[CountState] val]
+      let scbs = Array[StateChangeBuilder[CountState]]
       scbs.push(recover val CountStateChangeBuilder end)
     end
 

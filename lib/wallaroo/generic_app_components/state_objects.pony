@@ -66,10 +66,10 @@ primitive UpdateU64Counter is StateComputation[U64, U64, U64Counter]
     (input, state_change)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[U64Counter] val] val
+    Array[StateChangeBuilder[U64Counter]] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[U64Counter] val]
+      let scbs = Array[StateChangeBuilder[U64Counter]]
       scbs.push(recover val U64CounterStateChangeBuilder end)
     end
 
@@ -92,9 +92,9 @@ primitive UpdateU64Counter2 is StateComputation[U64, U64, U64Counter]
     (input, state_change)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[U64Counter] val] val
+    Array[StateChangeBuilder[U64Counter]] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[U64Counter] val]
+      let scbs = Array[StateChangeBuilder[U64Counter]]
       scbs.push(recover val U64CounterStateChangeBuilder end)
     end

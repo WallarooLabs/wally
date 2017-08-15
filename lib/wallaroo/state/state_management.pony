@@ -22,7 +22,7 @@ class EmptyStateChange[S: State ref] is StateChange[S]
   fun write_log_entry(out_writer: Writer) => None
   fun ref read_log_entry(in_reader: Reader) => None
 
-trait StateChangeBuilder[S: State ref]
+trait val StateChangeBuilder[S: State ref]
   fun apply(id: U64): StateChange[S]
 
 class StateChangeRepository[S: State ref]
@@ -33,7 +33,7 @@ class StateChangeRepository[S: State ref]
     _state_changes = Array[StateChange[S] ref]
     _named_lookup = Map[String val, U64]
 
-  fun ref make_and_register(scb: StateChangeBuilder[S] val): U64 =>
+  fun ref make_and_register(scb: StateChangeBuilder[S]): U64 =>
     let idx = _state_changes.size().u64()
     let sc = scb(idx)
     _named_lookup.update(sc.name(),idx)

@@ -24,9 +24,9 @@ interface StateComputation[In: Any val, Out: Any val, S: State ref] is BasicComp
 
   fun name(): String
 
-  fun state_change_builders(): Array[StateChangeBuilder[S] val] val
+  fun state_change_builders(): Array[StateChangeBuilder[S]] val
 
-trait StateProcessor[S: State ref] is BasicComputation
+trait val StateProcessor[S: State ref] is BasicComputation
   fun name(): String
   // Return a tuple containing a Bool indicating whether the message was
   // finished processing here, a Bool indicating whether a route can still
@@ -42,7 +42,7 @@ trait StateProcessor[S: State ref] is BasicComputation
 trait InputWrapper
   fun input(): Any val
 
-class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
+class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
   is (StateProcessor[S] & InputWrapper)
   let _state_comp: StateComputation[In, Out, S] val
   let _input: In
@@ -131,12 +131,12 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
 
   fun name(): String => _state_comp.name()
 
-interface BasicComputationBuilder
+interface val BasicComputationBuilder
   fun apply(): BasicComputation val
 
-interface ComputationBuilder[In: Any val, Out: Any val]
+interface val ComputationBuilder[In: Any val, Out: Any val]
   fun apply(): Computation[In, Out] val
 
-interface StateBuilder[S: State ref]
+interface val StateBuilder[S: State ref]
   fun apply(): S
   fun name(): String

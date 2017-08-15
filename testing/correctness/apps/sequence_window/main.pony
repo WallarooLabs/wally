@@ -232,6 +232,6 @@ primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
     Array[StateChangeBuilder[WindowState] val] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[WindowState] val]
+      let scbs = Array[StateChangeBuilder[WindowState]]
       scbs.push(recover val WindowStateChangeBuilder end)
     end

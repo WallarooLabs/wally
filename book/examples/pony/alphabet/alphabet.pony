@@ -93,10 +93,10 @@ primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
     (LetterTotal(votes.letter, votes.count + state.count), state_change)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[LetterState] val] val
+    Array[StateChangeBuilder[LetterState]] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[LetterState] val]
+      let scbs = Array[StateChangeBuilder[LetterState]]
       scbs.push(recover val AddVotesStateChangeBuilder end)
     end
 

@@ -182,12 +182,12 @@ class val RunnerSequenceBuilder is RunnerBuilder
     end
 
 class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
-  let _comp_builder: ComputationBuilder[In, Out] val
+  let _comp_builder: ComputationBuilder[In, Out]
   let _id: U128
   let _route_builder: RouteBuilder
   let _parallelized: Bool
 
-  new val create(comp_builder: ComputationBuilder[In, Out] val,
+  new val create(comp_builder: ComputationBuilder[In, Out],
     route_builder': RouteBuilder, id': U128 = 0,
     parallelized': Bool = false)
   =>
@@ -287,15 +287,15 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
     end
 
 class val StateRunnerBuilder[S: State ref] is RunnerBuilder
-  let _state_builder: StateBuilder[S] val
+  let _state_builder: StateBuilder[S]
   let _state_name: String
-  let _state_change_builders: Array[StateChangeBuilder[S] val] val
+  let _state_change_builders: Array[StateChangeBuilder[S]] val
   let _route_builder: RouteBuilder
   let _id: U128
 
-  new val create(state_builder: StateBuilder[S] val,
+  new val create(state_builder: StateBuilder[S],
     state_name': String,
-    state_change_builders: Array[StateChangeBuilder[S] val] val,
+    state_change_builders: Array[StateChangeBuilder[S]] val,
     route_builder': RouteBuilder = BoundaryOnlyRouteBuilder)
   =>
     _state_builder = state_builder
@@ -601,11 +601,11 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
       | let input: In =>
         match router
         | let shared_state_router: Router =>
-          let processor: StateComputationWrapper[In, Out, S] val =
+          let processor: StateComputationWrapper[In, Out, S] =
             StateComputationWrapper[In, Out, S](input, _state_comp,
               _target_id)
           shared_state_router.route[
-            StateComputationWrapper[In, Out, S] val](
+            StateComputationWrapper[In, Out, S]](
             metric_name, pipeline_time_spent, processor, producer,
             i_msg_uid, frac_ids, latest_ts, metrics_id + 1, worker_ingress_ts)
         else
@@ -651,7 +651,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
   fun ref set_step_id(id: U128) =>
     _id = id
 
-  fun ref register_state_change(scb: StateChangeBuilder[S] val) : U64 =>
+  fun ref register_state_change(scb: StateChangeBuilder[S]) : U64 =>
     _state_change_repository.make_and_register(scb)
 
   fun ref replay_log_entry(msg_uid: U128, frac_ids: FractionalMessageId,
@@ -680,7 +680,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
     match data
-    | let sp: StateProcessor[S] val =>
+    | let sp: StateProcessor[S] =>
       let new_metrics_id = ifdef "detailed-metrics" then
           // increment by 2 because we'll be reporting 2 step metrics below
           metrics_id + 2
