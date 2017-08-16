@@ -159,7 +159,9 @@ actor Step is (Producer & Consumer)
       let next_route = route_builder(this, consumer, _metrics_reporter)
       if not _routes.contains(consumer) then
         _routes(consumer) = next_route
-        _acker_x.add_route(next_route)
+        ifdef "resilience" then
+          _acker_x.add_route(next_route)
+        end
       end
     end
 
