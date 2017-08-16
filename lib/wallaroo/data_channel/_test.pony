@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "sendence/connemara"
 use "wallaroo/boundary"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/metrics"
 use "wallaroo/ent/network"
 use "wallaroo/topology"

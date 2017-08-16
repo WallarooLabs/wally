@@ -5,19 +5,6 @@ use "wallaroo/ent/network"
 use "wallaroo/recovery"
 use "wallaroo/topology"
 
-class _BoundaryId is Equatable[_BoundaryId]
-  let name: String
-  let step_id: U128
-
-  new create(n: String, s_id: U128) =>
-    name = n
-    step_id = s_id
-
-  fun eq(that: box->_BoundaryId): Bool =>
-    (name == that.name) and (step_id == that.step_id)
-
-  fun hash(): U64 =>
-    name.hash() xor step_id.hash()
 
 interface DataReceiversSubscriber
   be data_receiver_added(sender_name: String, boundary_step_id: U128,
@@ -29,7 +16,7 @@ actor DataReceivers
 
   var _initialized: Bool = false
 
-  let _data_receivers: Map[_BoundaryId, DataReceiver] =
+  let _data_receivers: Map[BoundaryId, DataReceiver] =
     _data_receivers.create()
   var _data_router: DataRouter =
     DataRouter(recover Map[U128, Consumer] end)
@@ -47,7 +34,7 @@ actor DataReceivers
   be subscribe(sub: DataReceiversSubscriber tag) =>
     _subscribers.set(sub)
 
-  fun _inform_subscribers(b_id: _BoundaryId, dr: DataReceiver) =>
+  fun _inform_subscribers(b_id: BoundaryId, dr: DataReceiver) =>
     for sub in _subscribers.values() do
       sub.data_receiver_added(b_id.name, b_id.step_id, dr)
     end
@@ -61,7 +48,7 @@ actor DataReceivers
     is the first time that OutgoingBoundary has connected to this worker,
     then we create a new DataReceiver here.
     """
-    let boundary_id = _BoundaryId(sender_name, sender_boundary_id)
+    let boundary_id = BoundaryId(sender_name, sender_boundary_id)
     let dr =
       try
         _data_receivers(boundary_id)

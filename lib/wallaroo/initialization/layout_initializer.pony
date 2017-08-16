@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/messages"
 
 trait tag LayoutInitializer
