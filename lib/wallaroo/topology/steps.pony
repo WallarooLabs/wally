@@ -149,14 +149,17 @@ actor Step is (Producer & Consumer)
     _route_builder = route_builder
 
   be register_routes(router: Router, route_builder: RouteBuilder) =>
+    ifdef "debug" then
+      if _initialized then
+        Fail()
+      end
+    end
+
     for consumer in router.routes().values() do
       let next_route = route_builder(this, consumer, _metrics_reporter)
       if not _routes.contains(consumer) then
         _routes(consumer) = next_route
         _acker_x.add_route(next_route)
-      end
-      if _initialized then
-        Fail()
       end
     end
 
