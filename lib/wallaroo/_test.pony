@@ -7,7 +7,7 @@ All tests can be run by compiling and running this package.
 """
 use "sendence/connemara"
 use broadcast = "ent/w_actor/broadcast"
-use cluster_manager = "cluster_manager"
+use cluster_manager = "ent/cluster_manager"
 use data_channel = "data_channel"
 use initialization = "initialization"
 use rebalancing = "rebalancing"
