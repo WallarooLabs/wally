@@ -97,7 +97,8 @@ class ControlChannelListenNotifier is TCPListenNotify
       @printf[I32]((_name + " control: listening on " + _host + ":" + _service
         + "\n").cstring())
     else
-      @printf[I32]((_name + "control : couldn't get local address\n").cstring())
+      @printf[I32]((_name + "control : couldn't get local address\n")
+        .cstring())
       listen.close()
     end
 
@@ -174,7 +175,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           | let i: ClusterInitializer =>
             i.identify_control_address(m.worker_name, host, m.service)
           end
-          _connections.create_control_connection(m.worker_name, host, m.service)
+          _connections.create_control_connection(m.worker_name, host,
+            m.service)
         end
       | let m: IdentifyDataPortMsg =>
         ifdef "trace" then

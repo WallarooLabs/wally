@@ -123,7 +123,8 @@ actor Connections is Cluster
         _listeners.push(TCPListener(auth, consume notifier, consume host',
           consume port'))
       else
-        @printf[I32]("could not recover host and port from file (replace with Fail())\n".cstring())
+        @printf[I32](("could not recover host and port from file (replace " +
+          " with Fail())\n").cstring())
       end
     else
       _listeners.push(TCPListener(auth, consume notifier, host, port))
@@ -145,12 +146,14 @@ actor Connections is Cluster
         var host': String = file.line()
         let port': String = file.line()
 
-        @printf[I32]("Restarting a data channel listener on %s:%s...\n\n".cstring(), host'.cstring(), port'.cstring())
+        @printf[I32]("Restarting a data channel listener on %s:%s...\n\n"
+          .cstring(), host'.cstring(), port'.cstring())
         let dch_listener = DataChannelListener(auth, consume notifier,
           router_registry, consume host', consume port')
         _data_channel_listeners.push(dch_listener)
       else
-        @printf[I32]("could not recover host and port from file (replace with Fail())\n".cstring())
+        @printf[I32](("could not recover host and port from file (replace " +
+          "with Fail())\n").cstring())
       end
     else
       let dch_listener = DataChannelListener(auth, consume notifier,
@@ -188,7 +191,8 @@ actor Connections is Cluster
       _control_conns(worker).writev(data)
       @printf[I32](("Sent control message to " + worker + "\n").cstring())
     else
-      @printf[I32](("No control connection for worker " + worker + "\n").cstring())
+      @printf[I32](("No control connection for worker " + worker + "\n")
+        .cstring())
     end
 
   be send_control_to_cluster(data: Array[ByteSeq] val) =>
@@ -219,9 +223,9 @@ actor Connections is Cluster
   fun _send_data(worker: String, data: Array[ByteSeq] val) =>
     try
       _data_conns(worker).writev(data)
-      // @printf[I32](("Sent protocol message over outgoing boundary to " + worker + "\n").cstring())
     else
-      @printf[I32](("No outgoing boundary to worker " + worker + "\n").cstring())
+      @printf[I32](("No outgoing boundary to worker " + worker + "\n")
+        .cstring())
     end
 
   be send_data_to_cluster(data: Array[ByteSeq] val) =>
@@ -270,7 +274,8 @@ actor Connections is Cluster
 
   be request_cluster_unmute() =>
     try
-      let unmute_request_msg = ChannelMsgEncoder.unmute_request(_worker_name, _auth)
+      let unmute_request_msg = ChannelMsgEncoder.unmute_request(_worker_name,
+        _auth)
       for (target, ch) in _control_conns.pairs() do
         if target != _worker_name then
           ch.writev(unmute_request_msg)
@@ -401,7 +406,8 @@ actor Connections is Cluster
       consume map
 
     try
-      let connection_addresses_file = FilePath(_auth, _connection_addresses_file)
+      let connection_addresses_file = FilePath(_auth,
+        _connection_addresses_file)
       let file = File(connection_addresses_file)
       let wb = Writer
       let serialised_connection_addresses: Array[U8] val =
@@ -427,7 +433,8 @@ actor Connections is Cluster
       ifdef "resilience" then
         @printf[I32]("Recovering connection addresses!\n".cstring())
         try
-          let connection_addresses_file = FilePath(_auth, _connection_addresses_file)
+          let connection_addresses_file = FilePath(_auth,
+            _connection_addresses_file)
           if connection_addresses_file.exists() then
             //we are recovering an existing worker topology
             let data = recover val
@@ -533,7 +540,8 @@ actor Connections is Cluster
       try
         boundary.register_step_id(boundary_ids(worker))
       else
-        @printf[I32](("Could not register step id for boundary to " + worker + "\n").cstring())
+        @printf[I32](("Could not register step id for boundary to " + worker +
+          "\n").cstring())
       end
     end
 
@@ -558,7 +566,8 @@ actor Connections is Cluster
         _metrics_service, consume c_addrs, consume d_addrs,
         local_topology.worker_names, _auth)
       conn.writev(inform_msg)
-      @printf[I32]("***Worker %s attempting to join the cluster. Sent necessary information.***\n".cstring(), worker.cstring())
+      @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
+        "necessary information.***\n").cstring(), worker.cstring())
     else
       Fail()
     end
@@ -566,7 +575,9 @@ actor Connections is Cluster
   be inform_cluster_of_join() =>
     try
       if not _has_registered_my_addrs() then
-        @printf[I32]("Cannot inform cluster of join: my addresses have not yet been registered. Is there something else listening on ports I was assigned?\n".cstring())
+        @printf[I32](("Cannot inform cluster of join: my addresses have not " +
+          "yet been registered. Is there something else listening on ports " +
+          "I was assigned?\n").cstring())
         Fail()
       end
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
@@ -620,10 +631,6 @@ actor Connections is Cluster
     for (key, conn) in _control_conns.pairs() do
       conn.dispose()
     end
-
-    // for (key, receiver) in _data_connection_receivers.pairs() do
-    //   receiver.dispose()
-    // end
 
     match _phone_home
     | let phc: TCPConnection =>
