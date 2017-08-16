@@ -12,10 +12,6 @@ class ref Watermarker
   let _routes: Map[RouteId, _AckedOnRoute] = _routes.create()
 
   fun ref add_route(id: RouteId) =>
-    ifdef debug then
-      Invariant(not _routes.contains(id))
-    end
-
     if not _routes.contains(id) then
         _routes(id) = _AckedOnRoute
     end

@@ -86,8 +86,10 @@ actor Step is (Producer & Consumer)
     omni_router: OmniRouter)
   =>
     for consumer in _router.routes().values() do
-      _routes(consumer) =
-        _route_builder(this, consumer, _metrics_reporter)
+      if not _routes.contains(consumer) then
+        _routes(consumer) =
+          _route_builder(this, consumer, _metrics_reporter)
+      end
     end
 
     for boundary in _outgoing_boundaries.values() do
@@ -149,7 +151,7 @@ actor Step is (Producer & Consumer)
     _route_builder = route_builder
 
   be register_routes(router: Router, route_builder: RouteBuilder) =>
-    ifdef "debug" then
+    ifdef debug then
       if _initialized then
         Fail()
       end
