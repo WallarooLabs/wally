@@ -1491,12 +1491,18 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be report_event_log_ready_to_work() =>
-    _application_ready_to_work()
+    // This should only get called after all initializables have reported
+    // they are ready to work, at which point we would have told the EventLog
+    // to start pipeline logging.
+    if _ready_to_work.size() == _initializables.size() then
+      _application_ready_to_work()
+    else
+      Fail()
+    end
 
   fun ref _application_ready_to_work() =>
     @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
       .cstring())
-    // TODO: THis should also depend on EventLog having completed reading
     for i in _initializables.values() do
       i.application_ready_to_work(this)
     end
