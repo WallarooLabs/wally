@@ -31,6 +31,7 @@ use "buffered"
 use "collections"
 use "net"
 use "wallaroo/boundary"
+use "wallaroo/ent/data_receiver"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)

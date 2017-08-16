@@ -1,6 +1,7 @@
 use "collections"
 use "sendence/guid"
 use "wallaroo/boundary"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
 use "wallaroo/ent/w_actor/broadcast"
 use "wallaroo/fail"

@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "wallaroo/boundary"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
 use "wallaroo/initialization"
 use "wallaroo/metrics"

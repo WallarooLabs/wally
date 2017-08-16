@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "collections"
 use "net"
 use "wallaroo/boundary"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/topology"
 
 type DataChannelListenerAuth is (AmbientAuth | NetAuth | TCPAuth |

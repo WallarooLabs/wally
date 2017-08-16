@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/routing"
 use "wallaroo/topology"
 use "wallaroo/ent/watermarking"
