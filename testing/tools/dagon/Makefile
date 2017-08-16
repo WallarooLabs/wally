@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -25,6 +25,7 @@ TEST_TARGET := false
 # standard rules generation makefile
 include $(rules_mk_path)
 
+
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)
 
@@ -38,3 +39,5 @@ include $(rules_mk_path)
 
 # end of prevent rules from being evaluated/included multiple times
 endif
+
+
