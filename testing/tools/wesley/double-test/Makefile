@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../Makefile
+include ../../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -21,6 +21,7 @@ TEST_TARGET := false
 
 # uncomment to disable generate recursing into Makefiles of subdirectories
 #RECURSE_SUBMAKEFILES := false
+
 
 # standard rules generation makefile
 include $(rules_mk_path)
