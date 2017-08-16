@@ -58,6 +58,8 @@ actor ClusterInitializer
       _worker_names.push(_initializer_name)
     end
     if _expected == 1 then
+      // This is a single worker cluster. We are ready to proceed with
+      // initialization.
       _topology_ready = true
       _distributor.distribute(this, _expected, recover [_initializer_name] end,
         _initializer_name)
