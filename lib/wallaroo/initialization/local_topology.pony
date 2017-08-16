@@ -821,7 +821,8 @@ actor LocalTopologyInitializer is LayoutInitializer
               // STATELESS, NON-PRESTATE BUILDER
                 @printf[I32](("----Spinning up " + builder.name() + "----\n")
                   .cstring())
-                // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
+                // Currently there are no splits (II), so we know that a node
+                // has only one output in the graph. We also know this is not
                 // a sink or proxy, so there is at most one output.
                 let out_id: (U128 | None) =
                   match _get_output_node_id(next_node,
@@ -838,7 +839,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       builder.clone_router_and_set_input_type(
                         built_routers(id))
                     else
-                      @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                      @printf[I32](("Invariant was violated: node was not " +
+                        "built before one of its inputs.\n").cstring())
                       error
                     end
                   else
@@ -889,9 +891,10 @@ actor LocalTopologyInitializer is LayoutInitializer
                   continue
                 end
 
-                @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
-                let state_step = builder(EmptyRouter, _metrics_conn, _event_log,
-                  _recovery_replayer, _auth, _outgoing_boundaries)
+                @printf[I32](("----Spinning up state for " + builder.name() +
+                  "----\n").cstring())
+                let state_step = builder(EmptyRouter, _metrics_conn,
+                  _event_log, _recovery_replayer, _auth, _outgoing_boundaries)
                 data_routes(next_id) = state_step
                 _initializables.set(state_step)
 
@@ -925,8 +928,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       end
 
                     let pre_state_step = b(state_step_router, _metrics_conn,
-                      _event_log, _recovery_replayer, _auth, _outgoing_boundaries,
-                      state_comp_target)
+                      _event_log, _recovery_replayer, _auth,
+                      _outgoing_boundaries, state_comp_target)
                     data_routes(b.id()) = pre_state_step
                     _initializables.set(pre_state_step)
 
@@ -944,7 +947,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       end
                     end
 
-                    @printf[I32](("Finished handling " + in_node.value.name() + " node\n").cstring())
+                    @printf[I32](("Finished handling " + in_node.value.name() +
+                      " node\n").cstring())
                   else
                     @printf[I32](("State steps should only have prestate " +
                       "predecessors!\n").cstring())
@@ -1105,11 +1109,13 @@ actor LocalTopologyInitializer is LayoutInitializer
                     try
                       built_routers(id)
                     else
-                      @printf[I32]("Prestate comp target not built! We should have already caught this\n".cstring())
+                      @printf[I32](("Prestate comp target not built! We " +
+                        "should have already caught this\n").cstring())
                       error
                     end
                   else
-                    @printf[I32]("There is no prestate comp target. Using an EmptyRouter\n".cstring())
+                    @printf[I32](("There is no prestate comp target. Using " +
+                      "an EmptyRouter\n").cstring())
                     EmptyRouter
                   end
                 else
@@ -1118,9 +1124,9 @@ actor LocalTopologyInitializer is LayoutInitializer
 
               let out_router =
                 if source_data.state_name() == "" then
-                  // Currently there are no splits (II), so we know that a node has
-                  // only one output in the graph. We also know this is not
-                  // a sink or proxy, so there is exactly one output.
+                  // Currently there are no splits (II), so we know that a
+                  // node has only one output in the graph. We also know this
+                  // is not a sink or proxy, so there is exactly one output.
                   let out_id: (U128 | None) = _get_output_node_id(next_node,
                     default_target_id, default_target_state_step_id)
 
@@ -1129,7 +1135,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                     try
                       built_routers(id)
                     else
-                      @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                      @printf[I32](("Invariant was violated: node was not " +
+                        "built before one of its inputs.\n").cstring())
                       error
                     end
                   else
@@ -1144,7 +1151,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                     source_data.clone_router_and_set_input_type(
                       state_map(source_data.state_name()), default_router)
                   else
-                    @printf[I32]("State doesn't exist for state computation.\n".cstring())
+                    @printf[I32]("State doesn't exist for state computation.\n"
+                      .cstring())
                     error
                   end
                 end
@@ -1154,7 +1162,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 _metrics_conn)
 
               let listen_auth = TCPListenAuth(_auth)
-              @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
+              @printf[I32](("----Creating source for " + pipeline_name +
+                " pipeline with " + source_data.name() + "----\n").cstring())
 
               sl_builders.push(source_data.source_listener_builder_builder()(
                 source_data.builder()(source_data.runner_builder(),
@@ -1181,7 +1190,8 @@ actor LocalTopologyInitializer is LayoutInitializer
               end
             end
 
-            @printf[I32](("Finished handling " + next_node.value.name() + " node\n").cstring())
+            @printf[I32](("Finished handling " + next_node.value.name() +
+              " node\n").cstring())
           else
             frontier.unshift(next_node)
           end
@@ -1202,12 +1212,14 @@ actor LocalTopologyInitializer is LayoutInitializer
                   try
                     built_routers(tid)
                   else
-                    @printf[I32]("Failed to build router for default target\n".cstring())
+                    @printf[I32]("Failed to build router for default target\n"
+                      .cstring())
                     error
                   end
                 ds.register_routes(target_router, psd.forward_route_builder())
               else
-                @printf[I32]("Default targets are not built on this worker\n".cstring())
+                @printf[I32]("Default targets are not built on this worker\n"
+                  .cstring())
               end
             else
               if psd.state_name() != "" then
@@ -1218,9 +1230,11 @@ actor LocalTopologyInitializer is LayoutInitializer
               end
               let partition_router =
                 try
-                  psd.clone_router_and_set_input_type(state_map(psd.state_name()))
+                  psd.clone_router_and_set_input_type(state_map(
+                    psd.state_name()))
                 else
-                  @printf[I32]("PartitionRouter was not built for expected state partition.\n".cstring())
+                  @printf[I32](("PartitionRouter was not built for expected " +
+                    "state partition.\n").cstring())
                   error
                 end
               let target_router = built_routers(tid)
@@ -1228,9 +1242,11 @@ actor LocalTopologyInitializer is LayoutInitializer
               | let pr: PartitionRouter =>
                 _router_registry.set_partition_router(psd.state_name(), pr)
                 pr.register_routes(target_router, psd.forward_route_builder())
-                @printf[I32](("Registered routes on state steps for " + psd.pre_state_name() + "\n").cstring())
+                @printf[I32](("Registered routes on state steps for " +
+                  psd.pre_state_name() + "\n").cstring())
               else
-                @printf[I32](("Expected PartitionRouter but found something else!\n").cstring())
+                @printf[I32](("Expected PartitionRouter but found something " +
+                  "else!\n").cstring())
                 error
               end
             end
@@ -1286,14 +1302,17 @@ actor LocalTopologyInitializer is LayoutInitializer
         _topology_initialized = true
 
         if _initializables.size() == 0 then
-          @printf[I32]("Phases I-II skipped (this topology must only have sources.)\n".cstring())
+          @printf[I32](("Phases I-II skipped (this topology must only have " +
+            "sources.)\n").cstring())
           _application_ready_to_work()
         end
       else
-        @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
+        @printf[I32](("Local Topology Initializer: No local topology to " +
+          "initialize\n").cstring())
       end
 
-      @printf[I32]("\n|^|^|^|Finished Initializing Local Topology|^|^|^|\n".cstring())
+      @printf[I32]("\n|^|^|^|Finished Initializing Local Topology|^|^|^|\n"
+        .cstring())
       @printf[I32]("---------------------------------------------------------\n".cstring())
 
     else
@@ -1303,7 +1322,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   fun ref _initialize_joining_worker() =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
-    @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n".cstring())
+    @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n"
+      .cstring())
     try
       let built_routers = Map[U128, Router]
       let data_routes = recover trn Map[U128, Consumer] end
@@ -1384,7 +1404,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         // processed first
         _router_registry.inform_cluster_of_join()
 
-        @printf[I32]("\n|^|^|^|Finished Initializing Joining Worker Local Topology|^|^|^|\n".cstring())
+        @printf[I32](("\n|^|^|^|Finished Initializing Joining Worker Local " +
+          "Topology|^|^|^|\n").cstring())
         @printf[I32]("---------------------------------------------------------\n".cstring())
 
         @printf[I32]("***Successfully joined cluster!***\n".cstring())
@@ -1417,9 +1438,10 @@ actor LocalTopologyInitializer is LayoutInitializer
         let runner_builder = subpartition.runner_builder()
         let reporter = MetricsReporter(t.name(), t.worker_name(),
           _metrics_conn)
-        let step = Step(runner_builder(where event_log = _event_log, auth = _auth),
-          consume reporter, msg.step_id(), runner_builder.route_builder(),
-          _event_log, _recovery_replayer, _outgoing_boundaries)
+        let step = Step(runner_builder(where event_log = _event_log,
+          auth = _auth), consume reporter, msg.step_id(),
+          runner_builder.route_builder(), _event_log, _recovery_replayer,
+          _outgoing_boundaries)
         step.receive_state(msg.state())
         msg.update_router_registry(_router_registry, step)
       else
@@ -1450,7 +1472,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         Fail()
       end
     else
-      @printf[I32]("The same Initializable reported being created twice\n".cstring())
+      @printf[I32]("The same Initializable reported being created twice\n"
+        .cstring())
       Fail()
     end
 
@@ -1465,7 +1488,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
       end
     else
-      @printf[I32]("The same Initializable reported being initialized twice\n".cstring())
+      @printf[I32]("The same Initializable reported being initialized twice\n"
+        .cstring())
       Fail()
     end
 
@@ -1486,7 +1510,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.application_ready_to_work()
       end
     else
-      @printf[I32]("The same Initializable reported being ready to work twice\n".cstring())
+      @printf[I32](("The same Initializable reported being ready to work " +
+        "twice\n").cstring())
       Fail()
     end
 
@@ -1513,13 +1538,15 @@ actor LocalTopologyInitializer is LayoutInitializer
         ci.topology_ready("initializer")
         _is_initializer = false
       else
-        @printf[I32]("Need ClusterInitializer to inform that topology is ready\n".cstring())
+        @printf[I32](("Need ClusterInitializer to inform that topology is " +
+          "ready\n").cstring())
       end
     end
 
   fun ref _spin_up_source_listeners() =>
     if not _topology_initialized then
-      @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
+      @printf[I32](("ERROR: Tried to spin up source listeners before " +
+        "topology was initialized!\n").cstring())
     else
       for builder in sl_builders.values() do
         let sl = builder()
@@ -1571,7 +1598,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     // Make sure this is not a sink or proxy node.
     match node.value
     | let eb: EgressBuilder =>
-      @printf[I32]("Sinks and Proxies have no output nodes in the local graph!\n".cstring())
+      @printf[I32](("Sinks and Proxies have no output nodes in the local " +
+        "graph!\n").cstring())
       error
     end
 
