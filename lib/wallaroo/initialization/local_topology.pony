@@ -180,7 +180,6 @@ class val LocalTopology
 
 actor LocalTopologyInitializer is LayoutInitializer
   let _application: Application val
-  let _input_addrs: Array[Array[String]] val
   let _worker_name: String
   let _worker_count: USize
   let _env: Env
@@ -233,7 +232,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
-    recovery_replayer: RecoveryReplayer, input_addrs: Array[Array[String]] val,
+    recovery_replayer: RecoveryReplayer,
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, cluster_manager: (ClusterManager | None) = None,
     is_joining: Bool = false)
@@ -251,7 +250,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     _event_log = event_log
     _recovery = recovery
     _recovery_replayer = recovery_replayer
-    _input_addrs = input_addrs
     _local_topology_file = local_topology_file
     _data_channel_file = data_channel_file
     _worker_names_file = worker_names_file

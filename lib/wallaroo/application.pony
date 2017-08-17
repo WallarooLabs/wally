@@ -20,8 +20,6 @@ class Application
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, PartitionBuilder] = _state_builders.create()
-  // Map from source id to filename
-  let init_files: Map[USize, InitFile] = init_files.create()
   // TODO: Replace this default strategy with a better one after POC
   var default_target: (Array[RunnerBuilder] val | None) = None
   var default_state_name: String = ""
@@ -33,14 +31,10 @@ class Application
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
     pipeline_name: String, source_config: SourceConfig[In],
-    init_file: (InitFile | None) = None, coalescing: Bool = true):
+    coalescing: Bool = true):
       PipelineBuilder[In, Out, In]
   =>
     let pipeline_id = pipelines.size()
-    match init_file
-    | let f: InitFile =>
-      add_init_file(pipeline_id, f)
-    end
     let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name,
       source_config, coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
@@ -75,9 +69,6 @@ class Application
 
   fun ref add_pipeline(p: BasicPipeline) =>
     pipelines.push(p)
-
-  fun ref add_init_file(source_id: USize, init_file: InitFile) =>
-    init_files(source_id) = init_file
 
   fun ref add_state_builder(state_name: String,
     state_partition: PartitionBuilder)

@@ -16,16 +16,13 @@ actor ApplicationDistributor is Distributor
   let _auth: AmbientAuth
   let _guid_gen: GuidGenerator = GuidGenerator
   let _local_topology_initializer: LocalTopologyInitializer
-  let _input_addrs: Array[Array[String]] val
   let _application: Application val
 
   new create(auth: AmbientAuth, application: Application val,
-    local_topology_initializer: LocalTopologyInitializer,
-    input_addrs: Array[Array[String]] val)
+    local_topology_initializer: LocalTopologyInitializer)
   =>
     _auth = auth
     _local_topology_initializer = local_topology_initializer
-    _input_addrs = input_addrs
     _application = application
 
   be distribute(cluster_initializer: (ClusterInitializer | None),
@@ -38,13 +35,6 @@ actor ApplicationDistributor is Distributor
 
   be topology_ready() =>
     @printf[I32]("Application has successfully initialized.\n".cstring())
-    for i in Range(0, _input_addrs.size()) do
-      try
-        let init_file = _application.init_files(i)
-        let file = InitFileReader(init_file, _auth)
-        file.read_into(_input_addrs(i))
-      end
-    end
 
   fun ref _distribute(application: Application val,
     cluster_initializer: (ClusterInitializer | None), worker_count: USize,
@@ -1065,4 +1055,3 @@ actor ApplicationDistributor is Distributor
       end
     end
     consume local_graphs
-
