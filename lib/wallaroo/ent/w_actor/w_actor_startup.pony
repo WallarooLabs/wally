@@ -232,7 +232,7 @@ actor ActorSystemStartup
         @printf[I32]("Running as Initializer...\n".cstring())
         let distributor =
           ActorSystemDistributor(auth, _system, initializer, connections,
-            _startup_options.input_addrs, is_recovering)
+            is_recovering)
         _cluster_initializer = ClusterInitializer(auth,
           _startup_options.worker_name, _startup_options.worker_count,
           connections, distributor, initializer, _startup_options.d_addr,

@@ -18,19 +18,17 @@ actor ActorSystemDistributor is Distributor
   let _guid_gen: GuidGenerator = GuidGenerator
   let _w_actor_initializer: WActorInitializer
   let _connections: Connections
-  let _input_addrs: Array[Array[String]] val
   var _system: ActorSystem val
   let _is_recovering: Bool
 
   new create(auth: AmbientAuth, actor_system: ActorSystem val,
     w_actor_initializer: WActorInitializer, connections: Connections,
-    input_addrs: Array[Array[String]] val, is_recovering: Bool)
+    is_recovering: Bool)
   =>
     _auth = auth
     _system = actor_system
     _w_actor_initializer = w_actor_initializer
     _connections = connections
-    _input_addrs = input_addrs
     _is_recovering = is_recovering
 
   be topology_ready() =>
