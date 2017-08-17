@@ -88,12 +88,12 @@ class DataChannelListenNotifier is DataChannelListenNotify
         _connections.send_control("initializer", message)
       end
     else
-      @printf[I32]((_name + "data : couldn't get local address").cstring())
+      @printf[I32]((_name + "data : couldn't get local address\n").cstring())
       listen.close()
     end
 
   fun ref not_listening(listen: DataChannelListener ref) =>
-    @printf[I32]((_name + "data : unable to listen").cstring())
+    @printf[I32]((_name + "data : unable to listen\n").cstring())
     Fail()
 
   fun ref connected(
