@@ -125,6 +125,14 @@ def application_setup(args):
     return ab.build()
 ```
 
+Configuration objects are used to pass information about sources and sinks to the application builder. Currently the only supported source is the TCP source, and the only supported sink is the TCP sink.
+
+Wallaroo provides convenience the functions `tcp_parse_input_addrs` and `tcp_parse_output_addrs` to parse host and port information that is passed on the command line, or the user can supply their own code for getting these values. When using the convenience functions, host/port pairs are represented on the command line as colon-separated values and multiple host/port values are represented by a comma-separated list of host/port values. The functions assume that `--in` is used for input addresses, and `--out` is used for output addresses. For example, this set of commandline arguments would specify two input host/port values and one output:
+
+```
+--in localhost:7001,localhost:7002 --out localhost:7010
+```
+
 ### Miscellaneous
 
 Of course, no python module is complete without its imports. In this case, only two imports are required:
