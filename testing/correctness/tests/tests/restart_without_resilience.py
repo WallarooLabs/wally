@@ -78,9 +78,8 @@ def test_restart():
         runners.append(runners[-1].respawn())
         runners[-1].start()
 
-
         # wait until sender completes (~1 second)
-        sender.join(10)
+        sender.join(30)
         if sender.error:
             raise sender.error
         if sender.is_alive():
@@ -108,7 +107,6 @@ def test_restart():
         stdout, stderr = runners[-1].get_output()
         try:
             assert(re.search(pattern_restarting, stdout) is not None)
-            assert(re.search(pattern_output, stdout) is not None)
         except AssertionError:
             raise AssertionError('Worker does not appear to have reconnected '
                                  'as expected. Worker output is '
