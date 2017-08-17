@@ -2,6 +2,7 @@ use "collections"
 use "buffered"
 
 use "wallaroo"
+use "wallaroo/sink"
 use "wallaroo/source"
 use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
@@ -462,9 +463,14 @@ primitive Machida
           PyFramedSourceHandler(d)
         end
 
+        let source_config = recover val
+          let sct = @PyTuple_GetItem(item, 3)
+          _SourceConfig.from_tuple(sct, decoder)
+        end
+
         latest = (latest as Application).new_pipeline[PyData val, PyData val](
           name,
-          TCPSourceConfig[PyData val].from_options(decoder, source_configs(source_idx)))
+          source_config)
         source_idx = source_idx + 1
       | "to" =>
         let computation_class = @PyTuple_GetItem(item, 1)
@@ -567,7 +573,7 @@ primitive Machida
         end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_sink(
-          TCPSinkConfig[PyData val].from_options(encoder, sink_configs(sink_idx)))
+          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 2), encoder))
         sink_idx = sink_idx + 1
         latest
       | "done" =>
@@ -774,3 +780,49 @@ primitive Machida
 
   fun implements_method(o: Pointer[U8] box, method: String): Bool =>
     @PyObject_HasAttrString(o, method.cstring()) == 1
+
+
+primitive _SourceConfig
+  fun from_tuple(source_config_tuple: Pointer[U8] val, d: PyFramedSourceHandler val):
+    SourceConfig[PyData val] ?
+  =>
+    let name = recover val
+      String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 0)))
+    end
+
+    match name
+    | "tcp" =>
+      let host = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+      end
+
+      let port = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 2)))
+      end
+      TCPSourceConfig[PyData val](d, host, port)
+    else
+      error
+    end
+
+
+primitive _SinkConfig
+  fun from_tuple(sink_config_tuple: Pointer[U8] val, e: PyEncoder val):
+    SinkConfig[PyData val] ?
+  =>
+    let name = recover val
+      String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 0)))
+    end
+
+    match name
+    | "tcp" =>
+      let host = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 1)))
+      end
+
+      let port = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 2)))
+      end
+      TCPSinkConfig[PyData val](e, host, port)
+    else
+      error
+    end
