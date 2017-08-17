@@ -1,3 +1,32 @@
+/*
+
+Copyright (C) 2016-2017, Sendence LLC
+Copyright (C) 2016-2017, The Pony Developers
+Copyright (c) 2014-2015, Causality Ltd.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+*/
+
 use "collections"
 use "wallaroo/boundary"
 use "wallaroo/core"
@@ -8,79 +37,6 @@ use "wallaroo/routing"
 use "wallaroo/source"
 use "wallaroo/tcp_sink"
 use "wallaroo/topology"
-
-class val TCPSourceListenerBuilderBuilder
-  let _host: String
-  let _service: String
-
-  new val create(host: String, service: String) =>
-    _host = host
-    _service = service
-
-  fun apply(source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry, route_builder: RouteBuilder,
-    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
-    layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso,
-    default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder | None) = None,
-    target_router: Router = EmptyRouter): TCPSourceListenerBuilder
-  =>
-    TCPSourceListenerBuilder(source_builder, router, router_registry,
-      route_builder,
-      outgoing_boundary_builders, event_log, auth,
-      layout_initializer, consume metrics_reporter, default_target,
-      default_in_route_builder, target_router, _host, _service)
-
-class val TCPSourceListenerBuilder
-  let _source_builder: SourceBuilder
-  let _router: Router
-  let _router_registry: RouterRegistry
-  let _route_builder: RouteBuilder
-  let _default_in_route_builder: (RouteBuilder | None)
-  let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
-  let _layout_initializer: LayoutInitializer
-  let _event_log: EventLog
-  let _auth: AmbientAuth
-  let _default_target: (Step | None)
-  let _target_router: Router
-  let _host: String
-  let _service: String
-  let _metrics_reporter: MetricsReporter
-
-  new val create(source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry, route_builder: RouteBuilder,
-    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
-    layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso,
-    default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder | None) = None,
-    target_router: Router = EmptyRouter,
-    host: String = "", service: String = "0")
-  =>
-    _source_builder = source_builder
-    _router = router
-    _router_registry = router_registry
-    _route_builder = route_builder
-    _default_in_route_builder = default_in_route_builder
-    _outgoing_boundary_builders = outgoing_boundary_builders
-    _layout_initializer = layout_initializer
-    _event_log = event_log
-    _auth = auth
-    _default_target = default_target
-    _target_router = target_router
-    _host = host
-    _service = service
-    _metrics_reporter = consume metrics_reporter
-
-  fun apply(): SourceListener =>
-    TCPSourceListener(_source_builder, _router, _router_registry,
-      _route_builder, _outgoing_boundary_builders,
-      _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
-      _default_target, _default_in_route_builder, _target_router, _host,
-      _service)
 
 actor TCPSourceListener is SourceListener
   """
