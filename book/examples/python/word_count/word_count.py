@@ -1,7 +1,7 @@
 import string
 import struct
-
 import wallaroo
+
 
 def application_setup(args):
     word_partitions = list(string.ascii_lowercase)
@@ -9,11 +9,12 @@ def application_setup(args):
 
     ab = wallaroo.ApplicationBuilder("Word Count Application")
     ab.new_pipeline("Split and Count", Decoder())
-    ab.to(Split)
+    ab.to_parallel(Split)
     ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
         WordPartitionFunction(), word_partitions)
     ab.to_sink(Encoder())
     return ab.build()
+
 
 class Split(object):
     def name(self):
@@ -31,6 +32,7 @@ class Split(object):
                 words.append(clean_word)
 
         return words
+
 
 class CountWord():
     def name(self):
@@ -56,10 +58,12 @@ class WordTotals(object):
     def get_votes(self, word):
         return WordCount(word, self.word_totals[word])
 
+
 class WordCount(object):
     def __init__(self, word, count):
         self.word = word
         self.count = count
+
 
 class WordTotalsBuilder(object):
     def build(self):

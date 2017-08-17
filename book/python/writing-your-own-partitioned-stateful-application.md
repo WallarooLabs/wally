@@ -111,6 +111,4 @@ import wallaroo
 
 The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/python/alphabet_partitioned/). To run it, follow the [Alphabet_partitioned application instructions](/book/examples/python/alphabet_partitioned/README.md)
 
-To learn how to make your application resilient and able to work across multiple workers, please continue to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).
-
-For further reading, please refer to the [Wallaroo Python API Classes](api.md).
+To see how everything we've learned so far comes together, check out our [Word Count walkthrough](word_count.md)

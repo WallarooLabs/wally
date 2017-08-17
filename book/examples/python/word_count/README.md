@@ -34,12 +34,12 @@ Run `machida` with `--application-module word_count`:
 machida --application-module word_count --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --name worker-name --ponythreads=1 --topology-initializer
+  --name worker-name --ponythreads=1
 ```
 
 machida --application-module word_count --in 127.0.0.1:7010 \
-  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --data 127.0.0.1:6001 --name worker-2 --ponythreads=1
+  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
+  --name worker-2 --ponythreads=1 -j 127.0.0.1:6000
 
 In a third shell, send some messages:
 
