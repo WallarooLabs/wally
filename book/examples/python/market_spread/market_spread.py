@@ -41,13 +41,13 @@ def application_setup(args):
     ab = wallaroo.ApplicationBuilder("market-spread")
     ab.new_pipeline(
             "Orders", OrderDecoder(),
-            wallaroo.TCPSourceConfig(order_host, in_port)
+            wallaroo.TCPSourceConfig(order_host, order_port)
         ).to_state_partition_u64(
             CheckOrder(), SymbolDataBuilder(), "symbol-data",
             SymbolPartitionFunction(), symbol_partitions
        ).to_sink(
             OrderResultEncoder(),
-            wallaroo.TCPSinkConfig(out_host, out_port))
+            wallaroo.TCPSinkConfig(out_host, out_port)
        ).new_pipeline(
             "Market Data", MarketDataDecoder(),
             wallaroo.TCPSourceConfig(nbbo_host, nbbo_port)
