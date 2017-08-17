@@ -40,7 +40,7 @@ class CountWord():
 
     def compute(self, word, word_totals):
         word_totals.update(word)
-        return (word_totals.get_votes(word), True)
+        return (word_totals.get_count(word), True)
 
 
 class WordTotals(object):
@@ -55,7 +55,7 @@ class WordTotals(object):
 
         print word + " => " + str(self.word_totals[word])
 
-    def get_votes(self, word):
+    def get_count(self, word):
         return WordCount(word, self.word_totals[word])
 
 

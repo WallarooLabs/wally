@@ -133,7 +133,7 @@ class WordPartitionFunction(object):
 
 The next three classes are the core of our word counting application. By this point, our messages has been split into individual words and run through our `WordPartitionFunction` and will arrive at a state computation based on the first letter of the word.
 
-Let's take a look at we have. `CountWord` is a `StateComputation`. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_votes` and `True`. The return value of `get_votes` is an instance of the `WordCount` class containing the word and its current count.
+Let's take a look at we have. `CountWord` is a `StateComputation`. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
 
 ```python
 class CountWord():
@@ -142,7 +142,7 @@ class CountWord():
 
     def compute(self, word, word_totals):
         word_totals.update(word)
-        return (word_totals.get_votes(word), True)
+        return (word_totals.get_count(word), True)
 
 class WordCount(object):
     def __init__(self, word, count):
@@ -150,7 +150,7 @@ class WordCount(object):
         self.count = count
 ```
 
-`WordTotals` isn't all that interesting. When we `update`, we check to see if we have seen the word before and if not, add it to our map of words and set the count to one. If we have seen the word before, we increment its count. `get_votes` looks up a word and returns a `WordCount` for it.
+`WordTotals` isn't all that interesting. When we `update`, we check to see if we have seen the word before and if not, add it to our map of words and set the count to one. If we have seen the word before, we increment its count. `get_count` looks up a word and returns a `WordCount` for it.
 
 ```python
 class WordTotals(object):
@@ -163,7 +163,7 @@ class WordTotals(object):
         else:
             self.word_totals[word] = 1
 
-    def get_votes(self, word):
+    def get_count(self, word):
         return WordCount(word, self.word_totals[word])
 ```
 
