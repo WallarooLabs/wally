@@ -19,7 +19,7 @@
 #+LaTeX_HEADER: \let\description\compactdesc
 #+LaTeX_HEADER: \let\enumerate\compactenum
 #+LaTeX_CLASS_OPTIONS: [captions=tableheading]
-#+LATEX: 
+#+LATEX:
 #+LATEX: \listoffigures
 
 * Introduction
@@ -90,7 +90,7 @@ mkdir $HOME/.aws
 
 Login to the AWS web console: https://sendence.signin.aws.amazon.com/console
 1. Select "Identity and Access Management" from the list of AWS services.
-2. Select "Users" form the menu. 
+2. Select "Users" form the menu.
 3. Search for your username and select it.
 4. Click on "Create Access Key".
 5. Click on "Download Credentials".
@@ -329,24 +329,24 @@ Make cluster of 1 leader node only with 2 cpus reserved for system use
 and the rest for user processes and the =isolcpus= boot option
 disabled.
 
-*** (create) 
+*** (create)
 #+BEGIN_SRC sh
 make cluster cluster_name=dh num_followers=0 \
  force_instance=c3.4xlarge ansible_num_system_cpus=2
 #+END_SRC
 
-*** (configure) 
+*** (configure)
 #+BEGIN_SRC sh
 make configure cluster_name=dh num_followers=0 \
  force_instance=c3.4xlarge ansible_num_system_cpus=2
 #+END_SRC
 
-** ISOCPUS On 
+** ISOCPUS On
 Make cluster of 1 leader node only with 2 cpus reserved for
 system use and the rest for user processes and the =isolcpus= boot
 option enabled.
 
-*** (create) 
+*** (create)
 #+BEGIN_SRC sh
 make cluster cluster_name=dh num_followers=0 \
 force_instance=c3.4xlarge ansible_num_system_cpus=2 ansible_isolcpus=true
@@ -357,7 +357,7 @@ PLAY RECAP *********************************************************************
 54.165.9.39                : ok=70   changed=39   unreachable=0    failed=0
 #+END_EXAMPLE
 
-*** (configure) 
+*** (configure)
 #+BEGIN_SRC sh
 make configure cluster_name=dh num_followers=0 \
 force_instance=c3.4xlarge ansible_num_system_cpus=2 ansible_isolcpus=true
@@ -389,7 +389,7 @@ sudo cset proc -s user -e stress-ng -- --cpu 0 --cpu-method all -t 1m
 
 *** Confirm CPU is Pinned
 In another shell, run =htop= to confirm cpu is pinned into user isolated
-cpus. 
+cpus.
 
 ** NUMACTL
 Run =stress-ng= to burn cpu within user cpuset bound to specific
@@ -511,7 +511,7 @@ ps aux | grep -i stress-ng | grep -v grep | grep -v sudo | \
 When using =ansible_isolcpus=true= as a make argument the
 workload for =stress-ng= is not spread across cpus automatigally anymore
 because the linux kernel doesn’t manage thread load balancing for
-processes running on these cores any longer. 
+processes running on these cores any longer.
 This is exactly what we want because pony will take care of
 managing/spreading it’s own threads.
 
@@ -557,15 +557,21 @@ sudo cset proc -s user -e numactl -- -C 5-11 chrt -f 80 \
 
 Giles sender:
 #+BEGIN_SRC sh
+
 sudo cset proc -s user -e numactl -- -C 12-13 chrt -f 80 \
- giles/sender/sender -h 127.0.0.1:7000 -m 1000000 \
- -f ./demos/marketspread/trades.msg -r \
- --ponythreads 1 -s 500
+ giles/sender/sender -h 127.0.0.1:7000 -m 2926 -s 300 \
+ -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg \
+ -r --ponythreads=1 -y -g 46 -w
+
+sudo cset proc -s user -e numactl -- -C 12-13 chrt -f 80 \
+ giles/sender/sender -h 127.0.0.1:7000 -m 5000000 \
+ -s 300 -i 5_000_000 -f testing/data/market_spread/orders/350-symbols_orders-fixish.msg \
+ -r --ponythreads=1 -y -g 57 -w
 
 sudo cset proc -s user -e numactl -- -C 14-15 chrt -f 80 \
- giles/sender/sender -h 127.0.0.1:7001 -m 1000000 \
- -f ./demos/marketspread/nbbo.msg -r \
- --ponythreads 1 -s 500
+ giles/sender/sender -h 127.0.0.1:7001 -m 10000000 \
+ -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg \
+ -r --ponythreads=1 -y -g 46 -w
 #+END_SRC
 
 
@@ -580,7 +586,7 @@ sudo cset proc -s user -e numactl -- -C 14-15 chrt -f 80 \
 
 *** Script for Kernel Tweaks
 (sysctl stuff, etc)
-#+BEGIN_SRC sh 
+#+BEGIN_SRC sh
 <buffy repo>/orchestration/ansible/playbooks/roles/common/files/kerneltweaks.sh
 #+END_SRC
 
