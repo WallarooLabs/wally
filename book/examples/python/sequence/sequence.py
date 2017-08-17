@@ -5,11 +5,16 @@ import wallaroo
 
 
 def application_setup(args):
+    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+
     ab = wallaroo.ApplicationBuilder("Sequence Window")
-    ab.new_pipeline("Sequence Window", Decoder())
+    ab.new_pipeline("Sequence Window", Decoder(),
+                    wallaroo.TCPSourceConfig(in_host, in_port))
     ab.to_stateful(ObserveNewValue(), SequenceWindowStateBuilder(),
                    "Sequence Window")
-    ab.to_sink(Encoder())
+    ab.to_sink(Encoder(),
+               wallaroo.TCPSinkConfig(out_host, out_port))
     return ab.build()
 
 
