@@ -368,3 +368,11 @@ class StateComputation(object):
             pass
         return (state.get_max(), True)
 ```
+
+### TCPSourceConfig
+
+A `TCPSourceConfig` object specifies the host and port to use for a TCP source connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `new_pipeline`.
+
+### TCPSinkConfig
+
+A `TCPSinkConfig` object specifies the host and port to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provides as an argument to `to_sink`.
