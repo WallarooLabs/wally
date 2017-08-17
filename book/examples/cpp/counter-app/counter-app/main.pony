@@ -1,5 +1,5 @@
 """
-Setting up a complex app run (in order):
+Setting up a counter-app run (in order):
 1) reports sink:
 nc -l 127.0.0.1 7002 >> /dev/null
 
@@ -9,7 +9,7 @@ nc -l 127.0.0.1 7003 >> /dev/null
 3a) single worker counter app:
 ./counter-app -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker-name
 
-3b) multi-worker complex app:
+3b) multi-worker counter-app:
 ./counter-app -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -t -n worker1
 ./counter-app -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker2
 ./counter-app -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker3

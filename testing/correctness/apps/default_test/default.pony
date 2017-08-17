@@ -31,7 +31,7 @@ actor Main
         StringPartitionFunction, Symbols.symbols)
 
       let application = recover val
-        Application("Complex Numbers App")
+        Application("Default Test App")
           .new_pipeline[String, Result val]("Default Test",
             TCPSourceConfig[String].from_options(DefaultTestFrameHandler,
               TCPSourceConfigCLIParser(env.args)(0)))

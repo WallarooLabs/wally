@@ -31,8 +31,8 @@ actor Main
         StringPartitionFunction, PartitionFileReader("partition.txt",        env.root as AmbientAuth))
 
       let application = recover val
-        Application("Complex Numbers App")
-          .new_pipeline[String, Result val]("Default Test",
+        Application("Weighted Test App")
+          .new_pipeline[String, Result val]("Weighted Test",
             TCPSourceConfig[String].from_options(WeightedTestFrameHandler,
               TCPSourceConfigCLIParser(env.args)(0)))
             .to_state_partition[String, String, Result val, NormalState](UpdateState, NormalStateBuilder, "normal-state",
