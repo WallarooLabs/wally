@@ -117,7 +117,14 @@ sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/wallaroo/giles/receiver/
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
 ```
 
-To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+
+```bash
+cd ~/wallaroo
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 350 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+```
+
+To run the NBBO Sender:
 
 ```bash
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
@@ -139,6 +146,13 @@ sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/wallaroo/giles/receiver/
 
 ```bash
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ~/wallaroo/testing/data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg -s ~/wallaroo/testing/data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
+```
+
+To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+
+```bash
+cd ~/wallaroo
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 2926 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/r3k-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
 ```
 
 To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
@@ -172,7 +186,14 @@ sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127
 sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 -n worker2
 ```
 
-To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+
+```bash
+cd ~/wallaroo
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 350 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+```
+
+To run the NBBO Sender:
 
 ```bash
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
@@ -194,7 +215,14 @@ sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127
 sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 -n worker2
 ```
 
-To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+
+```bash
+cd ~/wallaroo
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 2926 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/r3k-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+```
+
+To run the NBBO Sender:
 
 ```bash
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/r3k-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
@@ -244,7 +272,14 @@ to run the Market Spread application you must be in it's directory:
 sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -e 150000000 --ponythreads 4 --ponypinasio
 ```
 
-To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+
+```bash
+cd ~/wallaroo
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 350 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+```
+
+To run the NBBO Sender:
 
 ```bash
 sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/wallaroo/giles/sender/sender -h 127.0.0.1:7001 -m 100000000 -s 300 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock

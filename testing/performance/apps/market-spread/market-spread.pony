@@ -18,10 +18,13 @@ nc -l 127.0.0.1 5001 >> /dev/null
 
 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
-4) orders:
+4) initial nbbo (must be sent in or all orders will be rejected):
+giles/sender/sender -h 127.0.0.1:7001 -m 350 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+
+5) orders:
 giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
 
-5) nbbo:
+6) nbbo:
 giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 
 R3K or other Symbol Set (700, 1400, 2100)
@@ -34,10 +37,13 @@ R3K or other Symbol Set (700, 1400, 2100)
 
 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
-4) orders:
+4) initial nbbo (must be sent in or all orders will be rejected):
+giles/sender/sender -h 127.0.0.1:7001 -m 2926 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+
+5) orders:
 giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f testing/data/market_spread/orders/r3k-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
 
-5) nbbo:
+6) nbbo:
 giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 """
 use "assert"
