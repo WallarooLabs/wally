@@ -79,7 +79,7 @@ ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
     WordPartitionFunction(), word_partitions)
 ```
 
-Note we setup up 27 partitions to count our words, one for each letter plus one called "!" which will handle "word" that doesn't start with a letter:
+Note we setup up 27 partitions to count our words, one for each letter plus one called "!" which will handle any "word" that doesn't start with a letter:
 
 ```python
 word_partitions = list(string.ascii_lowercase)
@@ -118,7 +118,7 @@ Did you catch what is going on? Previously, we've seen our stateless computation
 
 Wallaroo's Python API allows a programmer to indicate that the output of a computation is meant to be treated as a single output by using the `compute` method. This allows us, for example, to split some text into words and have that list of words treated as a single item by Wallaroo. In our word splitting case, that isn't what we want. We want each word to be handled individually. `compute_multi` lets us tell Wallaroo that each of these words is a new message and should be handled individually.
 
-By using `compute_multi`, each word will be handled individually. This allows us to then route each one based on its first letter for counting. If you look below, you can see that our word partitioning function is excepting words, not a list, which makes sense.
+By using `compute_multi`, each word will be handled individually. This allows us to then route each one based on its first letter for counting. If you look below, you can see that our word partitioning function is expecting words, not a list, which makes sense.
 
 ```python
 class WordPartitionFunction(object):
@@ -131,7 +131,7 @@ class WordPartitionFunction(object):
 
 ### Our counting guts
 
-The next three classes are the core of our word counting application. By this point, our next has been split into individual words and run through our `WordPartitionFunction` and will arrive at a state computation based on the first letter of the word.
+The next three classes are the core of our word counting application. By this point, our messages has been split into individual words and run through our `WordPartitionFunction` and will arrive at a state computation based on the first letter of the word.
 
 Let's take a look at we have. `CountWord` is a `StateComputation`. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_votes` and `True`. The return value of `get_votes` is an instance of the `WordCount` class containing the word and its current count.
 
