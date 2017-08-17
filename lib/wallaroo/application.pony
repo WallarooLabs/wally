@@ -31,9 +31,10 @@ class Application
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
     pipeline_name: String, source_config: SourceConfig[In],
-    coalescing: Bool = true):
-      PipelineBuilder[In, Out, In]
+    init_file: (InitFile | None) = None): PipelineBuilder[In, Out, In]
   =>
+    // We have removed the ability to turn coalescing off at the command line.
+    let coalescing = true
     let pipeline_id = pipelines.size()
     let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name,
       source_config, coalescing)
