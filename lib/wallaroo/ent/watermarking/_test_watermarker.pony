@@ -17,6 +17,7 @@ actor _TestWatermarker is TestList
     test(_TestProposeWatermark3)
     test(_TestProposeWatermark4)
     test(_TestProposeWatermark5)
+    test(_TestProposeWatermark6)
 
 class iso _TestProposeWatermarkFullyAcked is UnitTest
   """
@@ -121,10 +122,10 @@ class iso _TestProposeWatermarkFullyAckedNoneFiltered is UnitTest
 class iso _TestProposeWatermark1 is UnitTest
   """
   Route | Sent | Ack
-  A       0     0
-  B       2     1
-  C       5     5
-  D       7     4
+  Filter  0     0
+  1       2     1
+  2       5     5
+  3       7     4
 
   Should be 1
   """
@@ -159,10 +160,10 @@ class iso _TestProposeWatermark1 is UnitTest
 class iso _TestProposeWatermark2 is UnitTest
   """
   Route | Sent | Ack
-    A       0     0
-    B       3     1
-    C       5     5
-    D       7     4
+  Filter  0     0
+  1       3     1
+  2       5     5
+  3       7     4
 
   Should be 1
   """
@@ -198,10 +199,10 @@ class iso _TestProposeWatermark2 is UnitTest
 class iso _TestProposeWatermark3 is UnitTest
   """
   Route | Sent | Ack
-    A       0     0
-    B       9     1
-    C       5     5
-    D       7     4
+  Filter  0     0
+  1       9     1
+  2       5     5
+  3       7     4
 
   Should be 1
   """
@@ -238,10 +239,10 @@ class iso _TestProposeWatermark3 is UnitTest
 class iso _TestProposeWatermark4 is UnitTest
   """
   Route | Sent | Ack
-    A       7     7
-    B       9     3
-    C       5     5
-    D       0     0
+  Filter  7     7
+  1       9     3
+  2       5     5
+  3       0     0
 
   Should be 3
   """
@@ -274,10 +275,10 @@ class iso _TestProposeWatermark4 is UnitTest
 class iso _TestProposeWatermark5 is UnitTest
   """
   Route | Sent | Ack
-    A       7     7
-    B       9     3
-    C       5     5
-    D       1     0
+  Filter  7     7
+  1       9     3
+  2       5     5
+  3       1     0
 
   Should be 0
   """
@@ -308,3 +309,47 @@ class iso _TestProposeWatermark5 is UnitTest
 
     let proposed: U64 = marker.propose_watermark()
     h.assert_eq[U64](0, proposed)
+
+class iso _TestProposeWatermark6 is UnitTest
+  """
+  Route | Sent | Ack
+  Filter  7     7
+  1       9     3
+  2       4     4
+  3       1     1
+
+  Could 4, however, this is an edge case which results in
+  poor performance for the normal case. So, keep our standard
+  algo and return 3.
+
+  This test exists as a warning to others in the future, least the get clever
+  like we once considered.
+  """
+  fun name(): String =>
+    "watermarker/ProposeWatermark6"
+
+  fun ref apply(h: TestHelper) =>
+    let marker: Watermarker = Watermarker
+    let route1 = RouteId(1)
+    let route2 = RouteId(2)
+    let route3 = RouteId(3)
+
+    marker.add_route(route1)
+    marker.add_route(route2)
+    marker.add_route(route3)
+
+    marker.filtered(SeqId(7))
+
+    marker.sent(route1, SeqId(3))
+    marker.sent(route1, SeqId(8))
+    marker.sent(route1, SeqId(9))
+    marker.ack_received(route1, SeqId(3))
+
+    marker.sent(route2, SeqId(4))
+    marker.ack_received(route2, SeqId(4))
+
+    marker.sent(route3, SeqId(1))
+    marker.ack_received(route3, SeqId(1))
+
+    let proposed: U64 = marker.propose_watermark()
+    h.assert_eq[U64](3, proposed)
