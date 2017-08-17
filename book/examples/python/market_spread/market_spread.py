@@ -29,19 +29,28 @@ def load_valid_symbols():
 
 
 def application_setup(args):
+    input_addrs = wallaroo.tcp_parse_input_addrs(args)
+    order_host, order_port = input_addrs[0]
+    nbbo_host, nbbo_port = input_addrs[1]
+
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+
     symbol_partitions = [str_to_partition(x.rjust(4)) for x in
                          load_valid_symbols()]
 
     ab = wallaroo.ApplicationBuilder("market-spread")
     ab.new_pipeline(
-            "Orders", OrderDecoder()
+            "Orders", OrderDecoder(),
+            wallaroo.TCPSourceConfig(order_host, in_port)
         ).to_state_partition_u64(
             CheckOrder(), SymbolDataBuilder(), "symbol-data",
             SymbolPartitionFunction(), symbol_partitions
        ).to_sink(
-            OrderResultEncoder()
+            OrderResultEncoder(),
+            wallaroo.TCPSinkConfig(out_host, out_port))
        ).new_pipeline(
-            "Market Data", MarketDataDecoder()
+            "Market Data", MarketDataDecoder(),
+            wallaroo.TCPSourceConfig(nbbo_host, nbbo_port)
         ).to_state_partition_u64(
             UpdateMarketData(), SymbolDataBuilder(), "symbol-data",
             SymbolPartitionFunction(), symbol_partitions
