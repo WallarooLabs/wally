@@ -286,7 +286,7 @@ actor Startup
             _startup_options.worker_count, _env, auth, connections,
             router_registry, metrics_conn, _startup_options.is_initializer,
             data_receivers, _event_log as EventLog, recovery,
-            recovery_replayer, _startup_options.input_addrs,
+            recovery_replayer,
             _local_topology_file, _data_channel_file, _worker_names_file,
             cluster_manager)
         else
@@ -295,14 +295,14 @@ actor Startup
             _startup_options.worker_count, _env, auth, connections,
             router_registry, metrics_conn, _startup_options.is_initializer,
             data_receivers, _event_log as EventLog, recovery,
-            recovery_replayer, _startup_options.input_addrs,
+            recovery_replayer,
             _local_topology_file, _data_channel_file, _worker_names_file)
         end
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
         _application_distributor = ApplicationDistributor(auth, _application,
-          local_topology_initializer, _startup_options.input_addrs)
+          local_topology_initializer)
         match _application_distributor
         | let ad: ApplicationDistributor =>
           _cluster_initializer = ClusterInitializer(auth,
@@ -446,7 +446,6 @@ actor Startup
             router_registry, metrics_conn,
             _startup_options.is_initializer, data_receivers,
             _event_log as EventLog, recovery, recovery_replayer,
-            _startup_options.input_addrs,
             _local_topology_file, _data_channel_file, _worker_names_file,
             cluster_manager where is_joining = _startup_options.is_joining)
         else
@@ -456,7 +455,6 @@ actor Startup
             router_registry, metrics_conn,
             _startup_options.is_initializer, data_receivers,
             _event_log as EventLog, recovery, recovery_replayer,
-            _startup_options.input_addrs,
             _local_topology_file, _data_channel_file, _worker_names_file
             where is_joining = _startup_options.is_joining)
         end

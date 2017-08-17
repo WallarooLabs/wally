@@ -50,7 +50,7 @@ actor ActorSystemStartup
 
     try
       let auth = _env.root as AmbientAuth
-      _startup_options = WallarooConfig.wallaroo_args(_env.args)
+      _startup_options = WallarooConfig.wactor_args(_env.args)
 
       @printf[I32]("#########################################\n".cstring())
       @printf[I32]("#*# Wallaroo Actor System Application #*#\n".cstring())

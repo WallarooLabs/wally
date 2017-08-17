@@ -73,8 +73,6 @@ actor Main
               env.root as AmbientAuth))
         end
 
-      let init_file = InitFile(initial_nbbo_file_path, 46)
-
       let initial_report_msgs_trn = recover trn Array[Array[ByteSeq] val] end
       let connect_msg = HubProtocol.connect()
       let join_msg = HubProtocol.join("reports:market-spread")

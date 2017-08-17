@@ -31,10 +31,10 @@ giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f testing
 R3K or other Symbol Set (700, 1400, 2100)
 
 3a) market spread app (1 worker):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg -f ../../../data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg --ponythreads=4 --ponynoblock
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock
 
 3b) market spread app (2 workers):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg -f ../../../data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg --ponythreads=4 --ponynoblock -t -w 2
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock -t -w 2
 
 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
@@ -69,8 +69,6 @@ use "wallaroo/topology"
 actor Main
   new create(env: Env) =>
     try
-      var initial_nbbo_file_path =
-        "../../../data/market_spread/initial-nbbo-fixish.msg"
       var symbols_file_path: (String | None) = None
       let options = Options(env.args, false)
 
@@ -80,8 +78,6 @@ actor Main
 
       for option in options do
         match option
-        | ("initial-nbbo-file", let arg: String) =>
-          initial_nbbo_file_path = arg
         | ("symbols-file", let arg: String) =>
           symbols_file_path = arg
         end
@@ -95,8 +91,6 @@ actor Main
             PartitionFileReader(symbols_file_path as String,
               env.root as AmbientAuth))
         end
-
-      let init_file = InitFile(initial_nbbo_file_path, 46)
 
       let initial_report_msgs_trn = recover trn Array[Array[ByteSeq] val] end
       let connect_msg = HubProtocol.connect()
@@ -122,8 +116,7 @@ actor Main
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
-              TCPSourceConfigCLIParser(env.args)(0))
-              where init_file = init_file)
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
