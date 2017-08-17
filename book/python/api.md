@@ -32,10 +32,15 @@ For a simple application with a `Decoder`, `Computation`, and `Encoder`, this fu
 
 ```python
 def application_setup(args):
+    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+
     ab = wallaroo.ApplicationBuilder("My Application")
-    ab.new_pipeline("pipeline 1", Decoder())
+    ab.new_pipeline("pipeline 1", Decoder(),
+                    wallaroo.TCPSourceConfig(in_host, in_port))
     ab.to(Computation)
-    ab.to_sink(Encoder())
+    ab.to_sink(Encoder(),
+               wallaroo.TCPSinkConfig(out_host, out_port))
     ab.done()
     return ab.build()
 ```
@@ -54,9 +59,9 @@ The `ApplicationBuilder` class in `wallaroo` is a utility for constructing appli
 
 Create a new application with the name `name`.
 
-##### `new_pipeline(name, decoder`
+##### `new_pipeline(name, decoder, source_config)`
 
-Create a new pipline with the name `name`, and a `decoder` instance of [SourceDecoder](#sourcedecoder).
+Create a new pipline with the name `name`, a `decoder` instance of [SourceDecoder](#sourcedecoder), and a source config object.
 
 If you're adding more than one pipeline, make sure to call `done()` before creating another pipeline.
 

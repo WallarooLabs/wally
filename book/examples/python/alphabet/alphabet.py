@@ -13,7 +13,7 @@ def application_setup(args):
                     wallaroo.TCPSourceConfig(in_host, in_port))
     ab.to_stateful(AddVotes(), LetterStateBuilder(), "letter state")
     ab.to_sink(Encoder(),
-               wallaroo.TCPSinkConfig(out_host, out_port)))
+               wallaroo.TCPSinkConfig(out_host, out_port))
     return ab.build()
 
 
