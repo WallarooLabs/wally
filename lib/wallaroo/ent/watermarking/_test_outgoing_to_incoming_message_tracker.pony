@@ -27,7 +27,7 @@ class iso _TestEmptyIndexFor is UnitTest
     "outgoing_to_incoming_message_tracker/EmptyIndexFor"
 
   fun ref apply(h: TestHelper) =>
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     h.assert_eq[USize](-1, t._index_for(1))
 
@@ -36,7 +36,7 @@ class iso _TestBelowFirstIndex is UnitTest
     "outgoing_to_incoming_message_tracker/BelowFirstIndex"
 
   fun ref apply(h: TestHelper) =>
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(2), _TestProducer, RouteId(1), SeqId(1))
 
@@ -47,7 +47,7 @@ class iso _TestIndexFor1 is UnitTest
     "outgoing_to_incoming_message_tracker/IndexFor1"
 
   fun ref apply(h: TestHelper) =>
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), _TestProducer, RouteId(1), SeqId(1))
     t.add(SeqId(2), _TestProducer, RouteId(1), SeqId(2))
@@ -68,7 +68,7 @@ class iso _TestIndexFor2 is UnitTest
     "outgoing_to_incoming_message_tracker/IndexFor2"
 
   fun ref apply(h: TestHelper) =>
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(505), _TestProducer, RouteId(1), SeqId(10))
     t.add(SeqId(506), _TestProducer, RouteId(1), SeqId(11))
@@ -89,7 +89,7 @@ class iso _TestIndexForWithGaps is UnitTest
     "outgoing_to_incoming_message_tracker/IndexForWithGaps"
 
   fun ref apply(h: TestHelper) =>
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(505), _TestProducer, RouteId(1), SeqId(10))
     t.add(SeqId(516), _TestProducer, RouteId(1), SeqId(11))
@@ -115,7 +115,7 @@ class iso _TestIndexForWithGaps2 is UnitTest
     "outgoing_to_incoming_message_tracker/IndexForWithGaps2"
 
   fun ref apply(h: TestHelper) =>
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(505), _TestProducer, RouteId(1), SeqId(10))
     t.add(SeqId(516), _TestProducer, RouteId(1), SeqId(11))
@@ -144,7 +144,7 @@ class iso _TestOriginHighsBelow1 is UnitTest
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     t.add(SeqId(2), o2, o2route, SeqId(1))
@@ -177,7 +177,7 @@ class iso _TestOriginHighsBelow2 is UnitTest
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     t.add(SeqId(2), o2, o2route, SeqId(1))
@@ -205,7 +205,7 @@ class iso _TestOriginHighsBelowWithOneToManyPartiallyAcked is UnitTest
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     // this incoming message is 1 to many
@@ -236,7 +236,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked1 is UnitTest
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     // this incoming message is 1 to many
@@ -268,7 +268,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked2 is UnitTest
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     // this incoming message is 1 to many
@@ -301,7 +301,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked3 is UnitTest
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     // this incoming message is 1 to many
@@ -333,7 +333,7 @@ class iso _TestOutgoingToIncomingEviction is UnitTest
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     t.add(SeqId(2), o2, o2route, SeqId(1))
@@ -362,7 +362,7 @@ class iso _TestOutgoingToIncomingEvictionBelow is UnitTest
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = OutgoingToIncomingMessageTracker
+    let t = _OutgoingToIncomingMessageTracker
 
 
     t.add(SeqId(5), o2, o2route, SeqId(2))

@@ -30,7 +30,7 @@ back to the source.
 To chain acknowledgements in this fashion, a Step like A needs to know what
 incoming message from an upstream `Producer` corresponds to what message that
 was sent to a downstream `Consumer`. This incoming to outgoing tracking is done
-in the `OutgoingToIncomingMessageTracker` class.
+in the `_OutgoingToIncomingMessageTracker` class.
 
 Acknowledged messages are recorded in the `Watermarker` class on a per route
 basis. A `Route` is a point between two steps. For example, A --> B results
@@ -40,7 +40,7 @@ messages can be acknowledged by a step at any given point in time. Each step's
 any messages that entered the step but had no corresponding output message.
 
 The `Acker` class is responsible for coordinating between the `Watermarker`
-and the `OutgoingToIncomingMessageTracker`. The `Acker` receives acks from
+and the `_OutgoingToIncomingMessageTracker`. The `Acker` receives acks from
 downstream consumers and will periodically check to see if it can acknowledge
 anything back to any of it's upstream producers.
 

@@ -18,14 +18,15 @@ class TerminusRoute
   var _highest_tracking_id_acked: U64 = 0
   let _ack_batch_size: USize
   var _tracking_id: U64 = 0
-  let _tracking_id_to_incoming: OutgoingToIncomingMessageTracker
+  let _tracking_id_to_incoming: _OutgoingToIncomingMessageTracker
   var _acked_watermark: U64 = 0
   var _ack_next_time: Bool = false
 
   // TODO: Change this to a reasonable value!
   new create(ack_batch_size': USize = 100) =>
     _ack_batch_size = ack_batch_size'
-    _tracking_id_to_incoming = OutgoingToIncomingMessageTracker(_ack_batch_size)
+    _tracking_id_to_incoming =
+      _OutgoingToIncomingMessageTracker(_ack_batch_size)
 
   fun ref terminate(i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): SeqId
