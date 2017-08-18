@@ -14,24 +14,11 @@ Stateless
 Stateless -> Stateful
 Stateless -> Stateful -> Stateless
 
-#### Uncoalesced
-Stateful -> Stateless
-Stateful -> Stateless -> Stateful
-Stateless
-Stateless -> Stateful
-Stateless -> Stateful -> Stateless
-
-
 #### Partitioned
 State Partition
 State Partition -> State Partition
 State Partition -> Stateful
 State Partition -> Stateless
-
-##### Uncoalesced
-State Partition -> Stateless
-Stateless -> State Partition
-Stateless -> State Partition -> Stateless
 
 #### Filtering Stateless
 Stateless (Filter) -> Stateful
@@ -44,21 +31,7 @@ Stateless -> Stateless (Filter)
 
 Stateful -> Stateless -> Stateful
 
-##### Uncoalesced
-Stateful -> Stateless
-Stateful -> Stateless -> Stateful
-Stateless -> Stateful -> Stateless
-
-
 ##### Partitioned
 State Partition -> State Partition
 State Partition -> Stateful
 State Partition -> Stateless
-
-###### Uncoalesced
-State Partition -> Stateless
-
-#### Related to Issue #1021
-##### Partitioned
-###### Uncoalesced
-Stateless -> State Partition -> Stateless
