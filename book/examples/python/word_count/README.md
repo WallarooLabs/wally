@@ -15,8 +15,7 @@ docker start mui
 In a shell, set up a listener:
 
 ```bash
-../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
-  --listen 127.0.0.1:7002
+nc -l 127.0.0.1 7002
 ```
 
 In another shell, export the current directory and `wallaroo.py` directories to `PYTHONPATH`:
@@ -44,3 +43,5 @@ In a third shell, send some messages:
 --batch-size 5 --interval 100_000_000 --messages 10000000 \
 --ponythreads=1 --repeat
 ```
+
+And then... watch a streaming output of words and counts appear in the listener window.
