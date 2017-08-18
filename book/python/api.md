@@ -54,7 +54,7 @@ The `ApplicationBuilder` class in `wallaroo` is a utility for constructing appli
 
 Create a new application with the name `name`.
 
-##### `new_pipeline(name, decoder[, coalescing=True])`
+##### `new_pipeline(name, decoder`
 
 Create a new pipline with the name `name`, and a `decoder` instance of [SourceDecoder](#sourcedecoder).
 
