@@ -18,11 +18,11 @@ class ApplicationBuilder(object):
     def __init__(self, name):
         self._actions = [("name", name)]
 
-    def new_pipeline(self, name, decoder, coalescing=True):
+    def new_pipeline(self, name, decoder):
         if inspect.isclass(decoder):
             raise WallarooParameterError("Expecting a Decoder instance. Got a "
                                          "class instead.")
-        self._actions.append(("new_pipeline", name, decoder, coalescing))
+        self._actions.append(("new_pipeline", name, decoder))
         return self
 
     def to(self, computation):
