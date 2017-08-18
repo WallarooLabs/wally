@@ -53,8 +53,6 @@ class WordTotals(object):
         else:
             self.word_totals[word] = 1
 
-        print word + " => " + str(self.word_totals[word])
-
     def get_count(self, word):
         return WordCount(word, self.word_totals[word])
 
