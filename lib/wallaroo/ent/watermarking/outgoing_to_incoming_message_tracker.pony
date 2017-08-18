@@ -4,13 +4,13 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/routing"
 
-type ProducerRouteSeqId is (Producer, RouteId, SeqId)
+type _ProducerRouteSeqId is (Producer, RouteId, SeqId)
 
-class ref OutgoingToIncomingMessageTracker
-  let _seq_id_to_incoming: Array[(SeqId, ProducerRouteSeqId)]
+class ref _OutgoingToIncomingMessageTracker
+  let _seq_id_to_incoming: Array[(SeqId, _ProducerRouteSeqId)]
 
   new create(size': USize = 0) =>
-    _seq_id_to_incoming = Array[(SeqId, ProducerRouteSeqId)](size')
+    _seq_id_to_incoming = Array[(SeqId, _ProducerRouteSeqId)](size')
 
   fun ref add(o_seq_id: SeqId, i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId)
