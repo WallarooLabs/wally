@@ -13,7 +13,8 @@ type MetricData is
 type MetricDataList is Array[MetricData]
 
 type MetricsCategory is
-  (ComputationCategory | StartToEndCategory | NodeIngressEgressCategory)
+  (ComputationCategory | StartToEndCategory | NodeIngressEgressCategory |
+    PipelineIngestionCategory)
 
 primitive ComputationCategory
   fun apply(): String => "computation"
@@ -23,6 +24,9 @@ primitive StartToEndCategory
 
 primitive NodeIngressEgressCategory
   fun apply(): String => "node-ingress-egress"
+
+primitive PipelineIngestionCategory
+  fun apply(): String => "pipeline-ingestion"
 
 class _MetricsReporter
   let _topic: String
@@ -88,6 +92,9 @@ class MetricsReporter
 
   let _step_metrics_map: Map[String, _MetricsReporter] =
     _step_metrics_map.create()
+
+  let _pipeline_ingestion_map: Map[String, _MetricsReporter] =
+    _pipeline_ingestion_map.create()
 
   let _pipeline_metrics_map: Map[String, _MetricsReporter] =
     _pipeline_metrics_map.create()
@@ -156,6 +163,26 @@ class MetricsReporter
     """
     time + (length - (time % length))
 
+  fun ref pipeline_ingest(pipeline: String val, source_name: String val) =>
+    """
+    Used to report how many messages are ingested at a source over a given
+    time frame. Latency is reported as 0 since processing time is not
+    part of this metric.
+    """
+    let metrics = try
+        _pipeline_ingestion_map(source_name)
+      else
+        let reporter =
+          _MetricsReporter(_metrics_conn, _app_name, _worker_name, pipeline,
+            source_name, 0, "", PipelineIngestionCategory)
+        _pipeline_metrics_map(source_name) = reporter
+        reporter
+      end
+
+    metrics.report(0)
+
+    _maybe_send_metrics()
+
   fun ref pipeline_metric(source_name: String val, time_spent: U64) =>
     let metrics = try
         _pipeline_metrics_map(source_name)
@@ -191,6 +218,18 @@ class MetricsReporter
     if now > _period_ends_at then
       let metrics = recover trn MetricDataList end
       for mr in _step_metrics_map.values() do
+        let h = mr.reset_histogram()
+        let metric_name = mr.metric_name()
+        let category = mr.category()
+        let topic = mr.topic()
+        let id = mr.id()
+        let pipeline = mr.pipeline()
+        let worker_name = mr.worker_name()
+        metrics.push((metric_name, category, pipeline,
+          worker_name, id, consume h, _period, _period_ends_at,
+          topic, "metrics"))
+      end
+      for mr in _pipeline_ingestion_map.values() do
         let h = mr.reset_histogram()
         let metric_name = mr.metric_name()
         let category = mr.category()
