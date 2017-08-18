@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "collections"
 use "wallaroo/boundary"
 use "wallaroo/core"
+use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
@@ -43,7 +44,6 @@ actor TCPSourceListener is SourceListener
   # TCPSourceListener
   """
 
-  var _notify: TCPSourceListenerNotify
   let _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
@@ -59,6 +59,10 @@ actor TCPSourceListener is SourceListener
   var _init_size: USize
   var _max_size: USize
   let _metrics_reporter: MetricsReporter
+  var _source_builder: SourceBuilder
+  let _event_log: EventLog
+  let _auth: AmbientAuth
+  let _target_router: Router
 
   new create(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry, route_builder: RouteBuilder,
@@ -75,7 +79,6 @@ actor TCPSourceListener is SourceListener
     """
     Listens for both IPv4 and IPv6 connections.
     """
-    _notify = SourceListenerNotify(source_builder, event_log, auth, target_router)
     _router = router
     _router_registry = router_registry
     _route_builder = route_builder
@@ -87,16 +90,20 @@ actor TCPSourceListener is SourceListener
     _limit = limit
     _default_target = default_target
     _metrics_reporter = consume metrics_reporter
+    _source_builder = source_builder
+    _event_log = event_log
+    _auth = auth
+    _target_router = target_router
 
     _init_size = init_size
     _max_size = max_size
     _fd = @pony_asio_event_fd(_event)
-     @printf[I32]((source_builder.name() + " source attempting to listen on "
+    @printf[I32]((source_builder.name() + " source attempting to listen on "
       + host + ":" + service + "\n").cstring())
     _notify_listening()
 
   be update_router(router: PartitionRouter) =>
-    _notify.update_router(router)
+    _source_builder = _source_builder.update_router(router)
 
   be remove_route_for(moving_step: Consumer) =>
     None
@@ -172,7 +179,7 @@ actor TCPSourceListener is SourceListener
     Spawn a new connection.
     """
     try
-      let source = TCPSource._accept(this, _notify.connected(this),
+      let source = TCPSource._accept(this, _notify_connected(),
         _router.routes(), _route_builder, _outgoing_boundary_builders,
         _layout_initializer, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size,
@@ -190,8 +197,22 @@ actor TCPSourceListener is SourceListener
     Inform the notifier that we're listening.
     """
     if not _event.is_null() then
-      _notify.listening(this)
+      @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
     else
       _closed = true
-      _notify.not_listening(this)
+      @printf[I32]((_source_builder.name() +
+        " source is unable to listen\n").cstring())
+      Fail()
     end
+
+  fun ref _notify_connected(): TCPSourceNotify iso^ ? =>
+    try
+      _source_builder(_event_log, _auth, _target_router)
+        as TCPSourceNotify iso^
+    else
+      @printf[I32](
+        (_source_builder.name() + " could not create a TCPSourceNotify\n").cstring())
+      Fail()
+      error
+    end
+
