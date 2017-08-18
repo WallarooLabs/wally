@@ -33,10 +33,13 @@ trait Backend
   fun ref encode_entry(entry: LogEntry)
 
 class DummyBackend is Backend
-  new create() => None
+  let _event_log: EventLog
+  new create(event_log: EventLog) =>
+    _event_log = event_log
   fun ref sync() => None
   fun ref datasync() => None
-  fun ref start_log_replay() => None
+  fun ref start_log_replay() =>
+    _event_log.log_replay_finished()
   fun ref write() => None
   fun ref encode_entry(entry: LogEntry) => None
 
@@ -264,10 +267,10 @@ actor EventLog
           FileBackend(FilePath(env.root as AmbientAuth, f), this,
             backend_file_length)
         else
-          DummyBackend
+          DummyBackend(this)
         end
       else
-        DummyBackend
+        DummyBackend(this)
       end
     end
 
