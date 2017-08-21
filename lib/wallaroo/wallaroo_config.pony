@@ -1,5 +1,4 @@
 use "sendence/options"
-use "wallaroo/fail"
 use "wallaroo/spike"
 
 class StartupOptions
@@ -165,9 +164,8 @@ primitive WallarooConfig
       @printf[I32](("--topology-initializer is an invalid command line " +
         "argument when joining.  Joining worker cannot function as " +
         "initializer.\n").cstring())
-      Fail()
+      error
     end
-
 
     if (so.worker_count == 1) and not so.is_joining then
       so.is_initializer = true
@@ -175,6 +173,8 @@ primitive WallarooConfig
     if so.is_initializer then
       so.worker_name = "initializer"
     end
+
+    if resilience_dir
 
     ifdef "spike" then
       so.spike_config = SpikeConfig(spike_drop, spike_prob, spike_margin,
