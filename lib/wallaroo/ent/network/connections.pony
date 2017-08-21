@@ -48,6 +48,7 @@ actor Connections is Cluster
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
     d_host: String, d_service: String, ph_host: String, ph_service: String,
+    external_host: String, external_service: String,
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
     is_joining: Bool, spike_config: (SpikeConfig | None) = None)
@@ -73,15 +74,23 @@ actor Connections is Cluster
     end
 
     if (ph_host != "") and (ph_service != "") then
-      let phone_home = TCPConnection(auth,
+      let phone_home = TCPConnection(_auth,
         HomeConnectNotify(_worker_name, this), ph_host, ph_service)
       _phone_home = phone_home
       if is_initializer then
         let ready_msg = ExternalMsgEncoder.ready(_worker_name)
         phone_home.writev(ready_msg)
       end
-      @printf[I32](("Set up phone home connection on " + ph_host
-        + ":" + ph_service + "\n").cstring())
+      @printf[I32]("Set up phone home connection on %s:%s\n".cstring(),
+        ph_host.cstring(), ph_service.cstring())
+    end
+
+    if (external_host != "") and (external_service != "") then
+      let external_listener = TCPListener(_auth,
+        ExternalChannelListenNotifier(_worker_name, _auth, this))
+      _listeners.push(external_listener)
+      @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
+        external_host.cstring(), external_service.cstring())
     end
 
   be register_my_control_addr(host: String, service: String) =>

@@ -136,5 +136,5 @@ primitive _RouterRegistryGenerator
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
-    Connections("", "", env, auth, "", "", "", "", "", "", MetricsSink("", ""),
-      "", "", false, "", false)
+    Connections("", "", env, auth, "", "", "", "", "", "", "", "",
+      MetricsSink("", ""), "", "", false, "", false)

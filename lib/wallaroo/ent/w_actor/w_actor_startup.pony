@@ -43,6 +43,8 @@ actor ActorSystemStartup
 
   var _ph_host: String = ""
   var _ph_service: String = ""
+  var _external_host: String = ""
+  var _external_service: String = ""
 
   new create(env: Env, system: ActorSystem val, app_name: String) =>
     _env = env
@@ -76,6 +78,19 @@ actor ActorSystemStartup
         @printf[I32]("You must provide a source address! (-in/-i)\n".cstring())
         Fail()
       end
+
+      (_external_host, _external_service) =
+        match _startup_options.x_arg
+        | let addr: Array[String] =>
+          try
+            (addr(0), addr(1))
+          else
+            Fail()
+            ("", "")
+          end
+        else
+          ("", "")
+        end
 
       let name = match _app_name
         | let n: String => n
@@ -194,8 +209,8 @@ actor ActorSystemStartup
       let connections = Connections(_app_name, _startup_options.worker_name,
         auth, _startup_options.c_host, _startup_options.c_service,
         _startup_options.d_host, _startup_options.d_service, _ph_host,
-        _ph_service, empty_metrics_conn, "", "",
-        _startup_options.is_initializer, _connection_addresses_file,
+        _ph_service, _external_host, _external_service, empty_metrics_conn,
+        "", "", _startup_options.is_initializer, _connection_addresses_file,
         _is_joining, _startup_options.spike_config)
 
       let w_name = _startup_options.worker_name
@@ -317,7 +332,7 @@ actor ActorSystemStartup
 
 primitive EmptyConnections
   fun apply(env: Env, auth: AmbientAuth): Connections =>
-    Connections("", "", auth, "", "", "", "", "", "",
+    Connections("", "", auth, "", "", "", "", "", "", "", "",
       ReconnectingMetricsSink("", "", "", ""), "", "", false, "", false)
 
 primitive EmptyRouterRegistry

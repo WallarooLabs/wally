@@ -18,6 +18,7 @@ class StartupOptions
   var my_d_host: String = ""
   var my_d_service: String = "0"
   var p_arg: (Array[String] | None) = None
+  var x_arg: (Array[String] | None) = None
   var worker_count: USize = 1
   var is_initializer: Bool = false
   var worker_name: String = ""
@@ -64,6 +65,7 @@ primitive WallarooConfig
       .add("my-control", "x", StringArgument)
       .add("my-data", "y", StringArgument)
       .add("phone-home", "p", StringArgument)
+      .add("external", "x", StringArgument)
       .add("file", "f", StringArgument)
       // worker count includes the initial "leader" since there is no
       // persisting leader
@@ -120,6 +122,7 @@ primitive WallarooConfig
         so.my_d_host = so.my_d_addr(0)
         so.my_d_service = so.my_d_addr(1)
       | ("phone-home", let arg: String) => so.p_arg = arg.split(":")
+      | ("external", let arg: String) => so.x_arg = arg.split(":")
       | ("worker-count", let arg: I64) =>
         so.worker_count = arg.usize()
       | ("topology-initializer", None) =>
