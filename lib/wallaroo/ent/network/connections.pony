@@ -73,7 +73,7 @@ actor Connections is Cluster
       create_control_connection("initializer", c_host, c_service)
     end
 
-    if (ph_host != "") and (ph_service != "") then
+    if (ph_host != "") or (ph_service != "") then
       let phone_home = TCPConnection(_auth,
         HomeConnectNotify(_worker_name, this), ph_host, ph_service)
       _phone_home = phone_home
@@ -85,9 +85,10 @@ actor Connections is Cluster
         ph_host.cstring(), ph_service.cstring())
     end
 
-    if (external_host != "") and (external_service != "") then
+    if (external_host != "") or (external_service != "") then
       let external_listener = TCPListener(_auth,
-        ExternalChannelListenNotifier(_worker_name, _auth, this))
+        ExternalChannelListenNotifier(_worker_name, _auth, this),
+          external_host, external_service)
       _listeners.push(external_listener)
       @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
         external_host.cstring(), external_service.cstring())

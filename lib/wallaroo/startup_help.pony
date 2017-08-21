@@ -10,7 +10,7 @@ primitive StartupHelp
       --my-control [Optionally sets address for my control channel]
       --my-data [Optionally sets address for my data channel]
       --phone-home/-p [Sets address for phone home connection]
-      --external/-x [Sets address for external message channel]
+      --external/-e [Sets address for external message channel]
       --worker-count/-w *[Sets total number of workers, including topology
         initializer]
       --worker-name/-n *[Sets name for this worker]

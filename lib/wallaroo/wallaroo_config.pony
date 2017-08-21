@@ -65,7 +65,7 @@ primitive WallarooConfig
       .add("my-control", "x", StringArgument)
       .add("my-data", "y", StringArgument)
       .add("phone-home", "p", StringArgument)
-      .add("external", "x", StringArgument)
+      .add("external", "e", StringArgument)
       .add("file", "f", StringArgument)
       // worker count includes the initial "leader" since there is no
       // persisting leader
@@ -94,7 +94,8 @@ primitive WallarooConfig
 
     for option in options do
       match option
-      | ("metrics", let arg: String) => so.m_arg = arg.split(":")
+      | ("metrics", let arg: String) =>
+        so.m_arg = arg.split(":")
       | ("in", let arg: String) =>
         let i_addrs_write = recover trn Array[Array[String]] end
         for addr in arg.split(",").values() do
@@ -121,13 +122,16 @@ primitive WallarooConfig
         so.my_d_addr = arg.split(":")
         so.my_d_host = so.my_d_addr(0)
         so.my_d_service = so.my_d_addr(1)
-      | ("phone-home", let arg: String) => so.p_arg = arg.split(":")
-      | ("external", let arg: String) => so.x_arg = arg.split(":")
+      | ("phone-home", let arg: String) =>
+        so.p_arg = arg.split(":")
+      | ("external", let arg: String) =>
+        so.x_arg = arg.split(":")
       | ("worker-count", let arg: I64) =>
         so.worker_count = arg.usize()
       | ("topology-initializer", None) =>
         so.is_initializer = true
-      | ("name", let arg: String) => so.worker_name = arg
+      | ("name", let arg: String) =>
+        so.worker_name = arg
       | ("resilience-dir", let arg: String) =>
         if arg.substring(arg.size().isize() - 1) == "/" then
           @printf[I32]("--resilience-dir must not end in /\n".cstring())
@@ -140,14 +144,20 @@ primitive WallarooConfig
       | ("join", let arg: String) =>
         so.j_arg = arg.split(":")
         so.is_joining = true
-      | ("swarm-managed", None) => so.is_swarm_managed = true
-      | ("swarm-manager-address", let arg: String) => so.a_arg = arg
+      | ("swarm-managed", None) =>
+        so.is_swarm_managed = true
+      | ("swarm-manager-address", let arg: String) =>
+        so.a_arg = arg
       | ("stop-pause", let arg: I64) =>
         so.stop_the_world_pause = arg.u64()
-      | ("spike-seed", let arg: I64) => spike_seed = arg.u64()
-      | ("spike-drop", None) => spike_drop = true
-      | ("spike-prob", let arg: F64) => spike_prob = arg
-      | ("spike-margin", let arg: I64) => spike_margin = arg.usize()
+      | ("spike-seed", let arg: I64) =>
+        spike_seed = arg.u64()
+      | ("spike-drop", None) =>
+        spike_drop = true
+      | ("spike-prob", let arg: F64) =>
+        spike_prob = arg
+      | ("spike-margin", let arg: I64) =>
+        spike_margin = arg.usize()
       end
     end
 
