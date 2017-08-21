@@ -129,6 +129,12 @@ actor Startup
       ifdef "resilience" then
         @printf[I32](("|||Resilience directory: " +
           _startup_options.resilience_dir + "|||\n").cstring())
+
+        if not FilePath(auth, _startup_options.resilience_dir).exists() then
+          @printf[I32](("Resilience directory: " +
+            _startup_options.resilience_dir + " doesn't exist\n").cstring())
+          error
+        end
       end
 
       if _startup_options.is_joining then
