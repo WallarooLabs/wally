@@ -20,6 +20,7 @@
 * [Run a Wallaroo Application](book/getting-started/run-a-application.md)
 * [Conclusion](book/getting-started/conclusion.md)
 
+<!--
 ### Wallaroo C++ API
 * [C++ API Introduction](book/cpp/intro.md)
 * [C++ Sample Application](book/cpp/sample-application.md)
@@ -45,6 +46,7 @@
    * [StateComputation](book/cpp/api/state-computation.md)
    * [State](book/cpp/api/state.md)
    * [UserFunctions](book/cpp/api/user-functions.md)
+-->
 
 ### Wallaroo Python API
 * [Python API Introduction](book/python/intro.md)

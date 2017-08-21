@@ -4,27 +4,32 @@ If all of the application state exists in one state object then only one computa
 
 For example, in an application that keeps track of stock prices, the application state might be a dictionary where the stock symbol is used to look up the price of the stock.
 
-```pony
-class Stock
-  var symbol: String
-  var price: F32
+```python
+class Stock(object):
+    def __init__(self, symbol, price):
+        self.symbol = symbol
+        self.price = price
 
-class Stocks
-  let _stocks: Map[String, Stock]
-  fun set(symbol: String, price: F32) =>
-    let stock = _stocks(symbol)
-    stock.price = price
+
+class Stocks(object):
+    def __init__(self):
+        self.stocks = {}
+
+    def set(self, symbol, price):
+        stock = self.stocks[symbol]
+        stock.price = price
 ```
 
 If a message came into the system with a new stock price, the computation would take that message, get the symbol and the price, and use them to update the state.
 
-```pony
-class UpdateStock
-  fun compute(message_data: MessageData, state: Stocks) =>
-    symbol = message_data.symbol
-    price = message_data.price
-    state.set(symbol, price)
-    // ...
+```python
+class UpdateStock(object):
+    def compute(self, stock, state):
+        symbol = stock.symbol
+        price = stock.price
+
+        state.set(symbol, price)
+        return (None, True)
 ```
 
 However, only one computation may access the state at a time, so in this cases messages are handled one at a time.
@@ -40,20 +45,22 @@ To do this, a _partition function_ is used to determine which _state part_ a par
 
 In order to take advantage of state partitioning, state objects need to be broken down. In the stock example there is already a class that represents an individual stock, so it can be used as the partitioned state.
 
-```pony
-class Stock
-  var symbol: String
-  var price: F32
+```python
+class Stock(object):
+    def __init__(self, symbol, price):
+        self.symbol = symbol
+        self.price = price
 ```
 
 Since the computation only has one stock in its state now, there is no need to do a dictionary look up. Instead, the computation can update the particular Stock's state right away.
 
-```pony
-class UpdateStock
-  fun compute(message_data: MessageData, state: Stock) =>
-    state.symbol = message_data.symbol
-    state.price = message_data.price
-    // ...
+```python
+class UpdateStock(object):
+    def compute(self, stock, state):
+        state.symbol = stock.symbol
+        state.price = stock.price
+
+        return (None, True)
 ```
 
 ### Parition Key
@@ -65,8 +72,8 @@ Currently, the partition keys for a particular partition need to be defined alon
 
 The partition function takes in message data and returns a partition key. In the example, the message symbol would be extracted from the message data and returned as the key.
 
-```pony
-primitive StockPartitionFunction
-  fun apply(stock: Stock val): String =>
-    stock.symbol
+```python
+class SymbolPartitionFunction(object):
+    def partition(self, data):
+        return data.symbol
 ```
