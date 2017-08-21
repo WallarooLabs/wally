@@ -23,40 +23,54 @@ primitive ExternalMsgEncoder
     wb.done()
 
   fun data(d: Stringable val, wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
     _encode(_Data(), d.string(), wb)
 
   fun ready(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
     _encode(_Ready(), node_name, wb)
 
   fun topology_ready(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
     _encode(_TopologyReady(), node_name, wb)
 
   fun start(wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
     _encode(_Start(), "", wb)
 
   fun shutdown(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
     _encode(_Shutdown(), node_name, wb)
 
   fun done_shutdown(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
     _encode(_DoneShutdown(), node_name, wb)
 
   fun done(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
     _encode(_Done(), node_name, wb)
 
   fun start_giles_senders(wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
       _encode(_StartGilesSenders(), "", wb)
 
   fun senders_started(wb: Writer = Writer):
-    Array[ByteSeq] val =>
+    Array[ByteSeq] val
+  =>
     _encode(_GilesSendersStarted(), "", wb)
+
+  fun print_message(message: String, wb: Writer = Writer):
+    Array[ByteSeq] val
+  =>
+    _encode(_Print(), message, wb)
 
 class BufferedExternalMsgEncoder
   let _buffer: Writer
@@ -175,11 +189,11 @@ class val ExternalDoneMsg is ExternalMsg
   new val create(n: String) =>
     node_name = n
 
+primitive ExternalStartGilesSendersMsg is ExternalMsg
+primitive ExternalGilesSendersStartedMsg is ExternalMsg
+
 class val ExternalPrintMsg is ExternalMsg
   let message: String
 
   new val create(m: String) =>
     message = m
-
-primitive ExternalStartGilesSendersMsg is ExternalMsg
-primitive ExternalGilesSendersStartedMsg is ExternalMsg
