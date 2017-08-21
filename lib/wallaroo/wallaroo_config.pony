@@ -174,8 +174,6 @@ primitive WallarooConfig
       so.worker_name = "initializer"
     end
 
-    if resilience_dir
-
     ifdef "spike" then
       so.spike_config = SpikeConfig(spike_drop, spike_prob, spike_margin,
         spike_seed)
