@@ -630,7 +630,13 @@ actor Connections is Cluster
       Fail()
     end
 
+  be dispose() =>
+    _shutdown()
+
   be shutdown() =>
+    _shutdown()
+
+  fun ref _shutdown() =>
     for listener in _listeners.values() do
       listener.dispose()
     end
