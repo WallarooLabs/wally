@@ -29,5 +29,5 @@ primitive StartupHelp
       --swarm-manager-address/-a [Sets the Docker Swarm Manager address]
       --stop-world/-u [Sets pause before state migration after stop the world]
       -----------------------------------------------------------------------------------
-      """
+      """.cstring()
     )
