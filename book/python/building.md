@@ -27,9 +27,9 @@ You should have already completed the [setup instructions](/book/getting-started
 
 * On Ubuntu:
 
-  ```bash
-  sudo apt-get install -y python-dev
-  ```
+```bash
+sudo apt-get install -y python-dev
+```
 
 #### Giles sender
 
