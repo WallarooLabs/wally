@@ -11,6 +11,7 @@ primitive _Done                                 fun apply(): U16 => 7
 primitive _Unknown                              fun apply(): U16 => 8
 primitive _StartGilesSenders                    fun apply(): U16 => 9
 primitive _GilesSendersStarted                  fun apply(): U16 => 10
+primitive _Print                                fun apply(): U16 => 11
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -120,6 +121,8 @@ primitive ExternalMsgDecoder
       ExternalStartGilesSendersMsg
     | (_GilesSendersStarted(), let s: String) =>
       ExternalGilesSendersStartedMsg
+    | (_Print(), let s: String) =>
+      ExternalPrintMsg(s)
     else
       error
     end
@@ -171,6 +174,12 @@ class val ExternalDoneMsg is ExternalMsg
 
   new val create(n: String) =>
     node_name = n
+
+class val ExternalPrintMsg is ExternalMsg
+  let message: String
+
+  new val create(m: String) =>
+    message = m
 
 primitive ExternalStartGilesSendersMsg is ExternalMsg
 primitive ExternalGilesSendersStartedMsg is ExternalMsg

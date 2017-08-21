@@ -28,6 +28,8 @@ actor Startup
 
   var _ph_host: String = ""
   var _ph_service: String = ""
+  var _external_host: String = ""
+  var _external_service: String = ""
   var _is_multi_worker: Bool = true
   var _cluster_initializer: (ClusterInitializer | None) = None
   var _application_distributor: (ApplicationDistributor | None) = None
@@ -81,6 +83,19 @@ actor Startup
 
       (_ph_host, _ph_service) =
         match _startup_options.p_arg
+        | let addr: Array[String] =>
+          try
+            (addr(0), addr(1))
+          else
+            Fail()
+            ("", "")
+          end
+        else
+          ("", "")
+        end
+
+      (_external_host, _external_service) =
+        match _startup_options.x_arg
         | let addr: Array[String] =>
           try
             (addr(0), addr(1))
@@ -256,12 +271,13 @@ actor Startup
         end
 
       let connections = Connections(_application.name(),
-        _startup_options.worker_name,
-        auth, _startup_options.c_host, _startup_options.c_service,
-        _startup_options.d_host, _startup_options.d_service, _ph_host,
-        _ph_service, metrics_conn, m_addr(0), m_addr(1), _startup_options.
-        is_initializer, _connection_addresses_file,
-        _startup_options.is_joining, _startup_options.spike_config)
+        _startup_options.worker_name, auth,
+        _startup_options.c_host, _startup_options.c_service,
+        _startup_options.d_host, _startup_options.d_service,
+        _ph_host, _ph_service, _external_host, _external_service,
+        metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
+        _connection_addresses_file, _startup_options.is_joining,
+        _startup_options.spike_config)
 
       let data_receivers = DataReceivers(auth,
         _startup_options.worker_name, is_recovering)
@@ -412,6 +428,7 @@ actor Startup
       let connections = Connections(_application.name(),
         _startup_options.worker_name,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
+        _external_host, _external_service,
         metrics_conn, m.metrics_host, m.metrics_service,
         _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
