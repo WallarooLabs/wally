@@ -292,6 +292,7 @@ actor RouterRegistry
     """
     Called when rotation has copmleted and we should resume processing
     """
+    _connections.request_cluster_unmute()
     _resume_the_world()
 
   fun ref _stop_the_world_for_log_rotation() =>
