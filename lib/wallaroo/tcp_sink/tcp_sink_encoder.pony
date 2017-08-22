@@ -1,15 +1,15 @@
 use "buffered"
 
-interface val SinkEncoder[In: Any val]
+interface val TCPSinkEncoder[In: Any val]
   fun apply(input: In, wb: Writer): Array[ByteSeq] val
 
-trait val EncoderWrapper
+trait val TCPEncoderWrapper
   fun encode[D: Any val](d: D, wb: Writer): Array[ByteSeq] val ?
 
-class val TypedEncoderWrapper[In: Any val] is EncoderWrapper
-  let _encoder: SinkEncoder[In] val
+class val TypedTCPEncoderWrapper[In: Any val] is TCPEncoderWrapper
+  let _encoder: TCPSinkEncoder[In] val
 
-  new val create(e: SinkEncoder[In] val) =>
+  new val create(e: TCPSinkEncoder[In] val) =>
     _encoder = e
 
   fun encode[D: Any val](d: D, wb: Writer): Array[ByteSeq] val ? =>

@@ -17,7 +17,7 @@ use "wallaroo/ent/watermarking"
 
 actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   // Steplike
-  let _encoder: EncoderWrapper
+  let _encoder: KafkaEncoderWrapper
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
   var _initializer: (LocalTopologyInitializer | None) = None
@@ -47,7 +47,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   let _pending_delivery_report: MapIs[Any tag, (String, U16, U64, U64, U64,
     (U64 | None))] = _pending_delivery_report.create()
 
-  new create(encoder_wrapper: EncoderWrapper,
+  new create(encoder_wrapper: KafkaEncoderWrapper,
     metrics_reporter: MetricsReporter iso, conf: KafkaConfig val,
     auth: TCPConnectionAuth)
   =>
@@ -71,7 +71,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   fun ref producer_mapping(): (KafkaProducerMapping | None) =>
     _kafka_producer_mapping
 
-  be receive_kafka_topics_partitions(new_topic_partitions: Map[String, 
+  be receive_kafka_topics_partitions(new_topic_partitions: Map[String,
     (KafkaTopicType, Set[I32])] val)
   =>
     None
@@ -104,7 +104,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       end
 
       (_, (let metric_name, let metrics_id, let send_ts, let worker_ingress_ts,
-        let pipeline_time_spent, let tracking_id)) = 
+        let pipeline_time_spent, let tracking_id)) =
         _pending_delivery_report.remove(delivery_report.opaque)
 
       if delivery_report.status isnt ErrorNone then
@@ -238,7 +238,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       @printf[I32]("Rcvd msg at KafkaSink\n".cstring())
     end
     try
-      let encoded = _encoder.encode[D](data, _wb)
+      (let encoded_value, let encoded_key) = _encoder.encode[D](data, _wb)
       my_metrics_id = ifdef "detailed-metrics" then
           var old_ts = my_latest_ts = Time.nanos()
           _metrics_reporter.step_metric(metric_name, "Sink encoding time", 9998,
@@ -253,7 +253,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
         // issues with the items not being found in `_pending_delivery_report`.
         let any: Any tag = data
         let ret = (_kafka_producer_mapping as KafkaProducerMapping ref)
-          .send_topic_message(_topic, any, encoded)
+          .send_topic_message(_topic, any, encoded_value, encoded_key)
         if ret isnt None then error end
         let next_tracking_id = _next_tracking_id(i_origin, i_route_id, i_seq_id)
         _pending_delivery_report(any) = (metric_name, my_metrics_id,

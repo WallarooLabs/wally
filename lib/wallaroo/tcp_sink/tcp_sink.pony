@@ -78,7 +78,7 @@ actor TCPSink is Consumer
     was acknowleged.)
   """
   // Steplike
-  let _encoder: EncoderWrapper
+  let _encoder: TCPEncoderWrapper
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
   var _initializer: (LocalTopologyInitializer | None) = None
@@ -122,7 +122,7 @@ actor TCPSink is Consumer
   // Origin (Resilience)
   let _terminus_route: TerminusRoute = TerminusRoute
 
-  new create(encoder_wrapper: EncoderWrapper,
+  new create(encoder_wrapper: TCPEncoderWrapper,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,

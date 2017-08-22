@@ -40,12 +40,12 @@ class val TCPSinkConfigOptions
     service = service'
 
 class val TCPSinkConfig[Out: Any val] is SinkConfig[Out]
-  let _encoder: SinkEncoder[Out]
+  let _encoder: TCPSinkEncoder[Out]
   let _host: String
   let _service: String
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(encoder: SinkEncoder[Out], host: String, service: String,
+  new val create(encoder: TCPSinkEncoder[Out], host: String, service: String,
     initial_msgs: Array[Array[ByteSeq] val] val =
     recover Array[Array[ByteSeq] val] end)
   =>
@@ -54,7 +54,7 @@ class val TCPSinkConfig[Out: Any val] is SinkConfig[Out]
     _host = host
     _service = service
 
-  new val from_options(encoder: SinkEncoder[Out], opts: TCPSinkConfigOptions,
+  new val from_options(encoder: TCPSinkEncoder[Out], opts: TCPSinkConfigOptions,
     initial_msgs: Array[Array[ByteSeq] val] val =
     recover Array[Array[ByteSeq] val] end)
   =>
@@ -65,16 +65,16 @@ class val TCPSinkConfig[Out: Any val] is SinkConfig[Out]
 
 
   fun apply(): SinkBuilder =>
-    TCPSinkBuilder(TypedEncoderWrapper[Out](_encoder), _host, _service,
+    TCPSinkBuilder(TypedTCPEncoderWrapper[Out](_encoder), _host, _service,
       _initial_msgs)
 
 class val TCPSinkBuilder
-  let _encoder_wrapper: EncoderWrapper
+  let _encoder_wrapper: TCPEncoderWrapper
   let _host: String
   let _service: String
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(encoder_wrapper: EncoderWrapper, host: String,
+  new val create(encoder_wrapper: TCPEncoderWrapper, host: String,
     service: String, initial_msgs: Array[Array[ByteSeq] val] val)
   =>
     _encoder_wrapper = encoder_wrapper

@@ -95,8 +95,8 @@ primitive KafkaSinkConfigCLIParser
 
     // create kafka config
     recover val
-      let kc = KafkaConfig(logger, "Wallaroo Kafka Sink " + topic where 
-        max_message_size' = max_message_size, max_produce_buffer_ms' = 
+      let kc = KafkaConfig(logger, "Wallaroo Kafka Sink " + topic where
+        max_message_size' = max_message_size, max_produce_buffer_ms' =
         max_produce_buffer_ms)
 
       // add topic config to consumer
@@ -131,11 +131,11 @@ primitive KafkaSinkConfigCLIParser
     consume topics
 
 class val KafkaSinkConfig[Out: Any val] is SinkConfig[Out]
-  let _encoder: SinkEncoder[Out]
+  let _encoder: KafkaSinkEncoder[Out]
   let _conf: KafkaConfig val
   let _auth: TCPConnectionAuth
 
-  new val create(encoder: SinkEncoder[Out], conf: KafkaConfig val,
+  new val create(encoder: KafkaSinkEncoder[Out], conf: KafkaConfig val,
     auth: TCPConnectionAuth)
   =>
     _encoder = encoder
@@ -143,14 +143,14 @@ class val KafkaSinkConfig[Out: Any val] is SinkConfig[Out]
     _auth = auth
 
   fun apply(): SinkBuilder =>
-    KafkaSinkBuilder(TypedEncoderWrapper[Out](_encoder), _conf, _auth)
+    KafkaSinkBuilder(TypedKafkaEncoderWrapper[Out](_encoder), _conf, _auth)
 
 class val KafkaSinkBuilder
-  let _encoder_wrapper: EncoderWrapper
+  let _encoder_wrapper: KafkaEncoderWrapper
   let _conf: KafkaConfig val
   let _auth: TCPConnectionAuth
 
-  new val create(encoder_wrapper: EncoderWrapper, conf: KafkaConfig val,
+  new val create(encoder_wrapper: KafkaEncoderWrapper, conf: KafkaConfig val,
     auth: TCPConnectionAuth)
   =>
     _encoder_wrapper = encoder_wrapper

@@ -1,5 +1,5 @@
 use "buffered"
-use "wallaroo/messages"
+use "wallaroo/tcp_sink"
 
 use @w_sink_encoder_get_size[USize](sink_encoder: SinkEncoderP,
   data: DataP tag)
@@ -9,7 +9,7 @@ use @w_sink_encoder_encode[None](sink_encoder: SinkEncoderP,
 
 type SinkEncoderP is Pointer[U8] val
 
-class CPPSinkEncoder is SinkEncoder[CPPData val]
+class CPPSinkEncoder is TCPSinkEncoder[CPPData val]
   var _sink_encoder: SinkEncoderP
 
   new create(sink_encoder: SinkEncoderP) =>
