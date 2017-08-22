@@ -26,10 +26,7 @@ def test_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = '''
-        sequence_window_resilience \
-          --resilience-dir {res_dir}
-        '''.format(res_dir = res_dir)
+    command = 'sequence_window_resilience'
 
     runners = []
     try:
@@ -53,7 +50,7 @@ def test_recovery():
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, control_port, data_port, workers)
+                      metrics_port, control_port, data_port, res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
