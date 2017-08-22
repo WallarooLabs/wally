@@ -715,6 +715,7 @@ BASE_COMMAND = r'''
     --metrics {host}:{metrics_port} \
     --control {host}:{control_port} \
     --data {host}:{data_port} \
+    --resilience-dir {res_dir} \
     --worker-count {workers} \
     --name {{name}} \
     {{topology_initializer}} \
@@ -723,7 +724,7 @@ BASE_COMMAND = r'''
     --ponynoblock
     '''
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
-                  control_port, data_port, workers):
+                  control_port, data_port, res_dir, workers):
     command_stub = BASE_COMMAND.format(command = command,
                                        host = host,
                                        inputs = inputs,
@@ -731,6 +732,7 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
                                        metrics_port = metrics_port,
                                        control_port = control_port,
                                        data_port = data_port,
+                                       res_dir = res_dir,
                                        workers = workers)
     # for each worker, assign `name` and `topology-initializer` values
 
@@ -775,7 +777,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                   delay=None,
                   validate_file=None, giles_mode=False,
                   host='127.0.0.1', listen_attempts=1,
-                  ready_timeout=30):
+                  ready_timeout=30, resilience_dir='/tmp/res-dir'):
     """
     Run a pipeline test without having to instrument everything
     yourself. This only works for 1-source, 1-sink topologies.
@@ -830,6 +832,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
       Default 1.
     - `ready_timeout`: number of seconds before an error is raised if the
       application does not report as ready. Default 30
+    - `resilience_dir`: The directory where resilience file are kept. This
+      path will be cleaned up before and after each run.
 
     `expected` and the processed sink(s) data should be directly equatable.
     The test fails if they fail an equality assertion.
@@ -839,6 +843,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
     then expected should be [1,1,1,2,2,2].
     """
 
+    setup_resilience_path(resilience_dir)
     runners = []
     try:
         # Create sinks, metrics
@@ -877,7 +882,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 inputs = ','.join(['{}:{}'.format(host, p) for p in
                                    input_ports])
                 start_runners(runners, command, host, inputs, outputs,
-                              metrics_port, control_port, data_port, workers)
+                              metrics_port, control_port, data_port, resilience_dir, workers)
                 break
             except PipelineTestError as err:
                 # terminate runners, prepare to retry
@@ -1047,3 +1052,4 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         # clean up any remaining runner processes
         for r in runners:
             r.stop()
+        clean_up_resilience_path(resilience_dir)
