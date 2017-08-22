@@ -48,9 +48,9 @@ primitive Add is Computation[F32, F32]
   fun name(): String => "Add 32"
 
 primitive FahrenheitEncoder
-  fun apply(f: F32, wb: Writer): Array[ByteSeq] val =>
+  fun apply(f: F32, wb: Writer): (Array[ByteSeq] val, None) =>
     wb.f32_be(f)
-    wb.done()
+    (wb.done(), None)
 
 primitive CelsiusKafkaDecoder is SourceHandler[F32]
   fun decode(a: Array[U8] val): F32 ? =>
