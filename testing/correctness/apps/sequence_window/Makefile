@@ -65,7 +65,6 @@ sequence_window_test:
 clean-testing-correctness-apps-sequence_window: sequence_window_clean
 
 sequence_window_clean:
-	$(QUIET)rm -fr $(SEQUENCE_WINDOW_PATH)/bin*
 	$(QUIET)rm -fr $(SEQUENCE_WINDOW_PATH)/sequence_window*
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI

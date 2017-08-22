@@ -305,7 +305,7 @@ actor Startup
         _ph_host, _ph_service, _external_host, _external_service,
         metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
-        _startup_options.spike_config, event_log)
+        _startup_options.spike_config, event_log, _startup_options.log_rotation)
 
       let data_receivers = DataReceivers(auth,
         _startup_options.worker_name, is_recovering)
@@ -463,7 +463,7 @@ actor Startup
         metrics_conn, m.metrics_host, m.metrics_service,
         _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
-        _startup_options.spike_config, event_log)
+        _startup_options.spike_config, event_log, _startup_options.log_rotation)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,

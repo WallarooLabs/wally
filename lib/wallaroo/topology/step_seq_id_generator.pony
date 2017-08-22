@@ -47,3 +47,5 @@ class ref StepSeqIdGenerator
     """
     _generate_new = true
 
+  fun last_id(): SeqId =>
+    _seq_id

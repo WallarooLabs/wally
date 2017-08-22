@@ -161,6 +161,10 @@ class Ring[A: Any val]
     end
     this
 
+  fun box clone(): Ring[A] ref^ =>
+    (let ar, let size', let count') = raw()
+    from_array(consume ar, size', count')
+
   fun keys(): RingKeys[A, this->Ring[A]]^ =>
     """
     Return an iterator over the indices in the ring.

@@ -122,6 +122,14 @@ actor EventLog
     statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] iso)
   =>
+    _queue_log_entry(origin_id, uid, frac_ids, statechange_id, seq_id,
+      consume payload)
+
+  fun ref _queue_log_entry(origin_id: U128, uid: U128,
+    frac_ids: FractionalMessageId,
+    statechange_id: U64, seq_id: U64,
+    payload: Array[ByteSeq] iso, force_write: Bool = false)
+  =>
     ifdef "resilience" then
       // add to backend buffer after encoding
       // encode right away to amortize encoding cost per entry when received
@@ -131,7 +139,7 @@ actor EventLog
 
       num_encoded = num_encoded + 1
 
-      if num_encoded == _config.logging_batch_size then
+      if (num_encoded == _config.logging_batch_size) or force_write then
         //write buffer to disk
         write_log()
       end
@@ -150,7 +158,10 @@ actor EventLog
       Fail()
     end
 
-  be flush_buffer(origin_id: U128, low_watermark:U64) =>
+  be flush_buffer(origin_id: U128, low_watermark: U64) =>
+    _flush_buffer(origin_id, low_watermark)
+
+  fun ref _flush_buffer(origin_id: U128, low_watermark: U64) =>
     ifdef "trace" then
       @printf[I32]("flush_buffer for id: %d\n\n".cstring(), origin_id)
     end
@@ -191,8 +202,14 @@ actor EventLog
         "expected steps!\n").cstring())
       Fail()
     end
-    queue_log_entry(origin_id, uid, None, statechange_id, seq_id,
-      consume payload)
+
+    // Note: calling _flush_buffer relies on the assumption that everything
+    // is acked by now, which isn't being validated here.
+    // This should be addressed by
+    // https://github.com/Sendence/wallaroo/issues/1132
+    _flush_buffer(origin_id, seq_id)
+    _queue_log_entry(origin_id, uid, None, statechange_id, seq_id,
+      consume payload, true)
     if _steps_to_snapshot.size() == 0 then
       rotation_complete()
     end
@@ -239,6 +256,12 @@ actor EventLog
 
   fun ref rotation_complete() =>
     @printf[I32]("Steps snapshotting to new log file complete.\n".cstring())
+    try
+      _backend.sync()
+      _backend.datasync()
+    else
+      Fail()
+    end
     _rotating = false
     match _router_registry
     | let r: RouterRegistry => r.rotation_complete()

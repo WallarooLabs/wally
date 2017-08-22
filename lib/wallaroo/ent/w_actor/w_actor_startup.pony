@@ -232,7 +232,8 @@ actor ActorSystemStartup
         _startup_options.d_host, _startup_options.d_service, _ph_host,
         _ph_service, _external_host, _external_service, empty_metrics_conn,
         "", "", _startup_options.is_initializer, _connection_addresses_file,
-        _is_joining, _startup_options.spike_config, event_log)
+        _is_joining, _startup_options.spike_config, event_log,
+        _startup_options.log_rotation)
 
       let w_name = _startup_options.worker_name
 

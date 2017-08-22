@@ -35,28 +35,12 @@ primitive WindowU64Decoder
     consume a
 
 primitive WindowStateEncoder
-  fun apply(index: USize, buf: Array[U64], size: USize,
-    count: USize, out_writer: Writer)
-  =>
-    out_writer.u64_be(index.u64())
-    // This is relying on the array being initialized with zeroes
-    for v in buf.values() do
-      out_writer.u64_be(v)
-    end
-    out_writer.u64_be(size.u64())
-    out_writer.u64_be(count.u64())
+  fun apply(last_value: U64, out_writer: Writer) =>
+    out_writer.u64_be(last_value)
 
 primitive WindowStateDecoder
-  fun apply(in_reader: Reader): (USize, Array[U64] iso^, USize, USize) ?
-  =>
-    let index = in_reader.u64_be().usize()
-    let a: Array[U64] iso = recover Array[U64 val] end
-    for x in Range[USize](0,4) do
-      a.push(in_reader.u64_be())
-    end
-    let size = in_reader.u64_be().usize()
-    let count = in_reader.u64_be().usize()
-    (index, consume a, size, count)
+  fun apply(in_reader: Reader): U64 ? =>
+    in_reader.u64_be()
 
 primitive U64FramedHandler is FramedSourceHandler[U64 val]
   fun header_length(): USize =>

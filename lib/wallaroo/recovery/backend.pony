@@ -13,7 +13,7 @@ type LogEntry is (Bool, U128, U128, FractionalMessageId, U64, U64,
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
 // (origin_id, uid, frac_ids, statechange_id, seq_id, payload)
-type ReplayEntry is (U128, U128, None, U64, U64, ByteSeq val)
+type ReplayEntry is (U128, U128, FractionalMessageId, U64, U64, ByteSeq val)
 
 //////////////////////////////////
 // Helpers for RotatingFileBackend
@@ -167,8 +167,8 @@ class FileBackend is Backend
             end
 
             // put entry into temporary recovered buffer
-            replay_buffer.push((origin_id, uid, None, statechange_id, seq_id
-                               , payload))
+            replay_buffer.push((origin_id, uid, frac_ids, statechange_id, seq_id
+              ,payload))
 
           end
 
@@ -317,9 +317,11 @@ class RotatingFileBackend is Backend
     let fp = FilePath(_base_dir, p)
     _backend = FileBackend(fp, _event_log)
 
-  fun ref sync() ? => _backend.sync()
+  fun ref sync() ? =>
+    _backend.sync()
 
-  fun ref datasync() ? => _backend.datasync()
+  fun ref datasync() ? =>
+    _backend.datasync()
 
   fun ref start_log_replay() => _backend.start_log_replay()
 

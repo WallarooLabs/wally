@@ -95,6 +95,7 @@ def test_recovery():
 
         # Stop sink
         sink.stop()
+        print 'sink.data size: ', len(sink.data)
 
         # Use validator to validate the data in at-least-once mode
         # save sink data to a file
@@ -110,6 +111,10 @@ def test_recovery():
         try:
             assert(success)
         except AssertionError:
+            print runners[-1].get_output()[0]
+            print '---'
+            print runners[-2].get_output()[0]
+            print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 

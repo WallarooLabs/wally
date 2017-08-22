@@ -9,6 +9,8 @@ use "sendence/messages"
 use "sendence/options"
 
 actor Main
+  var _conn: (TCPConnection | None) = None
+
   new create(env: Env) =>
     try
       var x_host: String = ""
@@ -53,12 +55,11 @@ actor Main
           ExternalMsgEncoder.print_message(message)
       end
       let tcp_auth = TCPConnectAuth(auth)
-      let conn = TCPConnection(tcp_auth, ExternalSenderConnectNotifier(auth,
+      _conn = TCPConnection(tcp_auth, ExternalSenderConnectNotifier(auth,
         msg), x_host, x_service)
     else
       @printf[I32]("Error sending.\n".cstring())
     end
-
 
 class ExternalSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
@@ -73,6 +74,7 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
     @printf[I32]("Connected...\n".cstring())
     conn.writev(_msg)
     @printf[I32]("Sent message!\n".cstring())
+    conn.dispose()
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool

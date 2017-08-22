@@ -460,10 +460,9 @@ actor Step is (Producer & Consumer)
       let oid: U128 = _id
       let uid: U128 = -1
       let statechange_id: U64 = -1
-      let seq_id: U64 = _seq_id_generator.new_id()
+      let seq_id: U64 = _seq_id_generator.last_id()
       _event_log.snapshot_state(oid, uid, statechange_id, seq_id,
         consume payload)
-      _acker_x.filtered(this, seq_id)
     else
       @printf[I32](("Could not complete log rotation. StateRunner is not " +
         "Serializable.\n").cstring())

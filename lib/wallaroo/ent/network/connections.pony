@@ -45,6 +45,7 @@ actor Connections is Cluster
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
   let _event_log: EventLog
+  let _log_rotation: Bool
 
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
@@ -53,7 +54,7 @@ actor Connections is Cluster
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
     is_joining: Bool, spike_config: (SpikeConfig | None) = None,
-    event_log: EventLog)
+    event_log: EventLog, log_rotation: Bool = false)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -68,6 +69,7 @@ actor Connections is Cluster
     _is_joining = is_joining
     _spike_config = spike_config
     _event_log = event_log
+    _log_rotation = log_rotation
 
     if _is_initializer then
       _my_control_addr = (c_host, c_service)
@@ -654,16 +656,21 @@ actor Connections is Cluster
     _rotate_log_files(worker_name)
 
   fun _rotate_log_files(worker_name: String) =>
-    if worker_name == _worker_name then
-      _event_log.start_rotation()
-    elseif _control_conns.contains(worker_name) then
-      try
-        let rotate_log_files_msg = ChannelMsgEncoder.rotate_log_files(_auth)
-        _send_control(worker_name, rotate_log_files_msg)
+    if _log_rotation then
+      if worker_name == _worker_name then
+        _event_log.start_rotation()
+      elseif _control_conns.contains(worker_name) then
+        try
+          let rotate_log_files_msg = ChannelMsgEncoder.rotate_log_files(_auth)
+          _send_control(worker_name, rotate_log_files_msg)
+        else
+          Fail()
+        end
       else
-        Fail()
+        @printf[I32](("WARNING: LogRotation requested for non-existent worker: " +
+          "%s\n").cstring(), worker_name.cstring())
       end
     else
-      @printf[I32](("WARNING: LogRotation requested for non-existent worker: " +
-        "%s\n").cstring(), worker_name.cstring())
+      @printf[I32]("WARNING: LogRotation requested, but log_rotation is off!\n"
+        .cstring())
     end

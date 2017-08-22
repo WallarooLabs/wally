@@ -14,6 +14,7 @@ actor Main is TestList
     test(_TestKeys)
     test(_TestValues)
     test(_TestPairs)
+    test(_TestClone)
 
 class iso _TestRing is UnitTest
   fun name(): String => "ring/Ring"
@@ -212,4 +213,19 @@ class iso _TestPairs is UnitTest
       (let vi, let vv) = v_pairs.next()
       h.assert_eq[USize](vi, ri)
       h.assert_eq[U64](vv, rv)
+    end
+
+class iso _TestClone is UnitTest
+  fun name(): String => "ring/Clone"
+
+  fun apply(h: TestHelper) ? =>
+    let ring = Ring[U64].from_array(recover [5,2,3,4] end, 4, 5)
+    let ring' = ring.clone()
+    let pairs = ring.pairs()
+    let pairs' = ring'.pairs()
+    for x in Range[USize](0, 4) do
+      (let i, let v) = pairs.next()
+      (let i', let v') = pairs'.next()
+      h.assert_eq[USize](i, i')
+      h.assert_eq[U64](v, v')
     end
