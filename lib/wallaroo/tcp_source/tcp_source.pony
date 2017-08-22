@@ -126,8 +126,10 @@ actor TCPSource is Producer
 
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
-      _outgoing_boundaries(target_worker_name) = builder.build_and_initialize(
-        _guid.u128(), _layout_initializer)
+      if not _outgoing_boundaries.contains(target_worker_name) then
+        _outgoing_boundaries(target_worker_name) = builder.build_and_initialize(
+          _guid.u128(), _layout_initializer)
+      end
     end
 
     //TODO: either only accept when we are done recovering or don't start
