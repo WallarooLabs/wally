@@ -326,6 +326,8 @@ def CLI():
     parser.add_argument('--batch-size', type=int, default=1,
                         help=("The batch size to use in the senders. "
                               "The same batch size is used in all senders."))
+    parser.add_argument('--resilience-dir', type=str, default='/tmp/res-dir',
+                        help=("The path of the resilience data files."))
 
     # When to stop the run and begin validation
     stopper = parser.add_mutually_exclusive_group()
@@ -391,7 +393,8 @@ def CLI():
                       validate_file = (args.output if args.validation_cmd else
                                        False),
                       giles_mode = 'giles' if args.giles_mode else None,
-                      host=args.host)
+                      host=args.host,
+                      resilience_dir=args.resilience_dir)
     except Exception as err:
         logging.error("Encountered an error while running the test for %r"
                       % args.command)
