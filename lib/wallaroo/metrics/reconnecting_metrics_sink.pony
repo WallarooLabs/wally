@@ -66,7 +66,7 @@ actor ReconnectingMetricsSink
 
   new create(host: String, service: String, application_name: String,
     worker_name: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384, reconnect_pause: U64 = 10000000000)
+    max_size: USize = 16384, reconnect_pause: U64 = 10_000_000_000)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
@@ -677,6 +677,7 @@ actor ReconnectingMetricsSink
       // The socket has been closed from the other side.
       _shutdown_peer = true
       _hard_close()
+      _schedule_reconnect()
     end
 
   fun ref _notify_connecting() =>
@@ -939,6 +940,13 @@ class MetricsSinkNotify is _MetricsSinkNotify
     _metrics_conn.writev(connect_msg)
     _metrics_conn.writev(metrics_join_msg)
 
+  fun ref connect_failed(conn: MetricsSink ref) =>
+    @printf[I32]("%s connection failed\n".cstring(),
+      _name.cstring())
+
+  fun ref closed(conn: MetricsSink ref) =>
+    @printf[I32]("%s connection closed\n".cstring(),
+      _name.cstring())
 
   fun ref throttled(sock: MetricsSink ref) =>
     @printf[None]("%s outgoing throttled\n".cstring(),
