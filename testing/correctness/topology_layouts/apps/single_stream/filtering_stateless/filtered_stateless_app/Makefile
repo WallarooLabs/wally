@@ -31,6 +31,7 @@ include $(rules_mk_path)
 test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: single_worker_filtering_stateless_filtered_stateless_app_test
 
 single_worker_filtering_stateless_filtered_stateless_app_test:
+	rm -f /tmp/filtered_stateless_app*
 	cd $(SINGLE_STREAM_FILTERING_STATELESS_FILTERERED_STATELESS_APP_PATH) && \
 	integration_test \
 	--framed-file-sender ../doubled_data_gen/_test.msg \
@@ -43,6 +44,7 @@ single_worker_filtering_stateless_filtered_stateless_app_test:
 test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: two_worker_single_worker_filtering_stateless_filtered_stateless_app_test
 
 two_worker_single_worker_filtering_stateless_filtered_stateless_app_test:
+	rm -f /tmp/filtered_stateless_app*
 	cd $(SINGLE_STREAM_FILTERING_STATELESS_FILTERERED_STATELESS_APP_PATH) && \
 	integration_test \
 	--framed-file-sender ../doubled_data_gen/_test.msg \
@@ -56,6 +58,7 @@ two_worker_single_worker_filtering_stateless_filtered_stateless_app_test:
 test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: three_worker_single_worker_filtering_stateless_filtered_stateless_app_test
 
 three_worker_single_worker_filtering_stateless_filtered_stateless_app_test:
+	rm -f /tmp/filtered_stateless_app*
 	cd $(SINGLE_STREAM_FILTERING_STATELESS_FILTERERED_STATELESS_APP_PATH) && \
 	integration_test \
 	--framed-file-sender ../doubled_data_gen/_test.msg \
