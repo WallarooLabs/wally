@@ -74,9 +74,6 @@ primitive WallarooConfig
       .add("event_log-file-length", "l", I64Argument)
       // pass in control address of any worker as the value of this parameter
       // to join a running cluster
-      // TODO: Actually make a joining worker a first class citizen.
-      // All this does is give the new worker metrics info so it can
-      // register with the UI (a "nominal join").
       .add("join", "j", StringArgument)
       .add("swarm-managed", "s", None)
       .add("swarm-manager-address", "a", StringArgument)
