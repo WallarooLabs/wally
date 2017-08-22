@@ -29,10 +29,7 @@ def test_restart():
 
     setup_resilience_path(res_dir)
 
-    command = '''
-        sequence_window
-          --resilience-dir {res_dir}
-        '''.format(res_dir = res_dir)
+    command = 'sequence_window'
 
     runners = []
     try:
@@ -56,7 +53,7 @@ def test_restart():
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, control_port, data_port, workers)
+                      metrics_port, control_port, data_port, res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
