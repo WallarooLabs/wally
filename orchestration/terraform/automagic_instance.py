@@ -66,12 +66,14 @@ def get_spot_price_history(region, availability_zone, instances, start_offset
   az_arg = ""
   if availability_zone:
     az_arg = " --availability-zone {0}".format(availability_zone)
+  now_date = datetime.datetime.utcnow()
+  start_date = (now_date + datetime.timedelta(hours=start_offset)).strftime('%Y-%m-%dT%H:%M:%SZ')
+  end_date = (now_date + datetime.timedelta(hours=end_offset)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
   cmd = ("aws ec2 --region {0} describe-spot-price-history --query " + \
         "'SpotPriceHistory[]' --product-descriptions 'Linux/UNIX (Amazon VPC)'"+\
-        " --instance-types {1} --start-time `date -v{2:+}H -u " + \
-        " +'%Y-%m-%dT%H:%M:%SZ'` --end-time `date -v{3:+}H -u " + \
-        " +'%Y-%m-%dT%H:%M:%SZ'`").format(region, ' '.join(instances)
-        , start_offset, end_offset)
+        " --instance-types {1} --start-time {2} --end-time {3}").format(
+        region, ' '.join(instances), start_date, end_date)
   cmd = cmd + az_arg
   popen_proc = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
   proc_out, proc_err = popen_proc.communicate()
