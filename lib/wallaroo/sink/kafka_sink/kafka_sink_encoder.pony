@@ -1,6 +1,8 @@
 use "buffered"
 
 interface val KafkaSinkEncoder[In: Any val]
+  // Returns a tuple (encoded_value, encoded_key) where you can pass None
+  // for the encoded_key if there is none
   fun apply(input: In, wb: Writer):
     (Array[ByteSeq] val, (Array[ByteSeq] val | None))
 
