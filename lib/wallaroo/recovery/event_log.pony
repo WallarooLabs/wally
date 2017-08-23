@@ -48,6 +48,7 @@ actor EventLog
   var _steps_to_snapshot: SetIs[U128] = _steps_to_snapshot.create()
   var _router_registry: (RouterRegistry | None) = None
   var _rotating: Bool = false
+  var _backend_bytes_after_snapshot: USize
 
   new create(event_log_config: EventLogConfig = EventLogConfig()) =>
     _config = event_log_config
@@ -80,6 +81,7 @@ actor EventLog
       else
         DummyBackend(this)
       end
+    _backend_bytes_after_snapshot = _backend.bytes_written()
 
   be set_router_registry(router_registry: RouterRegistry) =>
     _router_registry = router_registry
@@ -215,7 +217,11 @@ actor EventLog
     end
 
   be start_rotation() =>
-    if not _rotating then
+    if _rotating then
+      @printf[I32](("Event log rotation already ongoing. Rotate log request "
+        + "ignrored.\n").cstring())
+    elseif _backend.bytes_written() > _backend_bytes_after_snapshot then
+      @printf[I32]("Starting event log rotation.\n".cstring())
       _rotating = true
       match _router_registry
       | let r: RouterRegistry =>
@@ -223,6 +229,9 @@ actor EventLog
       else
         Fail()
       end
+    else
+      @printf[I32](("Event log does not contain new data. Rotate log request"
+        + " ignored.\n").cstring())
     end
 
   be rotate_file(steps: Map[U128, Step] val) =>
@@ -259,6 +268,7 @@ actor EventLog
     try
       _backend.sync()
       _backend.datasync()
+      _backend_bytes_after_snapshot = _backend.bytes_written()
     else
       Fail()
     end

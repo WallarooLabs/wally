@@ -216,8 +216,12 @@ actor Startup
         existing_files.set(elf.path)
         elf
       else
-        FilePath(event_log_dir_filepath,
+        let elf = FilePath(event_log_dir_filepath,
           _event_log_file_basename + _event_log_file_suffix)
+        if elf.exists() then
+          existing_files.set(elf.path)
+        end
+        elf
       end
 
       let local_topology_filepath: FilePath = FilePath(auth,

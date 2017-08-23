@@ -46,7 +46,7 @@ wallaroo_lib :=  $(buffy_path)/lib
 wallaroo_python_path := $(buffy_path)/machida
 machida_bin_path := $(buffy_path)/machida/build
 export PYTHONPATH := .:$(integration_path):$(wallaroo_python_path)
-export PATH := $(PATH):$(integration_bin_path):$(machida_bin_path)
+export PATH += :$(integration_bin_path):$(machida_bin_path):$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
 
 # initialize default for some normal targets and variables
 build-buffyroot-all :=

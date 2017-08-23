@@ -64,6 +64,7 @@ trait Backend
   fun ref start_log_replay()
   fun ref write(): USize ?
   fun ref encode_entry(entry: LogEntry)
+  fun bytes_written(): USize
 
 class DummyBackend is Backend
   let _event_log: EventLog
@@ -75,6 +76,7 @@ class DummyBackend is Backend
     _event_log.log_replay_finished()
   fun ref write(): USize => 0
   fun ref encode_entry(entry: LogEntry) => None
+  fun bytes_written(): USize => 0
 
 class FileBackend is Backend
   //a record looks like this:
@@ -104,8 +106,8 @@ class FileBackend is Backend
   fun ref dispose() =>
     _file.dispose()
 
-  fun bytes_written(): U64 =>
-    _bytes_written.u64()
+  fun bytes_written(): USize =>
+    _bytes_written
 
   fun ref start_log_replay() =>
     if _replay_log_exists then
@@ -296,6 +298,7 @@ class RotatingFileBackend is Backend
   let _event_log: EventLog
   let _file_length: (USize | None)
   var _offset: U64
+  var _rotate_requested: Bool = false
 
   new create(base_dir: FilePath, base_name: String, suffix: String = ".evlog",
     event_log: EventLog, file_length: (USize | None)) ?
@@ -320,23 +323,26 @@ class RotatingFileBackend is Backend
     let fp = FilePath(_base_dir, p)
     _backend = FileBackend(fp, _event_log)
 
-  fun ref sync() ? =>
-    _backend.sync()
+  fun bytes_written(): USize => _backend.bytes_written()
 
-  fun ref datasync() ? =>
-    _backend.datasync()
+  fun ref sync() ? => _backend.sync()
+
+  fun ref datasync() ? => _backend.datasync()
 
   fun ref start_log_replay() => _backend.start_log_replay()
 
   fun ref write(): USize ? =>
-    let bytes_written = _backend.write()
+    let bytes_written' = _backend.write()
     match _file_length
     | let l: USize =>
-      if bytes_written >= l then
-        _event_log.start_rotation()
+      if bytes_written' >= l then
+        if not _rotate_requested then
+          _rotate_requested = true
+          _event_log.start_rotation()
+        end
       end
     end
-    bytes_written
+    bytes_written'
 
   fun ref encode_entry(entry: LogEntry) => _backend.encode_entry(consume entry)
 
@@ -349,9 +355,10 @@ class RotatingFileBackend is Backend
       // 2. close the file by disposing the backend
       _backend.dispose()
       // 3. update _offset
-      _offset = _offset + _backend.bytes_written()
+      _offset = _offset + _backend.bytes_written().u64()
       // 4. open new backend with new file set to new offset.
       let p = _base_name + "-" + HexOffset(_offset) + _suffix
       let fp = FilePath(_base_dir, p)
       _backend = FileBackend(fp, _event_log)
     end
+    _rotate_requested = false

@@ -44,13 +44,14 @@ def test_recovery():
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, data_port = (
+        input_ports, control_port, external_port, data_port = (
             get_port_values(host, sources))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, control_port, data_port, res_dir, workers)
+                      metrics_port, control_port, external_port, data_port,
+                      res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)

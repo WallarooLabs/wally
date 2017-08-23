@@ -22,6 +22,8 @@ TEST_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 #RECURSE_SUBMAKEFILES := false
 
+EXTERNAL_SENDER_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 # standard rules generation makefile
 include $(rules_mk_path)
 
@@ -38,3 +40,4 @@ include $(rules_mk_path)
 
 # end of prevent rules from being evaluated/included multiple times
 endif
+

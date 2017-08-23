@@ -23,9 +23,9 @@ DOCKER_TARGET := false
 RECURSE_SUBMAKEFILES := false
 
 CORRECTNESS_TESTS_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-PATH := $(PATH):$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH)
 
 build-testing-correctness-tests: build-testing-correctness-apps-sequence_window
+build-testing-correctness-tests: build-testing-tools-external_sender
 test-testing-correctness-tests: build-testing-correctness-tests
 test-testing-correctness-tests: correctness_tests
 

@@ -652,6 +652,52 @@ class RunnerReadyChecker(StoppableThread):
                     break
 
 
+class RunnerChecker(StoppableThread):
+    __base_name__ = 'RunnerChecker'
+
+    def __init__(self, runner, patterns, timeout=30):
+        super(RunnerChecker, self).__init__()
+        self.name = self.__base_name__
+        self._path = runner.stdout_file.name
+        self.timeout = timeout
+        self.error = None
+        if isinstance(patterns, (list, tuple)):
+            self.patterns = patterns
+        else:
+            self.patterns = [pattern]
+        self.compiled = [re.compile(p) for p in patterns]
+
+    def run(self):
+        with open(self._path, 'rb') as r:
+            last_match = 0
+            started = time.time()
+            while not self.stopped():
+                r.seek(last_match)
+                stdout = r.read()
+                if not stdout:
+                    time.sleep(0.1)
+                    continue
+                else:
+                    match = self.compiled[0].search(stdout)
+                    if match:
+                        logging.debug('Pattern %r found in runner STDOUT.'
+                                      % match.re.pattern)
+                        self.compiled.pop(0)
+                        last_match = match.end()
+                        if self.compiled:
+                            continue
+                        self.stop()
+                        break
+                if time.time() - started > self.timeout:
+                    self.error = TimeoutError(
+                        'Application STDOUT did not contain pattern {!r} after'
+                        ' {} '
+                        'seconds. It had the following output:\n---\n{}'
+                        .format(self.pattern, self.timeout, stdout))
+                    self.stop()
+                    break
+
+
 def ex_validate(cmd):
     """
     Run a shell command, wait for it to exit.
@@ -699,13 +745,18 @@ class PipelineTestError(Exception):
 
 def get_port_values(host, sources):
     port = 50000
+    source_ports = []
     free_ports = []
-    target = sources + 2
-    while len(free_ports) < target:
+    target = sources
+    while len(source_ports) < sources:
+        if is_address_available(host, port):
+            source_ports.append(port)
+        port += 1
+    while len(free_ports) < 3:
         if is_address_available(host, port):
             free_ports.append(port)
-        port += 1
-    return free_ports[:-2], free_ports[-2], free_ports[-1]
+        port +=1
+    return source_ports, free_ports[0], free_ports[1], free_ports[2]
 
 
 BASE_COMMAND = r'''
@@ -714,6 +765,7 @@ BASE_COMMAND = r'''
     --out {outputs} \
     --metrics {host}:{metrics_port} \
     --control {host}:{control_port} \
+    --external {host}:{external_port} \
     --data {host}:{data_port} \
     --resilience-dir {res_dir} \
     --worker-count {workers} \
@@ -724,13 +776,14 @@ BASE_COMMAND = r'''
     --ponynoblock
     '''
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
-                  control_port, data_port, res_dir, workers):
+                  control_port, external_port, data_port, res_dir, workers):
     command_stub = BASE_COMMAND.format(command = command,
                                        host = host,
                                        inputs = inputs,
                                        outputs = outputs,
                                        metrics_port = metrics_port,
                                        control_port = control_port,
+                                       external_port = external_port,
                                        data_port = data_port,
                                        res_dir = res_dir,
                                        workers = workers)
@@ -793,8 +846,9 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         The data should be directly comparable to the decoded output.
     - `command`: the command to run each worker. Make sure to leave out the
         Wallaroo parameters: `--in`, `--out`, `--metrics`, `--data`,
-        `--control`, `--workers`, `--name`, `--topology-initializer`, and
-        `--ponynoblock`. These will be applied by the test setup utility.
+        `--control`, `--external`, `--workers`, `--name`,
+        `--topology-initializer`, and `--ponynoblock`.
+        These will be applied by the test setup utility.
     - `workers`: the number of workers to use in the test. Default: 1.
     - `sources`: the number of sources in the application. Default: 1.
     - `mode`: the decoding mode to use in the sink. Can be `'framed'` or
@@ -877,12 +931,13 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             logging.debug("Attempt #%d to start workers with random listen"
                           " ports..." % attempt)
             try:
-                input_ports, control_port, data_port = (
+                input_ports, control_port, external_port, data_port = (
                     get_port_values(host, sources))
                 inputs = ','.join(['{}:{}'.format(host, p) for p in
                                    input_ports])
                 start_runners(runners, command, host, inputs, outputs,
-                              metrics_port, control_port, data_port, resilience_dir, workers)
+                              metrics_port, control_port, external_port,
+                              data_port, resilience_dir, workers)
                 break
             except PipelineTestError as err:
                 # terminate runners, prepare to retry

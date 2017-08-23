@@ -24,7 +24,7 @@ def test_restart():
     workers = 2
     res_dir = '/tmp/res-data'
     expect = 200
-    last_value = '[194,196,198,200]'
+    last_value = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
     await_value = struct.pack('>I', len(last_value)) + last_value
 
     setup_resilience_path(res_dir)
@@ -47,13 +47,14 @@ def test_restart():
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, data_port = (
+        input_ports, control_port, external_port, data_port = (
             get_port_values(host, sources))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, control_port, data_port, res_dir, workers)
+                      metrics_port, control_port, external_port, data_port,
+                      res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
@@ -89,6 +90,13 @@ def test_restart():
         stopper.start()
         stopper.join()
         if stopper.error:
+            for r in runners:
+                print r.name
+                print r.get_output()[0]
+                print '---'
+            print 'sink data'
+            print sink.data
+            print '---'
             raise stopper.error
 
         # stop application workers

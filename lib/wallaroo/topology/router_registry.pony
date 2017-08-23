@@ -294,6 +294,7 @@ actor RouterRegistry
     """
     _connections.request_cluster_unmute()
     _resume_the_world()
+    _unmute_request(_worker_name)
 
   fun ref _stop_the_world_for_log_rotation() =>
     """
