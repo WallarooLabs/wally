@@ -8,7 +8,6 @@ use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/state"
-use "wallaroo/messages"
 
 // these are included because of sendence/wallaroo issue #814
 use "serialise"
@@ -361,7 +360,7 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
   fun _final() =>
     Machida.dec_ref(_computation)
 
-class PyEncoder is SinkEncoder[PyData val]
+class PyTCPEncoder is TCPSinkEncoder[PyData val]
   var _sink_encoder: Pointer[U8] val
 
   new create(sink_encoder: Pointer[U8] val) =>
@@ -569,7 +568,7 @@ primitive Machida
         let encoderp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(encoderp)
         let encoder = recover val
-          PyEncoder(encoderp)
+          PyTCPEncoder(encoderp)
         end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_sink(
@@ -806,7 +805,7 @@ primitive _SourceConfig
 
 
 primitive _SinkConfig
-  fun from_tuple(sink_config_tuple: Pointer[U8] val, e: PyEncoder val):
+  fun from_tuple(sink_config_tuple: Pointer[U8] val, e: PyTCPEncoder val):
     SinkConfig[PyData val] ?
   =>
     let name = recover val
