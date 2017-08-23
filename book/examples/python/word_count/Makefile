@@ -28,17 +28,43 @@ WORD_COUNT_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-book-examples-python-word_count: build-machida
-#test-book-examples-python-reverse: build-book-examples-python-reverse
+test-book-examples-python-word_count: build-book-examples-python-word_count
+test-book-examples-python-word_count: word_count_py_test
+clean-book-examples-python-alphabet: word_count_py_clean
 
-#test-book-examples-python-reverse: reverse_py_test
+word_count_py_test:
+	cd $(WORD_COUNT_PY_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida --application-module word_count' \
+		--sink-mode newlines \
+		--sink-expect 482
+	cd $(WORD_COUNT_PY_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida --application-module word_count' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 2
+	cd $(WORD_COUNT_PY_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida --application-module word_count' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 3
 
-#reverse_py_test:
-#	cd $(REVERSE_PY_PATH) && \
-#	integration_test --csv-sender '1234,5678,1212,1111' \
-#	  --validation-cmp --sink-mode 'newlines' \
-#	  --expected-csv '4321,8765,2121,1111' \
-#		--command 'machida --application-module reverse' \
-#		--sink-expect 4
+word_count_py_clean:
+	$(QUIET)rm -f $(WORD_COUNT_PY_PATH)/received.txt
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)
