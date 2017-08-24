@@ -54,6 +54,7 @@
 * [Writing Your Own Application](book/python/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
 * [Writing Your Own Partitioned Stateful Application](book/python/writing-your-own-partitioned-stateful-application.md).
+* [Word Count](book/python/word-count.md)
 * [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)
 * [Wallaroo Python API](book/python/api.md)
 

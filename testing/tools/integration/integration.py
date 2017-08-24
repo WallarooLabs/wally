@@ -518,15 +518,14 @@ def newline_file_generator(filepath, header_fmt='>I'):
     Generate length-encoded strings from a newline-delimited file.
     """
     with open(filepath, 'rb') as f:
-        while True:
-            o = f.readline()
+        f.seek(0,2)
+        fin = f.tell()
+        f.seek(0)
+        while f.tell() < fin:
+            o = f.readline().strip('\n')
             if o:
-                o = o.strip('\n')
                 yield struct.pack(header_fmt, len(o))
                 yield o
-
-            else:
-                break
 
 
 def framed_file_generator(filepath, header_fmt='>I'):
@@ -945,6 +944,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             for stopper in stoppers:
                 stopper.join()
                 if stopper.error:
+                    for r in runners:
+                        print r.get_output()[0]
                     raise stopper.error
 
         elif delay:
