@@ -242,7 +242,9 @@ actor DataChannel
   fun ref _mute(d: Any tag) =>
     _muted_downstream.set(d)
     if not _muted then
-      @printf[I32]("Muting DataChannel\n".cstring())
+      ifdef debug then
+        @printf[I32]("Muting DataChannel\n".cstring())
+      end
       _muted = true
     end
 
@@ -256,7 +258,9 @@ actor DataChannel
     _muted_downstream.unset(d)
 
     if _muted_downstream.size() == 0 then
-      @printf[I32]("Unmuting DataChannel\n".cstring())
+      ifdef debug then
+        @printf[I32]("Unmuting DataChannel\n".cstring())
+      end
       _muted = false
       _pending_reads()
     end
