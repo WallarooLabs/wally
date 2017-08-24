@@ -820,11 +820,15 @@ actor ApplicationDistributor is Distributor
                 sid, pipeline.sink_builder())
 
               try
-                local_graphs(worker).add_node(egress_builder, sid)
-                  local_graphs = _add_edges_to_graph(
-                    last_initializer, local_graphs = recover Map[String,
-                      Dag[StepInitializer] trn] end,
-                    sid, worker)
+                // Add a sink to each worker
+                for w in all_workers.values() do
+                  local_graphs(w).add_node(egress_builder, sid)
+                end
+                // Add an edge for this worker
+                local_graphs = _add_edges_to_graph(
+                  last_initializer, local_graphs = recover Map[String,
+                    Dag[StepInitializer] trn] end,
+                  sid, worker)
               else
                 @printf[I32](("No graph for worker " + worker + "\n")
                   .cstring())
