@@ -61,7 +61,7 @@ actor EventLog
                 _config.backend_file_length)
             else
               Fail()
-              DummyBackend
+              DummyBackend(this)
             end
           else
             match _config.log_dir
@@ -71,14 +71,14 @@ actor EventLog
               FileBackend(FilePath(ld, f), this)
             else
               Fail()
-              DummyBackend
+              DummyBackend(this)
             end
           end
         else
-          DummyBackend
+          DummyBackend(this)
         end
       else
-        DummyBackend
+        DummyBackend(this)
       end
 
   be set_router_registry(router_registry: RouterRegistry) =>

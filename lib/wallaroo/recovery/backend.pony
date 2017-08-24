@@ -66,10 +66,13 @@ trait Backend
   fun ref encode_entry(entry: LogEntry)
 
 class DummyBackend is Backend
-  new create() => None
+  let _event_log: EventLog
+  new create(event_log: EventLog) =>
+    _event_log = event_log
   fun ref sync() => None
   fun ref datasync() => None
-  fun ref start_log_replay() => None
+  fun ref start_log_replay() =>
+    _event_log.log_replay_finished()
   fun ref write(): USize => 0
   fun ref encode_entry(entry: LogEntry) => None
 
