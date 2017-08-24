@@ -511,14 +511,14 @@ actor TCPSource is Producer
     _read_buf.undefined(size)
 
   fun ref _mute() =>
-    ifdef "credit_trace" then
-      @printf[I32]("MUTE SOURCE\n".cstring())
+    ifdef debug then
+      @printf[I32]("Muting TCPSource\n".cstring())
     end
     _muted = true
 
   fun ref _unmute() =>
-    ifdef "credit_trace" then
-      @printf[I32]("UNMUTE SOURCE\n".cstring())
+    ifdef debug then
+      @printf[I32]("Unmuting TCPSource\n".cstring())
     end
     _muted = false
     if not _reading then
@@ -526,12 +526,10 @@ actor TCPSource is Producer
     end
 
   be mute(c: Consumer) =>
-    @printf[I32]("MUTE\n".cstring())
     _muted_downstream.set(c)
     _mute()
 
   be unmute(c: Consumer) =>
-    @printf[I32]("UNMUTE\n".cstring())
     _muted_downstream.unset(c)
 
     if _muted_downstream.size() == 0 then

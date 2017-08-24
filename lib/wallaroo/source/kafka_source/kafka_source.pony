@@ -149,7 +149,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     None
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef "trace" then
+    ifdef debug then
       @printf[I32]("KafkaSource received update_watermark\n".cstring())
     end
 
@@ -170,30 +170,26 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     _seq_id
 
   fun ref _mute() =>
-    ifdef "credit_trace" then
-      @printf[I32]("MUTE SOURCE\n".cstring())
+    ifdef debug then
+      @printf[I32]("Muting KafkaSource\n".cstring())
     end
-
     _kc.consumer_pause(_topic, _partition_id)
 
     _muted = true
 
   fun ref _unmute() =>
-    ifdef "credit_trace" then
-      @printf[I32]("UNMUTE SOURCE\n".cstring())
+    ifdef debug then
+      @printf[I32]("Muting KafkaSource\n".cstring())
     end
-
     _kc.consumer_resume(_topic, _partition_id)
 
     _muted = false
 
   be mute(c: Consumer) =>
-    @printf[I32]("MUTE\n".cstring())
     _muted_downstream.set(c)
     _mute()
 
   be unmute(c: Consumer) =>
-    @printf[I32]("UNMUTE\n".cstring())
     _muted_downstream.unset(c)
 
     if _muted_downstream.size() == 0 then

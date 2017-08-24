@@ -363,7 +363,9 @@ actor RouterRegistry
     """
     Mute all sources and data channel.
     """
-    @printf[I32]("Muting any local sources.\n".cstring())
+    ifdef debug then
+      @printf[I32]("RouterRegistry muting any local sources.\n".cstring())
+    end
     for source in _sources.values() do
       source.mute(_dummy_consumer)
     end
@@ -372,7 +374,9 @@ actor RouterRegistry
     """
     Unmute all sources and data channel.
     """
-    @printf[I32]("Unmuting any local sources.\n".cstring())
+    ifdef debug then
+      @printf[I32]("RouterRegistry unmuting any local sources.\n".cstring())
+    end
     for source in _sources.values() do
       source.unmute(_dummy_consumer)
     end
