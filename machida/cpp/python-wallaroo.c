@@ -55,11 +55,15 @@ extern size_t source_decoder_header_length(PyObject *source_decoder)
 
   pFunc = PyObject_GetAttrString(source_decoder, "header_length");
   pValue = PyObject_CallFunctionObjArgs(pFunc, NULL);
-  Py_DECREF(pFunc);
 
   size_t sz = PyInt_AsSsize_t(pValue);
+  Py_XDECREF(pFunc);
   Py_DECREF(pValue);
-  return sz;
+  if (sz > 0 && sz < SIZE_MAX) {
+    return sz;
+  } else {
+    return 0;
+  }
 }
 
 extern size_t source_decoder_payload_length(PyObject *source_decoder, char *bytes, size_t size)
@@ -72,11 +76,21 @@ extern size_t source_decoder_payload_length(PyObject *source_decoder, char *byte
 
   size_t sz = PyInt_AsSsize_t(pValue);
 
-  Py_DECREF(pFunc);
-  Py_DECREF(pBytes);
-  Py_DECREF(pValue);
+  Py_XDECREF(pFunc);
+  Py_XDECREF(pBytes);
+  Py_XDECREF(pValue);
 
-  return sz;
+  /*
+  ** NOTE: This doesn't protect us from Python from returning
+  **       something bogus like -7.  There is no Python/C API
+  **       function to tell us if the Python value is negative.
+  */
+  if (sz > 0 && sz < SIZE_MAX) {
+    return sz;
+  } else {
+    printf("ERROR: Python payload_length() method returned invalid size\n");
+    return 0;
+  }
 }
 
 extern PyObject *source_decoder_decode(PyObject *source_decoder, char *bytes, size_t size)
@@ -100,12 +114,13 @@ extern PyObject *instantiate_python_class(PyObject *class)
 
 extern PyObject *get_name(PyObject *pObject)
 {
-  PyObject *pFunc, *pValue;
+  PyObject *pFunc, *pValue = NULL;
 
   pFunc = PyObject_GetAttrString(pObject, "name");
-  pValue = PyObject_CallFunctionObjArgs(pFunc, NULL);
-
-  Py_DECREF(pFunc);
+  if (pFunc != NULL) {
+    pValue = PyObject_CallFunctionObjArgs(pFunc, NULL);
+    Py_DECREF(pFunc);
+  }
 
   return pValue;
 }

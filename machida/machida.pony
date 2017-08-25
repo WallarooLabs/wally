@@ -69,6 +69,9 @@ use @py_decref[None](o: Pointer[U8] box)
 use @py_list_check[I32](b: Pointer[U8] box)
 
 use @Py_Initialize[None]()
+use @PyErr_Clear[None]()
+use @PyErr_Occurred[Pointer[U8]]()
+use @PyErr_print[None]()
 use @PyTuple_GetItem[Pointer[U8] val](t: Pointer[U8] val, idx: USize)
 use @PyString_Size[USize](str: Pointer[U8] box)
 use @PyString_AsString[Pointer[U8]](str: Pointer[U8] box)
@@ -252,7 +255,13 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
 
   new create(source_decoder: Pointer[U8] val) =>
     _source_decoder = source_decoder
-    _header_length = Machida.framed_source_decoder_header_length(_source_decoder)
+    let hl = Machida.framed_source_decoder_header_length(_source_decoder)
+    if (Machida.err_occurred()) or (hl == 0) then
+      @printf[U32]("ERROR: _header_length %d is invalid\n".cstring(), hl)
+      _header_length = 4
+    else
+      _header_length = hl
+    end
 
   fun header_length(): USize =>
     _header_length
@@ -396,13 +405,15 @@ class PyTCPEncoder is TCPSinkEncoder[PyData val]
 
   fun apply(data: PyData val, wb: Writer): Array[ByteSeq] val =>
     let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
-    let arr = recover val
-      // create a temporary Array[U8] wrapper for the C array, then clone it
-      Array[U8].from_cpointer(@PyString_AsString(byte_buffer),
-        @PyString_Size(byte_buffer)).clone()
+    if not byte_buffer.is_null() and not Machida.is_py_none(byte_buffer) then
+      let arr = recover val
+        // create a temporary Array[U8] wrapper for the C array, then clone it
+        Array[U8].from_cpointer(@PyString_AsString(byte_buffer),
+          @PyString_Size(byte_buffer)).clone()
+      end
+      Machida.dec_ref(byte_buffer)
+      wb.write(arr)
     end
-    Machida.dec_ref(byte_buffer)
-    wb.write(arr)
     wb.done()
 
   fun _serialise_space(): USize =>
@@ -465,9 +476,16 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
 
 primitive Machida
   fun print_errors(): Bool =>
+    if err_occurred() then
+      @PyErr_Print[None]()
+      true
+    else
+      false
+    end
+
+  fun err_occurred(): Bool =>
     let er = @PyErr_Occurred[Pointer[U8]]()
     if not er.is_null() then
-      @PyErr_Print[None]()
       true
     else
       false
@@ -649,16 +667,27 @@ primitive Machida
     app as Application
 
   fun framed_source_decoder_header_length(source_decoder: Pointer[U8] val): USize =>
+    @PyErr_Clear[None]()
     let r = @source_decoder_header_length(source_decoder)
     print_errors()
-    r
+    if (r >= 1) and (r <= 8) then
+      r
+    else
+      @printf[U32]("ERROR: header_length() method returned invalid size\n".cstring())
+      4
+    end
 
   fun framed_source_decoder_payload_length(source_decoder: Pointer[U8] val,
     data: Pointer[U8] tag, size: USize): USize
   =>
+    @PyErr_Clear[None]()
     let r = @source_decoder_payload_length(source_decoder, data, size)
-    print_errors()
-    r
+    if err_occurred() then
+      print_errors()
+      4
+    else
+      r
+    end
 
   fun source_decoder_decode(source_decoder: Pointer[U8] val,
     data: Pointer[U8] tag, size: USize): Pointer[U8] val
@@ -779,11 +808,15 @@ primitive Machida
 
   fun get_name(o: Pointer[U8] val): String =>
     let ps = @get_name(o)
-    let s = recover
-      String.copy_cstring(@PyString_AsString(ps))
+    recover
+      if not ps.is_null() then
+        let ret = String.copy_cstring(@PyString_AsString(ps))
+        dec_ref(ps)
+	ret
+      else
+        "undefined-name"
+      end
     end
-    dec_ref(ps)
-    s
 
   fun set_user_serialization_fns(m: Pointer[U8] val) =>
     @set_user_serialization_fns(m)
