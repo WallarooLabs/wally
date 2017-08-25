@@ -44,13 +44,14 @@ def test_recovery():
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, data_port = (
+        input_ports, control_port, external_port, data_port = (
             get_port_values(host, sources))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, control_port, data_port, res_dir, workers)
+                      metrics_port, control_port, external_port, data_port,
+                      res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
@@ -95,6 +96,7 @@ def test_recovery():
 
         # Stop sink
         sink.stop()
+        print 'sink.data size: ', len(sink.data)
 
         # Use validator to validate the data in at-least-once mode
         # save sink data to a file
@@ -110,6 +112,10 @@ def test_recovery():
         try:
             assert(success)
         except AssertionError:
+            print runners[-1].get_output()[0]
+            print '---'
+            print runners[-2].get_output()[0]
+            print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 

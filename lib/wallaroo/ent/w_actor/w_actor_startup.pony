@@ -32,7 +32,9 @@ actor ActorSystemStartup
   var _cluster_initializer: (ClusterInitializer | None) = None
   var _is_swarm_managed: Bool = false
   var _swarm_manager_addr: String = ""
-  var _event_log_file: String = ""
+  var _event_log_dir_filepath: (FilePath | None) = None
+  var _event_log_file_basename: String = ""
+  var _event_log_file_suffix: String = ""
   var _local_actor_system_file: String = ""
   var _data_channel_file: String = ""
   var _control_channel_file: String = ""
@@ -101,10 +103,11 @@ actor ActorSystemStartup
       //////////////////
       // RESILIENCE
       //////////////////
-      _event_log_file = _startup_options.resilience_dir + "/" + name + "-" +
-        _startup_options.worker_name + ".evlog"
-      _local_actor_system_file = _startup_options.resilience_dir + "/" + name + "-" +
-        _startup_options.worker_name + ".local-actor-system"
+      _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)
+      _event_log_file_basename = name + "-" + _startup_options.worker_name
+      _event_log_file_suffix = ".evlog"
+      _local_actor_system_file = _startup_options.resilience_dir + "/" + name +
+        "-" + _startup_options.worker_name + ".local-actor-system"
       _data_channel_file = _startup_options.resilience_dir + "/" + name + "-" +
         _startup_options.worker_name + ".tcp-data"
       _control_channel_file = _startup_options.resilience_dir + "/" + name +
@@ -117,16 +120,26 @@ actor ActorSystemStartup
 
       @printf[I32](("||| Resilience directory: " +
         _startup_options.resilience_dir + " |||\n").cstring())
+      ifdef "resilience" then
+        @printf[I32](("||| Log-rotation: " +
+          _startup_options.log_rotation.string() + "|||\n").cstring())
+      end
 
       var is_recovering: Bool = false
+      let event_log_dir_filepath = _event_log_dir_filepath as FilePath
 
       // check to see if we can recover
       // Use Set to make the logic explicit and clear
       let existing_files: Set[String] = Set[String]
 
-      let event_log_filepath: FilePath = FilePath(auth, _event_log_file)
-      if event_log_filepath.exists() then
-        existing_files.set(event_log_filepath.path)
+      let event_log_filepath = try
+        let elf: FilePath = LastLogFilePath(_event_log_file_basename,
+          _event_log_file_suffix, event_log_dir_filepath)
+        existing_files.set(elf.path)
+        elf
+      else
+        FilePath(event_log_dir_filepath,
+          _event_log_file_basename + _event_log_file_suffix)
       end
 
       let local_actor_system_filepath: FilePath = FilePath(auth,
@@ -194,12 +207,22 @@ actor ActorSystemStartup
       // Actor System Startup
       //////////////////////////
       let event_log = ifdef "resilience" then
-          EventLog(_env, _event_log_file
-            where backend_file_length = _startup_options.event_log_file_length,
-              logging_batch_size = 1)
+        if _startup_options.log_rotation then
+          EventLog(EventLogConfig(event_log_dir_filepath,
+            _event_log_file_basename
+            where backend_file_length' = _startup_options.event_log_file_length,
+            logging_batch_size' = 1,
+            suffix' = _event_log_file_suffix, log_rotation' = true))
         else
-          EventLog(_env, None)
+          EventLog(EventLogConfig(event_log_dir_filepath,
+            _event_log_file_basename + _event_log_file_suffix
+            where backend_file_length' =
+              _startup_options.event_log_file_length,
+              logging_batch_size' = 1))
         end
+      else
+        EventLog()
+      end
 
       let seed: U64 = 123456
 
@@ -209,7 +232,8 @@ actor ActorSystemStartup
         _startup_options.d_host, _startup_options.d_service, _ph_host,
         _ph_service, _external_host, _external_service, empty_metrics_conn,
         "", "", _startup_options.is_initializer, _connection_addresses_file,
-        _is_joining, _startup_options.spike_config)
+        _is_joining, _startup_options.spike_config, event_log,
+        _startup_options.log_rotation)
 
       let w_name = _startup_options.worker_name
 
@@ -218,6 +242,8 @@ actor ActorSystemStartup
 
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
         data_receivers, connections, _startup_options.stop_the_world_pause)
+      router_registry.set_event_log(event_log)
+      event_log.set_router_registry(router_registry)
 
       //TODO: Remove this once we have application lifecycle implemented
       //for ActorSystem
@@ -259,7 +285,8 @@ actor ActorSystemStartup
           _cluster_initializer, initializer, recovery, recovery_replayer,
           router_registry, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service
-          where broadcast_variables = broadcast_variables)
+          where broadcast_variables = broadcast_variables,
+          event_log = event_log)
 
       if _startup_options.is_initializer then
         connections.make_and_register_recoverable_listener(
@@ -313,7 +340,8 @@ actor ActorSystemStartup
 primitive EmptyConnections
   fun apply(env: Env, auth: AmbientAuth): Connections =>
     Connections("", "", auth, "", "", "", "", "", "", "", "",
-      ReconnectingMetricsSink("", "", "", ""), "", "", false, "", false)
+      ReconnectingMetricsSink("", "", "", ""), "", "", false, "", false
+      where event_log = EventLog())
 
 primitive EmptyRouterRegistry
   fun apply(auth: AmbientAuth, c: Connections): RouterRegistry =>

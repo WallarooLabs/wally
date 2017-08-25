@@ -139,7 +139,6 @@ class val WindowStateBuilder
   fun name(): String => "Window State"
 
 class WindowState is State
-  var idx: USize = 0
   var ring: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4, 0)
 
   fun string(): String =>
@@ -151,7 +150,6 @@ class WindowState is State
 
   fun ref push(u: U64) =>
     ring.push(u)
-    idx = idx + 1
 
     ifdef "validate" then
       try
@@ -174,7 +172,7 @@ class WindowState is State
 
 class WindowStateChange is StateChange[WindowState]
   var _id: U64
-  var _window: WindowState = WindowState
+  var _last_value: U64 = 0
 
   new create(id': U64) =>
     _id = id'
@@ -183,26 +181,32 @@ class WindowStateChange is StateChange[WindowState]
   fun id(): U64 => _id
 
   fun ref update(u: U64 val) =>
-    _window.push(u)
-
-  fun string(): String =>
-    _window.string()
+    _last_value = u
 
   fun apply(state: WindowState) =>
-    (let buf, let size', let count') = _window.ring.raw()
-    state.ring = Ring[U64].from_array(consume buf, size', count')
-    state.idx = _window.idx
+    state.push(_last_value)
+
+  fun string(state: WindowState): String =>
+    // This is necessary because in the StateChange (rather than
+    // DirectStateChange) scenario, at the time where ObserveNewValue is
+    // returning an output to be encoded for the sink, the state_change hasn't
+    // yet been applied to the state. So if State still has the previous
+    // copmutation's values, and state_change has the next value to be applied,
+    // we need to construct the output of the current computation from the two
+    // in order to return _this computation's output_ to the sink encoder.
+    let ring = state.ring.clone()
+    ring.push(_last_value)
+    try
+      ring.string(where fill = "0")
+    else
+      "Error: failed to convert sequence window into a string."
+    end
 
   fun write_log_entry(out_writer: Writer) =>
-    (let buf, let s, let c) = _window.ring.raw()
-    WindowStateEncoder(_window.idx, consume buf, s, c, out_writer)
+    WindowStateEncoder(_last_value, out_writer)
 
   fun ref read_log_entry(in_reader: Reader) ? =>
-    (let index, let buf, let size, let count) = WindowStateDecoder(
-      in_reader)
-    _window = WindowState
-    _window.idx = index
-    _window.ring = Ring[U64].from_array(consume buf, size, count)
+    _last_value = WindowStateDecoder(in_reader)
 
 class WindowStateChangeBuilder is StateChangeBuilder[WindowState]
   fun apply(id: U64): StateChange[WindowState] =>
@@ -221,12 +225,11 @@ primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
       else
         WindowStateChange(0)
       end
-
     state_change.update(u)
 
     // TODO: This is ugly since this is where we need to simulate the state
     // change in order to produce a result
-    (state_change.string(), state_change)
+    (state_change.string(state), state_change)
 
   fun state_change_builders():
     Array[StateChangeBuilder[WindowState] val] val

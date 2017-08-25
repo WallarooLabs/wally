@@ -49,7 +49,7 @@ actor RouterRegistry
   //////
   // Partition Migration
   //////
-  var _migrating: Bool = false
+  var _stop_the_world_in_process: Bool = false
   // Steps migrated out and waiting for acknowledgement
   let _step_waiting_list: SetIs[U128] = _step_waiting_list.create()
   // Workers in running cluster that have been stopped for migration
@@ -66,6 +66,11 @@ actor RouterRegistry
   var _stop_the_world_pause: U64
 
   var _waiting_to_finish_join: Bool = false
+
+  /////
+  // LOG ROTATION
+  /////
+  var _event_log: (EventLog | None) = None
 
   new create(auth: AmbientAuth, worker_name: String,
     data_receivers: DataReceivers, c: Connections, stop_the_world_pause: U64)
@@ -96,12 +101,15 @@ actor RouterRegistry
   be set_omni_router(o: OmniRouter) =>
     _omni_router = o
 
+  be set_event_log(e: EventLog) =>
+    _event_log = e
+
   be update_actor_data_router(adr: ActorSystemDataRouter) =>
     _actor_data_router = adr
 
   be register_source(tcp_source: Source) =>
     _sources.set(tcp_source)
-    if not _migrating and _application_ready_to_work then
+    if not _stop_the_world_in_process and _application_ready_to_work then
       tcp_source.unmute(_dummy_consumer)
     end
 
@@ -245,6 +253,58 @@ actor RouterRegistry
     end
 
   //////////////
+  // LOG ROTATION
+  //////////////
+  be rotate_log_file() =>
+    """
+    Called when it's time to rotate the log file for the worker.
+    This will mute upstream, ack on all in-flight messages, then initiate a
+    log file rotation, followed by snapshotting of all states on the worker
+    to the new file, before unmuting upstream and resuming processing.
+    """
+    // stop the world
+    _stop_the_world_in_process = true
+    _stop_all_local()
+    _stop_the_world_for_log_rotation()
+    // await acks?
+    let timers = Timers
+    let timer = Timer(PauseBeforeLogRotationNotify(this), _stop_the_world_pause)
+    timers(consume timer)
+
+  be begin_log_rotation() =>
+    """
+    Start the log rotation and initiate snapshots.
+    """
+    let steps: Map[U128, Step] iso = recover steps.create() end
+    for pr in _partition_routers.values() do
+      for (i, v) in pr.local_map().pairs() do
+        steps(i) = v
+      end
+    end
+    match _event_log
+    | let e: EventLog =>
+      e.rotate_file(consume steps)
+    else
+      Fail()
+    end
+
+  be rotation_complete() =>
+    """
+    Called when rotation has copmleted and we should resume processing
+    """
+    _connections.request_cluster_unmute()
+    _resume_the_world()
+    _unmute_request(_worker_name)
+
+  fun ref _stop_the_world_for_log_rotation() =>
+    """
+    We currently stop all message processing before perofrming log rotaion.
+    """
+    @printf[I32]("~~~Stopping message processing for log rotation.~~~\n".cstring())
+    _mute_request(_worker_name)
+    _connections.stop_the_world()
+
+  //////////////
   // NEW WORKER PARTITION MIGRATION
   //////////////
   be migrate_onto_new_worker(new_worker: String) =>
@@ -253,7 +313,7 @@ actor RouterRegistry
     the partition migration process. We first trigger a pause to allow
     in-flight messages to finish processing.
     """
-    _migrating = true
+    _stop_the_world_in_process = true
     _stop_the_world(new_worker)
     let timers = Timers
     let timer = Timer(PauseBeforeMigrationNotify(this, new_worker),
@@ -278,7 +338,7 @@ actor RouterRegistry
     Migration is complete and we're ready to resume message processing
     """
     _resume_all_local()
-    _migrating = false
+    _stop_the_world_in_process = false
     @printf[I32]("~~~Resuming message processing.~~~\n".cstring())
 
   be begin_migration(target_worker: String) =>
@@ -335,7 +395,7 @@ actor RouterRegistry
 
   fun ref _unmute_request(originating_worker: String) =>
     _stopped_worker_waiting_list.unset(originating_worker)
-    if (_stopped_worker_waiting_list.size() == 0) and _migrating then
+    if (_stopped_worker_waiting_list.size() == 0) then
       if _migration_target_ack_list.size() == 0 then
         _resume_the_world()
       else
@@ -579,6 +639,16 @@ class PauseBeforeMigrationNotify is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     _registry.begin_migration(_target_worker)
+    false
+
+class PauseBeforeLogRotationNotify is TimerNotify
+  let _registry: RouterRegistry
+
+  new iso create(registry: RouterRegistry) =>
+    _registry = registry
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _registry.begin_log_rotation()
     false
 
 // TODO: Replace using this with the badly named SetIs once we address a bug

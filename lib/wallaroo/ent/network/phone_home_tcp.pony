@@ -36,6 +36,9 @@ class HomeConnectNotify is TCPConnectionNotify
         | let m: ExternalShutdownMsg =>
           @printf[I32]("Received ExternalShutdownMsg\n".cstring())
           _connections.shutdown()
+        | let m: ExternalRotateLogFilesMsg =>
+          @printf[I32]("Received ExternalRotateLogFilesMsg\n".cstring())
+          _connections.rotate_log_files(m.node_name)
         end
       else
         @printf[I32](("Phone home connection: error decoding phone home " +

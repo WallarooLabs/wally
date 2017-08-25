@@ -32,7 +32,7 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
-    let event_log = EventLog(h.env)
+    let event_log = EventLog()
     let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
     let step1 = _StepGenerator(event_log, recovery_replayer)
@@ -88,8 +88,8 @@ class iso _TestOmniRouterEquality is UnitTest
     "topology/OmniRouterEquality"
 
   fun ref apply(h: TestHelper) ? =>
-    let event_log = EventLog(h.env)
     let auth = h.env.root as AmbientAuth
+    let event_log = EventLog()
     let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
     let step1 = _StepGenerator(event_log, recovery_replayer)
@@ -145,8 +145,8 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     "topology/DataRouterEqualityAfterRemove"
 
   fun ref apply(h: TestHelper) ? =>
-    let event_log = EventLog(h.env)
     let auth = h.env.root as AmbientAuth
+    let event_log = EventLog()
     let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
     let step1 = _StepGenerator(event_log, recovery_replayer)
@@ -178,8 +178,8 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     "topology/_TestDataRouterEqualityAfterAdd"
 
   fun ref apply(h: TestHelper) ? =>
-    let event_log = EventLog(h.env)
     let auth = h.env.root as AmbientAuth
+    let event_log = EventLog()
     let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
     let step1 = _StepGenerator(event_log, recovery_replayer)
@@ -266,7 +266,8 @@ primitive _DataReceiversGenerator
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
     Connections("", "", auth, "", "", "", "", "", "", "", "",
-      _NullMetricsSink, "", "", false, "", false)
+      _NullMetricsSink, "", "", false, "", false
+      where event_log = EventLog())
 
 primitive _RecoveryReplayerGenerator
   fun apply(env: Env, auth: AmbientAuth): RecoveryReplayer =>
