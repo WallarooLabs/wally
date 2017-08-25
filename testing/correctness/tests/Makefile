@@ -23,6 +23,7 @@ DOCKER_TARGET := false
 RECURSE_SUBMAKEFILES := false
 
 CORRECTNESS_TESTS_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
 
 build-testing-correctness-tests: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests: build-testing-tools-external_sender
