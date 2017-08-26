@@ -117,9 +117,9 @@ Now you need to install the Sendence fork of the Pony compiler `ponyc`. Run:
 
 ```bash
 cd ~/
-wget https://github.com/Sendence/ponyc/archive/sendence-19.2.9.tar.gz
-tar xzfv sendence-19.2.9.tar.gz
-cd ponyc-sendence-19.2.9
+wget https://github.com/Sendence/ponyc/archive/sendence-19.2.10.tar.gz
+tar xzfv sendence-19.2.10.tar.gz
+cd ponyc-sendence-19.2.10
 sudo make config=release install
 ```
 
