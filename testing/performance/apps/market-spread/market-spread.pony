@@ -53,6 +53,7 @@ use "net"
 use "serialise"
 use "time"
 use "sendence/bytes"
+use "sendence/conversions"
 use "sendence/fix"
 use "sendence/hub"
 use "sendence/new_fix"
@@ -180,12 +181,12 @@ class SymbolDataStateChange is StateChange[SymbolData]
   fun write_log_entry(out_writer: Writer) =>
     out_writer.f64_be(_last_bid)
     out_writer.f64_be(_last_offer)
-    out_writer.bool(_should_reject_trades)
+    out_writer.u8(BoolConverter.bool_to_u8(_should_reject_trades))
 
   fun ref read_log_entry(in_reader: Reader) ? =>
     _last_bid = in_reader.f64_be()
     _last_offer = in_reader.f64_be()
-    _should_reject_trades = in_reader.bool()
+    _should_reject_trades = BoolConverter.u8_to_bool(in_reader.u8())
 
 class SymbolDataStateChangeBuilder is StateChangeBuilder[SymbolData]
   fun apply(id: U64): StateChange[SymbolData] =>
