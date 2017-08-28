@@ -13,6 +13,85 @@ defmodule MetricsReporterUI.MetricsChannel do
     {:ok, socket}
   end
 
+  def handle_in("metrics", %{"category" => "start-to-end"} = metrics_msg, socket) do
+    "metrics:" <> app_name = socket.topic
+    %{"category" => category, "latency_list" => latency_list,
+      "timestamp" => end_timestamp, "period" => period, "name" => pipeline_key,
+      "min" => min, "max" => max} = metrics_msg
+    [pipeline_name, _worker_name] = String.split(pipeline_key, "@")
+    # By worker
+    start_timestamp = end_timestamp - period
+    latency_list_msg = create_latency_list_msg(pipeline_key, end_timestamp, latency_list)
+    store_latency_list_msg(app_name, "start-to-end-by-worker", pipeline_key, latency_list_msg)
+    throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    store_period_throughput_msg(app_name, "start-to-end-by-worker", pipeline_key, throughput_msg)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "start-to-end-by-worker", pipeline_key)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, "start-to-end-by-worker", pipeline_key)
+    # By Pipeline
+    start_timestamp = end_timestamp - period
+    latency_list_msg = create_latency_list_msg(pipeline_name, end_timestamp, latency_list)
+    store_latency_list_msg(app_name, category, pipeline_name, latency_list_msg)
+    throughput_msg = create_throughput_msg_from_latency_list(pipeline_name, end_timestamp, period, latency_list)
+    store_period_throughput_msg(app_name, category, pipeline_name, throughput_msg)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, pipeline_name)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_name)
+    {:noreply, socket}
+  end
+
+  def handle_in("metrics", %{"category" => "node-ingress-egress"} = metrics_msg, socket) do
+    "metrics:" <> app_name = socket.topic
+    %{"category" => category, "latency_list" => latency_list,
+      "timestamp" => end_timestamp, "period" => period, "name" => pipeline_key,
+      "min" => min, "max" => max} = metrics_msg
+    # By Pipeline
+    start_timestamp = end_timestamp - period
+    latency_list_msg = create_latency_list_msg(pipeline_key, end_timestamp, latency_list)
+    store_latency_list_msg(app_name, "node-ingress-egress-by-pipeline", pipeline_key, latency_list_msg)
+    throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    store_period_throughput_msg(app_name, "node-ingress-egress-by-pipeline", pipeline_key, throughput_msg)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "node-ingress-egress-by-pipeline", pipeline_key)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, "node-ingress-egress-by-pipeline", pipeline_key)
+    # By Worker
+    [_pipeline_name, worker_name] = String.split(pipeline_key, "*")
+    start_timestamp = end_timestamp - period
+    latency_list_msg = create_latency_list_msg(worker_name, end_timestamp, latency_list)
+    store_latency_list_msg(app_name, category, worker_name, latency_list_msg)
+    throughput_msg = create_throughput_msg_from_latency_list(worker_name, end_timestamp, period, latency_list)
+    store_period_throughput_msg(app_name, category, worker_name, throughput_msg)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, worker_name)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, worker_name)
+    {:noreply, socket}
+  end
+
+  def handle_in("metrics", %{"category" => "computation"} = metrics_msg, socket) do
+    "metrics:" <> app_name = socket.topic
+    %{"category" => category, "latency_list" => latency_list,
+      "timestamp" => end_timestamp, "period" => period, "name" => pipeline_key,
+      "min" => min, "max" => max} = metrics_msg
+    [pipeline_and_worker_name, computation_name] = String.split(pipeline_key, ":", parts: 2)
+    [pipeline_name, worker_name] = String.split(pipeline_and_worker_name, "@")
+    updated_pipeline_key = worker_name <> ":" <> computation_name
+    #By Worker
+    start_timestamp = end_timestamp - period
+    latency_list_msg = create_latency_list_msg(pipeline_key, end_timestamp, latency_list)
+    store_latency_list_msg(app_name, "computation-by-worker", pipeline_key, latency_list_msg)
+    throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    store_period_throughput_msg(app_name, "computation-by-worker", pipeline_key, throughput_msg)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "computation-by-worker", pipeline_key)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, "computation-by-worker", pipeline_key)
+    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_and_worker_name, pipeline_key, "computation-by-worker:" <> pipeline_key)
+    # By Computation
+    start_timestamp = end_timestamp - period
+    latency_list_msg = create_latency_list_msg(computation_name, end_timestamp, latency_list)
+    store_latency_list_msg(app_name, category, computation_name, latency_list_msg)
+    throughput_msg = create_throughput_msg_from_latency_list(computation_name, end_timestamp, period, latency_list)
+    store_period_throughput_msg(app_name, category, computation_name, throughput_msg)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, computation_name)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, computation_name)
+    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_name, computation_name, "computation:" <> computation_name)
+    {:noreply, socket}
+  end
+
   def handle_in("metrics", metrics_msg, socket) do
     "metrics:" <> app_name = socket.topic
     %{"category" => category, "latency_list" => latency_list,

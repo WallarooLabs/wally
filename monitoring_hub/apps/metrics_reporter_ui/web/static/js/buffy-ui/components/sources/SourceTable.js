@@ -1,7 +1,7 @@
 import React from "react"
 import { Table } from "react-bootstrap"
-import SourceTableHeader from "./SourceTableHeader"
-import SourceTableBody from "./SourceTableBody"
+import SourcePageTableHeader from "./SourcePageTableHeader"
+import SourcePageTableBody from "./SourcePageTableBody"
 import ThroughputStatsStore from "../../stores/ThroughputStatsStore"
 import LatencyPercentileBinStatsStore from "../../stores/LatencyPercentileBinStatsStore"
 import {is} from "immutable"
@@ -14,8 +14,8 @@ export default class SourceTable extends React.Component {
 		const { appName, sourceName, sourceType, throughputStats, latencyPercentileBinStats } = this.props;
 		return(
 			<Table>
-				<SourceTableHeader />
-				<SourceTableBody
+				<SourcePageTableHeader />
+				<SourcePageTableBody
 					linked={false}
 					appName={appName}
 					sourceType={sourceType}

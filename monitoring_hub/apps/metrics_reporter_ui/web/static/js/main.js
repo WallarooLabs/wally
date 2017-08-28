@@ -11,6 +11,7 @@ import SourceDashboardContainer from "./buffy-ui/components/sources/SourceDashbo
 import Perf from "react-addons-perf"
 import PhoenixConnector from "./buffy-ui/streaming/PhoenixConnector"
 import WorkersDashboardContainer from "./buffy-ui/components/applications/WorkersDashboardContainer"
+import WorkerDashboardContainer from "./buffy-ui/components/applications/WorkerDashboardContainer"
 
 window.Perf = Perf;
 

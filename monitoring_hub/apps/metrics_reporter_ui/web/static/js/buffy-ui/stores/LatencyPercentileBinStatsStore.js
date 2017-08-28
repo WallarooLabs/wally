@@ -20,6 +20,10 @@ class LatencyPercentileBinStatsStore extends ReduceStore {
 			.set("start-to-end", Map())
 			.set("node-ingress-egress", Map())
 			.set("computation", Map())
+			.set("pipeline", Map())
+			.set("start-to-end-by-worker", Map())
+			.set("node-ingress-egress-by-pipeline", Map())
+			.set("computation-by-worker", Map())
 		return state;
 	}
 	getLatencyPercentileBinStats(category, metricsKey) {
@@ -46,6 +50,22 @@ class LatencyPercentileBinStatsStore extends ReduceStore {
 				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
 			case Actions.RECEIVE_SOURCE_SINK_LATENCY_PERCENTILE_BIN_STATS.actionType:
 				category = "start-to-end";
+				metricsKey = action["latency-percentile-bin-stats"].pipeline_key;
+				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
+			case Actions.RECEIVE_STEP_BY_WORKER_LATENCY_PERCENTILE_BIN_STATS.actionType:
+				category = "computation-by-worker";
+				metricsKey = action["latency-percentile-bin-stats"].pipeline_key;
+				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
+			case Actions.RECEIVE_INGRESS_EGRESS_BY_PIPELINE_LATENCY_PERCENTILE_BIN_STATS.actionType:
+				category = "node-ingress-egress-by-pipeline";
+				metricsKey = action["latency-percentile-bin-stats"].pipeline_key;
+				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
+			case Actions.RECEIVE_SOURCE_SINK_BY_WORKER_LATENCY_PERCENTILE_BIN_STATS.actionType:
+				category = "start-to-end-by-worker";
+				metricsKey = action["latency-percentile-bin-stats"].pipeline_key;
+				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
+			case Actions.RECEIVE_PIPELINE_LATENCY_PERCENTILE_BIN_STATS.actionType:
+				category = "pipeline";
 				metricsKey = action["latency-percentile-bin-stats"].pipeline_key;
 				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
 			default:
