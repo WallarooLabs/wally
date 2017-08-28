@@ -36,7 +36,7 @@ class val EventLogConfig
     suffix = suffix'
 
 actor EventLog
-  let _origins: Map[U128, Resilient] = _origins.create()
+  let _producers: Map[U128, Resilient] = _producers.create()
   let _backend: Backend
   let _replay_complete_markers: Map[U64, Bool] =
     _replay_complete_markers.create()
@@ -105,29 +105,29 @@ actor EventLog
       Fail()
     end
 
-  be replay_log_entry(origin_id: U128,
+  be replay_log_entry(producer_id: U128,
     uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq val)
   =>
     try
-      _origins(origin_id).replay_log_entry(uid, frac_ids,
+      _producers(producer_id).replay_log_entry(uid, frac_ids,
         statechange_id, payload)
     else
       @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
       Fail()
     end
 
-  be register_origin(origin: Resilient, id: U128) =>
-    _origins(id) = origin
+  be register_producer(producer: Resilient, id: U128) =>
+    _producers(id) = producer
 
-  be queue_log_entry(origin_id: U128, uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, seq_id: U64,
+  be queue_log_entry(producer_id: U128, uid: U128,
+    frac_ids: FractionalMessageId, statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] iso)
   =>
-    _queue_log_entry(origin_id, uid, frac_ids, statechange_id, seq_id,
+    _queue_log_entry(producer_id, uid, frac_ids, statechange_id, seq_id,
       consume payload)
 
-  fun ref _queue_log_entry(origin_id: U128, uid: U128,
+  fun ref _queue_log_entry(producer_id: U128, uid: U128,
     frac_ids: FractionalMessageId,
     statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] iso, force_write: Bool = false)
@@ -136,7 +136,7 @@ actor EventLog
       // add to backend buffer after encoding
       // encode right away to amortize encoding cost per entry when received
       // as opposed to when writing a batch to disk
-      _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id,
+      _backend.encode_entry((false, producer_id, uid, frac_ids, statechange_id,
         seq_id, consume payload))
 
       num_encoded = num_encoded + 1
@@ -160,17 +160,17 @@ actor EventLog
       Fail()
     end
 
-  be flush_buffer(origin_id: U128, low_watermark: U64) =>
-    _flush_buffer(origin_id, low_watermark)
+  be flush_buffer(producer_id: U128, low_watermark: U64) =>
+    _flush_buffer(producer_id, low_watermark)
 
-  fun ref _flush_buffer(origin_id: U128, low_watermark: U64) =>
+  fun ref _flush_buffer(producer_id: U128, low_watermark: U64) =>
     ifdef "trace" then
-      @printf[I32]("flush_buffer for id: %d\n\n".cstring(), origin_id)
+      @printf[I32]("flush_buffer for id: %d\n\n".cstring(), producer_id)
     end
 
     try
       // Add low watermark ack to buffer
-      _backend.encode_entry((true, origin_id, 0, None, 0, low_watermark,
+      _backend.encode_entry((true, producer_id, 0, None, 0, low_watermark,
         recover Array[ByteSeq] end))
 
       num_encoded = num_encoded + 1
@@ -184,21 +184,21 @@ actor EventLog
       //   _backend.datasync()
       // end
 
-      _origins(origin_id).log_flushed(low_watermark)
+      _producers(producer_id).log_flushed(low_watermark)
     else
       @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
       Fail()
     end
 
-  be snapshot_state(origin_id: U128, uid: U128,
+  be snapshot_state(producer_id: U128, uid: U128,
     statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] iso)
   =>
     ifdef "trace" then
-      @printf[I32]("Snapshotting state for step %lu\n".cstring(), origin_id)
+      @printf[I32]("Snapshotting state for step %lu\n".cstring(), producer_id)
     end
-    if _steps_to_snapshot.contains(origin_id) then
-      _steps_to_snapshot.unset(origin_id)
+    if _steps_to_snapshot.contains(producer_id) then
+      _steps_to_snapshot.unset(producer_id)
     else
       @printf[I32](("Error writing snapshot to logfile. StepId not in set of " +
         "expected steps!\n").cstring())
@@ -209,8 +209,8 @@ actor EventLog
     // is acked by now, which isn't being validated here.
     // This should be addressed by
     // https://github.com/Sendence/wallaroo/issues/1132
-    _flush_buffer(origin_id, seq_id)
-    _queue_log_entry(origin_id, uid, None, statechange_id, seq_id,
+    _flush_buffer(producer_id, seq_id)
+    _queue_log_entry(producer_id, uid, None, statechange_id, seq_id,
       consume payload, true)
     if _steps_to_snapshot.size() == 0 then
       rotation_complete()

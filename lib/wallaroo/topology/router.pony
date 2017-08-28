@@ -511,7 +511,7 @@ class val DataRouter is Equatable[DataRouter]
     _data_routes(id)
 
   fun route(d_msg: DeliveryMsg, pipeline_time_spent: U64,
-    origin: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    producer: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
     ifdef "trace" then
@@ -525,10 +525,10 @@ class val DataRouter is Equatable[DataRouter]
       end
       try
         let route_id = _target_ids_to_route_ids(target_id)
-        d_msg.deliver(pipeline_time_spent, target, origin, seq_id, route_id,
+        d_msg.deliver(pipeline_time_spent, target, producer, seq_id, route_id,
           latest_ts, metrics_id, worker_ingress_ts)
         ifdef "resilience" then
-          origin.bookkeeping(route_id, seq_id)
+          producer.bookkeeping(route_id, seq_id)
         end
       else
         // This shouldn't happen. If we have a route, we should have a route
@@ -540,7 +540,7 @@ class val DataRouter is Equatable[DataRouter]
     end
 
   fun replay_route(r_msg: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    origin: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    producer: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
     try
@@ -548,9 +548,9 @@ class val DataRouter is Equatable[DataRouter]
       let route_id = _target_ids_to_route_ids(target_id)
       //TODO: create and deliver envelope
       r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id),
-        origin, seq_id, route_id, latest_ts, metrics_id, worker_ingress_ts)
+        producer, seq_id, route_id, latest_ts, metrics_id, worker_ingress_ts)
       ifdef "resilience" then
-        origin.bookkeeping(route_id, seq_id)
+        producer.bookkeeping(route_id, seq_id)
       end
       false
     else

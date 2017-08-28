@@ -7,13 +7,13 @@ use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/messages"
 
-// (is_watermark, origin_id, uid, frac_ids, statechange_id, seq_id, payload)
+// (is_watermark, producer_id, uid, frac_ids, statechange_id, seq_id, payload)
 type LogEntry is (Bool, U128, U128, FractionalMessageId, U64, U64,
   Array[ByteSeq] iso)
 
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
-// (origin_id, uid, frac_ids, statechange_id, seq_id, payload)
+// (producer_id, uid, frac_ids, statechange_id, seq_id, payload)
 type ReplayEntry is (U128, U128, FractionalMessageId, U64, U64, ByteSeq val)
 
 //////////////////////////////////
@@ -82,7 +82,7 @@ class DummyBackend is Backend
 class FileBackend is Backend
   //a record looks like this:
   // - is_watermark boolean
-  // - origin id
+  // - producer id
   // - seq id (low watermark record ends here)
   // - uid
   // - size of fractional id list
@@ -137,11 +137,11 @@ class FileBackend is Backend
         while _file.position() < size do
           r.append(_file.read(25))
           let is_watermark = BoolConverter.u8_to_bool(r.u8())
-          let origin_id = r.u128_be()
+          let producer_id = r.u128_be()
           let seq_id = r.u64_be()
           if is_watermark then
             // save last watermark read from file
-            watermarks(origin_id) = seq_id
+            watermarks(producer_id) = seq_id
           else
             r.append(_file.read(24))
             let uid = r.u128_be()
@@ -173,9 +173,8 @@ class FileBackend is Backend
             end
 
             // put entry into temporary recovered buffer
-            replay_buffer.push((origin_id, uid, frac_ids, statechange_id, seq_id
-              ,payload))
-
+            replay_buffer.push((producer_id, uid, frac_ids, statechange_id,
+              seq_id, payload))
           end
 
           // clear read buffer to free file data read so far
@@ -226,7 +225,7 @@ class FileBackend is Backend
 
   fun ref encode_entry(entry: LogEntry)
   =>
-    (let is_watermark: Bool, let origin_id: U128,
+    (let is_watermark: Bool, let producer_id: U128,
      let uid: U128, let frac_ids: FractionalMessageId,
      let statechange_id: U64, let seq_id: U64,
      let payload: Array[ByteSeq] val) = consume entry
@@ -240,7 +239,7 @@ class FileBackend is Backend
     end
 
     _writer.u8(BoolConverter.bool_to_u8(is_watermark))
-    _writer.u128_be(origin_id)
+    _writer.u128_be(producer_id)
     _writer.u64_be(seq_id)
 
     if not is_watermark then

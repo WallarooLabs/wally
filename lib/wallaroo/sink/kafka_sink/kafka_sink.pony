@@ -30,7 +30,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   let _conf: KafkaConfig val
   let _auth: TCPConnectionAuth
 
-  // Origin (Resilience)
+  // Producer (Resilience)
   let _terminus_route: TerminusRoute = TerminusRoute
 
   // variable to hold producer mapping for sending requests to broker
@@ -199,11 +199,11 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   be request_ack() =>
     _terminus_route.request_ack()
 
-  fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
+  fun ref _next_tracking_id(i_producer: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)
   =>
     ifdef "resilience" then
-      return _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
+      return _terminus_route.terminate(i_producer, i_route_id, i_seq_id)
     end
 
     None
@@ -219,7 +219,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     _upstreams.unset(producer)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    i_producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -255,7 +255,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
         let ret = (_kafka_producer_mapping as KafkaProducerMapping ref)
           .send_topic_message(_topic, any, encoded_value, encoded_key)
         if ret isnt None then error end
-        let next_tracking_id = _next_tracking_id(i_origin, i_route_id, i_seq_id)
+        let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
         _pending_delivery_report(any) = (metric_name, my_metrics_id,
           my_latest_ts, worker_ingress_ts, pipeline_time_spent,
           next_tracking_id)
@@ -270,7 +270,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     end
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    data: D, i_producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>

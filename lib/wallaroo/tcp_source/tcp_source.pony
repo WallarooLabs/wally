@@ -90,7 +90,7 @@ actor TCPSource is Producer
   var _expect_read_buf: Reader = Reader
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
-  // Origin (Resilience)
+  // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,

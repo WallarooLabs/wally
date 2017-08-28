@@ -46,25 +46,25 @@ class Acker
     _watermarker.ack_received(route_id, seq_id)
     _maybe_ack(ackable)
 
-  fun ref track_incoming_to_outgoing(o_seq_id: SeqId, i_origin: Producer,
+  fun ref track_incoming_to_outgoing(o_seq_id: SeqId, i_producer: Producer,
     i_route_id: RouteId, i_seq_id: SeqId)
   =>
-    _add_incoming(o_seq_id, i_origin, i_route_id, i_seq_id)
+    _add_incoming(o_seq_id, i_producer, i_route_id, i_seq_id)
 
   fun ref flushed(up_to: SeqId) =>
     _flushing = false
     for (o_r, id) in
-      _outgoing_to_incoming._origin_highs_below(up_to).pairs()
+      _outgoing_to_incoming._producer_highs_below(up_to).pairs()
     do
       o_r._1.update_watermark(o_r._2, id)
     end
     _outgoing_to_incoming.evict(up_to)
     _flushed_watermark = up_to
 
-  fun ref _add_incoming(o_seq_id: SeqId, i_origin: Producer,
+  fun ref _add_incoming(o_seq_id: SeqId, i_producer: Producer,
     i_route_id: RouteId, i_seq_id: SeqId)
   =>
-    _outgoing_to_incoming.add(o_seq_id, i_origin, i_route_id, i_seq_id)
+    _outgoing_to_incoming.add(o_seq_id, i_producer, i_route_id, i_seq_id)
 
   fun ref _maybe_ack(ackable: Ackable ref) =>
     if not _flushing and

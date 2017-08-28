@@ -122,7 +122,7 @@ actor DataReceiver is Producer
     end
 
   fun ref flush(low_watermark: SeqId) =>
-    """This is not a real Origin, so it doesn't write any State"""
+    """This is not a real Producer, so it doesn't write any State"""
     None
 
   //////////////

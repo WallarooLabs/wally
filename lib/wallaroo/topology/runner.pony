@@ -40,7 +40,7 @@ interface SerializableStateRunner
 
 trait ReplayableRunner
   fun ref replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq val, origin: Producer)
+    statechange_id: U64, payload: ByteSeq val, producer: Producer)
   fun ref set_step_id(id: U128)
 
 trait val RunnerBuilder
@@ -656,7 +656,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
     _state_change_repository.make_and_register(scb)
 
   fun ref replay_log_entry(msg_uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq val, origin: Producer)
+    statechange_id: U64, payload: ByteSeq val, producer: Producer)
   =>
     if statechange_id == U64.max_value() then
       replace_serialized_state(payload)

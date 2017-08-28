@@ -12,10 +12,10 @@ class ref _OutgoingToIncomingMessageTracker
   new create(size': USize = 0) =>
     _seq_id_to_incoming = Array[(SeqId, _ProducerRouteSeqId)](size')
 
-  fun ref add(o_seq_id: SeqId, i_origin: Producer, i_route_id: RouteId,
+  fun ref add(o_seq_id: SeqId, i_producer: Producer, i_route_id: RouteId,
     i_seq_id: SeqId)
   =>
-    _seq_id_to_incoming.push((o_seq_id, (i_origin, i_route_id, i_seq_id)))
+    _seq_id_to_incoming.push((o_seq_id, (i_producer, i_route_id, i_seq_id)))
 
   fun ref evict(through: SeqId) =>
     let n = _index_for(through)
@@ -26,14 +26,14 @@ class ref _OutgoingToIncomingMessageTracker
 
     _seq_id_to_incoming.remove(0, n + 1)
 
-  fun _origin_highs_below(id: SeqId): MapIs[(Producer, RouteId), U64] =>
-    let high_by_origin_route: MapIs[(Producer, RouteId), U64] =
+  fun _producer_highs_below(id: SeqId): MapIs[(Producer, RouteId), U64] =>
+    let high_by_producer_route: MapIs[(Producer, RouteId), U64] =
       MapIs[(Producer, RouteId), U64]
 
     let index: USize = _index_for(id)
     // magic not found index
     if index == -1 then
-      return high_by_origin_route
+      return high_by_producer_route
     end
 
     ifdef debug then
@@ -43,13 +43,13 @@ class ref _OutgoingToIncomingMessageTracker
     try
       for i in Reverse(index, 0) do
         (let o, let r, let s) = _seq_id_to_incoming(i)._2
-        high_by_origin_route.insert_if_absent((o, r), s)
+        high_by_producer_route.insert_if_absent((o, r), s)
       end
     else
       Fail()
     end
 
-    high_by_origin_route
+    high_by_producer_route
 
   fun _index_for(id: SeqId): USize =>
     """

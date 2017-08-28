@@ -140,7 +140,7 @@ actor OutgoingBoundary is Consumer
   // over seq_id generation whether there is resilience or not.
   var _seq_id: SeqId = 1
 
-  // Origin (Resilience)
+  // Producer (Resilience)
   let _terminus_route: TerminusRoute = TerminusRoute
 
   new create(auth: AmbientAuth, worker_name: String,
@@ -270,7 +270,7 @@ actor OutgoingBoundary is Consumer
     _step_id = step_id
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -278,7 +278,7 @@ actor OutgoingBoundary is Consumer
     Fail()
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    data: D, producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -287,7 +287,7 @@ actor OutgoingBoundary is Consumer
 
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    i_origin: Producer, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
+    i_producer: Producer, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
     let metric_name = delivery_msg.metric_name()
@@ -314,7 +314,7 @@ actor OutgoingBoundary is Consumer
 
     try
       let seq_id = ifdef "resilience" then
-        _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
+        _terminus_route.terminate(i_producer, i_route_id, i_seq_id)
       else
         _seq_id = _seq_id + 1
       end

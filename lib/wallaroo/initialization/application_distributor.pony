@@ -85,7 +85,7 @@ actor ApplicationDistributor is Distributor
       end
 
       // Edges that must be added at the end (because we need to create the
-      // edge at the time the origin node is created, in which case the target
+      // edge at the time the producer node is created, in which case the target
       // node will not yet exist).
       // Map from worker name to all (from_id, to_id) pairs
       let unbuilt_edges: Map[String, Array[(U128, U128)]] =
@@ -1045,12 +1045,12 @@ actor ApplicationDistributor is Distributor
       @printf[I32]("Error initializing application!\n".cstring())
     end
 
-  fun ref _add_edges_to_graph(origin_ids: (U128 | Array[U128] | None),
+  fun ref _add_edges_to_graph(producer_ids: (U128 | Array[U128] | None),
     local_graphs: Map[String, Dag[StepInitializer] trn] trn,
     target_id: U128, worker: String):
     Map[String, Dag[StepInitializer] trn] trn^ ?
   =>
-    match origin_ids
+    match producer_ids
     | let last_id: U128 =>
       local_graphs(worker).add_edge(last_id, target_id)
     | let last_ids: Array[U128] =>

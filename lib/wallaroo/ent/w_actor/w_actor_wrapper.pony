@@ -94,7 +94,7 @@ actor WActorWithState is WActorWrapper
     _helper = LiveWActorHelper(this)
     _w_actor = w_actor_builder(id, _helper)
     _central_actor_registry.register_actor(_w_actor_id, this)
-    _event_log.register_origin(this, id)
+    _event_log.register_producer(this, id)
 
   be receive(msg: WMessage val) =>
     """

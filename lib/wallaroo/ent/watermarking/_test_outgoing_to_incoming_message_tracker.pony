@@ -14,11 +14,11 @@ actor _TestOutgoingToIncomingMessageTracker is TestList
     test(_TestIndexFor2)
     test(_TestIndexForWithGaps)
     test(_TestIndexForWithGaps2)
-    test(_TestOriginHighsBelow1)
-    test(_TestOriginHighsBelow2)
-    test(_TestOriginHighsBelowWithOneToManyPartiallyAcked)
-    test(_TestOriginHighsBelowWithOneToManyFullyAcked1)
-    test(_TestOriginHighsBelowWithOneToManyFullyAcked2)
+    test(_TestProducerHighsBelow1)
+    test(_TestProducerHighsBelow2)
+    test(_TestProducerHighsBelowWithOneToManyPartiallyAcked)
+    test(_TestProducerHighsBelowWithOneToManyFullyAcked1)
+    test(_TestProducerHighsBelowWithOneToManyFullyAcked2)
     test(_TestOutgoingToIncomingEviction)
     test(_TestOutgoingToIncomingEvictionBelow)
 
@@ -130,14 +130,14 @@ class iso _TestIndexForWithGaps2 is UnitTest
     h.assert_eq[USize](3, t._index_for(542))
     h.assert_eq[USize](4, t._index_for(550))
 
-class iso _TestOriginHighsBelow1 is UnitTest
+class iso _TestProducerHighsBelow1 is UnitTest
   """
-  Test origin highs below when there are multiple
+  Test producer highs below when there are multiple
   messages that went out on the route below the SeqId that
   we are getting up to.
   """
   fun name(): String =>
-    "outgoing_to_incoming_message_tracker/OriginHighsBelow1"
+    "outgoing_to_incoming_message_tracker/ProducerHighsBelow1"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -153,7 +153,7 @@ class iso _TestOriginHighsBelow1 is UnitTest
     t.add(SeqId(5), o2, o2route, SeqId(2))
     t.add(SeqId(6), o1, o1route, SeqId(4))
 
-    let highs = t._origin_highs_below(SeqId(5))
+    let highs = t._producer_highs_below(SeqId(5))
     h.assert_eq[USize](2, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
@@ -164,13 +164,13 @@ class iso _TestOriginHighsBelow1 is UnitTest
       h.fail()
     end
 
-class iso _TestOriginHighsBelow2 is UnitTest
+class iso _TestProducerHighsBelow2 is UnitTest
   """
-  Test _origin_high_below correctly only gets first item in
+  Test _producer_high_below correctly only gets first item in
   and not others.
   """
   fun name(): String =>
-    "outgoing_to_incoming_message_tracker/OriginHighsBelow2"
+    "outgoing_to_incoming_message_tracker/ProducerHighsBelow2"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -186,7 +186,7 @@ class iso _TestOriginHighsBelow2 is UnitTest
     t.add(SeqId(5), o2, o2route, SeqId(2))
     t.add(SeqId(6), o1, o1route, SeqId(4))
 
-    let highs = t._origin_highs_below(SeqId(1))
+    let highs = t._producer_highs_below(SeqId(1))
     h.assert_eq[USize](1, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_false(highs.contains((o2, o2route)))
@@ -196,9 +196,9 @@ class iso _TestOriginHighsBelow2 is UnitTest
       h.fail()
     end
 
-class iso _TestOriginHighsBelowWithOneToManyPartiallyAcked is UnitTest
+class iso _TestProducerHighsBelowWithOneToManyPartiallyAcked is UnitTest
   fun name(): String =>
-    "outgoing_to_incoming_message_tracker/OriginHighsBelowWithOneToManyPartiallyAcked"
+    "outgoing_to_incoming_message_tracker/ProducerHighsBelowWithOneToManyPartiallyAcked"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -217,7 +217,7 @@ class iso _TestOriginHighsBelowWithOneToManyPartiallyAcked is UnitTest
     t.add(SeqId(8), o2, o2route, SeqId(2))
     t.add(SeqId(9), o1, o1route, SeqId(4))
 
-    let highs = t._origin_highs_below(SeqId(4))
+    let highs = t._producer_highs_below(SeqId(4))
     h.assert_eq[USize](1, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_false(highs.contains((o2, o2route)))
@@ -227,9 +227,9 @@ class iso _TestOriginHighsBelowWithOneToManyPartiallyAcked is UnitTest
       h.fail()
     end
 
-class iso _TestOriginHighsBelowWithOneToManyFullyAcked1 is UnitTest
+class iso _TestProducerHighsBelowWithOneToManyFullyAcked1 is UnitTest
   fun name(): String =>
-    "outgoing_to_incoming_message_tracker/OriginHighsBelowWithOneToManyFullyAcked1"
+    "outgoing_to_incoming_message_tracker/ProducerHighsBelowWithOneToManyFullyAcked1"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -248,7 +248,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked1 is UnitTest
     t.add(SeqId(8), o2, o2route, SeqId(2))
     t.add(SeqId(9), o1, o1route, SeqId(4))
 
-    let highs = t._origin_highs_below(SeqId(5))
+    let highs = t._producer_highs_below(SeqId(5))
     h.assert_eq[USize](2, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
@@ -259,9 +259,9 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked1 is UnitTest
       h.fail()
     end
 
-class iso _TestOriginHighsBelowWithOneToManyFullyAcked2 is UnitTest
+class iso _TestProducerHighsBelowWithOneToManyFullyAcked2 is UnitTest
   fun name(): String =>
-    "outgoing_to_incoming_message_tracker/OriginHighsBelowWithOneToManyFullyAcked2"
+    "outgoing_to_incoming_message_tracker/ProducerHighsBelowWithOneToManyFullyAcked2"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -280,7 +280,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked2 is UnitTest
     t.add(SeqId(8), o2, o2route, SeqId(2))
     t.add(SeqId(9), o1, o1route, SeqId(4))
 
-    let highs = t._origin_highs_below(SeqId(8))
+    let highs = t._producer_highs_below(SeqId(8))
 
     h.assert_eq[USize](2, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
@@ -292,9 +292,9 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked2 is UnitTest
       h.fail()
     end
 
-class iso _TestOriginHighsBelowWithOneToManyFullyAcked3 is UnitTest
+class iso _TestProducerHighsBelowWithOneToManyFullyAcked3 is UnitTest
   fun name(): String =>
-    "outgoing_to_incoming_message_tracker/OriginHighsBelowWithOneToManyFullyAcked3"
+    "outgoing_to_incoming_message_tracker/ProducerHighsBelowWithOneToManyFullyAcked3"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -313,7 +313,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked3 is UnitTest
     t.add(SeqId(8), o2, o2route, SeqId(2))
     t.add(SeqId(9), o1, o1route, SeqId(4))
 
-    let highs = t._origin_highs_below(SeqId(7))
+    let highs = t._producer_highs_below(SeqId(7))
     h.assert_eq[USize](2, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
