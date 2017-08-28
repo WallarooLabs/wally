@@ -27,8 +27,13 @@ function formatThroughput(thr) {
         return "0k";
     } else if (thr == "-") {
         return thr;
+    } else if (thr > 10000) {
+        return cleanTrailing(thr/1000, 0) + "k";
+    } else if (thr >= 1000000) {
+        return cleanTrailing(thr/1000000, 2) + "m";
+    } else {
+        return cleanTrailing(thr/1000, 2) + "k";
     }
-    return cleanTrailing(thr/1000, 2) + "k";
 }
 
 function formatLatency(latency) {
@@ -106,7 +111,7 @@ function formatLatencyBin(bin) {
         case 0:
             return "0";
         case "0":
-            return "0"; 
+            return "0";
         case "1":
             return "≤ 1 ns";
         case "2":

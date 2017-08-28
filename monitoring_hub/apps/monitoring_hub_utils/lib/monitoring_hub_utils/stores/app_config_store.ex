@@ -32,6 +32,11 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 		GenServer.call(__MODULE__, {:add_metrics_channel_to_app_config, [app_name: app_name, category: category, channel: channel]})
 	end
 
+	def add_pipeline_computation_to_app_config(app_name, pipeline_name, computation_name, channel) do
+		GenServer.call(__MODULE__, {:add_pipeline_computation_to_app_config, [app_name: app_name,
+			pipeline_name: pipeline_name, compuation_name: computation_name, channel: channel]})
+	end
+
 	def add_worker_to_app_config(app_name, worker_name) do
 		GenServer.call(__MODULE__, {:add_worker_to_app_config, [app_name: app_name, worker_name: worker_name]})
 	end
@@ -93,6 +98,23 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 		end
 	end
 
+	def handle_call({:add_pipeline_computation_to_app_config, [app_name: app_name, pipeline_name: pipeline_name,
+		compuation_name: computation_name, channel: channel]}, _from, %{tid: tid} = state) do
+		app_config = case :ets.lookup(tid, app_name) do
+			[{^app_name, config}] ->
+				config
+			[] ->
+				do_create_initial_app_config(app_name)
+		end
+		new_app_config = do_add_pipeline_computation_to_app_config(app_config, pipeline_name, computation_name, channel)
+		if (app_config == new_app_config) do
+			{:reply, {:ok, app_config}, state}
+		else
+			true = :ets.insert(tid, {app_name, new_app_config})
+			{:reply, {:ok, new_app_config}, state}
+		end
+	end
+
 	def handle_call({:add_worker_to_app_config, [app_name: app_name, worker_name: worker_name]},
 	    _from, %{tid: tid} = state) do
 		app_config = case :ets.lookup(tid, app_name) do
@@ -121,7 +143,11 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 				"start-to-end" => [],
 				"node-ingress-egress" => [],
 				"computation" => [],
-				"pipeline" => []
+				"pipeline" => [],
+				"computation-by-worker" => %{},
+				"start-to-end-by-worker" => %{},
+				"node-ingress-egress-by-pipeline" => %{},
+				"pipeline-computations" => %{}
 				},
 			"workers" => []}
 	end
@@ -133,6 +159,53 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 				|> Enum.uniq
 		end)
 
+	end
+
+	defp do_add_metrics_channel_to_app_config(app_config,  "computation-by-worker" = category, channel) do
+		update_in(app_config, ["metrics", category], fn computations_map ->
+			[_category, pipeline_and_worker_name, computation_name] = String.split(channel, ":", parts: 3)
+			[_pipeline_name, worker_name] = String.split(pipeline_and_worker_name, "@")
+			computations_map
+			 	|> Map.update(computation_name, [channel], fn channel_list ->
+					channel_list ++ [channel]
+						|> Enum.sort
+						|> Enum.uniq
+				end)
+				|> Map.update(worker_name, [channel], fn channel_list ->
+					channel_list ++ [channel]
+					 |> Enum.sort
+					 |> Enum.uniq
+				end)
+		end)
+	end
+
+	defp do_add_metrics_channel_to_app_config(app_config,  "start-to-end-by-worker" = category, channel) do
+		update_in(app_config, ["metrics", category], fn pipelines_map ->
+			[category_and_pipeline_name, worker_name] = String.split(channel, "@")
+			[_category, pipeline_name] = String.split(category_and_pipeline_name, ":")
+			pipelines_map
+				|> Map.update(pipeline_name, [channel], fn channel_list ->
+					channel_list ++ [channel]
+						|> Enum.sort
+						|> Enum.uniq
+				end)
+				|> Map.update(worker_name, [channel], fn channel_list ->
+					channel_list ++ [channel]
+						|> Enum.sort
+						|> Enum.uniq
+				end)
+		end)
+	end
+
+	defp do_add_metrics_channel_to_app_config(app_config,  "node-ingress-egress-by-pipeline" = category, channel) do
+		update_in(app_config, ["metrics", category], fn workers_map ->
+			[pipeline_name, worker_name] = String.split(channel, "*")
+			Map.update(workers_map, worker_name, [channel], fn channel_list ->
+				channel_list ++ [channel]
+					|> Enum.sort
+					|> Enum.uniq
+			end)
+		end)
 	end
 
 	defp do_add_metrics_channel_to_app_config(app_config, category, channel) do
@@ -150,6 +223,16 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 					|> Enum.sort
 				{events_list, updated_events_list}
 			end)
+	end
+
+	defp do_add_pipeline_computation_to_app_config(app_config, pipeline_name, computation_name, channel) do
+		update_in(app_config, ["metrics", "pipeline-computations"], fn pipeline_map ->
+			Map.update(pipeline_map, pipeline_name, [channel], fn channel_list ->
+				channel_list ++ [channel]
+					|> Enum.sort
+					|> Enum.uniq
+			end)
+		end)
 	end
 
 	defp get_table_keys(tid) do

@@ -15,6 +15,10 @@ class ThroughputsStore extends ReduceStore {
 		let state = Map().set("start-to-end", Map())
 					 .set("node-ingress-egress", Map())
 					 .set("computation", Map())
+					 .set("pipeline", Map())
+					 .set("start-to-end-by-worker", Map())
+					 .set("computation-by-worker", Map())
+					 .set("node-ingress-egress-by-pipeline", Map())
 		return state;
 	}
 	getThroughputs(category, metricsKey) {
@@ -54,24 +58,56 @@ class ThroughputsStore extends ReduceStore {
 				category = "computation";
 				metricsKey = action["total-throughput"].pipeline_key;
 				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
+			case Actions.RECEIVE_STEP_BY_WORKER_TOTAL_THROUGHPUT.actionType:
+				category = "computation-by-worker";
+				metricsKey = action["total-throughput"].pipeline_key;
+				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
 			case Actions.RECEIVE_SOURCE_SINK_TOTAL_THROUGHPUT.actionType:
 				category = "start-to-end";
+				metricsKey = action["total-throughput"].pipeline_key;
+				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
+			case Actions.RECEIVE_SOURCE_SINK_BY_WORKER_TOTAL_THROUGHPUT.actionType:
+				category = "start-to-end-by-worker";
 				metricsKey = action["total-throughput"].pipeline_key;
 				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
 			case Actions.RECEIVE_INGRESS_EGRESS_TOTAL_THROUGHPUT.actionType:
 				category = "node-ingress-egress";
 				metricsKey = action["total-throughput"].pipeline_key;
 				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
+			case Actions.RECEIVE_INGRESS_EGRESS_BY_PIPELINE_TOTAL_THROUGHPUT.actionType:
+				category = "node-ingress-egress-by-pipeline";
+				metricsKey = action["total-throughput"].pipeline_key;
+				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
+			case Actions.RECEIVE_PIPELINE_TOTAL_THROUGHPUT.actionType:
+				category = "pipeline";
+				metricsKey = action["total-throughput"].pipeline_key;
+				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
 			case Actions.RECEIVE_STEP_INITIAL_TOTAL_THROUGHPUTS.actionType:
 				category = "computation";
+				metricsKey = action["initial-total-throughputs"].pipeline_key;
+				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
+			case Actions.RECEIVE_STEP_BY_WORKER_INITIAL_TOTAL_THROUGHPUTS.actionType:
+				category = "computation-by-worker";
 				metricsKey = action["initial-total-throughputs"].pipeline_key;
 				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
 			case Actions.RECEIVE_SOURCE_SINK_INITIAL_TOTAL_THROUGHPUTS.actionType:
 				category = "start-to-end";
 				metricsKey = action["initial-total-throughputs"].pipeline_key;
 				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
+			case Actions.RECEIVE_SOURCE_SINK_BY_WORKER_INITIAL_TOTAL_THROUGHPUTS.actionType:
+				category = "start-to-end-by-worker";
+				metricsKey = action["initial-total-throughputs"].pipeline_key;
+				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
 			case Actions.RECEIVE_INGRESS_EGRESS_INITIAL_TOTAL_THROUGHPUTS.actionType:
 				category = "node-ingress-egress";
+				metricsKey = action["initial-total-throughputs"].pipeline_key;
+				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
+			case Actions.RECEIVE_INGRESS_EGRESS_BY_PIPELINE_INITIAL_TOTAL_THROUGHPUTS.actionType:
+				category = "node-ingress-egress-by-pipeline";
+				metricsKey = action["initial-total-throughputs"].pipeline_key;
+				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
+			case Actions.RECEIVE_PIPELINE_INITIAL_TOTAL_THROUGHPUTS.actionType:
+				category = "pipeline";
 				metricsKey = action["initial-total-throughputs"].pipeline_key;
 				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
 			default:

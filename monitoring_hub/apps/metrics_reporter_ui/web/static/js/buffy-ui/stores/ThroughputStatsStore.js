@@ -18,9 +18,15 @@ class ThroughputStatsStore extends ReduceStore {
 			.set("start-to-end", Map())
 			.set("node-ingress-egress", Map())
 			.set("computation", Map())
+			.set("pipeline", Map())
+			.set("start-to-end-by-worker", Map())
+			.set("computation-by-worker", Map())
+			.set("node-ingress-egress-by-pipeline", Map())
 		return state;
 	}
 	getThroughputStats(category, metricsKey) {
+		// console.log("Category: " + category + " MetricsKey: " + metricsKey);
+		// console.log("Throughput Stats: " + this.getState());
 		if (this.getState().hasIn([category, metricsKey])) {
 			return this.getState().getIn([category, metricsKey]);
 		} else {
@@ -38,12 +44,28 @@ class ThroughputStatsStore extends ReduceStore {
 				category = "computation";
 				metricsKey = action["throughput-stats"].pipeline_key;
 				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+			case Actions.RECEIVE_STEP_BY_WORKER_THROUGHPUT_STATS.actionType:
+				category = "computation-by-worker";
+				metricsKey = action["throughput-stats"].pipeline_key;
+				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_INGRESS_EGRESS_THROUGHPUT_STATS.actionType:
 				category = "node-ingress-egress";
 				metricsKey = action["throughput-stats"].pipeline_key;
 				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+			case Actions.RECEIVE_INGRESS_EGRESS_BY_PIPELINE_THROUGHPUT_STATS.actionType:
+				category = "node-ingress-egress-by-pipeline";
+				metricsKey = action["throughput-stats"].pipeline_key;
+				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_SOURCE_SINK_THROUGHPUT_STATS.actionType:
 				category = "start-to-end";
+				metricsKey = action["throughput-stats"].pipeline_key;
+				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+			case Actions.RECEIVE_SOURCE_SINK_BY_WORKER_THROUGHPUT_STATS.actionType:
+				category = "start-to-end-by-worker";
+				metricsKey = action["throughput-stats"].pipeline_key;
+				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+			case Actions.RECEIVE_PIPELINE_THROUGHPUT_STATS.actionType:
+				category = "pipeline";
 				metricsKey = action["throughput-stats"].pipeline_key;
 				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
 			default:

@@ -7,11 +7,15 @@ defmodule MonitoringHubUtils.Stores.AppConfigStoreTest do
   setup do
   	AppConfigStore.start_link
   	empty_app_config = %{"metrics" => %{
-  		"start-to-end" => [],
-  		"computation" => [],
-  		"node-ingress-egress" => [],
-  		"pipeline" => []
-  		},
+        "start-to-end" => [],
+        "node-ingress-egress" => [],
+        "computation" => [],
+        "pipeline" => [],
+        "computation-by-worker" => %{},
+        "start-to-end-by-worker" => %{},
+        "node-ingress-egress-by-pipeline" => %{},
+        "pipeline-computations" => %{}
+      },
       "workers" => []
     }
   	{:ok, empty_app_config: empty_app_config}
