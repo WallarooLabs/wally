@@ -256,8 +256,8 @@ actor Connections is Cluster
       end
       let migration_complete_msg =
         ChannelMsgEncoder.step_migration_complete(id, _auth)
-      for origin in exclusions.values() do
-        _control_conns(origin).writev(migration_complete_msg)
+      for producer in exclusions.values() do
+        _control_conns(producer).writev(migration_complete_msg)
       end
     else
       Fail()

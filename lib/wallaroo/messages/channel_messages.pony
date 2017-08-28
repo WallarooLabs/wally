@@ -581,12 +581,12 @@ trait val DeliveryMsg is ChannelMsg
   fun target_id(): U128
   fun sender_name(): String
   fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    origin: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
+    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    origin: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
+    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
   fun input(): Any val
   fun metric_name(): String
@@ -622,19 +622,19 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun sender_name(): String => _sender_name
 
   fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    origin: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
+    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
-    target_step.run[D](_metric_name, pipeline_time_spent, _data, origin,
+    target_step.run[D](_metric_name, pipeline_time_spent, _data, producer,
       _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
     false
 
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    origin: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
+    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
-    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, origin,
+    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, producer,
       _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
     false

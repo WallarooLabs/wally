@@ -141,7 +141,7 @@ class Ring[A: Any val]
 
   fun pos(): USize =>
     """
-    The current position of the origin on the ring.
+    The current position of the producer on the ring.
     """
     _count % _size
 

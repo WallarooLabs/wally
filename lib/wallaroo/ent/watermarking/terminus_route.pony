@@ -28,14 +28,14 @@ class TerminusRoute
     _tracking_id_to_incoming =
       _OutgoingToIncomingMessageTracker(_ack_batch_size)
 
-  fun ref terminate(i_origin: Producer, i_route_id: RouteId,
+  fun ref terminate(i_producer: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): SeqId
   =>
     """
     Mark for termination. Termination isn't complete until its acknowledged.
     """
     let id = _next_tracking_id()
-    _tracking_id_to_incoming.add(id, i_origin, i_route_id, i_seq_id)
+    _tracking_id_to_incoming.add(id, i_producer, i_route_id, i_seq_id)
 
     id
 
@@ -73,7 +73,7 @@ class TerminusRoute
     end
 
     for (o_r, id) in
-      _tracking_id_to_incoming._origin_highs_below(up_to).pairs()
+      _tracking_id_to_incoming._producer_highs_below(up_to).pairs()
     do
       o_r._1.update_watermark(o_r._2, id)
     end

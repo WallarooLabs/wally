@@ -19,8 +19,8 @@ trait tag Ackable
   be log_flushed(low_watermark: SeqId) =>
     """
     We will be called back here once the eventlogs have been flushed for a
-    particular origin. We can now send the low watermark upstream to this
-    origin.
+    particular producer. We can now send the low watermark upstream to this
+    producer.
     """
     _acker().flushed(low_watermark)
 

@@ -71,7 +71,7 @@ actor Step is (Producer & Consumer)
     for (state_name, boundary) in _outgoing_boundaries.pairs() do
       _outgoing_boundaries(state_name) = boundary
     end
-    _event_log.register_origin(this, id)
+    _event_log.register_producer(this, id)
 
     let initial_router = _runner.clone_router_and_set_input_type(router)
     _update_router(initial_router)
@@ -222,18 +222,18 @@ actor Step is (Producer & Consumer)
     end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    i_producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _run[D](metric_name, pipeline_time_spent, data, i_origin,
+    _run[D](metric_name, pipeline_time_spent, data, i_producer,
       msg_uid, frac_ids, i_seq_id, i_route_id,
       latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref _run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    data: D, i_producer: Producer, msg_uid: U128,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_incoming_message()
 
@@ -282,7 +282,7 @@ actor Step is (Producer & Consumer)
     end
 
     ifdef "resilience" then
-      _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_origin,
+      _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_producer,
         i_route_id, i_seq_id)
     end
 
@@ -328,15 +328,15 @@ actor Step is (Producer & Consumer)
     false
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_origin: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    data: D, i_producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if not _is_duplicate(msg_uid, frac_ids) then
-      _deduplication_list.push((i_origin, msg_uid, frac_ids, i_seq_id,
+      _deduplication_list.push((i_producer, msg_uid, frac_ids, i_seq_id,
         i_route_id))
 
-      _run[D](metric_name, pipeline_time_spent, data, i_origin,
+      _run[D](metric_name, pipeline_time_spent, data, i_producer,
         msg_uid, frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts)
     else
@@ -349,7 +349,7 @@ actor Step is (Producer & Consumer)
       ifdef "resilience" then
         _acker_x.filtered(this, current_sequence_id())
         _acker_x.track_incoming_to_outgoing(current_sequence_id(),
-          i_origin, i_route_id, i_seq_id)
+          i_producer, i_route_id, i_seq_id)
       end
     end
 
