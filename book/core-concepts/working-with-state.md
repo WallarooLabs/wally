@@ -6,7 +6,7 @@ Wallaroo's state objects allow developers to define their own domain-specific da
 
 Imagine a word counting application. We'll have a state object for each different word. Each word and count object would look something like:
 
-```pony
+```python
 class WordAndCount(object):
     def __init__(self, word="", count=0):
         self.word = word
