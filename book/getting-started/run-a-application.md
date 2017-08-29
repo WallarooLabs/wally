@@ -50,7 +50,7 @@ We need to set up a data receiver where we can send the output stream from our a
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-stable env ponyc
+make
 ```
 
 This will create a binary called `receiver`
@@ -63,23 +63,14 @@ You will now be able to start the `receiver` with the following command:
 
 You should see the `Listening for data` that indicates that Giles receiver is running.
 
-## Compile the Celsius Conversion App
+## Run the Celsius Conversion App
 
-We'll be running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/celsius/celsius.pony).  In a new window, run:
+We'll be compiling and running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/celsius/celsius.pony).  In a new window, run:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius
+make
 ```
-
-Now compile the Celsius Conversion app:
-
-```bash
-stable env ponyc
-```
-
-This will create a binary called `celsius`.
-
-## Run the Celsius Conversion App
 
 Now that we have our Celsius Conversion application compiled, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command from our original terminal:
 
@@ -98,7 +89,7 @@ A data generator is bundled with the application. It needs to be built and a dat
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius/data_gen
-stable env ponyc
+make
 ```
 
 Then you can generate a file with a fixed number of psuedo-random votes:
@@ -117,7 +108,7 @@ Open a new terminal and run the following to compile the sender:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/sender
-stable env ponyc
+make
 ```
 
 This will create a binary called `sender`
