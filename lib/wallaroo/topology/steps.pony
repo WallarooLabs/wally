@@ -303,6 +303,10 @@ actor Step is (Producer & Consumer)
           return true
         | (let x: Array[U32] val, let y: Array[U32] val) =>
           if x.size() != y.size() then
+            ifdef debug then
+              @printf[I32]("Deduplication false 1: %d %d\n".cstring(),
+                x.size(), y.size())
+            end
             return false
           end
 
@@ -310,6 +314,10 @@ actor Step is (Producer & Consumer)
           while (i < x.size()) do
             try
               if x(i) != y(i) then
+                ifdef debug then
+                  @printf[I32]("Deduplication false 2: %d %d\n".cstring(),
+                    x(i), y(i))
+                end
                 return false
               end
             else
