@@ -7,8 +7,11 @@ There's a couple Wallaroo support applications that you'll be interacting with f
 - Our Metrics UI that allows you to monitor the performance and health of your applications.
 - Giles receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
+- Our example Wallaroo application.
 
 You're going to setup our "Celsius to Fahrenheit" example. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
+
+The Metrics UI process will be run in the background via Docker.  The other three processes (receiver, sender, and Wallaroo) will run in the foreground.  We recommend that you run each process in a separate window.
 
 Let's get started!
 
@@ -43,7 +46,7 @@ docker start mui
 
 ## Run Giles Receiver
 
-We need to set up a data receiver where we can send the output stream from our application:
+We need to set up a data receiver where we can send the output stream from our application.  In a new window, run:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
@@ -62,7 +65,7 @@ You should see the `Listening for data` that indicates that Giles receiver is ru
 
 ## Compile the Celsius Conversion App
 
-We'll be running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/celsius/celsius.pony).
+We'll be running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/celsius/celsius.pony).  In a new window, run:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius
@@ -91,7 +94,7 @@ This tells Wallaroo that it should listen on port 7000 for incoming data, write 
 
 ### Generating Some Data
 
-A data generator is bundled with the application. It needs to be built:
+A data generator is bundled with the application. It needs to be built.  In a new window, run:
 
 ```bash
 cd data_gen
