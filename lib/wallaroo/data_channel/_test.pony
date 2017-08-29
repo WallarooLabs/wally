@@ -50,8 +50,9 @@ actor Main is TestList
 
 class _TestDataChannel is DataChannelListenNotify
   """
-  Run a typical TCP test consisting of a single DataChannelListener that accepts a
-  single DataChannel as a client, using a dynamic available listen port.
+  Run a typical TCP test consisting of a single DataChannelListener that
+  accepts a single DataChannel as a client, using a dynamic available listen
+  port.
   """
   let _h: TestHelper
   var _client_conn_notify: (DataChannelNotify iso | None) = None
