@@ -1,7 +1,11 @@
 {
   "deps": [
-    { "type": "local",
-      "local-path": "../lib/"
-    }
+      { "type": "local",
+        "local-path": "../lib/"
+      },
+      { "type": "github",
+        "repo": "Sendence/pony-kafka",
+        "tag": "0.0.0.0.0.0.0.0.0.3"
+      }
   ]
 }

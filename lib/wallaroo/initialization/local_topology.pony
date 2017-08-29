@@ -470,9 +470,10 @@ actor LocalTopologyInitializer is LayoutInitializer
         // Clear contents of file.
         file.set_length(0)
         let wb = Writer
-        let serialised_topology: Array[U8] val =
-          Serialised(SerialiseAuth(_auth), t).output(
-            OutputSerialisedAuth(_auth))
+        let sa = SerialiseAuth(_auth)
+        let s = Serialised(sa, t)
+        let osa = OutputSerialisedAuth(_auth)
+        let serialised_topology: Array[U8] val = s.output(osa)
         wb.write(serialised_topology)
         file.writev(recover val wb.done() end)
         file.sync()

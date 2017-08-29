@@ -16,8 +16,10 @@ The recommended way to create your topology structure is by using the [Applicati
 * [Data](#data)
 * [Key](#key)
 * [PartitionFunction](#partitionfunction)
-* [SinkEncoder](#sinkencoder)
-* [SourceDecoder](#sourcedecoder)
+* [TCPSinkEncoder](#tcpsinkencoder)
+* [TCPSourceDecoder](#tcpsourcedecoder)
+* [KafkaSinkEncoder](#kafkasinkencoder)
+* [kafkaSourceDecoder](#kafkasourcedecoder)
 * [State](#state)
 * [StateBuilder](#statebuilder)
 * [StateComputation](#statecomputation)
@@ -36,11 +38,10 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     ab = wallaroo.ApplicationBuilder("My Application")
-    ab.new_pipeline("pipeline 1", Decoder(),
-                    wallaroo.TCPSourceConfig(in_host, in_port))
+    ab.new_pipeline("pipeline 1",
+                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
     ab.to(Computation)
-    ab.to_sink(Encoder(),
-               wallaroo.TCPSinkConfig(out_host, out_port))
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
     ab.done()
     return ab.build()
 ```
@@ -59,9 +60,9 @@ The `ApplicationBuilder` class in `wallaroo` is a utility for constructing appli
 
 Create a new application with the name `name`.
 
-##### `new_pipeline(name, decoder, source_config)`
+##### `new_pipeline(name, source_config)`
 
-Create a new pipline with the name `name`, a `decoder` instance of [SourceDecoder](#sourcedecoder), and a source config object.
+Create a new pipline with the name `name` and a source config object.
 
 If you're adding more than one pipeline, make sure to call `done()` before creating another pipeline.
 
@@ -121,9 +122,9 @@ Add a partitioned stateful computation to the current pipeline.
 
 `partition_keys` must be a list of non-negative `int`.
 
-##### `to_sink(encoder)`
+##### `to_sink(sink_config)`
 
-Add a sink to the end of a pipeline. `encoder` must be an instance of [SinkEncoder](#sourcedecoder).
+Add a sink to the end of a pipeline. `sink_config` must be an instance of a sink configuration.
 
 ##### `build()`
 
@@ -208,19 +209,19 @@ PartitionFunction(object):
             return ''
 ```
 
-### SinkEncoder
+### TCPSinkEncoder
 
-The `SinkEncoder` is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out over the network to any receivers.
+The `TCPSinkEncoder` is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out over a TCP connection.
 
-To do this, a `SinkEncoder` class must provide the `encode(data)` method.
+To do this, a `TCPSinkEncoder` class must provide the `encode(data)` method.
 
 ##### `encode(data)`
 
 Return a `bytes` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes`, and what information to keep or discard.
 
-#### Example SinkEncoder
+#### Example TCPSinkEncoder
 
-A complete `SinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian Longs preceded by a big-endian short representing the number of integers in the list:
+A complete `TCPSinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian Longs preceded by a big-endian short representing the number of integers in the list:
 
 ```python
 class Encoder(object):
@@ -229,13 +230,13 @@ class Encoder(object):
         return struct.pack(fmt, len(data), *data)
 ```
 
-### SourceDecoder
+### TCPSourceDecoder
 
-The `SourceDecoder` is responsible for two tasks:
+The `TCPSourceDecoder` is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input connection.
 2. Converting those bytes into an object that the rest of the application can process.
 
-To do this, a `SourceDecoder` class must implement the following three methods:
+To do this, a `TCPSourceDecoder` class must implement the following three methods:
 
 ##### `header_length()`
 
@@ -259,9 +260,9 @@ Return a python a python object of the type the next step in the pipeline expect
 
 `bs` is a `bytes` of the length returned by [payload_length](#payload-length(bs)), and it is up to the developer to translate that into a python object.
 
-#### Example SourceDecoder
+#### Example TCPSourceDecoder
 
-A complete SourceDecoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bt unsigned int in its _payload_:
+A complete TCPSourceDecoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bt unsigned int in its _payload_:
 
 ```python
 class Decoder(object):
@@ -271,6 +272,50 @@ class Decoder(object):
     def payload_length(self, bs):
          return struct.unpack('>L', bs)
 
+    def decode(self, bs):
+        return struct.unpack('>1sL', bs)
+```
+
+### KafkaSinkEncoder
+
+The `KafkaSinkEncoder` is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out to a Kafka sink, along with a `key` or `None`.
+
+To do this, a `KafkaSinkEncoder` class must provide the `encode(data)` method.
+
+##### `encode(data)`
+
+Return a tuple of `(bytes, key)` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes` and `key`, and what information to keep or discard.
+
+#### Example KafkaSinkEncoder
+
+A complete `KafkaSinkEncoder` example that takes a word and sends it to the partition corresponding to the first letter of the word:
+
+```python
+class Encoder(object):
+    def encode(self, data):
+        word = data[:]
+        letter_key = data[0]
+        return (word, letter_key)
+```
+
+### KafakSourceDecoder
+
+The `TCPSourceDecoder` is responsible for converting bytes into an object that the rest of the application can process.
+
+To do this, a `KafkaSourceDecoder` class must implement the following method:
+
+##### `decode(bs)`
+
+Return Python object of the type the next step in the pipeline expects.
+
+`bs` is a `bytes` of the length returned by [payload_length](#payload-length(bs)), and it is up to the developer to translate that into a Python object.
+
+#### Example KafkaSourceDecoder
+
+A complete KafkaSourceDecoder example that decodes messages with a 32-bit unsigned int in its _payload_:
+
+```python
+class Decoder(object):
     def decode(self, bs):
         return struct.unpack('>1sL', bs)
 ```
@@ -371,8 +416,8 @@ class StateComputation(object):
 
 ### TCPSourceConfig
 
-A `TCPSourceConfig` object specifies the host and port to use for a TCP source connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `new_pipeline`.
+A `TCPSourceConfig` object specifies the host, port, and encoder to use for a TCP source connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `new_pipeline`.
 
 ### TCPSinkConfig
 
-A `TCPSinkConfig` object specifies the host and port to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provides as an argument to `to_sink`.
+A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `to_sink`.

@@ -1,10 +1,14 @@
 use "collections"
 use "buffered"
+use "pony-kafka"
+use "net"
 
 use "wallaroo"
 use "wallaroo/sink"
+use "wallaroo/sink/kafka_sink"
 use "wallaroo/sink/tcp_sink"
 use "wallaroo/source"
+use "wallaroo/source/kafka_source"
 use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/state"
@@ -218,19 +222,43 @@ class PyPartitionFunction
   fun _final() =>
     Machida.dec_ref(_partition_function)
 
+class PySourceHandler is SourceHandler[PyData val]
+  var _source_decoder: Pointer[U8] val
+
+  new create(source_decoder: Pointer[U8] val) =>
+    _source_decoder = source_decoder
+
+  fun decode(data: Array[U8] val): PyData val =>
+    recover
+      PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
+        data.size()))
+    end
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_source_decoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_source_decoder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _source_decoder = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_source_decoder)
+
 class PyFramedSourceHandler is FramedSourceHandler[PyData val]
   var _source_decoder: Pointer[U8] val
   let _header_length: USize
 
   new create(source_decoder: Pointer[U8] val) =>
     _source_decoder = source_decoder
-    _header_length = Machida.source_decoder_header_length(_source_decoder)
+    _header_length = Machida.framed_source_decoder_header_length(_source_decoder)
 
   fun header_length(): USize =>
     _header_length
 
   fun payload_length(data: Array[U8] iso): USize =>
-    Machida.source_decoder_payload_length(_source_decoder, data.cpointer(),
+    Machida.framed_source_decoder_payload_length(_source_decoder, data.cpointer(),
       data.size())
 
   fun decode(data: Array[U8] val): PyData val =>
@@ -389,6 +417,52 @@ class PyTCPEncoder is TCPSinkEncoder[PyData val]
   fun _final() =>
     Machida.dec_ref(_sink_encoder)
 
+class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
+  var _sink_encoder: Pointer[U8] val
+
+  new create(sink_encoder: Pointer[U8] val) =>
+    _sink_encoder = sink_encoder
+
+  fun apply(data: PyData val, wb: Writer):
+    (Array[ByteSeq] val, (Array[ByteSeq] val | None))
+  =>
+    let out_and_key = Machida.sink_encoder_encode(_sink_encoder, data.obj())
+    // `out_and_key` is a tuple of `(out, key)`, where `out` is a
+    // string and key is `None` or a string.
+    let out_p = @PyTuple_GetItem(out_and_key, 0)
+    let key_p = @PyTuple_GetItem(out_and_key, 1)
+
+    let out = wb.write(recover val
+        // create a temporary Array[U8] wrapper for the C array, then clone it
+        Array[U8].from_cpointer(@PyString_AsString(out_p),
+          @PyString_Size(out_p)).clone()
+      end).done()
+
+    let key = if Machida.is_py_none(key_p) then
+        None
+      else
+        wb.write(recover
+          Array[U8].from_cpointer(@PyString_AsString(out_p),
+            @PyString_Size(out_p)).clone()
+          end).done()
+      end
+
+    Machida.dec_ref(out_and_key)
+
+    (consume out, consume key)
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_sink_encoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_sink_encoder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _sink_encoder = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_sink_encoder)
+
 primitive Machida
   fun print_errors(): Bool =>
     let er = @PyErr_Occurred[Pointer[U8]]()
@@ -420,8 +494,7 @@ primitive Machida
     r
 
   fun apply_application_setup(application_setup_data: Pointer[U8] val,
-    source_configs: Array[TCPSourceConfigOptions] val,
-    sink_configs: Array[TCPSinkConfigOptions] val):
+    env: Env):
     Application ?
   =>
     let application_setup_item_count = @list_item_count(application_setup_data)
@@ -456,15 +529,10 @@ primitive Machida
         let name = recover val
           String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(item, 1)))
         end
-        let decoder = recover val
-          let d = @PyTuple_GetItem(item, 2)
-          Machida.inc_ref(d)
-          PyFramedSourceHandler(d)
-        end
 
         let source_config = recover val
-          let sct = @PyTuple_GetItem(item, 3)
-          _SourceConfig.from_tuple(sct, decoder)
+          let sct = @PyTuple_GetItem(item, 2)
+          _SourceConfig.from_tuple(sct, env)
         end
 
         latest = (latest as Application).new_pipeline[PyData val, PyData val](
@@ -565,14 +633,9 @@ primitive Machida
         latest = pb.to_state_partition[PyData val, PyKey val, PyData val, PyState](
           state_computation, state_builder, state_name, partition)
       | "to_sink" =>
-        let encoderp = @PyTuple_GetItem(item, 1)
-        Machida.inc_ref(encoderp)
-        let encoder = recover val
-          PyTCPEncoder(encoderp)
-        end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_sink(
-          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 2), encoder))
+          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env))
         sink_idx = sink_idx + 1
         latest
       | "done" =>
@@ -585,12 +648,12 @@ primitive Machida
     Machida.dec_ref(application_setup_data)
     app as Application
 
-  fun source_decoder_header_length(source_decoder: Pointer[U8] val): USize =>
+  fun framed_source_decoder_header_length(source_decoder: Pointer[U8] val): USize =>
     let r = @source_decoder_header_length(source_decoder)
     print_errors()
     r
 
-  fun source_decoder_payload_length(source_decoder: Pointer[U8] val,
+  fun framed_source_decoder_payload_length(source_decoder: Pointer[U8] val,
     data: Pointer[U8] tag, size: USize): USize
   =>
     let r = @source_decoder_payload_length(source_decoder, data, size)
@@ -780,9 +843,8 @@ primitive Machida
   fun implements_method(o: Pointer[U8] box, method: String): Bool =>
     @PyObject_HasAttrString(o, method.cstring()) == 1
 
-
 primitive _SourceConfig
-  fun from_tuple(source_config_tuple: Pointer[U8] val, d: PyFramedSourceHandler val):
+  fun from_tuple(source_config_tuple: Pointer[U8] val, env: Env):
     SourceConfig[PyData val] ?
   =>
     let name = recover val
@@ -798,14 +860,68 @@ primitive _SourceConfig
       let port = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 2)))
       end
-      TCPSourceConfig[PyData val](d, host, port)
+
+      let decoder = recover val
+        let d = @PyTuple_GetItem(source_config_tuple, 3)
+        Machida.inc_ref(d)
+        PyFramedSourceHandler(d)
+      end
+
+      TCPSourceConfig[PyData val](decoder, host, port)
+    | "kafka" =>
+      let conf = _kafka_config(source_config_tuple, env.out)
+
+      let decoder = recover val
+        let d = @PyTuple_GetItem(source_config_tuple, 4)
+        Machida.inc_ref(d)
+        PySourceHandler(d)
+      end
+
+      KafkaSourceConfig[PyData val](conf, (env.root as TCPConnectionAuth), decoder)
     else
       error
     end
 
+  fun _kafka_config(source_config_tuple: Pointer[U8] val, out: OutStream): KafkaConfig val ? =>
+    let topic = recover val
+      String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+    end
+
+    let brokers_list = @PyTuple_GetItem(source_config_tuple, 2)
+
+    let brokers = recover val
+      let num_brokers = @PyList_Size(brokers_list)
+      let brokers' = Array[(String, I32)](num_brokers)
+
+      for i in Range(0, num_brokers) do
+        let broker = @PyList_GetItem(brokers_list, i)
+        let host = recover val String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 0))) end
+        let port = try
+          String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 1))).i32()
+        else
+          9092
+        end
+        brokers'.push((host, port))
+      end
+      brokers'
+    end
+
+    let log_level = recover val
+      String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 3)))
+    end
+
+    match KafkaSourceConfigFactory(topic, brokers, log_level, out)
+    | let conf: KafkaConfig val =>
+      conf
+    | let kce: KafkaSourceConfigError =>
+      @printf[U32]("%s\n".cstring(), kce.message().cstring())
+      error
+    else
+      error
+    end
 
 primitive _SinkConfig
-  fun from_tuple(sink_config_tuple: Pointer[U8] val, e: PyTCPEncoder val):
+  fun from_tuple(sink_config_tuple: Pointer[U8] val, env: Env):
     SinkConfig[PyData val] ?
   =>
     let name = recover val
@@ -821,7 +937,66 @@ primitive _SinkConfig
       let port = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 2)))
       end
-      TCPSinkConfig[PyData val](e, host, port)
+
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
+      Machida.inc_ref(encoderp)
+      let encoder = recover val
+        PyTCPEncoder(encoderp)
+      end
+
+      TCPSinkConfig[PyData val](encoder, host, port)
+    | "kafka" =>
+      let conf = _kafka_config(sink_config_tuple, env.out)
+
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 6)
+      Machida.inc_ref(encoderp)
+      let encoder = recover val
+        PyKafkaEncoder(encoderp)
+      end
+
+      KafkaSinkConfig[PyData val](encoder, conf, (env.root as TCPConnectionAuth))
+    else
+      error
+    end
+
+  fun _kafka_config(source_config_tuple: Pointer[U8] val, out: OutStream): KafkaConfig val ? =>
+    let topic = recover val
+      String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+    end
+
+    let brokers_list = @PyTuple_GetItem(source_config_tuple, 2)
+
+    let brokers = recover val
+      let num_brokers = @PyList_Size(brokers_list)
+      let brokers' = Array[(String, I32)](num_brokers)
+
+      for i in Range(0, num_brokers) do
+        let broker = @PyList_GetItem(brokers_list, i)
+        let host = recover val String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 0))) end
+        let port = try
+          String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 1))).i32()
+        else
+          9092
+        end
+        brokers'.push((host, port))
+      end
+      brokers'
+    end
+
+    let log_level = recover val
+      String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 3)))
+    end
+
+    let max_produce_buffer_ms = @PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 4)).u64()
+
+    let max_message_size = @PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 5)).i32()
+
+    match KafkaSinkConfigFactory(topic, brokers, log_level, max_produce_buffer_ms, max_message_size, out)
+    | let conf: KafkaConfig val =>
+      conf
+    | let kce: KafkaSinkConfigError =>
+      @printf[U32]("%s\n".cstring(), kce.message().cstring())
+      error
     else
       error
     end

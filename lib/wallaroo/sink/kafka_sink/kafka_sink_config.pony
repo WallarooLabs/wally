@@ -6,6 +6,56 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/sink"
 
+
+class val KafkaSinkConfigError
+  let _message: String
+
+  new val create(m: String) =>
+    _message = m
+
+  fun message(): String =>
+    _message
+
+
+primitive KafkaSinkConfigFactory
+  fun apply(kafka_topic: String,
+    kafka_brokers: Array[(String, I32)] val,
+    kafka_log_level: String,
+    kafka_max_produce_buffer_ms: U64,
+    kafka_max_message_size: I32,
+    out: OutStream):
+    (KafkaConfig val | KafkaSinkConfigError)
+  =>
+    let log_level = match kafka_log_level
+      | "Fine" => Fine
+      | "Info" => Info
+      | "Warn" => Warn
+      | "Error" => Error
+      else
+        return KafkaSinkConfigError("Error! Invalid kafka_sink_log_level: " + kafka_log_level)
+      end
+
+    let logger = StringLogger(log_level, out)
+
+    if (kafka_brokers.size() == 0) or (kafka_topic == "") then
+      return KafkaSinkConfigError("Error! Either brokers is empty or topics is empty!")
+    end
+
+    recover
+      let kc = KafkaConfig(logger, "Wallaroo Kafka Sink " + kafka_topic where
+        max_message_size' = kafka_max_message_size,
+        max_produce_buffer_ms' = kafka_max_produce_buffer_ms)
+
+      // add topic config to consumer
+      kc.add_topic_config(kafka_topic, KafkaProduceOnly)
+
+      for (host, port) in kafka_brokers.values() do
+        kc.add_broker(host, port)
+      end
+
+      kc
+    end
+
 primitive KafkaSinkConfigCLIParser
   fun opts(): Array[(String, (None | String), ArgumentType, (Required |
     Optional), String)]
@@ -45,9 +95,9 @@ primitive KafkaSinkConfigCLIParser
     end
 
   fun apply(args: Array[String] val, out: OutStream): KafkaConfig val ? =>
-    var log_level: LogLevel = Warn
+    var log_level = "Warn"
 
-    var topic: String = ""
+    var topic = ""
     var brokers = recover val Array[(String, I32)] end
 
     var max_message_size: I32 = 1000000
@@ -71,42 +121,21 @@ primitive KafkaSinkConfigCLIParser
       | ("kafka_sink_brokers", let input: String) =>
         brokers = _brokers_from_input_string(input)
       | ("kafka_sink_log_level", let input: String) =>
-        log_level = match input
-          | "Fine" => Fine
-          | "Info" => Info
-          | "Warn" => Warn
-          | "Error" => Error
-          else
-            let l = StringLogger(log_level, out)
-            l(Error) and
-              l.log(Error, "Error! Invalid kafka_sink_log_level: " + input)
-            error
-          end
+        log_level = input
       end
-    end
-
-    let logger = StringLogger(log_level, out)
-
-    if (brokers.size() == 0) or (topic == "") then
-      logger(Error) and
-        logger.log(Error, "Error! Either brokers is empty or topics is empty!")
-      error
     end
 
     // create kafka config
-    recover val
-      let kc = KafkaConfig(logger, "Wallaroo Kafka Sink " + topic where
-        max_message_size' = max_message_size, max_produce_buffer_ms' =
-        max_produce_buffer_ms)
 
-      // add topic config to consumer
-      kc.add_topic_config(topic, KafkaProduceOnly)
-
-      for (host, port) in brokers.values() do
-        kc.add_broker(host, port)
-      end
-
+    match KafkaSinkConfigFactory(topic, brokers, log_level,
+      max_produce_buffer_ms, max_message_size, out)
+    | let kc: KafkaConfig val =>
       kc
+    | let ksce: KafkaSinkConfigError =>
+      @printf[U32]("%s\n".cstring(), ksce.message().cstring())
+      error
+    else
+      error
     end
 
   fun _brokers_from_input_string(inputs: String): Array[(String, I32)] val ? =>

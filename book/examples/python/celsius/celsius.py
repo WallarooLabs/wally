@@ -8,12 +8,11 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit")
-    ab.new_pipeline("convert", Decoder(),
-                    wallaroo.TCPSourceConfig(in_host, in_port))
+    ab.new_pipeline("convert",
+                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
     ab.to(Multiply)
     ab.to(Add)
-    ab.to_sink(Encoder(),
-               wallaroo.TCPSinkConfig(out_host, out_port))
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
     return ab.build()
 
 
