@@ -65,7 +65,7 @@ To read more about this, please refer to the [Creating A Decoder](/book/core-con
 
 For our application purposes, we will simply define the structure and how it is going to get parsed:
 
-1. input messages have the following structure: A fixed length `PYALOAD_SIZE` followed by `PAYLOAD`
+1. input messages have the following structure: A fixed length `PAYLOAD_SIZE` followed by `PAYLOAD`
 2. Wallaroo requires three methods to parse this type of message:
   1. `header_length()`, which returns the number of bytes used for the `PAYLOAD_SIZE` in the message. This value tells Wallaroo how many bytes to read from the stream as `HEADER`.
   2. `payload_length(bs)`, which reads `PAYLOAD_SIZE` bytestring of the size returned by `header_length()` and computes the size of `PAYLOAD`. It then returns that size as an integer to Wallaroo, which will then read that many bytes from the stream.
