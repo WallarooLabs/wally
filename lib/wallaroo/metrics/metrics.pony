@@ -175,7 +175,7 @@ class MetricsReporter
         let reporter =
           _MetricsReporter(_metrics_conn, _app_name, _worker_name, pipeline,
             source_name, 0, "", PipelineIngestionCategory)
-        _pipeline_metrics_map(source_name) = reporter
+        _pipeline_ingestion_map(source_name) = reporter
         reporter
       end
 
