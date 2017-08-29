@@ -315,7 +315,7 @@ actor Step is (Producer & Consumer)
             var ii = USize(0)
             while (ii < x.size()) do
               try
-                printf("x: %d\ty: %d\n".cstring() x(ii), y(ii))
+                @printf[I32]("x: %d\ty: %d\n".cstring(), x(ii), y(ii))
               else
                 // unreachable
                 Fail()
