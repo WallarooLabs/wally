@@ -5,6 +5,52 @@ use "pony-kafka/customlogger"
 use "wallaroo/source"
 
 
+class val KafkaSourceConfigError
+  let _message: String
+
+  new val create(m: String) =>
+    _message = m
+
+  fun message(): String =>
+    _message
+
+
+primitive KafkaSourceConfigFactory
+  fun apply(kafka_topic: String,
+    kafka_brokers: Array[(String, I32)] val,
+    kafka_log_level: String,
+    out: OutStream):
+    (KafkaConfig val | KafkaSourceConfigError)
+  =>
+    let log_level = match kafka_log_level
+      | "Fine" => Fine
+      | "Info" => Info
+      | "Warn" => Warn
+      | "Error" => Error
+      else
+        return KafkaSourceConfigError("Error! Invalid kafka_source_log_level: " + kafka_log_level)
+      end
+
+    if (kafka_brokers.size() == 0) or (kafka_topic == "") then
+      KafkaSourceConfigError("Error! Either brokers is empty or topics is empty!")
+    end
+
+    recover
+      let logger = StringLogger(log_level, out)
+
+      let kc = KafkaConfig(logger, "Kafka Wallaroo Source " + kafka_topic)
+
+      // add topic config to consumer
+      kc.add_topic_config(kafka_topic, KafkaConsumeOnly)
+
+      for (host, port) in kafka_brokers.values() do
+        kc.add_broker(host, port)
+      end
+
+      kc
+    end
+
+
 primitive KafkaSourceConfigCLIParser
   fun opts(): Array[(String, (None | String), ArgumentType,
     (Required | Optional), String)]
@@ -40,9 +86,9 @@ primitive KafkaSourceConfigCLIParser
     end
 
   fun apply(args: Array[String] val, out: OutStream): KafkaConfig val ? =>
-    var log_level: LogLevel = Warn
+    var log_level = "Warn"
 
-    var topic: String = ""
+    var topic = ""
     var brokers = recover val Array[(String, I32)] end
 
     let options = Options(args, false)
@@ -59,40 +105,18 @@ primitive KafkaSourceConfigCLIParser
       | ("kafka_source_brokers", let input: String) =>
         brokers = _brokers_from_input_string(input)
       | ("kafka_source_log_level", let input: String) =>
-        log_level = match input
-          | "Fine" => Fine
-          | "Info" => Info
-          | "Warn" => Warn
-          | "Error" => Error
-          else
-            let l = StringLogger(log_level, out)
-            l(Error) and
-              l.log(Error, "Error! Invalid kafka_source_log_level: " + input)
-            error
-          end
+        log_level = input
       end
     end
 
-    let logger = StringLogger(log_level, out)
-
-    if (brokers.size() == 0) or (topic == "") then
-      logger(Error) and
-        logger.log(Error, "Error! Either brokers is empty or topics is empty!")
-      error
-    end
-
-    // create kafka config
-    recover val
-      let kc = KafkaConfig(logger, "Kafka Wallaroo Source " + topic)
-
-      // add topic config to consumer
-      kc.add_topic_config(topic, KafkaConsumeOnly)
-
-      for (host, port) in brokers.values() do
-        kc.add_broker(host, port)
-      end
-
+    match KafkaSourceConfigFactory(topic, brokers, log_level, out)
+    | let kc: KafkaConfig val =>
       kc
+    | let e: KafkaSourceConfigError =>
+      @printf[U32]("%s\n".cstring(), e.message().cstring())
+      error
+    else
+      error
     end
 
   fun _brokers_from_input_string(inputs: String): Array[(String, I32)] val ? =>
@@ -137,4 +161,3 @@ class val KafkaSourceConfig[In: Any val] is SourceConfig[In]
     KafkaSourceBuilderBuilder[In]
   =>
     KafkaSourceBuilderBuilder[In](app_name, name, _handler)
-

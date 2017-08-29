@@ -35,9 +35,7 @@ actor Main
           let application_setup =
             Machida.application_setup(module, options.remaining())
           let application = recover val
-            let tcp_sources = TCPSourceConfigCLIParser(env.args)
-            let tcp_sinks = TCPSinkConfigCLIParser(env.args)
-            Machida.apply_application_setup(application_setup, tcp_sources, tcp_sinks)
+            Machida.apply_application_setup(application_setup, env)
           end
           Startup(env, application, module_name)
         else

@@ -11,13 +11,12 @@ def application_setup(args):
     print "args = {}".format(args)
     sequence_partitions = [0, 1]
     ab = wallaroo.ApplicationBuilder("Sequence Window")
-    ab.new_pipeline("Sequence Window", Decoder(),
-                    wallaroo.TCPSourceConfig(in_host, in_port))
+    ab.new_pipeline("Sequence Window",
+                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
     ab.to_state_partition(ObserveNewValue(), SequenceWindowStateBuilder(),
                           "Sequence Window", SequencePartitionFunction(),
                           sequence_partitions)
-    ab.to_sink(Encoder(),
-               wallaroo.TCPSinkConfig(out_host, out_port))
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
     return ab.build()
 
 
