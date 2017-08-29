@@ -94,10 +94,10 @@ This tells Wallaroo that it should listen on port 7000 for incoming data, write 
 
 ### Generating Some Data
 
-A data generator is bundled with the application. It needs to be built.  In a new window, run:
+A data generator is bundled with the application. It needs to be built and a data file created before we can continue.  In a new window, run:
 
 ```bash
-cd data_gen
+cd ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius/data_gen
 stable env ponyc
 ```
 
