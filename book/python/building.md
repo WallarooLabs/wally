@@ -2,7 +2,7 @@
 
 ## Setting Up Wallaroo
 
-You should have already completed the [setup instructions](/book/getting-started/setup.md) in the "getting started" section of this guide.
+You should have already completed the [setup instructions](/book/getting-started/setup.md) in the "Setting Up Your Environment for Wallaroo" section of this guide.
 
 ### Requirements
 

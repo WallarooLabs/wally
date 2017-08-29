@@ -39,7 +39,7 @@ Covers the concepts you'll need to understand in order to build a Wallaroo appli
 
 ### Developing with Wallaroo
 
-The "Getting Started" section is all about getting your development environment setup and then compiling and running a Wallaroo application. The tools you will install then are useful when developing a Wallaroo application.
+The "Setting Up Your Environment for Wallaroo" describes setting up your development environment and then compiling and running a Wallaroo application. The tools you will install then are useful when developing a Wallaroo application.
 
 By the time you are done with this, you will have touched many of the tools you'll use with Wallaroo as well has having run a Wallaroo application locally and shaken out any issues related to getting one setup.
 
