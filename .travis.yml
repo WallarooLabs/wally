@@ -92,6 +92,10 @@ install:
     git checkout 0054b429a54818d187100ed40f5525ec7931b31b;
     sudo make install;
   - echo "Installing snappy and lz4";
+  - if [ "${TRAVIS_OS_NAME}" = "osx" ];
+    then
+      brew install snappy lz4;
+    fi
   - if [ "${TRAVIS_OS_NAME}" = "linux" ];
     then
       sudo apt-get install libsnappy-dev;
