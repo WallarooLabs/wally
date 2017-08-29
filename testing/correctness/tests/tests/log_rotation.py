@@ -540,9 +540,6 @@ def test_log_rotation_file_size_trigger_recovery():
                 print r.name
                 print r.get_output()[0]
                 print '---'
-            print 'sink data'
-            print sink.data
-            print '---'
             raise stopper.error
 
         # stop application workers
@@ -551,7 +548,6 @@ def test_log_rotation_file_size_trigger_recovery():
 
         # Stop sink
         sink.stop()
-        print 'sink.data size: ', len(sink.data)
 
         # Use validator to validate the data in at-least-once mode
         # save sink data to a file
@@ -566,8 +562,6 @@ def test_log_rotation_file_size_trigger_recovery():
         try:
             assert(success)
         except AssertionError:
-            print runners[-1].get_output()[0]
-            print '---'
             print runners[-2].get_output()[0]
             print '---'
             raise AssertionError('Validation failed with the following '
@@ -599,6 +593,12 @@ def test_log_rotation_file_size_trigger_recovery():
                                  'recovery as expected. Worker output is '
                                  'included below.\nSTDOUT\n---\n%s\n---\n'
                                  'STDERR\n---\n%s' % (stdout, stderr))
+        for r in runners[-1:]:
+            print '=============='
+            print r.name
+            print '--------------'
+            print r.get_output()[0]
+        assert(0)
     finally:
         for r in runners:
             r.stop()
