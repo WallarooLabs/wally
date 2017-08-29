@@ -29,10 +29,11 @@ def application_setup(args):
 By now, hopefully, most of this looks somewhat familiar. We're building on concepts we've seen in our previous example applications. We set up a new application with a single pipeline:
 
 ```python
-ab = wallaroo.ApplicationBuilder("Word Count Application")ab.new_pipeline("Split and Count", Decoder())
+ab = wallaroo.ApplicationBuilder("Word Count Application")
+ab.new_pipeline("Split and Count", Decoder())
 ```
 
-Upon receiving some textual input, our word count application will route it to a stateless computation called `Split`. `Split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateful computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? `to` creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(Split)`, we are placing an instance of the `Split` computation on every worker in our cluster.
+Upon receiving some textual input, our word count application will route it to a stateless computation called `Split`. `Split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateful computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? The `to` method creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(Split)`, we are placing an instance of the `Split` computation on every worker in our cluster.
 
 ### `A to` vs `to_parallel` digression
 
@@ -52,7 +53,7 @@ Fred needs help.
 
 In the case of word count, it doesn't matter what order we count the messages. We just want to do it quickly. `to_parallel` is our friend. However, if all words starting with the letter "h" were going to be sent along to the same computation after splitting **and** the order they arrived was important than `to_parallel` would not be our friend. If the computation that deals with the letter "h" needs to see "Hello" then "how" and then "help", you have to use `to`. It will maintain ordering by processing the incoming blocks sequentially rather than in parallel.
 
-In our current case, counting words, we don't care about the order of the words, so `to_prallel` is fine.
+In our current case, counting words, we don't care about the order of the words, so `to_parallel` is fine.
 
 ### Application setup, the return
 
