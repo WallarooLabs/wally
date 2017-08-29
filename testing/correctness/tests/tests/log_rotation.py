@@ -562,8 +562,17 @@ def test_log_rotation_file_size_trigger_recovery():
         try:
             assert(success)
         except AssertionError:
+            print '\n\n'
+            print '=================='
+            print 'Worker1 before recovery'
+            print '------------------'
+            print runners[-2].get_output()[0]
+            print '=================='
+            print 'Worker1 after recovery'
+            print '------------------'
             print runners[-1].get_output()[0]
-            print '---'
+            print '------------------'
+            print '\n\n'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
