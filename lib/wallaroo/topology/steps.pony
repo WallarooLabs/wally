@@ -310,6 +310,20 @@ actor Step is (Producer & Consumer)
             return false
           end
 
+          ifdef debug then
+            @printf[I32]("Frac Ids lists\n".cstring())
+            var ii = USize(0)
+            while (ii < x.size()) do
+              try
+                printf("x: %d\ty: %d\n".cstring() x(ii), y(ii))
+              else
+                // unreachable
+                Fail()
+              end
+              ii = ii + 1
+            end
+          end
+
           var i = USize(0)
           while (i < x.size()) do
             try
