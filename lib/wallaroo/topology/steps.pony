@@ -364,8 +364,9 @@ actor Step is (Producer & Consumer)
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef debug then
-      @printf[I32]("replay_run. msg_uid: %llu, frac_ids: %s\n".cstring(),
-        msg_uid, FractionalMessageIdToString(frac_ids).cstring())
+      @printf[I32]("replay_run. msg_uid: %s, frac_ids: %s\n".cstring(),
+        msg_uid.string().cstring(),
+        FractionalMessageIdToString(frac_ids).cstring())
     end
     if not _is_duplicate(msg_uid, frac_ids) then
       _deduplication_list.push((i_producer, msg_uid, frac_ids, i_seq_id,
