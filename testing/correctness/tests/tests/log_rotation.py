@@ -593,12 +593,6 @@ def test_log_rotation_file_size_trigger_recovery():
                                  'recovery as expected. Worker output is '
                                  'included below.\nSTDOUT\n---\n%s\n---\n'
                                  'STDERR\n---\n%s' % (stdout, stderr))
-        for r in runners[-1:]:
-            print '=============='
-            print r.name
-            print '--------------'
-            print r.get_output()[0]
-        assert(0)
     finally:
         for r in runners:
             r.stop()
