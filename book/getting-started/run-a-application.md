@@ -75,8 +75,7 @@ make
 Now that we have our Celsius Conversion application compiled, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command from our original terminal:
 
 ```bash
-./celsius -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
--c 127.0.0.1:6000 -d 127.0.0.1:6001 --ponythreads=1
+./celsius -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=1
 ```
 
 This tells Wallaroo that it should listen on port 7000 for incoming data, write outgoing data to port 5555, and send metrics data to port 5001.
