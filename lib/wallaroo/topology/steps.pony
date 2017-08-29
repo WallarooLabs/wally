@@ -300,12 +300,15 @@ actor Step is (Producer & Consumer)
       if e._2 == msg_uid then
         match (e._3, frac_ids)
         | (None, None) =>
+          ifdef debug then
+            @printf[I32]("Deduplication true: No frac ids (None, None)\n".cstring())
+          end
           return true
         | (let x: Array[U32] val, let y: Array[U32] val) =>
           if x.size() != y.size() then
             ifdef debug then
-              @printf[I32]("Deduplication false 1: %d %d\n".cstring(),
-                x.size(), y.size())
+              @printf[I32](("Deduplication false: x.size() != y.size() [%d"
+                + " != %d]\n").cstring(), x.size(), y.size())
             end
             return false
           end
@@ -329,8 +332,8 @@ actor Step is (Producer & Consumer)
             try
               if x(i) != y(i) then
                 ifdef debug then
-                  @printf[I32]("Deduplication false 2: %d %d\n".cstring(),
-                    x(i), y(i))
+                  @printf[I32]("Deduplication false 2: x(i) != y(i) [%d: %d != %d]\n"
+                    .cstring(), i, x(i), y(i))
                 end
                 return false
               end
@@ -341,11 +344,17 @@ actor Step is (Producer & Consumer)
             i = i + 1
           end
 
+          ifdef debug then
+            @printf[I32]("Deduplication true: frac_ids match\n".cstring())
+          end
           return true
         else
           Fail()
         end
       end
+    end
+    ifdef debug then
+      @printf[I32]("Deduplication false: end of deduplication_list\n".cstring())
     end
     false
 
@@ -354,6 +363,10 @@ actor Step is (Producer & Consumer)
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    ifdef debug then
+      @printf[I32]("replay_run. msg_uid: %llu, frac_ids: %s\n".cstring(),
+        msg_uid, FractionalMessageIdToString(frac_ids).cstring())
+    end
     if not _is_duplicate(msg_uid, frac_ids) then
       _deduplication_list.push((i_producer, msg_uid, frac_ids, i_seq_id,
         i_route_id))

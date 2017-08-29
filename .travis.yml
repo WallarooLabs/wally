@@ -136,4 +136,4 @@ install:
   - echo "Installing pytest";
     python2 -m pip install pytest==3.1.0
 script:
-  - make test-testing-correctness-tests-all debug=true
+  - make test debug=true

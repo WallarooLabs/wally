@@ -91,12 +91,11 @@ def test_restart():
         stopper.join()
         if stopper.error:
             for r in runners:
+                print '======'
                 print r.name
+                print '------'
                 print r.get_output()[0]
-                print '---'
-            print 'sink data'
-            print sink.data
-            print '---'
+                print
             raise stopper.error
 
         # stop application workers
