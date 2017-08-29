@@ -1176,9 +1176,9 @@ docker -H tcp://52.87.211.240:2378 login docker.sendence.com:5043
 Build and publish containers.
 #+BEGIN_SRC sh
 cd buffy
-make arch=amd64 debug=true
-make arch=amd64 debug=true build-docker
-make arch=amd64 debug=true push-docker
+make debug=true
+make debug=true build-docker
+make debug=true push-docker
 #+END_SRC
 
 ** Build Dagon
@@ -1338,7 +1338,7 @@ local Docker host. Build the AMD64 binaries.
 DOCKER_HOST=tcp://192.168.99.100:2376 # change this as needed
 cd buffy
 make clean;make clean
-make arch=amd64 debug=true
+make debug=true
 #+END_SRC
 
 Make sure your =DOCKER_HOST= shell environment is pointing to the
@@ -1346,7 +1346,7 @@ Make sure your =DOCKER_HOST= shell environment is pointing to the
 host.
 #+BEGIN_SRC sh
 export DOCKER_HOST=tcp://10.0.1.200:2375
-make arch=amd64 debug=true build-docker
+make debug=true build-docker
 #+END_SRC
 
 ** Update Configurations
@@ -1552,9 +1552,9 @@ Change into the main Buffy directory and build the binaries and
 container images:
 #+BEGIN_SRC sh
 cd buffy
-make arch=amd64 debug=true
-make arch=amd64 debug=true build-docker
-make arch=amd64 debug=true push-docker
+make debug=true
+make debug=true build-docker
+make debug=true push-docker
 #+END_SRC
 
 List the container images and note down the latest tag:
@@ -1666,8 +1666,8 @@ The following are the steps:
 1. create & configure cluster (with makefile)
 2. ssh into leader node
 3. git clone buffy repo
-4. build binaries using make arch=amd64
-5. build/push docker containers using make arch=amd64 push-docker
+4. build binaries using make
+5. build/push docker containers using make push-docker
 6. copy relevant files (ini, etc) to /tmp on leader node (use latest
    in repo with edits for image tag as necessary)
 7. exit ssh
@@ -1834,8 +1834,8 @@ default VirtualBox VM that comes with the default Docker install.
 ** Build
 #+BEGIN_SRC sh
 cd buffy
-make arch=amd64
-make arch=amd64 build-docker
+make
+make build-docker
 #+END_SRC
 
 ** Prepare

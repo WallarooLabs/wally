@@ -84,19 +84,19 @@ git clone https://github.com/sendence/buffy.git
 To build Market Spread:
 
 ```bash
-make arch=amd64 build-apps-market-spread
+make build-apps-market-spread
 ```
 
 To build Giles Sender:
 
 ```bash
-make build-giles-sender arch=amd64
+make build-giles-sender
 ```
 
 To build Giles Receiver:
 
 ```bash
-make build-giles-receiver arch=amd64
+make build-giles-receiver
 ```
 
 ### AWS

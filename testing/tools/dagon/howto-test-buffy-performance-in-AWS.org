@@ -205,18 +205,18 @@ git clone https://github.com/Sendence/buffy.git buffy
 We are using the pre-build ponyc container to build the binaries:
 #+BEGIN_SRC sh
 cd buffy
-make arch=amd64
+make
 #+END_SRC
 
 Build the container images if you intend to use them later:
 #+BEGIN_SRC sh
-make arch=amd64 build-docker
+make build-docker
 #+END_SRC
 
 This will build the container images and publish them to the local Docker registry.
 If you want to publish the resulting images to the Sendence registry you will need to run he publish command:
 #+BEGIN_SRC sh
-make arch=amd64 push-docker
+make push-docker
 #+END_SRC
 
 * Run Performance Tests
