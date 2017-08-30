@@ -10,7 +10,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 
 actor ApplicationDistributor is Distributor
   let _auth: AmbientAuth

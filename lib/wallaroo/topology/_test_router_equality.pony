@@ -6,7 +6,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
 use "wallaroo/metrics"
 use "wallaroo/ent/network"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 
 actor _TestRouterEquality is TestList

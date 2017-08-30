@@ -9,7 +9,7 @@ use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/ent/network"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 
 type WeightedKey[Key: (Hashable val & Equatable[Key])] is

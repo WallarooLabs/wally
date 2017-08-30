@@ -2,7 +2,7 @@ use "collections"
 use "wallaroo/core"
 use "wallaroo/data_channel"
 use "wallaroo/ent/network"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/topology"
 
 

@@ -9,7 +9,7 @@ use "wallaroo/metrics"
 use "wallaroo/ent/network"
 use "wallaroo/sink"
 use "wallaroo/source/tcp_source"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
 

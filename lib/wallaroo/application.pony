@@ -11,7 +11,7 @@ use "wallaroo/sink"
 use "wallaroo/state"
 use "wallaroo/sink/tcp_sink"
 use "wallaroo/source/tcp_source"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
 

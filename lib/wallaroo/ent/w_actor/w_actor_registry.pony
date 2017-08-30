@@ -9,7 +9,7 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/ent/network"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/sink"
 use "wallaroo/topology"
 

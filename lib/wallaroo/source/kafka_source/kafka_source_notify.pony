@@ -6,7 +6,7 @@ use "wallaroo/boundary"
 use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/metrics"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/source"
 use "wallaroo/topology"
 
