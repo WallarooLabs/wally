@@ -2,10 +2,11 @@ use "collections"
 use "sendence/collection_helpers"
 use "wallaroo/boundary"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/network"
+use "wallaroo/ent/router_registry"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
-use "wallaroo/ent/network"
 use "wallaroo/topology"
 
 

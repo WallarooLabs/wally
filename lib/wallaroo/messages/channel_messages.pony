@@ -4,12 +4,13 @@ use "net"
 use "collections"
 use "wallaroo/boundary"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/w_actor"
 use "wallaroo/ent/w_actor/broadcast"
 use "wallaroo/core"
 use "wallaroo/initialization"
 use "wallaroo/routing"
 use "wallaroo/topology"
-use "wallaroo/ent/w_actor"
 
 primitive ChannelMsgEncoder
   fun _encode(msg: ChannelMsg, auth: AmbientAuth,

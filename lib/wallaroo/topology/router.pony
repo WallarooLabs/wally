@@ -3,14 +3,15 @@ use "net"
 use "sendence/equality"
 use "sendence/mort"
 use "wallaroo/boundary"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/rebalancing"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/w_actor"
 use "wallaroo/invariant"
 use "wallaroo/messages"
-use "wallaroo/ent/rebalancing"
 use "wallaroo/routing"
 use "wallaroo/sink"
-use "wallaroo/ent/w_actor"
 
 interface val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,

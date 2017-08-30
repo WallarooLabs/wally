@@ -31,6 +31,7 @@ use "collections"
 use "net"
 use "wallaroo/boundary"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/router_registry"
 use "wallaroo/topology"
 
 type DataChannelListenerAuth is (AmbientAuth | NetAuth | TCPAuth |

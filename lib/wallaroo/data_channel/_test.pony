@@ -30,9 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "sendence/connemara"
 use "wallaroo/boundary"
 use "wallaroo/ent/data_receiver"
-use "wallaroo/metrics"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
+use "wallaroo/metrics"
 use "wallaroo/topology"
 
 actor Main is TestList
