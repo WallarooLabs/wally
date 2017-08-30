@@ -15,7 +15,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
 use "wallaroo/spike"
-use "wallaroo/tcp_source"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 
 actor Connections is Cluster

@@ -2,7 +2,7 @@ use "collections"
 
 use "sendence/options"
 use "wallaroo"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink/tcp_sink"
 use "wallaroo/topology"
 
 use "lib:python2.7"

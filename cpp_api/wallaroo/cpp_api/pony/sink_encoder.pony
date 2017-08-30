@@ -1,5 +1,5 @@
 use "buffered"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink/tcp_sink"
 
 use @w_sink_encoder_get_size[USize](sink_encoder: SinkEncoderP,
   data: DataP tag)

@@ -22,7 +22,7 @@ use "wallaroo/ent/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/source"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink/tcp_sink"
 use "wallaroo/topology"
 
 class val LocalTopology

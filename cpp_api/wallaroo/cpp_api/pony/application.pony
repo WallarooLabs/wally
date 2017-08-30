@@ -1,7 +1,7 @@
 use "collections"
 use "wallaroo"
-use "wallaroo/tcp_sink"
-use "wallaroo/tcp_source"
+use "wallaroo/sink/tcp_sink"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/fail"
 

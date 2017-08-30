@@ -9,7 +9,7 @@ use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/recovery"
 use "wallaroo/routing"
-use "wallaroo/tcp_source"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 
 interface val WActorFramedSourceHandler

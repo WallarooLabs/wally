@@ -68,7 +68,7 @@ use "sendence/time"
 use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/metrics"
-use "wallaroo/tcp_source"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/ent/w_actor"
 

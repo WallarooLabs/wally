@@ -9,7 +9,7 @@ use "wallaroo/metrics"
 use "wallaroo/ent/network"
 use "wallaroo/recovery"
 use "wallaroo/state"
-use "wallaroo/tcp_source"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 
 actor Main

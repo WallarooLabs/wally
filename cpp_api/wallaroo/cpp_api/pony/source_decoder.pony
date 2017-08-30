@@ -1,5 +1,5 @@
 use "wallaroo/source"
-use "wallaroo/tcp_source"
+use "wallaroo/source/tcp_source"
 
 use @w_source_decoder_header_length[USize](source_decoder: SourceDecoderP)
 
