@@ -7,16 +7,16 @@ use "sendence/guid"
 use "sendence/time"
 use "wallaroo/boundary"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/watermarking"
 use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
-use "wallaroo/ent/network"
-use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 use "wallaroo/sink/tcp_sink"
-use "wallaroo/ent/watermarking"
 
 actor Step is (Producer & Consumer)
   var _id: U128
@@ -294,7 +294,7 @@ actor Step is (Producer & Consumer)
   ///////////
   // RECOVERY
   fun ref _is_duplicate(msg_uid: U128, frac_ids: FractionalMessageId): Bool =>
-    _MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
+    MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, i_producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,

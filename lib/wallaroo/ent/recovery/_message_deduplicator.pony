@@ -1,11 +1,9 @@
 use "sendence/mort"
 use "wallaroo/core"
 
-type MsgId is U128
-type MsgIdAndFracs is (MsgId, FractionalMessageId)
 type DeduplicationList is Array[MsgIdAndFracs]
 
-primitive _MessageDeduplicator
+primitive MessageDeduplicator
   fun is_duplicate(msg_uid: MsgId, frac_ids: FractionalMessageId,
     list: DeduplicationList): Bool
   =>

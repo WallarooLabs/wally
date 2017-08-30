@@ -6,6 +6,7 @@ actor Main is TestList
   new make() => None
 
   fun tag tests(test: Connemara) =>
+    _TestMessageDeduplicator.make().tests(test)
     test(_TestEventLogDummyCreation)
     test(_TestHexOffset)
     test(_TestFilterLogFiles)
