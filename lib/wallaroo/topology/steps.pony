@@ -1,4 +1,4 @@
-use "assert"
+@@use "assert"
 use "buffered"
 use "collections"
 use "net"
@@ -298,6 +298,10 @@ actor Step is (Producer & Consumer)
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
       if e._2 == msg_uid then
+        ifdef debug then
+          @printf[I32]("Deduplicating for message %s\n".cstring(),
+           msg_uid.string().cstring())
+        end
         match (e._3, frac_ids)
         | (None, None) =>
           ifdef debug then
