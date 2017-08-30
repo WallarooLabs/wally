@@ -26,7 +26,7 @@ All of these must be run from the Wallaroo root directory.
 
 To build for x86_64 for AWS/Vagrant, run:
 
-`make arch=amd64`
+`make`
 
 This will use a docker container based `ponyc` to compile for x86_64 based on the Sendence fork of the Pony repository.
 

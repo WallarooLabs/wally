@@ -89,21 +89,21 @@ To build Market Spread:
 
 ```bash
 cd ~/wallaroo
-make arch=amd64 build-testing-performance-apps-market-spread
+make build-testing-performance-apps-market-spread
 ```
 
 To build Giles Sender:
 
 ```bash
 cd ~/wallaroo
-make arch=amd64 build-giles-sender
+make build-giles-sender
 ```
 
 To build Giles Receiver:
 
 ```bash
 cd ~/wallaroo
-make arch=amd64 build-giles-receiver
+make build-giles-receiver
 ```
 
 ### SINGLE WORKER market spread:

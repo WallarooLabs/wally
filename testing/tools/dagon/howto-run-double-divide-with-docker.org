@@ -38,8 +38,8 @@ Start the test like this:
 
 ** Build
 1. Checkout buffy and switch to branch "dagon-docker-reanimator"
-2. run "make arch=amd64"
-3. run "make arch=amd64 build-docker"
+2. run "make"
+3. run "make build-docker"
 4. cd dagon
 5. run "stable env ponyc --debug"
 
