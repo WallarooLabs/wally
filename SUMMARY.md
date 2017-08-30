@@ -10,6 +10,7 @@
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Partitioning](book/core-concepts/partitioning.md)
 * [Decoders and Encoders](book/core-concepts/decoders-and-encoders.md)
+* [Multiple Worker Clusters](book/multi-worker.md)
 
 ## Developing with Wallaroo
 
