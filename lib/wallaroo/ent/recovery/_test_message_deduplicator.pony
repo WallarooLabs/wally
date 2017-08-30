@@ -25,7 +25,7 @@ class _TestEmptyDuplicates is UnitTest
 
   fun ref apply(h: TestHelper) =>
     let empty = DeduplicationList.create()
-    let is_dup = _MessageDeduplicator.is_duplicate(1, None, empty)
+    let is_dup = MessageDeduplicator.is_duplicate(1, None, empty)
 
     h.assert_eq[Bool](false, is_dup)
 
@@ -40,7 +40,7 @@ class _TestDifferentMessagesNoFracs is UnitTest
     let msg_id = MsgId(2)
     let frac_ids = None
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](false, is_dup)
 
@@ -55,7 +55,7 @@ class _TestDifferentMessagesSameFracs is UnitTest
     let msg_id = MsgId(2)
     let frac_ids = recover val [as U32: 1] end
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](false, is_dup)
 
@@ -70,7 +70,7 @@ class _TestSameMessageNoFracs is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = None
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](true, is_dup)
 
@@ -85,7 +85,7 @@ class _TestSameMessageDifferentFracs is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = recover val [as U32: 2] end
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](false, is_dup)
 
@@ -100,7 +100,7 @@ class _TestSameMessageDifferentFracs2 is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = recover val [as U32: 1, 2] end
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](false, is_dup)
 
@@ -115,7 +115,7 @@ class _TestSameMessageDifferentFracs3 is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = recover val [as U32: 1, 2] end
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](false, is_dup)
 
@@ -130,7 +130,7 @@ class _TestSameMessageDifferentFracs4 is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = None
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](false, is_dup)
 
@@ -145,7 +145,7 @@ class _TestSameMessageSameFracs is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = recover val [as U32: 10] end
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](true, is_dup)
 
@@ -161,7 +161,7 @@ class _TestMatchIsLater is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = recover val [as U32: 10] end
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](true, is_dup)
 
@@ -177,7 +177,7 @@ class _TestMatchIsLater2 is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = recover val [as U32: 10] end
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](true, is_dup)
 
@@ -193,6 +193,6 @@ class _TestMatchIsLater3 is UnitTest
     let msg_id = MsgId(1)
     let frac_ids = recover val [as U32: 10] end
 
-    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+    let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
     h.assert_eq[Bool](true, is_dup)
