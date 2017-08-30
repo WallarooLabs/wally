@@ -6,8 +6,8 @@ use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
 use "wallaroo/routing"
-use "wallaroo/tcp_sink"
-use "wallaroo/tcp_source"
+use "wallaroo/sink/tcp_sink"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 
 interface val SourceListenerBuilder

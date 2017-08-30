@@ -1,6 +1,6 @@
 use "wallaroo"
-use "wallaroo/tcp_sink"
-use "wallaroo/tcp_source"
+use "wallaroo/sink/tcp_sink"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 
 use @w_wrapper_main[Bool](argc: U32, argv: Pointer[Pointer[U8] tag] tag,

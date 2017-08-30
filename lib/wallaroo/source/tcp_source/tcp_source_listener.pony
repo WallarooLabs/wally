@@ -37,7 +37,7 @@ use "wallaroo/metrics"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/source"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink/tcp_sink"
 use "wallaroo/topology"
 
 actor TCPSourceListener is SourceListener

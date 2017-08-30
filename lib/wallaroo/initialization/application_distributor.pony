@@ -8,7 +8,7 @@ use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/tcp_source"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/recovery"
 

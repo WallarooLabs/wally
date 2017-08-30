@@ -11,8 +11,8 @@ Filtered Stateless Computation -> Stateless Computation
 use "generic_app_components"
 use "wallaroo"
 use "wallaroo/source"
-use "wallaroo/tcp_sink"
-use "wallaroo/tcp_source"
+use "wallaroo/sink/tcp_sink"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 
 actor Main

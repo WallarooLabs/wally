@@ -19,7 +19,7 @@ use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/source"
 use "wallaroo/sink"
-use "wallaroo/tcp_source"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 
 actor WActorInitializer is LayoutInitializer

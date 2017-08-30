@@ -7,8 +7,8 @@ use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/ent/w_actor"
-use "wallaroo/tcp_sink"
-use "wallaroo/tcp_source"
+use "wallaroo/sink/tcp_sink"
+use "wallaroo/source/tcp_source"
 
 use @set_user_serialization_fns[None](module: Pointer[U8] tag)
 use @user_serialization_get_size[USize](o: Pointer[U8] tag)

@@ -15,7 +15,7 @@ use "wallaroo/metrics"
 use "wallaroo/ent/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink/tcp_sink"
 use "wallaroo/ent/watermarking"
 
 actor Step is (Producer & Consumer)

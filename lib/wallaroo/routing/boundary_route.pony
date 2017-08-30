@@ -6,7 +6,7 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/tcp_source"
+use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 
 class BoundaryRoute is Route
