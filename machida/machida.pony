@@ -253,12 +253,12 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
   var _source_decoder: Pointer[U8] val
   let _header_length: USize
 
-  new create(source_decoder: Pointer[U8] val) =>
+  new create(source_decoder: Pointer[U8] val) ? =>
     _source_decoder = source_decoder
     let hl = Machida.framed_source_decoder_header_length(_source_decoder)
     if (Machida.err_occurred()) or (hl == 0) then
       @printf[U32]("ERROR: _header_length %d is invalid\n".cstring(), hl)
-      _header_length = 4
+      error
     else
       _header_length = hl
     end
