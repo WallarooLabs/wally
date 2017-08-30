@@ -33,7 +33,6 @@ actor Startup
   var _is_multi_worker: Bool = true
   var _cluster_initializer: (ClusterInitializer | None) = None
   var _application_distributor: (ApplicationDistributor | None) = None
-  var _swarm_manager_addr: String = ""
   var _event_log_dir_filepath: (FilePath | None) = None
   var _event_log_file_basename: String = ""
   var _event_log_file_suffix: String = ""
@@ -64,24 +63,6 @@ actor Startup
     try
       let auth = _env.root as AmbientAuth
       _startup_options = WallarooConfig.wallaroo_args(_env.args)
-
-      if _startup_options.is_swarm_managed then
-        if _startup_options.a_arg is None then
-          @printf[I32](("You must supply '--swarm-manager-address' if " +
-            "passing '--swarm-managed'\n").cstring())
-          error
-        else
-          let swarm_manager_url =
-            URL.build(_startup_options.a_arg as String, false)
-          if swarm_manager_url.is_valid() then
-            _swarm_manager_addr = _startup_options.a_arg as String
-          else
-            @printf[I32](("You must provide a valid URL to " +
-              "'--swarm-manager-address'\n").cstring())
-            error
-          end
-        end
-      end
 
       (_ph_host, _ph_service) =
         match _startup_options.p_arg
@@ -328,25 +309,12 @@ actor Startup
         event_log, recovery_replayer, connections)
 
       let local_topology_initializer =
-        if _startup_options.is_swarm_managed then
-          let cluster_manager: DockerSwarmClusterManager =
-            DockerSwarmClusterManager(auth, _swarm_manager_addr,
-              _startup_options.c_service)
-          LocalTopologyInitializer(
-            _application, _startup_options.worker_name,
-            _startup_options.worker_count, _env, auth, connections,
-            router_registry, metrics_conn, _startup_options.is_initializer,
-            data_receivers, event_log, recovery, recovery_replayer,
-            _local_topology_file, _data_channel_file, _worker_names_file,
-            cluster_manager)
-        else
-          LocalTopologyInitializer(
-            _application, _startup_options.worker_name,
-            _startup_options.worker_count, _env, auth, connections,
-            router_registry, metrics_conn, _startup_options.is_initializer,
-            data_receivers, event_log, recovery, recovery_replayer,
-            _local_topology_file, _data_channel_file, _worker_names_file)
-        end
+        LocalTopologyInitializer(
+          _application, _startup_options.worker_name,
+          _startup_options.worker_count, _env, auth, connections,
+          router_registry, metrics_conn, _startup_options.is_initializer,
+          data_receivers, event_log, recovery, recovery_replayer,
+          _local_topology_file, _data_channel_file, _worker_names_file)
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
@@ -483,27 +451,14 @@ actor Startup
         event_log, recovery_replayer, connections)
 
       let local_topology_initializer =
-        if _startup_options.is_swarm_managed then
-          let cluster_manager: DockerSwarmClusterManager =
-            DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
-          LocalTopologyInitializer(
-            _application, _startup_options.worker_name,
-            _startup_options.worker_count, _env, auth, connections,
-            router_registry, metrics_conn,
-            _startup_options.is_initializer, data_receivers,
-            event_log, recovery, recovery_replayer,
-            _local_topology_file, _data_channel_file, _worker_names_file,
-            cluster_manager where is_joining = _startup_options.is_joining)
-        else
-          LocalTopologyInitializer(
-            _application, _startup_options.worker_name,
-            _startup_options.worker_count, _env, auth, connections,
-            router_registry, metrics_conn,
-            _startup_options.is_initializer, data_receivers,
-            event_log, recovery, recovery_replayer,
-            _local_topology_file, _data_channel_file, _worker_names_file
-            where is_joining = _startup_options.is_joining)
-        end
+        LocalTopologyInitializer(
+          _application, _startup_options.worker_name,
+          _startup_options.worker_count, _env, auth, connections,
+          router_registry, metrics_conn,
+          _startup_options.is_initializer, data_receivers,
+          event_log, recovery, recovery_replayer,
+          _local_topology_file, _data_channel_file, _worker_names_file
+          where is_joining = _startup_options.is_joining)
 
       router_registry.set_data_router(DataRouter)
       local_topology_initializer.update_topology(m.local_topology)
