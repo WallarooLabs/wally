@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -27,10 +27,10 @@ REVERSE_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-book-examples-python-reverse: build-machida
-test-book-examples-python-reverse: build-book-examples-python-reverse
+build-examples-python-reverse: build-machida
+test-examples-python-reverse: build-examples-python-reverse
 
-test-book-examples-python-reverse: reverse_py_test
+test-examples-python-reverse: reverse_py_test
 
 reverse_py_test:
 	cd $(REVERSE_PY_PATH) && \

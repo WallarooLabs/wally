@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -26,7 +26,7 @@ ifeq ($(shell uname -s),Linux)
 	PONY_LINKER = --linker g++
 endif
 
-COUNTER_PATH = $(buffy_path)/book/examples/cpp/counter-app
+COUNTER_PATH = $(buffy_path)/examples/cpp/counter-app
 COUNTER_BUILD = $(COUNTER_PATH)/build
 COUNTER_CPP = $(COUNTER_PATH)/cpp
 COUNTER_HPP = $(COUNTER_PATH)/hpp
@@ -37,9 +37,9 @@ WALLAROO_CPP_INSTALL = /tmp/cpp_api
 WALLAROO_CPP_LIB = $(WALLAROO_CPP_INSTALL)/lib/WallarooCppApi
 WALLAROO_CPP_INCLUDE = $(WALLAROO_CPP_INSTALL)/include/
 
-build-book-examples-cpp-counter-app-all = build-cpp_api-all counter_app_clean counter_app_build
-test-book-examples-cpp-counter-app-all = build-book-examples-cpp-counter-app-all counter_app_test
-clean-book-examples-cpp-counter-app-all = clean-cpp_api-all counter_app_clean
+build-examples-cpp-counter-app-all = build-cpp_api-all counter_app_clean counter_app_build
+test-examples-cpp-counter-app-all = build-examples-cpp-counter-app-all counter_app_test
+clean-examples-cpp-counter-app-all = clean-cpp_api-all counter_app_clean
 
 counter_app_build:
 	mkdir -p $(COUNTER_BUILD)

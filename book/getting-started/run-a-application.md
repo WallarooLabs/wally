@@ -65,10 +65,10 @@ You should see the `Listening for data` that indicates that Giles receiver is ru
 
 ## Run the Celsius Conversion App
 
-We'll be compiling and running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/celsius/celsius.pony).  In a new window, run:
+We'll be compiling and running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/examples/pony/celsius/celsius.pony).  In a new window, run:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius
+cd ~/wallaroo-tutorial/wallaroo/examples/pony/celsius
 make
 ```
 
@@ -87,7 +87,7 @@ This tells Wallaroo that it should listen on port 7000 for incoming data, write 
 A data generator is bundled with the application. It needs to be built and a data file created before we can continue.  In a new window, run:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius/data_gen
+cd ~/wallaroo-tutorial/wallaroo/examples/pony/celsius/data_gen
 make
 ```
 
@@ -116,7 +116,7 @@ You will now be able to start the `sender` with the following command:
 
 ```bash
 ./sender -h 127.0.0.1:7000 -m 10000 -y -s 300 \
-  -f ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius/data_gen/celsius.msg \
+  -f ~/wallaroo-tutorial/wallaroo/examples/pony/celsius/data_gen/celsius.msg \
   -r -w -g 8 --ponythreads=1
 ```
 

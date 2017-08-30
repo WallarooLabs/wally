@@ -109,6 +109,6 @@ import wallaroo
 
 ## Next Steps
 
-The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/python/alphabet_partitioned/). To run it, follow the [Alphabet_partitioned application instructions](/book/examples/python/alphabet_partitioned/README.md)
+The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/examples/python/alphabet_partitioned/). To run it, follow the [Alphabet_partitioned application instructions](/examples/python/alphabet_partitioned/README.md)
 
 To see how everything we've learned so far comes together, check out our [Word Count walkthrough](word_count.md)

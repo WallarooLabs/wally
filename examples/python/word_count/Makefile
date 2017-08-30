@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -27,10 +27,10 @@ WORD_COUNT_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-book-examples-python-word_count: build-machida
-test-book-examples-python-word_count: build-book-examples-python-word_count
-test-book-examples-python-word_count: word_count_py_test
-clean-book-examples-python-alphabet: word_count_py_clean
+build-examples-python-word_count: build-machida
+test-examples-python-word_count: build-examples-python-word_count
+test-examples-python-word_count: word_count_py_test
+clean-examples-python-alphabet: word_count_py_clean
 
 word_count_py_test:
 	cd $(WORD_COUNT_PY_PATH) && \

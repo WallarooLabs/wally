@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -27,11 +27,11 @@ SEQUENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-book-examples-python-sequence: build-machida
-build-book-examples-python-sequence: build-testing-correctness-apps-sequence_window-validator
-test-book-examples-python-sequence: build-book-examples-python-sequence
+build-examples-python-sequence: build-machida
+build-examples-python-sequence: build-testing-correctness-apps-sequence_window-validator
+test-examples-python-sequence: build-examples-python-sequence
 
-test-book-examples-python-sequence: sequence_py_test
+test-examples-python-sequence: sequence_py_test
 
 sequence_py_test:
 	cd $(SEQUENCE_PATH) && \
@@ -43,7 +43,7 @@ sequence_py_test:
 		--giles-mode \
 		--sink-expect 1000
 
-clean-book-examples-python-sequence: sequence_py_clean
+clean-examples-python-sequence: sequence_py_clean
 
 sequence_py_clean:
 	$(QUIET)rm -f $(SEQUENCE_PATH)/received.txt
