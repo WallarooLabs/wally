@@ -1,89 +1,153 @@
 # Decoders and Encoders
 
-Wallaroo currently only supports TCP sources and TCP sinks (though we will be adding more source and sink types in the near future). When using TCP for your input and output streams, you need a way to convert a stream of bytes to your application input types and  to convert your application output types to a stream of bytes. This is where decoders and encoders come in. 
+Earlier, we spoke of [sources and sinks](core-concepts.md) and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s. Our examples will focus on TCP sources and sinks, but the same principles apply to any other type of source or sink.
 
-## Creating a Decoder
+## Reviewing our terms
 
-Currently, Wallaroo assumes that you will be using the following protocol for the stream of bytes sent into the system over TCP:
+### Source
+
+: Input point for data from external systems into an application.
+
+### Sink
+
+: Output point from an application to external systems.
+
+### Decoder
+
+: Code that transforms a stream of bytes from an external system
+into a series of application input types.
+
+### Encoder
+
+: Code that transforms an application output type into bytes for
+sending to an external system.
+
+## Framed Message Protocols
+
+A Wallaroo source accepts a stream of bytes from an external source and turns that stream of bytes into a stream of application specific messages. As an application programmer, you provide a `Decoder` to tell Wallaroo how to turn that stream of bytes into messages.
+
+An incoming stream of bytes can represent many things: each byte could be an 8-bit unsigned integer, or every 4-byte block may be a 32-bit integer. Or the stream may be an ASCII sequence (each byte is a char), or a Unicode sequence (in which case characters aren't equally-wide!).
+
+Decoders are unique to the type of source. Currently, we support TCP and Kafka sources. `TCPSource`s use a [framed message protocol](https://www.codeproject.com/Articles/37496/TCP-IP-Protocol-Design-Message-Framing). A framed message protocol boils down to:
+
+- We have a fixed size header that tells us how long a message is
+- We have a variable length message payload 
+
+The message payload is what our application cares about. The fixed length header allows us to easily get the size of our payload. With these two pieces of information, we can quickly chop up a stream of incoming bytes into a series of messages.
+
+The size of the header is up to you the designer of the particular message type. You can make it 4 bytes, 8 bytes, 16, et cetera. The important part is that you need enough bytes to represent the length of your payload. For most data, a 4-byte header is plenty. In the abstract, this looks like
 
 ```
 PayloadSize [x bytes] : Payload [bytes specified in PayloadSize]
 ```
 
-You decide both how many bytes you will use to specify the payload size (depending on whether you're encoding a 16, 32, or 64-bit  integer, for example) and how you encode that size (for example, using a big-endian or little-endian encoding).  
+So if our header is 4 bytes long, an incoming message would look something like:
 
-In order for Wallaroo to know how to parse your incoming stream, you need to implement a `FramedSourceHandler`. You must implement three methods, where type `In` is the input type for your pipeline:
+| header | payload |
+| xxxx | some data here |
 
-```pony
-fun header_length(): USize
-fun payload_length(data: Array[U8] iso): USize ?
-fun decode(data: Array[U8] val): In ?
+Let's make that a bit more concrete. Let's say we are sending in two messages; each contains a string. The first has "first" as a payload and the second payload is "not first". Our stream of bytes would be:
+
+- 4-byte header whose value is `5`
+- 5-byte payload containing the binary representation of the ASCII string "first"
+- 4-byte header whose value is 9`
+- 9 byte payload containing the binary representation of the ASCII string "not first"
+
+## Creating a Decoder
+
+Wallaroo's `TCPSource` takes a `Decoder` that can process a framed message protocol. You'll need to implement three methods. Below is a `Decoder` that we can use to process our stream of strings that we layed out in the previous section.
+
+```python
+class Decoder(object):
+    def header_length(self):
+        return 4
+
+    def payload_length(self, bs):
+        return struct.unpack(">I", bs)[0]
+
+    def decode(self, bs):
+        return bs.decode("utf-8")
 ```
 
-`header_length()` will return the fixed size of your PayloadSize field. 
+`header_length` will return the fixed size of our payload field. 
 
-`payload_length()` is a function that takes the bytes of your PayloadSize field and transforms them into an integer of type `USize`.
+`payload_length` is used to decode our message header to determine how long the payload is going to be. In this case, we are relying on the Python `struct` package to decode the bytes. If you aren't familiar with `struct`, you can check out [the documentation](https://docs.python.org/2/library/struct.html) to learn more. Remember, when using `struct`, don't forget to import it!
 
-`decode()` takes the bytes of your Payload field and transforms them to a value of type `In`.
+`decode` takes a series of bytes that represent your payload and turns it into an application message. In this case, our application message is a string, so we take the incoming byte stream `bs` and convert it to UTF-8 Python string.
 
-Here's an example taken from our [Alphabet Popularity Contest app](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/alphabet). We're using a 32-bit payload length header using big-endian encoding. We use the `Bytes` library to convert the four bytes in our header array into a `U32` and then convert that to a `USize` via the `usize()` method:
+Here's a slightly more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/Sendence/wallaroo/tree/release/book/examples/python/alphabet). 
 
-```pony
-primitive VotesDecoder is FramedSourceHandler[Votes val]
-  fun header_length(): USize =>
-    4
+```python
+class Decoder(object):
+    def header_length(self):
+        return 4
 
-  fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    def payload_length(self, bs):
+        return struct.unpack(">I", bs)[0]
 
-  fun decode(data: Array[U8] val): Votes val ? =>
-    // Assumption: 1 byte for letter
-    let letter = String.from_array(data.trim(0, 1))
-    let count = Bytes.to_u32(data(1), data(2), data(3), data(4))
-    Votes(letter, count)
+    def decode(self, bs):
+        (letter, vote_count) = struct.unpack(">sI", bs)
+        return Votes(letter, vote_count)
 ```
 
-Notice that we have passed in `Votes` as our type argument, since `Votes` is the input type into our pipeline. In the `decode()` method,  we use the first byte in our payload array to get the letter we're voting on and the next four to get the `U32` specifying the vote count for that letter. 
+Like we did in our previous example, we're using a 4-byte payload length header:
 
-In this example, since the payload will always be 5 bytes long, we could have actually implemented `payload_length()` as:
-
-```pony
-fun payload_length(data: Array[U8] iso): USize ? =>
-  5
+```python
+class Decoder(object):
+    def header_length(self):
+        return 4
 ```
 
-In the near future, Wallaroo will allow users to use fixed length protocols without the need for size headers, but at the moment that is not supported.
+We're once again use `struct` to decode our header into a payload length:
 
-An example where our payload would not be fixed length is if we are sending in a stream of strings, such as customer names. Here's a possible `FramedSourceHandler` for that case:
-
-```pony
-primitive NamesDecoder is FramedSourceHandler[String]
-  fun header_length(): USize =>
-    4
-
-  fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-
-  fun decode(data: Array[U8] val): String ? =>
-    String.from_array(data)
+```python
+class Decoder(object):
+    def payload_length(self, bs):
+        return struct.unpack(">I", bs)[0]
 ```
 
-Here our input type to our pipeline is `String`. Our payload size field tells Wallaroo how many bytes to pull out of the stream for each payload, and in this case this size varies over time. Wallaroo will always pass an `Array` of bytes of this size to `decode()`. And then in `decode()` we convert those bytes directly to a `String`.
+But this time, we are doing something slightly more complicated in our payload. Our payload is two items, a string representing a letter and some votes for that letter. We'll unpack those using `struct` and create a domain specific object `Votes` to return.
+
+```
+class Decoder(object):
+    def decode(self, bs):
+        (letter, vote_count) = struct.unpack(">sI", bs)
+        return Votes(letter, vote_count)
+```
 
 ## Creating an Encoder
 
-If your application uses a TCP sink to send outputs to an external system, then you will need an encoder converting your pipeline output types to a stream of bytes. For this purpose you need to create an encoder `primitive` that implements the following function (where `Out` is the output type for your pipeline):
+Wallaroo encoders do the opposite of decoders. A decoder takes a stream of bytes and turns in into messages for Wallaroo to process. An encoder receives a stream of messages and converts them into a stream of bytes for sending to another system.
 
-```pony
-fun apply(o: Out, wb: Writer = Writer): Array[ByteSeq] val
+Here's a quick example `Encoder`:
+
+```python
+class Encoder(object):
+    def encode(self, data):
+        # data is a string
+        return data + "\n"
 ```
 
-Wallaroo provides you with a `Writer` which you will use to buffer data to be sent out. Here's an example from the [Alphabet Popularity Contest app](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/alphabet): 
+This is just about the simplest encoder you could have. It's from the [Reverse Word example](https://github.com/Sendence/wallaroo/tree/release/book/examples/python/reverse). It takes a string that we want to send to an external system as an input, adds a newline at the end and returns it for sending. 
 
-```pony
-primitive LetterTotalEncoder
-  fun apply(t: LetterTotal val, wb: Writer = Writer): Array[ByteSeq] val =>
-    wb.write(t.letter)
-    wb.u32_be(t.count)
-    wb.done()
+Here's a more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/Sendence/wallaroo/tree/release/book/examples/python/alphabet):
+
 ```
+class Votes(object):
+    def __init__(self, letter, votes):
+        self.letter = letter
+        self.votes = votes
+
+class Encoder(object):
+    def encode(self, data):
+        # data is a Votes
+        return struct.pack(">IsQ", 9, data.letter, data.votes)
+```
+
+Let's take a look at what is happening here. First of all, we are once again using the Python `struct` package. In this case, though, we are creating our own packed binary message. It's a framed message with a 4-byte header for the payload length, plus the payload:
+
+| header | payload |
+| 9 | letter & votes |
+
+If we were encoding the letter "A" and a vote value of "1" our payload would be `'A\x00\x00\x00\x00\x00\x00\x00\x01'`. This along with our framing data can be sent along to another system that expects framed data.
+ 
