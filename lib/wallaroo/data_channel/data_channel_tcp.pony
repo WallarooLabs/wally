@@ -39,7 +39,7 @@ use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/ent/network"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/topology"
 use "wallaroo/initialization"
 

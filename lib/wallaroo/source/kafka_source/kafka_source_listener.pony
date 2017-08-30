@@ -6,7 +6,7 @@ use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 use "wallaroo/source"
 use "wallaroo/topology"
@@ -199,13 +199,13 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       // about the latest mappings
       // TODO: add logic to update starting offsets to consume from kafka
       for (topic, consumers) in _kafka_topic_partition_sources.pairs() do
-        let my_consumers: Map[I32, KafkaConsumer tag] iso = recover iso 
+        let my_consumers: Map[I32, KafkaConsumer tag] iso = recover iso
           Map[I32, KafkaConsumer tag] end
         for (part_id, consumer) in consumers.pairs() do
           my_consumers(part_id) = consumer
         end
 
-        _kc.update_consumer_message_handler(topic, recover val 
+        _kc.update_consumer_message_handler(topic, recover val
           MapPartitionConsumerMessageHandler(consume my_consumers) end)
       end
     end

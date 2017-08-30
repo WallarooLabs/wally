@@ -15,7 +15,7 @@ use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/ent/network"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/spike"
 use "wallaroo/topology"
 

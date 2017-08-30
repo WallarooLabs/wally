@@ -4,7 +4,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
 

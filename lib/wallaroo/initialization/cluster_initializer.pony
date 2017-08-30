@@ -7,7 +7,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/ent/network"
 use "wallaroo/topology"
-use "wallaroo/recovery"
+use "wallaroo/ent/recovery"
 use "wallaroo/ent/w_actor"
 
 actor ClusterInitializer
