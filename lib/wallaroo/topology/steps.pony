@@ -30,8 +30,7 @@ actor Step is (Producer & Consumer)
   // then this is used to create a route to that step during initialization.
   let _default_target: (Step | None)
   // list of envelopes
-  let _deduplication_list: Array[(Producer, U128, FractionalMessageId,
-    SeqId, RouteId)] = _deduplication_list.create()
+  let _deduplication_list: DeduplicationList = _deduplication_list.create()
   let _event_log: EventLog
   let _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
 
@@ -294,38 +293,8 @@ actor Step is (Producer & Consumer)
 
   ///////////
   // RECOVERY
-  fun _is_duplicate(msg_uid: U128, frac_ids: FractionalMessageId): Bool =>
-    for e in _deduplication_list.values() do
-      //TODO: Bloom filter maybe?
-      if e._2 == msg_uid then
-        match (e._3, frac_ids)
-        | (None, None) =>
-          return true
-        | (let x: Array[U32] val, let y: Array[U32] val) =>
-          if x.size() != y.size() then
-            return false
-          end
-
-          var i = USize(0)
-          while (i < x.size()) do
-            try
-              if x(i) != y(i) then
-                return false
-              end
-            else
-              // unreachable
-              Fail()
-            end
-            i = i + 1
-          end
-
-          return true
-        else
-          Fail()
-        end
-      end
-    end
-    false
+  fun ref _is_duplicate(msg_uid: U128, frac_ids: FractionalMessageId): Bool =>
+    _MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, i_producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
@@ -333,8 +302,7 @@ actor Step is (Producer & Consumer)
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if not _is_duplicate(msg_uid, frac_ids) then
-      _deduplication_list.push((i_producer, msg_uid, frac_ids, i_seq_id,
-        i_route_id))
+      _deduplication_list.push((msg_uid, frac_ids))
 
       _run[D](metric_name, pipeline_time_spent, data, i_producer,
         msg_uid, frac_ids, i_seq_id, i_route_id,
@@ -374,7 +342,7 @@ actor Step is (Producer & Consumer)
     statechange_id: U64, payload: ByteSeq val)
   =>
     if not _is_duplicate(uid, frac_ids) then
-      _deduplication_list.push((this, uid, frac_ids, 0, 0))
+      _deduplication_list.push((uid, frac_ids))
       match _runner
       | let r: ReplayableRunner =>
         r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)

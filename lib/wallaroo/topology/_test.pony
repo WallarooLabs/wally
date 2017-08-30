@@ -17,5 +17,6 @@ actor Main is TestList
     None
 
   fun tag tests(test: Connemara) =>
+    _TestMessageDeduplicator.make().tests(test)
     _TestRouterEquality.make().tests(test)
     _TestStepSeqIdGenerator.make().tests(test)
