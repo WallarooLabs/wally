@@ -150,11 +150,17 @@ class FileBackend is Backend
               if fractional_size > 0 then
                 let bytes_to_read = fractional_size.usize() * 4
                 r.append(_file.read(bytes_to_read))
-                let l = Array[U32]
+                let l: Array[U32] iso = recover Array[U32] end
                 for i in Range(0,fractional_size.usize()) do
                   l.push(r.u32_be())
                 end
-                l
+                let l': Array[U32] val = consume l
+                ifdef debug then
+                  @printf[I32](("Decoding FractionalMessageIds %s for msg_uid "
+                    + "%s\n").cstring(), FractionalMessageIdToString(l')
+                    .cstring(), uid.string().cstring())
+                end
+                l'
               else
                 //None is faster if we have no frac_ids, which will probably be
                 //true most of the time
@@ -249,6 +255,12 @@ class FileBackend is Backend
       | None =>
         _writer.u64_be(0)
       | let x: Array[U32] val =>
+        ifdef debug then
+          @printf[I32]("Encoding...\n".cstring())
+          @printf[I32]("Encoding FractionalMessageIds %s for msg_uid %s\n"
+            .cstring(), FractionalMessageIdToString(frac_ids).cstring(),
+            uid.string().cstring())
+        end
         let fractional_size = x.size().u64()
         _writer.u64_be(fractional_size)
 
