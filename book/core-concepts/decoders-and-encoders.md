@@ -1,6 +1,6 @@
 # Decoders and Encoders
 
-Earlier, we spoke of [sources and sinks](core-concepts.md) and the role they play in Wallaroo. In this section we are going to dive more into how you work with sources and sinks. We'll be covering to key concepts: `Decoder`s and `Encoder`s. Our examples will focus on TCP sources and sinks but the same  principles apply to any other type of source or sink.
+Earlier, we spoke of [sources and sinks](core-concepts.md) and the role they play in Wallaroo. In this section we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s. Our examples will focus on TCP sources and sinks but the same  principles apply to any other type of source or sink.
 
 ## Reviewing our terms
 
@@ -33,7 +33,7 @@ Decoders are specific to the type of source. Currently we support TCP and Kafka 
 - We have a fixed size header that tells us how long a message is
 - We have a variable length message payload 
 
-The message payload is what our application cares about. The fixed length header allows us to easily get the size of our payload. With these two bits of information, we can quickly chop up a stream of incoming bytes into a series of messages.
+The message payload is what our application cares about. The fixed length header allows us to easily get the size of our payload. With these two pieces of information, we can quickly chop up a stream of incoming bytes into a series of messages.
 
 The size of the header is up to you the designer of the particular message type. You can make it 4 bytes, 8 bytes, 16, et cetera. The important part is that you need enough bytes to represent the length of your payload. For most data, a 4 byte header is plenty. In the abstract this looks like
 
@@ -55,7 +55,7 @@ Let's make that a bit more concrete. Let's say we are sending in two messages, e
 
 ## Creating a Decoder
 
-Wallaroo's `TCPSource` takes a `Decoder` that is able to process a framed message protocol. You'll need to implement 3 methods. Below is a `Decoder` that we can use to process our stream of strings that we layed out in the previous section.
+Wallaroo's `TCPSource` takes a `Decoder` that is able to process a framed message protocol. You'll need to implement three methods. Below is a `Decoder` that we can use to process our stream of strings that we layed out in the previous section.
 
 ```python
 class Decoder(object):
@@ -93,23 +93,26 @@ class Decoder(object):
 Like we did in our previous example, we're using a 4-byte payload length header:
 
 ```python
-def header_length(self):
-    return 4
+class Decoder(object):
+    def header_length(self):
+        return 4
 ```
 
 We're once again use `struct` to decode our header into a payload length:
 
 ```python
-def payload_length(self, bs):
-    return struct.unpack(">I", bs)[0]
+class Decoder(object):
+    def payload_length(self, bs):
+        return struct.unpack(">I", bs)[0]
 ```
 
 But this time, we are doing something slightly more complicated in our payload. Our payload is two items, a string representing a letter and a number of votes for that letter. We'll unpack those using `struct` and create a domain specific object `Votes` to return.
 
 ```
-def decode(self, bs):
-    (letter, vote_count) = struct.unpack(">sI", bs)
-    return Votes(letter, vote_count)
+class Decoder(object):
+    def decode(self, bs):
+        (letter, vote_count) = struct.unpack(">sI", bs)
+        return Votes(letter, vote_count)
 ```
 
 ## Creating an Encoder
@@ -125,7 +128,7 @@ class Encoder(object):
         return data + "\n"
 ```
 
-This is just about the simplest encoder you could have. It's from the [Reverse Word example](https://github.com/Sendence/wallaroo/tree/release/book/examples/python/reverse). It takes a string that we want to send to an external system as an input, adding a newline at the end and returns it for sending. 
+This is just about the simplest encoder you could have. It's from the [Reverse Word example](https://github.com/Sendence/wallaroo/tree/release/book/examples/python/reverse). It takes a string that we want to send to an external system as an input, adfs a newline at the end and returns it for sending. 
 
 Here's a more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/Sendence/wallaroo/tree/release/book/examples/python/alphabet):
 
