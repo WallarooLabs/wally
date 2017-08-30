@@ -5,14 +5,15 @@ use "files"
 use "sendence/bytes"
 use "sendence/hub"
 use "wallaroo"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/w_actor"
 use "wallaroo/ent/w_actor/broadcast"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/w_actor"
 
 class ControlChannelListenNotifier is TCPListenNotify
   let _auth: AmbientAuth

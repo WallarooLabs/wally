@@ -2,10 +2,11 @@ use "buffered"
 use "collections"
 use "files"
 use "wallaroo/core"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/w_actor"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
-use "wallaroo/ent/w_actor"
 use "wallaroo/topology"
 
 interface tag Resilient

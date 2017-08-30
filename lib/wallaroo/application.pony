@@ -29,8 +29,8 @@ class Application
   new create(name': String) =>
     _name = name'
 
-  fun ref new_pipeline[In: Any val, Out: Any val] (
-    pipeline_name: String, source_config: SourceConfig[In]): PipelineBuilder[In, Out, In]
+  fun ref new_pipeline[In: Any val, Out: Any val] (pipeline_name: String,
+    source_config: SourceConfig[In]): PipelineBuilder[In, Out, In]
   =>
     // We have removed the ability to turn coalescing off at the command line.
     let coalescing = true
@@ -58,8 +58,8 @@ class Application
       TypedRouteBuilder[Out], TypedRouteBuilder[In])
     builders.push(pre_state_builder)
 
-    let state_builder' = StateRunnerBuilder[S](s_initializer, default_name, s_comp.state_change_builders(),
-      TypedRouteBuilder[Out])
+    let state_builder' = StateRunnerBuilder[S](s_initializer, default_name,
+      s_comp.state_change_builders(), TypedRouteBuilder[Out])
     builders.push(state_builder')
 
     default_target = consume builders
