@@ -1,10 +1,10 @@
 use "collections"
 use "net"
 use "sendence/equality"
+use "sendence/mort"
 use "wallaroo/boundary"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
-use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/rebalancing"
@@ -271,8 +271,7 @@ class val StepIdRouter is OmniRouter
           (true, true, latest_ts)
         end
       else
-        // unreachable. we did a contains on our map before doing a lookup
-        Fail()
+        Unreachable()
         (true, true, latest_ts)
       end
     else

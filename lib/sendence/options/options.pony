@@ -86,6 +86,8 @@ actor Main
 ```
 """
 
+use "sendence/mort"
+
 primitive StringArgument
 primitive I64Argument
 primitive F64Argument
@@ -274,7 +276,8 @@ class Options is Iterator[(ParsedOption | ParseError | None)]
           | ('-', '-') => (2, 0)
           | ('-', let char: U8) => (1, 1)
           else
-            (0, 0) // unreachable
+            Unreachable()
+            (0, 0)
           end
 
         let last = candidate.size().isize()
