@@ -1,7 +1,7 @@
 use "collections"
+use "wallaroo/ent/network"
 use "wallaroo/fail"
 use "wallaroo/messages"
-use "wallaroo/ent/network"
 
 interface tag BroadcastSubscriber
   be broadcast_variable_update(k: String, v: Any val)

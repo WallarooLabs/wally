@@ -1,7 +1,7 @@
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/fail"
-use "wallaroo/core"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 

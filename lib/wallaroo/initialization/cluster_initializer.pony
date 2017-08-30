@@ -3,12 +3,12 @@ use "net"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"
-use "wallaroo/messages"
-use "wallaroo/metrics"
 use "wallaroo/ent/network"
-use "wallaroo/topology"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/w_actor"
+use "wallaroo/messages"
+use "wallaroo/metrics"
+use "wallaroo/topology"
 
 actor ClusterInitializer
   let _auth: AmbientAuth

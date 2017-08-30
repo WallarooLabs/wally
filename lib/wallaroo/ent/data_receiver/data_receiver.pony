@@ -3,14 +3,14 @@ use "net"
 use "time"
 use "wallaroo/core"
 use "wallaroo/data_channel"
+use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/watermarking"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
-use "wallaroo/ent/network"
-use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
-use "wallaroo/ent/watermarking"
 
 
 actor DataReceiver is Producer

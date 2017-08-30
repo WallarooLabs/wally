@@ -5,13 +5,13 @@ use "sendence/dag"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"
+use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/ent/network"
 use "wallaroo/topology"
-use "wallaroo/ent/recovery"
 
 actor ActorSystemDistributor is Distributor
   let _auth: AmbientAuth

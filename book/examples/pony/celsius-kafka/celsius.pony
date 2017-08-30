@@ -1,8 +1,8 @@
 use "buffered"
 use "wallaroo"
+use "wallaroo/sink/kafka_sink"
 use "wallaroo/source"
 use "wallaroo/source/kafka_source"
-use "wallaroo/sink/kafka_sink"
 use "wallaroo/topology"
 
 actor Main

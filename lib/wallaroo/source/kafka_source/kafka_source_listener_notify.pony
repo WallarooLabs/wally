@@ -1,8 +1,8 @@
+use "wallaroo/ent/recovery"
 use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/source"
 use "wallaroo/topology"
-use "wallaroo/ent/recovery"
 
 class KafkaSourceListenerNotify[In: Any val]
   var _source_builder: SourceBuilder

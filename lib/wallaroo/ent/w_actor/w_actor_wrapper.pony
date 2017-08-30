@@ -1,16 +1,16 @@
 use "collections"
 use "sendence/guid"
 use "wallaroo/boundary"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
-use "wallaroo/ent/w_actor/broadcast"
-use "wallaroo/fail"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/watermarking"
+use "wallaroo/ent/w_actor/broadcast"
+use "wallaroo/fail"
 use "wallaroo/routing"
 use "wallaroo/sink"
 use "wallaroo/topology"
-use "wallaroo/ent/watermarking"
 
 trait WActorWrapper
   be receive(msg: WMessage val)

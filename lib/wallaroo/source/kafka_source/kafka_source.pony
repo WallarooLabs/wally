@@ -3,12 +3,12 @@ use "pony-kafka"
 use "sendence/guid"
 use "wallaroo/boundary"
 use "wallaroo/core"
+use "wallaroo/ent/watermarking"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/routing"
 use "wallaroo/topology"
-use "wallaroo/ent/watermarking"
 
 actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
   let _guid: GuidGenerator = GuidGenerator

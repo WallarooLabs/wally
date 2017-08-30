@@ -5,6 +5,7 @@ use "pony-kafka"
 use "pony-kafka/customlogger"
 use "time"
 use "wallaroo/core"
+use "wallaroo/ent/watermarking"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
@@ -12,7 +13,6 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/routing"
 use "wallaroo/topology"
-use "wallaroo/ent/watermarking"
 
 
 actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)

@@ -34,16 +34,16 @@ use "time"
 use "sendence/bytes"
 use "sendence/time"
 use "wallaroo/core"
+use "wallaroo/ent/network"
+use "wallaroo/ent/watermarking"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/ent/network"
 use "wallaroo/routing"
 use "wallaroo/spike"
 use "wallaroo/topology"
-use "wallaroo/ent/watermarking"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)

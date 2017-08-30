@@ -13,11 +13,11 @@ use "sendence/hub"
 use "sendence/new_fix"
 use "sendence/rand"
 use "wallaroo"
+use "wallaroo/ent/w_actor"
 use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
-use "wallaroo/ent/w_actor"
 
 primitive Roles
   fun ping(): String => "ping"
