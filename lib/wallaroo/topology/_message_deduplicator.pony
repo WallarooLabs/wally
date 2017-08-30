@@ -1,5 +1,5 @@
+use "sendence/mort"
 use "wallaroo/core"
-use "wallaroo/fail"
 
 // TODO: refactor to use everywhere
 type MsgId is U128
@@ -41,8 +41,7 @@ primitive _MessageDeduplicator
               return false
             end
           else
-            // unreachable
-            Fail()
+            Unreachable()
           end
           i = i + 1
         end
@@ -52,6 +51,5 @@ primitive _MessageDeduplicator
     else
       return false
     end
-    // unreachable
-    Fail()
+    Unreachable()
     false
