@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -28,7 +28,7 @@ CELSIUS_PONY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-test-book-examples-pony-celsius: celsius_pony_test
+test-examples-pony-celsius: celsius_pony_test
 
 celsius_pony_test:
 	cd $(CELSIUS_PONY_PATH) && \

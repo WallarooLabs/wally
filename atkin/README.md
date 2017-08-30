@@ -48,5 +48,5 @@ You can read up on the [WActor Python API](/book/python-wactor/api.md).
 
 #### Run Toy CRDT computation
 
-See [CRDT application instructions](/book/examples/python-wactor/CRDT/README.md).
+See [CRDT application instructions](/examples/python-wactor/CRDT/README.md).
 

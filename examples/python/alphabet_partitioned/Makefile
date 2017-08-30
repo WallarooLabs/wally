@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -27,10 +27,10 @@ ALPHABET_PARTITIONED_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-book-examples-python-alphabet_partitioned: build-machida
-test-book-examples-python-alphabet_partitioned: build-book-examples-python-alphabet_partitioned
+build-examples-python-alphabet_partitioned: build-machida
+test-examples-python-alphabet_partitioned: build-examples-python-alphabet_partitioned
 
-test-book-examples-python-alphabet_partitioned: alphabet_partitioned_py_test
+test-examples-python-alphabet_partitioned: alphabet_partitioned_py_test
 
 alphabet_partitioned_py_test:
 	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
@@ -43,7 +43,7 @@ alphabet_partitioned_py_test:
 		--command 'machida --application-module alphabet_partitioned' \
 		--sink-expect 1000
 
-clean-book-examples-python-alphabet-partitioned: alphabet_partitioned_py_clean
+clean-examples-python-alphabet-partitioned: alphabet_partitioned_py_clean
 
 alphabet_partitioned_py_clean:
 	$(QUIET)rm -f $(ALPHABET_PY_PATH)/_test.txt $(ALPHABET_PY_PATH)/_expected.json

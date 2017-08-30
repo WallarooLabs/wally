@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -29,11 +29,11 @@ SEQUENCE_PART_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 
-build-book-examples-python-sequence_partitioned: build-machida
-build-book-examples-python-sequence_partitioned: build-testing-correctness-apps-sequence_window-validator
-test-book-examples-python-sequence_partitioned: build-book-examples-python-sequence_partitioned
+build-examples-python-sequence_partitioned: build-machida
+build-examples-python-sequence_partitioned: build-testing-correctness-apps-sequence_window-validator
+test-examples-python-sequence_partitioned: build-examples-python-sequence_partitioned
 
-test-book-examples-python-sequence_partitioned: sequence_partitioned_py_test
+test-examples-python-sequence_partitioned: sequence_partitioned_py_test
 
 sequence_partitioned_py_test:
 	cd $(SEQUENCE_PART_PATH) && \
@@ -46,7 +46,7 @@ sequence_partitioned_py_test:
 		--giles-mode \
 		--sink-expect 1000
 
-clean-book-examples-python-sequence_partitioned: sequence_partitioned_py_clean
+clean-examples-python-sequence_partitioned: sequence_partitioned_py_clean
 
 sequence_partitioned_py_clean:
 	$(QUIET)rm -f $(SEQUENCE_PART_PATH)/received.txt

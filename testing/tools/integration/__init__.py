@@ -27,7 +27,7 @@ Below is an example for running the integration test on reverse, a
 python-wallaroo application, using the machida binary, the wallaroo python
 api, and the the integration tester utility. The integration test script
 can be found at
-https://github.com/Sendence/wallaroo/book/examples/python/reverse/_test.py.
+https://github.com/Sendence/wallaroo/examples/python/reverse/_test.py.
 
 ```bash
 # Add integration utility to PYTHONPATH

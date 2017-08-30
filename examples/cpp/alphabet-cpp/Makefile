@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -31,15 +31,15 @@ CPP_PONY_LIB = $(buffy_path)/cpp_api/
 WALLAROO_CPP_INSTALL = /tmp/cpp_api
 WALLAROO_CPP_LIB = $(WALLAROO_CPP_INSTALL)/lib/WallarooCppApi
 WALLAROO_CPP_INCLUDE = $(WALLAROO_CPP_INSTALL)/include/
-ALPHABET_PATH = $(buffy_path)/book/examples/cpp/alphabet-cpp
+ALPHABET_PATH = $(buffy_path)/examples/cpp/alphabet-cpp
 ALPHABET_BUILD = $(ALPHABET_PATH)/build
 ALPHABET_CPP = $(ALPHABET_PATH)/cpp
 ALPHABET_HPP = $(ALPHABET_PATH)/include
 ALPHABET_PONY_SOURCE = $(ALPHABET_PATH)/alphabet-app
 
-build-book-examples-cpp-alphabet-cpp-all = build-cpp_api-all alphabet_cpp_clean alphabet_cpp_build
-test-book-examples-cpp-alphabet-cpp-all = build-book-examples-cpp-alphabet-cpp-all alphabet_cpp_test
-clean-book-examples-cpp-alphabet-cpp-all = clean-cpp_api-all alphabet_cpp_clean
+build-examples-cpp-alphabet-cpp-all = build-cpp_api-all alphabet_cpp_clean alphabet_cpp_build
+test-examples-cpp-alphabet-cpp-all = build-examples-cpp-alphabet-cpp-all alphabet_cpp_test
+clean-examples-cpp-alphabet-cpp-all = clean-cpp_api-all alphabet_cpp_clean
 
 alphabet_cpp_build:
 	mkdir -p $(ALPHABET_BUILD)

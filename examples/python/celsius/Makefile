@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -28,10 +28,10 @@ CELSIUS_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 
-build-book-examples-python-celsius: build-machida
-test-book-examples-python-celsius: build-book-examples-python-celsius
+build-examples-python-celsius: build-machida
+test-examples-python-celsius: build-examples-python-celsius
 
-test-book-examples-python-celsius: celsius_py_test
+test-examples-python-celsius: celsius_py_test
 
 celsius_py_test:
 	cd $(CELSIUS_PY_PATH) && \

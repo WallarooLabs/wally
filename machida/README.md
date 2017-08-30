@@ -47,12 +47,12 @@ You can read up on the [Wallaroo Python API](/book/python/api.md).
 
 #### Run Reverse Word (stateless computation)
 
-See [Reverse application instructions](/book/examples/python/reverse/README.md).
+See [Reverse application instructions](/examples/python/reverse/README.md).
 
 #### Run Alphabet (stateful computation)
 
-See [Alphabet application instructions](/book/examples/python/alphabet/README.md).
+See [Alphabet application instructions](/examples/python/alphabet/README.md).
 
 #### Run Marketspread (stateful computation)
 
-See [Market Spread application instructions](/book/examples/python/market_spread/README.md)
+See [Market Spread application instructions](/examples/python/market_spread/README.md)

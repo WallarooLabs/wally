@@ -39,7 +39,7 @@ This will build the C++ library and install the library and associated header fi
 
 Anytime you are on Linux and need to build a C++ application, you'll need to make sure that `ponyc` uses `c++` as the linker. You'll see this in our examples. Make sure you pass the `--linker c++` option to `ponyc`. This is only needed on Linux.
 
-Let's start by building one of the example applications that uses the C++ API, `counter-app`. Go to the `book/examples/cpp/counter-app` directory and run these commands:
+Let's start by building one of the example applications that uses the C++ API, `counter-app`. Go to the `examples/cpp/counter-app` directory and run these commands:
 
 ```bash
 mkdir build

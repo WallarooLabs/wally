@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -27,10 +27,10 @@ MARKET_SPREAD_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-book-examples-python-market_spread: build-machida
-test-book-examples-python-market_spread: build-book-examples-python-market_spread
+build-examples-python-market_spread: build-machida
+test-examples-python-market_spread: build-examples-python-market_spread
 
-test-book-examples-python-market_spread: market_spread_py_test
+test-examples-python-market_spread: market_spread_py_test
 
 market_spread_py_test:
 	cd $(MARKET_SPREAD_PY_PATH) && \
@@ -45,7 +45,7 @@ market_spread_py_test:
 		--sources 2 \
 		--sink-expect 1000
 
-clean-book-examples-python-market_spread: market_spread_py_clean
+clean-examples-python-market_spread: market_spread_py_clean
 
 market_spread_py_clean:
 	$(QUIET)rm -f $(MARKET_SPREAD_PY_PATH)/received.txt $(MARKET_SPREAD_PY_PATH)/_expected.txt $(MARKET_SPREAD_PY_PATH)/_orders.txt $(MARKET_SPREAD_PY_PATH)/_market.txt
