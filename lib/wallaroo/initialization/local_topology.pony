@@ -22,8 +22,8 @@ use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/routing"
-use "wallaroo/source"
 use "wallaroo/sink/tcp_sink"
+use "wallaroo/source"
 use "wallaroo/topology"
 
 class val LocalTopology

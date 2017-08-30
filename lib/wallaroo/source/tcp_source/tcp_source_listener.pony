@@ -29,16 +29,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "collections"
 use "wallaroo/boundary"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/routing"
-use "wallaroo/source"
 use "wallaroo/sink/tcp_sink"
+use "wallaroo/source"
 use "wallaroo/topology"
 
 actor TCPSourceListener is SourceListener

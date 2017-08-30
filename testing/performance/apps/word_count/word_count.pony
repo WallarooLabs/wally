@@ -10,10 +10,10 @@ use "sendence/bytes"
 use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/metrics"
-use "wallaroo/state"
+use "wallaroo/sink/tcp_sink"
 use "wallaroo/source"
 use "wallaroo/source/tcp_source"
-use "wallaroo/sink/tcp_sink"
+use "wallaroo/state"
 use "wallaroo/topology"
 
 actor Main

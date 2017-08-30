@@ -9,8 +9,8 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/fail"
 use "wallaroo/metrics"
-use "wallaroo/state"
 use "wallaroo/source/tcp_source"
+use "wallaroo/state"
 use "wallaroo/topology"
 
 actor Main

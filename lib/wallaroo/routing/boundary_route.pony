@@ -1,7 +1,7 @@
 use "sendence/guid"
 use "wallaroo/boundary"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"

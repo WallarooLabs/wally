@@ -10,8 +10,8 @@ Stateless Computation -> Stateful Computation -> Stateless Computation
 
 use "generic_app_components"
 use "wallaroo"
-use "wallaroo/source"
 use "wallaroo/sink/tcp_sink"
+use "wallaroo/source"
 use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
 

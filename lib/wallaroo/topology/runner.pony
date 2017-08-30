@@ -8,14 +8,14 @@ use "sendence/time"
 use "sendence/weighted"
 use "wallaroo/"
 use "wallaroo/core"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/w_actor"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
-use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 use "wallaroo/state"
-use "wallaroo/ent/w_actor"
 
 
 interface Runner

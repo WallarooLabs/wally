@@ -1,9 +1,9 @@
 use "collections"
 use "wallaroo/boundary"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
-use "wallaroo/metrics"
+use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
+use "wallaroo/metrics"
 use "wallaroo/routing"
 use "wallaroo/topology"
 

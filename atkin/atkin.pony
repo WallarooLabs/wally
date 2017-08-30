@@ -4,9 +4,9 @@ use "random"
 
 use "sendence/rand"
 use "wallaroo"
+use "wallaroo/ent/w_actor"
 use "wallaroo/fail"
 use "wallaroo/messages"
-use "wallaroo/ent/w_actor"
 use "wallaroo/sink/tcp_sink"
 use "wallaroo/source/tcp_source"
 

@@ -1,10 +1,10 @@
 use "collections"
 use "wallaroo/boundary"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/recovery"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/ent/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
 

@@ -5,12 +5,12 @@ use "sendence/dag"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"
+use "wallaroo/ent/recovery"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/source/tcp_source"
 use "wallaroo/topology"
-use "wallaroo/ent/recovery"
 
 actor ApplicationDistributor is Distributor
   let _auth: AmbientAuth
