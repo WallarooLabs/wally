@@ -1,7 +1,6 @@
 use "sendence/mort"
 use "wallaroo/core"
 
-// TODO: refactor to use everywhere
 type MsgId is U128
 type MsgIdAndFracs is (MsgId, FractionalMessageId)
 type DeduplicationList is Array[MsgIdAndFracs]
