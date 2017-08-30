@@ -144,7 +144,7 @@ import wallaroo
 
 ## Running `reverse.py`
 
-The complete example is available [here](https://github.com/Sendence/wallaroo/tree/release/examples/python/reverse/). To run it, follow the [Reverse application instructions](/examples/python/reverse/README.md)
+The complete example is available [here](https://github.com/Sendence/wallaroo/tree/release/examples/python/reverse/). To run it, follow the [Reverse application instructions](https://github.com/Sendence/wallaroo/tree/release/examples/python/reverse/README.md)
 
 ## Next Steps
 

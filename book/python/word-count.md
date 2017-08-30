@@ -180,7 +180,7 @@ class Encoder(object):
 
 ### Running `word_count.py`
 
-The complete example is available [here](https://github.com/Sendence/wallaroo/tree/release/examples/python/word_count/). To run it, follow the [Word Count application instructions](/examples/python/word_count/README.md)
+The complete example is available [here](https://github.com/Sendence/wallaroo/tree/release/examples/python/word_count/). To run it, follow the [Word Count application instructions](https://github.com/Sendence/wallaroo/tree/release/examples/python/word_count/README.md)
 
 ### Next Steps
 

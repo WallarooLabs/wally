@@ -152,7 +152,7 @@ import wallaroo
 
 ## Next Steps
 
-The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/release/examples/python/alphabet/). To run it, follow the [Alphabet application instructions](/examples/python/alphabet/README.md)
+The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/release/examples/python/alphabet/). To run it, follow the [Alphabet application instructions](https://github.com/Sendence/wallaroo/tree/release/examples/python/alphabet/README.md)
 
 To learn how to write a stateful application with partitioning, continue to [Writing Your Own Partitioned Stateful Application](writing-your-own-partitioned-stateful-application.md).
 
