@@ -30,8 +30,6 @@ actor ActorSystemStartup
   var _is_multi_worker: Bool = true
   var _is_joining: Bool = false
   var _cluster_initializer: (ClusterInitializer | None) = None
-  var _is_swarm_managed: Bool = false
-  var _swarm_manager_addr: String = ""
   var _event_log_dir_filepath: (FilePath | None) = None
   var _event_log_file_basename: String = ""
   var _event_log_file_suffix: String = ""
