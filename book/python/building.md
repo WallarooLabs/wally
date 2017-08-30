@@ -85,7 +85,7 @@ If you would like to skip this step in the future, you add these exports to your
 
 ## Next Steps
 
-To try running an example, go to [the Reverse example application](https://github.com/Sendence/wallaroo/tree/master/examples/python/reverse/) and follow its [instructions](/examples/python/reverse/README.md).
+To try running an example, go to [the Reverse example application](https://github.com/Sendence/wallaroo/tree/release/examples/python/reverse/) and follow its [instructions](/examples/python/reverse/README.md).
 
 To learn how to write your own Wallaroo Python application, continue to [Writing Your Own Application](writing-your-own-application.md)
 
