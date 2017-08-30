@@ -12,6 +12,8 @@ actor _TestMessageDeduplicator is TestList
     test(_TestSameMessageNoFracs)
     test(_TestSameMessageDifferentFracs)
     test(_TestSameMessageDifferentFracs2)
+    test(_TestSameMessageDifferentFracs3)
+    test(_TestSameMessageDifferentFracs4)
     test(_TestSameMessageSameFracs)
     test(_TestMatchIsLater)
     test(_TestMatchIsLater2)
@@ -97,6 +99,36 @@ class _TestSameMessageDifferentFracs2 is UnitTest
 
     let msg_id = MsgId(1)
     let frac_ids = recover val [as U32: 1, 2] end
+
+    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+
+    h.assert_eq[Bool](false, is_dup)
+
+class _TestSameMessageDifferentFracs3 is UnitTest
+  fun name(): String =>
+    "message_deduplicator/SameMessageDifferentFracs3"
+
+  fun ref apply(h: TestHelper) =>
+    let list = DeduplicationList.create()
+    list.push( (MsgId(1), None ) )
+
+    let msg_id = MsgId(1)
+    let frac_ids = recover val [as U32: 1, 2] end
+
+    let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
+
+    h.assert_eq[Bool](false, is_dup)
+
+class _TestSameMessageDifferentFracs4 is UnitTest
+  fun name(): String =>
+    "message_deduplicator/SameMessageDifferentFracs4"
+
+  fun ref apply(h: TestHelper) =>
+    let list = DeduplicationList.create()
+    list.push( (MsgId(1), recover val [as U32: 1] end) )
+
+    let msg_id = MsgId(1)
+    let frac_ids = None
 
     let is_dup = _MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 

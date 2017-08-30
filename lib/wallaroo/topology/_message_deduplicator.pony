@@ -25,6 +25,10 @@ primitive _MessageDeduplicator
       match (check._2, against._2)
       | (None, None) =>
         return true
+      | (let x: Array[U32] val, None) =>
+        return false
+      | (None, let x: Array[U32] val) =>
+        return false
       | (let x: Array[U32] val, let y: Array[U32] val) =>
         if x.size() != y.size() then
           return false
