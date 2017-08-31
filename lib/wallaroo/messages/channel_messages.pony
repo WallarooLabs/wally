@@ -37,7 +37,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(ActorDataMsg(delivery_msg, seq_id), auth, wb)
 
-  fun migrate_step[K: (Hashable val & Equatable[K] val)](step_id: U128,
+  fun migrate_step[K: (Hashable val & Equatable[K] val)](step_id: StepId,
     state_name: String, key: K, state: ByteSeq val, worker: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -61,7 +61,7 @@ primitive ChannelMsgEncoder
     """
     _encode(AckMigrationBatchCompleteMsg(worker), auth)
 
-  fun step_migration_complete(step_id: U128,
+  fun step_migration_complete(step_id: StepId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -136,7 +136,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(CreateDataChannelListener(workers), auth)
 
-  fun data_connect(sender_name: String, sender_step_id: U128,
+  fun data_connect(sender_name: String, sender_step_id: StepId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(DataConnectMsg(sender_name, sender_step_id), auth)
@@ -154,7 +154,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayCompleteMsg(sender_name, boundary_id), auth)
 
-  fun ack_watermark(sender_name: String, sender_step_id: U128, seq_id: SeqId,
+  fun ack_watermark(sender_name: String, sender_step_id: StepId, seq_id: SeqId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)
@@ -445,7 +445,7 @@ class val KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
   StepMigrationMsg
   let _state_name: String
   let _key: K
-  let _step_id: U128
+  let _step_id: StepId
   let _state: ByteSeq val
   let _worker: String
 
@@ -490,14 +490,14 @@ class val UnmuteRequestMsg is ChannelMsg
     originating_worker = worker
 
 class val StepMigrationCompleteMsg is ChannelMsg
-  let step_id: U128
+  let step_id: StepId
   new val create(step_id': U128)
   =>
     step_id = step_id'
 
 class val AckWatermarkMsg is ChannelMsg
   let sender_name: String
-  let sender_step_id: U128
+  let sender_step_id: StepId
   let seq_id: SeqId
 
   new val create(sender_name': String, sender_step_id': U128,
@@ -730,7 +730,7 @@ class val KeyedAnnounceNewStatefulStepMsg[
   This message is sent to notify another worker that a new stateful step has
   been created on this worker and that partition routers should be updated.
   """
-  let _step_id: U128
+  let _step_id: StepId
   let _worker_name: String
   let _key: K
   let _state_name: String

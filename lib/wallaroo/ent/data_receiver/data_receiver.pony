@@ -17,7 +17,7 @@ actor DataReceiver is Producer
   let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
-  var _sender_step_id: U128 = 0
+  var _sender_step_id: StepId = 0
   var _router: DataRouter =
     DataRouter(recover Map[U128, Consumer] end)
   var _last_id_seen: SeqId = 0
@@ -63,7 +63,7 @@ actor DataReceiver is Producer
     _processing_phase = _DataReceiverAcceptingMessagesPhase(this)
     _inform_boundary_to_send_normal_messages()
 
-  be data_connect(sender_step_id: U128, conn: DataChannel) =>
+  be data_connect(sender_step_id: StepId, conn: DataChannel) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
     _processing_phase.data_connect()

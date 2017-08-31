@@ -581,7 +581,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         var default_in_route_builder: (RouteBuilder | None) = None
         var default_target: (Step | None) = None
         var default_target_id: U128 = t.default_target_id
-        var default_target_state_step_id: U128 = 0
+        var default_target_state_step_id: StepId = 0
         var default_target_state_step: (Step | None) = None
         match t.default_target
         | let targets: Array[StepBuilder] val =>
@@ -1562,7 +1562,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     is_ready
 
   fun _get_output_node_id(node: DagNode[StepInitializer] val,
-    default_target_id: U128, default_target_state_step_id: U128):
+    default_target_id: U128, default_target_state_step_id: StepId):
     (U128 | None) ?
   =>
     // TODO: Replace this once we move past POC default target strategy
