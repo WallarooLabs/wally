@@ -28,6 +28,9 @@ log_rotated_patterns = ['Starting event log rotation\.',
 log_rotated_pattern = '.*'.join(log_rotated_patterns)
 
 
+STOP_THE_WORLD_PAUSE = '2_000_000_000'
+AWAIT_TIMEOUT = 30
+
 def test_log_rotation_external_trigger_no_recovery():
     host = '127.0.0.1'
     sources = 1
@@ -42,8 +45,8 @@ def test_log_rotation_external_trigger_no_recovery():
 
     command = '''sequence_window_resilience \
         --log-rotation \
-        --stop-pause 10_000_000_000
-    '''
+        --stop-pause {}
+    '''.format(STOP_THE_WORLD_PAUSE)
 
     runners = []
     try:
@@ -105,7 +108,7 @@ def test_log_rotation_external_trigger_no_recovery():
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, 30)
+        stopper = SinkAwaitValue(sink, await_value, AWAIT_TIMEOUT)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -113,9 +116,6 @@ def test_log_rotation_external_trigger_no_recovery():
                 print r.name
                 print r.get_output()[0]
                 print '---'
-            print 'sink data'
-            print sink.data
-            print '---'
             raise stopper.error
 
         # stop application workers
@@ -140,8 +140,10 @@ def test_log_rotation_external_trigger_no_recovery():
         try:
             assert(success)
         except AssertionError:
+            print runners[0].name
             print runners[0].get_output()[0]
             print '---'
+            print runners[1].name
             print runners[1].get_output()[0]
             print '---'
             raise AssertionError('Validation failed with the following '
@@ -181,8 +183,8 @@ def test_log_rotation_external_trigger_recovery():
 
     command = '''sequence_window_resilience \
         --log-rotation \
-        --stop-pause 10_000_000_000
-    '''
+        --stop-pause {}
+    '''.format(STOP_THE_WORLD_PAUSE)
 
     runners = []
     try:
@@ -236,7 +238,7 @@ def test_log_rotation_external_trigger_recovery():
 
         # Check for log rotation
         log_rotated_checker = RunnerChecker(runners[1], log_rotated_patterns,
-                                            timeout=30)
+                                            timeout=AWAIT_TIMEOUT)
         log_rotated_checker.start()
         log_rotated_checker.join()
         if log_rotated_checker.error:
@@ -259,7 +261,7 @@ def test_log_rotation_external_trigger_recovery():
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, 30)
+        stopper = SinkAwaitValue(sink, await_value, AWAIT_TIMEOUT)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -267,9 +269,6 @@ def test_log_rotation_external_trigger_recovery():
                 print r.name
                 print r.get_output()[0]
                 print '---'
-            print 'sink data'
-            print sink.data
-            print '---'
             raise stopper.error
 
         # stop application workers
@@ -294,8 +293,10 @@ def test_log_rotation_external_trigger_recovery():
         try:
             assert(success)
         except AssertionError:
+            print runners[0].name
             print runners[0].get_output()[0]
             print '---'
+            print runners[1].name
             print runners[1].get_output()[0]
             print '---'
             raise AssertionError('Validation failed with the following '
@@ -349,8 +350,8 @@ def test_log_rotation_file_size_trigger_no_recovery():
     command = '''sequence_window_resilience \
         --log-rotation \
         --event-log-file-size {} \
-        --stop-pause 10_000_000_000
-    '''.format(event_log_file_size)
+        --stop-pause {}
+    '''.format(event_log_file_size, STOP_THE_WORLD_PAUSE)
 
     runners = []
     try:
@@ -401,7 +402,7 @@ def test_log_rotation_file_size_trigger_no_recovery():
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, 30)
+        stopper = SinkAwaitValue(sink, await_value, AWAIT_TIMEOUT)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -409,9 +410,6 @@ def test_log_rotation_file_size_trigger_no_recovery():
                 print r.name
                 print r.get_output()[0]
                 print '---'
-            print 'sink data'
-            print sink.data
-            print '---'
             raise stopper.error
 
         # stop application workers
@@ -478,8 +476,8 @@ def test_log_rotation_file_size_trigger_recovery():
     command = '''sequence_window_resilience \
         --log-rotation \
         --event-log-file-size {} \
-        --stop-pause 10_000_000_000
-    '''.format(event_log_file_size)
+        --stop-pause {}
+    '''.format(event_log_file_size, STOP_THE_WORLD_PAUSE)
 
     runners = []
     try:
@@ -520,7 +518,7 @@ def test_log_rotation_file_size_trigger_recovery():
 
         # Wait for runner to complete a log rotation
         log_rotated_checker = RunnerChecker(runners[1], log_rotated_patterns,
-                                            timeout=30)
+                                            timeout=AWAIT_TIMEOUT)
         log_rotated_checker.start()
         log_rotated_checker.join()
         if log_rotated_checker.error:
@@ -543,7 +541,7 @@ def test_log_rotation_file_size_trigger_recovery():
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, 30)
+        stopper = SinkAwaitValue(sink, await_value, AWAIT_TIMEOUT)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -551,9 +549,6 @@ def test_log_rotation_file_size_trigger_recovery():
                 print r.name
                 print r.get_output()[0]
                 print '---'
-            print 'sink data'
-            print sink.data
-            print '---'
             raise stopper.error
 
         # stop application workers
@@ -577,8 +572,10 @@ def test_log_rotation_file_size_trigger_recovery():
         try:
             assert(success)
         except AssertionError:
+            print runners[-1].name
             print runners[-1].get_output()[0]
             print '---'
+            print runners[-2].name
             print runners[-2].get_output()[0]
             print '---'
             raise AssertionError('Validation failed with the following '
