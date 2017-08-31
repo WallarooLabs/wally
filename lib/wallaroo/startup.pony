@@ -288,7 +288,7 @@ actor Startup
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
 
-      let data_receivers = DataReceivers(auth,
+      let data_receivers = DataReceivers(auth, connections,
         _startup_options.worker_name, is_recovering)
 
       let router_registry = RouterRegistry(auth,
@@ -403,8 +403,6 @@ actor Startup
           m.data_addrs("initializer")
         end
 
-      let data_receivers = DataReceivers(auth, _startup_options.worker_name)
-
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
@@ -434,6 +432,9 @@ actor Startup
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
+
+      let data_receivers = DataReceivers(auth, connections,
+        _startup_options.worker_name)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
@@ -552,7 +553,7 @@ actor Startup
       let event_log_filenames = FilterLogFiles(_event_log_file_basename,
         _event_log_file_suffix, base_dir.entries())
       for fn in event_log_filenames.values() do
-        _remove_file(event_log_dir_filepath.path + fn)
+        _remove_file(event_log_dir_filepath.path + "/" + fn)
       end
     else
       Fail()

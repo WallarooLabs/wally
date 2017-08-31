@@ -211,3 +211,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     end
     _notify.received(this, msg, network_received_timestamp)
 
+  be dispose() =>
+    for b in _outgoing_boundaries.values() do
+      b.dispose()
+    end

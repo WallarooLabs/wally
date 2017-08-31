@@ -125,6 +125,10 @@ actor TCPSourceListener is SourceListener
     end
     _outgoing_boundary_builders = consume new_builders
 
+  be dispose() =>
+    @printf[I32]("Shutting down TCPSourceListener\n".cstring())
+    _close()
+
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     When we are readable, we accept new connections until none remain.
@@ -218,3 +222,22 @@ actor TCPSourceListener is SourceListener
       error
     end
 
+  fun ref _close() =>
+    """
+    Dispose of resources.
+    """
+    if _closed then
+      return
+    end
+
+    _closed = true
+
+    if not _event.is_null() then
+      @pony_os_socket_close[None](_fd)
+      _fd = -1
+
+      // When not on windows, the unsubscribe is done immediately.
+      ifdef not windows then
+        @pony_asio_event_unsubscribe(_event)
+      end
+    end

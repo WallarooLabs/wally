@@ -924,6 +924,15 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let sink = egress_builder(_worker_name,
                   consume sink_reporter, _auth, _outgoing_boundaries)
 
+                match sink
+                | let d: DisposableActor =>
+                  _connections.register_disposable(d)
+                else
+                  @printf[I32](("All sinks and boundaries should be " +
+                    "disposable!!\n").cstring())
+                  Fail()
+                end
+
                 if not _initializables.contains(sink) then
                   _initializables.set(sink)
                 end
@@ -1291,10 +1300,19 @@ actor LocalTopologyInitializer is LayoutInitializer
               let sink_reporter = MetricsReporter(t.name(),
                 t.worker_name(), _metrics_conn)
 
-              // Create a sink or OutgoingBoundary proxy. If the latter,
+              // Create a sink or OutgoingBoundary. If the latter,
               // egress_builder finds it from _outgoing_boundaries
               let sink = egress_builder(_worker_name,
                 consume sink_reporter, _auth, _outgoing_boundaries)
+
+              match sink
+              | let d: DisposableActor =>
+                _connections.register_disposable(d)
+              else
+                @printf[I32](("All sinks and boundaries should be " +
+                  "disposable!!\n").cstring())
+                Fail()
+              end
 
               if not _initializables.contains(sink) then
                 _initializables.set(sink)

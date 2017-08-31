@@ -83,7 +83,7 @@ class _TestDataChannel is DataChannelListenNotify
         _NullMetricsSink, "127.0.0.1", "0",
         true, "/tmp/foo_connections.txt", false
         where event_log = event_log)
-      let dr = DataReceivers(auth, "worker_name")
+      let dr = DataReceivers(auth, conns, "worker_name")
       let rr = RouterRegistry(auth, "worker_name", dr, conns, 1)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
       h.dispose_when_done(conns)
@@ -518,4 +518,7 @@ actor _NullMetricsSink
     None
 
   be writev(data: ByteSeqIter) =>
+    None
+
+  be dispose() =>
     None

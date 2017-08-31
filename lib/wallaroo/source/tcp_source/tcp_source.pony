@@ -238,6 +238,10 @@ actor TCPSource is Producer
     """
     - Close the connection gracefully.
     """
+    @printf[I32]("Shutting down TCPSource\n".cstring())
+    for b in _outgoing_boundaries.values() do
+      b.dispose()
+    end
     close()
 
   fun ref route_to(c: Consumer): (Route | None) =>

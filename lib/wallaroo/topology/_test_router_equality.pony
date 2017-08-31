@@ -262,7 +262,7 @@ primitive _RouterRegistryGenerator
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>
-    DataReceivers(auth, "")
+    DataReceivers(auth, _ConnectionsGenerator(env, auth), "")
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
@@ -290,4 +290,7 @@ actor _NullMetricsSink
     None
 
   be writev(data: ByteSeqIter) =>
+    None
+
+  be dispose() =>
     None
