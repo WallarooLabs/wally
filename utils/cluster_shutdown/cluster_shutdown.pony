@@ -12,7 +12,7 @@ actor Main
       let tcp_auth = TCPConnectAuth(auth)
       TCPConnection(tcp_auth, Notifier(env, host, service), host, service)
     else
-      env.err.print("usage: cluster_shutdown HOST:PORT")
+      env.err.print("Usage: cluster_shutdown HOST:PORT")
       env.exitcode(1)
     end
 
