@@ -238,8 +238,8 @@ actor ActorSystemStartup
 
       let w_name = _startup_options.worker_name
 
-      let data_receivers = DataReceivers(auth, _startup_options.worker_name,
-        is_recovering)
+      let data_receivers = DataReceivers(auth, connections,
+        _startup_options.worker_name, is_recovering)
 
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
         data_receivers, connections, _startup_options.stop_the_world_pause)
@@ -352,7 +352,7 @@ actor ActorSystemStartup
       let event_log_filenames = FilterLogFiles(_event_log_file_basename,
         _event_log_file_suffix, base_dir.entries())
       for fn in event_log_filenames.values() do
-        _remove_file(event_log_dir_filepath.path + fn)
+        _remove_file(event_log_dir_filepath.path + "/" + fn)
       end
     else
       Fail()
@@ -379,4 +379,4 @@ primitive EmptyConnections
 
 primitive EmptyRouterRegistry
   fun apply(auth: AmbientAuth, c: Connections): RouterRegistry =>
-    RouterRegistry(auth, "", DataReceivers(auth, ""), c, 0)
+    RouterRegistry(auth, "", DataReceivers(auth, c, ""), c, 0)

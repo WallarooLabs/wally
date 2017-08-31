@@ -39,11 +39,11 @@ actor Connections is Cluster
   let _metrics_service: String
   let _init_d_host: String
   let _init_d_service: String
-  let _listeners: Array[TCPListener] = _listeners.create(0)
+  let _listeners: Array[TCPListener] = _listeners.create()
   let _data_channel_listeners: Array[DataChannelListener] =
     _data_channel_listeners.create()
+  let _disposables: SetIs[DisposableActor] = _disposables.create()
   let _step_id_gen: StepIdGenerator = StepIdGenerator
-  let _disposables: SetIs[Disposable] = _disposables.create()
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
@@ -97,8 +97,10 @@ actor Connections is Cluster
     if (external_host != "") or (external_service != "") then
       match recovery_file_cleaner
       | let rfc: RecoveryFileCleaner =>
+        let external_channel_notifier =
+          ExternalChannelListenNotifier(_worker_name, _auth, this, rfc)
         let external_listener = TCPListener(_auth,
-          ExternalChannelListenNotifier(_worker_name, _auth, this, rfc), external_host, external_service)
+          consume external_channel_notifier, external_host, external_service)
         _listeners.push(external_listener)
       else
         @printf[I32]("Need RecoveryFileCleaner to create external channel\n"
@@ -107,6 +109,8 @@ actor Connections is Cluster
       @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
         external_host.cstring(), external_service.cstring())
     end
+
+    _register_disposable(_metrics_conn)
 
   be register_my_control_addr(host: String, service: String) =>
     _my_control_addr = (host, service)
@@ -128,7 +132,10 @@ actor Connections is Cluster
       Fail()
     end
 
-  be register_disposable(d: Disposable) =>
+  be register_disposable(d: DisposableActor) =>
+    _register_disposable(d)
+
+  fun ref _register_disposable(d: DisposableActor) =>
     _disposables.set(d)
 
   be make_and_register_recoverable_listener(auth: TCPListenerAuth,
@@ -325,6 +332,7 @@ actor Connections is Cluster
         consume reporter, host, service, _spike_config)
       let boundary = builder.build_and_initialize(boundary_id,
         local_topology_initializer)
+      _register_disposable(boundary)
       local_topology_initializer.add_boundary_to_new_worker(target, boundary,
         builder)
     else
@@ -535,6 +543,7 @@ actor Connections is Cluster
       _spike_config)
     let outgoing_boundary = boundary_builder(_step_id_gen())
     _data_conn_builders(target_name) = boundary_builder
+    _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
 
   be create_data_connection_to_joining_worker(target_name: String,

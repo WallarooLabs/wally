@@ -108,14 +108,16 @@ actor RouterRegistry
   be update_actor_data_router(adr: ActorSystemDataRouter) =>
     _actor_data_router = adr
 
-  be register_source(tcp_source: Source) =>
-    _sources.set(tcp_source)
+  be register_source(source: Source) =>
+    _sources.set(source)
     if not _stop_the_world_in_process and _application_ready_to_work then
-      tcp_source.unmute(_dummy_consumer)
+      source.unmute(_dummy_consumer)
     end
+    _connections.register_disposable(source)
 
-  be register_source_listener(tcp_source_listener: SourceListener) =>
-    _source_listeners.set(tcp_source_listener)
+  be register_source_listener(source_listener: SourceListener) =>
+    _source_listeners.set(source_listener)
+    _connections.register_disposable(source_listener)
 
   be register_data_channel_listener(dchl: DataChannelListener) =>
     _data_channel_listeners.set(dchl)

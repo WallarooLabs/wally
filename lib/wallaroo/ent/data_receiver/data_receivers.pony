@@ -12,6 +12,7 @@ interface DataReceiversSubscriber
 
 actor DataReceivers
   let _auth: AmbientAuth
+  let _connections: Connections
   let _worker_name: String
 
   var _initialized: Bool = false
@@ -22,10 +23,11 @@ actor DataReceivers
     DataRouter(recover Map[U128, Consumer] end)
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
-  new create(auth: AmbientAuth, worker_name: String,
+  new create(auth: AmbientAuth, connections: Connections, worker_name: String,
     is_recovering: Bool = false)
   =>
     _auth = auth
+    _connections = connections
     _worker_name = worker_name
     if not is_recovering then
       _initialized = true
@@ -57,6 +59,7 @@ actor DataReceivers
           _initialized)
         new_dr.update_router(_data_router)
         _data_receivers(boundary_id) = new_dr
+        _connections.register_disposable(new_dr)
         new_dr
       end
     conn.identify_data_receiver(dr, sender_boundary_id)

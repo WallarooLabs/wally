@@ -41,6 +41,7 @@ actor ReconnectingMetricsSink
   var _shutdown: Bool = false
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
+  var _no_more_reconnect: Bool = false
   var _host: String
   var _service: String
   var _from: String
@@ -63,6 +64,8 @@ actor ReconnectingMetricsSink
   var _reconnect_pause: U64
   var _application_name: String
   var _worker_name: String
+
+  let _timers: Timers = Timers
 
   new create(host: String, service: String, application_name: String,
     worker_name: String, from: String = "", init_size: USize = 64,
@@ -243,6 +246,9 @@ actor ReconnectingMetricsSink
     """
     Close the connection gracefully once all writes are sent.
     """
+    @printf[I32]("Shutting down ReconnectingMetricsSink\n".cstring())
+    _no_more_reconnect = true
+    _timers.dispose()
     close()
 
   fun local_address(): IPAddress =>
@@ -708,7 +714,6 @@ actor ReconnectingMetricsSink
        _close()
      end
     end
-    _schedule_reconnect()
 
   fun ref _close() =>
     _closed = true
@@ -789,12 +794,11 @@ actor ReconnectingMetricsSink
     _notify.closed(this)
 
   fun ref _schedule_reconnect() =>
-    if (_host != "") and (_service != "") then
+    if (_host != "") and (_service != "") and not _no_more_reconnect then
       @printf[I32]("RE-Connecting MetricsSink to %s:%s\n".cstring(),
                    _host.cstring(), _service.cstring())
-      let timers = Timers
-      let timer = Timer(PauseBeforeReconnect(this), _reconnect_pause)
-      timers(consume timer)
+      let timer = Timer(_PauseBeforeReconnect(this), _reconnect_pause)
+      _timers(consume timer)
     end
 
   be reconnect() =>
@@ -956,7 +960,7 @@ class MetricsSinkNotify is _MetricsSinkNotify
     @printf[None]("%s outgoing no longer throttled\n".cstring(),
       _name.cstring())
 
-class PauseBeforeReconnect is TimerNotify
+class _PauseBeforeReconnect is TimerNotify
   let _metrics_sink: ReconnectingMetricsSink
 
   new iso create(metrics_sink: ReconnectingMetricsSink) =>

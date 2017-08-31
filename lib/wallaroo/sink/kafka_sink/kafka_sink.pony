@@ -280,3 +280,6 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   be receive_state(state: ByteSeq val) =>
     // TODO: implement state recovery
     Fail()
+
+  be dispose() =>
+    None

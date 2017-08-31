@@ -112,6 +112,7 @@ actor TCPSink is Consumer
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+  var _no_more_reconnect: Bool = false
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
   var _reconnect_pause: U64
@@ -251,8 +252,10 @@ actor TCPSink is Consumer
     to be sent but any writes that arrive after this will be
     silently discarded and not acknowleged.
     """
+    @printf[I32]("Shutting down TCPSink\n".cstring())
+    _no_more_reconnect = true
+    _timers.dispose()
     close()
-
 
   fun ref _unit_finished(number_finished: ISize,
     number_tracked_finished: ISize,
@@ -774,7 +777,7 @@ actor TCPSink is Consumer
     _pending_reads()
 
   fun ref _schedule_reconnect() =>
-    if (_host != "") and (_service != "") then
+    if (_host != "") and (_service != "") and not _no_more_reconnect then
       @printf[I32]("RE-Connecting TCPSink to %s:%s\n".cstring(),
                    _host.cstring(), _service.cstring())
       let timer = Timer(PauseBeforeReconnectTCPSink(this), _reconnect_pause)

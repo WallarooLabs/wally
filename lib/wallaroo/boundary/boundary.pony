@@ -123,6 +123,7 @@ actor OutgoingBoundary is Consumer
   var _read_len: USize = 0
   var _shutdown: Bool = false
   var _muted: Bool = false
+  var _no_more_reconnect: Bool = false
   var _expect_read_buf: Reader = Reader
 
   // Connection, Acking and Replay
@@ -142,6 +143,9 @@ actor OutgoingBoundary is Consumer
 
   // Producer (Resilience)
   let _terminus_route: TerminusRoute = TerminusRoute
+
+  var _reconnect_pause: U64 = 10_000_000_000
+  let _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -422,6 +426,8 @@ actor OutgoingBoundary is Consumer
     to be sent but any writes that arrive after this will be
     silently discarded and not acknowleged.
     """
+    @printf[I32]("Shutting down OutgoingBoundary\n".cstring())
+    _no_more_reconnect = true
     close()
     _notify.dispose()
 
@@ -578,6 +584,14 @@ actor OutgoingBoundary is Consumer
       end
     end
 
+  fun ref _schedule_reconnect() =>
+    if (_host != "") and (_service != "") and not _no_more_reconnect then
+      @printf[I32]("RE-Connecting OutgoingBoundary to %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
+      let timer = Timer(_PauseBeforeReconnect(this), _reconnect_pause)
+      _timers(consume timer)
+    end
+
   fun ref _writev(data: ByteSeqIter) =>
     """
     Write a sequence of sequences of bytes.
@@ -617,6 +631,7 @@ actor OutgoingBoundary is Consumer
     else
       _notify.connect_failed(this)
       _hard_close()
+      _schedule_reconnect()
     end
 
   fun ref close() =>
@@ -755,6 +770,7 @@ actor OutgoingBoundary is Consumer
       // The socket has been closed from the other side.
       _shutdown_peer = true
       _hard_close()
+      _schedule_reconnect()
     end
 
   be _read_again() =>
@@ -834,6 +850,7 @@ actor OutgoingBoundary is Consumer
       else
         // Non-graceful shutdown on error.
         _hard_close()
+        _schedule_reconnect()
       end
     end
 
@@ -939,7 +956,6 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
   let _outgoing_boundary: OutgoingBoundary tag
-  let _timers: Timers = Timers
   let _reconnect_closed_delay: U64
   let _reconnect_failed_delay: U64
 
@@ -1009,15 +1025,9 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
-    let t = Timer(_ReconnectTimerNotify(_outgoing_boundary),
-     _reconnect_closed_delay, 0)
-    _timers(consume t)
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
-    let t = Timer(_ReconnectTimerNotify(_outgoing_boundary),
-      _reconnect_failed_delay, 0)
-    _timers(consume t)
 
   fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
     data: ByteSeqIter): ByteSeqIter
@@ -1033,19 +1043,12 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
 
- fun dispose() =>
-    ifdef "trace" then
-      @printf[I32]("Disposing any active reconnect timers...".cstring())
-    end
-    _timers.dispose()
-
-class _ReconnectTimerNotify is TimerNotify
+class _PauseBeforeReconnect is TimerNotify
   let _ob: OutgoingBoundary
 
-  new iso create(outgoing_boundary: OutgoingBoundary tag) =>
-    _ob = outgoing_boundary
+  new iso create(ob: OutgoingBoundary) =>
+    _ob = ob
 
   fun ref apply(timer: Timer, count: U64): Bool =>
-    @printf[I32]("Attempting to reconnect to downstream...\n".cstring())
     _ob.reconnect()
     false

@@ -233,6 +233,7 @@ actor DataReceiver is Producer
     end
 
   be dispose() =>
+    @printf[I32]("Shutting down DataReceiver\n".cstring())
     _timers.dispose()
 
   fun ref route_to(c: Consumer): (Route | None) =>

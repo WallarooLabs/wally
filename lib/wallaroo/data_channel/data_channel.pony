@@ -276,6 +276,7 @@ actor DataChannel
     """
     Close the connection gracefully once all writes are sent.
     """
+    @printf[I32]("Shutting down DataChannel\n".cstring())
     close()
 
   fun local_address(): IPAddress =>
