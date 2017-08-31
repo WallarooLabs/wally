@@ -7,6 +7,7 @@ A Wallaroo cluster does not have a continuously-running centralized manager for 
 ## Starting a Wallaroo cluster
 
 ### --worker-count
+
 To create a topology with multiple workers, the initializer needs be started with the `--worker-count` option. `--worker-count 2` would tell the initializer to wait until the cluster has 2 members before starting up the application.
 
 ### --name
