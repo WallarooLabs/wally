@@ -663,7 +663,7 @@ actor ProcessManager
           else
             is_leader = false
           end
-        | "topology-initializer" =>
+        | "cluster-initializer" =>
           match sections(section)(key)
           | "true" =>
             is_leader = true

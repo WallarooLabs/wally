@@ -69,7 +69,7 @@ primitive WallarooConfig
       // worker count includes the initial "leader" since there is no
       // persisting leader
       .add("worker-count", "w", I64Argument)
-      .add("topology-initializer", "t", None)
+      .add("cluster-initializer", "t", None)
       .add("name", "n", StringArgument)
       .add("resilience-dir", "r", StringArgument)
       .add("log-rotation", "", None)
@@ -123,7 +123,7 @@ primitive WallarooConfig
         so.x_arg = arg.split(":")
       | ("worker-count", let arg: I64) =>
         so.worker_count = arg.usize()
-      | ("topology-initializer", None) =>
+      | ("cluster-initializer", None) =>
         so.is_initializer = true
       | ("name", let arg: String) =>
         so.worker_name = arg
@@ -154,7 +154,7 @@ primitive WallarooConfig
     end
 
     if so.is_joining and so.is_initializer then
-      @printf[I32](("--topology-initializer is an invalid command line " +
+      @printf[I32](("--cluster-initializer is an invalid command line " +
         "argument when joining.  Joining worker cannot function as " +
         "initializer.\n").cstring())
       error

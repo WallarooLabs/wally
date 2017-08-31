@@ -786,13 +786,13 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
                                        data_port = data_port,
                                        res_dir = res_dir,
                                        workers = workers)
-    # for each worker, assign `name` and `topology-initializer` values
+    # for each worker, assign `name` and `cluster-initializer` values
 
     if workers < 1:
         raise PipelineTestError("workers must be 1 or more")
     runners.append(Runner(cmd_string=command_stub.format(
         name = 'initializer',
-        topology_initializer = '--topology-initializer'),
+        topology_initializer = '--cluster-initializer'),
                          name='initializer'))
     for x in range(1, workers):
         runners.append(Runner(cmd_string=command_stub.format(
@@ -846,7 +846,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
     - `command`: the command to run each worker. Make sure to leave out the
         Wallaroo parameters: `--in`, `--out`, `--metrics`, `--data`,
         `--control`, `--external`, `--workers`, `--name`,
-        `--topology-initializer`, and `--ponynoblock`.
+        `--cluster-initializer`, and `--ponynoblock`.
         These will be applied by the test setup utility.
     - `workers`: the number of workers to use in the test. Default: 1.
     - `sources`: the number of sources in the application. Default: 1.
