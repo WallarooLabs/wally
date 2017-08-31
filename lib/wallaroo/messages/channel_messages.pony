@@ -256,6 +256,9 @@ primitive ChannelMsgEncoder
   fun rotate_log_files(auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(RotateLogFilesMsg, auth)
 
+  fun clean_shutdown(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(CleanShutdownMsg, auth)
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -749,3 +752,5 @@ primitive RotateLogFilesMsg is ChannelMsg
   """
   This message is sent to a worker instructing it to rotate its log files.
   """
+
+primitive CleanShutdownMsg is ChannelMsg

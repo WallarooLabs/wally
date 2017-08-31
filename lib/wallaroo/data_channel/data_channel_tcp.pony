@@ -134,7 +134,6 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _connections: Connections
   let _auth: AmbientAuth
   var _header: Bool = true
-  let _timers: Timers = Timers
   let _metrics_reporter: MetricsReporter
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers

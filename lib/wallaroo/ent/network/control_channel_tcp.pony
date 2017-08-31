@@ -5,6 +5,7 @@ use "files"
 use "sendence/bytes"
 use "sendence/hub"
 use "wallaroo"
+use "wallaroo/core"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/w_actor"
@@ -31,8 +32,8 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _router_registry: RouterRegistry
   let _broadcast_variables: (BroadcastVariables | None)
   let _recovery_file: FilePath
-  let _joining_existing_cluster: Bool
   let _event_log: EventLog
+  let _recovery_file_cleaner: RecoveryFileCleaner
 
   new iso create(name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
@@ -40,9 +41,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     recovery_file: FilePath, data_host: String, data_service: String,
-    joining: Bool = false,
-    broadcast_variables: (BroadcastVariables | None) = None,
-    event_log: EventLog)
+    event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner,
+    broadcast_variables: (BroadcastVariables | None) = None)
   =>
     _auth = auth
     _name = name
@@ -59,8 +59,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     _recovery_file = recovery_file
     _d_host = data_host
     _d_service = data_service
-    _joining_existing_cluster = joining
     _event_log = event_log
+    _recovery_file_cleaner = recovery_file_cleaner
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -75,17 +75,11 @@ class ControlChannelListenNotifier is TCPListenNotify
       if _recovery_file.exists() then
         @printf[I32]("Recovery file exists for control channel\n".cstring())
       end
-      if _joining_existing_cluster then
-        //TODO: Do we actually need to do this? Isn't this sent as
-        // part of joining worker initialized message?
-        let message = ChannelMsgEncoder.identify_control_port(_name,
-          _service, _auth)
-        _connections.send_control_to_cluster(message)
-      else
-        let message = ChannelMsgEncoder.identify_control_port(_name,
-          _service, _auth)
-        _connections.send_control_to_cluster(message)
-      end
+
+      let message = ChannelMsgEncoder.identify_control_port(_name,
+        _service, _auth)
+      _connections.send_control_to_cluster(message)
+
       let f = File(_recovery_file)
       f.print(_host)
       f.print(_service)
@@ -107,7 +101,8 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
-      _router_registry, _broadcast_variables, _d_host, _d_service, _event_log)
+      _router_registry, _broadcast_variables, _d_host, _d_service, _event_log,
+      _recovery_file_cleaner)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
@@ -122,6 +117,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _d_host: String
   let _d_service: String
   let _event_log: EventLog
+  let _recovery_file_cleaner: RecoveryFileCleaner
   var _header: Bool = true
 
   new iso create(name: String, auth: AmbientAuth,
@@ -129,7 +125,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     broadcast_variables: (BroadcastVariables | None),
-    data_host: String, data_service: String, event_log: EventLog)
+    data_host: String, data_service: String, event_log: EventLog,
+    recovery_file_cleaner: RecoveryFileCleaner)
   =>
     _auth = auth
     _name = name
@@ -143,6 +140,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _d_host = data_host
     _d_service = data_service
     _event_log = event_log
+    _recovery_file_cleaner = recovery_file_cleaner
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -369,6 +367,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Control Ch: Received Rotate Log Files request\n"
           .cstring())
         _event_log.start_rotation()
+      | let m: CleanShutdownMsg =>
+        _recovery_file_cleaner.clean_recovery_files()
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else

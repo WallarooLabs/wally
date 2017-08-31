@@ -120,6 +120,8 @@ actor TCPSink is Consumer
   var _from: String
 
   // Producer (Resilience)
+  let _timers: Timers = Timers
+
   let _terminus_route: TerminusRoute = TerminusRoute
 
   new create(encoder_wrapper: TCPEncoderWrapper,
@@ -775,9 +777,8 @@ actor TCPSink is Consumer
     if (_host != "") and (_service != "") then
       @printf[I32]("RE-Connecting TCPSink to %s:%s\n".cstring(),
                    _host.cstring(), _service.cstring())
-      let timers = Timers
       let timer = Timer(PauseBeforeReconnectTCPSink(this), _reconnect_pause)
-      timers(consume timer)
+      _timers(consume timer)
     end
 
   be reconnect() =>
