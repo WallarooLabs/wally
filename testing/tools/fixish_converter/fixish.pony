@@ -65,7 +65,15 @@ actor Main
       else
         let wb = Writer
         var p = true
-        for line in input_file.lines() do
+        let reader = Reader
+        reader.append(input_file.read(input_file.size()))
+        while true do
+          let line = try
+            reader.line()
+          else
+            break
+          end
+
           match FixParser(line)
           | let m: FixOrderMessage val =>
             try
