@@ -39,7 +39,8 @@ actor DataReceiver is Producer
   var _timer_init: _TimerInit = _UninitializedTimerInit
   let _timers: Timers = Timers
 
-  var _processing_phase: _DataReceiverProcessingPhase = _DataReceiverNotProcessingPhase
+  var _processing_phase: _DataReceiverProcessingPhase =
+    _DataReceiverNotProcessingPhase
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     initialized: Bool = false)

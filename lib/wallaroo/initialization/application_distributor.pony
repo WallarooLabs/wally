@@ -85,8 +85,8 @@ actor ApplicationDistributor is Distributor
       end
 
       // Edges that must be added at the end (because we need to create the
-      // edge at the time the producer node is created, in which case the target
-      // node will not yet exist).
+      // edge at the time the producer node is created, in which case the
+      // target node will not yet exist).
       // Map from worker name to all (from_id, to_id) pairs
       let unbuilt_edges: Map[String, Array[(U128, U128)]] =
         unbuilt_edges.create()
@@ -113,7 +113,8 @@ actor ApplicationDistributor is Distributor
       @printf[I32](("Found " + application.pipelines.size().string() +
         " pipelines in application\n").cstring())
 
-      // Add stepbuilders for each pipeline into LocalGraphs to distribute to // workers
+      // Add stepbuilders for each pipeline into LocalGraphs to distribute to
+      // workers
       for pipeline in application.pipelines.values() do
         if not pipeline.is_coalesced() then
           @printf[I32](("Coalescing is off for " + pipeline.name() +

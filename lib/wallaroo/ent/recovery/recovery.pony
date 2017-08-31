@@ -211,7 +211,8 @@ class _BoundaryMsgReplay is _RecoveryPhase
     | let rr: RecoveryReplayer =>
       rr.start_recovery_replay(_workers, _recovery)
     else
-      @printf[I32]("|~~ - - No RecoveryReplayer: Finishing early - - ~~|\n".cstring())
+      @printf[I32]("|~~ - - No RecoveryReplayer: Finishing early - - ~~|\n"
+        .cstring())
       msg_replay_finished()
     end
 

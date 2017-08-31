@@ -668,8 +668,8 @@ actor Connections is Cluster
           Fail()
         end
       else
-        @printf[I32](("WARNING: LogRotation requested for non-existent worker: " +
-          "%s\n").cstring(), worker_name.cstring())
+        @printf[I32](("WARNING: LogRotation requested for non-existent " +
+          "worker: %s\n").cstring(), worker_name.cstring())
       end
     else
       @printf[I32]("WARNING: LogRotation requested, but log_rotation is off!\n"

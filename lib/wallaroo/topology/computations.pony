@@ -14,7 +14,8 @@ interface Computation[In: Any val, Out: Any val] is BasicComputation
   fun apply(input: In): (Out | Array[Out] val | None)
   fun name(): String
 
-interface StateComputation[In: Any val, Out: Any val, S: State ref] is BasicComputation
+interface StateComputation[In: Any val, Out: Any val, S: State ref] is
+  BasicComputation
   // Return a tuple containing the result of the computation (which is None
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).

@@ -28,7 +28,8 @@ class val Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
   fun function(): PartitionFunction[In, Key] val => _function
   fun keys(): (Array[WeightedKey[Key]] val | Array[Key] val) => _keys
 
-interface PartitionFunction[In: Any val, Key: (Hashable val & Equatable[Key] val)]
+interface PartitionFunction[In: Any val, Key:
+  (Hashable val & Equatable[Key] val)]
   fun apply(input: In): Key
 
 primitive SingleStepPartitionFunction[In: Any val] is
@@ -186,7 +187,8 @@ class val KeyedStateSubpartition[PIn: Any val,
       | let pa: ProxyAddress =>
         if pa.worker == worker_name then
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
-          let next_state_step = Step(_runner_builder(where event_log = event_log, auth=auth),
+          let next_state_step = Step(_runner_builder(where event_log =
+            event_log, auth=auth),
             consume reporter, id, _runner_builder.route_builder(),
               event_log, recovery_replayer, outgoing_boundaries)
 
@@ -210,7 +212,8 @@ class val KeyedStateSubpartition[PIn: Any val,
       end
     end
 
-    @printf[I32](("Spinning up " + partition_count.string() + " state partitions for " + _pipeline_name + " pipeline\n").cstring())
+    @printf[I32](("Spinning up " + partition_count.string() +
+      " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
     LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
       _partition_function, default_router)
@@ -268,7 +271,9 @@ primitive PartitionFileReader
       end
       file.dispose()
     else
-      @printf[I32]("ERROR: Problem reading partition file. Each line must have a key string and, optionally, a weight (separated by a comma)\n".cstring())
+      @printf[I32](("ERROR: Problem reading partition file. Each line must " +
+        "have a key string and, optionally, a weight (separated by a " +
+        "comma)\n").cstring())
     end
 
     consume keys

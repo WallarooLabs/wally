@@ -176,7 +176,8 @@ class val RunnerSequenceBuilder is RunnerBuilder
     default_r: (Router | None) = None): Router
   =>
     try
-      _runner_builders(_runner_builders.size() - 1).clone_router_and_set_input_type(r, default_r)
+      _runner_builders(_runner_builders.size() - 1)
+        .clone_router_and_set_input_type(r, default_r)
     else
       r
     end
@@ -541,15 +542,16 @@ class ComputationRunner[In: Any val, Out: Any val]
       end
 
     let latest_metrics_id = ifdef "detailed-metrics" then
-        metrics_reporter.step_metric(metric_name, _computation_name, metrics_id,
-          latest_ts, computation_start where prefix = "Before")
+        metrics_reporter.step_metric(metric_name, _computation_name,
+          metrics_id, latest_ts, computation_start where prefix = "Before")
         metrics_id + 1
       else
         metrics_id
       end
 
-    metrics_reporter.step_metric(metric_name, _computation_name, latest_metrics_id,
-      computation_start, computation_end)
+    metrics_reporter.step_metric(metric_name, _computation_name,
+      latest_metrics_id, computation_start, computation_end)
+
     (is_finished, keep_sending, last_ts)
 
   fun name(): String => _computation.name()
@@ -612,7 +614,8 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
           (true, true, latest_ts)
         end
       else
-        @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
+        @printf[I32]("StateRunner: Input was not a StateProcessor!\n"
+          .cstring())
         (true, true, latest_ts)
       end
     let wrapper_creation_end_ts = Time.nanos()
@@ -629,7 +632,8 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
   =>
     r
 
-class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStateRunner)
+class StateRunner[S: State ref] is (Runner & ReplayableRunner &
+  SerializableStateRunner)
   var _state: S
   //TODO: this needs to be per-computation, rather than per-runner
   let _state_change_repository: StateChangeRepository[S] ref
@@ -669,7 +673,8 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
           sc.apply(_state)
         end
       else
-        @printf[I32]("FATAL: could not look up state_change with id %d".cstring(), statechange_id)
+        @printf[I32]("FATAL: could not look up state_change with id %d"
+          .cstring(), statechange_id)
       end
     end
 
@@ -722,7 +727,8 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
             _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
               sc.id(), producer.current_sequence_id(), consume payload)
           else
-            @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
+            @printf[I32]("StateRunner with unassigned EventLogBuffer!"
+              .cstring())
           end
         end
         sc.apply(_state)
@@ -760,7 +766,8 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
 
   fun ref serialize_state(): ByteSeq val =>
     try
-      Serialised(SerialiseAuth(_auth), _state).output(OutputSerialisedAuth(_auth))
+      Serialised(SerialiseAuth(_auth), _state)
+        .output(OutputSerialisedAuth(_auth))
     else
       Fail()
       recover val Array[U8] end
