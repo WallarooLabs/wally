@@ -1,120 +1,82 @@
-# Multi-Worker apps
+# Clustered Wallaroo
 
-Wallaroo allows an application to be run on multiple workers. The topology is
-automatically arranged between workers at startup, such that no additional work
-is required on the developer's part.
+Wallaroo allows an application to be run on multiple workers working together in a cluster. Wallaroo handles distributing work across the cluster at startup, such that no additional work is required on the developer's part.
 
+A Wallaroo cluster does not have a continuously-running centralized manager for its workers. Coordination is all done on a decentralized basis. At cluster startup, one worker assumes the role of "initializer". The initializer is responsible for coordinating application startup. A worker is deemed to be an initializer by passing the `--topology-initializer` command line argument. 
 
-## Decentralized synchronization
+## Starting a Wallaroo cluster
 
-A Wallaroo cluster does not have a continuously-running centralized manager for
-its workers, so coordination is all done on a decentralized basis.
+### --worker-count
+To create a topology with multiple workers, the initializer needs be started with the `--worker-count` option. --worker-count 2` would tell the initializer to wait until the cluster has 2 members before starting up the application.
 
+### --name
 
-### The Initializer
+Each member of the cluster needs to be supplied a unique name. The `--name` command line option is used to supply a worker name.
 
-At cluster startup, one worker assumes the role of "initializer". This means
-that this worker is responsible for coordinating the startup of all other
-workers. A worker is deemed to be an initializer by passing the
-`--topology-initializer` command line argument.
+### --control-channel
 
+The `--control-channel` flag serves two slightly different but related roles based on whether the worker is the initializer:
 
-### Multiple workers
+- The initializer uses the `--control-channel` flag to indicate an IP address that it should listen for incoming cluster setup connections on.
+- Non-initializers should be supplied with the initializer's control channel address to know where to find the initializer so that they can join the cluster.
 
-To create a topology with multiple workers, each worker needs to be started with
-the `--worker-count` option, and well as a `--worker-name` option, the latter
-being unique for each worker. Each worker will have to know the host and
-port for the control channel, via the `--control-channel` options. This is used
-to communicate with the initializer: the worker designated as initializer
-will be listening on that address, and all other workers will be connecting to
-it at startup to coordinate the topology distribution and synchronization.
-
-
-### Restarting workers
-
-All the workers in a newly-started cluster, will save topology information
-locally in the resilience directory (`/tmp/` if none is provided via the
-`--resilience-dir` command line option). At every worker's subsequent startup,
-it will check for these files, and if present, it will attempt to reconnect to
-the existing cluster specified in the resilience files.
-
-
-### Shutting down a cluster
-
-To entirely shut down a cluster, simply terminate all the running workers.
-If you intend to start a new cluster, you will have to delete the files created
-in the resilience directory.
-
-
-## Compatibility
-
-Currently, any Wallaroo app can be run with multiple workers. However, certain
-design considerations have to be made.
-
-
-### Coalescing
-
-Certain types of computations will be "coalesced": this means that, under
-certain circumstances and rules, they will be joined to their preceding or following
-computations, and treated as a single computation.
-
-
-### Simple computation
-
-A simple computation will live on a single worker. If you have multiple simple
-computations in a row, these are coalesced on a single worker and cannot be
-separated.
-
-
-### Stateful computations
-
-Like simple computations, a single stateful computation can only live on a
-single worker. A stateful computation interrupts the chain of coalescing of all
-the preceding simple computations and remains separated from them, so that any
-subsequent and preceding computation chains can be separated and if deemed necessary can be
-allocated to different workers.
-
-
-### Partitioned computations
-
-Partitioned computations are distributed uniformly across workers. This means
-that worker `A` may be responsible for a certain set of keys, while worker `B`
-will be responsible for others. Each key is processed only by one worker,
-without overlaps.
-
+The values for --control-channel should be the same address across all members of the cluster.
 
 ## Example
 
-This section illustrates how to run the
-[Alphabet example](../examples/pony/alphabet/README.md)
-with two workers. This example assumes that all workers are running on the same
-host. If not, you must replace IP addresses accordingly.
+Imagine for a moment you have a Wallaroo Python application like our [Alphabet Partitioned example](https://github.com/Sendence/wallaroo/tree/release/examples/python/alphabet_partitioned). That example starts up a 2 worker cluster. However, it does it on a single machine so it might be less than obvious what the specific IP addresses are that we are passing.
 
-0. Build the application and generate the data in the same way as the
-single worker version of the instructions.
+For the duration of this example, lets assume that we are starting a 2 worker cluster where:
 
-1. Start the metrics UI and the listener as indicated as well.
+- The initializer is running on 192.168.1.100 
+- The 2nd worker will be running on 192.168.1.110 
+- We will output results to 192.168.1.120:7002
+- Our metrics host is running on 192.168.1.130:5001
 
-2. Start the initializer:
 
-We use the `--topology-initializer` argument to signal that this process is in
-charge of initializing the cluster topology. We tell it to expect a total of 2
-workers (including itself), and give it a name of 'worker1'.
+The Alphabet Partitioned example has us start the initializer as:
 
 ```bash
-./alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:12500 --data 127.0.0.1:12501 --topology-initializer
-  --worker-count 2 --worker-name worker1
+machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
+  --data 127.0.0.1:6001 --worker-count 2 --topology-initializer \
+  --ponythreads=1
 ```
 
-3. Start a second worker:
+For the sake of multi-worker we would want to change that to:
 
-Note how we have changed the name of the worker and the input port, to avoid
-conflicts with the initializer.
 ```bash
-./alphabet --in 127.0.0.1:7011 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:12500 --data 127.0.0.1:12501 --worker-count 2
-  --worker-name worker2
+machida --application-module alphabet_partitioned --in 192.168.1.100:7010 \
+  --out 192.168.1.120:7002 --metrics 192.168.1.130:5001 \
+  --control 192.168.1.100:6000 --data 192.168.1.100:6001 --worker-count 2 \
+  --topology-initializer --ponythreads=1
 ```
 
-4. Start the sender as indicated in the single worker instructions.
+The Alphabet Partitioned example has us start our 2nd worker as:
+
+```bash
+machida --application-module alphabet_partitioned \
+  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
+  --name worker-2 --ponythreads=1
+```
+
+For the sake of multi-worker we would want to change that to:
+
+```bash
+machida --application-module alphabet_partitioned \
+  --out 192.168.1.120:7002 --metrics 192.168.1.130:5001 \
+  --control 127.0.0.1:6000 --name worker-2 --ponythreads=1
+```
+
+## Restarting workers
+
+When a cluster is starting up, all members of the cluster will save information about the cluster to local disk. If I worker exists and is restarted, it uses the saved information to reconnect to the running cluster. By default, cluster information is stored in `/tmp`. You can change the directory using the `--resilience-dir`.
+
+Resilience files are based on the name you supply the worker so starting different applications or clusters and reusing names can lead to odd results if you have left over files in your resilience directory. To avoid any weirdness, you should use our clean shutdown tool or make sure to manually clean your resilience directory.
+
+## Shutting down a cluster
+
+<< UPDATE THIS AFTER I WRITE SHUTDOWN TOOL >>
+To entirely shut down a cluster, simply terminate all the running workers.
+If you intend to start a new cluster, you will have to delete the files created
+in the resilience directory.
