@@ -1,6 +1,5 @@
 use "collections"
 use "time"
-use "sendence/guid"
 use "sendence/time"
 use "wallaroo/boundary"
 use "wallaroo/core"
@@ -27,7 +26,7 @@ primitive TCPFramedSourceNotifyBuilder[In: Any val]
       pre_state_target_id)
 
 class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
-  let _guid_gen: GuidGenerator = GuidGenerator
+  let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
   var _header: Bool = true
   let _pipeline_name: String
   let _source_name: String
@@ -99,7 +98,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
               " source\n").cstring())
           end
           _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-            conn, _router, _omni_router, _guid_gen.u128(), None,
+            conn, _router, _omni_router, _msg_id_gen(), None,
             decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
         else
           @printf[I32](("Unable to decode message at " + _pipeline_name +

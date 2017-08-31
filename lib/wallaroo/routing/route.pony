@@ -65,7 +65,7 @@ class _EmptyRouteLogic is RouteLogic
     None
 
 class EmptyRoute is Route
-  let _route_id: U64 = 1 + GuidGenerator.u64()
+  let _route_id: U64 = 1 + RouteIdGenerator()
 
   fun ref application_created() =>
     None

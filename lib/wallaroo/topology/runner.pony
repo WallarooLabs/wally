@@ -67,7 +67,7 @@ trait val RunnerBuilder
 
 class val RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder] val
-  let _id: U128
+  let _id: StepId
   var _forward_route_builder: RouteBuilder
   var _in_route_builder: (RouteBuilder | None)
   var _state_name: String
@@ -81,7 +81,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
       try
         bs(0).id()
       else
-        GuidGenerator.u128()
+        StepIdGenerator()
       end
     _forward_route_builder =
       try
@@ -247,7 +247,7 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
     _default_state_name = default_state_name'
     _route_builder = route_builder'
     _partition_function = partition_function'
-    _id = GuidGenerator.u128()
+    _id = StepIdGenerator()
     _is_multi = multi_worker
     _forward_route_builder = forward_route_builder'
     _in_route_builder = in_route_builder'
@@ -302,7 +302,7 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
     _state_name = state_name'
     _state_change_builders = state_change_builders
     _route_builder = route_builder'
-    _id = GuidGenerator.u128()
+    _id = StepIdGenerator()
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
@@ -354,7 +354,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
     forward_route_builder': RouteBuilder, id': U128 = 0,
     multi_worker: Bool = false, default_state_name': String = "")
   =>
-    _id = if id' == 0 then GuidGenerator.u128() else id' end
+    _id = if id' == 0 then StepIdGenerator() else id' end
     _state_name = state_name'
     _pipeline_name = pipeline_name
     _state_runner_builder = state_runner_builder

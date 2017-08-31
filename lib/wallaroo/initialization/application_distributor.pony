@@ -2,9 +2,9 @@ use "collections"
 use "files"
 use "net"
 use "sendence/dag"
-use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"
+use "wallaroo/core"
 use "wallaroo/ent/recovery"
 use "wallaroo/fail"
 use "wallaroo/messages"
@@ -14,7 +14,7 @@ use "wallaroo/topology"
 
 actor ApplicationDistributor is Distributor
   let _auth: AmbientAuth
-  let _guid_gen: GuidGenerator = GuidGenerator
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _application: Application val
 
@@ -263,7 +263,7 @@ actor ApplicationDistributor is Distributor
 
         // Create Source Initializer and add it to the graph for the
         // initializer worker.
-        let source_node_id = _guid_gen.u128()
+        let source_node_id = _step_id_gen()
         let source_seq_builder = RunnerSequenceBuilder(
             source_runner_builders = recover Array[RunnerBuilder] end)
 
@@ -471,17 +471,17 @@ actor ApplicationDistributor is Distributor
           let local_proxy_ids = Map[String, U128]
           proxy_ids(worker) = local_proxy_ids
           if worker != initializer_name then
-            local_proxy_ids(initializer_name) = _guid_gen.u128()
+            local_proxy_ids(initializer_name) = _step_id_gen()
           end
           for w in worker_names.values() do
             if worker != w then
-              local_proxy_ids(w) = _guid_gen.u128()
+              local_proxy_ids(w) = _step_id_gen()
             end
           end
 
           // Make sure there are still runner_builders left in the pipeline.
           if runner_builder_idx < step_runner_builders.size() then
-            var cur_step_id = _guid_gen.u128()
+            var cur_step_id = _step_id_gen()
 
             // Until we hit the boundary for this worker, keep adding
             // stepinitializers from the pipeline
@@ -621,7 +621,7 @@ actor ApplicationDistributor is Distributor
                   worker_to_step_id_trn(w) = recover Array[U128] end
                 end
                 for id in Range[U64](0, partition_count.u64()) do
-                  let step_id = _guid_gen.u128()
+                  let step_id = _step_id_gen()
                   partition_id_to_step_id_trn(id) = step_id
                   let w = all_workers(id.usize() % worker_count)
                   partition_id_to_worker_trn(id) = w

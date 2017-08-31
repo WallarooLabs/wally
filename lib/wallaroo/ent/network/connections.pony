@@ -4,9 +4,9 @@ use "files"
 use "net"
 use "serialise"
 use "time"
-use "sendence/guid"
 use "sendence/messages"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/data_channel"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
@@ -41,7 +41,7 @@ actor Connections is Cluster
   let _listeners: Array[TCPListener] = Array[TCPListener]
   let _data_channel_listeners: Array[DataChannelListener] =
     Array[DataChannelListener]
-  let _guid_gen: GuidGenerator = GuidGenerator
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
@@ -522,7 +522,7 @@ actor Connections is Cluster
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
-    let outgoing_boundary = boundary_builder(_guid_gen.u128())
+    let outgoing_boundary = boundary_builder(_step_id_gen())
     _data_conn_builders(target_name) = boundary_builder
     _data_conns(target_name) = outgoing_boundary
 
@@ -534,7 +534,7 @@ actor Connections is Cluster
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
     let outgoing_boundary =
-      boundary_builder.build_and_initialize(_guid_gen.u128(), li)
+      boundary_builder.build_and_initialize(_step_id_gen(), li)
     _data_conn_builders(target_name) = boundary_builder
     _data_conns(target_name) = outgoing_boundary
 

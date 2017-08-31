@@ -13,7 +13,8 @@ class BoundaryRoute is Route
   """
   Relationship between a single producer and a single consumer.
   """
-  let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
+  // route 0 is used for filtered messages
+  let _route_id: U64 = 1 + RouteIdGenerator()
   var _step_type: String = ""
   let _step: Producer ref
   let _consumer: OutgoingBoundary
