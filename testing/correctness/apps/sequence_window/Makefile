@@ -37,7 +37,7 @@ build-testing-correctness-apps-sequence_window: build-testing-correctness-apps-s
 # to Make
 $(subst $(abs_buffy_dir)/,,$(SEQUENCE_WINDOW_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))):
 	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace)
+	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace -D validate)
 	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_PATH:%/=%)))
 	mv $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window $(abspath $(SEQUENCE_WINDOW_PATH:%/=%))/sequence_window_resilience
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D spike -D spiketrace)

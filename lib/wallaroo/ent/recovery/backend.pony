@@ -141,6 +141,9 @@ class FileBackend is Backend
           let seq_id = r.u64_be()
           if is_watermark then
             // save last watermark read from file
+            @printf[I32]("|| NISAN watermarks(%s) = %s\n".cstring(),
+              producer_id.string().cstring(),
+              seq_id.string().cstring())
             watermarks(producer_id) = seq_id
           else
             r.append(_file.read(24))
@@ -187,12 +190,23 @@ class FileBackend is Backend
         // iterate through recovered buffer and replay entries at or below
         // watermark
         for entry in replay_buffer.values() do
+
+          let w' = watermarks.get_or_else(entry._1, 0)
+          @printf[I32]("|| NISAN rep_buf, e._5: %s, wm: %s\n".cstring(),
+            entry._5.string().cstring(), w'.string().cstring())
+
           // only replay if at or below watermark
           if entry._5 <= watermarks.get_or_else(entry._1, 0) then
+
+            @printf[I32]("|| NISAN rep_buf ._5 le wm\n".cstring())
+
             num_replayed = num_replayed + 1
             _event_log.replay_log_entry(entry._1, entry._2, entry._3,
               entry._4, entry._6)
           else
+
+            @printf[I32]("|| NISAN rep_buf ._5 gt wm\n".cstring())
+
             num_skipped = num_skipped + 1
           end
         end
