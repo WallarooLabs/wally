@@ -93,8 +93,5 @@ class Acker
 
   fun ref propose_new_watermark(): U64 =>
     let proposed_watermark = _watermarker.propose_watermark()
-    ifdef debug then
-      Invariant(proposed_watermark >= _flushed_watermark)
-    end
     _last_proposed_watermark = proposed_watermark
     proposed_watermark
