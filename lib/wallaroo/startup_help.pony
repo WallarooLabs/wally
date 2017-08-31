@@ -13,7 +13,7 @@ primitive StartupHelp
       --external/-e [Sets address for external message channel]
       --worker-count/-w *[Sets total number of workers, including topology
         initializer]
-      --worker-name/-n *[Sets name for this worker]
+      --name/-n *[Sets name for this worker]
 
       --metrics/-m [Sets address for external metrics (e.g. monitoring hub)]
       --cluster-initializer/-t [Sets this process as the topology
