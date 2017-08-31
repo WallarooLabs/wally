@@ -40,7 +40,10 @@ def test_log_rotation_external_trigger_no_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = 'sequence_window_resilience --log-rotation'
+    command = '''sequence_window_resilience \
+        --log-rotation \
+        --stop-pause 10_000_000_000
+    '''
 
     runners = []
     try:
@@ -176,7 +179,10 @@ def test_log_rotation_external_trigger_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = 'sequence_window_resilience --log-rotation'
+    command = '''sequence_window_resilience \
+        --log-rotation \
+        --stop-pause 10_000_000_000
+    '''
 
     runners = []
     try:
@@ -340,8 +346,11 @@ def test_log_rotation_file_size_trigger_no_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = ('sequence_window_resilience --log-rotation --event-log-file-size {}'
-               .format(event_log_file_size))
+    command = '''sequence_window_resilience \
+        --log-rotation \
+        --event-log-file-size {} \
+        --stop-pause 10_000_000_000
+    '''.format(event_log_file_size)
 
     runners = []
     try:
@@ -466,9 +475,11 @@ def test_log_rotation_file_size_trigger_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = ('sequence_window_resilience --log-rotation '
-               '--event-log-file-size {}'
-               .format(event_log_file_size))
+    command = '''sequence_window_resilience \
+        --log-rotation \
+        --event-log-file-size {} \
+        --stop-pause 10_000_000_000
+    '''.format(event_log_file_size)
 
     runners = []
     try:
