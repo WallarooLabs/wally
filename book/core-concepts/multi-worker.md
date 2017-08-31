@@ -85,7 +85,7 @@ It's important to note that when we started the 2nd worker:
 
 When a cluster is starting up, all members of the cluster will save information about the cluster to local disk. If a worker exits and is restarted, it uses the saved information to reconnect to the running cluster. By default, cluster information is stored in `/tmp`. You can change the directory using the `--resilience-dir` parameter.
 
-Resilience files are based on the name you supply the worker so starting different applications or clusters and reusing names can lead to odd results if you have leftover files in your resilience directory. To avoid any weirdness, you should use our clean shutdown tool or make sure to manually clean your resilience directory.
+Resilience files are based on the name you supply the worker so starting different applications or clusters and reusing names can lead to odd results if you have leftover files in your resilience directory. To avoid any weirdness, you should use our clean shutdown tool or make sure to "manually" clean your resilience directory. For example, if you were using `/tmp/wallaroo` as a resilience directory, you can manually clean it by running `rm -rf /tmp/wallaroo/` to remove all cluster information files.
 
 ## Shutting down a cluster
 
