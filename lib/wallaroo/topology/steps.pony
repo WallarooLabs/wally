@@ -32,7 +32,7 @@ actor Step is (Producer & Consumer)
   // list of envelopes
   let _deduplication_list: DeduplicationList = _deduplication_list.create()
   let _event_log: EventLog
-  let _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
+  var _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
 
   let _routes: MapIs[Consumer, Route] = _routes.create()
   var _upstreams: SetIs[Producer] = _upstreams.create()
@@ -40,6 +40,7 @@ actor Step is (Producer & Consumer)
   // Lifecycle
   var _initializer: (LocalTopologyInitializer | None) = None
   var _initialized: Bool = false
+  var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
   let _recovery_replayer: RecoveryReplayer
 
@@ -351,6 +352,13 @@ actor Step is (Producer & Consumer)
         runner!".cstring())
       end
     end
+
+  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
+    ifdef debug then
+      Invariant(_seq_id_initialized_on_recovery == false)
+    end
+    _seq_id_generator = StepSeqIdGenerator(seq_id)
+    _seq_id_initialized_on_recovery = true
 
   be clear_deduplication_list() =>
     _deduplication_list.clear()

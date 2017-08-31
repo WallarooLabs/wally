@@ -12,6 +12,7 @@ use "wallaroo/topology"
 interface tag Resilient
   be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq)
+  be initialize_seq_id_on_recovery(seq_id: SeqId)
   be log_flushed(low_watermark: SeqId)
 
 class val EventLogConfig
@@ -114,8 +115,20 @@ actor EventLog
       _producers(producer_id).replay_log_entry(uid, frac_ids,
         statechange_id, payload)
     else
-      @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
+      @printf[I32](("FATAL: Unable to replay event log, because a replay " +
+        "buffer has disappeared").cstring())
       Fail()
+    end
+
+  be initialize_seq_ids(seq_ids: Map[U128, SeqId] val) =>
+    for (producer_id, seq_id) in seq_ids.pairs() do
+      try
+        _producers(producer_id).initialize_seq_id_on_recovery(seq_id)
+      else
+        @printf[I32]("Could not initialize seq id. Producer does not exist\n"
+          .cstring())
+        Fail()
+      end
     end
 
   be register_producer(producer: Resilient, id: U128) =>
@@ -201,8 +214,8 @@ actor EventLog
     if _steps_to_snapshot.contains(producer_id) then
       _steps_to_snapshot.unset(producer_id)
     else
-      @printf[I32](("Error writing snapshot to logfile. StepId not in set of " +
-        "expected steps!\n").cstring())
+      @printf[I32](("Error writing snapshot to logfile. StepId not in set " +
+        "of expected steps!\n").cstring())
       Fail()
     end
 

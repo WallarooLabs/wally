@@ -5,6 +5,7 @@ use "format"
 use "sendence/conversions"
 use "wallaroo/core"
 use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
 
 // (is_watermark, producer_id, uid, frac_ids, statechange_id, seq_id, payload)
@@ -131,7 +132,7 @@ class FileBackend is Backend
         // be replayed
         var replay_buffer: Array[ReplayEntry val] ref = replay_buffer.create()
 
-        let watermarks: Map[U128, U64] = watermarks.create()
+        let watermarks_trn = recover trn Map[U128, SeqId] end
 
         //start iterating until we reach original EOF
         while _file.position() < size do
@@ -140,8 +141,19 @@ class FileBackend is Backend
           let producer_id = r.u128_be()
           let seq_id = r.u64_be()
           if is_watermark then
+            ifdef debug then
+              Invariant(
+                try
+                  let last_seq_id = watermarks_trn(producer_id)
+                  seq_id > last_seq_id
+                else
+                  true
+                end
+              )
+            end
+
             // save last watermark read from file
-            watermarks(producer_id) = seq_id
+            watermarks_trn(producer_id) = seq_id
           else
             r.append(_file.read(24))
             let uid = r.u128_be()
@@ -184,6 +196,10 @@ class FileBackend is Backend
           r.clear()
         end
 
+        let watermarks = consume val watermarks_trn
+
+        _event_log.initialize_seq_ids(watermarks)
+
         // iterate through recovered buffer and replay entries at or below
         // watermark
         for entry in replay_buffer.values() do
@@ -197,10 +213,10 @@ class FileBackend is Backend
           end
         end
 
-        @printf[I32]("RESILIENCE: Replayed %d entries from recovery log file.\n"
-          .cstring(), num_replayed)
-        @printf[I32]("RESILIENCE: Skipped %d entries from recovery log file.\n"
-          .cstring(), num_skipped)
+        @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
+          "file.\n").cstring(), num_replayed)
+        @printf[I32](("RESILIENCE: Skipped %d entries from recovery log " +
+          "file.\n").cstring(), num_skipped)
 
         _file.seek_end(0)
         _event_log.log_replay_finished()
