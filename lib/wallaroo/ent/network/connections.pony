@@ -5,6 +5,7 @@ use "net"
 use "serialise"
 use "time"
 use "sendence/messages"
+use "wallaroo"
 use "wallaroo/boundary"
 use "wallaroo/core"
 use "wallaroo/data_channel"
@@ -38,10 +39,11 @@ actor Connections is Cluster
   let _metrics_service: String
   let _init_d_host: String
   let _init_d_service: String
-  let _listeners: Array[TCPListener] = Array[TCPListener]
+  let _listeners: Array[TCPListener] = _listeners.create(0)
   let _data_channel_listeners: Array[DataChannelListener] =
-    Array[DataChannelListener]
+    _data_channel_listeners.create()
   let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _disposables: SetIs[Disposable] = _disposables.create()
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
@@ -55,7 +57,8 @@ actor Connections is Cluster
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
     is_joining: Bool, spike_config: (SpikeConfig | None) = None,
-    event_log: EventLog, log_rotation: Bool = false)
+    event_log: EventLog, log_rotation: Bool = false,
+    recovery_file_cleaner: (RecoveryFileCleaner | None) = None)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -92,10 +95,15 @@ actor Connections is Cluster
     end
 
     if (external_host != "") or (external_service != "") then
-      let external_listener = TCPListener(_auth,
-        ExternalChannelListenNotifier(_worker_name, _auth, this),
-          external_host, external_service)
-      _listeners.push(external_listener)
+      match recovery_file_cleaner
+      | let rfc: RecoveryFileCleaner =>
+        let external_listener = TCPListener(_auth,
+          ExternalChannelListenNotifier(_worker_name, _auth, this, rfc), external_host, external_service)
+        _listeners.push(external_listener)
+      else
+        @printf[I32]("Need RecoveryFileCleaner to create external channel\n"
+          .cstring())
+      end
       @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
         external_host.cstring(), external_service.cstring())
     end
@@ -119,6 +127,9 @@ actor Connections is Cluster
     else
       Fail()
     end
+
+  be register_disposable(d: Disposable) =>
+    _disposables.set(d)
 
   be make_and_register_recoverable_listener(auth: TCPListenerAuth,
     notifier: TCPListenNotify iso,
@@ -645,6 +656,10 @@ actor Connections is Cluster
     | let phc: TCPConnection =>
       phc.writev(ExternalMsgEncoder.done_shutdown(_worker_name))
       phc.dispose()
+    end
+
+    for d in _disposables.values() do
+      d.dispose()
     end
 
     @printf[I32]("Connections: Finished shutdown procedure.\n".cstring())

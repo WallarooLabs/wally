@@ -48,12 +48,15 @@ actor Main
         end
 
       let auth = env.root as AmbientAuth
-      let msg = match message_type.lower()
+      let msg =
+        match message_type.lower()
+        | "clean-shutdown" =>
+          ExternalMsgEncoder.clean_shutdown()
         | "rotate-log" =>
           ExternalMsgEncoder.rotate_log(message)
         else // default to print
           ExternalMsgEncoder.print_message(message)
-      end
+        end
       let tcp_auth = TCPConnectAuth(auth)
       _conn = TCPConnection(tcp_auth, ExternalSenderConnectNotifier(auth,
         msg), x_host, x_service)

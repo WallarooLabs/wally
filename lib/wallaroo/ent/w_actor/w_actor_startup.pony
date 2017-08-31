@@ -39,6 +39,7 @@ actor ActorSystemStartup
   var _control_channel_file: String = ""
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
+  var _connections: (Connections | None) = None
   // DEMO fields
   var _iterations: USize = 100
 
@@ -232,7 +233,8 @@ actor ActorSystemStartup
         _ph_service, _external_host, _external_service, empty_metrics_conn,
         "", "", _startup_options.is_initializer, _connection_addresses_file,
         _is_joining, _startup_options.spike_config, event_log,
-        _startup_options.log_rotation)
+        _startup_options.log_rotation where recovery_file_cleaner = this)
+      _connections = connections
 
       let w_name = _startup_options.worker_name
 
@@ -283,9 +285,8 @@ actor ActorSystemStartup
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, initializer, recovery, recovery_replayer,
           router_registry, control_channel_filepath,
-          _startup_options.my_d_host, _startup_options.my_d_service
-          where broadcast_variables = broadcast_variables,
-          event_log = event_log)
+          _startup_options.my_d_host, _startup_options.my_d_service,
+          event_log, this where broadcast_variables = broadcast_variables)
 
       if _startup_options.is_initializer then
         connections.make_and_register_recoverable_listener(
@@ -335,6 +336,40 @@ actor ActorSystemStartup
     end
 
     ws
+
+  be clean_recovery_files() =>
+    @printf[I32]("Removing recovery files\n".cstring())
+    _remove_file(_local_actor_system_file)
+    _remove_file(_data_channel_file)
+    _remove_file(_control_channel_file)
+    _remove_file(_worker_names_file)
+    _remove_file(_connection_addresses_file)
+
+    try
+      let event_log_dir_filepath = _event_log_dir_filepath as FilePath
+      let base_dir = Directory(event_log_dir_filepath)
+
+      let event_log_filenames = FilterLogFiles(_event_log_file_basename,
+        _event_log_file_suffix, base_dir.entries())
+      for fn in event_log_filenames.values() do
+        _remove_file(event_log_dir_filepath.path + fn)
+      end
+    else
+      Fail()
+    end
+
+    @printf[I32]("Recovery files removed.\n".cstring())
+
+    match _connections
+    | let c: Connections =>
+      c.shutdown()
+    else
+      Fail()
+    end
+
+  fun ref _remove_file(filename: String) =>
+    @printf[I32]("...Removing %s...\n".cstring(), filename.cstring())
+    @remove[I32](filename.cstring())
 
 primitive EmptyConnections
   fun apply(env: Env, auth: AmbientAuth): Connections =>

@@ -25,7 +25,7 @@ actor Startup
   var _startup_options: StartupOptions = StartupOptions
 
   let _application: Application val
-  let _app_name: (String | None)
+  let _app_name: String
 
   var _ph_host: String = ""
   var _ph_service: String = ""
@@ -34,6 +34,12 @@ actor Startup
   var _is_multi_worker: Bool = true
   var _cluster_initializer: (ClusterInitializer | None) = None
   var _application_distributor: (ApplicationDistributor | None) = None
+  var _swarm_manager_addr: String = ""
+  var _event_log: (EventLog | None) = None
+  var _joining_listener: (TCPListener | None) = None
+
+  // RECOVERY FILES
+  var _event_log_file: String = ""
   var _event_log_dir_filepath: (FilePath | None) = None
   var _event_log_file_basename: String = ""
   var _event_log_file_suffix: String = ""
@@ -42,15 +48,19 @@ actor Startup
   var _control_channel_file: String = ""
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
-  var _event_log: (EventLog | None) = None
-  var _joining_listener: (TCPListener | None) = None
+
+  var _connections: (Connections | None) = None
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
   =>
     _env = env
     _application = application
-    _app_name = app_name
+    _app_name = match app_name
+      | let n: String => n
+      else
+        ""
+      end
     ifdef "resilience" then
       @printf[I32]("****RESILIENCE is active****\n".cstring())
     end
@@ -90,26 +100,6 @@ actor Startup
         else
           ("", "")
         end
-
-      let name = match _app_name
-        | let n: String => n
-        else
-          ""
-        end
-
-      _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)
-      _event_log_file_basename = name + "-" + _startup_options.worker_name
-      _event_log_file_suffix = ".evlog"
-      _local_topology_file = _startup_options.resilience_dir
-        + "/" + name + "-" + _startup_options.worker_name + ".local-topology"
-      _data_channel_file = _startup_options.resilience_dir + "/" + name + "-" +
-        _startup_options.worker_name + ".tcp-data"
-      _control_channel_file = _startup_options.resilience_dir + "/" + name +
-        "-" + _startup_options.worker_name + ".tcp-control"
-      _worker_names_file = _startup_options.resilience_dir + "/" + name + "-" +
-        _startup_options.worker_name + ".workers"
-      _connection_addresses_file = _startup_options.resilience_dir + "/" +
-        name + "-" + _startup_options.worker_name + ".connection-addresses"
 
       @printf[I32](("||| Resilience directory: " +
         _startup_options.resilience_dir + "|||\n").cstring())
@@ -172,6 +162,8 @@ actor Startup
   be initialize() =>
     try
       let auth = _env.root as AmbientAuth
+      _set_recovery_file_names(auth)
+
       let m_addr = _startup_options.m_arg as Array[String]
 
       if _startup_options.worker_name == "" then
@@ -293,7 +285,8 @@ actor Startup
         metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
         _startup_options.spike_config, event_log,
-        _startup_options.log_rotation)
+        _startup_options.log_rotation where recovery_file_cleaner = this)
+      _connections = connections
 
       let data_receivers = DataReceivers(auth,
         _startup_options.worker_name, is_recovering)
@@ -335,13 +328,11 @@ actor Startup
 
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
-          auth, connections,
-          _startup_options.is_initializer, _cluster_initializer,
-          local_topology_initializer, recovery,
+          auth, connections, _startup_options.is_initializer,
+          _cluster_initializer, local_topology_initializer, recovery,
           recovery_replayer, router_registry,
           control_channel_filepath, _startup_options.my_d_host,
-          _startup_options.my_d_service
-          where event_log = event_log)
+          _startup_options.my_d_service, event_log, this)
 
       if _startup_options.is_initializer then
         connections.make_and_register_recoverable_listener(
@@ -391,6 +382,7 @@ actor Startup
   be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg) =>
     try
       let auth = _env.root as AmbientAuth
+      _set_recovery_file_names(auth)
 
       let metrics_conn = ReconnectingMetricsSink(m.metrics_host,
         m.metrics_service, _application.name(), _startup_options.worker_name)
@@ -440,7 +432,8 @@ actor Startup
         _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
         _startup_options.spike_config, event_log,
-        _startup_options.log_rotation)
+        _startup_options.log_rotation where recovery_file_cleaner = this)
+      _connections = connections
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
@@ -494,12 +487,11 @@ actor Startup
         _control_channel_file)
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
-          auth, connections,
-          _startup_options.is_initializer, _cluster_initializer,
-          local_topology_initializer, recovery,
+          auth, connections, _startup_options.is_initializer,
+          _cluster_initializer, local_topology_initializer, recovery,
           recovery_replayer, router_registry, control_channel_filepath,
-          _startup_options.my_d_host, _startup_options.my_d_service
-          where event_log = event_log)
+          _startup_options.my_d_host, _startup_options.my_d_service,
+          event_log, this)
 
       connections.make_and_register_recoverable_listener(
         auth, consume control_notifier, control_channel_filepath,
@@ -522,6 +514,62 @@ actor Startup
     else
       Fail()
     end
+
+  fun ref _set_recovery_file_names(auth: AmbientAuth) =>
+    try
+      _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)
+    else
+      Fail()
+    end
+    _event_log_file_basename = _app_name + "-" + _startup_options.worker_name
+    _event_log_file_suffix = ".evlog"
+    _event_log_file = _startup_options.resilience_dir + "/" + _app_name + "-" +
+      _startup_options.worker_name + ".evlog"
+    _local_topology_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".local-topology"
+    _data_channel_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".tcp-data"
+    _control_channel_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".tcp-control"
+    _worker_names_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".workers"
+    _connection_addresses_file = _startup_options.resilience_dir + "/" +
+      _app_name + "-" + _startup_options.worker_name + ".connection-addresses"
+
+  be clean_recovery_files() =>
+    @printf[I32]("Removing recovery files\n".cstring())
+    _remove_file(_event_log_file)
+    _remove_file(_local_topology_file)
+    _remove_file(_data_channel_file)
+    _remove_file(_control_channel_file)
+    _remove_file(_worker_names_file)
+    _remove_file(_connection_addresses_file)
+
+    try
+      let event_log_dir_filepath = _event_log_dir_filepath as FilePath
+      let base_dir = Directory(event_log_dir_filepath)
+
+      let event_log_filenames = FilterLogFiles(_event_log_file_basename,
+        _event_log_file_suffix, base_dir.entries())
+      for fn in event_log_filenames.values() do
+        _remove_file(event_log_dir_filepath.path + fn)
+      end
+    else
+      Fail()
+    end
+
+    @printf[I32]("Recovery files removed.\n".cstring())
+
+    match _connections
+    | let c: Connections =>
+      c.shutdown()
+    else
+      Fail()
+    end
+
+  fun ref _remove_file(filename: String) =>
+    @printf[I32]("...Removing %s...\n".cstring(), filename.cstring())
+    @remove[I32](filename.cstring())
 
   fun ref _recover_worker_names(worker_names_filepath: FilePath):
     Array[String] val

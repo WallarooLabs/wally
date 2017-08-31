@@ -4,8 +4,10 @@ use "time"
 use "sendence/bytes"
 use "sendence/messages"
 use "wallaroo"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
+use "wallaroo/messages"
 use "wallaroo/topology"
 
 class ExternalChannelListenNotifier is TCPListenNotify
@@ -14,12 +16,15 @@ class ExternalChannelListenNotifier is TCPListenNotify
   var _host: String = ""
   var _service: String = ""
   let _connections: Connections
+  let _recovery_file_cleaner: RecoveryFileCleaner
 
-  new iso create(name: String, auth: AmbientAuth, connections: Connections)
+  new iso create(name: String, auth: AmbientAuth, connections: Connections,
+    recovery_file_cleaner: RecoveryFileCleaner)
   =>
     _auth = auth
     _worker_name = name
     _connections = connections
+    _recovery_file_cleaner = recovery_file_cleaner
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -40,19 +45,23 @@ class ExternalChannelListenNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ExternalChannelConnectNotifier(_worker_name, _auth, _connections)
+    ExternalChannelConnectNotifier(_worker_name, _auth, _connections,
+      _recovery_file_cleaner)
 
 class ExternalChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _worker_name: String
   let _connections: Connections
+  let _recovery_file_cleaner: RecoveryFileCleaner
   var _header: Bool = true
 
-  new iso create(name: String, auth: AmbientAuth, connections: Connections)
+  new iso create(name: String, auth: AmbientAuth, connections: Connections,
+    recovery_file_cleaner: RecoveryFileCleaner)
   =>
     _auth = auth
     _worker_name = name
     _connections = connections
+    _recovery_file_cleaner = recovery_file_cleaner
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -88,6 +97,14 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
               "Channel\n").cstring())
           end
           _connections.rotate_log_files(m.node_name)
+        | let m: ExternalCleanShutdownMsg =>
+          try
+            let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)
+            _connections.send_control_to_cluster(clean_shutdown_msg)
+            _recovery_file_cleaner.clean_recovery_files()
+          else
+            Fail()
+          end
         else
           @printf[I32](("Incoming External Message type not handled by " +
             "external channel.\n").cstring())

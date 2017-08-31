@@ -185,7 +185,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _worker_count: USize
   let _env: Env
   let _auth: AmbientAuth
-  let _connections: (Connections | None)
+  let _connections: Connections
   let _router_registry: RouterRegistry
   let _metrics_conn: MetricsSink
   let _data_receivers: DataReceivers
@@ -229,7 +229,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _t: USize = 0
 
   new create(app: Application val, worker_name: String, worker_count: USize,
-    env: Env, auth: AmbientAuth, connections: (Connections | None),
+    env: Env, auth: AmbientAuth, connections: Connections,
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
@@ -264,18 +264,13 @@ actor LocalTopologyInitializer is LayoutInitializer
     control_addr: (String, String), data_addr: (String, String))
   =>
     _add_worker_name(w)
-    match _connections
-    | let c: Connections =>
-      c.create_control_connection(w, joining_host, control_addr._2)
-      c.create_data_connection_to_joining_worker(w, joining_host, data_addr._2,
-        this)
-      let new_boundary_id = _step_id_gen()
-      c.create_boundary_to_new_worker(w, new_boundary_id, this)
-      @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
-        w.cstring())
-    else
-      Fail()
-    end
+    _connections.create_control_connection(w, joining_host, control_addr._2)
+    _connections.create_data_connection_to_joining_worker(w, joining_host,
+      data_addr._2, this)
+    let new_boundary_id = _step_id_gen()
+    _connections.create_boundary_to_new_worker(w, new_boundary_id, this)
+    @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
+      w.cstring())
 
   be add_boundary_to_new_worker(w: String, boundary: OutgoingBoundary,
     builder: OutgoingBoundaryBuilder)
@@ -341,94 +336,76 @@ actor LocalTopologyInitializer is LayoutInitializer
     host: String, service: String,
     cluster_initializer: (ClusterInitializer | None) = None)
   =>
-    match _connections
-    | let conns: Connections =>
-      try
-        let data_channel_filepath = FilePath(_auth, _data_channel_file)
-        if not _is_initializer then
-          let data_notifier: DataChannelListenNotify iso =
-            DataChannelListenNotifier(_worker_name, _auth, conns,
-              _is_initializer,
-              MetricsReporter(_application.name(), _worker_name,
-                _metrics_conn),
-              data_channel_filepath, this, _data_receivers, _recovery_replayer,
-              _router_registry)
+    try
+      let data_channel_filepath = FilePath(_auth, _data_channel_file)
+      if not _is_initializer then
+        let data_notifier: DataChannelListenNotify iso =
+          DataChannelListenNotifier(_worker_name, _auth, _connections,
+            _is_initializer,
+            MetricsReporter(_application.name(), _worker_name,
+              _metrics_conn),
+            data_channel_filepath, this, _data_receivers, _recovery_replayer,
+            _router_registry)
 
-          conns.make_and_register_recoverable_data_channel_listener(
-            _auth, consume data_notifier, _router_registry,
-            data_channel_filepath, host, service)
-        else
-          match cluster_initializer
-            | let ci: ClusterInitializer =>
-              conns.create_initializer_data_channel_listener(
-                _data_receivers, _recovery_replayer, _router_registry, ci,
-                data_channel_filepath, this)
-          end
-        end
+        _connections.make_and_register_recoverable_data_channel_listener(
+          _auth, consume data_notifier, _router_registry,
+          data_channel_filepath, host, service)
       else
-        @printf[I32]("FAIL: cannot create data channel\n".cstring())
+        match cluster_initializer
+          | let ci: ClusterInitializer =>
+            _connections.create_initializer_data_channel_listener(
+              _data_receivers, _recovery_replayer, _router_registry, ci,
+              data_channel_filepath, this)
+        end
       end
     else
-      Fail()
+      @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
 
   be create_connections(control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val)
   =>
-    match _connections
-    | let conns: Connections =>
-      conns.create_connections(control_addrs, data_addrs, this)
-    else
-      Fail()
-    end
+    _connections.create_connections(control_addrs, data_addrs, this)
 
   be quick_initialize_data_connections() =>
     """
     Called as part of joining worker's initialization
     """
-    match _connections
-    | let conns: Connections =>
-      conns.quick_initialize_data_connections(this)
-    else
-      Fail()
-    end
+    _connections.quick_initialize_data_connections(this)
 
   be recover_and_initialize(ws: Array[String] val,
     cluster_initializer: (ClusterInitializer | None) = None)
   =>
-    match _connections
-    | let conns: Connections =>
-      _recovering = true
-      _recovered_worker_names = ws
+    _recovering = true
+    _recovered_worker_names = ws
 
-      try
-        let data_channel_filepath = FilePath(_auth, _data_channel_file)
-        if not _is_initializer then
-          let data_notifier: DataChannelListenNotify iso =
-            DataChannelListenNotifier(_worker_name, _auth, conns,
-              _is_initializer,
-              MetricsReporter(_application.name(), _worker_name,
-                _metrics_conn),
-              data_channel_filepath, this, _data_receivers, _recovery_replayer,
-              _router_registry)
+    try
+      let data_channel_filepath = FilePath(_auth, _data_channel_file)
+      if not _is_initializer then
+        let data_notifier: DataChannelListenNotify iso =
+          DataChannelListenNotifier(_worker_name, _auth, _connections,
+            _is_initializer,
+            MetricsReporter(_application.name(), _worker_name,
+              _metrics_conn),
+            data_channel_filepath, this, _data_receivers, _recovery_replayer,
+            _router_registry)
 
-          conns.make_and_register_recoverable_data_channel_listener(
-            _auth, consume data_notifier, _router_registry,
-            data_channel_filepath)
-        else
-          match cluster_initializer
-          | let ci: ClusterInitializer =>
-            conns.create_initializer_data_channel_listener(
-              _data_receivers, _recovery_replayer, _router_registry, ci,
-              data_channel_filepath, this)
-          end
-        end
+        _connections.make_and_register_recoverable_data_channel_listener(
+          _auth, consume data_notifier, _router_registry,
+          data_channel_filepath)
       else
-        @printf[I32]("FAIL: cannot create data channel\n".cstring())
+        match cluster_initializer
+        | let ci: ClusterInitializer =>
+          _connections.create_initializer_data_channel_listener(
+            _data_receivers, _recovery_replayer, _router_registry, ci,
+            data_channel_filepath, this)
+        end
       end
-
-      conns.recover_connections(this)
+    else
+      @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
+
+    _connections.recover_connections(this)
 
   fun ref _save_worker_names()
   =>
@@ -558,12 +535,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         // Update the step ids for all OutgoingBoundaries
         if _worker_count > 1 then
-          match _connections
-          | let conns: Connections =>
-            conns.update_boundary_ids(t.proxy_ids())
-          else
-            Fail()
-          end
+          _connections.update_boundary_ids(t.proxy_ids())
         end
 
         // Keep track of routers to the steps we've built
@@ -1256,13 +1228,10 @@ actor LocalTopologyInitializer is LayoutInitializer
             end
 
           if not recovering then
-            match _connections
-            | let conns: Connections =>
-              conns.send_control("initializer", topology_ready_msg)
+            _connections.send_control("initializer", topology_ready_msg)
 
-              let ready_msg = ExternalMsgEncoder.ready(_worker_name)
-              conns.send_phone_home(ready_msg)
-            end
+            let ready_msg = ExternalMsgEncoder.ready(_worker_name)
+            _connections.send_phone_home(ready_msg)
           end
         end
 
@@ -1536,12 +1505,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   be inform_joining_worker(conn: TCPConnection, worker_name: String) =>
     match _topology
     | let t: LocalTopology =>
-      match _connections
-      | let c: Connections =>
-        c.inform_joining_worker(conn, worker_name, t)
-      else
-        Fail()
-      end
+      _connections.inform_joining_worker(conn, worker_name, t)
     else
       Fail()
     end

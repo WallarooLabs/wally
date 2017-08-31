@@ -13,6 +13,7 @@ primitive _StartGilesSenders                    fun apply(): U16 => 9
 primitive _GilesSendersStarted                  fun apply(): U16 => 10
 primitive _Print                                fun apply(): U16 => 11
 primitive _RotateLog                            fun apply(): U16 => 12
+primitive _CleanShutdown                        fun apply(): U16 => 13
 
 
 primitive ExternalMsgEncoder
@@ -78,6 +79,9 @@ primitive ExternalMsgEncoder
     Array[ByteSeq] val
   =>
     _encode(_RotateLog(), worker_name, wb)
+
+  fun clean_shutdown(wb: Writer = Writer): Array[ByteSeq] val =>
+    _encode(_CleanShutdown(), "", wb)
 
 class BufferedExternalMsgEncoder
   let _buffer: Writer
@@ -146,6 +150,8 @@ primitive ExternalMsgDecoder
       ExternalPrintMsg(s)
     | (_RotateLog(), let s: String) =>
       ExternalRotateLogFilesMsg(s)
+    | (_CleanShutdown(), let s: String) =>
+      ExternalCleanShutdownMsg
     else
       error
     end
@@ -212,3 +218,5 @@ class val ExternalRotateLogFilesMsg is ExternalMsg
 
   new val create(n: String) =>
     node_name = n
+
+primitive ExternalCleanShutdownMsg is ExternalMsg
