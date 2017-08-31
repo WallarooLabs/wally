@@ -769,7 +769,7 @@ BASE_COMMAND = r'''
     --resilience-dir {res_dir} \
     --worker-count {workers} \
     --name {{name}} \
-    {{topology_initializer}} \
+    {{cluster_initializer}} \
     --ponythreads=1 \
     --ponypinasio \
     --ponynoblock
@@ -792,12 +792,12 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
         raise PipelineTestError("workers must be 1 or more")
     runners.append(Runner(cmd_string=command_stub.format(
         name = 'initializer',
-        topology_initializer = '--cluster-initializer'),
+        cluster_initializer = '--cluster-initializer'),
                          name='initializer'))
     for x in range(1, workers):
         runners.append(Runner(cmd_string=command_stub.format(
             name = 'worker{}'.format(x),
-            topology_initializer = ''),
+            cluster_initializer = ''),
                              name='worker{}'.format(x)))
 
     # start the workers, 50ms apart
