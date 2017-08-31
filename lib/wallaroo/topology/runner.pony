@@ -26,7 +26,7 @@ interface Runner
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
-    i_msg_uid: U128, frac_ids: FractionalMessageId,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   fun name(): String
@@ -459,7 +459,7 @@ class ComputationRunner[In: Any val, Out: Any val]
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
-    i_msg_uid: U128, frac_ids: FractionalMessageId,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
@@ -591,7 +591,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
-    i_msg_uid: U128, frac_ids: FractionalMessageId,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
@@ -655,7 +655,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
   fun ref register_state_change(scb: StateChangeBuilder[S]) : U64 =>
     _state_change_repository.make_and_register(scb)
 
-  fun ref replay_log_entry(msg_uid: U128, frac_ids: FractionalMessageId,
+  fun ref replay_log_entry(msg_uid: MsgId, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq val, producer: Producer)
   =>
     if statechange_id == U64.max_value() then
@@ -676,7 +676,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
-    i_msg_uid: U128, frac_ids: FractionalMessageId,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
@@ -783,7 +783,7 @@ class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, pipeline_time_spent: U64,
     output: Out, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
-    i_msg_uid: U128, frac_ids: FractionalMessageId,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>

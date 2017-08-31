@@ -44,7 +44,7 @@ class TypedRoute[In: Any val] is Route
     _route.dispose()
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     ifdef "trace" then
@@ -78,7 +78,7 @@ class TypedRoute[In: Any val] is Route
     true
 
   fun ref _send_message_on_route(metric_name: String, pipeline_time_spent: U64,
-    input: In, cfp: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    input: In, cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     let o_seq_id = cfp.next_sequence_id()

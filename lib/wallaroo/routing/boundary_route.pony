@@ -45,7 +45,7 @@ class BoundaryRoute is Route
     _route.dispose()
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     // Run should never be called on a BoundaryRoute

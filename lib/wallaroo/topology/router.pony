@@ -15,14 +15,14 @@ use "wallaroo/sink"
 
 interface val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, i_msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   fun routes(): Array[Consumer] val
   fun routes_not_in(router: Router): Array[Consumer] val
 
 class val EmptyRouter
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, i_msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     (true, true, latest_ts)
@@ -40,7 +40,7 @@ class val DirectRouter
     _target = target
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, i_msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
@@ -99,7 +99,7 @@ class val ProxyRouter is Equatable[ProxyRouter]
     _auth = auth
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
@@ -178,7 +178,7 @@ class val ProxyRouter is Equatable[ProxyRouter]
 trait val OmniRouter is Equatable[OmniRouter]
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
 
   fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter
@@ -196,7 +196,7 @@ trait val OmniRouter is Equatable[OmniRouter]
 class val EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
@@ -244,7 +244,7 @@ class val StepIdRouter is OmniRouter
 
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
@@ -717,7 +717,7 @@ class val LocalPartitionRouter[In: Any val,
     end
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, i_msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
@@ -997,7 +997,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     _partition_size
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, i_msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then

@@ -14,7 +14,7 @@ trait Route
   // Return false to indicate queue is full and if producer is a Source, it
   // should mute
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
@@ -78,7 +78,7 @@ class EmptyRoute is Route
   fun ref request_ack() => None
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: U128, frac_ids: FractionalMessageId,
+    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     Fail()
