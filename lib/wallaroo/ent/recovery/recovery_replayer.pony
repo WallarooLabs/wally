@@ -1,6 +1,7 @@
 use "collections"
 use "sendence/collection_helpers"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/router_registry"
@@ -72,7 +73,7 @@ actor RecoveryReplayer
       Fail()
     end
 
-  be data_receiver_added(worker: String, boundary_step_id: U128,
+  be data_receiver_added(worker: String, boundary_step_id: StepId,
     dr: DataReceiver)
   =>
     try
@@ -138,7 +139,7 @@ actor RecoveryReplayer
       false
     end
 
-  fun ref _boundary_reconnected(worker: String, boundary_step_id: U128) =>
+  fun ref _boundary_reconnected(worker: String, boundary_step_id: StepId) =>
     try
       if not _reconnected_boundaries.contains(worker) then
         _reconnected_boundaries(worker) = SetIs[U128]
@@ -188,7 +189,7 @@ interface _RecoveryReplayer
   """
   This only exists for testability.
   """
-  fun ref _boundary_reconnected(worker: String, boundary_step_id: U128)
+  fun ref _boundary_reconnected(worker: String, boundary_step_id: StepId)
   fun ref _wait_for_reconnections(expected_boundaries: Map[String, USize] box,
     reconnected_boundaries: Map[String, SetIs[U128]])
   fun ref _start_replay_phase(expected_boundaries: Map[String, USize] box)
@@ -215,7 +216,7 @@ class _AwaitingRecoveryReplayStart is _ReplayPhase
 
   fun name(): String => "Awaiting Recovery Replay Phase"
 
-  fun ref add_reconnected_boundary(worker: String, boundary_step_id: U128) =>
+  fun ref add_reconnected_boundary(worker: String, boundary_step_id: StepId) =>
     _replayer._boundary_reconnected(worker, boundary_step_id)
 
 class _ReadyForNormalProcessing is _ReplayPhase

@@ -356,7 +356,7 @@ actor RouterRegistry
       _migrate_partition_steps(state_name, target_worker)
     end
 
-  be step_migration_complete(step_id: U128) =>
+  be step_migration_complete(step_id: StepId) =>
     """
     Step with provided step id has been created on another worker.
     """
@@ -470,7 +470,7 @@ actor RouterRegistry
       Fail()
     end
 
-  be add_to_step_waiting_list(step_id: U128) =>
+  be add_to_step_waiting_list(step_id: StepId) =>
     _step_waiting_list.set(step_id)
 
 

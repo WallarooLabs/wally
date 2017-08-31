@@ -7,7 +7,7 @@ use "wallaroo/topology"
 
 
 interface DataReceiversSubscriber
-  be data_receiver_added(sender_name: String, boundary_step_id: U128,
+  be data_receiver_added(sender_name: String, boundary_step_id: StepId,
     dr: DataReceiver)
 
 actor DataReceivers

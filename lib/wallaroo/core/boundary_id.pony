@@ -1,8 +1,8 @@
 class BoundaryId is Equatable[BoundaryId]
   let name: String
-  let step_id: U128
+  let step_id: StepId
 
-  new create(n: String, s_id: U128) =>
+  new create(n: String, s_id: StepId) =>
     name = n
     step_id = s_id
 

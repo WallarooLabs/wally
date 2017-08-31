@@ -72,12 +72,12 @@ class val OutgoingBoundaryBuilder
     _service = s
     _spike_config = spike_config
 
-  fun apply(step_id: U128): OutgoingBoundary =>
+  fun apply(step_id: StepId): OutgoingBoundary =>
     let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
       _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
 
-  fun build_and_initialize(step_id: U128,
+  fun build_and_initialize(step_id: StepId,
     layout_initializer: LayoutInitializer): OutgoingBoundary
   =>
     """
@@ -130,7 +130,7 @@ actor OutgoingBoundary is Consumer
   var _replaying: Bool = false
   let _auth: AmbientAuth
   let _worker_name: String
-  var _step_id: U128 = 0
+  var _step_id: StepId = 0
   let _host: String
   let _service: String
   let _from: String
@@ -246,7 +246,7 @@ actor OutgoingBoundary is Consumer
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
       + "\n").cstring())
 
-  be migrate_step[K: (Hashable val & Equatable[K] val)](step_id: U128,
+  be migrate_step[K: (Hashable val & Equatable[K] val)](step_id: StepId,
     state_name: String, key: K, state: ByteSeq val)
   =>
     try
@@ -266,7 +266,7 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
-  be register_step_id(step_id: U128) =>
+  be register_step_id(step_id: StepId) =>
     _step_id = step_id
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,

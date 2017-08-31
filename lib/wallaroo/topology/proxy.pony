@@ -1,8 +1,10 @@
+use "wallaroo/core"
+
 class val ProxyAddress
   let worker: String
-  let step_id: U128
+  let step_id: StepId
 
-  new val create(w: String, s_id: U128) =>
+  new val create(w: String, s_id: StepId) =>
     worker = w
     step_id = s_id
 

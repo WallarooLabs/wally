@@ -691,7 +691,7 @@ actor ApplicationDistributor is Distributor
                         last_initializer_ids.push(s_id)
                       else
                         match successor_step_id
-                        | let ss_id: U128 =>
+                        | let ss_id: StepId =>
                           // We have not yet built the node corresponding
                           // to our successor step id (i.e. the node that
                           // this node has an edge to). So we keep track of

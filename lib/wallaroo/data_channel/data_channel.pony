@@ -31,6 +31,7 @@ use "buffered"
 use "collections"
 use "net"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/ent/data_receiver"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -153,7 +154,7 @@ actor DataChannel
     _notify.accepted(this)
     _queue_read()
 
-  be identify_data_receiver(dr: DataReceiver, sender_step_id: U128) =>
+  be identify_data_receiver(dr: DataReceiver, sender_step_id: StepId) =>
     """
     Each abstract data channel (a connection from an OutgoingBoundary)
     corresponds to a single DataReceiver. On reconnect, we want a new
