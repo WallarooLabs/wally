@@ -9,9 +9,11 @@ class iso JoiningListenNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (let host, let service) = listen.local_address().name()
-      @printf[I32](("Joining Worker Listener listening on " + host + ":" + service + "\n").cstring())
+      @printf[I32](("Joining Worker Listener listening on " + host + ":" +
+        service + "\n").cstring())
     else
-      @printf[I32]("Joining Worker Listener: couldn't get local address\n".cstring())
+      @printf[I32]("Joining Worker Listener: couldn't get local address\n"
+        .cstring())
       listen.close()
     end
 

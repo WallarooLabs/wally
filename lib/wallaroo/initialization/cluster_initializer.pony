@@ -143,7 +143,8 @@ actor ClusterInitializer
         _topology_ready = true
       end
     else
-      @printf[I32]("Duplicate topology ready sent to worker initializer!\n".cstring())
+      @printf[I32]("Duplicate topology ready sent to worker initializer!\n"
+        .cstring())
     end
 
   fun _create_data_channel_listeners() =>
@@ -170,7 +171,8 @@ actor ClusterInitializer
       _layout_initializer.create_data_channel_listener(workers, "", "",
         this)
     else
-      @printf[I32]("Failed to create message to create data receivers\n".cstring())
+      @printf[I32]("Failed to create message to create data receivers\n"
+        .cstring())
     end
 
   fun _create_interconnections() =>
@@ -185,7 +187,8 @@ actor ClusterInitializer
       _connections.save_connections()
       _connections.update_boundaries(_layout_initializer)
     else
-      @printf[I32]("Initializer: Error initializing interconnections\n".cstring())
+      @printf[I32]("Initializer: Error initializing interconnections\n"
+        .cstring())
     end
 
   fun _generate_addresses_map(): (Map[String, (String, String)] val,

@@ -269,7 +269,8 @@ actor RouterRegistry
     _stop_the_world_for_log_rotation()
     // await acks?
     let timers = Timers
-    let timer = Timer(PauseBeforeLogRotationNotify(this), _stop_the_world_pause)
+    let timer = Timer(PauseBeforeLogRotationNotify(this),
+      _stop_the_world_pause)
     timers(consume timer)
 
   be begin_log_rotation() =>
@@ -301,7 +302,8 @@ actor RouterRegistry
     """
     We currently stop all message processing before perofrming log rotaion.
     """
-    @printf[I32]("~~~Stopping message processing for log rotation.~~~\n".cstring())
+    @printf[I32]("~~~Stopping message processing for log rotation.~~~\n"
+      .cstring())
     _mute_request(_worker_name)
     _connections.stop_the_world()
 
@@ -326,7 +328,8 @@ actor RouterRegistry
     We currently stop all message processing before migrating partitions and
     updating routers/routes.
     """
-    @printf[I32]("~~~Stopping message processing for state migration.~~~\n".cstring())
+    @printf[I32]("~~~Stopping message processing for state migration.~~~\n"
+      .cstring())
     _migration_target_ack_list.set(new_worker)
     _mute_request(_worker_name)
     _connections.stop_the_world(recover [new_worker] end)
@@ -348,10 +351,12 @@ actor RouterRegistry
     """
     if _partition_routers.size() == 0 then
       //no steps have been migrated
-      @printf[I32]("Resuming message processing immediately. No partitions to migrate.\n".cstring())
+      @printf[I32](("Resuming message processing immediately. No partitions " +
+        "to migrate.\n").cstring())
       _resume_the_world()
     end
-    @printf[I32]("Migrating partitions to %s\n".cstring(), target_worker.cstring())
+    @printf[I32]("Migrating partitions to %s\n".cstring(),
+      target_worker.cstring())
     for state_name in _partition_routers.keys() do
       _migrate_partition_steps(state_name, target_worker)
     end
@@ -369,7 +374,8 @@ actor RouterRegistry
     """
     Inform migration target that the entire migration batch has been sent.
     """
-    @printf[I32]("--Sending migration batch complete msg to new workers\n".cstring())
+    @printf[I32]("--Sending migration batch complete msg to new workers\n"
+      .cstring())
     for target in _migration_target_ack_list.values() do
       try
         _outgoing_boundaries(target).send_migration_batch_complete()
@@ -411,11 +417,13 @@ actor RouterRegistry
     Called when we receive a migration batch ack from the new worker
     (i.e. migration target) indicating it's ready to receive data messages
     """
-    @printf[I32]("--Processing migration batch complete ack from %s\n".cstring(), target.cstring())
+    @printf[I32]("--Processing migration batch complete ack from %s\n"
+      .cstring(), target.cstring())
     _migration_target_ack_list.unset(target)
 
     if _migration_target_ack_list.size() == 0 then
-      @printf[I32]("--All new workers have acked migration batch complete\n".cstring(), target.cstring())
+      @printf[I32]("--All new workers have acked migration batch complete\n"
+        .cstring(), target.cstring())
       _connections.request_cluster_unmute()
       _unmute_request(_worker_name)
     end

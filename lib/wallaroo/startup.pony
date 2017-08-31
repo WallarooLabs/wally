@@ -271,7 +271,8 @@ actor Startup
         if _startup_options.log_rotation then
           EventLog(EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
-            where backend_file_length' = _startup_options.event_log_file_length,
+            where backend_file_length' =
+              _startup_options.event_log_file_length,
             suffix' = _event_log_file_suffix, log_rotation' = true))
         else
           EventLog(EventLogConfig(event_log_dir_filepath,
@@ -291,7 +292,8 @@ actor Startup
         _ph_host, _ph_service, _external_host, _external_service,
         metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
-        _startup_options.spike_config, event_log, _startup_options.log_rotation)
+        _startup_options.spike_config, event_log,
+        _startup_options.log_rotation)
 
       let data_receivers = DataReceivers(auth,
         _startup_options.worker_name, is_recovering)
@@ -416,7 +418,8 @@ actor Startup
         if _startup_options.log_rotation then
           EventLog(EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
-            where backend_file_length' = _startup_options.event_log_file_length,
+            where backend_file_length' =
+              _startup_options.event_log_file_length,
             suffix' = _event_log_file_suffix, log_rotation' = true))
         else
           EventLog(EventLogConfig(event_log_dir_filepath,
@@ -436,7 +439,8 @@ actor Startup
         metrics_conn, m.metrics_host, m.metrics_service,
         _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
-        _startup_options.spike_config, event_log, _startup_options.log_rotation)
+        _startup_options.spike_config, event_log,
+        _startup_options.log_rotation)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,

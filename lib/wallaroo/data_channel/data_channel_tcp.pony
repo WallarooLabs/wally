@@ -189,7 +189,8 @@ class DataChannelConnectNotifier is DataChannelNotify
       end
       true
     else
-      let ingest_ts = WallClock.nanoseconds() // because we received this from another worker
+      // because we received this from another worker
+      let ingest_ts = WallClock.nanoseconds()
       let my_latest_ts = Time.nanos()
 
       ifdef "trace" then

@@ -199,7 +199,8 @@ class val EmptyOmniRouter is OmniRouter
     producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
-    @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
+    @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n"
+      .cstring())
     (true, true, latest_ts)
 
   fun val add_boundary(w: String,
@@ -309,7 +310,8 @@ class val StepIdRouter is OmniRouter
           else
             // We don't have a reference to the right outgoing boundary
             ifdef debug then
-              @printf[I32]("OmniRouter has no reference to OutgoingBoundary\n".cstring())
+              @printf[I32]("OmniRouter has no reference to OutgoingBoundary\n"
+                .cstring())
             end
             Fail()
             (true, true, latest_ts)
@@ -323,7 +325,8 @@ class val StepIdRouter is OmniRouter
       else
         // Apparently this target_id does not refer to a valid step id
         ifdef debug then
-          @printf[I32]("OmniRouter: target id does not refer to valid step id\n".cstring())
+          @printf[I32](("OmniRouter: target id does not refer to valid step " +
+            "id\n").cstring())
         end
         Fail()
         (true, true, latest_ts)
@@ -760,7 +763,8 @@ class val LocalPartitionRouter[In: Any val,
           match _default_router
           | let r: Router =>
             ifdef "trace" then
-              @printf[I32]("PartitionRouter sending to default step as there was no entry for key\n".cstring())
+              @printf[I32](("PartitionRouter sending to default step as " +
+                "there was no entry for key\n").cstring())
             end
             r.route[In](metric_name, pipeline_time_spent, input, producer,
               i_msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
@@ -781,7 +785,8 @@ class val LocalPartitionRouter[In: Any val,
       else
         // InputWrapper doesn't wrap In
         ifdef debug then
-          @printf[I32]("LocalPartitionRouter.route: InputWrapper doesn't contain data of type In\n".cstring())
+          @printf[I32](("LocalPartitionRouter.route: InputWrapper doesn't " +
+            "contain data of type In\n").cstring())
         end
         (true, true, latest_ts)
       end

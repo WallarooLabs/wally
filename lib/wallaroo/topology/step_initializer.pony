@@ -72,8 +72,8 @@ class val StepBuilder
     omni_router: OmniRouter = EmptyOmniRouter,
     default_target: (Step | None) = None): Step tag
   =>
-    let runner = _runner_builder(where event_log = event_log, auth = auth, router = router,
-      pre_state_target_id' = pre_state_target_id())
+    let runner = _runner_builder(where event_log = event_log, auth = auth,
+      router = router, pre_state_target_id' = pre_state_target_id())
     let step = Step(consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
       _runner_builder.route_builder(), event_log, recovery_replayer,
