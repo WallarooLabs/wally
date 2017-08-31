@@ -46,7 +46,6 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
   var _kc: (KafkaClient tag | None) = None
   let _conf: KafkaConfig val
-  let _env: Env
   let _auth: TCPConnectionAuth
 
   // Producer (Resilience)
@@ -68,12 +67,11 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
   new create(encoder_wrapper: KafkaEncoderWrapper,
     metrics_reporter: MetricsReporter iso, conf: KafkaConfig val,
-    env: Env, auth: TCPConnectionAuth)
+    auth: TCPConnectionAuth)
   =>
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _conf = conf
-    _env = env
     _auth = auth
 
     _topic = try
