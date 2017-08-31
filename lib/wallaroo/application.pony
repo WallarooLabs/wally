@@ -1,6 +1,5 @@
 use "collections"
 use "net"
-use "sendence/guid"
 use "wallaroo/core"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -155,7 +154,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun sink_id(): (U128 | None) => _sink_id
 
   fun ref update_sink_id() =>
-    _sink_id = GuidGenerator.u128()
+    _sink_id = StepIdGenerator()
 
   fun is_coalesced(): Bool => _is_coalesced
 
@@ -197,12 +196,12 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     // TODO: This is a shortcut. Non-partitioned state is being treated as a
     // special case of partitioned state with one partition. This works but is
     // a bit confusing when reading the code.
-    let guid_gen = GuidGenerator
+    let step_id_gen = StepIdGenerator
     let single_step_partition = Partition[Last, U8](
       SingleStepPartitionFunction[Last], recover [0] end)
-    let step_id_map = recover trn Map[U8, U128] end
+    let step_id_map = recover trn Map[U8, StepId] end
 
-    step_id_map(0) = guid_gen.u128()
+    step_id_map(0) = step_id_gen()
 
 
     let next_builder = PreStateRunnerBuilder[Last, Next, Last, U8, S](
@@ -234,17 +233,17 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       default_state_name: String = ""
     ): PipelineBuilder[In, Out, Next]
   =>
-    let guid_gen = GuidGenerator
+    let step_id_gen = StepIdGenerator
     let step_id_map = recover trn Map[Key, U128] end
 
     match partition.keys()
     | let wks: Array[WeightedKey[Key]] val =>
       for wkey in wks.values() do
-        step_id_map(wkey._1) = guid_gen.u128()
+        step_id_map(wkey._1) = step_id_gen()
       end
     | let ks: Array[Key] val =>
       for key in ks.values() do
-        step_id_map(key) = guid_gen.u128()
+        step_id_map(key) = step_id_gen()
       end
     end
 

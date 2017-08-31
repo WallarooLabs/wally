@@ -11,7 +11,7 @@ use "wallaroo/routing"
 use "wallaroo/topology"
 
 actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
-  let _guid: GuidGenerator = GuidGenerator
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
@@ -56,7 +56,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       _outgoing_boundaries(target_worker_name) = builder.build_and_initialize(
-        _guid.u128(), _layout_initializer)
+        _step_id_gen(), _layout_initializer)
     end
 
     for consumer in routes.values() do
@@ -107,7 +107,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        let boundary = builder.build_and_initialize(_guid.u128(),
+        let boundary = builder.build_and_initialize(_step_id_gen(),
           _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _routes(boundary) =

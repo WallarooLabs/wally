@@ -1,7 +1,6 @@
 use "collections"
 use "pony-kafka"
 use "time"
-use "sendence/guid"
 use "wallaroo/boundary"
 use "wallaroo/core"
 use "wallaroo/ent/recovery"
@@ -22,7 +21,7 @@ primitive KafkaSourceNotifyBuilder[In: Any val]
       consume metrics_reporter, event_log, target_router, pre_state_target_id)
 
 class KafkaSourceNotify[In: Any val]
-  let _guid_gen: GuidGenerator = GuidGenerator
+  let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
   let _pipeline_name: String
   let _source_name: String
   let _handler: SourceHandler[In] val
@@ -92,7 +91,7 @@ class KafkaSourceNotify[In: Any val]
             " source\n").cstring())
         end
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          src, _router, _omni_router, _guid_gen.u128(), None,
+          src, _router, _omni_router, _msg_id_gen(), None,
           decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
       else
         @printf[I32](("Unable to decode message at " + _pipeline_name +

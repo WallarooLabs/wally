@@ -6,17 +6,16 @@ use "promises"
 use "serialise"
 use "sendence/dag"
 use "sendence/equality"
-use "sendence/guid"
 use "sendence/messages"
 use "sendence/queue"
 use "wallaroo"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/cluster_manager"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/core"
 use "wallaroo/data_channel"
 use "wallaroo/fail"
 use "wallaroo/messages"
@@ -210,7 +209,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _recovering: Bool = false
   let _is_joining: Bool
 
-  let _guid: GuidGenerator = GuidGenerator
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
 
   // Lifecycle
   var _omni_router: (OmniRouter | None) = None
@@ -270,7 +269,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       c.create_control_connection(w, joining_host, control_addr._2)
       c.create_data_connection_to_joining_worker(w, joining_host, data_addr._2,
         this)
-      let new_boundary_id = _guid.u128()
+      let new_boundary_id = _step_id_gen()
       c.create_boundary_to_new_worker(w, new_boundary_id, this)
       @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
         w.cstring())

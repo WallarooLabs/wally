@@ -31,7 +31,6 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
-use "sendence/guid"
 use "wallaroo/boundary"
 use "wallaroo/core"
 use "wallaroo/ent/data_receiver"
@@ -58,7 +57,7 @@ actor TCPSource is Producer
   ## Future work
   * Switch to requesting credits via promise
   """
-  let _guid: GuidGenerator = GuidGenerator
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
@@ -127,8 +126,8 @@ actor TCPSource is Producer
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        _outgoing_boundaries(target_worker_name) = builder.build_and_initialize(
-          _guid.u128(), _layout_initializer)
+        _outgoing_boundaries(target_worker_name) =
+          builder.build_and_initialize(_step_id_gen(), _layout_initializer)
       end
     end
 
@@ -183,7 +182,7 @@ actor TCPSource is Producer
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        let boundary = builder.build_and_initialize(_guid.u128(),
+        let boundary = builder.build_and_initialize(_step_id_gen(),
           _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _routes(boundary) =
