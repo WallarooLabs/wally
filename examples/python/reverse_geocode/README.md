@@ -19,6 +19,9 @@ source ENV/bin/activate
 pip install reverse_geocoder
 ```
 
+#### A note on Python versions
+Some platforms use a pip command that is versioned, for example, `pip2` and/or `pip2.7` for use with Python 2.7 or `pip3` for use with Python 3.x. If that is the case for your platform, please make sure you install virtualenv for Python 2, as this is the version that will be used by `machida`.
+
 ## Running Reverse
 
 In a shell, start up the Metrics UI if you don't already have it running:
