@@ -12,7 +12,6 @@ class Acker
   var _flushing: Bool = false
   let _ack_batch_size: USize
   var _ack_next_time: Bool = false
-  var _last_proposed_watermark: SeqId = 0
   let _outgoing_to_incoming: _OutgoingToIncomingMessageTracker
   let _watermarker: Watermarker
 
@@ -93,5 +92,4 @@ class Acker
 
   fun ref propose_new_watermark(): U64 =>
     let proposed_watermark = _watermarker.propose_watermark()
-    _last_proposed_watermark = proposed_watermark
     proposed_watermark
