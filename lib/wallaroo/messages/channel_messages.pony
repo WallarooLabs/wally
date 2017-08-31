@@ -78,7 +78,7 @@ primitive ChannelMsgEncoder
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, msg_data: D,
     metric_name: String, auth: AmbientAuth,
-    proxy_address: ProxyAddress, msg_uid: U128,
+    proxy_address: ProxyAddress, msg_uid: MsgId,
     frac_ids: FractionalMessageId): Array[ByteSeq] val ?
   =>
     _encode(ForwardMsg[D](target_id, from_worker_name,
@@ -599,7 +599,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _data: D
   let _metric_name: String
   let _proxy_address: ProxyAddress
-  let _msg_uid: U128
+  let _msg_uid: MsgId
   let _frac_ids: FractionalMessageId
 
   fun input(): Any val => _data

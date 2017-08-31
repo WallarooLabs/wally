@@ -34,7 +34,7 @@ trait val StateProcessor[S: State ref] is BasicComputation
   // no state change).
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter, metric_name: String, pipeline_time_spent: U64,
-    producer: Producer ref, i_msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
     (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
       U64, U64)
@@ -58,7 +58,7 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
 
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter, metric_name: String, pipeline_time_spent: U64,
-    producer: Producer ref, i_msg_uid: U128, frac_ids: FractionalMessageId,
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
     (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
       U64, U64)

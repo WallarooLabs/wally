@@ -222,7 +222,7 @@ actor Step is (Producer & Consumer)
     end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -231,7 +231,7 @@ actor Step is (Producer & Consumer)
       latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref _run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: U128,
+    data: D, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -294,11 +294,11 @@ actor Step is (Producer & Consumer)
 
   ///////////
   // RECOVERY
-  fun ref _is_duplicate(msg_uid: U128, frac_ids: FractionalMessageId): Bool =>
+  fun ref _is_duplicate(msg_uid: MsgId, frac_ids: FractionalMessageId): Bool =>
     MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: U128, frac_ids: FractionalMessageId,
+    data: D, i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
