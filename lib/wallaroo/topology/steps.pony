@@ -336,6 +336,7 @@ actor Step is (Producer & Consumer)
     ifdef "trace" then
       @printf[I32]("flushing at and below: %llu\n".cstring(), low_watermark)
     end
+    @printf[I32]("|| NISAN flushing at and below: %llu\n".cstring(), low_watermark)
     _event_log.flush_buffer(_id, low_watermark)
 
   be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,

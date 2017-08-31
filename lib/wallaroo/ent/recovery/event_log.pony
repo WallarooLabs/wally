@@ -170,6 +170,10 @@ actor EventLog
     end
 
     try
+      @printf[I32]("|| NISAN Saving low_watermark %s for producer_id %s\n"
+        .cstring(), low_watermark.string().cstring(),
+        producer_id.string().cstring())
+
       // Add low watermark ack to buffer
       _backend.encode_entry((true, producer_id, 0, None, 0, low_watermark,
         recover Array[ByteSeq] end))
