@@ -8,7 +8,7 @@ class Acker
   Handles coordination between different moving parts that are used to
   when making decisions of what messages to acknowledge having been handled.
   """
-  var _flushed_watermark: U64 = 0
+  var _last_watermark_sent_to_log: U64 = 0
   var _flushing: Bool = false
   let _ack_batch_size: USize
   var _ack_next_time: Bool = false
@@ -58,7 +58,6 @@ class Acker
       o_r._1.update_watermark(o_r._2, id)
     end
     _outgoing_to_incoming.evict(up_to)
-    _flushed_watermark = up_to
 
   fun ref _add_incoming(o_seq_id: SeqId, i_producer: Producer,
     i_route_id: RouteId, i_seq_id: SeqId)
@@ -76,13 +75,13 @@ class Acker
   fun ref _ack(ackable: Ackable ref) =>
     let proposed_watermark = propose_new_watermark()
 
-    if proposed_watermark <= _flushed_watermark then
-      return
+    if proposed_watermark > _last_watermark_sent_to_log then
+      _last_watermark_sent_to_log = proposed_watermark
+      _flushing = true
+      _ack_next_time = false
+      ackable.flush(proposed_watermark)
     end
 
-    _flushing = true
-    _ack_next_time = false
-    ackable.flush(proposed_watermark)
 
   fun ref request_ack(ackable: Ackable ref) =>
     _ack_next_time = true
