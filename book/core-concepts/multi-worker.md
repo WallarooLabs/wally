@@ -22,6 +22,12 @@ The `--control-channel` flag serves two slightly different but related roles bas
 
 The values for --control-channel should be the same address across all members of the cluster.
 
+### --external
+
+The `--external` flag sets the IP address that the Wallaroo worker should listen for administrative messages like "rotate logs" or "shutdown cluster". When running a Wallaroo cluster it is advised that you provide an address for administrative messages. 
+
+The IP address supplied to `--external` must be unique amongst each worker in a cluster.
+
 ## Example
 
 Imagine for a moment you have a Wallaroo Python application like our [Alphabet Partitioned example](https://github.com/Sendence/wallaroo/tree/release/examples/python/alphabet_partitioned). That example starts up a 2 worker cluster. However, it does it on a single machine so it might be less than obvious what the specific IP addresses are that we are passing.
@@ -40,7 +46,7 @@ The Alphabet Partitioned example has us start the initializer as:
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --worker-count 2 --topology-initializer \
-  --ponythreads=1
+  --external 127.0.0.1:6002 --ponythreads=1
 ```
 
 For the sake of multi-worker we would want to change that to:
@@ -49,7 +55,7 @@ For the sake of multi-worker we would want to change that to:
 machida --application-module alphabet_partitioned --in 192.168.1.100:7010 \
   --out 192.168.1.120:7002 --metrics 192.168.1.130:5001 \
   --control 192.168.1.100:6000 --data 192.168.1.100:6001 --worker-count 2 \
-  --topology-initializer --ponythreads=1
+  --external 192.168.1.100:6002 --topology-initializer --ponythreads=1
 ```
 
 The Alphabet Partitioned example has us start our 2nd worker as:
@@ -57,7 +63,7 @@ The Alphabet Partitioned example has us start our 2nd worker as:
 ```bash
 machida --application-module alphabet_partitioned \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --name worker-2 --ponythreads=1
+  --external 127.0.0.1:6010 --name worker-2 --ponythreads=1
 ```
 
 For the sake of multi-worker we would want to change that to:
@@ -65,8 +71,14 @@ For the sake of multi-worker we would want to change that to:
 ```bash
 machida --application-module alphabet_partitioned \
   --out 192.168.1.120:7002 --metrics 192.168.1.130:5001 \
-  --control 127.0.0.1:6000 --name worker-2 --ponythreads=1
+  --control 192.168.1.100:6000 --external 192.168.1.110:8888 --name worker-2 \
+  --ponythreads=1
 ```
+
+It's important to note that when we started the 2nd worker:
+
+- `--control` is a remote address where the initializer is listening
+- `--external` is any local address that we want to listen on
 
 ## Restarting workers
 
@@ -76,7 +88,4 @@ Resilience files are based on the name you supply the worker so starting differe
 
 ## Shutting down a cluster
 
-<< UPDATE THIS AFTER I WRITE SHUTDOWN TOOL >>
-To entirely shut down a cluster, simply terminate all the running workers.
-If you intend to start a new cluster, you will have to delete the files created
-in the resilience directory.
+Wallaroo comes with a [cluster shutdown tool](https://github.com/Sendence/wallaroo/tree/release/utils/cluster_shutdown) that can be used to cleanly shut down a running cluster.
