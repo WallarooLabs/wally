@@ -31,11 +31,11 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
 class val KafkaSourceListenerBuilderBuilder[In: Any val]
-  let _conf: KafkaConfig val
+  let _ksco: KafkaSourceConfigOptions val
   let _auth: TCPConnectionAuth
 
-  new val create(conf: KafkaConfig val, auth: TCPConnectionAuth) =>
-    _conf = conf
+  new val create(ksco: KafkaSourceConfigOptions val, auth: TCPConnectionAuth) =>
+    _ksco = ksco
     _auth = auth
 
   fun apply(source_builder: SourceBuilder, router: Router,
@@ -52,7 +52,7 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
       route_builder,
       outgoing_boundary_builders, event_log, auth,
       layout_initializer, consume metrics_reporter, default_target,
-      default_in_route_builder, target_router, _conf, _auth)
+      default_in_route_builder, target_router, _ksco, _auth)
 
 class val KafkaSourceListenerBuilder[In: Any val]
   let _source_builder: SourceBuilder
@@ -67,7 +67,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
   let _default_target: (Step | None)
   let _target_router: Router
   let _metrics_reporter: MetricsReporter
-  let _conf: KafkaConfig val
+  let _ksco: KafkaSourceConfigOptions val
   let _tcp_auth: TCPConnectionAuth
 
   new val create(source_builder: SourceBuilder, router: Router,
@@ -79,7 +79,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder | None) = None,
     target_router: Router = EmptyRouter,
-    conf: KafkaConfig val, tcp_auth: TCPConnectionAuth)
+    ksco: KafkaSourceConfigOptions val, tcp_auth: TCPConnectionAuth)
   =>
     _source_builder = source_builder
     _router = router
@@ -93,14 +93,14 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _default_target = default_target
     _target_router = target_router
     _metrics_reporter = consume metrics_reporter
-    _conf = conf
+    _ksco = ksco
     _tcp_auth = tcp_auth
 
   fun apply(env: Env): SourceListener =>
     KafkaSourceListener[In](env, _source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
-      _default_target, _default_in_route_builder, _target_router, _conf,
+      _default_target, _default_in_route_builder, _target_router, _ksco,
       _tcp_auth)
 
 
@@ -130,11 +130,9 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _layout_initializer: LayoutInitializer
   let _default_target: (Step | None)
   let _metrics_reporter: MetricsReporter
-  let _array: Array[Array[U8] val] val
-  let _emit_gap: U64
-  let _conf: KafkaConfig val
+  let _ksco: KafkaSourceConfigOptions val
   let _tcp_auth: TCPConnectionAuth
-  let _kc: KafkaClient tag
+  let _kc: (KafkaClient tag | None)
   let _kafka_topic_partition_sources: Map[String, Map[I32, KafkaSource[In]]] =
     _kafka_topic_partition_sources.create()
 
@@ -147,7 +145,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder | None) = None,
     target_router: Router = EmptyRouter,
-    conf: KafkaConfig val, tcp_auth: TCPConnectionAuth)
+    ksco: KafkaSourceConfigOptions val, tcp_auth: TCPConnectionAuth)
   =>
     _env = env
     _notify = KafkaSourceListenerNotify[In](source_builder, event_log, auth,
@@ -161,15 +159,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _default_target = default_target
     _metrics_reporter = consume metrics_reporter
 
-    _conf = conf
+    _ksco = ksco
     _tcp_auth = tcp_auth
-    _array = recover val Array[Array[U8] val] end
-    _emit_gap = 0
-
-
-    for topic in _conf.consumer_topics.values() do
-      _kafka_topic_partition_sources(topic) = Map[I32, KafkaSource[In]]
-    end
 
     match router
     | let pr: PartitionRouter =>
@@ -180,8 +171,20 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
         spr.partition_id(), this)
     end
 
-    // create kafka client
-    _kc = KafkaClient(_tcp_auth, _conf, this)
+
+    // create kafka config
+    _kc = match KafkaSourceConfigFactory(_ksco, _env.out)
+    | let kc: KafkaConfig val =>
+      for topic in kc.consumer_topics.values() do
+        _kafka_topic_partition_sources(topic) = Map[I32, KafkaSource[In]]
+      end
+      // create kafka client
+      KafkaClient(_tcp_auth, kc, this)
+    | let ksce: KafkaSourceConfigError =>
+      @printf[U32]("%s\n".cstring(), ksce.message().cstring())
+      Fail()
+      None
+    end
 
   be kafka_client_error(error_report: KafkaErrorReport) =>
     @printf[I32](("ERROR: Kafka client encountered an unrecoverable error! " +
@@ -214,20 +217,27 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
           partitions_changed = true
 
           try
-            let source = KafkaSource[In](this, _notify.build_source(_env)?,
-              _router.routes(), _route_builder, _outgoing_boundary_builders,
-              _layout_initializer, _default_target,
-              _default_in_route_builder,
-              _metrics_reporter.clone(), topic, part_id, _kc,
-              _router_registry)
-            partitions_sources(part_id) = source
-            _router_registry.register_source(source)
-            match _router
-            | let pr: PartitionRouter =>
-              _router_registry.register_partition_router_subscriber(pr.state_name(), source)
-            | let spr: StatelessPartitionRouter =>
-              _router_registry.register_stateless_partition_router_subscriber(
-                spr.partition_id(), source)
+            match _kc
+            | let kc: KafkaClient tag =>
+              let source = KafkaSource[In](this, _notify.build_source(_env)?,
+                _router.routes(), _route_builder, _outgoing_boundary_builders,
+                _layout_initializer, _default_target,
+                _default_in_route_builder,
+                _metrics_reporter.clone(), topic, part_id, kc,
+                _router_registry)
+              partitions_sources(part_id) = source
+              _router_registry.register_source(source)
+              match _router
+              | let pr: PartitionRouter =>
+                _router_registry.register_partition_router_subscriber(pr.state_name(), source)
+              | let spr: StatelessPartitionRouter =>
+                _router_registry.register_stateless_partition_router_subscriber(
+                  spr.partition_id(), source)
+              end
+            else
+              @printf[I32]("Error _kc as None instead of KafkaClient!\n"
+                .cstring())
+              Unreachable()
             end
           else
             @printf[I32](("Error creating KafkaSource for topic: " + topic
@@ -249,8 +259,15 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
           my_consumers(part_id) = consumer
         end
 
-        _kc.update_consumer_message_handler(topic, recover val
-          MapPartitionConsumerMessageHandler(consume my_consumers) end)
+        match _kc
+        | let kc: KafkaClient tag =>
+          kc.update_consumer_message_handler(topic, recover val
+            MapPartitionConsumerMessageHandler(consume my_consumers) end)
+        else
+          @printf[I32]("Error _kc as None instead of KafkaClient!\n"
+            .cstring())
+          Unreachable()
+        end
       end
     end
 
