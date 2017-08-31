@@ -2,7 +2,7 @@
 
 Wallaroo allows an application to be run on multiple workers working together in a cluster. Wallaroo handles distributing work across the cluster at startup, such that no additional work is required on the developer's part.
 
-A Wallaroo cluster does not have a continuously-running centralized manager for its workers. Coordination is all done on a decentralized basis. At cluster startup, one worker assumes the role of "initializer." The initializer is responsible for coordinating application startup. A worker is deemed to be an initializer by passing the `--topology-initializer` command line argument. 
+A Wallaroo cluster does not have a continuously-running centralized manager for its workers. Coordination is all done on a decentralized basis. At cluster startup, one worker assumes the role of "initializer." The initializer is responsible for coordinating application startup. A worker is deemed to be an initializer by passing the `--cluster-initializer` command line argument. 
 
 ## Starting a Wallaroo cluster
 
@@ -46,7 +46,7 @@ The Alphabet Partitioned example has us start the initializer as:
 ```bash
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --data 127.0.0.1:6001 --worker-count 2 --topology-initializer \
+  --data 127.0.0.1:6001 --worker-count 2 --cluster-initializer \
   --external 127.0.0.1:6002 --ponythreads=1
 ```
 
@@ -56,7 +56,7 @@ For the sake of clustering, we would want to change that to:
 machida --application-module alphabet_partitioned --in 192.168.1.100:7010 \
   --out 192.168.1.120:7002 --metrics 192.168.1.130:5001 \
   --control 192.168.1.100:6000 --data 192.168.1.100:6001 --worker-count 2 \
-  --external 192.168.1.100:6002 --topology-initializer --ponythreads=1
+  --external 192.168.1.100:6002 --cluster-initializer --ponythreads=1
 ```
 
 The Alphabet Partitioned example has us start our 2nd worker as:

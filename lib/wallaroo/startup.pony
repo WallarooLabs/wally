@@ -498,7 +498,7 @@ actor Startup
         auth, consume control_notifier, control_channel_filepath,
         _startup_options.my_c_host, _startup_options.my_c_service)
 
-      // Call this on local topology initializer instead of Connections
+      // Call this on local cluster initializer instead of Connections
       // directly to make sure messages are processed in the create
       // initialization order
       local_topology_initializer.create_connections(consume control_addrs,
