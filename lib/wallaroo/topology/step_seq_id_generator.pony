@@ -17,7 +17,10 @@ class ref StepSeqIdGenerator
   """
   var _generate_new: Bool = true
   // 0 is reserved for "not seen yet"
-  var _seq_id: SeqId = 0
+  var _seq_id: SeqId
+
+  new create(initial_seq_id: SeqId = 0) =>
+    _seq_id = initial_seq_id
 
   fun ref latest_for_run(): SeqId =>
     """

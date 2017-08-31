@@ -189,6 +189,9 @@ actor WActorWithState is WActorWrapper
       Fail()
     end
 
+  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
+    None
+
   be log_flushed(low_watermark: SeqId) =>
     None
 

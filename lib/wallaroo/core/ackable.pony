@@ -16,6 +16,9 @@ trait tag Ackable
   =>
     None
 
+  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
+    None
+
   be log_flushed(low_watermark: SeqId) =>
     """
     We will be called back here once the eventlogs have been flushed for a
