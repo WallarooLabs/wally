@@ -4,10 +4,10 @@ that are connected sink-to-source (forming a closed circle between
 them). There is no need to set up any external data listeners.
 
 Run Ping:
-./ping_pong -i 127.0.0.1:7000 -o 127.0.0.1:7001 -m 127.0.0.1:5001 -c 127.0.0.1:6002 -d 127.0.0.1:6004 -n node-name --ping
+./ping_pong -i 127.0.0.1:7000 -o 127.0.0.1:7001 -m 127.0.0.1:5001 -c 127.0.0.1:6002 -d 127.0.0.1:6004 -n node-name --ping -t
 
 Run Pong:
-./ping_pong -i 127.0.0.1:7001 -o 127.0.0.1:7000 -m 127.0.0.1:5001 -c 127.0.0.1:6012 -d 127.0.0.1:6014 -n node-name --pong
+./ping_pong -i 127.0.0.1:7001 -o 127.0.0.1:7000 -m 127.0.0.1:5001 -c 127.0.0.1:6012 -d 127.0.0.1:6014 -n node-name --pong -t
 
 Send 1 message into Ping:
 ../../../../giles/sender/sender -h 127.0.0.1:7000 -y -g 12 -w -u -m 1

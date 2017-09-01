@@ -31,7 +31,7 @@ The gist of the test is simple: We run `sequence_window` with `Spike` on the `in
 
 1. start giles-receiver:  `../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555`
 2. start initializer-worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t --spike-drop --spike-prob 0.001 --spike-margin 1000`
-3. start second worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker2`
+3. start second worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -r res-data -n worker2`
 4. start giles-sender and send 10000 integers: `../../../../giles/sender/sender -h 127.0.0.1:7000 -s 10 -i 5_000_000 -u --ponythreads=1 -y -g 12 -w -m 10000`
 5. wait for giles-sender to complete
 6. Terminate all of the processes

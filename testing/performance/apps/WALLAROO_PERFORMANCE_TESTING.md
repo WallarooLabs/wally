@@ -114,7 +114,7 @@ sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/wallaroo/giles/receiver/
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -t
 ```
 
 To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
@@ -145,7 +145,7 @@ sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/wallaroo/giles/receiver/
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ~/wallaroo/testing/data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg -s ~/wallaroo/testing/data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ~/wallaroo/testing/data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg -s ~/wallaroo/testing/data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -t
 ```
 
 To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
@@ -183,7 +183,7 @@ sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 -n worker2
+sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 --ponythreads 4 --ponypinasio --ponynoblock -n worker2
 ```
 
 To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
@@ -212,7 +212,7 @@ sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 -n worker2
+sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 --ponythreads 4 --ponypinasio --ponynoblock -n worker2
 ```
 
 To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
@@ -255,7 +255,7 @@ sudo cset proc -s user -e numactl -- -C 1-12,17 chrt -f 80 ~/wallaroo/apps/marke
 Machine 2:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-12,17 chrt -f 80 ~/wallaroo/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 12 --ponypinasio --ponynoblock -n worker2 -w 2
+sudo cset proc -s user -e numactl -- -C 1-12,17 chrt -f 80 ~/wallaroo/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 --ponythreads 12 --ponypinasio --ponynoblock -n worker2
 ```
 
 ### Packet
@@ -348,5 +348,5 @@ sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 stap /home/ubuntu/pony
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 stap /home/ubuntu/ponyc/examples/systemtap/actor-telemetry-heap-only.stp -o market-stap-w2.txt -g --suppress-time-limits -c '~/wallaroo/apps/market-spread/market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2'
+sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 stap /home/ubuntu/ponyc/examples/systemtap/actor-telemetry-heap-only.stp -o market-stap-w2.txt -g --suppress-time-limits -c '~/wallaroo/apps/market-spread/market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 --ponythreads 4 --ponypinasio --ponynoblock --name w2'
 ```

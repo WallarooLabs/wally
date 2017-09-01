@@ -5,7 +5,7 @@ APP:
 2 WORKER:
 ./weightest_test -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=2 --ponynoblock -t -w 2
 
-./weightest_test -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=2 --ponynoblock -w 2
+./weightest_test -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=2 --ponynoblock
 
 
 SENDER:
