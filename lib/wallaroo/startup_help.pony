@@ -5,18 +5,19 @@ primitive StartupHelp
       To run Wallaroo:
       -----------------------------------------------------------------------------------
       --in/-i *[Comma-separated list of input addresses sources listen on]
-      --control/-c *[Sets address for initializer control channel]
+      --control/-c *[Sets address for initializer control channel; sets
+        control address to connect to for non-initializers]
       --data/-d *[Sets address for initializer data channel]
       --my-control [Optionally sets address for my control channel]
       --my-data [Optionally sets address for my data channel]
       --phone-home/-p [Sets address for phone home connection]
       --external/-e [Sets address for external message channel]
-      --worker-count/-w *[Sets total number of workers, including topology
+      --worker-count/-w *[Sets total number of workers, including cluster
         initializer]
       --name/-n *[Sets name for this worker]
 
       --metrics/-m [Sets address for external metrics (e.g. monitoring hub)]
-      --cluster-initializer/-t [Sets this process as the topology
+      --cluster-initializer/-t [Sets this process as the cluster
         initializing process (that status is meaningless after init is done)]
       --resilience-dir/-r [Sets directory to write resilience files to,
         e.g. -r /tmp/data (no trailing slash)]
