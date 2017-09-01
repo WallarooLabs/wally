@@ -475,9 +475,10 @@ def test_log_rotation_file_size_trigger_recovery():
 
     command = '''sequence_window_resilience \
         --log-rotation \
-        --event-log-file-size {} \
         --stop-pause {}
-    '''.format(event_log_file_size, STOP_THE_WORLD_PAUSE)
+    '''.format(STOP_THE_WORLD_PAUSE)
+    alt_block = '--event-log-file-size {}'.format(event_log_file_size)
+    alt_func = lambda x: x > 0
 
     runners = []
     try:
@@ -502,7 +503,7 @@ def test_log_rotation_file_size_trigger_recovery():
 
         start_runners(runners, command, host, inputs, outputs,
                       metrics_port, control_port, external_port, data_port,
-                      res_dir, workers)
+                      res_dir, workers, alt_block, alt_func)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
@@ -581,21 +582,21 @@ def test_log_rotation_file_size_trigger_recovery():
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
-        # Validate all workers underwent log rotation
-        for (i, r) in enumerate(runners[:-1]):
-            stdout, stderr = r.get_output()
-            try:
-                assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
-                       is not None)
-            except AssertionError:
-                raise AssertionError('Worker %d.%r does not appear to have '
-                                     'performed log rotation as expected.'
-                                     ' The pattern %r '
-                                     'is missing form the Worker output '
-                                     'included below.\nSTDOUT\n---\n%s\n'
-                                     '---\n'
-                                     % (i, r.name, log_rotated_pattern,
-                                        stdout))
+        # Validate worker underwent log rotation, but not initializer
+        i, r = 1, runners[1]
+        stdout, stderr = r.get_output()
+        try:
+            assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
+                   is not None)
+        except AssertionError:
+            raise AssertionError('Worker %d.%r does not appear to have '
+                                 'performed log rotation as expected.'
+                                 ' The pattern %r '
+                                 'is missing form the Worker output '
+                                 'included below.\nSTDOUT\n---\n%s\n'
+                                 '---\n'
+                                 % (i, r.name, log_rotated_pattern,
+                                    stdout))
 
         # Validate worker actually underwent recovery
         pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."

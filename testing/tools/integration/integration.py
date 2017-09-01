@@ -758,8 +758,7 @@ def get_port_values(host, sources):
     return source_ports, free_ports[0], free_ports[1], free_ports[2]
 
 
-BASE_COMMAND = r'''
-    {command} \
+BASE_COMMAND = r'''{command} \
     --in {inputs} \
     --out {outputs} \
     --metrics {host}:{metrics_port} \
@@ -776,33 +775,39 @@ INITIALIZER_CMD = r'''--worker-count {workers} \
     --external {host}:{external_port} \
     --cluster-initializer'''
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
-                  control_port, external_port, data_port, res_dir, workers):
-    command_stub = BASE_COMMAND.format(command = command,
-                                       host = host,
-                                       inputs = inputs,
-                                       outputs = outputs,
-                                       metrics_port = metrics_port,
-                                       control_port = control_port,
-                                       res_dir = res_dir)
-    # for each worker, assign `name` and `cluster-initializer` values
+                  control_port, external_port, data_port, res_dir, workers,
+                  alt_block=None, alt_func=None):
+    cmd_stub = BASE_COMMAND.format(command = command,
+                                   host = host,
+                                   inputs = inputs,
+                                   outputs = outputs,
+                                   metrics_port = metrics_port,
+                                   control_port = control_port,
+                                   res_dir = res_dir)
 
+    # for each worker, assign `name` and `cluster-initializer` values
     if workers < 1:
         raise PipelineTestError("workers must be 1 or more")
-    runners.append(Runner(
-        cmd_string = command_stub.format(
-            name = 'initializer',
-            initializer_block = INITIALIZER_CMD.format(
-                workers = workers,
-                data_port = data_port,
-                external_port = external_port,
-                host=host)),
-        name = 'initializer'))
+    x = 0
+    cmd = cmd_stub.format(
+        name = 'initializer',
+        initializer_block = INITIALIZER_CMD.format(
+            workers = workers,
+            data_port = data_port,
+            external_port = external_port,
+            host = host))
+    if alt_func and alt_func(x):
+        cmd = '''{} \
+            {}'''.format(cmd, alt_block)
+    runners.append(Runner(cmd_string = cmd, name = 'initializer'))
     for x in range(1, workers):
-        runners.append(Runner(
-            cmd_string = command_stub.format(
-                name = 'worker{}'.format(x),
-                initializer_block = ''),
-            name='worker{}'.format(x)))
+        cmd = cmd_stub.format(name = 'worker{}'.format(x),
+                              initializer_block = '')
+        if alt_func and alt_func(x):
+            cmd = '''{} \
+                {}'''.format(cmd, alt_block)
+        runners.append(Runner(cmd_string = cmd,
+                              name = 'worker{}'.format(x)))
 
     # start the workers, 50ms apart
     for idx, r in enumerate(runners):
