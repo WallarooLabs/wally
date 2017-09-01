@@ -18,8 +18,6 @@ In a shell, set up a listener:
 nc -l 127.0.0.1 7002
 ```
 
-In another shell, export the current directory and `wallaroo.py` directories to `PYTHONPATH`:
-
 In another shell, set up your environment variables if you haven't already done so. Assuming you installed Machida according to the tutorial instructions you would do:
 
 ```bash
