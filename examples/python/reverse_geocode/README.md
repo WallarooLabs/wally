@@ -53,7 +53,8 @@ Run `machida` with `--application-module reverse_geocode`:
 ```bash
 machida --application-module reverse_geocode --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --name worker-name \
+  --cluster_initialier \
+  --name initializer \
   --ponythreads=1
 ```
 
