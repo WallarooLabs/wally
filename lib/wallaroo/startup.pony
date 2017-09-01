@@ -6,6 +6,7 @@ use "net"
 use "net/http"
 use "time"
 use "sendence/hub"
+use "sendence/mort"
 use "sendence/options"
 use "wallaroo/boundary"
 use "wallaroo/ent/data_receiver"
@@ -13,7 +14,6 @@ use "wallaroo/ent/cluster_manager"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -118,13 +118,19 @@ actor Startup
       if _startup_options.is_joining then
         @printf[I32]("New worker preparing to join cluster\n".cstring())
       else
-        if _startup_options.worker_count == 1 then
-          @printf[I32]("Single worker topology\n".cstring())
-          _startup_options.is_initializer = true
-          _is_multi_worker = false
+        match _startup_options.worker_count
+        | let wc: USize =>
+          if wc == 1 then
+            @printf[I32]("Single worker topology\n".cstring())
+            _is_multi_worker = false
+          else
+            @printf[I32]((_startup_options.worker_count.string() +
+              " worker topology\n").cstring())
+          end
         else
-          @printf[I32]((_startup_options.worker_count.string() +
-            " worker topology\n").cstring())
+          if _startup_options.is_initializer then
+            Unreachable()
+          end
         end
       end
 
@@ -307,10 +313,10 @@ actor Startup
       let local_topology_initializer =
         LocalTopologyInitializer(
           _application, _startup_options.worker_name,
-          _startup_options.worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _startup_options.is_initializer,
-          data_receivers, event_log, recovery, recovery_replayer,
-          _local_topology_file, _data_channel_file, _worker_names_file)
+          _env, auth, connections, router_registry, metrics_conn,
+          _startup_options.is_initializer, data_receivers, event_log, recovery,
+          recovery_replayer, _local_topology_file, _data_channel_file,
+          _worker_names_file)
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
@@ -318,11 +324,15 @@ actor Startup
           local_topology_initializer)
         match _application_distributor
         | let ad: ApplicationDistributor =>
-          _cluster_initializer = ClusterInitializer(auth,
-            _startup_options.worker_name,
-            _startup_options.worker_count, connections,
-            ad, local_topology_initializer, _startup_options.d_addr,
-            metrics_conn, is_recovering)
+          match _startup_options.worker_count
+          | let wc: USize =>
+            _cluster_initializer = ClusterInitializer(auth,
+              _startup_options.worker_name, wc, connections, ad,
+              local_topology_initializer, _startup_options.d_addr,
+              metrics_conn, is_recovering)
+          else
+            Unreachable()
+          end
         end
       end
 
@@ -452,8 +462,7 @@ actor Startup
       let local_topology_initializer =
         LocalTopologyInitializer(
           _application, _startup_options.worker_name,
-          _startup_options.worker_count, _env, auth, connections,
-          router_registry, metrics_conn,
+          _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
           event_log, recovery, recovery_replayer,
           _local_topology_file, _data_channel_file, _worker_names_file

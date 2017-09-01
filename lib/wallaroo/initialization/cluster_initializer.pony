@@ -61,7 +61,7 @@ actor ClusterInitializer
       // This is a single worker cluster. We are ready to proceed with
       // initialization.
       _topology_ready = true
-      _distributor.distribute(this, _expected, recover [_initializer_name] end,
+      _distributor.distribute(this, _expected, recover Array[String] end,
         _initializer_name)
       _connections.save_connections()
       _layout_initializer.create_data_channel_listener(

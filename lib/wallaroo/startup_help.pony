@@ -12,8 +12,8 @@ primitive StartupHelp
       --my-data [Optionally sets address for my data channel]
       --phone-home/-p [Sets address for phone home connection]
       --external/-e [Sets address for external message channel]
-      --worker-count/-w *[Sets total number of workers, including cluster
-        initializer]
+      --worker-count/-w *[Sets cluster initializer's total number of workers,
+        including cluster initializer itself]
       --name/-n *[Sets name for this worker]
 
       --metrics/-m [Sets address for external metrics (e.g. monitoring hub)]

@@ -6,6 +6,7 @@ use "net"
 use "net/http"
 use "time"
 use "sendence/hub"
+use "sendence/mort"
 use "sendence/options"
 use "sendence/rand"
 use "wallaroo"
@@ -16,7 +17,6 @@ use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/w_actor/broadcast"
-use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -274,10 +274,15 @@ actor ActorSystemStartup
         let distributor =
           ActorSystemDistributor(auth, _system, initializer, connections,
             is_recovering)
-        _cluster_initializer = ClusterInitializer(auth,
-          _startup_options.worker_name, _startup_options.worker_count,
-          connections, distributor, initializer, _startup_options.d_addr,
-          empty_metrics_conn, is_recovering)
+        match _startup_options.worker_count
+        | let wc: USize =>
+          _cluster_initializer = ClusterInitializer(auth,
+            _startup_options.worker_name, wc, connections, distributor,
+            initializer, _startup_options.d_addr, empty_metrics_conn,
+            is_recovering)
+        else
+          Unreachable()
+        end
       end
 
       let control_notifier: TCPListenNotify iso =
