@@ -74,6 +74,7 @@ validator/validator -i recived.txt -e 10002
 ```
 """
 
+use "assert"
 use "buffered"
 use "collections"
 use "ring"
@@ -138,6 +139,25 @@ class WindowState is State
   fun ref push(u: U64) =>
     ring.push(u)
     idx = idx + 1
+
+    ifdef "validate" then
+      try
+        // Test validity of updated window
+        let values = to_array()
+        Fact(TestIncrements(values), "Increments test failed on " +
+          string())
+      else
+        Fail()
+      end
+    end
+
+  fun to_array(): Array[U64] val =>
+    let ar: Array[U64] iso = recover Array[U64](4) end
+    for v in ring.values() do
+      ar.push(v)
+    end
+    ar.reverse_in_place()
+    consume ar
 
 primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
   fun name(): String => "Observe new value"
