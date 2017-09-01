@@ -1,3 +1,4 @@
+use "sendence/mort"
 use "sendence/options"
 use "wallaroo/spike"
 
@@ -18,7 +19,7 @@ class StartupOptions
   var my_d_service: String = "0"
   var p_arg: (Array[String] | None) = None
   var x_arg: (Array[String] | None) = None
-  var worker_count: USize = 1
+  var worker_count: (USize | None) = None
   var is_initializer: Bool = false
   var worker_name: String = ""
   var resilience_dir: String = "/tmp"
@@ -122,6 +123,9 @@ primitive WallarooConfig
       | ("external", let arg: String) =>
         so.x_arg = arg.split(":")
       | ("worker-count", let arg: I64) =>
+        if arg.usize() == 0 then
+          FatalUserError("--worker-count must be at least 1.")
+        end
         so.worker_count = arg.usize()
       | ("cluster-initializer", None) =>
         so.is_initializer = true
@@ -160,11 +164,24 @@ primitive WallarooConfig
       error
     end
 
-    if (so.worker_count == 1) and not so.is_joining then
-      so.is_initializer = true
-    end
     if so.is_initializer then
+      match so.worker_count
+      | None =>
+        so.worker_count = 1
+      end
       so.worker_name = "initializer"
+      if so.d_host == "" then
+        FatalUserError("Cluster initializer needs its data channel address " +
+          "to be specified via --data.")
+      end
+    else
+      match so.worker_count
+      | let wc: USize =>
+        FatalUserError("Only supply --worker-count to cluster initializer.")
+      end
+      if so.d_host != "" then
+        FatalUserError("Only supply --data to cluster initializer.")
+      end
     end
 
     ifdef "spike" then

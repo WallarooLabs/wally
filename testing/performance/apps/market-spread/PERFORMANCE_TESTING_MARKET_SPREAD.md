@@ -119,7 +119,7 @@ sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/wallaroo/giles/receiv
 
 ```bash
 cd ~/wallaroo/testing/performance/apps/market-spread
-sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 8 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
+sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 8 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -t
 ```
 
 To run the Initial NBBO Sender: (must be started before Orders so that the initial NBBO can be set)

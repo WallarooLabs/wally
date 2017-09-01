@@ -182,7 +182,6 @@ class val LocalTopology
 actor LocalTopologyInitializer is LayoutInitializer
   let _application: Application val
   let _worker_name: String
-  let _worker_count: USize
   let _env: Env
   let _auth: AmbientAuth
   let _connections: Connections
@@ -228,8 +227,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   var _t: USize = 0
 
-  new create(app: Application val, worker_name: String, worker_count: USize,
-    env: Env, auth: AmbientAuth, connections: Connections,
+  new create(app: Application val, worker_name: String, env: Env,
+    auth: AmbientAuth, connections: Connections,
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
@@ -240,7 +239,6 @@ actor LocalTopologyInitializer is LayoutInitializer
   =>
     _application = app
     _worker_name = worker_name
-    _worker_count = worker_count
     _env = env
     _auth = auth
     _connections = connections
@@ -478,11 +476,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("|v|v|v|Initializing Local Topology|v|v|v|\n\n".cstring())
     _cluster_initializer = cluster_initializer
     try
-      if (_worker_count > 1) and (_outgoing_boundaries.size() == 0) then
-        @printf[I32]("Outgoing boundaries not set up!\n".cstring())
-        error
-      end
-
       try
         let local_topology_file = FilePath(_auth, _local_topology_file)
         if local_topology_file.exists() then
@@ -505,6 +498,13 @@ actor LocalTopologyInitializer is LayoutInitializer
 
       match _topology
       | let t: LocalTopology =>
+        let worker_count = t.worker_names.size()
+
+        if (worker_count > 1) and (_outgoing_boundaries.size() == 0) then
+          @printf[I32]("Outgoing boundaries not set up!\n".cstring())
+          error
+        end
+
         _router_registry.set_pre_state_data(t.pre_state_data())
 
         _save_local_topology()
@@ -534,7 +534,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         var data_routes = recover trn Map[U128, Consumer] end
 
         // Update the step ids for all OutgoingBoundaries
-        if _worker_count > 1 then
+        if worker_count > 1 then
           _connections.update_boundary_ids(t.proxy_ids())
         end
 
@@ -929,7 +929,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   _connections.register_disposable(d)
                 else
                   @printf[I32](("All sinks and boundaries should be " +
-                    "disposable!!\n").cstring())
+                    "disposable!\n").cstring())
                   Fail()
                 end
 
@@ -1310,7 +1310,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 _connections.register_disposable(d)
               else
                 @printf[I32](("All sinks and boundaries should be " +
-                  "disposable!!\n").cstring())
+                  "disposable!\n").cstring())
                 Fail()
               end
 

@@ -764,16 +764,17 @@ BASE_COMMAND = r'''
     --out {outputs} \
     --metrics {host}:{metrics_port} \
     --control {host}:{control_port} \
-    --external {host}:{external_port} \
-    --data {host}:{data_port} \
     --resilience-dir {res_dir} \
-    --worker-count {workers} \
     --name {{name}} \
-    {{cluster_initializer}} \
+    {{initializer_block}} \
     --ponythreads=1 \
     --ponypinasio \
     --ponynoblock
     '''
+INITIALIZER_CMD = r'''--worker-count {workers} \
+    --data {host}:{data_port} \
+    --external {host}:{external_port} \
+    --cluster-initializer'''
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
                   control_port, external_port, data_port, res_dir, workers):
     command_stub = BASE_COMMAND.format(command = command,
@@ -782,23 +783,26 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
                                        outputs = outputs,
                                        metrics_port = metrics_port,
                                        control_port = control_port,
-                                       external_port = external_port,
-                                       data_port = data_port,
-                                       res_dir = res_dir,
-                                       workers = workers)
+                                       res_dir = res_dir)
     # for each worker, assign `name` and `cluster-initializer` values
 
     if workers < 1:
         raise PipelineTestError("workers must be 1 or more")
-    runners.append(Runner(cmd_string=command_stub.format(
-        name = 'initializer',
-        cluster_initializer = '--cluster-initializer'),
-                         name='initializer'))
+    runners.append(Runner(
+        cmd_string = command_stub.format(
+            name = 'initializer',
+            initializer_block = INITIALIZER_CMD.format(
+                workers = workers,
+                data_port = data_port,
+                external_port = external_port,
+                host=host)),
+        name = 'initializer'))
     for x in range(1, workers):
-        runners.append(Runner(cmd_string=command_stub.format(
-            name = 'worker{}'.format(x),
-            cluster_initializer = ''),
-                             name='worker{}'.format(x)))
+        runners.append(Runner(
+            cmd_string = command_stub.format(
+                name = 'worker{}'.format(x),
+                initializer_block = ''),
+            name='worker{}'.format(x)))
 
     # start the workers, 50ms apart
     for idx, r in enumerate(runners):
@@ -1020,23 +1024,22 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             s.stop()
 
         logging.debug('Begin validation phase...')
-        # Use runners' outputs to validate they all ran correctly
-        check_workers = re.compile(r'([\w\d]+) worker topology')
-        for r in runners:
-            stdout, stderr = r.get_output()
-            try:
-                m = check_workers.search(stdout)
-                assert(m is not None)
-                topo_type = m.group(1)
-                if topo_type.lower() == 'single':
-                    topo_type = 1
-                else:
-                    topo_type = int(topo_type)
-                assert(workers == topo_type)
-            except Exception as err:
-                print 'runner output'
-                print stdout
-                raise err
+        # Use initializer's outputs to validate topology is set up correctly
+        check_initializer = re.compile(r'([\w\d]+) worker topology')
+        stdout, stderr = runners[0].get_output()
+        try:
+            m = check_initializer.search(stdout)
+            assert(m is not None)
+            topo_type = m.group(1)
+            if topo_type.lower() == 'single':
+                topo_type = 1
+            else:
+                topo_type = int(topo_type)
+            assert(workers == topo_type)
+        except Exception as err:
+            print 'runner output'
+            print stdout
+            raise err
 
         if validate_file:
             validation_files = validate_file.split(',')

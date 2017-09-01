@@ -7,12 +7,12 @@ nc -l 127.0.0.1 5555 >> /dev/null
 nc -l 127.0.0.1 5001 >> /dev/null
 
 3a) single worker
-./market-spread-cpp -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:501 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=4 --ponynoblock
+./market-spread-cpp -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:501 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name -t --ponythreads=4 --ponynoblock
 
 3b) multi-worker
 ./market-spread-cpp -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock -t -w 2
 
-./market-spread-cpp -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
+./market-spread-cpp -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
 
 4) initialization:
 giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f testing/data/market_spread/initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 57 -w

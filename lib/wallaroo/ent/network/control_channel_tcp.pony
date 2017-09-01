@@ -57,8 +57,6 @@ class ControlChannelListenNotifier is TCPListenNotify
     _router_registry = router_registry
     _broadcast_variables = broadcast_variables
     _recovery_file = recovery_file
-    _d_host = data_host
-    _d_service = data_service
     _event_log = event_log
     _recovery_file_cleaner = recovery_file_cleaner
 

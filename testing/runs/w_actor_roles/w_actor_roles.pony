@@ -30,7 +30,8 @@ nc -l 127.0.0.1 5001 >> /dev/null
   --cluster-initializer
 
 ./w_actor_roles --in 127.0.0.1:7001 --out 127.0.0.1:5555 \
-  --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker2 --ponythreads=4 --ponynoblock --worker-count 2
+  --metrics 127.0.0.1:5001 --control 127.0.0.1:6000  \
+  --name worker2 --ponythreads=4 --ponynoblock
 ```
 
 4) sender
