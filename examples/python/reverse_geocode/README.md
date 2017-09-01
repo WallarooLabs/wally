@@ -12,9 +12,12 @@ You will need a working [Wallaroo Python API](/book/python/intro.md).
 First, install virtualenv according to its [installation instructions](https://virtualenv.pypa.io/en/stable/installation/).
 
 Now, create a virtual environment, and install `reverse_geocoder` from pip.
+OS X users should not omit the `--python` argument to `virtualenv` in order to work around a known problem with Python 2.7.
 
 ```bash
-virtualenv ENV
+rm -rf ENV
+virtualenv ENV --python=`which python`
+# NOTE: If you are a CSH or FISH shell user, adjust the "source" command below
 source ENV/bin/activate
 pip install reverse_geocoder
 ```
