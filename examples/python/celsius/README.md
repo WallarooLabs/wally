@@ -70,7 +70,7 @@ import struct
 with open('celsius.out', 'rb') as f:
     while True:
         try:
-            print struct.unpack('>Id', f.read(12))
+            print struct.unpack('>If', f.read(12))
         except:
             break
 ```
