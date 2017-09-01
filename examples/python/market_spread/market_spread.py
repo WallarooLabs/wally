@@ -1,4 +1,3 @@
-import pickle
 import struct
 import time
 
@@ -57,13 +56,81 @@ def application_setup(args):
         ).done()
     return ab.build()
 
+from enum import IntEnum
 
+class SerializedTypes(IntEnum):
+    UPDATEMARKETDATA = 1
+    SYMBOLPARTITIONFUNCTION = 2
+    CHECKORDER = 3
+    SYMBOLDATABUILDER = 4
+    ORDERRESULTENCODER = 5
+    MARKETDATAMESSAGE = 6
+    MARKETDATADECODER = 7
+    ORDERMESSAGE = 8
+    ORDERDECODER = 9
+    
+
+import struct
 def serialize(o):
-    return pickle.dumps(o)
+    if type(o) is UpdateMarketData:
+	s = struct.Struct('>I')
+        return s.pack(SerializedTypes.UPDATEMARKETDATA)
+    elif type(o) is SymbolPartitionFunction:
+	s = struct.Struct('>I')
+        return s.pack(SerializedTypes.SYMBOLPARTITIONFUNCTION)
+    elif type(o) is CheckOrder:
+	s = struct.Struct('>I')
+        return s.pack(SerializedTypes.CHECKORDER)
+    elif type(o) is SymbolDataBuilder:
+	s = struct.Struct('>I')
+        return s.pack(SerializedTypes.SYMBOLDATABUILDER)
+    elif type(o) is OrderResultEncoder:
+	s = struct.Struct('>I')
+        return s.pack(SerializedTypes.ORDERRESULTENCODER)
+    elif type(o) is MarketDataMessage:
+	s = struct.Struct('>I4s21sdd')
+        return s.pack(SerializedTypes.MARKETDATAMESSAGE,
+		      o.symbol, o.transact_time, o.bid, o.offer)
+    elif type(o) is MarketDataDecoder:
+	s = struct.Struct('>I')
+        return s.pack(SerializedTypes.MARKETDATADECODER)
+    elif type(o) is Order:
+	s = struct.Struct('>IBI6s4sdd21s')
+        return s.pack(SerializedTypes.ORDERMESSAGE, o.side, o.account,
+		      o.order_id, o.symbol, o.qty, o.price, o.transact_time)
+    elif type(o) is OrderDecoder:
+	s = struct.Struct('>I')
+        return s.pack(SerializedTypes.ORDERDECODER)
+    else:
+        print("Don't know how to serialize {}".format(type(o).__name__))
+    return None
 
 
 def deserialize(bs):
-    return pickle.loads(bs)
+    (obj_type,), bs = struct.unpack('>I', bs[:4]), bs[4:]
+    if obj_type == SerializedTypes.UPDATEMARKETDATA:
+	return UpdateMarketData()
+    elif obj_type == SerializedTypes.SYMBOLPARTITIONFUNCTION:
+        return SymbolPartitionFunction()
+    elif obj_type == SerializedTypes.CHECKORDER:
+        return CheckOrder()
+    elif obj_type == SerializedTypes.SYMBOLDATABUILDER:
+        return SymbolDataBuilder()
+    elif obj_type == SerializedTypes.ORDERRESULTENCODER:
+        return OrderResultEncoder()
+    elif obj_type == SerializedTypes.MARKETDATAMESSAGE:
+        (symbol, time, bid, offer) = struct.unpack('>4s21sdd', bs)
+        return MarketDataMessage(symbol, time, bid, offer)
+    elif obj_type == SerializedTypes.MARKETDATADECODER:
+        return MarketDataDecoder()
+    elif obj_type == SerializedTypes.ORDERMESSAGE:
+	(side, acct, oid, symbol, qty, price, t_time)  = struct.unpack('>BI6s4sdd21s', bs)
+        return Order(side, acct, oid, symbol, qty, price, t_time)
+    elif obj_type == SerializedTypes.ORDERDECODER:
+        return OrderDecoder()
+    else:
+        print("Don't know how to deserialize: {}".format(obj_type))
+    return None
 
 
 class MarketSpreadError(Exception):
@@ -133,8 +200,8 @@ class OrderDecoder(object):
         """
         order_type = struct.unpack(">B", bs[0:1])[0]
         if order_type != FIXTYPE_ORDER:
-            raise MarketSpreadError("Wrong Fix message type. Did you connect "
-                                    "the senders the wrong way around?")
+            raise MarketSpreadError("Wrong Fix message type {}. Did you connect "
+                                    "the senders the wrong way around?".format(order_type))
         side = struct.unpack(">B", bs[1:2])[0]
         account = struct.unpack(">I", bs[2:6])[0]
         order_id = struct.unpack("6s", bs[6:12])[0]
