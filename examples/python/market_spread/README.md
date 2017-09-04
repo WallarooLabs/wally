@@ -37,8 +37,10 @@ Run `machida` with `--application-module market_spread`:
 
 ```bash
 machida --application-module market_spread \
-  -i 127.0.0.1:7010,127.0.0.1:7011 -o 127.0.0.1:7002 -m 127.0.0.1:5001 \
-  -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name -t --ponythreads=1
+  --in 127.0.0.1:7010,127.0.0.1:7011 --out 127.0.0.1:7002 \
+  --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
+  --worker-name worker1 --external 127.0.0.1:5050 --cluster-initializer \
+  --ponythreads=1
 ```
 
 Send some market data messages
@@ -57,4 +59,10 @@ and some orders messages
   ../../../../testing/data/market_spread/orders/350-symbols_orders-fixish.msg --batch-size 20 \
   --interval 100_000_000 --messages 1000000 --binary --repeat --ponythreads=1 \
   --msg-size 57 --no-write
+```
+
+shut down cluster once finished processing
+
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```

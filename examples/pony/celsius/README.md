@@ -55,7 +55,8 @@ docker start mui
 
 ```bash
 ./celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:12500 --data 127.0.0.1:12501
+  --control 127.0.0.1:12500 --data 127.0.0.1:12501 --external 127.0.0.1:5050 \
+  --cluster-initializer
 ```
 
 3. Start a sender
@@ -65,4 +66,10 @@ docker start mui
   --file data_gen/celsius.msg \
   --batch-size 5 --interval 100_000_000 --messages 150 --binary \
   --variable-size --repeat --ponythreads=1 --no-write
+```
+
+4. Shut down cluster once finished processing
+
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```

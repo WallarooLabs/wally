@@ -42,8 +42,8 @@ docker start mui
 ./celsius-kafka --kafka_source_topic test --kafka_source_brokers 127.0.0.1 \
   --kafka_sink_topic test --kafka_sink_brokers 127.0.0.1 \
   --metrics 127.0.0.1:5001  --control 127.0.0.1:12500 --data 127.0.0.1:12501 \
-   --cluster-initializer --kafka_sink_max_message_size 100000 \
-   --kafka_sink_max_produce_buffer_ms 10
+  --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10 \
+  --cluster-initializer --external 127.0.0.1:5050
 ```
 
 `kafka_sink_max_message_size` controls maximum size of message sent to kafka in a single produce request. Kafka will return errors if this is bigger than server is configured to accept.
@@ -51,3 +51,9 @@ docker start mui
 `kafka_sink_max_produce_buffer_ms` controls maximum time (in ms) to buffer messages before sending to kafka. Either don't specify it or set it to `0` to disable batching on produce.
 
 3. Send data into kafka using kafkacat or some other mechanism
+
+4. Shut down cluster once finished processing
+
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+```

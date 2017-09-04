@@ -67,3 +67,9 @@ with open('received.txt', 'rb') as f:
         except:
             break
 ```
+
+Remember to shut down the cluster once finished processing
+
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:6002
+```

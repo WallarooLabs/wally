@@ -49,7 +49,8 @@ Run `atkin` with `--application-module matching-engine`:
 atkin --application-module matching-engine --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002,127.0.0.1:7003,127.0.0.1:7004 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --name worker-name --cluster-initializer --ponythreads=1
+  --external 127.0.0.1:5050 --cluster-initializer --name worker-name \
+  --ponythreads=1
 ```
 
 In a third shell, send some messages:
@@ -93,3 +94,9 @@ with open('matching-engine-L1.out', 'rb') as f:
 
 "T" stands for Trade, "B" for Bid and "A" for Ask. The first number if price,
 the second is quantity.
+
+## Shutting down cluster once finished processing
+
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+```
