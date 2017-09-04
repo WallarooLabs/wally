@@ -66,3 +66,9 @@ shut down cluster once finished processing
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
+
+shut down cluster once finished processing
+
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+```
