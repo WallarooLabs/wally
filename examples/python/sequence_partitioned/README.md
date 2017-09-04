@@ -47,8 +47,8 @@ export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 machida --application-module sequence_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --data 127.0.0.1:6001 --worker-count 2 --cluster-initializer \
-  --ponythreads=1
+  --data 127.0.0.1:6001 --external 127.0.0.1:5050 --worker-count 2
+  --cluster-initializer --ponythreads=1
 ```
 
 Worker:
@@ -58,7 +58,7 @@ export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 machida --application-module sequence_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --name worker-2 --ponythreads=1
+  --external 127.0.0.1:5051 --name worker-2 --ponythreads=1
 ```
 
 In a third shell, send some messages:
@@ -67,4 +67,10 @@ In a third shell, send some messages:
 ../../../../giles/sender/sender --host 127.0.0.1:7010 --batch-size 10 \
   --interval 100_000_000 --ponythreads=1 --binary --msg-size 12 --no-write \
   --u64 --messages 100
+```
+
+Shut down cluster once finished processing:
+
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```

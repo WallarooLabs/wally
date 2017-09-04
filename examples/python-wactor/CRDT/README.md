@@ -33,7 +33,8 @@ Run `atkin` with `--application-module CRDT`:
 ```bash
 atkin --application-module CRDT --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --name worker-name --cluster-initializer --ponythreads=1
+  --external 127.0.0.1:5050 --cluster-initializer --name worker-name \
+  --ponythreads=1
 ```
 
 In a third shell, send some messages:
@@ -59,4 +60,10 @@ accumulator act report: GCounter(15)
 round 4: GCounter(17)
 accumulator act report: GCounter(17)
 round 5: GCounter(33)
+```
+
+## Shutting down cluster once finished processing
+
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```

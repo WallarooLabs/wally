@@ -31,8 +31,8 @@ Run `machida` with `--application-module alphabet`.
 ```bash
 machida --application-module alphabet --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --data 127.0.0.1:6001 --name worker-name  --cluster-initializer \
-  --ponythreads=1
+  --external 127.0.0.1:5050 --cluster-initializer --data 127.0.0.1:6001 \
+  --name worker-name --ponythreads=1
 ```
 
 In a third shell, send some messages
@@ -61,4 +61,11 @@ with open('alphabet.out', 'rb') as f:
             print struct.unpack('>LsL', f.read(9))
         except:
             break
+```
+
+## Shutting down the cluster
+
+To shut down the cluster, you will need to use the `cluster_shutdown` tool.
+```bash
+../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
