@@ -51,7 +51,7 @@
 
 ### Wallaroo Python API
 * [Python API Introduction](book/python/intro.md)
-* [Building a Python Application](book/python/building.md)
+* [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
 * [Writing Your Own Application](book/python/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
 * [Writing Your Own Partitioned Stateful Application](book/python/writing-your-own-partitioned-stateful-application.md).
