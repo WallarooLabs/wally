@@ -18,7 +18,7 @@ Generally, in order to build a Wallaroo Python application, the following steps 
 
 Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate topology, and enters a `ready` state where it awaits incoming data to process.
 
-### A Note PYTHONPATH
+### A Note About PYTHONPATH
 
 Machida uses the `PYTHONPATH` environment variable to find modules that are imported by the application. You will have at least two modules in your `PYTHONPATH`: the application module and the `wallaroo` module. For example, if you have followed the directions for setting up the tutorial then the Wallaroo Python module is in `$HOME/wallaroo-tutorial/machida/wallaroo.py` and the "Celsius to Farenheit" application module is in `$HOME/wallaroo-tutorial/examples/python/celsius/celsius.py`, so you would export `PYTHONPATH` like this:
 
