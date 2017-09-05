@@ -13,6 +13,7 @@ def application_setup(args):
     ab = wallaroo.ApplicationBuilder("Sequence Window")
     ab.new_pipeline("Sequence Window",
                     wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
+    ab.to(MaybeOneToMany)
     ab.to_state_partition(ObserveNewValue(), SequenceWindowStateBuilder(),
                           "Sequence Window", SequencePartitionFunction(),
                           sequence_partitions)
@@ -71,6 +72,34 @@ class Decoder(object):
         return value
 
 
+class MaybeOneToMany(object):
+    magic_number = 12
+
+    def name(self):
+        return "I might one to many this message!"
+
+    def compute_multi(self, data):
+          """
+          Possibly one to many this message.
+
+          The goal is to keep a continous sequence of incrementing U64s.
+          Every Xth number, we will send that number plus the next two numbers as a
+          "one to many" message. We then filter the next to numbers when we come to
+          them. This allows for us to test with a "normal" sequence window test that
+          both "1 to 1" and "1 to many" work correctly.
+          """
+          if data < self.magic_number:
+              return [data]
+          mod_magic = data % self.magic_number
+          if mod_magic == 0:
+              return [data, data + 1, data + 2]
+          elif mod_magic == 1 or mod_magic == 2:
+              return None
+          else:
+              return [data]
+
+
+
 class ObserveNewValue(object):
     def name(self):
         return "Observe New Value"
@@ -85,5 +114,5 @@ class Encoder(object):
     def encode(self, data):
         print "Encoder:encode: ", data
         # data is a list of integers
-        s = str(data)
+        s = '[{}]'.format(','.join(str(v) for v in data))
         return struct.pack('>L{}s'.format(len(s)), len(s), s)
