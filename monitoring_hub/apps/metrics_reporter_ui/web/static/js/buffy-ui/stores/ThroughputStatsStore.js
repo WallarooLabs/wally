@@ -19,6 +19,7 @@ class ThroughputStatsStore extends ReduceStore {
 			.set("node-ingress-egress", Map())
 			.set("computation", Map())
 			.set("pipeline", Map())
+			.set("pipeline-ingestion", Map())
 			.set("start-to-end-by-worker", Map())
 			.set("computation-by-worker", Map())
 			.set("node-ingress-egress-by-pipeline", Map())
@@ -66,6 +67,10 @@ class ThroughputStatsStore extends ReduceStore {
 				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_PIPELINE_THROUGHPUT_STATS.actionType:
 				category = "pipeline";
+				metricsKey = action["throughput-stats"].pipeline_key;
+				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+			case Actions.RECEIVE_PIPELINE_INGESTION_THROUGHPUT_STATS.actionType:
+				category = "pipeline-ingestion";
 				metricsKey = action["throughput-stats"].pipeline_key;
 				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
 			default:

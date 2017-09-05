@@ -19,6 +19,7 @@ class ThroughputsStore extends ReduceStore {
 					 .set("start-to-end-by-worker", Map())
 					 .set("computation-by-worker", Map())
 					 .set("node-ingress-egress-by-pipeline", Map())
+					 .set("pipeline-ingestion", Map())
 		return state;
 	}
 	getThroughputs(category, metricsKey) {
@@ -82,6 +83,10 @@ class ThroughputsStore extends ReduceStore {
 				category = "pipeline";
 				metricsKey = action["total-throughput"].pipeline_key;
 				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
+			case Actions.RECEIVE_PIPELINE_INGESTION_TOTAL_THROUGHPUT.actionType:
+				category = "pipeline-ingestion";
+				metricsKey = action["total-throughput"].pipeline_key;
+				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
 			case Actions.RECEIVE_STEP_INITIAL_TOTAL_THROUGHPUTS.actionType:
 				category = "computation";
 				metricsKey = action["initial-total-throughputs"].pipeline_key;
@@ -108,6 +113,10 @@ class ThroughputsStore extends ReduceStore {
 				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
 			case Actions.RECEIVE_PIPELINE_INITIAL_TOTAL_THROUGHPUTS.actionType:
 				category = "pipeline";
+				metricsKey = action["initial-total-throughputs"].pipeline_key;
+				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
+			case Actions.RECEIVE_PIPELINE_INGESTION_INITIAL_TOTAL_THROUGHPUTS.actionType:
+				category = "pipeline-ingestion";
 				metricsKey = action["initial-total-throughputs"].pipeline_key;
 				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
 			default:

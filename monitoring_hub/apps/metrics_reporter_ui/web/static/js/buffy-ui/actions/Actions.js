@@ -83,6 +83,10 @@ export default {
         actionType: "receive-pipeline-total-throughput",
         actionProp: "total-throughput"
     },
+    RECEIVE_PIPELINE_INGESTION_TOTAL_THROUGHPUT: {
+        actionType: "receive-pipeline-ingestion-total-throughput",
+        actionProp: "total-throughput"
+    },
     RECEIVE_INGRESS_EGRESS_TOTAL_THROUGHPUT: {
         actionType: "receive-ingress-egress-total-throughput",
         actionProp: "total-throughput"
@@ -111,6 +115,10 @@ export default {
         actionType: "receive-pipeline-initial-total-throughputs",
         actionProp: "initial-total-throughputs"
     },
+    RECEIVE_PIPELINE_INGESTION_INITIAL_TOTAL_THROUGHPUTS: {
+        actionType: "receive-pipeline-ingestion-initial-total-throughputs",
+        actionProp: "initial-total-throughputs"
+    },
     RECEIVE_INGRESS_EGRESS_INITIAL_TOTAL_THROUGHPUTS: {
         actionType: "receive-ingress-egress-initial-total-throughputs",
         actionProp: "initial-total-throughputs"
@@ -137,6 +145,10 @@ export default {
     },
     RECEIVE_PIPELINE_THROUGHPUT_STATS: {
         actionType: "receive-pipeline-throughput-stats",
+        actionProp: "throughput-stats"
+    },
+    RECEIVE_PIPELINE_INGESTION_THROUGHPUT_STATS: {
+        actionType: "receive-pipeline-ingestion-throughput-stats",
         actionProp: "throughput-stats"
     },
     RECEIVE_INGRESS_EGRESS_THROUGHPUT_STATS: {

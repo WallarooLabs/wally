@@ -8,6 +8,7 @@ const emptyAppConfig = Map({
 				  .set("node-ingress-egress", List())
 				  .set("start-to-end", List())
 				  .set("pipeline", List())
+				  .set("pipeline-ingestion", List())
 				  .set("node-ingress-egress-by-pipeline", Map())
 				  .set("start-to-end-by-worker", Map())
 				  .set("computation-by-worker", Map()),

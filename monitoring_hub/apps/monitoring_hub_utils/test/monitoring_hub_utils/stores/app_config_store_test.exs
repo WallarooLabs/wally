@@ -14,7 +14,8 @@ defmodule MonitoringHubUtils.Stores.AppConfigStoreTest do
         "computation-by-worker" => %{},
         "start-to-end-by-worker" => %{},
         "node-ingress-egress-by-pipeline" => %{},
-        "pipeline-computations" => %{}
+        "pipeline-computations" => %{},
+        "pipeline-ingestion" => []
       },
       "workers" => []
     }

@@ -34,6 +34,8 @@ function metricsChannelsToDispatcherWith(connector, appConfig) {
     sourceSinkMetricsChannelToDispatcherWith(connector, sourceSinkChannels)
     let pipelineChannels = metrics.get("pipeline")
     pipelineMetricsChannelToDispatcherWith(connector, pipelineChannels);
+    let pipelineIngestionChannels = metrics.get("pipeline-ingestion")
+    pipelineIngestionMetricsChannelToDispatcherWith(connector, pipelineIngestionChannels);
 }
 
 function workerMetricsChannelsToDispatcherWith(connector, appConfig, workerName) {
@@ -85,6 +87,12 @@ function sourceSinkMetricsByWorkerChannelToDispatcherWith(connector, channels) {
 function pipelineMetricsChannelToDispatcherWith(connector, channels) {
     channels.forEach((channel) => {
         dispatchMetricsForSource(connector, "pipeline", channel);
+    });
+}
+
+function pipelineIngestionMetricsChannelToDispatcherWith(connector, channels) {
+    channels.forEach((channel) => {
+        dispatchMetricsForSource(connector, "pipeline-ingestion", channel);
     });
 }
 
@@ -151,6 +159,12 @@ function dispatchMetricsForSource(connector, sourceType, channel) {
                 .dispatchOn("throughput-stats:last-5-mins", ActionCreators[Actions.RECEIVE_PIPELINE_THROUGHPUT_STATS.actionType])
                 .dispatchOn("latency-percentile-bin-stats:last-5-mins", ActionCreators[Actions.RECEIVE_PIPELINE_LATENCY_PERCENTILE_BIN_STATS.actionType]);
             break;
+        case "pipeline-ingestion":
+            connector.connectTo(channel)
+                .dispatchOn("initial-total-throughputs:last-1-sec", ActionCreators[Actions.RECEIVE_PIPELINE_INGESTION_INITIAL_TOTAL_THROUGHPUTS.actionType])
+                .dispatchOn("total-throughput:last-1-sec", ActionCreators[Actions.RECEIVE_PIPELINE_INGESTION_TOTAL_THROUGHPUT.actionType])
+                .dispatchOn("throughput-stats:last-5-mins", ActionCreators[Actions.RECEIVE_PIPELINE_INGESTION_THROUGHPUT_STATS.actionType])
+            break;
     }
 }
 
@@ -162,6 +176,7 @@ export default {
     ingressEgressMetricsChannelToDispatcherWith: ingressEgressMetricsChannelToDispatcherWith,
     sourceSinkMetricsChannelToDispatcherWith: sourceSinkMetricsChannelToDispatcherWith,
     pipelineMetricsChannelToDispatcherWith: pipelineMetricsChannelToDispatcherWith,
+    pipelineIngestionMetricsChannelToDispatcherWith: pipelineIngestionMetricsChannelToDispatcherWith,
     wordCountReportChannelToDispatcherWith: wordCountReportChannelToDispatcherWith,
     connectSourceMetricsChannels: connectSourceMetricsChannels,
     workerMetricsChannelsToDispatcherWith: workerMetricsChannelsToDispatcherWith,
