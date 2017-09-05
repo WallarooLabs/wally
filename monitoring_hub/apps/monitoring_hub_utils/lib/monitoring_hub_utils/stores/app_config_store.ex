@@ -144,6 +144,7 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 				"node-ingress-egress" => [],
 				"computation" => [],
 				"pipeline" => [],
+				"pipeline-ingestion" => [],
 				"computation-by-worker" => %{},
 				"start-to-end-by-worker" => %{},
 				"node-ingress-egress-by-pipeline" => %{},

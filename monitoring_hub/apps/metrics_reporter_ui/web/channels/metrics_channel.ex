@@ -92,6 +92,18 @@ defmodule MetricsReporterUI.MetricsChannel do
     {:noreply, socket}
   end
 
+  def handle_in("metrics", %{"category" => "pipeline-ingestion"} = metrics_msg, socket) do
+    "metrics:" <> app_name = socket.topic
+    %{"category" => category, "latency_list" => latency_list,
+      "timestamp" => end_timestamp, "period" => period, "name" => pipeline_key,
+      "min" => min, "max" => max} = metrics_msg
+    start_timestamp = end_timestamp - period
+    throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    store_period_throughput_msg(app_name, category, pipeline_key, throughput_msg)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
+    {:noreply, socket}
+  end
+
   def handle_in("metrics", metrics_msg, socket) do
     "metrics:" <> app_name = socket.topic
     %{"category" => category, "latency_list" => latency_list,
