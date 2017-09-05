@@ -30,7 +30,7 @@ Run `machida` with `--application-module word_count`:
 ```bash
 machida --application-module word_count --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
+  --control 127.0.0.1:6000 --data 127.0.0.1:6001 --cluster-initializer \
   --name worker-name --ponythreads=1
 ```
 

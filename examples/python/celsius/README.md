@@ -45,8 +45,7 @@ Run `machida` with `--application-module celsius`:
 ```bash
 machida --application-module celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --name worker-name \
-  --ponythreads=1
+  --name worker-name  --cluster-initializer --ponythreads=1
 ```
 
 In a third shell, send some messages:
