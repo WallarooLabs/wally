@@ -1,23 +1,50 @@
-def test_restart():
-    # import requisite components for integration test
-    from integration import (clean_up_resilience_path,
-                             ex_validate,
-                             get_port_values,
-                             Metrics,
-                             Reader,
-                             Runner,
-                             RunnerReadyChecker,
-                             Sender,
-                             sequence_generator,
-                             setup_resilience_path,
-                             Sink,
-                             SinkAwaitValue,
-                             start_runners,
-                             TimeoutError)
-    import os
-    import re
-    import struct
-    import time
+# import requisite components for integration test
+from integration import (clean_up_resilience_path,
+                         ex_validate,
+                         get_port_values,
+                         Metrics,
+                         Reader,
+                         Runner,
+                         RunnerReadyChecker,
+                         Sender,
+                         sequence_generator,
+                         setup_resilience_path,
+                         Sink,
+                         SinkAwaitValue,
+                         start_runners,
+                         TimeoutError)
+import os
+import re
+import struct
+import time
+
+
+def test_restart_pony():
+    command = 'sequence_window'
+    _test_restart(command)
+
+
+def test_restart_machida():
+    command = 'machida --application-module sequence_window'
+    # set up PATH and PYTHONPATH variables for test
+    os.environ['PATH'] += os.pathsep + os.path.join(
+        os.path.expanduser('~'),
+        'wallaroo-tutorial',
+        'wallaroo',
+        'machida',
+        'build')
+    os.environ['PYTHONPATH'] += os.pathsep + os.path.join(
+        os.path.expanduser('~'),
+        'wallaroo-tutorial',
+        'wallaroo',
+        'testing',
+        'correctness',
+        'apps',
+        'sequence_window_python')
+    _test_restart(command)
+
+
+def _test_restart(command):
 
     host = '127.0.0.1'
     sources = 1
@@ -28,8 +55,6 @@ def test_restart():
     await_value = struct.pack('>I', len(last_value)) + last_value
 
     setup_resilience_path(res_dir)
-
-    command = 'sequence_window'
 
     runners = []
     try:

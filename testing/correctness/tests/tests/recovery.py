@@ -1,32 +1,58 @@
-def test_recovery():
-    # import requisite components for integration test
-    from integration import (clean_up_resilience_path,
-                             ex_validate,
-                             get_port_values,
-                             Metrics,
-                             Reader,
-                             Runner,
-                             RunnerReadyChecker,
-                             Sender,
-                             sequence_generator,
-                             setup_resilience_path,
-                             Sink,
-                             SinkExpect,
-                             start_runners,
-                             TimeoutError)
-    import os
-    import re
-    import time
+# import requisite components for integration test
+from integration import (clean_up_resilience_path,
+                         ex_validate,
+                         get_port_values,
+                         Metrics,
+                         Reader,
+                         Runner,
+                         RunnerReadyChecker,
+                         Sender,
+                         sequence_generator,
+                         setup_resilience_path,
+                         Sink,
+                         SinkAwaitValue,
+                         start_runners,
+                         TimeoutError)
+import os
+import re
+import struct
+import time
 
+def test_recovery_pony():
+    command = 'sequence_window_resilience'
+    _test_recovery(command)
+
+
+def test_recovery_machida():
+    command = 'machida_resilience --application-module sequence_window'
+    # set up PATH and PYTHONPATH variables for test
+    os.environ['PATH'] += os.pathsep + os.path.join(
+        os.path.expanduser('~'),
+        'wallaroo-tutorial',
+        'wallaroo',
+        'machida',
+        'build')
+    os.environ['PYTHONPATH'] += os.pathsep + os.path.join(
+        os.path.expanduser('~'),
+        'wallaroo-tutorial',
+        'wallaroo',
+        'testing',
+        'correctness',
+        'apps',
+        'sequence_window_python')
+    _test_recovery(command)
+
+
+def _test_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
     res_dir = '/tmp/res-data'
     expect = 2000
+    last_value = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
+    await_value = struct.pack('>I', len(last_value)) + last_value
 
     setup_resilience_path(res_dir)
-
-    command = 'sequence_window_resilience'
 
     runners = []
     try:
@@ -84,7 +110,7 @@ def test_recovery():
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkExpect(sink, expect)
+        stopper = SinkAwaitValue(sink, await_value, 30)
         stopper.start()
         stopper.join()
         if stopper.error:
