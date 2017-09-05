@@ -1,3 +1,15 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+Licensed as a Wallaroo Enterprise file under the Wallaroo Community
+License (the "License"); you may not use this file except in compliance with
+the License. You may obtain a copy of the License at
+
+     https://github.com/wallaroolabs/wallaroo/blob/master/LICENSE
+
+*/
+
 use ".."
 use "collections"
 
@@ -32,13 +44,13 @@ class WordCounter is CanonicalForm
   fun compare(that: CanonicalForm): (MatchStatus val, String) =>
     match that
     | let wc: WordCounter =>
-      if counts.size() != wc.counts.size() then 
+      if counts.size() != wc.counts.size() then
         return (ResultsDoNotMatch, "Count map sizes do not match up.")
       end
       for (key, count) in counts.pairs() do
         try
           if count != wc(key) then
-            let msg = "Expected " + key + " to have a count of " 
+            let msg = "Expected " + key + " to have a count of "
               + count.string() + " instead of " + wc(key).string()
   					return (ResultsDoNotMatch, msg)
   				end
