@@ -1,7 +1,25 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
 use "collections"
 
 primitive Weighted[V: Any val]
-  fun apply(unsorted_items: Array[(V, USize)] val, bucket_count: USize): 
+  fun apply(unsorted_items: Array[(V, USize)] val, bucket_count: USize):
     Array[Array[V]] val ?
   =>
     try
@@ -20,7 +38,7 @@ primitive Weighted[V: Any val]
           let next_bucket_idx = _lowest_weight_idx(bucket_weights)
           let next_item = items.pop()
           buckets(next_bucket_idx).push(next_item._1)
-          let new_bucket_weight_total = 
+          let new_bucket_weight_total =
             bucket_weights(next_bucket_idx) + next_item._2
           bucket_weights(next_bucket_idx) = new_bucket_weight_total
         end
@@ -71,10 +89,10 @@ primitive Weighted[V: Any val]
       error
     end
 
-  fun _lowest_sort_idx(a: Array[(V, USize)]): USize ? => 
+  fun _lowest_sort_idx(a: Array[(V, USize)]): USize ? =>
     try
       var idx: USize = 0
-      var lowest_weight: USize = a(0)._2 
+      var lowest_weight: USize = a(0)._2
       for i in Range(0, a.size()) do
         let next_weight = a(i)._2
         if next_weight < lowest_weight then
