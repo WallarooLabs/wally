@@ -30,7 +30,7 @@ docker start mui
   --kafka_sink_topic test-out --kafka_sink_brokers 127.0.0.1:9092 \
   --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10
   --metrics 127.0.0.1:5001 --control 127.0.0.1:12500 --data 127.0.0.1:12501 \
-  --ponythreads=1
+  --cluster-initializer --ponythreads=1
 ```
 
 `kafka_sink_max_message_size` controls maximum size of message sent to kafka in a single produce request. Kafka will return errors if this is bigger than server is configured to accept.

@@ -56,7 +56,7 @@ docker start mui
 
 ```bash
 ./alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:12500 --data 127.0.0.1:12501
+  --control 127.0.0.1:12500 --data 127.0.0.1:12501 --cluster-initializer
 ```
 
 3. Start a sender

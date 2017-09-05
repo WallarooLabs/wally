@@ -67,7 +67,7 @@ In a separate shell each:
     ```bash
     ./build/counter-app --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-      --worker-name worker-name   --ponythreads=1
+      --worker-name worker-name --cluster-initializer --ponythreads=1
     ```
 3. Start sending data
     ```bash

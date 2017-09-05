@@ -40,8 +40,7 @@ export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --data 127.0.0.1:6001 --worker-count 2 --name worker-2 \
-  --external 127.0.1:6010 --ponythreads=1
+  --name worker-2 --external 127.0.1:6010 --ponythreads=1
 ```
 
 In a fourth shell, send some messages
