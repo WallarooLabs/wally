@@ -1,8 +1,8 @@
 # Setting Up Your MacOS Environment for Wallaroo
 
-These instructions have been tested on OSX El Capitan and MacOS Sierra. 
+These instructions have been tested on OSX El Capitan and MacOS Sierra.
 
-There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment. 
+There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
 ## Installing Xcode Command Line Tools
 
@@ -73,6 +73,21 @@ cd pony-stable
 git checkout 0054b429a54818d187100ed40f5525ec7931b31b
 make
 sudo make install
+```
+
+## Install Python Development Libraries
+
+```bash
+brew install python
+```
+
+## Installing Machida
+
+Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/machida
+make
 ```
 
 ## Install Docker
