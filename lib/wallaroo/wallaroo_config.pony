@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "sendence/mort"
 use "sendence/options"
-use "wallaroo/spike"
+use "wallaroo/ent/spike"
 
 class StartupOptions
   var m_arg: (Array[String] | None) = None

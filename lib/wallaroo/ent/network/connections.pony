@@ -24,12 +24,12 @@ use "wallaroo/data_channel"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/spike"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/source/tcp_source"
-use "wallaroo/spike"
 use "wallaroo/topology"
 
 actor Connections is Cluster

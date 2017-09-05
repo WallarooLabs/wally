@@ -32,10 +32,10 @@ use "wallaroo/ent/cluster_manager"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/spike"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/spike"
 use "wallaroo/topology"
 
 actor Startup
