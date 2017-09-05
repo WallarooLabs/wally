@@ -1,3 +1,15 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+Licensed as a Wallaroo Enterprise file under the Wallaroo Community
+License (the "License"); you may not use this file except in compliance with
+the License. You may obtain a copy of the License at
+
+     https://github.com/wallaroolabs/wallaroo/blob/master/LICENSE
+
+*/
+
 #ifdef __APPLE__
     #include <Python/Python.h>
 #else
@@ -117,7 +129,7 @@ uint64_t *split_uint_128(__uint128_t big)
 extern PyObject *call_fn_u128arg(PyObject *actor, const char* funcName, __uint128_t arg)
 {
   PyObject *pFunc, *pValue, *pLeft, *pRight;
-  
+
   uint64_t *longs = split_uint_128(arg);
 
   pLeft = PyLong_FromUnsignedLongLong(longs[0]);
