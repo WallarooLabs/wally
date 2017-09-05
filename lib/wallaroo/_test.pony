@@ -12,7 +12,7 @@ use data_channel = "data_channel"
 use initialization = "initialization"
 use rebalancing = "ent/rebalancing"
 use recovery = "ent/recovery"
-use spike = "spike"
+use spike = "ent/spike"
 use topology = "topology"
 use watermarking = "ent/watermarking"
 

@@ -1,3 +1,15 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+Licensed as a Wallaroo Enterprise file under the Wallaroo Community
+License (the "License"); you may not use this file except in compliance with
+the License. You may obtain a copy of the License at
+
+     https://github.com/wallaroolabs/wallaroo/blob/master/LICENSE
+
+*/
+
 use "buffered"
 use "collections"
 use "files"
@@ -12,12 +24,12 @@ use "wallaroo/data_channel"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/spike"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/source/tcp_source"
-use "wallaroo/spike"
 use "wallaroo/topology"
 
 actor Connections is Cluster
