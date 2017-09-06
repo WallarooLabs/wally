@@ -117,9 +117,9 @@ Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`. Run
 
 ```bash
 cd ~/
-wget https://github.com/WallarooLabs/ponyc/archive/sendence-19.2.13.tar.gz
-tar xzfv sendence-19.2.13.tar.gz
-cd ponyc-sendence-19.2.13
+wget https://github.com/WallarooLabs/ponyc/archive/wallaroolabs-19.2.13.tar.gz
+tar xzfv wallaroolabs-19.2.13.tar.gz
+cd ponyc-wallaroolabs-19.2.13
 sudo make config=release install
 ```
 
