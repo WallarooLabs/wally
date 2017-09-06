@@ -11,10 +11,10 @@ the License. You may obtain a copy of the License at
 */
 
 use "wallaroo/core/common"
-use "wallaroo/fail"
-use "wallaroo/invariant"
-use "wallaroo/topology"
-use "wallaroo/routing"
+use "wallaroo/core/fail"
+use "wallaroo/core/invariant"
+use "wallaroo/core/topology"
+use "wallaroo/core/routing"
 
 class TerminusRoute
   """

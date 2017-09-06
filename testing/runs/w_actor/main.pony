@@ -74,10 +74,10 @@ use "sendence/rand"
 use "sendence/time"
 use "wallaroo"
 use "wallaroo/ent/w_actor"
-use "wallaroo/fail"
-use "wallaroo/metrics"
-use "wallaroo/source/tcp_source"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/metrics"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/topology"
 
 
 actor Main

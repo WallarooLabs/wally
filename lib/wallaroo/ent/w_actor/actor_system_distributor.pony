@@ -19,11 +19,11 @@ use "sendence/messages"
 use "wallaroo"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
-use "wallaroo/fail"
-use "wallaroo/initialization"
-use "wallaroo/messages"
-use "wallaroo/metrics"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
+use "wallaroo/core/metrics"
+use "wallaroo/core/topology"
 
 actor ActorSystemDistributor is Distributor
   let _auth: AmbientAuth

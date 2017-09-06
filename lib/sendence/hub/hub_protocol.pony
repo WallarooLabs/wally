@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "buffered"
 use "sendence/bytes"
-use "wallaroo/metrics"
+use "wallaroo/core/metrics"
 
 primitive HubProtocol
   fun connect(wb: Writer = Writer): Array[ByteSeq] val =>

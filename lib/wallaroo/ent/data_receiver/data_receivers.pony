@@ -12,10 +12,10 @@ the License. You may obtain a copy of the License at
 
 use "collections"
 use "wallaroo/core/common"
-use "wallaroo/data_channel"
+use "wallaroo/core/data_channel"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
-use "wallaroo/topology"
+use "wallaroo/core/topology"
 
 
 interface DataReceiversSubscriber

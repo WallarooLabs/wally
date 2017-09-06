@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "buffered"
 use "collections"
-use "wallaroo/metrics"
+use "wallaroo/core/metrics"
 
 primitive HubProtocolDecoder
   fun apply(data: Array[U8 val] val): HubProtocolMsg ? =>

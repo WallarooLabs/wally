@@ -7,8 +7,8 @@ so that it may be unit tested separately from the main application.
 use "buffered"
 use "collections"
 use "sendence/bytes"
-use "wallaroo/source"
-use "wallaroo/source/tcp_source"
+use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
 
 primitive WindowEncoder
   fun apply(s: String val, wb: Writer = Writer): Array[ByteSeq] val =>

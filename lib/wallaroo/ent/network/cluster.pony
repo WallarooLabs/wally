@@ -11,8 +11,8 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "wallaroo/fail"
-use "wallaroo/invariant"
+use "wallaroo/core/fail"
+use "wallaroo/core/invariant"
 
 // TODO: Figure out if there's a compilation order making Fail() appear like
 // it hasn't been declared and then replace None with Fail() in these defaults

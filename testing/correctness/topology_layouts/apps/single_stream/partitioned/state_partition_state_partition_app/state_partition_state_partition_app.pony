@@ -28,10 +28,10 @@ Partitioned Stateful Computation -> Partitioned Stateful Computation
 
 use "generic_app_components"
 use "wallaroo"
-use "wallaroo/sink/tcp_sink"
-use "wallaroo/source"
-use "wallaroo/source/tcp_source"
-use "wallaroo/topology"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>

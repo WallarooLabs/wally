@@ -12,15 +12,15 @@ the License. You may obtain a copy of the License at
 
 use "collections"
 use "sendence/collection_helpers"
-use "wallaroo/boundary"
+use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/router_registry"
-use "wallaroo/fail"
-use "wallaroo/invariant"
-use "wallaroo/messages"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/invariant"
+use "wallaroo/core/messages"
+use "wallaroo/core/topology"
 
 
 actor RecoveryReplayer

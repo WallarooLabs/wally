@@ -17,10 +17,10 @@ use "sendence/bytes"
 use "sendence/messages"
 use "wallaroo"
 use "wallaroo/core/common"
-use "wallaroo/fail"
-use "wallaroo/initialization"
-use "wallaroo/messages"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
+use "wallaroo/core/topology"
 
 class ExternalChannelListenNotifier is TCPListenNotify
   let _auth: AmbientAuth

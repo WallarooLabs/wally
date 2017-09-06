@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "wallaroo/ent/w_actor/broadcast"
-use "wallaroo/fail"
+use "wallaroo/core/fail"
 
 primitive BasicRoles
   fun ingress(): String => "ingress"

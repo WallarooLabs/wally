@@ -17,11 +17,11 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "wallaroo/boundary"
+use "wallaroo/core/boundary"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/watermarking"
-use "wallaroo/routing"
-use "wallaroo/topology"
+use "wallaroo/core/routing"
+use "wallaroo/core/topology"
 
 trait tag Ackable
   fun ref _acker(): Acker

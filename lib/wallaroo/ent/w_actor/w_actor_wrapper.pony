@@ -12,17 +12,17 @@ the License. You may obtain a copy of the License at
 
 use "collections"
 use "sendence/guid"
-use "wallaroo/boundary"
+use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/watermarking"
 use "wallaroo/ent/w_actor/broadcast"
-use "wallaroo/fail"
-use "wallaroo/routing"
-use "wallaroo/sink"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/routing"
+use "wallaroo/core/sink"
+use "wallaroo/core/topology"
 
 trait WActorWrapper
   be receive(msg: WMessage val)

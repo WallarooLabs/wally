@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "wallaroo/metrics"
+use "wallaroo/core/metrics"
 
 primitive _Triggered
 primitive _Untriggered

@@ -12,9 +12,9 @@ the License. You may obtain a copy of the License at
 
 use "wallaroo/ent/network"
 use "wallaroo/ent/w_actor"
-use "wallaroo/fail"
-use "wallaroo/initialization"
-use "wallaroo/messages"
+use "wallaroo/core/fail"
+use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
 
 actor Recovery
   """

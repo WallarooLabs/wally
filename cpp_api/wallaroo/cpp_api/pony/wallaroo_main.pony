@@ -17,9 +17,9 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "wallaroo"
-use "wallaroo/sink/tcp_sink"
-use "wallaroo/source/tcp_source"
-use "wallaroo/topology"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/topology"
 
 use @w_wrapper_main[Bool](argc: U32, argv: Pointer[Pointer[U8] tag] tag,
   application_builder: CPPApplicationBuilder)

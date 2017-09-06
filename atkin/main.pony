@@ -14,8 +14,8 @@ use "collections"
 
 use "sendence/options"
 use "wallaroo"
-use "wallaroo/sink/tcp_sink"
-use "wallaroo/topology"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/topology"
 
 use "lib:python2.7"
 use "lib:python-wactor"

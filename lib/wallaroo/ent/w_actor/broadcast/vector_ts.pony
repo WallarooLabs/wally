@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "wallaroo/fail"
+use "wallaroo/core/fail"
 
 class val VectorTimestamp
   let _worker: String

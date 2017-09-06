@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "wallaroo/state"
+use "wallaroo/core/state"
 
 export CPPStateChangeRepositoryHelper
 

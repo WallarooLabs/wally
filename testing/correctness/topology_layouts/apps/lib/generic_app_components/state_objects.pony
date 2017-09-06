@@ -1,8 +1,8 @@
 use "buffered"
 use "serialise"
-use "wallaroo/fail"
-use "wallaroo/state"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
 
 class U64Counter is State
   var count: U64 = 0

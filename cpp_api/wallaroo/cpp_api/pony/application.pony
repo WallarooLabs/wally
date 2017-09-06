@@ -18,10 +18,10 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "wallaroo"
-use "wallaroo/sink/tcp_sink"
-use "wallaroo/source/tcp_source"
-use "wallaroo/topology"
-use "wallaroo/fail"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/topology"
+use "wallaroo/core/fail"
 
 use @w_computation_builder_build_computation[ComputationP](fn: ComputationBuilderP)
 

@@ -1,4 +1,4 @@
-use "wallaroo/topology"
+use "wallaroo/core/topology"
 
 primitive Double is Computation[U64, U64]
   fun apply(input: U64): U64 =>

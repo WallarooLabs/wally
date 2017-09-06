@@ -8,12 +8,12 @@ All tests can be run by compiling and running this package.
 use "sendence/connemara"
 use broadcast = "ent/w_actor/broadcast"
 use cluster_manager = "ent/cluster_manager"
-use data_channel = "data_channel"
-use initialization = "initialization"
+use data_channel = "core/data_channel"
+use initialization = "core/initialization"
 use rebalancing = "ent/rebalancing"
 use recovery = "ent/recovery"
 use spike = "ent/spike"
-use topology = "topology"
+use topology = "core/topology"
 use watermarking = "ent/watermarking"
 
 actor Main is TestList
