@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "wallaroo/core"
+use "wallaroo/core/common"
 
 interface tag MetricsSink is DisposableActor
   be send_metrics(metrics: MetricDataList val)

@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/metrics"
 use "wallaroo/routing"
 use "wallaroo/topology"

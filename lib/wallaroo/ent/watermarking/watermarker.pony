@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/routing"

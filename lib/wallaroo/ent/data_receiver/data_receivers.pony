@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/data_channel"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"

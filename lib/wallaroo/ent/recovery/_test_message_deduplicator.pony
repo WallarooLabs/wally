@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "sendence/connemara"
-use "wallaroo/core"
+use "wallaroo/core/common"
 
 actor _TestMessageDeduplicator is TestList
   new make() =>

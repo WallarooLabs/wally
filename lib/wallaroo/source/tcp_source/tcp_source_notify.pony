@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "collections"
 use "wallaroo/boundary"
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/messages"
 use "wallaroo/routing"
