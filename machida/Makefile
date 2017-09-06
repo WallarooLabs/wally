@@ -50,6 +50,9 @@ machida_build: $(MACHIDA_BUILD)/machida
 
 $(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a
 	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
+	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD))
+	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
+	mv $(abspath $(MACHIDA_BUILD:%/=%))/machida $(abspath $(MACHIDA_BUILD:%/=%))/machida_resilience
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS) --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD))
 	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS))

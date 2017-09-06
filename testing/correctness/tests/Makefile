@@ -27,6 +27,7 @@ CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH
 
 build-testing-correctness-tests: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests: build-testing-tools-external_sender
+build-testing-correctness-tests: build-machida
 test-testing-correctness-tests: build-testing-correctness-tests
 test-testing-correctness-tests: correctness_tests
 

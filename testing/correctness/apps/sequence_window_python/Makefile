@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../Makefile
+include ../../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -22,34 +22,29 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-SEQUENCE_PART_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+SEQUENCE_WINDOW_PYTHON_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
 
-build-examples-python-sequence_partitioned: build-machida
-build-examples-python-sequence_partitioned: build-testing-correctness-apps-sequence_window-validator
-test-examples-python-sequence_partitioned: build-examples-python-sequence_partitioned
+build-testing-correctness-apps-sequence_window_python: build-machida
+build-testing-correctness-apps-sequence_window_python: build-testing-correctness-apps-sequence_window-validator
+test-testing-correctness-apps-sequence_window_python: build-testing-correctness-apps-sequence_window_python
+test-testing-correctness-apps-sequence_window_python: sequence_window_python_test
 
-test-examples-python-sequence_partitioned: sequence_partitioned_py_test
-
-sequence_partitioned_py_test:
-	cd $(SEQUENCE_PART_PATH) && \
+sequence_window_python_test:
+	cd $(SEQUENCE_WINDOW_PYTHON_PATH) && \
 	integration_test --sequence-sender '(0,1000]' \
 	  --log-level error \
-		--command 'machida --application-module sequence_partitioned' \
-		--validation-cmd '$(VALIDATOR_PATH)/validator -e 1000 -a -i' \
+		--command 'machida --application-module sequence_window' \
+		--validation-cmd 'validator -e 1000 -a -i' \
 		--output 'received.txt' \
 		--workers 2 \
 		--giles-mode \
 		--sink-expect 1000
 
-clean-examples-python-sequence_partitioned: sequence_partitioned_py_clean
-
-sequence_partitioned_py_clean:
-	$(QUIET)rm -f $(SEQUENCE_PART_PATH)/received.txt
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)

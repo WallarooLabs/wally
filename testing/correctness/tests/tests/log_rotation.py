@@ -31,7 +31,18 @@ log_rotated_pattern = '.*'.join(log_rotated_patterns)
 STOP_THE_WORLD_PAUSE = '2_000_000_000'
 AWAIT_TIMEOUT = 30
 
-def test_log_rotation_external_trigger_no_recovery():
+
+def test_log_rotation_external_trigger_no_recovery_pony():
+    command = 'sequence_window_resilience'
+    _test_log_rotation_external_trigger_no_recovery(command)
+
+
+def test_log_rotation_external_trigger_no_recovery_machida():
+    command = 'machida_resilience --application-module sequence_window'
+    _test_log_rotation_external_trigger_no_recovery(command)
+
+
+def _test_log_rotation_external_trigger_no_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
@@ -43,10 +54,10 @@ def test_log_rotation_external_trigger_no_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = '''sequence_window_resilience \
+    command = '''{} \
         --log-rotation \
         --stop-pause {}
-    '''.format(STOP_THE_WORLD_PAUSE)
+    '''.format(command, STOP_THE_WORLD_PAUSE)
 
     runners = []
     try:
@@ -169,7 +180,17 @@ def test_log_rotation_external_trigger_no_recovery():
         clean_up_resilience_path(res_dir)
 
 
-def test_log_rotation_external_trigger_recovery():
+def test_log_rotation_external_trigger_recovery_pony():
+    command = 'sequence_window_resilience'
+    _test_log_rotation_external_trigger_recovery(command)
+
+
+def test_log_rotation_external_trigger_recovery_machida():
+    command = 'machida_resilience --application-module sequence_window'
+    _test_log_rotation_external_trigger_recovery(command)
+
+
+def _test_log_rotation_external_trigger_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
@@ -181,10 +202,10 @@ def test_log_rotation_external_trigger_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = '''sequence_window_resilience \
+    command = '''{} \
         --log-rotation \
         --stop-pause {}
-    '''.format(STOP_THE_WORLD_PAUSE)
+    '''.format(command, STOP_THE_WORLD_PAUSE)
 
     runners = []
     try:
@@ -335,7 +356,17 @@ def test_log_rotation_external_trigger_recovery():
         clean_up_resilience_path(res_dir)
 
 
-def test_log_rotation_file_size_trigger_no_recovery():
+def test_log_rotation_file_size_trigger_no_recovery_pony():
+    command = 'sequence_window_resilience'
+    _test_log_rotation_file_size_trigger_no_recovery(command)
+
+
+def test_log_rotation_file_size_trigger_no_recovery_machida():
+    command = 'machida_resilience --application-module sequence_window'
+    _test_log_rotation_file_size_trigger_no_recovery(command)
+
+
+def _test_log_rotation_file_size_trigger_no_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
@@ -347,11 +378,11 @@ def test_log_rotation_file_size_trigger_no_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = '''sequence_window_resilience \
+    command = '''{} \
         --log-rotation \
         --event-log-file-size {} \
         --stop-pause {}
-    '''.format(event_log_file_size, STOP_THE_WORLD_PAUSE)
+    '''.format(command, event_log_file_size, STOP_THE_WORLD_PAUSE)
 
     runners = []
     try:
@@ -460,7 +491,17 @@ def test_log_rotation_file_size_trigger_no_recovery():
         clean_up_resilience_path(res_dir)
 
 
-def test_log_rotation_file_size_trigger_recovery():
+def test_log_rotation_file_size_trigger_recovery_pony():
+    command = 'sequence_window_resilience'
+    _test_log_rotation_file_size_trigger_recovery(command)
+
+
+def test_log_rotation_file_size_trigger_recovery_machida():
+    command = 'machida_resilience --application-module sequence_window'
+    _test_log_rotation_file_size_trigger_recovery(command)
+
+
+def _test_log_rotation_file_size_trigger_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
@@ -473,10 +514,10 @@ def test_log_rotation_file_size_trigger_recovery():
 
     setup_resilience_path(res_dir)
 
-    command = '''sequence_window_resilience \
+    command = '''{} \
         --log-rotation \
         --stop-pause {}
-    '''.format(STOP_THE_WORLD_PAUSE)
+    '''.format(command, STOP_THE_WORLD_PAUSE)
     alt_block = '--event-log-file-size {}'.format(event_log_file_size)
     alt_func = lambda x: x > 0
 
