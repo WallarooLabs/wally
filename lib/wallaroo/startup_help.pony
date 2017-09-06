@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 primitive StartupHelp
-  fun apply(env: Env) =>
+  fun apply() =>
     @printf[I32](
       """
       To run Wallaroo:
@@ -45,6 +45,11 @@ primitive StartupHelp
       --join/-j [When a new worker is joining a running cluster, pass the
         control channel address of any worker as the value for this parameter]
       --stop-world/-u [Sets pause before state migration after stop the world]
+
+      To set Wallaroo modes, compile with the following -D flags:
+        resilience - Sets resilience mode
+        autoscale - Sets autoscaling mode
+        clustering - Sets clustering mode
       -----------------------------------------------------------------------------------
       """.cstring()
     )

@@ -181,7 +181,7 @@ actor Startup
         initialize()
       end
     else
-      StartupHelp(_env)
+      StartupHelp()
     end
 
   be initialize() =>
@@ -405,7 +405,7 @@ actor Startup
         end
       end
     else
-      StartupHelp(_env)
+      StartupHelp()
     end
 
   be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg) =>

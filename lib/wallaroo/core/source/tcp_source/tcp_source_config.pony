@@ -17,8 +17,8 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "options"
+use "wallaroo"
 use "wallaroo/core/source"
-
 
 primitive TCPSourceConfigCLIParser
   fun apply(args: Array[String] val): Array[TCPSourceConfigOptions] val ? =>
@@ -28,9 +28,12 @@ primitive TCPSourceConfigCLIParser
     let options = Options(args, false)
 
     options.add(in_arg, short_in_arg, StringArgument, Required)
+    options.add("help", None)
 
     for option in options do
       match option
+      | ("help", let arg: None) =>
+        StartupHelp()
       | (in_arg, let input: String) =>
         return _from_input_string(input)
       end
