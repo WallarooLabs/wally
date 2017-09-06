@@ -13,7 +13,7 @@ the License. You may obtain a copy of the License at
 use "sendence/connemara"
 use "wallaroo/core/common"
 use "wallaroo/ent/network"
-use "wallaroo/routing"
+use "wallaroo/core/routing"
 
 actor Main is TestList
   new make() =>

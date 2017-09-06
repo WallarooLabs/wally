@@ -12,8 +12,8 @@ the License. You may obtain a copy of the License at
 
 use "sendence/connemara"
 use "wallaroo/core/common"
-use "wallaroo/topology"
-use "wallaroo/routing"
+use "wallaroo/core/topology"
+use "wallaroo/core/routing"
 
 actor _TestOutgoingToIncomingMessageTracker is TestList
   new make() =>

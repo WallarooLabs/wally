@@ -22,18 +22,18 @@ use "pony-kafka"
 use "net"
 
 use "wallaroo"
-use "wallaroo/sink"
-use "wallaroo/sink/kafka_sink"
-use "wallaroo/sink/tcp_sink"
-use "wallaroo/source"
-use "wallaroo/source/kafka_source"
-use "wallaroo/source/tcp_source"
-use "wallaroo/topology"
-use "wallaroo/state"
+use "wallaroo/core/sink"
+use "wallaroo/core/sink/kafka_sink"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source"
+use "wallaroo/core/source/kafka_source"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/topology"
+use "wallaroo/core/state"
 
 // these are included because of sendence/wallaroo issue #814
 use "serialise"
-use "wallaroo/fail"
+use "wallaroo/core/fail"
 
 use @set_user_serialization_fns[None](module: Pointer[U8] tag)
 use @user_serialization_get_size[USize](o: Pointer[U8] tag)

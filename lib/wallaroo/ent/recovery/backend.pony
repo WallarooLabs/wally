@@ -16,9 +16,9 @@ use "files"
 use "format"
 use "sendence/conversions"
 use "wallaroo/core/common"
-use "wallaroo/fail"
-use "wallaroo/invariant"
-use "wallaroo/messages"
+use "wallaroo/core/fail"
+use "wallaroo/core/invariant"
+use "wallaroo/core/messages"
 
 // (is_watermark, producer_id, uid, frac_ids, statechange_id, seq_id, payload)
 type LogEntry is (Bool, U128, U128, FractionalMessageId, U64, U64,

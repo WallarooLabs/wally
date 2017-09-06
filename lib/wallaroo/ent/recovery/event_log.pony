@@ -16,10 +16,10 @@ use "files"
 use "wallaroo/core/common"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/w_actor"
-use "wallaroo/fail"
-use "wallaroo/initialization"
-use "wallaroo/messages"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
+use "wallaroo/core/topology"
 
 interface tag Resilient
   be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,

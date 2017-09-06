@@ -16,11 +16,11 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "wallaroo/state"
+use "wallaroo/core/state"
 
 // these are included because of sendence/wallaroo issue #814
 use "serialise"
-use "wallaroo/fail"
+use "wallaroo/core/fail"
 
 type StateP is Pointer[U8] val
 

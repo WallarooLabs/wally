@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "wallaroo/core/common"
-use "wallaroo/routing"
+use "wallaroo/core/routing"
 
 interface WallarooOutgoingNetworkActor
   fun ref set_nodelay(state: Bool)

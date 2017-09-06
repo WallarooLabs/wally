@@ -12,7 +12,7 @@ the License. You may obtain a copy of the License at
 
 use "sendence/connemara"
 
-use "wallaroo/topology"
+use "wallaroo/core/topology"
 
 actor Main is TestList
   new create(env: Env) =>

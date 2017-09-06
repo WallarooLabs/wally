@@ -13,17 +13,17 @@ the License. You may obtain a copy of the License at
 use "collections"
 use "net"
 use "time"
-use "wallaroo/boundary"
+use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/data_channel"
+use "wallaroo/core/data_channel"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/w_actor"
-use "wallaroo/fail"
-use "wallaroo/routing"
-use "wallaroo/source"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/routing"
+use "wallaroo/core/source"
+use "wallaroo/core/topology"
 
 actor RouterRegistry
   let _auth: AmbientAuth

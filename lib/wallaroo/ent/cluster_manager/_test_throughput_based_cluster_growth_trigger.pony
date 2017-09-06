@@ -12,7 +12,7 @@ the License. You may obtain a copy of the License at
 
 use "collections"
 use "sendence/connemara"
-use "wallaroo/metrics"
+use "wallaroo/core/metrics"
 
 actor _TestThroughputBasedClusterGrowthTrigger is TestList
   new make() =>

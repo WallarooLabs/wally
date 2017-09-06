@@ -1,9 +1,9 @@
 use "buffered"
 use "wallaroo"
-use "wallaroo/sink/kafka_sink"
-use "wallaroo/source"
-use "wallaroo/source/kafka_source"
-use "wallaroo/topology"
+use "wallaroo/core/sink/kafka_sink"
+use "wallaroo/core/source"
+use "wallaroo/core/source/kafka_source"
+use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>

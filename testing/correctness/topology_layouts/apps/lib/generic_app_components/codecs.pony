@@ -1,6 +1,6 @@
 use "buffered"
 use "sendence/bytes"
-use "wallaroo/source"
+use "wallaroo/core/source"
 
 primitive U64Decoder is FramedSourceHandler[U64 val]
   fun apply(data: String val): U64 ? =>

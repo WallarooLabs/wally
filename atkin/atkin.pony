@@ -17,10 +17,10 @@ use "random"
 use "sendence/rand"
 use "wallaroo"
 use "wallaroo/ent/w_actor"
-use "wallaroo/fail"
-use "wallaroo/messages"
-use "wallaroo/sink/tcp_sink"
-use "wallaroo/source/tcp_source"
+use "wallaroo/core/fail"
+use "wallaroo/core/messages"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source/tcp_source"
 
 use @set_user_serialization_fns[None](module: Pointer[U8] tag)
 use @user_serialization_get_size[USize](o: Pointer[U8] tag)

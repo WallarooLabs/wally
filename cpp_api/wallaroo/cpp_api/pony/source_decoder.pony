@@ -16,8 +16,8 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "wallaroo/source"
-use "wallaroo/source/tcp_source"
+use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
 
 use @w_source_decoder_header_length[USize](source_decoder: SourceDecoderP)
 

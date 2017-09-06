@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "buffered"
-use "wallaroo/sink/tcp_sink"
+use "wallaroo/core/sink/tcp_sink"
 
 use @w_sink_encoder_get_size[USize](sink_encoder: SinkEncoderP,
   data: DataP tag)

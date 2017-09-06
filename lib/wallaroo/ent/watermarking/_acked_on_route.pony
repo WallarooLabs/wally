@@ -12,8 +12,8 @@ the License. You may obtain a copy of the License at
 
 use "time"
 use "wallaroo/core/common"
-use "wallaroo/invariant"
-use "wallaroo/routing"
+use "wallaroo/core/invariant"
+use "wallaroo/core/routing"
 
 class _AckedOnRoute
   """

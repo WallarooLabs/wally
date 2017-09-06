@@ -17,9 +17,9 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "wallaroo/topology"
-use "wallaroo/state"
-use "wallaroo/fail"
+use "wallaroo/core/topology"
+use "wallaroo/core/state"
+use "wallaroo/core/fail"
 
 use @w_computation_compute[DataP](computation: ComputationP, input: DataP)
 use @w_computation_get_name[Pointer[U8]](computation: ComputationP)

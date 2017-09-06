@@ -35,11 +35,11 @@ use "options"
 use "serialise"
 use "sendence/bytes"
 use "wallaroo"
-use "wallaroo/fail"
-use "wallaroo/sink/tcp_sink"
-use "wallaroo/source"
-use "wallaroo/source/tcp_source"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/topology"
 
 primitive Ping
 primitive Pong
