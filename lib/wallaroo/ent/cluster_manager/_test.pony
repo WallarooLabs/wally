@@ -10,14 +10,14 @@ the License. You may obtain a copy of the License at
 
 */
 
-use "wallaroo_labs/connemara"
+use "ponytest"
 
 actor Main is TestList
   new create(env: Env) =>
-    Connemara(env, this)
+    PonyTest(env, this)
 
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     _TestThroughputBasedClusterGrowthTrigger.make().tests(test)

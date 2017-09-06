@@ -10,7 +10,7 @@ the License. You may obtain a copy of the License at
 
 */
 
-use "wallaroo_labs/connemara"
+use "ponytest"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
 use "wallaroo/core/routing"
@@ -19,7 +19,7 @@ actor _TestOutgoingToIncomingMessageTracker is TestList
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestEmptyIndexFor)
     test(_TestBelowFirstIndex)
     test(_TestIndexFor1)

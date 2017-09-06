@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "wallaroo_labs/connemara"
+use "ponytest"
 use "wallaroo/core/common"
 use "wallaroo/core/routing"
 
@@ -24,7 +24,7 @@ actor _TestStepSeqIdGenerator is TestList
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestNewIncrementsByOne)
     test(_TestLatestAfterNew)
     test(_TestLatestWithNew)

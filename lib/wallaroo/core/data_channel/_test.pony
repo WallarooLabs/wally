@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-use "wallaroo_labs/connemara"
+use "ponytest"
 use "wallaroo/core/boundary"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
@@ -37,10 +37,10 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
 
 actor Main is TestList
-  new create(env: Env) => Connemara(env, this)
+  new create(env: Env) => PonyTest(env, this)
   new make() => None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestDataChannelWritev)
     test(_TestDataChannelExpect)
     test(_TestDataChannelMute)

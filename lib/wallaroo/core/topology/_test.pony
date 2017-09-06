@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "wallaroo_labs/connemara"
+use "ponytest"
 use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -29,11 +29,11 @@ use "wallaroo/core/routing"
 
 actor Main is TestList
   new create(env: Env) =>
-    Connemara(env, this)
+    PonyTest(env, this)
 
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     _TestRouterEquality.make().tests(test)
     _TestStepSeqIdGenerator.make().tests(test)

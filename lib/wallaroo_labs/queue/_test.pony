@@ -16,16 +16,16 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "wallaroo_labs/connemara"
+use "ponytest"
 use "collections"
 use "debug"
 
 actor Main is TestList
-  new create(env: Env) => Connemara(env, this)
+  new create(env: Env) => PonyTest(env, this)
 
   new make() => None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestQueue)
     test(_TestFixedQueue)
     test(_TestNoneFixedQueue)

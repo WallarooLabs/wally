@@ -10,14 +10,14 @@ the License. You may obtain a copy of the License at
 
 */
 
-use "wallaroo_labs/connemara"
+use "ponytest"
 use "wallaroo/core/common"
 
 actor _TestMessageDeduplicator is TestList
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestEmptyDuplicates)
     test(_TestDifferentMessagesNoFracs)
     test(_TestDifferentMessagesSameFracs)
