@@ -11,9 +11,9 @@ the License. You may obtain a copy of the License at
 */
 
 use "net"
-use "sendence/messages"
-use "sendence/options"
-use "sendence/tcp"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/options"
+use "wallaroo_labs/tcp"
 
 actor Main
 

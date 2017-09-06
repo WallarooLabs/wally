@@ -1,5 +1,5 @@
 use "buffered"
-use "sendence/bytes"
+use "wallaroo_labs/bytes"
 use "wallaroo/core/source"
 
 primitive U64Decoder is FramedSourceHandler[U64 val]

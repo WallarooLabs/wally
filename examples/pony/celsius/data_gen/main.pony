@@ -4,7 +4,7 @@ use "time"
 use "buffered"
 use "files"
 
-use "sendence/options"
+use "wallaroo_labs/options"
 
 actor Main
   new create(env: Env) =>

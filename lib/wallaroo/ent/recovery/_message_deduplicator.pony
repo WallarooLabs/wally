@@ -10,7 +10,7 @@ the License. You may obtain a copy of the License at
 
 */
 
-use "sendence/mort"
+use "wallaroo_labs/mort"
 use "wallaroo/core/common"
 
 type DeduplicationList is Array[MsgIdAndFracs]

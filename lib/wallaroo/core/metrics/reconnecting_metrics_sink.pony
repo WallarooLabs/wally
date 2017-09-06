@@ -31,7 +31,7 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
-use "sendence/hub"
+use "wallaroo_labs/hub"
 use "wallaroo/core/fail"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,

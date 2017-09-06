@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 
 actor _TestExternalBroadcastVariableUpdater is TestList
   new make() =>

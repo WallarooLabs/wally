@@ -19,7 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "random"
 use "time"
 use "collections"
-use "sendence/fix"
+use "wallaroo_labs/fix"
 
 class InstrumentData
   let _name: String val

@@ -16,8 +16,8 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "sendence/mort"
-use "sendence/options"
+use "wallaroo_labs/mort"
+use "wallaroo_labs/options"
 use "wallaroo/ent/spike"
 
 class StartupOptions

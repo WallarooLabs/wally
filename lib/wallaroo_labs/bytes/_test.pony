@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 use "promises"
 
 actor Main is TestList

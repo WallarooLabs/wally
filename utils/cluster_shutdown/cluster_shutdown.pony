@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "net"
-use "sendence/messages"
+use "wallaroo_labs/messages"
 
 actor Main
   new create(env: Env) =>

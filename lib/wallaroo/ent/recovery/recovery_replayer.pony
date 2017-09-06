@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "sendence/collection_helpers"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"

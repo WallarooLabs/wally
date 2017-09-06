@@ -12,7 +12,7 @@ the License. You may obtain a copy of the License at
 
 use "collections"
 
-use "sendence/options"
+use "wallaroo_labs/options"
 use "wallaroo"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/topology"

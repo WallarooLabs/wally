@@ -26,9 +26,9 @@ use "assert"
 use "collections"
 use "files"
 use "generic_app_components"
-use "sendence/bytes"
-use "sendence/messages"
-use "sendence/options"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/options"
 
 actor Main
   new create(env: Env) =>

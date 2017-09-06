@@ -18,8 +18,8 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "net"
-use "sendence/equality"
-use "sendence/mort"
+use "wallaroo_labs/equality"
+use "wallaroo_labs/mort"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"

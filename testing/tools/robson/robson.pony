@@ -15,9 +15,9 @@ use "collections"
 use "files"
 use "format"
 use "net"
-use "sendence/hub"
-use "sendence/options"
-use "sendence/time"
+use "wallaroo_labs/hub"
+use "wallaroo_labs/options"
+use "wallaroo_labs/time"
 
 actor Main
   new create(env: Env) =>

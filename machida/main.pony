@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "signals"
-use "sendence/options"
+use "wallaroo_labs/options"
 use "wallaroo"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source/tcp_source"

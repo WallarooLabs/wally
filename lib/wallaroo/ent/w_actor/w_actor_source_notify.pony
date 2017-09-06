@@ -12,9 +12,9 @@ the License. You may obtain a copy of the License at
 
 use "collections"
 use "time"
-use "sendence/bytes"
-use "sendence/guid"
-use "sendence/time"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/guid"
+use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"

@@ -10,7 +10,7 @@ the License. You may obtain a copy of the License at
 
 */
 
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 
 use "wallaroo/core/topology"
 

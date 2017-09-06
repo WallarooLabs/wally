@@ -17,8 +17,8 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "sendence/connemara"
-use "sendence/equality"
+use "wallaroo_labs/connemara"
+use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"

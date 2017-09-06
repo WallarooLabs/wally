@@ -12,7 +12,7 @@ the License. You may obtain a copy of the License at
 
 use "buffered"
 use "net"
-use "sendence/messages"
+use "wallaroo_labs/messages"
 
 trait MessageFileParser
   fun ref apply(fields: Array[String] val) ?

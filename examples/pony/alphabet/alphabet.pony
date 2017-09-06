@@ -1,7 +1,7 @@
 use "buffered"
 use "collections"
 use "serialise"
-use "sendence/bytes"
+use "wallaroo_labs/bytes"
 use "wallaroo"
 use "wallaroo/core/common"
 use "wallaroo/core/fail"

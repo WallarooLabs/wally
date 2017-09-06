@@ -16,9 +16,9 @@ A tool for test sending external messages.
 use "buffered"
 use "net"
 use "files"
-use "sendence/bytes"
-use "sendence/messages"
-use "sendence/options"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/options"
 
 actor Main
   var _conn: (TCPConnection | None) = None
