@@ -31,7 +31,7 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 use "wallaroo/core/state"
 
-// these are included because of sendence/wallaroo issue #814
+// these are included because of wallaroo issue #814
 use "serialise"
 use "wallaroo/core/fail"
 
