@@ -27,6 +27,7 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
+use "wallaroo/ent/rebalancing"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/watermarking"
 use "wallaroo/core/fail"
@@ -361,13 +362,9 @@ actor Step is (Producer & Consumer)
     statechange_id: U64, payload: ByteSeq val)
   =>
     if not _is_duplicate(uid, frac_ids) then
-      _deduplication_list.push((uid, frac_ids))
-      match _runner
-      | let r: ReplayableRunner =>
-        r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
-      else
-        @printf[I32]("trying to replay a message to a non-replayable
-        runner!".cstring())
+      ifdef "resilience" then
+        StepLogEntryReplayer(_runner, _deduplication_list, uid, frac_ids,
+          statechange_id, payload, this)
       end
     end
 
@@ -414,51 +411,24 @@ actor Step is (Producer & Consumer)
   ///////////////
   // GROW-TO-FIT
   be receive_state(state: ByteSeq val) =>
-    ifdef "trace" then
-      @printf[I32]("Received new state\n".cstring())
-    end
-    match _runner
-    | let r: SerializableStateRunner =>
-      r.replace_serialized_state(state)
-    else
-      Fail()
+    ifdef "autoscale" then
+      StepStateMigrator.receive_state(_runner, state)
     end
 
   be send_state_to_neighbour(neighbour: Step) =>
-    match _runner
-    | let r: SerializableStateRunner =>
-      neighbour.receive_state(r.serialize_state())
-    else
-      Fail()
+    ifdef "autoscale" then
+      StepStateMigrator.send_state_to_neighbour(_runner, neighbour)
     end
 
   be send_state[K: (Hashable val & Equatable[K] val)](
     boundary: OutgoingBoundary, state_name: String, key: K)
   =>
-    match _runner
-    | let r: SerializableStateRunner =>
-      let state: ByteSeq val = r.serialize_state()
-      boundary.migrate_step[K](_id, state_name, key, state)
-    else
-      Fail()
+    ifdef "autoscale" then
+      StepStateMigrator.send_state[K](_runner, _id, boundary, state_name, key)
     end
 
   // Log-rotation
   be snapshot_state() =>
-    match _runner
-    | let r: SerializableStateRunner =>
-      let wb = Writer
-      let serialized: ByteSeq val = r.serialize_state()
-      wb.write(serialized)
-      let payload = wb.done()
-      let oid: U128 = _id
-      let uid: U128 = -1
-      let statechange_id: U64 = -1
-      let seq_id: U64 = _seq_id_generator.last_id()
-      _event_log.snapshot_state(oid, uid, statechange_id, seq_id,
-        consume payload)
-    else
-      @printf[I32](("Could not complete log rotation. StateRunner is not " +
-        "Serializable.\n").cstring())
-      Fail()
+    ifdef "resilience" then
+      StepStateSnapshotter(_runner, _id, _seq_id_generator, _event_log)
     end
