@@ -6,7 +6,7 @@ application to be written in Python.
 ## Requirements
 - clang >=3.5 on MacOS or gcc >=5 on Linux
 - python-dev
-- sendence-ponyc
+- wallaroolabs-ponyc
 - giles-sender
 
 You will also need your environment to be [set up with a working

@@ -1,4 +1,4 @@
-# Sendence Wallaroo
+# Wallaroo
 
 * [What is Wallaroo?](book/what-is-wallaroo.md)
 

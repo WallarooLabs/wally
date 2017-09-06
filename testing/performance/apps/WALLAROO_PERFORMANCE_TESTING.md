@@ -78,7 +78,7 @@ docker stop mui && docker start mui
 You'll need to clone the repo:
 
 ```bash
-git clone https://github.com/sendence/buffy.git
+git clone https://github.com/WallarooLabs/wallaroo.git
 ```
 
 To build Market Spread:

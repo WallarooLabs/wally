@@ -14,7 +14,7 @@ Giles components act as external testers for Wallaroo. Giles Sender is used to m
 If you do not already have the `wallaroo` repo, create a local copy:
 
 ```bash
-git clone https://github.com/sendence/wallaroo
+git clone https://github.com/WallarooLabs/wallaroo
 ```
 
 Compile the `giles-sender` binary:

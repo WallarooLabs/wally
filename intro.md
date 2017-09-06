@@ -1,17 +1,15 @@
 # About this Guide
 
-Welcome to the developer's guide for Sendence Wallaroo. This document is available in a variety of formats including:
+Welcome to the developer's guide for Wallaroo. This document is available in a variety of formats including:
 
-- [On the web](https://sendence.gitbooks.io/wallaroo/content/)
-- [PDF](https://www.gitbook.com/download/pdf/book/sendence/wallaroo)
-- [ePub](https://www.gitbook.com/download/epub/book/sendence/wallaroo)
-- [Mobi](https://www.gitbook.com/download/mobi/book/sendence/wallaroo)
+- [On the web](https://wallaroolabs.gitbooks.io/wallaroo/content/)
+- [PDF](https://www.gitbook.com/download/pdf/book/wallaroolabs/wallaroo)
+- [ePub](https://www.gitbook.com/download/epub/book/wallaroolabs/wallaroo)
+- [Mobi](https://www.gitbook.com/download/mobi/book/wallaroolabs/wallaroo)
 
-You can open issues and submit pull requests against [our GitHub repo](https://github.com/Sendence/wallaroo).
+You can open issues and submit pull requests against [our GitHub repo](https://github.com/wallaroolabs/wallaroo).
 
-All material and documentation herein is copyrighted (c) 2017 by Sendence Solutions LLC. Furthermore, by accessing any of Sendence's sites or documentation in any format (PDF, WORD, etc.) you acknowledge that you have read and agree to our [Terms and Conditions](/book/legal/terms.md).
-
-This document is has been written to take an application developer from zero knowledge about Sendence Wallaroo to being able to develop streaming Wallaroo applications in a local development environment.
+This document is has been written to take an application developer from zero knowledge about Wallaroo to being able to develop streaming Wallaroo applications in a local development environment.
 
 ## Intended Audience
 

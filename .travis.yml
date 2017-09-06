@@ -79,9 +79,9 @@ install:
       tar zxvf cmake-3.5.2-Linux-x86_64.tar.gz;
       export PATH=/tmp/dl/cmake-3.5.2-Linux-x86_64/bin:$PATH;
     fi;
-  - echo "Installing sendence/ponyc";
+  - echo "Installing WallarooLabs/ponyc";
     cd /tmp;
-    git clone git@github.com:Sendence/ponyc.git;
+    git clone git@github.com:WallarooLabs/ponyc.git;
     cd ponyc;
     make CC=$CC1 CXX=$CXX1;
     sudo make install;

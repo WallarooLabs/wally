@@ -1,6 +1,6 @@
 # Wallaroo Market Spread Single Machine Performance Testing on AWS
 
-If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/wallaroo/tree/master/orchestration/terraform) please do so before continuing.
+If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/WallarooLabs/wallaroo/tree/master/orchestration/terraform) please do so before continuing.
 
 ## Configuring Cluster:
 
@@ -31,7 +31,7 @@ ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 You'll need to clone the repo:
 
 ```
-git clone https://github.com/sendence/wallaroo.git
+git clone https://github.com/WallarooLabs/wallaroo.git
 ```
 
 ### Verify optimal setup
@@ -221,11 +221,11 @@ cd pcre2-10.21
 sudo make install
 ```
 
-#### Install Sendence ponyc
+#### Install Wallaroo Labs ponyc
 
 ```bash
 cd ~/
-git clone https://github.com/Sendence/ponyc.git
+git clone https://github.com/WallarooLabs/ponyc.git
 cd ~/ponyc/
 sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/llvm-config
 ```

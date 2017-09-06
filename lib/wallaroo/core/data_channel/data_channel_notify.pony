@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2016-2017, Sendence LLC
+Copyright (C) 2016-2017, Wallaroo Labs
 Copyright (C) 2016-2017, The Pony Developers
 Copyright (c) 2014-2015, Causality Ltd.
 All rights reserved.

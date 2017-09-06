@@ -43,4 +43,4 @@ The purpose of these tests is to validate that the behaviour of the application 
 
 ### Observation:
 
-1. Application exits immediately with error This should never happen: `failure in /home/nisan/proj/sendence/Buffy/lib/wallaroo/tcp_sink/tcp_sink.pony at line 745`
+1. Application exits immediately with error This should never happen: `failure in /home/nisan/proj/wallaroolabs/wallaroo/lib/wallaroo/tcp_sink/tcp_sink.pony at line 745`

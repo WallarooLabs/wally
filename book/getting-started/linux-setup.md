@@ -113,11 +113,11 @@ sudo make install
 
 ### Installing ponyc
 
-Now you need to install the Sendence fork of the Pony compiler `ponyc`. Run:
+Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`. Run:
 
 ```bash
 cd ~/
-wget https://github.com/Sendence/ponyc/archive/sendence-19.2.13.tar.gz
+wget https://github.com/WallarooLabs/ponyc/archive/sendence-19.2.13.tar.gz
 tar xzfv sendence-19.2.13.tar.gz
 cd ponyc-sendence-19.2.13
 sudo make config=release install
@@ -186,7 +186,7 @@ This will be our base directory in what follows. If you haven't already
 cloned the Wallaroo repo, do so now:
 
 ```bash
-git clone https://github.com/sendence/wallaroo
+git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
 git checkout 0.0.1-rc15
 ```

@@ -17,11 +17,11 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 """
-# Sendence Standard Library
+# Wallaroo Labs Standard Library
 
-This package represents the unit test suite for Sendence's standard library.
-Classes herein are used across applications rather than being specific to
-just Wallaroo.
+This package represents the unit test suite for Wallaroo Labs's
+standard library. Classes herein are used across applications rather
+than being specific to just Wallaroo.
 
 All tests can be run by compiling and running this package.
 """

@@ -23,7 +23,7 @@ Wallaroo is the most advanced real-time (event-by-event) data processing and ana
 ### What does the roadmap look like one the next 12 months?
 You can view the Wallaroo roadmap [here](roadmap)
 ### Who is using Wallaroo in production?
-Sendence is currently working with several companies move development applications into production.
+Wallaroo Labs is currently working with several companies move development applications into production.
 
 ### What types of connectivity is available to connect with various data sources?
 ### What types of data processing guarantees does Wallaroo support?

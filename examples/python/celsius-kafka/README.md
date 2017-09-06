@@ -10,7 +10,7 @@ This is an example of a stateless Python application that takes a floating point
 - Wallaroo
 - Machida
 
-See [Wallaroo Environment Setup Instructions](https://github.com/sendence/wallaroo/book/getting-started/setup.md).
+See [Wallaroo Environment Setup Instructions](https://github.com/WallarooLabs/wallaroo/book/getting-started/setup.md).
 
 ## Running Celsius-kafka
 

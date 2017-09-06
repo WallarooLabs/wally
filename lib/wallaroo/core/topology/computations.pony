@@ -102,7 +102,7 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
           var this_is_finished = true
           var this_last_ts = computation_end
           // this is unused and kept here only for short term posterity until
-          // https://github.com/Sendence/wallaroo/issues/1010 is addressed
+          // https://github.com/WallarooLabs/wallaroo/issues/1010 is addressed
           let this_keep_sending = true
 
           for (frac_id, output) in outputs.pairs() do
