@@ -10,7 +10,7 @@ the License. You may obtain a copy of the License at
 
 */
 
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/routing"
 
 interface WallarooOutgoingNetworkActor

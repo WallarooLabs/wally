@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "net"
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/fail"

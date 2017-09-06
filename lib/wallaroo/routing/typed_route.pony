@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "time"
 use "sendence/guid"
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"

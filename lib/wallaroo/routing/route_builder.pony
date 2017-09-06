@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "wallaroo/boundary"
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/fail"
 use "wallaroo/metrics"

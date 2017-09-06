@@ -13,7 +13,7 @@ the License. You may obtain a copy of the License at
 use "buffered"
 use "collections"
 use "files"
-use "wallaroo/core"
+use "wallaroo/core/common"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/w_actor"
 use "wallaroo/fail"
