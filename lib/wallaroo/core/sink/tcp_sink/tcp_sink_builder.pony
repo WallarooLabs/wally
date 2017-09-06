@@ -17,9 +17,13 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "options"
+use "wallaroo"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
+use "wallaroo/messages"
+use "wallaroo/metrics"
+use "wallaroo/sink"
 
 primitive TCPSinkConfigCLIParser
   fun apply(args: Array[String] val): Array[TCPSinkConfigOptions] val ? =>
@@ -29,9 +33,12 @@ primitive TCPSinkConfigCLIParser
     let options = Options(args, false)
 
     options.add(out_arg, out_short_arg, StringArgument, Required)
+    options.add("help", "h", None)
 
     for option in options do
       match option
+      | ("help", let arg: None) =>
+        StartupHelp()
       | (out_arg, let output: String) =>
         return _from_output_string(output)
       end

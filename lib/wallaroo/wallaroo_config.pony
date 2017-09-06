@@ -101,6 +101,7 @@ primitive WallarooConfig
       .add("spike-drop", "", None)
       .add("spike-prob", "", F64Argument)
       .add("spike-margin", "", I64Argument)
+      .add("help", "h", None)
 
     if include_input_addrs then
       options.add("in", "i", StringArgument)
@@ -108,6 +109,8 @@ primitive WallarooConfig
 
     for option in options do
       match option
+      | ("help", let arg: None) =>
+        StartupHelp()
       | ("metrics", let arg: String) =>
         so.m_arg = arg.split(":")
       | ("in", let arg: String) =>
@@ -186,6 +189,13 @@ primitive WallarooConfig
       match so.worker_count
       | None =>
         so.worker_count = 1
+      | let wc: USize =>
+        ifdef not "clustering" then
+          if wc > 1 then
+            FatalUserError("Worker counts greater than 1 are only supported " +
+              "in clustering mode")
+          end
+        end
       end
       so.worker_name = "initializer"
       if so.d_host == "" then
