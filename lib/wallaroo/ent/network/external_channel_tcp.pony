@@ -110,6 +110,12 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
           end
           _connections.rotate_log_files(m.node_name)
         | let m: ExternalCleanShutdownMsg =>
+          if m.msg != "" then
+            @printf[I32]("External Clean Shutdown received: %s\n".cstring(),
+              m.msg.cstring())
+          else
+            @printf[I32]("External Clean Shutdown received.\n".cstring())
+          end
           try
             let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)
             _connections.send_control_to_cluster(clean_shutdown_msg)

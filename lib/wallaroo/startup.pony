@@ -69,6 +69,8 @@ actor Startup
 
   var _connections: (Connections | None) = None
 
+  let _disposables: SetIs[DisposableActor] = _disposables.create()
+
   new create(env: Env, application: Application val,
     app_name: (String | None))
   =>
@@ -152,9 +154,6 @@ actor Startup
         end
       end
 
-      // TODO: When we add full cluster join functionality, we will probably
-      // need to break out initialization branches into primitives.
-      // Currently a joining worker only nominally becomes part of the cluster.
       if _startup_options.is_joining then
         if _startup_options.worker_name == "" then
           @printf[I32](("You must specify a name for the worker " +
@@ -167,6 +166,7 @@ actor Startup
             _startup_options.worker_name, this)
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0), j_addr(1))
+        _disposables.set(control_conn)
         let cluster_join_msg =
           ChannelMsgEncoder.join_cluster(_startup_options.worker_name, auth)
         control_conn.writev(cluster_join_msg)
@@ -174,8 +174,9 @@ actor Startup
         // This only exists to keep joining worker alive while it waits for
         // cluster information.
         // TODO: Eliminate the need for this.
-        _joining_listener =
-          TCPListener(auth, JoiningListenNotifier)
+        let joining_listener = TCPListener(auth, JoiningListenNotifier)
+        _joining_listener = joining_listener
+        _disposables.set(joining_listener)
       else
         initialize()
       end
@@ -593,6 +594,11 @@ actor Startup
       c.shutdown()
     else
       Fail()
+    end
+
+  be dispose() =>
+    for d in _disposables.values() do
+      d.dispose()
     end
 
   fun ref _remove_file(filename: String) =>
