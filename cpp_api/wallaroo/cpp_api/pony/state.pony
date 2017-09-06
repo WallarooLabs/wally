@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "wallaroo/core/state"
 
-// these are included because of sendence/wallaroo issue #814
+// these are included because of issue #814
 use "serialise"
 use "wallaroo/core/fail"
 

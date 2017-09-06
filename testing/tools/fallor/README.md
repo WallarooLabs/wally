@@ -10,4 +10,4 @@ Reads a binary file encoded in the Fallor message format, decodes, and writes th
 
 ## Fallor Encoder/Decoder
 
-The Fallor message encoder/decoder is part of the sendence/messages library.
+The Fallor message encoder/decoder is part of the wallaroo_labs/messages library.
