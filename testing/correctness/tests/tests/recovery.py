@@ -25,21 +25,6 @@ def test_recovery_pony():
 
 def test_recovery_machida():
     command = 'machida_resilience --application-module sequence_window'
-    # set up PATH and PYTHONPATH variables for test
-    os.environ['PATH'] += os.pathsep + os.path.join(
-        os.path.expanduser('~'),
-        'wallaroo-tutorial',
-        'wallaroo',
-        'machida',
-        'build')
-    os.environ['PYTHONPATH'] += os.pathsep + os.path.join(
-        os.path.expanduser('~'),
-        'wallaroo-tutorial',
-        'wallaroo',
-        'testing',
-        'correctness',
-        'apps',
-        'sequence_window_python')
     _test_recovery(command)
 
 
