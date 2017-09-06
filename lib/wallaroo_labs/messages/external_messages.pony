@@ -98,8 +98,8 @@ primitive ExternalMsgEncoder
   =>
     _encode(_RotateLog(), worker_name, wb)
 
-  fun clean_shutdown(wb: Writer = Writer): Array[ByteSeq] val =>
-    _encode(_CleanShutdown(), "", wb)
+  fun clean_shutdown(msg: String, wb: Writer = Writer): Array[ByteSeq] val =>
+    _encode(_CleanShutdown(), msg, wb)
 
 class BufferedExternalMsgEncoder
   let _buffer: Writer
@@ -169,7 +169,7 @@ primitive ExternalMsgDecoder
     | (_RotateLog(), let s: String) =>
       ExternalRotateLogFilesMsg(s)
     | (_CleanShutdown(), let s: String) =>
-      ExternalCleanShutdownMsg
+      ExternalCleanShutdownMsg(s)
     else
       error
     end
@@ -237,4 +237,8 @@ class val ExternalRotateLogFilesMsg is ExternalMsg
   new val create(n: String) =>
     node_name = n
 
-primitive ExternalCleanShutdownMsg is ExternalMsg
+class val ExternalCleanShutdownMsg is ExternalMsg
+  let msg: String
+
+  new val create(m: String) =>
+    msg = m

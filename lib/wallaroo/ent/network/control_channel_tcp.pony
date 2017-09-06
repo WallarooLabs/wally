@@ -336,11 +336,23 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _layout_initializer.create_data_channel_listener(m.workers,
           _d_host, _d_service)
       | let m: JoinClusterMsg =>
-        match _layout_initializer
-        | let lti: LocalTopologyInitializer =>
-          lti.inform_joining_worker(conn, m.worker_name)
+        ifdef "autoscale" then
+          match _layout_initializer
+          | let lti: LocalTopologyInitializer =>
+            lti.inform_joining_worker(conn, m.worker_name)
+          else
+            Fail()
+          end
         else
-          Fail()
+          @printf[I32](("Worker is trying to join the cluster. This is only " +
+            "supported in autoscale mode\n").cstring())
+          try
+            let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth,
+              "Joining a cluster is only supported in autoscale mode.")
+            conn.writev(clean_shutdown_msg)
+          else
+            Fail()
+          end
         end
       | let m: AnnounceNewStatefulStepMsg =>
         m.update_registry(_router_registry)
@@ -462,9 +474,12 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
+      | let m: CleanShutdownMsg =>
+        @printf[I32]("Shutting down early: %s\n".cstring(), m.msg.cstring())
+        _startup.dispose()
       else
-        @printf[I32](("Incoming Channel Message type not handled by control " +
-          "channel.\n").cstring())
+        @printf[I32](("Incoming Channel Message type not handled by joining " +
+          "control channel.\n").cstring())
       end
       conn.expect(4)
       _header = true
