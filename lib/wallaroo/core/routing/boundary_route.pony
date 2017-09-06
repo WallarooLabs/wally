@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "sendence/guid"
+use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"

@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use ".."
-use "sendence/fix"
+use "wallaroo_labs/fix"
 use "collections"
 
 actor Main

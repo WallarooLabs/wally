@@ -19,7 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 """
 # TCP package
 """
-use "sendence/bytes"
+use "wallaroo_labs/bytes"
 
 class Framer
   """

@@ -16,7 +16,7 @@ use "net"
 use "collections"
 use "crypto"
 use "random"
-use "sendence/rand"
+use "wallaroo_labs/rand"
 
 primitive Pickle
   fun apply[S: Any #read](s: S, auth: AmbientAuth): ByteSeq val ? =>

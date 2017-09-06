@@ -34,7 +34,7 @@ The Options package provides support for parsing command line arguments.
 
 ## Example program
 ```pony
-use "sendence/options"
+use "wallaroo_labs/options"
 
 actor Main
   let _env: Env
@@ -86,7 +86,7 @@ actor Main
 ```
 """
 
-use "sendence/mort"
+use "wallaroo_labs/mort"
 
 primitive StringArgument
 primitive I64Argument

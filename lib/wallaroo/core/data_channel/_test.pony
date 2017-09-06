@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 use "wallaroo/core/boundary"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"

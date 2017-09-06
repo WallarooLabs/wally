@@ -33,7 +33,7 @@ Send 1 message into Ping:
 use "buffered"
 use "options"
 use "serialise"
-use "sendence/bytes"
+use "wallaroo_labs/bytes"
 use "wallaroo"
 use "wallaroo/core/fail"
 use "wallaroo/core/sink/tcp_sink"

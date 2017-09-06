@@ -13,9 +13,9 @@ the License. You may obtain a copy of the License at
 use "buffered"
 use "net"
 use "files"
-use "sendence/bytes"
-use "sendence/messages"
-use "sendence/options"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/options"
 
 actor Main
   new create(env: Env) =>

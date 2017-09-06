@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 
 actor Main is TestList
   new create(env: Env) =>

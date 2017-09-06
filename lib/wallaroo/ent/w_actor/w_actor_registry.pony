@@ -12,8 +12,8 @@ the License. You may obtain a copy of the License at
 
 use "collections"
 use "time"
-use "sendence/guid"
-use "sendence/rand"
+use "wallaroo_labs/guid"
+use "wallaroo_labs/rand"
 use "wallaroo/core/boundary"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"

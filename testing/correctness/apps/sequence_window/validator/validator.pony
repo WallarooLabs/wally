@@ -33,9 +33,9 @@ as that the highest value matches the expected value provided to the validator.
 use "assert"
 use "collections"
 use "files"
-use "sendence/bytes"
-use "sendence/options"
-use "sendence/messages"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/options"
+use "wallaroo_labs/messages"
 use "ring"
 use "window_codecs"
 

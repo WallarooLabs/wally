@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "sendence/guid"
+use "wallaroo_labs/guid"
 
 class MsgIdGenerator
   let _guid: GuidGenerator = GuidGenerator

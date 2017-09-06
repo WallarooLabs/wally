@@ -13,7 +13,7 @@ the License. You may obtain a copy of the License at
 use "collections"
 use "net"
 use "time"
-use "sendence/guid"
+use "wallaroo_labs/guid"
 use "wallaroo/core/common"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"

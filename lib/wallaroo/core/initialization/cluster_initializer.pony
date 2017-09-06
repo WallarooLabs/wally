@@ -18,8 +18,8 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "net"
-use "sendence/guid"
-use "sendence/messages"
+use "wallaroo_labs/guid"
+use "wallaroo_labs/messages"
 use "wallaroo"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"

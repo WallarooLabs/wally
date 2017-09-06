@@ -21,8 +21,8 @@ use "collections"
 use "json"
 use "net"
 use "time"
-use "sendence/hub"
-use "sendence/time"
+use "wallaroo_labs/hub"
+use "wallaroo_labs/time"
 
 type MetricData is
   (String, String, String, String, U16,

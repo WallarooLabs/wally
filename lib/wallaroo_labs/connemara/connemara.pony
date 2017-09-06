@@ -55,7 +55,7 @@ for the package.
 The following is a complete program with 2 trivial tests.
 
 ```pony
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -116,7 +116,7 @@ list function for each package. The following is an example that aggregates the
 tests from packages `foo` and `bar`.
 
 ```pony
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 use foo = "foo"
 use bar = "bar"
 
@@ -195,7 +195,7 @@ By default label is empty. You can set it up by overriding `label(): String`
 method in unit test.
 
 ```pony
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 
 class iso _I8AddTest is UnitTest
   fun name(): String => "_I8AddTest"

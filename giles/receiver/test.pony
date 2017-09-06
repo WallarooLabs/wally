@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 
 actor TestMain is TestList
   new create(env: Env) => Connemara(env, this)

@@ -22,12 +22,12 @@ Giles receiver
 use "collections"
 use "files"
 use "net"
-use "sendence/options"
+use "wallaroo_labs/options"
 use "signals"
 use "time"
-use "sendence/messages"
-use "sendence/bytes"
-use "sendence/time"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/time"
 use "debug"
 
 // tests

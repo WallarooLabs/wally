@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "buffered"
-use "sendence/bytes"
+use "wallaroo_labs/bytes"
 use "wallaroo/core/metrics"
 
 primitive HubProtocol

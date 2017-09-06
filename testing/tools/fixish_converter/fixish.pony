@@ -11,11 +11,11 @@ the License. You may obtain a copy of the License at
 */
 
 use "net"
-use "sendence/options"
+use "wallaroo_labs/options"
 use "files"
-use "sendence/messages"
-use "sendence/fix"
-use "sendence/new_fix"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/fix"
+use "wallaroo_labs/new_fix"
 use "buffered"
 use "collections"
 

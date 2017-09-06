@@ -5,7 +5,7 @@ This package represents the unit test suite for Wallaroo.
 
 All tests can be run by compiling and running this package.
 """
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 use broadcast = "ent/w_actor/broadcast"
 use cluster_manager = "ent/cluster_manager"
 use data_channel = "core/data_channel"

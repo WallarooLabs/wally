@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 
 actor Main is TestList
   new create(env: Env) => Connemara(env, this)

@@ -14,7 +14,7 @@ use "collections"
 use "buffered"
 use "random"
 
-use "sendence/rand"
+use "wallaroo_labs/rand"
 use "wallaroo"
 use "wallaroo/ent/w_actor"
 use "wallaroo/core/fail"

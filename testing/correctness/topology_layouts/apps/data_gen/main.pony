@@ -16,7 +16,7 @@ use "collections"
 use "files"
 use "generic_app_components"
 use "random"
-use "sendence/options"
+use "wallaroo_labs/options"
 
 actor Main
   new create(env: Env) =>

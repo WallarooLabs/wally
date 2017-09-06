@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "files"
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 
 actor Main is TestList
   new create(env: Env) => Connemara(env, this)

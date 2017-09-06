@@ -10,12 +10,12 @@ the License. You may obtain a copy of the License at
 
 */
 
-use "sendence/options"
+use "wallaroo_labs/options"
 use "files"
 use "buffered"
 use "collections"
-use "sendence/fix"
-use "sendence/fix_generator_utils"
+use "wallaroo_labs/fix"
+use "wallaroo_labs/fix_generator_utils"
 use "random"
 use "ini"
 use "time"

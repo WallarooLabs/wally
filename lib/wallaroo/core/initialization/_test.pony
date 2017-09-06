@@ -17,8 +17,8 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "sendence/connemara"
-use "sendence/dag"
+use "wallaroo_labs/connemara"
+use "wallaroo_labs/dag"
 use "wallaroo/core/common"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"

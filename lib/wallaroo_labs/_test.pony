@@ -25,7 +25,7 @@ just Wallaroo.
 
 All tests can be run by compiling and running this package.
 """
-use "sendence/connemara"
+use "wallaroo_labs/connemara"
 use bytes = "bytes"
 use container_queue = "container_queue"
 use fix = "fix"
