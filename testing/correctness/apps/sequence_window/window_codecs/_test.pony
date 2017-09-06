@@ -1,14 +1,14 @@
 use "buffered"
 use "collections"
-use "wallaroo_labs/connemara"
+use "ponytest"
 
 actor Main is TestList
   new create(env: Env) =>
-    Connemara(env, this)
+    PonyTest(env, this)
 
   new make() => None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestWindowEncoder)
     test(_TestWindowDecoder)
     test(_TestWindowState)

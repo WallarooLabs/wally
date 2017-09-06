@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "wallaroo_labs/connemara"
+use "ponytest"
 use "wallaroo_labs/dag"
 use "wallaroo/core/common"
 use "wallaroo/core/routing"
@@ -27,7 +27,7 @@ actor Main is TestList
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestLocalTopologyEquality)
 
 class iso _TestLocalTopologyEquality is UnitTest

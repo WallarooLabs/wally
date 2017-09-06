@@ -11,13 +11,13 @@ the License. You may obtain a copy of the License at
 */
 
 use "files"
-use "wallaroo_labs/connemara"
+use "ponytest"
 
 actor Main is TestList
-  new create(env: Env) => Connemara(env, this)
+  new create(env: Env) => PonyTest(env, this)
   new make() => None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     _TestMessageDeduplicator.make().tests(test)
     test(_TestEventLogDummyCreation)
     test(_TestHexOffset)

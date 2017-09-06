@@ -17,7 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "wallaroo_labs/connemara"
+use "ponytest"
 use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -32,7 +32,7 @@ actor _TestRouterEquality is TestList
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestLocalPartitionRouterEquality)
     test(_TestOmniRouterEquality)
     test(_TestDataRouterEqualityAfterRemove)

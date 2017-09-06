@@ -27,13 +27,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-use "wallaroo_labs/connemara"
+use "ponytest"
 
 actor Main is TestList
-  new create(env: Env) => Connemara(env, this)
+  new create(env: Env) => PonyTest(env, this)
   new make() => None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestLongOptions)
     test(_TestShortOptions)
     test(_TestCombineShortOptions)

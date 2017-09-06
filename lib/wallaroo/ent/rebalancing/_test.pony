@@ -11,13 +11,13 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "wallaroo_labs/connemara"
+use "ponytest"
 
 actor Main is TestList
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     test(_TestRebalancerStepsFromOne)
     test(_TestRebalancerStepsForNewWorker)
 

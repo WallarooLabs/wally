@@ -5,7 +5,7 @@ This package represents the unit test suite for Wallaroo.
 
 All tests can be run by compiling and running this package.
 """
-use "wallaroo_labs/connemara"
+use "ponytest"
 use broadcast = "ent/w_actor/broadcast"
 use cluster_manager = "ent/cluster_manager"
 use data_channel = "core/data_channel"
@@ -18,12 +18,12 @@ use watermarking = "ent/watermarking"
 
 actor Main is TestList
   new create(env: Env) =>
-    Connemara(env, this)
+    PonyTest(env, this)
 
   new make() =>
     None
 
-  fun tag tests(test: Connemara) =>
+  fun tag tests(test: PonyTest) =>
     broadcast.Main.make().tests(test)
     cluster_manager.Main.make().tests(test)
     data_channel.Main.make().tests(test)
