@@ -362,7 +362,6 @@ actor ReconnectingMetricsSink
             _notify_connecting()
           end
         elseif not _connected and _closed then
-          @printf[I32]("Reconnection asio event\n".cstring())
           if @pony_os_connected[Bool](fd) then
             // The connection was successful, make it ours.
             _fd = fd
@@ -824,8 +823,16 @@ actor ReconnectingMetricsSink
 
   fun ref _schedule_reconnect() =>
     if (_host != "") and (_service != "") and not _no_more_reconnect then
-      @printf[I32]("RE-Connecting MetricsSink to %s:%s\n".cstring(),
-                   _host.cstring(), _service.cstring())
+      // TODO: revist after metrics are optional
+      // For our initial release, we aren't telling people to run a metrics
+      // receiver in examples. This would result in a lot of noise in STDOUT.
+      // Until metrics are optional, see:
+      // https://github.com/WallarooLabs/wallaroo/issues/766
+      // we are turning of printing that we are reconnecting.
+      // Once metrics are optional, we can revisit this and decide when
+      // and how often we should print.
+      //@printf[I32]("RE-Connecting MetricsSink to %s:%s\n".cstring(),
+      //             _host.cstring(), _service.cstring())
       let timer = Timer(_PauseBeforeReconnect(this), _reconnect_pause)
       _timers(consume timer)
     end
@@ -974,8 +981,17 @@ class MetricsSinkNotify is _MetricsSinkNotify
     _metrics_conn.writev(metrics_join_msg)
 
   fun ref connect_failed(conn: MetricsSink ref) =>
-    @printf[I32]("%s connection failed\n".cstring(),
-      _name.cstring())
+    // TODO: revist after metrics are optional
+    // For our initial release, we aren't telling people to run a metrics
+    // receiver in examples. This would result in a lot of noise in STDOUT.
+    // Until metrics are optional, see:
+    // https://github.com/WallarooLabs/wallaroo/issues/766
+    // we are turning of printing that we failed to connect.
+    // Once metrics are optional, we can revisit this and decide when
+    // and how often we should print.
+    //@printf[I32]("%s connection failed\n".cstring(),
+    //  _name.cstring())
+    None
 
   fun ref closed(conn: MetricsSink ref) =>
     @printf[I32]("%s connection closed\n".cstring(),
