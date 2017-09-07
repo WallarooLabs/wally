@@ -323,14 +323,17 @@ class SinkExpect(StoppableThread):
 
 class SinkAwaitValue(StoppableThread):
     """
-    Stop the sink after receiving an expected value.
+    Stop the sink after receiving an expected value or values.
     """
     __base_name__ = 'SinkAwaitValue'
 
-    def __init__(self, sink, value, timeout=30):
+    def __init__(self, sink, values, timeout=30):
         super(SinkAwaitValue, self).__init__()
         self.sink = sink
-        self.value= value
+        if isinstance(values, (list, tuple)):
+            self.values = set(values)
+        else:
+            self.values = set((values, ))
         self.timeout = timeout
         self.name = self.__base_name__
         self.error = None
@@ -342,18 +345,24 @@ class SinkAwaitValue(StoppableThread):
             msgs = len(self.sink.data)
             if msgs and msgs > self.position:
                 while self.position < msgs:
-                    if self.sink.data[self.position] == self.value:
+                    for val in list(self.values):
+                        if self.sink.data[self.position] == val:
+                            self.values.discard(val)
+                            logging.debug("{} matched on value {}."
+                                          .format(self.name,
+                                                  val))
+                    if not self.values:
                         self.stop()
                         break
                     self.position += 1
             if time.time() - started > self.timeout:
                 self.error = TimeoutError('{}: has timed out after {} seconds'
                                           ', with {} messages. before '
-                                          'receiving the awaited value '
+                                          'receiving the awaited values '
                                           '{!r}.'.format(self.name,
                                                          self.timeout,
                                                          msgs,
-                                                         self.value))
+                                                         self.values))
                 self.stop()
                 break
             time.sleep(0.1)

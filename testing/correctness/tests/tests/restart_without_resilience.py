@@ -36,8 +36,11 @@ def _test_restart(command):
     workers = 2
     res_dir = '/tmp/res-data'
     expect = 200
-    last_value = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
-    await_value = struct.pack('>I', len(last_value)) + last_value
+    last_value_0 = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
+    last_value_1 = '[{}]'.format(','.join((str(expect-1-v) for v in range(6,-2,-2))))
+    await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
+                   struct.pack('>I', len(last_value_1)) + last_value_1)
+
 
     setup_resilience_path(res_dir)
 
@@ -96,7 +99,7 @@ def _test_restart(command):
                                'period')
 
         # Wait for the last sent value expected at the worker
-        stopper = SinkAwaitValue(sink, await_value, 30)
+        stopper = SinkAwaitValue(sink, await_values, 30)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -118,7 +121,6 @@ def _test_restart(command):
 
         # Validate worker actually underwent recovery
         pattern_restarting = "Restarting a listener ..."
-        pattern_output = "output: " + await_value
         stdout, stderr = runners[-1].get_output()
         try:
             assert(re.search(pattern_restarting, stdout) is not None)

@@ -48,9 +48,12 @@ def _test_log_rotation_external_trigger_no_recovery(command):
     workers = 2
     res_dir = '/tmp/res-data'
     expect = 2000
-    last_value = '[{}]'.format(','.join((str(expect-v)
+    last_value_0 = '[{}]'.format(','.join((str(expect-v)
                                          for v in range(6,-2,-2))))
-    await_value = struct.pack('>I', len(last_value)) + last_value
+    last_value_1 = '[{}]'.format(','.join((str(expect-1-v)
+                                         for v in range(6,-2,-2))))
+    await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
+                    struct.pack('>I', len(last_value_1)) + last_value_1)
 
     setup_resilience_path(res_dir)
 
@@ -119,7 +122,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, AWAIT_TIMEOUT)
+        stopper = SinkAwaitValue(sink, await_values, AWAIT_TIMEOUT)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -196,9 +199,12 @@ def _test_log_rotation_external_trigger_recovery(command):
     workers = 2
     res_dir = '/tmp/res-data'
     expect = 2000
-    last_value = '[{}]'.format(','.join((str(expect-v)
+    last_value_0 = '[{}]'.format(','.join((str(expect-v)
                                          for v in range(6,-2,-2))))
-    await_value = struct.pack('>I', len(last_value)) + last_value
+    last_value_1 = '[{}]'.format(','.join((str(expect-1-v)
+                                         for v in range(6,-2,-2))))
+    await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
+                    struct.pack('>I', len(last_value_1)) + last_value_1)
 
     setup_resilience_path(res_dir)
 
@@ -282,7 +288,7 @@ def _test_log_rotation_external_trigger_recovery(command):
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, AWAIT_TIMEOUT)
+        stopper = SinkAwaitValue(sink, await_values, AWAIT_TIMEOUT)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -373,8 +379,12 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
     res_dir = '/tmp/res-data'
     expect = 2000
     event_log_file_size = 50000
-    last_value = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
-    await_value = struct.pack('>I', len(last_value)) + last_value
+    last_value_0 = '[{}]'.format(','.join((str(expect-v)
+                                         for v in range(6,-2,-2))))
+    last_value_1 = '[{}]'.format(','.join((str(expect-1-v)
+                                         for v in range(6,-2,-2))))
+    await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
+                    struct.pack('>I', len(last_value_1)) + last_value_1)
 
     setup_resilience_path(res_dir)
 
@@ -433,7 +443,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, AWAIT_TIMEOUT)
+        stopper = SinkAwaitValue(sink, await_values, AWAIT_TIMEOUT)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -508,9 +518,12 @@ def _test_log_rotation_file_size_trigger_recovery(command):
     res_dir = '/tmp/res-data'
     expect = 2000
     event_log_file_size = 50000
-    last_value = '[{}]'.format(','.join((str(expect-v)
+    last_value_0 = '[{}]'.format(','.join((str(expect-v)
                                          for v in range(6,-2,-2))))
-    await_value = struct.pack('>I', len(last_value)) + last_value
+    last_value_1 = '[{}]'.format(','.join((str(expect-1-v)
+                                         for v in range(6,-2,-2))))
+    await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
+                    struct.pack('>I', len(last_value_1)) + last_value_1)
 
     setup_resilience_path(res_dir)
 
@@ -583,7 +596,7 @@ def _test_log_rotation_file_size_trigger_recovery(command):
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, AWAIT_TIMEOUT)
+        stopper = SinkAwaitValue(sink, await_values, AWAIT_TIMEOUT)
         stopper.start()
         stopper.join()
         if stopper.error:

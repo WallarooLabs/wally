@@ -18,6 +18,7 @@ import re
 import struct
 import time
 
+
 def test_recovery_pony():
     command = 'sequence_window_resilience'
     _test_recovery(command)
@@ -34,8 +35,12 @@ def _test_recovery(command):
     workers = 2
     res_dir = '/tmp/res-data'
     expect = 2000
-    last_value = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
-    await_value = struct.pack('>I', len(last_value)) + last_value
+    last_value_0 = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
+    last_value_1 = '[{}]'.format(','.join((str(expect-1-v) for v in range(6,-2,-2))))
+
+    await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
+                    struct.pack('>I', len(last_value_1)) + last_value_1)
+
 
     setup_resilience_path(res_dir)
 
@@ -95,7 +100,7 @@ def _test_recovery(command):
                                'period')
 
         # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_value, 30)
+        stopper = SinkAwaitValue(sink, await_values, 30)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -140,6 +145,7 @@ def _test_recovery(command):
                                  'recovery as expected. Worker output is '
                                  'included below.\nSTDOUT\n---\n%s\n---\n'
                                  'STDERR\n---\n%s' % (stdout, stderr))
+
     finally:
         for r in runners:
             r.stop()
