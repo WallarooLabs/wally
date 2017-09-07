@@ -4,6 +4,7 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 
 - [What is Wallaroo?](#what-is-wallaroo)
 - [Status](#status)
+- [Quickstart](#quickstart)
 - [Documentation](#documentation)
 - [Getting Help](#getting-help)
 - [How to Contribute](#how-to-contribute)
@@ -17,6 +18,10 @@ Wallaroo is a framework for writing event-by-event distributed data processing a
 ## Status
 
 "status here"
+
+## Quickstart
+
+Are you the sort who just wants to get going? Dive right into our [documentation](http://docs.wallaroolabs.com) then! It will get you up and running with Wallaroo.
 
 ## Documentation
 
