@@ -89,6 +89,12 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   fun ref producer_mapping(): (KafkaProducerMapping | None) =>
     _kafka_producer_mapping
 
+  be kafka_client_error(error_report: KafkaErrorReport) =>
+    @printf[I32](("ERROR: Kafka client encountered an unrecoverable error! " +
+      error_report.string() + "\n").cstring())
+
+    Fail()
+
   be receive_kafka_topics_partitions(new_topic_partitions: Map[String,
     (KafkaTopicType, Set[I32])] val)
   =>
@@ -272,7 +278,10 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
         let any: Any tag = data
         let ret = (_kafka_producer_mapping as KafkaProducerMapping ref)
           .send_topic_message(_topic, any, encoded_value, encoded_key)
+
+        // TODO: Proper error handling
         if ret isnt None then error end
+
         let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
         _pending_delivery_report(any) = (metric_name, my_metrics_id,
           my_latest_ts, worker_ingress_ts, pipeline_time_spent,

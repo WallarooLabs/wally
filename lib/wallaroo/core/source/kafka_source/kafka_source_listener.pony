@@ -172,6 +172,12 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     // create kafka client
     _kc = KafkaClient(_tcp_auth, _conf, this)
 
+  be kafka_client_error(error_report: KafkaErrorReport) =>
+    @printf[I32](("ERROR: Kafka client encountered an unrecoverable error! " +
+      error_report.string() + "\n").cstring())
+
+    Fail()
+
   be receive_kafka_topics_partitions(new_topic_partitions: Map[String,
     (KafkaTopicType, Set[I32])] val)
   =>
