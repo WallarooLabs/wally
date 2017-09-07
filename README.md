@@ -43,6 +43,48 @@ Be sure to check out our [contributors guide](CONTRIBUTING.md) before you get st
 
 ## About this Repo
 
+Wallaroo currently exists as a monorepo. All the source that makes Wallaroo go is in this repo. Let's take a quick walk through what you'll find in each top-level directory:
 
+- atkin
 
+Source for runner application that powers our still prototype Python "Actor" API.
 
+- book
+
+Markdown source used to build [http://docs.wallaroolabs.com](http://docs.wallaroolabs.com). [http://docs.wallaroolabs.com](http://docs.wallaroolabs.com) gets built from the latest commit to the `release` branch. There's also ["Wallaroo-Latest" documentation](https://www.gitbook.com/book/wallaroo-labs/wallaroo-latest/details). "Wallaroo-Latest" is built from master so it will be as up to date as possible. Be aware many of the external links in our documentation point to the `release` branch. "Wallaroo-Latest" is intended only for the most adventurous amongst us.
+
+- cpp_api
+
+Code for writing Wallaroo applications using C++. This is currently unsupported.
+
+- examples
+
+Wallaroo example applications in a variety of langugages. Currently only the Python API examples are supported.
+
+- giles
+
+TCP utlity applications that can stream data over TCP to Wallaroo applications and receive TCP streams from said applications. 
+
+- lib
+
+The Pony source code that makes up Wallaroo.
+
+- machida
+
+Python runner application. Machida embeds a Python interpreter inside a native Wallaroo binary and allows you to run applications using the Wallaroo Python API.
+
+- monitoring hub
+
+Source for the Wallaroo metrics UI.
+
+- orchestration
+
+Tools we use to spin up machines in AWS and other environments.
+
+- testing
+
+Tools we have written that are used to test Wallaroo.
+
+- utils
+
+End user utilities designed to make it easier to do various Wallaroo tasks like cleanly shut down a cluster.
