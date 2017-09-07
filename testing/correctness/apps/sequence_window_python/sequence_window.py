@@ -8,7 +8,6 @@ def application_setup(args):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    print "args = {}".format(args)
     sequence_partitions = [0, 1]
     ab = wallaroo.ApplicationBuilder("Sequence Window")
     ab.new_pipeline("Sequence Window",
@@ -55,20 +54,15 @@ class SequenceWindow(object):
 
 class Decoder(object):
     def header_length(self):
-        print "header_length"
         return 4
 
     def payload_length(self, bs):
-        print "payload_length"
-
         l = struct.unpack(">I", bs)[0]
         return l
 
     def decode(self, bs):
-        print "decode"
         # Expecting a 64-bit unsigned int in big endian
         value = struct.unpack(">Q", bs)[0]
-        print "decode: value:", value
         return value
 
 
@@ -105,14 +99,12 @@ class ObserveNewValue(object):
         return "Observe New Value"
 
     def compute(self, data, state):
-        print "Observe New Value"
         state.update(data)
         return (state.get_window(), True)
 
 
 class Encoder(object):
     def encode(self, data):
-        print "Encoder:encode: ", data
         # data is a list of integers
         s = '[{}]'.format(','.join(str(v) for v in data))
         return struct.pack('>L{}s'.format(len(s)), len(s), s)
