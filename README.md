@@ -1,25 +1,42 @@
 # Wallaroo
 
-Welcome to Wallaroo. 
+Wallaroo is a fast, scalable data processing engine that rapidly takes you from prototype to production by eliminating infrastructure complexity.
 
-Currently everything that we want version for the project is stored in this monorepo. Why a monorepo? At the moment, we are regularly making changes cut across multiple sub-projects. It makes sense to keep them all together in a single monorepo at this time.
+- [What is Wallaroo?](#what-is-wallaroo)
+- [Status](#status)
+- [Documentation](#documentation)
+- [Getting Help](#getting-help)
+- [How to Contribute](#how-to-contribute)
+- [Additional Links](#additional-links)
+- [About this Repo](#about-this-repo)
 
-## Naming
+## What is Wallaroo?
 
-All project names are pulled from characters from the TV show _Buffy the Vampire Slayer_. You don't have to have watched the show to work on the project, but you have to have watched in order to name anything. We jokingly take the naming seriously and try to name components after a character whose role on the show matches their role in this project.
+Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where accuracy of results is key. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post](https://blog.wallaroolabs.com/2017/03/hello-wallaroo/).
 
-## Important Document Highlights
+## Status
 
-The Wallaroo book source is available in the [book](book/) directory. Due to how GitBook works, a couple files for the book also exist in the top level of this repo: `Summary.md`, `intro.md`, and `cover.jpg`.
+"status here"
 
-Before commiting any code, be sure to read the [contributing](CONTRIBUTING.md) documentation.
+## Documentation
 
-For information about using LLDB to debug Pony programs, please see the [Pony LLDB Cheatsheet](https://www.ponylang.org/reference/pony-lldb-cheatsheet/).
+"community section of website"
+[http://docs.wallaroolabs.com](http://docs.wallaroolabs.com)
 
-Additional documentation, including developer onboarding is in the [doc](doc/) directory.
- 
-## Components
+## Getting Help
 
-* Wallaroo: Stream processing core
-* Dagon: Responsible for setting up all components and running tests
-* Giles: Part of our external verification system for Buffy
+"irc"/"mailing list"
+
+## How to Contribute
+
+We're an open source project and welcome contributions. Trying to figure out how to get started? Drop us a line on [IRC]() or the [mailing list]() and we can get you started.
+
+Be sure to check out our [contributors guide](CONTRIBUTING.md) before you get started.
+
+## Additional Links
+
+## About this Repo
+
+
+
+
