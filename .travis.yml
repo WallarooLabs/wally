@@ -38,10 +38,10 @@ before_install:
 
 install:
   # Based on how travis-ci works, when this is run, we are in the source
-  # directory for Buffy. This means, when we go to git clone and install
+  # directory for Wallaroo. This means, when we go to git clone and install
   # dependencies, we need to leave that directory and then return to it when
   # done.
-  # If we clone into the Buffy directory, our recursive Makefile will try to
+  # If we clone into the Wallaroo directory, our recursive Makefile will try to
   # build the cloned dependencies and fail
   # If we clone our dependencies into another directory using `cd` and don't
   # return to our starting directory, then our `script` step will fail because
