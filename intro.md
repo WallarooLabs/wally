@@ -47,7 +47,7 @@ How to develop Wallaroo applications using Python.
 
 ### Code Examples
 
-The [Wallaroo Examples](examples) section has examples for each of the languages currently supported by Wallaroo.
+The [Wallaroo Examples](https://github.com/WallarooLabs/wallaroo/tree/release/examples) section has examples for each of the languages currently supported by Wallaroo.
 
 ### Appendix
 
