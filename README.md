@@ -25,11 +25,12 @@ Wallaroo is a framework for writing event-by-event distributed data processing a
 
 ## Getting Help
 
-"irc"/"mailing list"
+- [Join us on Freenode in #wallaroo](https://webchat.oftc.net/?channels=wallaroo). 
+- [Join our mailing list](https://groups.io/g/wallaroo).
 
 ## How to Contribute
 
-We're an open source project and welcome contributions. Trying to figure out how to get started? Drop us a line on [IRC]() or the [mailing list]() and we can get you started.
+We're an open source project and welcome contributions. Trying to figure out how to get started? Drop us a line on [IRC](https://webchat.oftc.net/?channels=wallaroo) or the [mailing list](https://groups.io/g/wallaroo) and we can get you started.
 
 Be sure to check out our [contributors guide](CONTRIBUTING.md) before you get started.
 
