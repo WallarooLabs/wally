@@ -149,15 +149,6 @@ sudo make install
 sudo apt-get install -y python-dev
 ```
 
-## Installing Machida
-
-Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/machida
-make
-```
-
 ## Install Docker
 
 You'll need Docker (CE or EE) to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/engine/installation/linux/ubuntu/) for getting Docker up and running on Ubuntu on the [Docker website](https://docs.docker.com/engine/installation/linux/ubuntu/).
@@ -194,6 +185,16 @@ git checkout 0.0.1-rc15
 Note: You need to login to GitHub for credentials
 
 This will create a subdirectory called `wallaroo`.
+
+
+## Installing Machida
+
+Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/machida
+make
+```
 
 ## Conclusion
 
