@@ -192,6 +192,25 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 make
 ```
 
+## Install Giles Sender
+
+Giles Sender is used to supply data to Wallaroo applications over TCP.
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/sender
+make
+```
+
+## Install Giles Receiver
+
+Giles Receiver receives data from Wallaroo over TCP.
+
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/receiver
+make
+```
+
 ## Conclusion
 
 Awesome! All set. Time to try running your first application.
