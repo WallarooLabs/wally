@@ -37,9 +37,9 @@ machida --application-module word_count --in 127.0.0.1:7010 \
 In a third shell, send some messages:
 
 ```bash
-../../../../giles/sender/sender --host 127.0.0.1:7010 --file count_this.txt \
---batch-size 5 --interval 100_000_000 --messages 10000000 \
---ponythreads=1 --repeat
+../../../giles/sender/sender --host 127.0.0.1:7010 --file count_this.txt \
+  --batch-size 5 --interval 100_000_000 --messages 10000000 \
+  --ponythreads=1 --repeat
 ```
 
 And then... watch a streaming output of words and counts appear in the listener window.
@@ -47,5 +47,5 @@ And then... watch a streaming output of words and counts appear in the listener 
 Shut down cluster once finished processing:
 
 ```bash
-../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
