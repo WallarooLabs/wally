@@ -146,7 +146,7 @@ sudo make install
 ## Install Compression Development Libraries
 
 Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
- 
+
 ### Xenial Ubuntu:
 
 ```bash
@@ -182,7 +182,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Install the Metrics UI
 
 ```bash
-sudo docker pull sendence/wallaroo-metrics-ui:pre-0.0.1
+sudo docker pull sendence/wallaroo-metrics-ui:0.1
 ```
 
 ## Set up Environment for the Wallaroo Tutorial

@@ -96,7 +96,7 @@ You'll need Docker to run the Wallaroo metrics UI. There are [instructions](http
 ## Install the Metrics UI
 
 ```bash
-docker pull sendence/wallaroo-metrics-ui:pre-0.0.1
+docker pull sendence/wallaroo-metrics-ui:0.1
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
