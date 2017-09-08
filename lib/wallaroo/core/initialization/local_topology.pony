@@ -22,10 +22,6 @@ use "files"
 use "net"
 use "promises"
 use "serialise"
-use "wallaroo_labs/dag"
-use "wallaroo_labs/equality"
-use "wallaroo_labs/messages"
-use "wallaroo_labs/queue"
 use "wallaroo"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -35,13 +31,17 @@ use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/core/data_channel"
-use "wallaroo/core/fail"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/dag"
+use "wallaroo_labs/equality"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/mort"
+use "wallaroo_labs/queue"
 
 class val LocalTopology
   let _app_name: String
@@ -610,9 +610,15 @@ actor LocalTopologyInitializer is LayoutInitializer
           built_routers(default_target_state_step_id) = state_step_router
           state_map(t.default_state_name) = state_step_router
         | let proxy_target: ProxyAddress =>
-          let proxy_router = ProxyRouter(_worker_name,
-            _outgoing_boundaries(proxy_target.worker), proxy_target,
-            _auth)
+          let proxy_router =
+            try
+              ProxyRouter(_worker_name,
+                _outgoing_boundaries(proxy_target.worker), proxy_target, _auth)
+            else
+              @printf[I32]("Can't find outgoing boundary for %s\n".cstring(),
+                proxy_target.worker.cstring())
+              error
+            end
           built_routers(default_target_id) = proxy_router
         end
 
@@ -674,7 +680,14 @@ actor LocalTopologyInitializer is LayoutInitializer
         //       (connecting it to its out step, which has already been built)
         // If there are no cycles (I), this will terminate
         while frontier.size() > 0 do
-          let next_node = frontier.pop()
+          let next_node =
+            try
+              frontier.pop()
+            else
+              @printf[I32](("Graph frontier stack was empty when node was " +
+                "still expected\n").cstring())
+              error
+            end
 
           if built_routers.contains(next_node.id) then
             // We've already handled this node (probably because it's
@@ -718,7 +731,14 @@ actor LocalTopologyInitializer is LayoutInitializer
                   | let dsinit: StepBuilder =>
                     if (dsn != "") and (dsn == t.default_state_name) then
                       // We need a default router
-                      let default_state_router = state_map(dsn)
+                      let default_state_router =
+                        try
+                          state_map(dsn)
+                        else
+                          @printf[I32](("Default state router not found in " +
+                            "state_map\n").cstring())
+                          error
+                        end
 
                       let default_pre_state_id = dsinit.id()
                       let default_pre_state_step =
@@ -744,10 +764,15 @@ actor LocalTopologyInitializer is LayoutInitializer
                 ////
                 // Create the state partition if it doesn't exist
                 if builder.state_name() != "" then
-                  t.update_state_map(builder.state_name(), state_map,
-                    _metrics_conn, _event_log, _recovery_replayer, _auth,
-                    _outgoing_boundaries, _initializables,
-                    data_routes_ref, default_router)
+                  try
+                    t.update_state_map(builder.state_name(), state_map,
+                      _metrics_conn, _event_log, _recovery_replayer, _auth,
+                      _outgoing_boundaries, _initializables,
+                      data_routes_ref, default_router)
+                  else
+                    @printf[I32]("Failed to update state_map\n".cstring())
+                    error
+                  end
                 end
 
                 let partition_router =
@@ -796,11 +821,16 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // has only one output in the graph. We also know this is not
                 // a sink or proxy, so there is at most one output.
                 let out_id: (U128 | None) =
-                  match _get_output_node_id(next_node,
-                    default_target_id, default_target_state_step_id)
-                  | let id: U128 => id
+                  try
+                    match _get_output_node_id(next_node,
+                      default_target_id, default_target_state_step_id)
+                    | let id: U128 => id
+                    else
+                      None
+                    end
                   else
-                    None
+                    @printf[I32]("Failed to get output node id\n".cstring())
+                    error
                   end
 
                 let out_router =
@@ -939,8 +969,15 @@ actor LocalTopologyInitializer is LayoutInitializer
 
                 // Create a sink or OutgoingBoundary proxy. If the latter,
                 // egress_builder finds it from _outgoing_boundaries
-                let sink = egress_builder(_worker_name,
-                  consume sink_reporter, _auth, _outgoing_boundaries)
+                let sink =
+                  try
+                    egress_builder(_worker_name,
+                      consume sink_reporter, _auth, _outgoing_boundaries)
+                  else
+                    @printf[I32]("Failed to build sink from egress_builder\n"
+                      .cstring())
+                    error
+                  end
 
                 match sink
                 | let d: DisposableActor =>
@@ -1052,7 +1089,14 @@ actor LocalTopologyInitializer is LayoutInitializer
                 | let dsinit: StepBuilder =>
                   if (dsn != "") and (dsn == t.default_state_name) then
                     // We need a default router
-                    let default_state_router = state_map(dsn)
+                    let default_state_router =
+                      try
+                        state_map(dsn)
+                      else
+                        @printf[I32](("Failed to find default state router " +
+                          "in state_map\n").cstring())
+                        error
+                      end
 
                     let default_pre_state_id = dsinit.id()
                     let default_pre_state_step =
@@ -1076,10 +1120,15 @@ actor LocalTopologyInitializer is LayoutInitializer
               ////
               // Create the state partition if it doesn't exist
               if source_data.state_name() != "" then
-                t.update_state_map(source_data.state_name(), state_map,
-                  _metrics_conn, _event_log, _recovery_replayer, _auth,
-                  _outgoing_boundaries, _initializables,
-                  data_routes_ref, default_router)
+                try
+                  t.update_state_map(source_data.state_name(), state_map,
+                    _metrics_conn, _event_log, _recovery_replayer, _auth,
+                    _outgoing_boundaries, _initializables,
+                    data_routes_ref, default_router)
+                else
+                  @printf[I32]("Failed to update state map\n".cstring())
+                  error
+                end
               end
 
               let state_comp_target_router =
@@ -1107,8 +1156,14 @@ actor LocalTopologyInitializer is LayoutInitializer
                   // Currently there are no splits (II), so we know that a
                   // node has only one output in the graph. We also know this
                   // is not a sink or proxy, so there is exactly one output.
-                  let out_id: (U128 | None) = _get_output_node_id(next_node,
-                    default_target_id, default_target_state_step_id)
+                  let out_id: (U128 | None) =
+                    try
+                      _get_output_node_id(next_node,
+                        default_target_id, default_target_state_step_id)
+                    else
+                      @printf[I32]("Failed to get output node id\n".cstring())
+                      error
+                    end
 
                   match out_id
                   | let id: U128 => id
@@ -1203,10 +1258,15 @@ actor LocalTopologyInitializer is LayoutInitializer
               end
             else
               if psd.state_name() != "" then
-                t.update_state_map(psd.state_name(), state_map,
-                  _metrics_conn, _event_log, _recovery_replayer, _auth,
-                  _outgoing_boundaries, _initializables,
-                  data_routes_ref, None)
+                try
+                  t.update_state_map(psd.state_name(), state_map,
+                    _metrics_conn, _event_log, _recovery_replayer, _auth,
+                    _outgoing_boundaries, _initializables,
+                    data_routes_ref, None)
+                else
+                  @printf[I32]("Failed to update state map\n".cstring())
+                  error
+                end
               end
               let partition_router =
                 try
@@ -1217,7 +1277,14 @@ actor LocalTopologyInitializer is LayoutInitializer
                     "state partition.\n").cstring())
                   error
                 end
-              let target_router = built_routers(tid)
+              let target_router =
+                try
+                  built_routers(tid)
+                else
+                  @printf[I32](("Failed to find built router for " +
+                    "target_router\n").cstring())
+                  error
+                end
               match partition_router
               | let pr: PartitionRouter =>
                 _router_registry.set_partition_router(psd.state_name(), pr)
