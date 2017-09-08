@@ -143,6 +143,28 @@ make
 sudo make install
 ```
 
+## Install Compression Development Libraries
+
+Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
+ 
+### Xenial Ubuntu:
+
+```bash
+sudo apt-get install -y libsnappy-dev liblz4-dev
+```
+
+### Trusty Ubuntu:
+
+*Note:* some older versions of Ubuntu have an outdated `liblz4` package. For these you will need to install from source like this:
+
+```bash
+cd ~/
+wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
+tar zxvf liblz4-1.7.5.tar.gz
+cd lz4-1.7.5
+sudo make install
+```
+
 ## Install Python Development Libraries
 
 ```bash
