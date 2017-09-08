@@ -48,6 +48,7 @@ machida_clean:
 
 machida_build: $(MACHIDA_BUILD)/machida
 
+-include $(MACHIDA_PATH)/machida.d
 $(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a
 	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD))

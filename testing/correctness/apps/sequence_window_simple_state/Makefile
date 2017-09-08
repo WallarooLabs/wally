@@ -34,6 +34,7 @@ build-testing-correctness-apps-sequence_window_simple_state: build-testing-corre
 
 # This will build three different binaries of sequence_window, but respect PONYCFLAGS passed
 # to Make
+-include $(subst $(abs_buffy_dir)/,,$(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))).d
 $(subst $(abs_buffy_dir)/,,$(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))):
 	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace -D validate)

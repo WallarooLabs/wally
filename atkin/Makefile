@@ -45,6 +45,7 @@ atkin_clean:
 
 atkin_build: $(ATKIN_BUILD)/atkin
 
+-include $(ATKIN_PATH)/atkin.d
 $(ATKIN_BUILD)/atkin: $(ATKIN_BUILD)/libpython-wactor.a
 	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS) --output=$(ATKIN_BUILD) --path=$(ATKIN_BUILD))
