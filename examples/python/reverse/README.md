@@ -38,12 +38,12 @@ machida --application-module reverse --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
 In a third shell, send some messages:
 
 ```bash
-../../../../giles/sender/sender --host 127.0.0.1:7010 --file words.txt \
+../../../giles/sender/sender --host 127.0.0.1:7010 --file words.txt \
 --batch-size 5 --interval 100_000_000 --messages 150 --repeat \
 --ponythreads=1
 ```
 
 When processing has finished, shut down the cluster:
 ```bash
-../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```

@@ -75,6 +75,12 @@ make
 sudo make install
 ```
 
+## Install Compression Development Libraries
+
+```bash
+brew install snappy lz4
+```
+
 ## Install Python Development Libraries
 
 ```bash
