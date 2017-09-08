@@ -19,14 +19,14 @@ You should already have Docker installed if you have followed the `Setup` instru
 Once you have Docker setup, you can grab the Metrics UI image by running:
 
 ```
-docker pull sendence/wallaroo-metrics-ui:pre-0.0.1
+docker pull sendence/wallaroo-metrics-ui:0.1
 ```
 
 To start the Metrics UI you will run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  sendence/wallaroo-metrics-ui:pre-0.0.1
+  sendence/wallaroo-metrics-ui:0.1
 ```
 
 If you are running locally, open [http://localhost:4000](http://localhost:4000)
