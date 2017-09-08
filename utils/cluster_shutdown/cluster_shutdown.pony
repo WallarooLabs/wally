@@ -22,7 +22,7 @@ use "wallaroo_labs/messages"
 actor Main
   new create(env: Env) =>
     try
-      let split = env.args(0).split(":")
+      let split = env.args(1).split(":")
       let host = split(0)
       let service = split(1)
 
@@ -49,6 +49,6 @@ class Notifier is TCPConnectionNotify
     conn.dispose()
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    _env.err.print("Error: Unable to connect to " + _service + ":" + _host)
+    _env.err.print("Error: Unable to connect to " + _host + ":" + _service)
     _env.exitcode(1)
 
