@@ -171,4 +171,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
     conn.expect(_header_size)
 
+  fun ref closed(conn: TCPSource ref) =>
+    @printf[I32]("TCPSource connection closed\n".cstring())
+
   // TODO: implement connect_failed
