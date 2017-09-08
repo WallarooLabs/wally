@@ -81,15 +81,6 @@ sudo make install
 brew install python
 ```
 
-## Installing Machida
-
-Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/machida
-make
-```
-
 ## Install Docker
 
 You'll need Docker to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/docker-for-mac/) for getting Docker up and running on MacOS on the [Docker website](https://docs.docker.com/docker-for-mac/). Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/docker-for-mac/#general).
@@ -122,6 +113,33 @@ git checkout 0.0.1-rc15
 Note: You need to login to GitHub for credentials
 
 This will create a subdirectory called `wallaroo`.
+
+## Installing Machida
+
+Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/machida
+make
+```
+
+## Install Giles Sender
+
+Giles Sender is used to supply data to Wallaroo applications over TCP.
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/sender
+make
+```
+
+## Install Giles Receiver
+
+Giles Receiver receives data from Wallaroo over TCP.
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/receiver
+make
+```
 
 ## Conclusion
 

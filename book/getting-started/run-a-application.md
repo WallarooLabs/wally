@@ -46,18 +46,10 @@ docker start mui
 
 ## Terminal 2, Run Giles Receiver
 
-We need to set up a data receiver where we can send the output stream from our application. Change to the Giles receiver directory compile it:
+We'll use Giles Receiver to listen for data from our Wallaroo application.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-make
-```
-
-This will create a binary called `receiver`.
-
-You will now be able to start the `receiver` with the following command:
-
-```bash
 ./receiver -l 127.0.0.1:5555 --ponythreads=1
 ```
 
@@ -93,20 +85,12 @@ cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen
 
 This will create a `celsius.msg` file in your current working directory.
 
-### Sending Data
-
-Giles Sender is used to mimic the behavior of an incoming data source. It can be built like this:
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/giles/sender
-make
-```
-
-This will create a binary called `sender`
+### Sending Data with Giles Sender
 
 You will now be able to start the `sender` with the following command:
 
 ```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/sender
 ./sender -h 127.0.0.1:7000 -m 10000 -y -s 300 \
   -f ~/wallaroo-tutorial/wallaroo/examples/pony/celsius/data_gen/celsius.msg \
   -r -w -g 8 --ponythreads=1
