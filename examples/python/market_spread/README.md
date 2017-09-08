@@ -46,8 +46,8 @@ machida --application-module market_spread \
 Send some market data messages
 
 ```bash
-../../../../giles/sender/sender --host 127.0.0.1:7011 --file \
-  ../../../../testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg --batch-size 20 \
+../../../giles/sender/sender --host 127.0.0.1:7011 --file \
+  ../../../testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg --batch-size 20 \
   --interval 100_000_000 --messages 1000000 --binary --repeat --ponythreads=1 \
   --msg-size 46 --no-write
 ```
@@ -55,8 +55,8 @@ Send some market data messages
 and some orders messages
 
 ```bash
-../../../../giles/sender/sender --host 127.0.0.1:7010 --file \
-  ../../../../testing/data/market_spread/orders/350-symbols_orders-fixish.msg --batch-size 20 \
+../../../giles/sender/sender --host 127.0.0.1:7010 --file \
+  ../../../testing/data/market_spread/orders/350-symbols_orders-fixish.msg --batch-size 20 \
   --interval 100_000_000 --messages 1000000 --binary --repeat --ponythreads=1 \
   --msg-size 57 --no-write
 ```
@@ -64,5 +64,5 @@ and some orders messages
 shut down cluster once finished processing
 
 ```bash
-../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```

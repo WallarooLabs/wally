@@ -7,8 +7,11 @@ endif
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
+# uncomment to disable genrate of test target
+TEST_TARGET := false
+
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
-PONY_TARGET := false
+#PONY_TARGET := false
 
 # uncomment to disable generate exs related targets (build/test/clean) for elixir sources in this directory
 EXS_TARGET := false

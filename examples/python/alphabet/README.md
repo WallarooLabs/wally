@@ -38,7 +38,7 @@ machida --application-module alphabet --in 127.0.0.1:7010 \
 In a third shell, send some messages
 
 ```bash
-../../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
+../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
   --batch-size 50 --interval 10_000_000 --messages 1000000 --binary \
   --msg-size 9 --repeat --ponythreads=1
 ```
@@ -67,5 +67,5 @@ with open('alphabet.out', 'rb') as f:
 
 To shut down the cluster, you will need to use the `cluster_shutdown` tool.
 ```bash
-../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```

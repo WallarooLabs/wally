@@ -4,6 +4,10 @@ These instructions have been tested for Ubuntu Trusty and Xenial releases.
 
 There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
+## Memory requirements
+
+In order to compile all of the Wallaroo applications your system will need to have approximately 6GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
+
 ## Installing git
 
 If you do not already have Git installed, install it:
@@ -140,6 +144,26 @@ git clone https://github.com/ponylang/pony-stable
 cd pony-stable
 git checkout 0054b429a54818d187100ed40f5525ec7931b31b
 make
+sudo make install
+```
+
+## Install Compression Development Libraries
+
+### Xenial Ubuntu:
+
+```bash
+sudo apt-get install -y libsnappy-dev liblz4-dev
+```
+
+### Trusty Ubuntu:
+
+*Note:* some older versions of Ubuntu have an outdated `liblz4` package. For these you will need to install from source like this:
+
+```bash
+cd ~/
+wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
+tar zxvf liblz4-1.7.5.tar.gz
+cd lz4-1.7.5
 sudo make install
 ```
 

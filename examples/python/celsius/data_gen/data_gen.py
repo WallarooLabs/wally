@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 # Copyright 2017 The Wallaroo Authors.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,9 +13,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
-
-
-#!/usr/bin/env python2
 
 import random
 import struct
