@@ -707,20 +707,10 @@ actor DataChannel
 
   fun ref close() =>
     """
-    Attempt to perform a graceful shutdown. Don't accept new writes. If the
-    connection isn't muted then we won't finish closing until we get a zero
-    length read.  If the connection is muted, perform a hard close and
-    shut down immediately.
+    Shut our connection down immediately. Stop reading data from the incoming
+    source.
     """
-     ifdef windows then
-      _close()
-    else
-      if _muted then
-        _hard_close()
-      else
-       _close()
-     end
-    end
+    _hard_close()
 
   fun ref _close() =>
     _closed = true
