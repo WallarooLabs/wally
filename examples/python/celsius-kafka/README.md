@@ -28,7 +28,7 @@ docker start mui
 ./machida --application-module celsius \
   --kafka_source_topic test-in --kafka_source_brokers 127.0.0.1:9092 \
   --kafka_sink_topic test-out --kafka_sink_brokers 127.0.0.1:9092 \
-  --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10
+  --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:12500 --data 127.0.0.1:12501 \
   --cluster-initializer --ponythreads=1
 ```
