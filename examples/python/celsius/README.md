@@ -52,7 +52,7 @@ machida --application-module celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
 In a third shell, send some messages:
 
 ```bash
-../../../giles/sender/sender --host 127.0.0.1:7010 
+../../../giles/sender/sender --host 127.0.0.1:7010 \
   --file data_gen/celsius.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --repeat \
   --ponythreads=1 --binary --msg-size 8
