@@ -16,7 +16,7 @@ Additional notes regarding formatting:
 
 ## Bug report
 
-First of all please [search existing issues][https://github.com/wallaroolabs/wallaroo/issues] to make sure your issue hasn't already been reported. If you cannot find a suitable issue — [create a new one][https://github.com/WallarooLabs/wallaroo/issues/new].
+First of all please [search existing issues](https://github.com/wallaroolabs/wallaroo/issues) to make sure your issue hasn't already been reported. If you cannot find a suitable issue — [create a new one](https://github.com/WallarooLabs/wallaroo/issues/new).
 
 Provide the following details:
 
@@ -136,6 +136,3 @@ All Python sources should follow [PEP-8 formatting](https://www.python.org/dev/p
 ##  File naming
 
 Our Pony code follows the [Pony standard library file naming guidelines](https://github.com/ponylang/ponyc/blob/master/STYLE_GUIDE.md#naming).
-
-
-
