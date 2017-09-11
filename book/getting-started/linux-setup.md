@@ -4,6 +4,10 @@ These instructions have been tested for Ubuntu Trusty and Xenial releases.
 
 There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
+## Memory requirements
+
+In order to compile all of the Wallaroo applications your system will need to have approximately 6 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
+
 ## Installing git
 
 If you do not already have Git installed, install it:
