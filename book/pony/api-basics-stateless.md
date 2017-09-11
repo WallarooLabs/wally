@@ -107,8 +107,8 @@ our `Application` definition in context:
 
 ```pony
 use "wallaroo"
-use "wallaroo/tcp-source"
-use "wallaroo/topology"
+use "wallaroo/core/source/tcp-source"
+use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>

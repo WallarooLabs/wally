@@ -27,7 +27,7 @@ actor Main
     try
       var x_host: String = ""
       var x_service: String = "0"
-      var message: String = "DEFAULT MESSAGE"
+      var message: String = ""
       var message_type: String = "Print"
       let options = Options(env.args)
 
@@ -63,7 +63,7 @@ actor Main
       let msg =
         match message_type.lower()
         | "clean-shutdown" =>
-          ExternalMsgEncoder.clean_shutdown()
+          ExternalMsgEncoder.clean_shutdown(message)
         | "rotate-log" =>
           ExternalMsgEncoder.rotate_log(message)
         else // default to print
