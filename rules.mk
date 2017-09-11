@@ -127,6 +127,8 @@ $(eval \
   $(call lazy-init,docker_image_version_val,\
     $$(call docker_image_version_src)))
 
+DEBUG_SHELL ?= ## Debug shell commands?
+VERBOSE ?= ## Print commands as they're executed?
 docker_image_version ?= $(strip $(docker_image_version_val))## Docker Image Tag to use
 docker_image_repo_host ?= docker.sendence.com:5043## Docker Repository to use
 docker_image_repo ?= $(docker_image_repo_host)/sendence## Docker Repository to use
@@ -151,6 +153,42 @@ unix_timestamp := $(shell date +%s) # unix timestamp for docker network name
 demo_cluster_name ?= ## Name of demo cluster
 demo_cluster_spot_pricing ?= true## Whether to use spot pricing or not for demo cluster
 demo_to_run ?= dagon-identity## Name of demo dagon command to run
+autoscale ?= on## Build with Autoscale or not
+clustering ?= on## Build with Clustering or not
+resilience ?= off## Build with Resilience or not
+
+# validation of variable
+ifdef autoscale
+  ifeq (,$(filter $(autoscale),on off))
+    $(error Unknown autoscale option "$(autoscale)". Valid values are "on off".)
+  endif
+endif
+
+ifeq ($(autoscale),on)
+  autoscale_arg := -D autoscale
+endif
+
+# validation of variable
+ifdef clustering
+  ifeq (,$(filter $(clustering),on off))
+    $(error Unknown autoscale option "$(clustering)". Valid values are "on off".)
+  endif
+endif
+
+ifeq ($(clustering),on)
+  clustering_arg := -D clustering
+endif
+
+# validation of variable
+ifdef resilience
+  ifeq (,$(filter $(resilience),on off))
+    $(error Unknown autoscale option "$(resilience)". Valid values are "on off".)
+  endif
+endif
+
+ifeq ($(resilience),on)
+  resilience_arg := -D resilience
+endif
 
 # validation of variable
 ifdef dagon_in_docker
@@ -182,7 +220,7 @@ ifeq ($(shell uname -s),Linux)
   docker_user_arg := -u `id -u`
   extra_awk_arg := \\
   host_ip_src = $(shell ifconfig `route -n | grep '^0.0.0.0' | awk '{print $$8}'` | egrep -o 'inet addr:[^ ]+' | awk -F: '{print $$2}')
-  system_cpus := $(shell sudo cset set -l -r | grep '/system' | awk '{print $$2}')
+  system_cpus := $(shell which cset && sudo cset set -l -r | grep '/system' | awk '{print $$2}')
   ifneq (,$(system_cpus))
     docker_cpu_arg := --cpuset-cpus $(system_cpus)
   endif
@@ -248,10 +286,12 @@ define PONYC
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable fetch \
     $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
-    $(debug_arg) $(PONYCFLAGS) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
+    $(debug_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
+    $(PONYCFLAGS) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && echo "$@: $(abspath $(1))/bundle.json" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
-    $(debug_arg) $(PONYCFLAGS) . --pass import --files $(if $(filter \
+    $(debug_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
+    $(PONYCFLAGS) . --pass import --files $(if $(filter \
     $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_buffy_dir).*.pony" \
     | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \
     >> $(notdir $(abspath $(1:%/=%))).d
