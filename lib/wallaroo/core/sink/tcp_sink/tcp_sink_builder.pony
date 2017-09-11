@@ -21,9 +21,6 @@ use "wallaroo"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
-use "wallaroo/messages"
-use "wallaroo/metrics"
-use "wallaroo/sink"
 
 primitive TCPSinkConfigCLIParser
   fun apply(args: Array[String] val): Array[TCPSinkConfigOptions] val ? =>

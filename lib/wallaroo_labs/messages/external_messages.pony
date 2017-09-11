@@ -98,7 +98,9 @@ primitive ExternalMsgEncoder
   =>
     _encode(_RotateLog(), worker_name, wb)
 
-  fun clean_shutdown(msg: String, wb: Writer = Writer): Array[ByteSeq] val =>
+  fun clean_shutdown(msg: String = "", wb: Writer = Writer):
+    Array[ByteSeq] val
+  =>
     _encode(_CleanShutdown(), msg, wb)
 
 class BufferedExternalMsgEncoder

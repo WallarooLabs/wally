@@ -82,7 +82,16 @@ actor Startup
         ""
       end
     ifdef "resilience" then
-      @printf[I32]("****RESILIENCE is active****\n".cstring())
+      @printf[I32]("****RESILIENCE MODE is active****\n".cstring())
+      _print_link_to_community_license()
+    end
+    ifdef "clustering" then
+      @printf[I32]("****CLUSTERING MODE is active****\n".cstring())
+      _print_link_to_community_license()
+    end
+    ifdef "autoscale" then
+      @printf[I32]("****AUTOSCALE MODE is active****\n".cstring())
+      _print_link_to_community_license()
     end
     ifdef "trace" then
       @printf[I32]("****TRACE is active****\n".cstring())
@@ -621,3 +630,8 @@ actor Startup
     end
 
     ws
+
+  fun ref _print_link_to_community_license() =>
+    @printf[I32](("****This is an enterprise feature. See the community " +
+      "license at https://github.com/WallarooLabs/wallaroo/blob/master/" +
+      "LICENSE****\n").cstring())
