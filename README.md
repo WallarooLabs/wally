@@ -17,7 +17,16 @@ Wallaroo is a framework for writing event-by-event distributed data processing a
 
 ## Status
 
-"status here"
+languages we are going to support, features. 
+point to roadmap for more details.
+
+what languages are currently supported. 
+point to status of different features.
+
+testing. 
+billions of messages processed. 
+we look forward to working with you to help solve your problems.
+contact information.
 
 ## Quickstart
 
