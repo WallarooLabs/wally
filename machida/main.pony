@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "signals"
+use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 use "wallaroo"
 use "wallaroo/core/sink/tcp_sink"
@@ -38,11 +39,19 @@ actor Main
 
       let options = Options(WallarooConfig.application_args(env.args), false)
       options.add("application-module", "", StringArgument)
+      options.add("help", "h", None)
 
       for option in options do
         match option
+        | ("help", let arg: None) =>
+          MachidaStartupHelp()
+          return
         | ("application-module", let arg: String) => module_name = arg
         end
+      end
+
+      if module_name == "" then
+        FatalUserError("You must provide Machida with --application-module\n")
       end
 
       try
