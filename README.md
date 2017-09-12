@@ -119,6 +119,7 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 - [Hello Wallaroo!][hello wallaroo post]
 - [Documentation][documentation website]
 - [How did I get here? Building Confidence in a Distributed Stream Processor][how did i get here video]
+- [WallarooLabs Twitter][twitter]
 
 ## About this Repository
 
@@ -185,3 +186,4 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [pony examples]: pony/examples
 [wallaroo labs website]: https://www.wallaroolabs.com
 [how did i get here video]: https://www.youtube.com/watch?v=6MsPDtpe2tg
+[twitter]: https://www.twitter.com/wallaroolabs
