@@ -51,21 +51,22 @@ class StartupOptions
 
 primitive WallarooConfig
   fun application_args(args: Array[String] val): Array[String] val ? =>
-    (let z, let remaining) = _parse(args)
+    (let z, let remaining) = _parse(args where handle_help = false)
     remaining
 
   fun wallaroo_args(args: Array[String] val): StartupOptions ? =>
-    (let so, let z) = _parse(args)
+    (let so, let z) = _parse(args where handle_help = true)
     so
 
   fun wactor_args(args: Array[String] val): StartupOptions ? =>
     // The wactor system expects to get input addresses from this function,
     // Wallaroo expects applications to parse this information themselves.
-    (let so, let z) = _parse(args, true)
+    (let so, let z) = _parse(args where handle_help = true,
+      include_input_addrs = true)
     so
 
-  fun _parse(args: Array[String] val, include_input_addrs: Bool = false):
-    (StartupOptions, Array[String] val) ?
+  fun _parse(args: Array[String] val, handle_help: Bool,
+    include_input_addrs: Bool = false): (StartupOptions, Array[String] val) ?
   =>
     let so: StartupOptions ref = StartupOptions
 
@@ -101,7 +102,10 @@ primitive WallarooConfig
       .add("spike-drop", "", None)
       .add("spike-prob", "", F64Argument)
       .add("spike-margin", "", I64Argument)
-      .add("help", "h", None)
+
+    if handle_help then
+      options.add("help", "h", None)
+    end
 
     if include_input_addrs then
       options.add("in", "i", StringArgument)
