@@ -4,22 +4,16 @@
 
 This is an example of a stateless application that takes a floating point Celsius value and sends out a floating point Fahrenheit value.
 
-```
---> TCP --> [Decoder] --> [Multiply] --> [Add] --> [Encoder] --> TCP -->
-  Celsius                                                     Fahrenheit
-```
-
-You will need a working [Wallaroo Python API](/book/python/intro.md) in order to run it.
-
 ### Input and Output
 
-The inputs and outputs of the celsius application are binary 32-bits float encoded in the [source message framing protocol](/book/appendix/writing-your-own-feed.md#source-message-framing-protocol). Here's an example message, written as a Python string:
+The inputs and outputs of the "Celsius" application are binary 32-bits float encoded in the [source message framing protocol](/book/appendix/writing-your-own-feed.md#source-message-framing-protocol). Here's an example message, written as a Python string:
 
 ```
 "\x00\x00\x00\x04\x42\x48\x00\x00"
 ```
 
 `\x00\x00\x00\x04` -- four bytes representing the number of bytes in the payload
+
 `\x42\x48\x00\x00` -- four bytes representing the 32-bit float `50.0`
 
 ### Processing
@@ -31,29 +25,21 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 A data generator is bundled with the application:
 
 ```bash
-cd data_gen
+cd examples/python/celsius/data_gen
 python data_gen.py 1000000
 ```
 
 This will generate a million messages.
 
-Return to the `celsius` application directory for the [running](#running) instructions.
-
 ## Running Celsius
+
+In order to run the application you will need Machida, Giles Sender, and Giles Receiver.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius` directory.
 
 ### Shell 1
 
-Run the data generator to generate message data.
-
-Start up the Metrics UI if you don't already have it running:
-
-```bash
-docker start mui
-```
-
-Then, run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
+Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
 nc -l 127.0.0.1 7002 > celsius.out
@@ -90,7 +76,7 @@ Send messages:
 
 ## Reading the Output
 
-The output data will be in the file that `nc` is writing to in shell 1. You can read the output data with the following code stub:
+The output data will be in the file that `nc` is writing to in shell 1. You can read the output data with the following code:
 
 ```python
 import struct
@@ -104,7 +90,9 @@ with open('celsius.out', 'rb') as f:
             break
 ```
 
-## Shutting down cluster once finished processing
+## Shutting Down The Cluster
+
+You can shut down the cluster with this command once processing has finished:
 
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
