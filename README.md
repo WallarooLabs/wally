@@ -10,6 +10,7 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 - [How to Contribute][contribute section]
 - [Additional Links](#additional-links)
 - [About this Repository][about this repository section]
+
 ## What is Wallaroo?
 
 Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where accuracy of results is key. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
@@ -58,7 +59,6 @@ We have no "as a service" offering at this time.
 features. 
 point to roadmap for more details.
 
-
 ### Language bindings
 
 - Pony
@@ -87,8 +87,6 @@ JavaScript support is currently in the planning stages with no release date targ
 
 ### Other status
 
-
-
 testing. 
 billions of messages processed. 
 we look forward to working with you to help solve your problems.
@@ -107,6 +105,7 @@ Are you the sort who just wants to get going? Dive right into our [documentation
 
 - [Join us on Freenode in #wallaroo][IRC]. 
 - [Join our developer mailing list][developer mailing list].
+- [Commercial support](mailto:hello@wallaroolabs.com)
 
 ## How to Contribute
 
