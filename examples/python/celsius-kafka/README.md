@@ -21,7 +21,7 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 
 ## Running Celsius Kafka
 
-In order to run the application you will need Machida.
+In order to run the application you will need Machida. To build it, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will also need access to a Kafka cluster. This example assumes that there is a Kafka broker listening on port `9092` on `127.0.0.1`.
 

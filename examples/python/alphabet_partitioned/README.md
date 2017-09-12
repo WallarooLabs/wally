@@ -45,7 +45,7 @@ This will generate 1000 messages.
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, and Giles Reciever.
+In order to run the application you will need Machida, Giles Sender, and Giles Reciever. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
