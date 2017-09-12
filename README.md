@@ -132,12 +132,26 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 
 ## Additional Links
 
+- [Hello Wallaroo!][hello wallaroo post]
+
+An introduction to Wallaroo.
+
+- [What's the "Secret Sauce"][secret sauce post]
+
+A look inside Wallaroo's excellent performance
+
 - [Wallaroo Labs][wallaroo labs website]
+
+The company behind Wallaroo.
+
 - [Documentation][documentation website]
 
-- [Hello Wallaroo!][hello wallaroo post]
+Wallaroo documentation.
+
 - QCon NY 2016: [How did I get here? Building Confidence in a Distributed Stream Processor][qcon16 how did i get here]
 - CodeMesh 2016:[How did I get here? Building Confidence in a Distributed Stream Processor][codemesh16 how did i get here]
+
+Our VP of Engineering Sean T. Allen talks about one of the techniques we use to test Wallaroo.
 
 - [WallarooLabs Twitter][twitter]
 
@@ -209,3 +223,4 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
 [twitter]: https://www.twitter.com/wallaroolabs
+[secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
