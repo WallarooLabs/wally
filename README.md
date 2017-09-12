@@ -8,7 +8,7 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 - [Documentation][documentation section]
 - [Getting Help][getting help section]
 - [How to Contribute][contribute section]
-- [Additional Links](#additional-links)
+- [Additional Links][additional links]
 - [About this Repository][about this repository section]
 
 ## What is Wallaroo?
@@ -84,13 +84,6 @@ We are currently working with a client who is very interested in writing Wallaro
 - JavaScript 
 
 JavaScript support is currently in the planning stages with no release date targeted. 
-
-### Other status
-
-testing. 
-billions of messages processed. 
-we look forward to working with you to help solve your problems.
-contact information.
 
 ## Getting Started
 
@@ -175,6 +168,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [documentation section]: #documentation
 [getting help section]: #getting-help
 [contribute section]: #how-to-contribute
+[additional links]: #additional-links
 [about this repository section]: #about-this-repository 
 
 [hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
