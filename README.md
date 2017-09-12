@@ -115,6 +115,11 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 
 ## Additional Links
 
+- [Wallaroo Labs][wallaroo labs website]
+- [Hello Wallaroo!][hello wallaroo post]
+- [Documentation][documentation website]
+- [How did I get here? Building Confidence in a Distributed Stream Processor][how did i get here video]
+
 ## About this Repository
 
 Wallaroo currently exists as a monorepo. All the source that makes Wallaroo go is in this repo. Let's take a quick walk through what you'll find in each top-level directory:
@@ -178,3 +183,5 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [developer mailing list]: https://groups.io/g/wallaroo
 [contributors guide]: CONTRIBUTING.md
 [pony examples]: pony/examples
+[wallaroo labs website]: https://www.wallaroolabs.com
+[how did i get here video]: https://www.youtube.com/watch?v=6MsPDtpe2tg
