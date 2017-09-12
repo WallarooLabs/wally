@@ -18,9 +18,21 @@ Wallaroo is a framework for writing event-by-event distributed data processing a
 ### Features
 
 - State Management
+
+point to feature description
+
 - Scale running stateful applications with zero downtime
+
+point to feature description
+
 - Resilience in the face of failures
+
+point to feature description
+
 - Exactly-once message processing
+
+point to feature description
+
 
 ### Language Bindings
 
@@ -55,8 +67,21 @@ We have no "as a service" offering at this time.
 
 ### Features
 
-features. 
-point to roadmap for more details.
+- State Management
+
+point to feature status link
+
+- Scale running stateful applications with zero downtime
+
+point to feature status links
+
+- Resilience in the face of failures
+
+point to feature status link
+
+- Exactly-once message processing
+
+point to feature status link
 
 ### Language bindings
 
