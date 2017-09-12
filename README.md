@@ -30,7 +30,6 @@ Existing language bindings:
 - C++
 - Pony
 
-
 Planned Language bindings:
 
 - Python 3
@@ -109,9 +108,12 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 ## Additional Links
 
 - [Wallaroo Labs][wallaroo labs website]
-- [Hello Wallaroo!][hello wallaroo post]
 - [Documentation][documentation website]
-- [How did I get here? Building Confidence in a Distributed Stream Processor][how did i get here video]
+
+- [Hello Wallaroo!][hello wallaroo post]
+- QCon NY 2016: [How did I get here? Building Confidence in a Distributed Stream Processor][qcon16 how did i get here]
+- CodeMesh 2016:[How did I get here? Building Confidence in a Distributed Stream Processor][codemesh16 how did i get here]
+
 - [WallarooLabs Twitter][twitter]
 
 ## About this Repository
@@ -179,5 +181,6 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [contributors guide]: CONTRIBUTING.md
 [pony examples]: pony/examples
 [wallaroo labs website]: https://www.wallaroolabs.com
-[how did i get here video]: https://www.youtube.com/watch?v=6MsPDtpe2tg
+[qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
+[codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
 [twitter]: https://www.twitter.com/wallaroolabs
