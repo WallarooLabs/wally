@@ -13,7 +13,7 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 
 ## What is Wallaroo?
 
-Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where accuracy of results is key. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
+Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is essential. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
 
 ### Features
 
@@ -41,13 +41,13 @@ Please see [status][status section] for language binding support details. Wallar
 ### Supported platforms
 
 - Linux
-- macOs
+- MacOS
 
 Wallaroo is open source software with an expanding software community. Please see the [How to Contribute][contribute section] section if you wish to help support your favorite operating system.
 
 ### Deployment model
 
-Wallaroo applications are user hosted. It's equally at home "in the cloud" or "on premises".
+Wallaroo applications are user hosted. It's equally at home "in the cloud" or "on premises."
 
 We have no "as a service" offering at this time. 
 
@@ -69,11 +69,11 @@ We are planning on adding Python 3 support when there is enough demand. If you a
 
 - C++
 
-C++ was our first API non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future in order to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. If you are interested in using Wallaroo with C++, you should contact us. We're happy to work with you.
+C++ was our first API non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. If you are interested in using Wallaroo with C++, you should contact us. We're happy to work with you.
 
 - Go
 
-We are currently working with a client who is very interested in writing Wallaroo applications in Go. We plan to introduce Go support by the end of 2017. 
+We are currently working with a client who is very interested in writing Wallaroo applications in Go. We plan to introduce Go language bindings by the end of 2017. 
 
 - JavaScript 
 
@@ -95,7 +95,7 @@ Are you the sort who just wants to get going? Dive right into our [documentation
 
 ## How to Contribute
 
-We're an open source project and welcome contributions. Trying to figure out how to get started? Drop us a line on [IRC][IRC] or the [developer mailing list][developer mailing list] and we can get you started.
+We're an open source project and welcome contributions. Trying to figure out how to get started? Drop us a line on [IRC][IRC] or the [developer mailing list][developer mailing list], and we can get you started.
 
 Be sure to check out our [contributors guide][contributors guide] before you get started.
 
@@ -126,7 +126,7 @@ Our VP of Engineering Sean T. Allen talks about one of the techniques we use to 
 
 ## About this Repository
 
-Wallaroo currently exists as a monorepo. All the source that makes Wallaroo go is in this repo. Let's take a quick walk through what you'll find in each top-level directory:
+Wallaroo currently exists as a mono-repo. All the source that makes Wallaroo go is in this repo. Let's take a quick walk through what you'll find in each top-level directory:
 
 - atkin
 
@@ -142,11 +142,11 @@ Code for writing Wallaroo applications using C++. This is currently unsupported.
 
 - examples
 
-Wallaroo example applications in a variety of languages. Currently only the Python API examples are supported. See [status section][status section] for details.
+Wallaroo example applications in a variety of languages. Currently, only the Python API examples are supported. See [status section][status section] for details.
 
 - giles
 
-TCP utlity applications that can stream data over TCP to Wallaroo applications and receive TCP streams from said applications. 
+TCP utility applications that can stream data over TCP to Wallaroo applications and receive TCP streams from said applications. 
 
 - lib
 
