@@ -69,7 +69,7 @@ We are planning on adding Python 3 support when there is enough demand. If you a
 
 - C++
 
-C++ was our first API non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. If you are interested in using Wallaroo with C++, you should contact us. We're happy to work with you.
+C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. If you are interested in using Wallaroo with C++, you should contact us. We're happy to work with you.
 
 - Go
 
