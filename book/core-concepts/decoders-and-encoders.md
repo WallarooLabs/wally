@@ -75,7 +75,7 @@ class Decoder(object):
 
 `decode` takes a series of bytes that represent your payload and turns it into an application message. In this case, our application message is a string, so we take the incoming byte stream `bs` and convert it to UTF-8 Python string.
 
-Here's a slightly more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/alphabet). 
+Here's a slightly more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.0-rc2/examples/python/alphabet). 
 
 ```python
 class Decoder(object):
@@ -128,9 +128,9 @@ class Encoder(object):
         return data + "\n"
 ```
 
-This is just about the simplest encoder you could have. It's from the [Reverse Word example](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/reverse). It takes a string that we want to send to an external system as an input, adds a newline at the end and returns it for sending. 
+This is just about the simplest encoder you could have. It's from the [Reverse Word example](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.0-rc2/examples/python/reverse). It takes a string that we want to send to an external system as an input, adds a newline at the end and returns it for sending. 
 
-Here's a more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/alphabet):
+Here's a more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.0-rc2/examples/python/alphabet):
 
 ```
 class Votes(object):
