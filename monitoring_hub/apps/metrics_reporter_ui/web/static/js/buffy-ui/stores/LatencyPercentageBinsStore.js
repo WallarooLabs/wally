@@ -12,7 +12,8 @@ class LatencyPercentageBinsStore extends ReduceStore {
 	getInitialState() {
 		let state = Map().set("start-to-end", Map())
 						 .set("computation", Map())
-						 .set("node-ingress-egress", Map());
+						 .set("node-ingress-egress", Map())
+						 .set("pipeline", Map());
 		return state;
 	}
 	getLatencyPercentageBins(category, metricsKey) {
@@ -40,6 +41,22 @@ class LatencyPercentageBinsStore extends ReduceStore {
 				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
 			case Actions.RECEIVE_SOURCE_SINK_LATENCY_PERCENTAGE_BINS.actionType:
 				category = "start-to-end";
+				metricsKey = action["latency-percentage-bins"].pipeline_key;
+				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
+			case Actions.RECEIVE_STEP_BY_WORKER_LATENCY_PERCENTAGE_BINS.actionType:
+				category = "computation-by-worker";
+				metricsKey = action["latency-percentage-bins"].pipeline_key;
+				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
+			case Actions.RECEIVE_INGRESS_EGRESS_BY_PIPELINE_LATENCY_PERCENTAGE_BINS.actionType:
+				category = "node-ingress-egress-by-pipeline";
+				metricsKey = action["latency-percentage-bins"].pipeline_key;
+				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
+			case Actions.RECEIVE_SOURCE_SINK_BY_WORKER_LATENCY_PERCENTAGE_BINS.actionType:
+				category = "start-to-end-by-worker";
+				metricsKey = action["latency-percentage-bins"].pipeline_key;
+				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
+			case Actions.RECEIVE_PIPELINE_LATENCY_PERCENTAGE_BINS.actionType:
+				category = "pipeline";
 				metricsKey = action["latency-percentage-bins"].pipeline_key;
 				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
 			default:

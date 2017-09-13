@@ -4,6 +4,8 @@
 .deps/
 .cache/
 .cache/*
+__pycache__/
+__pycache__/*
 .DS_Store
 *.bc
 *.ll

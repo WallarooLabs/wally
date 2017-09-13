@@ -7,18 +7,21 @@ There's a couple Wallaroo support applications that you'll be interacting with f
 - Our Metrics UI that allows you to monitor the performance and health of your applications.
 - Giles receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
+- Machida, our program for running Wallaroo Python applications.
 
-You're going to setup our "Celsius to Fahrenheit" example. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
+You're going to setup our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
+
+The Metrics UI process will be run in the background via Docker.  The other three processes (receiver, sender, and Wallaroo) will run in the foreground.  We recommend that you run each process in a separate terminal.
 
 Let's get started!
 
-## Start the Metrics UI
+## Terminal 1, Start the Metrics UI
 
 To start the Metrics UI run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  sendence/wallaroo-metrics-ui:pre-0.0.1
+  sendence/wallaroo-metrics-ui:0.1
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -41,89 +44,55 @@ If you need to start the UI after stopping it, run:
 docker start mui
 ```
 
-## Run Giles Receiver
+## Terminal 2, Run Giles Receiver
 
-We need to set up a data receiver where we can send the output stream from our application:
+We'll use Giles Receiver to listen for data from our Wallaroo application.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-stable env ponyc
-```
-
-This will create a binary called `receiver`
-
-You will now be able to start the `receiver` with the following command:
-
-```bash
 ./receiver -l 127.0.0.1:5555 --ponythreads=1
 ```
 
 You should see the `Listening for data` that indicates that Giles receiver is running.
 
-## Compile the Celsius Conversion App
+## Terminal 3, Run the "Celsius to Fahrenheit" Application
 
-We'll be running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/celsius/celsius.pony).
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius
-```
-
-Now compile the Celsius Conversion app:
+First, we will need to set up the `PYTHONPATH` environment variable. Machida needs to be able to find the `wallaroo` Python module, which is in a file called `wallaroo.py` in the `machida` directory. It also needs to be able to find the module that defines the application. In order to do that, set and export the `PYTHONPATH` environment variable like this:
 
 ```bash
-stable env ponyc
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo/machida:$HOME/wallaroo-tutorial/wallaroo/examples/python/celsius"
 ```
 
-This will create a binary called `celsius`.
-
-## Run the Celsius Conversion App
-
-Now that we have our Celsius Conversion application compiled, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command from our original terminal:
+Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
 
 ```bash
-./celsius -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
--c 127.0.0.1:6000 -d 127.0.0.1:6001 --ponythreads=1
+./build/machida --application-module celsius --in 127.0.0.1:7000 \
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --ponythreads=1
 ```
 
-This tells Wallaroo that it should listen on port 7000 for incoming data, write outgoing data to port 5555, and send metrics data to port 5001.
+This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
 
-## Let's Get Some Data: Running Giles Sender
+## Terminal 4
 
-### Generating Some Data
+### Generating Data
 
-A data generator is bundled with the application. It needs to be built:
+A data generator is bundled with the application. Use these commands to generate data:
 
 ```bash
-cd data_gen
-ponyc
-```
-
-Then you can generate a file with a fixed number of psuedo-random votes:
-
-```
-./data_gen --messages 10000
+cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen
+./data_gen 10000
 ```
 
 This will create a `celsius.msg` file in your current working directory.
 
-### Sending Data
-
-Giles Sender is used to mimic the behavior of an incoming data source.
-
-Open a new terminal and run the following to compile the sender:
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/giles/sender
-stable env ponyc
-```
-
-This will create a binary called `sender`
+### Sending Data with Giles Sender
 
 You will now be able to start the `sender` with the following command:
 
 ```bash
-./sender -h 127.0.0.1:7000 -m 100000 -y -s 300 \
-  -f ~/wallaroo-tutorial/wallaroo/book/examples/celsius/data_gen/celsius.msg \
+cd ~/wallaroo-tutorial/wallaroo/giles/sender
+./sender -h 127.0.0.1:7000 -m 10000 -y -s 300 \
+  -f ~/wallaroo-tutorial/wallaroo/examples/pony/celsius/data_gen/celsius.msg \
   -r -w -g 8 --ponythreads=1
 ```
 
@@ -133,13 +102,13 @@ If the sender is working correctly, you should see `Connected` printed to the sc
 
 ### First Look
 
-Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000) the landing page should show you that the Celsius Conversion application has successfully connected.
+Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000) the landing page should show you that the "Celsius to Fahrenheit" application has successfully connected.
 
 ![Landing Page](/book/metrics/images/landing-page.png)
 
-If your landing page resembles the one above, the Celsius Conversion application has successfully connected to the Metrics UI.
+If your landing page resembles the one above, the "Celsius to Fahrenheit" application has successfully connected to the Metrics UI.
 
-Now, let's have a look at some metrics. By clicking on the Celsius Conversion App link, you'll be taken to the Application Dashboard page. On this page you should see metric stats for the following:
+Now, let's have a look at some metrics. By clicking on the "Celsius to Fahrenheit" link, you'll be taken to the "Application Dashboard" page. On this page you should see metric stats for the following:
 
 - a single pipeline: `Celsius Conversion`
 - a single worker: `Initializer`

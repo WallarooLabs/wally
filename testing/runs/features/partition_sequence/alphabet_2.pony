@@ -1,12 +1,33 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
 use "buffered"
 use "collections"
 use "serialise"
-use "sendence/bytes"
-use "wallaroo/"
-use "wallaroo/fail"
-use "wallaroo/state"
-use "wallaroo/tcp_source"
-use "wallaroo/topology"
+use "wallaroo_labs/bytes"
+use "wallaroo"
+use "wallaroo/core/common"
+use "wallaroo/core/fail"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>
@@ -22,7 +43,8 @@ actor Main
       let application = recover val
         Application("Alphabet Popularity Contest")
           .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes",
-            VotesDecoder)
+            TCPSourceConfig[Votes val].from_options(VotesDecoder,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to_state_partition[Votes val, String, LetterTotal val,
               LetterState](AddVotes, LetterStateBuilder, "letter-state",
               letter_partition where multi_worker = true)
@@ -38,9 +60,11 @@ actor Main
             .to_state_partition[LetterTotal val, String, LetterTotal val,
               LetterState](AddVotes2, LetterStateBuilder, "letter-state-5",
               letter_partition2 where multi_worker = true)
-            .to_sink(LetterTotalEncoder, recover [0] end)
+            .to_sink(TCPSinkConfig[LetterTotal val].from_options(LetterTotalEncoder,
+              TCPSinkConfigCLIParser(env.args)(0)))
           .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes X",
-            VotesDecoder)
+            TCPSourceConfig[Votes val].from_options(VotesDecoder,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to[Votes val](VotesIdentityBuilder)
             .to_state_partition[Votes val, String, LetterTotal val,
               LetterState](AddVotes, LetterStateBuilder, "letter-state-x",
@@ -48,7 +72,8 @@ actor Main
             .to_state_partition[LetterTotal val, String, LetterTotal val,
               LetterState](AddVotes2, LetterStateBuilder, "letter-state-y",
               letter_partition2 where multi_worker = true)
-            .to_sink(LetterTotalEncoder, recover [0] end)
+            .to_sink(TCPSinkConfig[LetterTotal val].from_options(LetterTotalEncoder,
+              TCPSinkConfigCLIParser(env.args)(0)))
       end
       Startup(env, application, "alphabet-contest")
     else
@@ -125,10 +150,10 @@ primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
     (LetterTotal(votes.letter, state.count + votes.count), state_change)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[LetterState] val] val
+    Array[StateChangeBuilder[LetterState]] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[LetterState] val]
+      let scbs = Array[StateChangeBuilder[LetterState]]
       scbs.push(recover val AddVotesStateChangeBuilder end)
     end
 
@@ -152,10 +177,10 @@ primitive AddVotes2 is StateComputation[LetterTotal val, LetterTotal val,
     (LetterTotal(lt.letter, state.count + lt.count), state_change)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[LetterState] val] val
+    Array[StateChangeBuilder[LetterState]] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[LetterState] val]
+      let scbs = Array[StateChangeBuilder[LetterState]]
       scbs.push(recover val AddVotesStateChangeBuilder end)
     end
 

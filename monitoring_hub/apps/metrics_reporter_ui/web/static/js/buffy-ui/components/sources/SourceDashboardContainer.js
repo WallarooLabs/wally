@@ -3,6 +3,7 @@ import ThroughputsStore from "../../stores/ThroughputsStore"
 import ThroughputStatsStore from "../../stores/ThroughputStatsStore"
 import LatencyPercentileBinStatsStore from "../../stores/LatencyPercentileBinStatsStore"
 import LatencyPercentageBinsStore from "../../stores/LatencyPercentageBinsStore"
+import AppConfigStore from "../../stores/AppConfigStore"
 import SourceDashboard from "./SourceDashboard"
 import { is } from "immutable"
 import shallowCompare from "react-addons-shallow-compare"
@@ -96,9 +97,11 @@ export default class SourceDashboardContainer extends React.Component {
 	render() {
 		const { throughputs, throughputStats, latencyPercentageBins, latencyPercentileBinStats } = this.state;
 		const { appName, sourceName, sourceType } = this.props.params;
+		const appConfig = AppConfigStore.getAppConfig(appName);
 		return(
 			<SourceDashboard
 				appName={appName}
+				appConfig={appConfig}
 				sourceName={sourceName}
 				sourceType={sourceType}
 				throughputs={throughputs}

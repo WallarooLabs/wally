@@ -1,14 +1,33 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
 """
 Giles receiver
 """
 use "collections"
 use "files"
 use "net"
-use "sendence/options"
+use "wallaroo_labs/options"
 use "signals"
 use "time"
-use "sendence/messages"
-use "sendence/bytes"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/time"
 use "debug"
 
 // tests
@@ -180,7 +199,7 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     else
       if not _no_write then
-        _store.received(consume data, Time.wall_to_nanos(Time.now()))
+        _store.received(consume data, WallClock.nanoseconds())
       end
       _coordinator.received_message()
       conn.expect(4)
@@ -224,7 +243,7 @@ class ToDagonNotify is TCPConnectionNotify
       try
         let decoded = ExternalMsgDecoder(consume data)
         match decoded
-        | let d: ExternalShutdownMsg val =>
+        | let d: ExternalShutdownMsg =>
           _coordinator.finished()
         else
           @printf[I32]("Unexpected data from Dagon\n".cstring())

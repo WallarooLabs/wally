@@ -1,26 +1,44 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
 """
 One Stream Market App
 
 Setting up a market spread run (in order):
 1) reports sink (if not using Monitoring Hub):
-sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponypinasio --ponynoblock -w -l 0.0.0.0:5555
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ../../../../giles/receiver/receiver --ponythreads=1 --ponypinasio --ponynoblock -w -l 0.0.0.0:5555
 
 2) metrics sink (if not using Monitoring Hub):
-sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponypinasio --ponynoblock -w -l 0.0.0.0:5001
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ../../../../giles/receiver/receiver --ponythreads=1 --ponypinasio --ponynoblock -w -l 0.0.0.0:5001
 
 350 Symbols
 
 3a) one stream market app (1 worker):
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ~/buffy/apps/one-stream-market/one-stream-market -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./one-stream-market -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t --ponythreads=4 --ponynoblock
 
 3b) one stream market app (multi-machine):
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ~/buffy/apps/one-stream-market/one-stream-market -i 0.0.0.0:7000 -o 127.0.0.1:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -t -w 4
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./one-stream-market -i 0.0.0.0:7000 -o 127.0.0.1:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -t -w 4
 
 For each follower:
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ~/buffy/apps/one-stream-market/one-stream-market -i 0.0.0.0:7000 -o 127.0.0.1:5555 -m <METRICS>:5001 -c <INITIALIZER>:12500 -d <INITIALIZER>:12501 --ponythreads 4 --ponypinasio --ponynoblock -n <NAME> -w 4
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./one-stream-market -i 0.0.0.0:7000 -o 127.0.0.1:5555 -m <METRICS>:5001 -c <INITIALIZER>:12500 --ponythreads 4 --ponypinasio --ponynoblock -n <NAME>
 
 4) nbbo:
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -h 127.0.0.1:7000 -m 10000000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ../../../../giles/sender/sender -h 127.0.0.1:7000 -m 10000000000 -s 300 -i 2_500_000 -f ../../../data/market_spread/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
 """
 use "assert"
 use "buffered"
@@ -28,24 +46,27 @@ use "collections"
 use "net"
 use "serialise"
 use "time"
-use "sendence/bytes"
-use "sendence/fix"
-use "sendence/hub"
-use "sendence/new_fix"
-use "sendence/options"
-use "sendence/wall_clock"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/conversions"
+use "wallaroo_labs/fix"
+use "wallaroo_labs/hub"
+use "wallaroo_labs/new_fix"
+use "wallaroo_labs/options"
+use "wallaroo_labs/time"
 use "wallaroo"
-use "wallaroo/fail"
-use "wallaroo/metrics"
-use "wallaroo/state"
-use "wallaroo/tcp_source"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/metrics"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>
     try
       var initial_nbbo_file_path =
-        "../../demos/marketspread/initial-nbbo-fixish.msg"
+        "../../../data/market_spread/350-symbols_initial-nbbo-fixish.msg"
       var symbols_file_path: (String | None) = None
       let options = Options(env.args, false)
 
@@ -71,10 +92,7 @@ actor Main
               env.root as AmbientAuth))
         end
 
-      let init_file = InitFile(initial_nbbo_file_path, 46)
-
-      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn =
-        recover Array[Array[ByteSeq] val] end
+      let initial_report_msgs_trn = recover trn Array[Array[ByteSeq] val] end
       let connect_msg = HubProtocol.connect()
       let join_msg = HubProtocol.join("reports:market-spread")
       initial_report_msgs_trn.push(connect_msg)
@@ -85,13 +103,16 @@ actor Main
       let application = recover val
         Application("One Steam NBBO Updater App")
           .new_pipeline[FixNbboMessage val, NbboResult val](
-            "Nbbo", FixNbboFrameHandler)
+            "Nbbo",
+            TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to_state_partition[Symboly val, String,
               (NbboResult val | None), SymbolData](ProcessNbbo,
                 SymbolDataBuilder, "symbol-data",
                 symbol_data_partition where multi_worker = true)
-            .to_sink(NbboResultEncoder, recover [0] end,
-              initial_report_msgs)
+            .to_sink(TCPSinkConfig[NbboResult val].from_options(NbboResultEncoder,
+              TCPSinkConfigCLIParser(env.args)(0),
+              initial_report_msgs))
       end
       Startup(env, application, "market-spread")
     else
@@ -138,12 +159,12 @@ class SymbolDataStateChange is StateChange[SymbolData]
   fun write_log_entry(out_writer: Writer) =>
     out_writer.f64_be(_last_bid)
     out_writer.f64_be(_last_offer)
-    out_writer.bool(_should_reject_trades)
+    out_writer.u8(BoolConverter.bool_to_u8(_should_reject_trades))
 
   fun ref read_log_entry(in_reader: Reader) ? =>
     _last_bid = in_reader.f64_be()
     _last_offer = in_reader.f64_be()
-    _should_reject_trades = in_reader.bool()
+    _should_reject_trades = BoolConverter.u8_to_bool(in_reader.u8())
 
 class SymbolDataStateChangeBuilder is StateChangeBuilder[SymbolData]
   fun apply(id: U64): StateChange[SymbolData] =>
@@ -185,9 +206,9 @@ primitive ProcessNbbo is StateComputation[FixNbboMessage val, NbboResult val,
     let res = NbboResult(msg, state.last_bid, state.last_offer, Time.nanos())
     (res, state_change)
 
-  fun state_change_builders(): Array[StateChangeBuilder[SymbolData] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[SymbolData]] val =>
     recover val
-      let scbs = Array[StateChangeBuilder[SymbolData] val]
+      let scbs = Array[StateChangeBuilder[SymbolData]]
       scbs.push(recover val SymbolDataStateChangeBuilder end)
     end
 
@@ -263,7 +284,7 @@ class LegalSymbols
   let symbols: Array[String] val
 
   new create() =>
-    let padded: Array[String] trn = recover Array[String] end
+    let padded = recover trn Array[String] end
     for symbol in RawSymbols().values() do
       padded.push(RawSymbols.pad_symbol(symbol))
     end

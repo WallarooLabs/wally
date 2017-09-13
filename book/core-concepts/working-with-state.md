@@ -6,10 +6,11 @@ Wallaroo's state objects allow developers to define their own domain-specific da
 
 Imagine a word counting application. We'll have a state object for each different word. Each word and count object would look something like:
 
-```pony
-class WordAndCount
-  var word: String = ""
-  var count: U64 = 0
+```python
+class WordAndCount(object):
+    def __init__(self, word="", count=0):
+        self.word = word
+        self.count = count
 ```
 
 State computations allow you to read and write data to state objects. State computations have 3 inputs and 2 outputs. 
@@ -26,6 +27,4 @@ For the duration of this document, we're going to ignore the "state change repos
 
 ## Thread Safety
 
-When a state computation is running, one of the parameters it is provided is the state to operate on. That state will only be provided to a single state computation at a time. Within the state computation, you don't have to worry about thread synchronization issues[^threading]. 
-
-[^threading] Depending on your language, you may have to follow certain best practices. Check the best practices section for your language of choice for any caveats that might apply.
+When a state computation is running, one of the parameters it is provided is the state to operate on. That state will only be provided to a single state computation at a time. Within the state computation, you don't have to worry about thread synchronization issues. 

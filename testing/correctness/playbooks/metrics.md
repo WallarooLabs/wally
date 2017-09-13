@@ -10,7 +10,7 @@ Metrics is an external service that the application periodically sends data to. 
 
 1. sink: `nc -l 127.0.0.1 5555`
 1. metrics: `nc -l 127.0.0.1 5001`
-1. app: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -m 127.0.0.1:5001`
+1. app: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -m 127.0.0.1:5001 -t`
 1. sender: `sender -h 127.0.0.1:7000 -s 1 -i 1_000_000_000 -y -g 12 -w -u -m 100`
 1. terminate metrics with `Ctrl-C`
 1. restart metrics
@@ -33,7 +33,7 @@ Metrics is an external service that the application periodically sends data to. 
 ### Steps:
 
 1. sink: `nc -l 127.0.0.1 5555`
-1. app: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -m 127.0.0.1:5001`
+1. app: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -m 127.0.0.1:5001 -t`
 1. sender: `sender -h 127.0.0.1:7000 -s 1 -i 1_000_000_000 -y -g 12 -w -u -m 100`
 1. Wait a while for some metrics to be sent (10-20 seconds?)
 1. start metrics: `nc -l 127.0.0.1 5001`
@@ -56,7 +56,7 @@ Metrics is an external service that the application periodically sends data to. 
 
 ### Steps:
 1. sink: `nc -l 127.0.0.1 5555`
-1. app: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -c 127.0.0.1:12500 -d 127.0.0.1:12501`
+1. app: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -t`
 
 ### Expectation:
 1.Application starts successfully

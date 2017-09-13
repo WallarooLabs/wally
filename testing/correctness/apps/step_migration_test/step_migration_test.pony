@@ -1,16 +1,36 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
 use "buffered"
 use "collections"
 use "serialise"
-use "sendence/bytes"
-use "sendence/hub"
-use "wallaroo/"
-use "wallaroo/fail"
-use "wallaroo/metrics"
-use "wallaroo/network"
-use "wallaroo/recovery"
-use "wallaroo/state"
-use "wallaroo/tcp_source"
-use "wallaroo/topology"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/hub"
+use "wallaroo"
+use "wallaroo/core/common"
+use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
+use "wallaroo/core/fail"
+use "wallaroo/core/metrics"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
 
 actor Main
 	let _app_name: String = "Migration Demo"
@@ -43,7 +63,7 @@ actor Main
       for i in Range(0,10) do
         let wrapper = StateComputationWrapper[U64, U64, CountState](i.u64(),
               comp, 1001)
-        step_a.run[StateProcessor[CountState] val]("step a", 0, wrapper, step_a, i.u128(), None, i.u64(), 0, 0, 0, 0)
+        step_a.run[StateProcessor[CountState]]("step a", 0, wrapper, step_a, i.u128(), None, i.u64(), 0, 0, 0, 0)
       end
 
       //MIGRATE STATE
@@ -56,12 +76,12 @@ actor Main
       for i in Range(0,10) do
         let wrapper = StateComputationWrapper[U64, U64, CountState](i.u64(),
               comp, 1001)
-        step_b.run[StateProcessor[CountState] val]("step a", 0, wrapper, step_b, i.u128(), None, i.u64(), 0, 0, 0, 0)
+        step_b.run[StateProcessor[CountState]]("step a", 0, wrapper, step_b, i.u128(), None, i.u64(), 0, 0, 0, 0)
       end
     end
 
 primitive _RunnerBuilderGenerator
-  fun apply(): RunnerBuilder val =>
+  fun apply(): RunnerBuilder =>
 		let comp = CountComputation
     StateRunnerBuilder[CountState](
 			CountStateBuilder,
@@ -119,10 +139,10 @@ primitive CountComputation is StateComputation[U64, U64, CountState]
     (new_count, state_change)
 
   fun state_change_builders():
-    Array[StateChangeBuilder[CountState] val] val
+    Array[StateChangeBuilder[CountState]] val
   =>
     recover val
-      let scbs = Array[StateChangeBuilder[CountState] val]
+      let scbs = Array[StateChangeBuilder[CountState]]
       scbs.push(recover val CountStateChangeBuilder end)
     end
 
@@ -136,5 +156,5 @@ primitive _RouterRegistryGenerator
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
-    Connections("", "", env, auth, "", "", "", "", "", "", MetricsSink("", ""),
-      "", "", false, "", false)
+    Connections("", "", env, auth, "", "", "", "", "", "", "", "",
+      MetricsSink("", ""), "", "", false, "", false)

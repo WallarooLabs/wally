@@ -5,8 +5,7 @@ export default class GlobalFooter extends React.Component {
 		return(
 			<footer>
 				<div className="container">
-					<img src="/images/sendence-logo.png" />
-					<span>Wallaroo</span>
+					<img src="/images/wallaroo-labs.png" />
 				</div>
 			</footer>
 		)

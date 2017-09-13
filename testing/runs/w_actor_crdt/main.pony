@@ -1,3 +1,63 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
+
+"""
+CRDT WActor App
+
+1) reports sink:
+
+```
+nc -l 127.0.0.1 5555 >> /dev/null
+```
+
+2) metrics sink:
+
+```
+nc -l 127.0.0.1 5001 >> /dev/null
+```
+
+3a) 1 worker:
+
+```
+./w_actor_crdt -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+-c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock
+```
+
+3b) 2 workers:
+
+```
+./w_actor_crdt -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+  -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 \
+  --ponynoblock -w 2 -t
+
+./w_actor_crdt -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+  -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
+```
+
+4) sender
+
+```
+giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 \
+--ponythreads=1 -y -g 12 -w -u -m 10000
+```
+
+"""
 use "assert"
 use "buffered"
 use "collections"
@@ -5,20 +65,20 @@ use pers = "collections/persistent"
 use "net"
 use "random"
 use "time"
-use "sendence/bytes"
-use "sendence/fix"
-use "sendence/guid"
-use "sendence/hub"
-use "sendence/new_fix"
-use "sendence/options"
-use "sendence/rand"
-use "sendence/wall_clock"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/fix"
+use "wallaroo_labs/guid"
+use "wallaroo_labs/hub"
+use "wallaroo_labs/new_fix"
+use "wallaroo_labs/options"
+use "wallaroo_labs/rand"
+use "wallaroo_labs/time"
 use "wallaroo"
-use "wallaroo/fail"
-use "wallaroo/metrics"
-use "wallaroo/tcp_source"
-use "wallaroo/topology"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
+use "wallaroo/core/fail"
+use "wallaroo/core/metrics"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/topology"
 
 
 primitive Roles
@@ -31,13 +91,13 @@ actor Main
     let actor_count: USize = 10
     let iterations: USize = 100
     let actor_system = create_actors(actor_count, iterations, seed)
-    ActorSystemStartup(env, actor_system, "toy-model-CRDT-app", actor_count)
+    ActorSystemStartup(env, actor_system, "toy-model-CRDT-app")
 
   fun ref create_actors(n: USize, iterations: USize, init_seed: U64):
     ActorSystem val
   =>
     recover
-      let rand = Rand(init_seed)
+      let rand = EnhancedRandom(init_seed)
       let actor_system =
         ActorSystem("Toy Model CRDT App", rand.u64())
           .> add_source(SimulationFramedSourceHandler, IngressWActorRouter)
@@ -93,7 +153,7 @@ class A is WActor
   let _role: String
   var _pending_increments: USize = 0
   let _g_counter: GCounter
-  let _rand: Rand
+  let _rand: EnhancedRandom
   var _waiting: USize = 0
   var _started: Bool = false
 
@@ -103,9 +163,9 @@ class A is WActor
     h.register_as_role(BasicRoles.ingress())
     _id = id'
     _g_counter = GCounter(_id)
-    _rand = Rand(seed)
+    _rand = EnhancedRandom(seed)
 
-  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
+  fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
     | ActMsg =>
       act(h)
@@ -173,11 +233,11 @@ trait AMsg
 trait AMsgBuilder
 
 primitive IncrementsMsgBuilder is AMsgBuilder
-  fun apply(increments: USize): IncrementsMsg val =>
+  fun apply(increments: USize): IncrementsMsg =>
     IncrementsMsg(increments)
 
 primitive GossipMsgBuilder is AMsgBuilder
-  fun apply(data: PMap[U64, USize]): GossipMsg val =>
+  fun apply(data: PMap[U64, USize]): GossipMsg =>
     GossipMsg(data)
 
 class val IncrementsMsg is AMsg
@@ -218,7 +278,7 @@ class val PMap[K: (Hashable val & Equatable[K] val), V: Any val]
   fun apply(k: K): V ? => _s(k)
 
   fun val update(k: K, v: V): PMap[K, V] =>
-    let m: Map[K, V] trn = recover Map[K, V] end
+    let m = recover trn Map[K, V] end
     for (k', v') in _s.pairs() do
       m(k') = v'
     end

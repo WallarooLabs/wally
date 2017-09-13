@@ -1,6 +1,6 @@
 # Writing Your Own Wallaroo Python Application
 
-In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `reverse.py` application from the [examples](https://github.com/Sendence/wallaroo/tree/master/book/examples/python/reverse/) section, then move on to an application that maintains and modifies state and, finally, a stateful application that also uses partitioning to divide its work.
+In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `reverse.py` application from the [examples](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/reverse/) section, then move on to an application that maintains and modifies state and, finally, a stateful application that also uses partitioning to divide its work.
 
 ## A Stateless Application - Reverse Words
 
@@ -19,11 +19,14 @@ class Reverse(object):
     def name(self):
         return "reverse"
 
-    def compute(self, bs):
+    def compute(self, data):
+        print "compute", data
         return data[::-1]
 ```
 
 A Computation has no state, so it only needs to define its name, and how to convert input data into output data. In this case, string reversal is performed with a slice notation.
+
+Note that there is a `print` statement in the `compute` method (and in other methods in this document). They are here to help show the user what is happening at different points as the application executes. This is only for demonstration purposes and is not recommended in actual applications.
 
 ### Sink Encoder
 
@@ -32,7 +35,8 @@ Next, we are going to define how the output gets constructed for the sink. It is
 ```python
 class Encoder(object):
     def encode(self, data):
-        # data is already a string, so let's just add a newline to the end
+        # data is a string
+        print "encode", data
         return data + "\n"
 ```
 
@@ -43,12 +47,15 @@ Now, we also need to decode the incoming bytes of the source.
 ```python
 class Decoder(object):
     def header_length(self):
+        print "header_length"
         return 4
 
     def payload_length(self, bs):
+        print "payload_length", bs
         return struct.unpack(">I", bs)[0]
 
     def decode(self, bs):
+        print "decode", bs
         return bs.decode("utf-8")
 ```
 
@@ -58,7 +65,7 @@ To read more about this, please refer to the [Creating A Decoder](/book/core-con
 
 For our application purposes, we will simply define the structure and how it is going to get parsed:
 
-1. input messages have the following structure: A fixed length `PYALOAD_SIZE` followed by `PAYLOAD`
+1. input messages have the following structure: A fixed length `PAYLOAD_SIZE` followed by `PAYLOAD`
 2. Wallaroo requires three methods to parse this type of message:
   1. `header_length()`, which returns the number of bytes used for the `PAYLOAD_SIZE` in the message. This value tells Wallaroo how many bytes to read from the stream as `HEADER`.
   2. `payload_length(bs)`, which reads `PAYLOAD_SIZE` bytestring of the size returned by `header_length()` and computes the size of `PAYLOAD`. It then returns that size as an integer to Wallaroo, which will then read that many bytes from the stream.
@@ -81,20 +88,23 @@ For this, two things are needed:
 An application is constructed of pipelines which, in turn, are constructed from a sequence of a source, steps, and optionally a sink. Our reverse application only has one pipeline, so we only need to create one:
 
 ```python
-ab = wallaroo.ApplicationBuilder("Reverse word")
-ab.new_pipeline("reverse", Decoder())
+ab = wallaroo.ApplicationBuilder("Reverse Word")
+ab.new_pipeline("reverse", Decoder(),
+    wallaroo.TCPSourceConfig("localhost", "7002"))
 ```
 
 Since each pipeline must have a source, it must also have a source decoder. So `new_pipeline` takes a name and a `Decoder` instance as its arguments.
 
 Next, we add the computation step:
+
 ```python
 ab.to(Reverse)
 ```
 
 And finally, we add the sink along with an encoder:
+
 ```python
-ab.to_sink(Encoder())
+ab.to_sink(Encoder(), wallaroo.TCPSinkConfig("localhost", "7010"))
 ```
 
 ### The `application_setup` Entry Point
@@ -103,11 +113,24 @@ After Wallaroo has loaded the application's python file, it will try to execute 
 
 ```python
 def application_setup(args):
+    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+
     ab = wallaroo.ApplicationBuilder("Reverse Word")
-    ab.new_pipeline("reverse", Decoder())
+    ab.new_pipeline("reverse", Decoder(),
+                    wallaroo.TCPSourceConfig(in_host, in_port))
     ab.to(Reverse)
-    ab.to_sink(Encoder())
+    ab.to_sink(Encoder(),
+               wallaroo.TCPSinkConfig(out_host, out_port))
     return ab.build()
+```
+
+Configuration objects are used to pass information about sources and sinks to the application builder. Currently the only supported source is the TCP source, and the only supported sink is the TCP sink.
+
+Wallaroo provides convenience the functions `tcp_parse_input_addrs` and `tcp_parse_output_addrs` to parse host and port information that is passed on the command line, or the user can supply their own code for getting these values. When using the convenience functions, host/port pairs are represented on the command line as colon-separated values and multiple host/port values are represented by a comma-separated list of host/port values. The functions assume that `--in` is used for input addresses, and `--out` is used for output addresses. For example, this set of commandline arguments would specify two input host/port values and one output:
+
+```
+--in localhost:7001,localhost:7002 --out localhost:7010
 ```
 
 ### Miscellaneous
@@ -121,7 +144,7 @@ import wallaroo
 
 ## Running `reverse.py`
 
-The complete example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/python/reverse/). To run it, follow the [Reverse application instructions](/book/examples/python/reverse/README.md)
+The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/reverse/). To run it, follow the [Reverse application instructions](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/reverse/README.md)
 
 ## Next Steps
 

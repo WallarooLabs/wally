@@ -1,5 +1,5 @@
 # install python for full ansible support
-- hosts: tag_buffy:&tag_Cluster_{{ cluster_name }}:&{{ packet_region }}
+- hosts: tag_{{ cluster_project_name | replace('-', '_') }}:&tag_Cluster_{{ cluster_name | replace('-', '_') }}:&{{ packet_region }}
   gather_facts: False
   tasks:
   - name: install python for full ansible support
@@ -7,7 +7,7 @@
     become: yes
 
 # create dynamic groups
-- hosts: tag_buffy:&tag_Role_follower:&tag_Cluster_{{ cluster_name }}:&{{ packet_region }}
+- hosts: tag_{{ cluster_project_name | replace('-', '_') }}:&tag_Role_follower:&tag_Cluster_{{ cluster_name | replace('-', '_') }}:&{{ packet_region }}
   tasks:
   - name: Create a group of all followers for buffy
     group_by: key=buffy-followers
@@ -23,7 +23,7 @@
     become: yes
 
 
-- hosts: tag_buffy:&tag_Role_leader:&tag_Cluster_{{ cluster_name }}:&{{ packet_region }}
+- hosts: tag_{{ cluster_project_name | replace('-', '_') }}:&tag_Role_leader:&tag_Cluster_{{ cluster_name | replace('-', '_') }}:&{{ packet_region }}
   vars:
     ethernet_interface: "{{ ansible_default_ipv4.interface }}"
   tasks:

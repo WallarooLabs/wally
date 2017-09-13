@@ -8,11 +8,22 @@ export default class SourcesTable extends React.Component {
 	render() {
 		const { appName, linked, sourceType, sourceKeys } = this.props;
 		const sourceTableBodies = sourceKeys.map((sourceKey) => {
-			const sourceName = sourceKey.replace(sourceType + ":", "");
+			let updatedSourceType = sourceType;
+			switch(sourceType) {
+				case "computations-on-worker":
+					updatedSourceType = "computation-by-worker";
+					break;
+				case "computations-for-pipeline-on-worker":
+					updatedSourceType = "computation-by-worker";
+					break;
+				case "computations-for-pipeline":
+					updatedSourceType = "computation";
+			}
+			const sourceName = sourceKey.replace(updatedSourceType + ":", "");
 			return <SourceTableBodyContainer
 						linked={linked}
 						appName={appName}
-						sourceType={sourceType} 
+						sourceType={sourceType}
 						sourceName={sourceName}
 						key={sourceName} />
 		});

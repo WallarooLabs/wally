@@ -14,14 +14,14 @@ e.g. if in the control run, we observed the sequence of outputs `[10,11,12,13], 
 ### Setting Up for the Test:
 
 1. build Giles receiver and sender
-1. build `testing/correctness/apps/sequence-window` with `-D resilience` (and optionally `-d` for debug messages)
-1. create a `res-data` directory in the `testing/correctness/apps/sequence-window` directory
+1. build `testing/correctness/apps/sequence_window` with `-D resilience` (and optionally `-d` for debug messages)
+1. create a `res-data` directory in the `testing/correctness/apps/sequence_window` directory
 
 ### Running the Test:
 
 1. start giles-receiver:  `../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555`
-1. start initializer-worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t`
-1. start second worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker2`
+1. start initializer-worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t`
+1. start second worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -r res-data -n worker2`
 1. start giles-sender and send the first 10000 integers: `../../../../giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 -u --ponythreads=1 -y -g 12 -w -m 10000`
 1. terminate the second worker with Ctrl-C
 1. restart the second worker with the same command
@@ -32,7 +32,7 @@ e.g. if in the control run, we observed the sequence of outputs `[10,11,12,13], 
 ### Analysing the Test Results:
 
 #### Automatically
-1. Compile `testing/correctness/apps/sequence-window/validator`
+1. Compile `testing/correctness/apps/sequence_window/validator`
 2. run `validator/validator -i received.txt -e 10002`
 
 #### Manualy

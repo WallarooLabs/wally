@@ -66,9 +66,10 @@ is responsible for building the computation that will be added.
 
 Add a stateful computation to the current pipeline. The
 `state_builder_` builds the state that will be used by the
-computation. Any other computation whose state builder returns the
-same name will use the same state object. The `state_name_` is used to
-identify the step.
+computation. state_name_ is the name of the collection of state objects 
+that we will run computations against. You can share state partitions across 
+pipelines by using the same name. Using different names for different 
+partitions, keeps them separate and in this way, acts as a sort of namespace.
 
 ### `Application *to_state_partition(StateComputation *state_computation_, StateBuilder *state_builder_, const char* state_name_, Partition *partition_, bool multi_worker_)`
 

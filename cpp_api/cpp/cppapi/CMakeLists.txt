@@ -1,6 +1,3 @@
-#
-# KAGR (kevin@sendence.com)
-#
 cmake_minimum_required(VERSION 3.5)
 project(WallarooCppApi)
 set(WallarooCppApi_VERSION_MAJOR 0)

@@ -39,7 +39,7 @@ defmodule MarketSpreadReportsUI.Mixfile do
      {:gettext, "~> 0.9"},
      {:cowboy, "~> 1.0"},
      {:exrm, "~> 1.0.8"},
-     {:phoenix_tcp, git: "https://github.com/Sendence/phoenix_tcp.git", branch: "add-hub-protocol"},
+     {:phoenix_tcp, git: "https://github.com/WallarooLabs/phoenix_tcp.git", branch: "add-hub-protocol"},
      {:market_spread_reports, in_umbrella: true}]
   end
 end

@@ -11,6 +11,11 @@ defmodule MetricsReporterUI.MetricsSocket do
   channel "computation:*", MetricsReporterUI.ComputationChannel
   channel "start-to-end:*", MetricsReporterUI.StartEndChannel
   channel "node-ingress-egress:*", MetricsReporterUI.NodeIngressEgressChannel
+  channel "pipeline:*", MetricsReporterUI.PipelineChannel
+  channel "pipeline-ingestion:*", MetricsReporterUI.PipelineIngestionChannel
+  channel "computation-by-worker:*", MetricsReporterUI.ComputationByWorkerChannel
+  channel "node-ingress-egress-by-pipeline:*", MetricsReporterUI.NodeIngressEgressByPipelineChannel
+  channel "start-to-end-by-worker:*", MetricsReporterUI.StartEndByWorkerChannel
 
   transport :websocket, Phoenix.Transports.WebSocket
   transport :longpoll, Phoenix.Transports.LongPoll

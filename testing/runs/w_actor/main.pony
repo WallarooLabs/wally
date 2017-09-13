@@ -1,23 +1,83 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
+"""
+CRDT WActor App
+
+1) reports sink:
+
+```
+nc -l 127.0.0.1 5555 >> /dev/null
+```
+
+2) metrics sink:
+
+```
+nc -l 127.0.0.1 5001 >> /dev/null
+```
+
+3a) 1 worker:
+
+```
+./w_actor -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -t \
+-c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock
+```
+
+3b) 2 workers:
+
+```
+./w_actor -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+  -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 \
+  --ponynoblock -w 2 -t
+
+./w_actor -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+  -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
+```
+127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
+
+4) sender
+
+```
+giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 \
+--ponythreads=1 -y -g 12 -w -u -m 10000
+```
+
+"""
 use "assert"
 use "buffered"
 use "collections"
 use "net"
 use "random"
 use "time"
-use "sendence/bytes"
-use "sendence/fix"
-use "sendence/guid"
-use "sendence/hub"
-use "sendence/new_fix"
-use "sendence/options"
-use "sendence/rand"
-use "sendence/wall_clock"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/fix"
+use "wallaroo_labs/guid"
+use "wallaroo_labs/hub"
+use "wallaroo_labs/new_fix"
+use "wallaroo_labs/options"
+use "wallaroo_labs/rand"
+use "wallaroo_labs/time"
 use "wallaroo"
-use "wallaroo/fail"
-use "wallaroo/metrics"
-use "wallaroo/tcp_source"
-use "wallaroo/topology"
-use "wallaroo/w_actor"
+use "wallaroo/ent/w_actor"
+use "wallaroo/core/fail"
+use "wallaroo/core/metrics"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/topology"
 
 
 actor Main
@@ -26,7 +86,7 @@ actor Main
     let actor_count: USize = 10
     try
       let actor_system = create_actors(actor_count, seed)
-      ActorSystemStartup(env, actor_system, "toy-model-app", actor_count)
+      ActorSystemStartup(env, actor_system, "toy-model-app")
     else
       Fail()
     end
@@ -35,7 +95,7 @@ actor Main
     recover
       let roles: Array[String] val = recover [ARoles.one(), ARoles.two(),
         ARoles.three()] end
-      let rand = Rand(init_seed)
+      let rand = EnhancedRandom(init_seed)
       if n < 3 then
         @printf[I32]("There must be at least 3 actors\n".cstring())
         Fail()
@@ -61,26 +121,26 @@ primitive ARoles
   fun two(): String => "two"
   fun three(): String => "three"
 
-trait AMsg
+trait val AMsg
   fun string(): String
 
-trait AMsgBuilder
+trait val AMsgBuilder
 
 primitive SetActorProbability is AMsgBuilder
-  fun apply(prob: F64): SetActorProbabilityMsg val =>
+  fun apply(prob: F64): SetActorProbabilityMsg =>
     SetActorProbabilityMsg(prob)
 
 primitive SetNumberOfMessagesToSend is AMsgBuilder
-  fun apply(n: USize): SetNumberOfMessagesToSendMsg val =>
+  fun apply(n: USize): SetNumberOfMessagesToSendMsg =>
     SetNumberOfMessagesToSendMsg(n)
 
 primitive ChangeMessageTypesToSend is AMsgBuilder
   fun apply(types: Array[AMsgBuilder val] val):
-    ChangeMessageTypesToSendMsg val
+    ChangeMessageTypesToSendMsg
   =>
     ChangeMessageTypesToSendMsg(types)
 
-class SetActorProbabilityMsg is AMsg
+class val SetActorProbabilityMsg is AMsg
   let prob: F64
 
   new val create(prob': F64) =>
@@ -89,7 +149,7 @@ class SetActorProbabilityMsg is AMsg
   fun string(): String =>
     "SetActorProbabilityMsg"
 
-class SetNumberOfMessagesToSendMsg is AMsg
+class val SetNumberOfMessagesToSendMsg is AMsg
   let n: USize
 
   new val create(n': USize) =>
@@ -98,7 +158,7 @@ class SetNumberOfMessagesToSendMsg is AMsg
   fun string(): String =>
     "SetNumberOfMessagesToSendMsg"
 
-class ChangeMessageTypesToSendMsg is AMsg
+class val ChangeMessageTypesToSendMsg is AMsg
   let types: Array[AMsgBuilder val] val
 
   new val create(types': Array[AMsgBuilder val] val) =>
@@ -113,7 +173,7 @@ class A is WActor
   var _n_messages: USize = 1
   let _all_message_types: Array[AMsgBuilder val] val
   var _message_types_to_send: Array[AMsgBuilder val] val
-  let _rand: Rand
+  let _rand: EnhancedRandom
 
   new create(wh: WActorHelper, role: String, id: U128, seed: U64) =>
     _id = (id >> 96).u64()
@@ -123,7 +183,7 @@ class A is WActor
     wh.register_as_role(BasicRoles.ingress())
     _all_message_types =
       try
-        let ts: Array[AMsgBuilder val] trn = recover Array[AMsgBuilder val] end
+        let ts = recover trn Array[AMsgBuilder val] end
         ts.push(SetActorProbability as AMsgBuilder val)
         ts.push(SetNumberOfMessagesToSend as AMsgBuilder val)
         ts.push(ChangeMessageTypesToSend as AMsgBuilder val)
@@ -132,23 +192,23 @@ class A is WActor
         recover Array[AMsgBuilder val] end
       end
     _message_types_to_send = _all_message_types
-    _rand = Rand(seed)
+    _rand = EnhancedRandom(seed)
 
-  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
+  fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
-    | let m: SetActorProbabilityMsg val =>
+    | let m: SetActorProbabilityMsg =>
       ifdef debug then
         @printf[I32]("Received %s to %s\n".cstring(), m.string().cstring(),
           m.prob.string().cstring())
       end
       _emission_prob = m.prob
-    | let m: SetNumberOfMessagesToSendMsg val =>
+    | let m: SetNumberOfMessagesToSendMsg =>
       ifdef debug then
         @printf[I32]("Received %s to %lu msgs\n".cstring(),
           m.string().cstring(), m.n)
       end
       _n_messages = m.n
-    | let m: ChangeMessageTypesToSendMsg val =>
+    | let m: ChangeMessageTypesToSendMsg =>
       ifdef debug then
         @printf[I32]("Received %s\n".cstring(), m.string().cstring())
       end
@@ -168,14 +228,11 @@ class A is WActor
     end
 
   fun ref emit_messages(h: WActorHelper) ? =>
-    let known_actors = h.known_actors()
     for i in Range(1, _n_messages + 1) do
-      let should_emit = (known_actors.size() > 0) and
-        (_rand.test_odds(_emission_prob))
-      if should_emit then
+      if _rand.test_odds(_emission_prob) then
         let message = create_message()
-        let target = select_actor(h)
-        h.send_to(target, message)
+        let role = select_role(h)
+        h.send_to_role(role, message)
         ifdef debug then
           @printf[I32]("Actor %lu emitted a message on iteration %d out of %d. Message is of type %s.\n"
             .cstring(), _id, i, _n_messages, message.string().cstring())
@@ -188,10 +245,10 @@ class A is WActor
       end
     end
 
-  fun ref select_actor(h: WActorHelper): WActorId ? =>
-    _rand.pick[WActorId](h.known_actors())
+  fun ref select_role(h: WActorHelper): String ? =>
+    _rand.pick[String]([ARoles.one(), ARoles.two(), ARoles.three()])
 
-  fun ref create_message(): AMsg val ? =>
+  fun ref create_message(): AMsg ? =>
     match _rand.pick[AMsgBuilder val](_message_types_to_send)
     | let blder: SetActorProbability val =>
       SetActorProbability(_rand.f64_between(0.1, 0.9))

@@ -25,9 +25,11 @@ export default class AppNav extends React.Component {
 		const stepKeys = appConfig.getIn(["metrics", "computation"]);
 		const sourceSinkKeys = appConfig.getIn(["metrics", "start-to-end"]);
 		const ingressEgressKeys = appConfig.getIn(["metrics", "node-ingress-egress"]);
+		const pipelineKeys = appConfig.getIn(["metrics", "pipeline"]);
 		const stepLinks = this.generateSourceLinks(appPath, "computation", stepKeys);
 		const sourceSinkLinks = this.generateSourceLinks(appPath, "start-to-end", sourceSinkKeys);
 		const ingressEgressLinks = this.generateSourceLinks(appPath, "node-ingress-egress", ingressEgressKeys);
+		const pipelineLinks = this.generateSourceLinks(appPath, "pipeline", pipelineKeys);
 		return(
 			<NavDropdown title={"App: "+ titleize(appName)}>
 				<LinkContainer to={appPath  + "/dashboard"}>
@@ -37,7 +39,7 @@ export default class AppNav extends React.Component {
 					<MenuItem>Workers Dashboard</MenuItem>
 				</LinkContainer>
 				<MenuItem divider />
-				<MenuItem header>Overall (Start -> End)</MenuItem>
+				<MenuItem header>Pipeline</MenuItem>
 				<MenuItem divider />
 				{sourceSinkLinks}
 				<MenuItem divider />

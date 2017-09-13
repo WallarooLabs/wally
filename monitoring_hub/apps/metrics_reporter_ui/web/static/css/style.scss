@@ -55,7 +55,10 @@ display: block;
     margin-left: 0;
 }
 
-th div.col-lg-4, td div.col-lg-4 {
+th div.col-lg-4, td div.col-lg-4,
+th div.col-lg-2, td div.col-lg-2,
+th div.col-lg-3, td div.col-lg-3
+ {
     padding-left: 0;
     padding-right: 0;
 }
@@ -96,6 +99,7 @@ footer {
 }
 
 footer img {
+    margin-top: 5px;
     height: 30px;
 }
 
@@ -106,6 +110,7 @@ footer span {
 }
 
 footer div.container, nav div.container {
+    height: 100%;
     margin-bottom: 0px;
 }
 

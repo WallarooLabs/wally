@@ -4,6 +4,10 @@ These instructions have been tested for Ubuntu Trusty and Xenial releases.
 
 There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
+## Memory requirements
+
+In order to compile all of the Wallaroo applications your system will need to have approximately 6 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
+
 ## Installing git
 
 If you do not already have Git installed, install it:
@@ -113,13 +117,13 @@ sudo make install
 
 ### Installing ponyc
 
-Now you need to install the Sendence fork of the Pony compiler `ponyc`. Run:
+Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`. Run:
 
 ```bash
 cd ~/
-wget https://github.com/Sendence/ponyc/archive/sendence-19.2.8.tar.gz
-tar xzfv sendence-19.2.8.tar.gz
-cd ponyc-sendence-19.2.8
+wget https://github.com/WallarooLabs/ponyc/archive/wallaroolabs-19.2.14.tar.gz
+tar xzfv wallaroolabs-19.2.14.tar.gz
+cd ponyc-wallaroolabs-19.2.14
 sudo make config=release install
 ```
 
@@ -143,9 +147,37 @@ make
 sudo make install
 ```
 
+## Install Compression Development Libraries
+
+Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
+
+### Xenial Ubuntu:
+
+```bash
+sudo apt-get install -y libsnappy-dev liblz4-dev
+```
+
+### Trusty Ubuntu:
+
+*Note:* some older versions of Ubuntu have an outdated `liblz4` package. For these you will need to install from source like this:
+
+```bash
+cd ~/
+wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
+tar zxvf liblz4-1.7.5.tar.gz
+cd lz4-1.7.5
+sudo make install
+```
+
+## Install Python Development Libraries
+
+```bash
+sudo apt-get install -y python-dev
+```
+
 ## Install Docker
 
-You'll need Docker (CE or EE) to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/engine/installation/linux/ubuntu/) for getting Docker up and running on Ubuntu on the [Docker website](https://docs.docker.com/engine/installation/linux/ubuntu/). 
+You'll need Docker (CE or EE) to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/engine/installation/linux/ubuntu/) for getting Docker up and running on Ubuntu on the [Docker website](https://docs.docker.com/engine/installation/linux/ubuntu/).
 
 Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/engine/installation/linux/linux-postinstall/#configure-docker-to-start-on-boot).
 
@@ -154,7 +186,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Install the Metrics UI
 
 ```bash
-sudo docker pull sendence/wallaroo-metrics-ui:pre-0.0.1
+sudo docker pull sendence/wallaroo-metrics-ui:0.1
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -167,18 +199,43 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. If you haven't already
-cloned the Wallaroo repo, do so now:
+This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
 
 ```bash
-git clone https://github.com/sendence/wallaroo
+git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.0.1-rc15
+git checkout 0.1.0-rc1
 ```
 
 Note: You need to login to GitHub for credentials
 
-This will create a subdirectory called `wallaroo`.
+## Installing Machida
+
+Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/machida
+make
+```
+
+## Install Giles Sender
+
+Giles Sender is used to supply data to Wallaroo applications over TCP.
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/sender
+make
+```
+
+## Install Giles Receiver
+
+Giles Receiver receives data from Wallaroo over TCP.
+
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/receiver
+make
+```
 
 ## Conclusion
 

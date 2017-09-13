@@ -4,7 +4,7 @@
 
 We'll begin digging into the Wallaroo API by creating a linear pipeline of
 stateless computations. All the code in this section can be found in
-[`examples/pony/celsius/celsius.pony`](https://github.com/Sendence/wallaroo-examples/tree/master/examples/pony/celsius/celsius.pony).
+[`examples/pony/celsius/celsius.pony`](https://github.com/WallarooLabs/wallaroo-examples/tree/release/examples/pony/celsius/celsius.pony).
 
 We're going to start by creating an application that
 converts Celsius values to Fahrenheit. You may recall that the conversion goes
@@ -107,8 +107,8 @@ our `Application` definition in context:
 
 ```pony
 use "wallaroo"
-use "wallaroo/tcp-source"
-use "wallaroo/topology"
+use "wallaroo/core/source/tcp-source"
+use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>

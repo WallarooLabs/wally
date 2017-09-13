@@ -13,7 +13,7 @@ Giles components act as external testers for Wallaroo. Giles Receiver is used to
 If you do not already have the `wallaroo` repo, create a local copy of the repo:
 
 ```bash
-git clone https://github.com/sendence/wallaroo
+git clone https://github.com/WallarooLabs/wallaroo
 ```
 
 Compile the `giles-receiver` binary:

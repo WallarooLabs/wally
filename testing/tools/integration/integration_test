@@ -1,0 +1,430 @@
+#!/usr/bin/env python2
+
+import argparse
+import logging
+import os
+import random
+import re
+
+# set up basic logging
+logging.root.name = 'integration'
+logging.root.setLevel(logging.DEBUG)
+logging.root.formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.root.formatter)
+logging.root.addHandler(stream_handler)
+
+
+from integration import (ex_validate,
+                         files_generator,
+                         iter_generator,
+                         pipeline_test,
+                         sequence_generator)
+
+
+"""
+Run an integration test as a CLI
+"""
+
+
+class CSVGenAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        """
+        Permit three cases: 1, 2, and 3 values.
+        1 value: Take {0} as iter, use source 0, and header format '>I'
+        2 values: Take {0} as iter, use source {1}, and header format '>I'
+        3 values: Take {0} as iter, use source {1}, and header format {2}
+        """
+        if len(values) == 1:
+            gen = iter_generator(values[0].split(','))
+            source = 0
+        elif len(values) == 2:
+            gen = iter_generator(values[0].split(','))
+            source = int(values[1])
+        elif len(values) == 3:
+            gen = iter_generator(values[0].split(','),
+                                 header_fmt=values[2])
+            source = int(values[1])
+        else:
+            msg = ('Argument "{f}" requires 1, 2, or 3 arguments specifying '
+                   'comma-separated-list [, source-index [, header format]].\n'
+                   "When unspecified, source-index is 0, and header format is "
+                   "'>I'".format(f=self.dest))
+            raise argparse.ArgumentTypeError(msg)
+
+        try:
+            dest = getattr(namespace, self.dest)
+            if not dest:
+                dest= []
+                setattr(namespace, self.dest, dest)
+        except AttributeError:
+            dest = []
+            setattr(namespace, self.dest, dest)
+        dest.append((gen, source))
+
+
+class SeqGenAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        """
+        Permit three cases: 1, 2, and 3 values
+        1 value: range = {0}, source = 0, header format = '>I'
+        2 values: range = {0}, source = {1}, header format = '>I'
+        3 values: range = {0}, source = {1}, header format = {2}
+
+        range is a range notation, using () for exclusive, [] for inclusive,
+        and two integers separated by a comma to denote the start and stop.
+        E.g. (0, 1000] will produce 1, 2, 3, ..., 1000. And [0, 1000) will
+        produce 0, 1, 2, ..., 999.
+        """
+        if len(values) == 1:
+            start, stop = self.__range_parse__(values[0])
+            source = 0
+            gen = sequence_generator(stop, start)
+        elif len(values) == 2:
+            start, stop = self.__range_parse__(values[0])
+            source = int(values[1])
+            gen = sequence_generator(stop, start)
+        elif len(values) == 3:
+            start, stop = self.__range_parse__(values[0])
+            source = int(values[1])
+            gen = sequence_generator(stop, start, values[2])
+        else:
+            msg = ('Argument "{f}" requires 1, 2, or 3 arguments specifying '
+                   '(start, stop] [, source-index [, header format]].\n'
+                   "When unspecified, source-index is 0, and header format is "
+                   "'>I'".format(f=self.dest))
+            raise argparse.ArgumentTypeError(msg)
+
+        try:
+            dest = getattr(namespace, self.dest)
+            if not dest:
+                dest= []
+                setattr(namespace, self.dest, dest)
+        except AttributeError:
+            dest = []
+            setattr(namespace, self.dest, dest)
+        dest.append((gen, source))
+
+    def __range_parse__(self, range_str):
+        start, stop = range_str.lstrip().rstrip().split(',')
+        start_type, start_val = start[:1], start[1:]
+        if not start_val:
+            start_val = 0
+        if start_type == '[':
+            start = int(start_val) - 1
+        else:
+            start = int(start_val)
+
+        stop_val, stop_type = stop[:-1], stop[-1:]
+        if not stop_val:
+            stop_val = 1000
+        if stop_type == ']':
+            stop = int(stop_val)
+        elif stop_type == ')':
+            stop = int(stop_val) -1
+        return start, stop
+
+
+class NewlineGenAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        """
+        Permit three cases: 1, 2, and 3 values
+        1 value: paths = {0}, source = 0, header format = '>I'
+        2 values: paths = {0}, source = {1}, header format = '>I'
+        3 values: paths = {0}, source = {1}, header format = {2}
+        """
+        paths = values[0].split(',')
+        if len(values) == 1:
+            source = 0
+            gen = files_generator(paths, mode='newlines')
+        elif len(values) == 2:
+            source = int(values[1])
+            gen = files_generator(paths, mode='newlines')
+        elif len(values) == 3:
+            source = int(values[1])
+            gen = files_generator(paths, mode='newlines',
+                                  header_fmt = values[2])
+        else:
+            msg = ('Argument "{f}" requires 1, 2, or 3 arguments specifying '
+                   'paths [, source-index [, header format]].\n'
+                   "When unspecified, source-index is 0, and header format is "
+                   "'>I'".format(f=self.dest))
+            raise argparse.ArgumentTypeError(msg)
+
+        try:
+            dest = getattr(namespace, self.dest)
+            if not dest:
+                dest= []
+                setattr(namespace, self.dest, dest)
+        except AttributeError:
+            dest = []
+            setattr(namespace, self.dest, dest)
+        dest.append((gen, source))
+
+
+class FramedGenAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        """
+        Permit three cases: 1, 2, and 3 values
+        1 value: paths = {0}, source = 0, header format = '>I'
+        2 values: paths = {0}, source = {1}, header format = '>I'
+        3 values: paths = {0}, source = {1}, header format = {2}
+        """
+        paths = values[0].split(',')
+        if len(values) == 1:
+            source = 0
+            gen = files_generator(paths, mode='framed')
+        elif len(values) == 2:
+            source = int(values[1])
+            gen = files_generator(paths, mode='framed')
+        elif len(values) == 3:
+            source = int(values[1])
+            gen = files_generator(paths, mode='framed',
+                                  header_fmt = values[2])
+        else:
+            msg = ('Argument "{f}" requires 1, 2, or 3 arguments specifying '
+                   'paths [, source-index [, header format]].\n'
+                   "When unspecified, source-index is 0, and header format is "
+                   "'>I'".format(f=self.dest))
+            raise argparse.ArgumentTypeError(msg)
+
+        try:
+            dest = getattr(namespace, self.dest)
+            if not dest:
+                dest= []
+                setattr(namespace, self.dest, dest)
+        except AttributeError:
+            dest = []
+            setattr(namespace, self.dest, dest)
+        dest.append((gen, source))
+
+
+class CSVStringAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Split the string and store the list as expected-csv"""
+        setattr(namespace, self.dest, values.split(','))
+
+
+LOG_LEVELS = {'none': 0,
+              'debug': 10,
+              'info': 20,
+              'warn': 30,
+              'error': 40,
+              'critical': 50}
+def set_log_level(value):
+    """Set the effective log level"""
+    level = LOG_LEVELS.get(value, 20)
+    logging.root.setLevel(level)
+
+
+class SetLogFile(argparse.Action):
+    def __call__(self, parser, namespace, value, option_string=None):
+        """Set the log file"""
+        fh = logging.FileHandler(value, 'w')
+        fh.setFormatter(logging.root.formatter)
+        logging.root.addHandler(fh)
+
+
+class NargsHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    def _format_args(self, action, default_metavar):
+        if action.nargs == '+':
+            if isinstance(action.metavar, (list, tuple)):
+                nargs = len(action.metavar)
+                acc = ['%s' % action.metavar[0]]
+                for mv in action.metavar[1:]:
+                    acc.append('[ %s' % mv)
+                acc.append(']'*(nargs-1))
+                return ''.join(acc)
+        return super(NargsHelpFormatter, self)._format_args(action,
+                                                            default_metavar)
+
+
+def CLI():
+    parser = argparse.ArgumentParser(prog='Integration Test',
+                                     formatter_class=NargsHelpFormatter)
+
+    # Input generators: framed file, newlines file, sequence, and iter
+    gens = parser.add_argument_group('Senders', '''
+        Send data using one of the various data generators.
+        Optionally specify application source index, and header format to be used
+        with the sender.
+
+        - source index is a 0-indexed integer corresponding to the order in which
+          the source is declared in the application topology. Default: 0
+        - header format is a formatting string to be used by python's struct.pack
+          (https://docs.python.org/2/library/struct.html#format-characters).
+          Default: '>I'
+        ''')
+    gens.add_argument('--framed-file-sender', dest='generators',
+                      action=FramedGenAction, nargs='+',
+                      metavar=('filepaths', 'source_index', 'header_format'),
+                      help=("Send values from a comma-separated list of "
+                           "files."))
+    gens.add_argument('--newline-file-sender', dest='generators',
+                      action=NewlineGenAction, nargs='+',
+                      metavar=('filepaths', 'source_index', 'header_format'),
+                      help=("Send values form a comma-separated list of "
+                            "files that use newlines to separate records."))
+    gens.add_argument('--sequence-sender', dest='generators',
+                      action=SeqGenAction, nargs='+',
+                      metavar=('range', 'source_index', 'header_format'),
+                      help=("Send values from the set of integers "
+                            "(start,stop]"))
+    gens.add_argument('--csv-sender', dest='generators', action=CSVGenAction,
+                      nargs='+',
+                      metavar=('item1,item2,...', 'source_index', 'header_format'),
+                      help="Send values from a comma delimited string")
+
+    net1 = parser.add_argument_group('Network')
+    net1.add_argument('--host', help=("The host address to use in "
+                                           "networked components."),
+                           default='127.0.0.1')
+
+    # Expected data foir validation
+    exp_group = parser.add_mutually_exclusive_group()
+    exp_group.add_argument('--expected-file', help=("The path to a file "
+                           "containing binary data to compare against the "
+                           "output."))
+    exp_group.add_argument('--expected-csv', dest='expected_val',
+                           help=("A comma delimited list of"
+                           " of values to compare against the output data."),
+                           action=CSVStringAction)
+    exp_group.add_argument('--expected-string', dest='expected_val',
+                           help=("A string to compare "
+                           "against the output data."))
+
+    # Validation action: execute a command, or perform a direct comparison
+    val_group = parser.add_mutually_exclusive_group(required=True)
+    val_group.add_argument('--validation-cmd', help=("The command to execute "
+                           "with the output data file as its first argument "
+                           "and optionally the expected data file as its "
+                           "second."))
+    val_group.add_argument('--validation-cmp', action='store_true',
+                           help=("Perform a direct "
+                           "comparison between the output data and expected "
+                           "data provided by '--expected-csv' or "
+                           "--expected-string'"))
+
+    parser.add_argument('--output', type=str, help=("Filepath(s) to save sink "
+                        "output to for external validation. If used with "
+                        "'--validation-cmd', this filepath will be appended "
+                        "to the end of the command string."))
+    parser.add_argument('--giles-mode', action='store_true',
+                        help=("Save sink output with giles-receiver compatible"
+                            " encoding, adding a U64 timestamp between header "
+                            "length and payload."))
+    # Detail for the specific run
+    parser.add_argument('--workers', type=int, default=1,
+                        help="Number of workers to use in the test.")
+    parser.add_argument('--sources', type=int, default=1,
+                        help="Number of sources the application listens on.")
+    parser.add_argument('--sinks', type=int, default=1,
+                        help="Number of sinks the application outputs to.")
+    parser.add_argument('--sink-mode', default='framed',
+                        choices=['newlines', 'framed'])
+    parser.add_argument('--batch-size', type=int, default=1,
+                        help=("The batch size to use in the senders. "
+                              "The same batch size is used in all senders."))
+    parser.add_argument('--resilience-dir', type=str, default='/tmp/res-dir',
+                        help=("The path of the resilience data files."))
+
+    # When to stop the run and begin validation
+    stopper = parser.add_mutually_exclusive_group()
+    expect = stopper.add_argument_group('Sink Expect')
+    expect.add_argument('--sink-expect', type=int, action='append',
+                        help=("How many messages to expect at each sink."))
+    expect.add_argument('--sink-expect-timeout', type=float,
+                        help=("Timeout in seconds before raising a "
+                              "TimeoutError"))
+    stopper.add_argument('--delay', type=float, default=None,
+                         help=("The delay between end of senders and output "
+                               "validation. Inferred from metrics data if not "
+                               "set"))
+
+    parser.add_argument('--command', type=str,
+                        help=("The base command to run the Wallaroo "
+                              "application. e.g. 'machida --application-module"
+                              " reverse'."))
+
+    log_group = parser.add_argument_group('Logging')
+    log_group.add_argument('--log-file', help=("Save integration test output"
+                           " to file."), action=SetLogFile)
+    log_group.add_argument('--log-level', help=("Set the logging level."),
+                           choices=['none', 'debug', 'info', 'warning',
+                                    'error', 'critical'],
+                           default='info')
+
+    args = parser.parse_args()
+    set_log_level(args.log_level)
+
+    # If --validation-cmp, make sure expected_val is not None
+    if args.validation_cmp:
+        if args.expected_file:
+            args.expected_val = open(args.expected_file, 'rb')
+        if not args.expected_val:
+            parser.error("either '--expected-csv', '--expected-string' "
+                         "or '--expected-file' must be used with "
+                         "'--validation-cmp'.")
+    if args.validation_cmd:
+        if not args.output:
+            parser.error("'--output' is required with '--validation-cmd'")
+        validation_cmd = '%s %s' % (args.validation_cmd, args.output)
+    else:
+        validation_cmd = None
+
+    logging.debug("Running integration test with the following options:")
+    for k, v in args._get_kwargs():
+        logging.debug('%s: %r' % (k, v))
+
+    # Run the test!
+    try:
+        pipeline_test(generator = args.generators,
+                      expected = args.expected_val,
+                      command = args.command,
+                      workers = args.workers,
+                      sources = args.sources,
+                      sinks = args.sinks,
+                      mode = args.sink_mode,
+                      batch_size = args.batch_size,
+                      sink_expect = args.sink_expect,
+                      sink_expect_timeout = args.sink_expect_timeout,
+                      delay = args.delay,
+                      validate_file = (args.output if args.validation_cmd else
+                                       False),
+                      giles_mode = 'giles' if args.giles_mode else None,
+                      host=args.host,
+                      resilience_dir=args.resilience_dir)
+    except Exception as err:
+        logging.error("Encountered an error while running the test for %r"
+                      % args.command)
+        logging.exception(err)
+        parser.exit(1)
+
+    if validation_cmd:
+        (success, out, ret_code, cmd) = ex_validate(validation_cmd)
+        if success:
+            if out:
+                logging.info("Validation command '%s' completed successfully "
+                             "with the output:\n--\n%s", ' '.join(cmd), out)
+            else:
+                logging.info("Validation command '%s' completed successfully",
+                             ' '.join(cmd))
+        else:
+            logging.error("Validation command '%s' failed with the output:\n--\n%s",
+                         ' '.join(cmd), out)
+
+        if logging.root.level > logging.ERROR:
+            # If failed, and logging level means we didn't log error, include it
+            # in exit message
+            parser.exit(ret_code, out)
+        else:
+            parser.exit(ret_code)
+
+    # Reached the end and nothing broke. Success!
+    logging.info("Integration test completed successfully for command %r" %
+                 args.command)
+
+
+if __name__ == '__main__':
+    CLI()

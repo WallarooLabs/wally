@@ -1,8 +1,8 @@
 # Setting Up Your MacOS Environment for Wallaroo
 
-These instructions have been tested on OSX El Capitan and MacOS Sierra. 
+These instructions have been tested on OSX El Capitan and MacOS Sierra.
 
-There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment. 
+There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
 ## Installing Xcode Command Line Tools
 
@@ -45,13 +45,13 @@ $ brew install pcre2 libressl
 
 ### Installing ponyc
 
-Now you need to install the Sendence fork of the Pony compiler `ponyc`.
+Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`.
 
 ```bash
 cd ~/
-git clone https://github.com/sendence/ponyc
-cd ponyc
-git checkout sendence-19.2.8
+wget https://github.com/WallarooLabs/ponyc/archive/wallaroolabs-19.2.14.tar.gz
+tar xzfv wallaroolabs-19.2.14.tar.gz
+cd ponyc-wallaroolabs-19.2.14
 sudo make config=release install
 ```
 
@@ -75,6 +75,20 @@ make
 sudo make install
 ```
 
+## Install Compression Development Libraries
+
+Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
+
+```bash
+brew install snappy lz4
+```
+
+## Install Python Development Libraries
+
+```bash
+brew install python
+```
+
 ## Install Docker
 
 You'll need Docker to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/docker-for-mac/) for getting Docker up and running on MacOS on the [Docker website](https://docs.docker.com/docker-for-mac/). Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/docker-for-mac/#general).
@@ -82,7 +96,7 @@ You'll need Docker to run the Wallaroo metrics UI. There are [instructions](http
 ## Install the Metrics UI
 
 ```bash
-docker pull sendence/wallaroo-metrics-ui:pre-0.0.1
+docker pull sendence/wallaroo-metrics-ui:0.1
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -99,13 +113,41 @@ This will be our base directory in what follows. If you haven't already
 cloned the Wallaroo repo, do so now:
 
 ```bash
-git clone https://github.com/sendence/wallaroo
-git checkout 0.0.1-rc15
+git clone https://github.com/WallarooLabs/wallaroo
+cd wallaroo
+git checkout 0.1.0-rc1
 ```
 
 Note: You need to login to GitHub for credentials
 
 This will create a subdirectory called `wallaroo`.
+
+## Installing Machida
+
+Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/machida
+make
+```
+
+## Install Giles Sender
+
+Giles Sender is used to supply data to Wallaroo applications over TCP.
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/sender
+make
+```
+
+## Install Giles Receiver
+
+Giles Receiver receives data from Wallaroo over TCP.
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/giles/receiver
+make
+```
 
 ## Conclusion
 

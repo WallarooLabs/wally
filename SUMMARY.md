@@ -1,4 +1,4 @@
-# Sendence Wallaroo
+# Wallaroo
 
 * [What is Wallaroo?](book/what-is-wallaroo.md)
 
@@ -10,15 +10,18 @@
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Partitioning](book/core-concepts/partitioning.md)
 * [Decoders and Encoders](book/core-concepts/decoders-and-encoders.md)
+* [Clustered Wallaroo](book/clustering.md)
 
 ## Developing with Wallaroo
 
 * [Setting up Your Environment](book/getting-started/setup.md)
   * [MacOS Installation](book/getting-started/macos-setup.md)
   * [Ubuntu Installation](book/getting-started/linux-setup.md)
+  * [Windows Installation](book/getting-started/windows-setup.md)
 * [Run a Wallaroo Application](book/getting-started/run-a-application.md)
 * [Conclusion](book/getting-started/conclusion.md)
 
+<!--
 ### Wallaroo C++ API
 * [C++ API Introduction](book/cpp/intro.md)
 * [C++ Sample Application](book/cpp/sample-application.md)
@@ -44,22 +47,28 @@
    * [StateComputation](book/cpp/api/state-computation.md)
    * [State](book/cpp/api/state.md)
    * [UserFunctions](book/cpp/api/user-functions.md)
+-->
 
 ### Wallaroo Python API
 * [Python API Introduction](book/python/intro.md)
-* [Building a Python Application](book/python/building.md)
+* [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
 * [Writing Your Own Application](book/python/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
 * [Writing Your Own Partitioned Stateful Application](book/python/writing-your-own-partitioned-stateful-application.md).
-* [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)  
+* [Word Count](book/python/word-count.md)
+* [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)
 * [Wallaroo Python API](book/python/api.md)
+
+### Debugging Python Wallaroo Applications
+* [Debugging](book/python/debugging.md)
+* [Remote Debugging Setup for Windows](book/python/windows-remote-debugging-setup.md)
+   * [Remote Debugging Using Wing IDE](book/python/wing-remote-debugging.md)
 
 ## Appendix
 * [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
 * [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
-* [Writing Your Own Data Feed](book/appendix/writing-your-own-feed.md)
 
 ## Legal
 * [Terms and Conditions](book/legal/terms.md)

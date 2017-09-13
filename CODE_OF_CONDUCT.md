@@ -37,7 +37,7 @@ This Code of Conduct applies both within project spaces and in public spaces whe
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project team at coc@sendence.com. All complaints will be reviewed and investigated and will result in a response that is deemed necessary and appropriate to the circumstances. The project team is obligated to maintain confidentiality with regard to the reporter of an incident. Further details of specific enforcement policies may be posted separately.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project team at coc@wallaroolabs.com. All complaints will be reviewed and investigated and will result in a response that is deemed necessary and appropriate to the circumstances. The project team is obligated to maintain confidentiality with regard to the reporter of an incident. Further details of specific enforcement policies may be posted separately.
 
 Project maintainers who do not follow or enforce the Code of Conduct in good faith may face temporary or permanent repercussions as determined by other members of the project's leadership.
 
@@ -68,6 +68,6 @@ Our last social rule bans subtle racism, sexism, homophobia, transphobia, and ot
 
 Subtle -isms are small things that make others feel uncomfortable, things that we all sometimes do by mistake. For example, saying "It's so easy my grandmother could do it" is a subtle -ism. Like the other three social rules, this one is often accidentally broken. Like the other three, it's not a big deal to mess up – you just apologize and move on.
 
-If you see a subtle -ism in the Wallaroo community, you can point it out to the relevant person, either publicly or privately, or you can ask one of the project maintainers to say something. After this, we ask that all further discussion move off of public channels. If you are a third party, and you don't see what could be biased about the comment that was made, feel free to talk to the project maintainers. Please don't say, "Comment X wasn't homophobic!" Similarly,please don't pile on to someone who made a mistake. The "subtle" in "subtle -isms" means that it's probably not obvious to everyone right away what was wrong with the comment.
+If you see a subtle -ism in the Wallaroo community, you can point it out to the relevant person, either publicly or privately, or you can ask one of the project maintainers to say something. After this, we ask that all further discussion move off of public channels. If you are a third party, and you don't see what could be biased about the comment that was made, feel free to talk to the project maintainers. Please don't say, "Comment X wasn't homophobic!" Similarly, please don't pile on to someone who made a mistake. The "subtle" in "subtle -isms" means that it's probably not obvious to everyone right away what was wrong with the comment.
 
 If you have any questions about any part of the code of conduct or social rules, please feel free to reach out to any of the project maintainers.

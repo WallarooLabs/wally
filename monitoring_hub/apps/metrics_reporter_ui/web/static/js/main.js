@@ -8,9 +8,11 @@ import App from "./buffy-ui/components/App"
 import Applications from "./buffy-ui/components/Applications"
 import AppDashboardContainer from "./buffy-ui/components/applications/AppDashboardContainer"
 import SourceDashboardContainer from "./buffy-ui/components/sources/SourceDashboardContainer"
+import IngestionSourceDashboardContainer from "./buffy-ui/components/sources/IngestionSourceDashboardContainer"
 import Perf from "react-addons-perf"
 import PhoenixConnector from "./buffy-ui/streaming/PhoenixConnector"
 import WorkersDashboardContainer from "./buffy-ui/components/applications/WorkersDashboardContainer"
+import WorkerDashboardContainer from "./buffy-ui/components/applications/WorkerDashboardContainer"
 
 window.Perf = Perf;
 
@@ -23,8 +25,8 @@ render(
 				<Route path=":appName">
 					<Route path="dashboard"component={AppDashboardContainer}/>
 					<Route path="workers-dashboard" component={WorkersDashboardContainer}/>
-					<Route path=":sourceType/:sourceName" component={SourceDashboardContainer}>
-					</Route>
+					<Route path="start-to-end/:sourceName" component={IngestionSourceDashboardContainer}/>
+					<Route path=":sourceType/:sourceName" component={SourceDashboardContainer}/>
 				</Route>
 			</Route>
 		</Route>

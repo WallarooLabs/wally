@@ -16,8 +16,10 @@ The recommended way to create your topology structure is by using the [Applicati
 * [Data](#data)
 * [Key](#key)
 * [PartitionFunction](#partitionfunction)
-* [SinkEncoder](#sinkencoder)
-* [SourceDecoder](#sourcedecoder)
+* [TCPSinkEncoder](#tcpsinkencoder)
+* [TCPSourceDecoder](#tcpsourcedecoder)
+* [KafkaSinkEncoder](#kafkasinkencoder)
+* [kafkaSourceDecoder](#kafkasourcedecoder)
 * [State](#state)
 * [StateBuilder](#statebuilder)
 * [StateComputation](#statecomputation)
@@ -32,10 +34,14 @@ For a simple application with a `Decoder`, `Computation`, and `Encoder`, this fu
 
 ```python
 def application_setup(args):
+    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+
     ab = wallaroo.ApplicationBuilder("My Application")
-    ab.new_pipeline("pipeline 1", Decoder())
+    ab.new_pipeline("pipeline 1",
+                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
     ab.to(Computation)
-    ab.to_sink(Encoder())
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
     ab.done()
     return ab.build()
 ```
@@ -54,9 +60,9 @@ The `ApplicationBuilder` class in `wallaroo` is a utility for constructing appli
 
 Create a new application with the name `name`.
 
-##### `new_pipeline(name, decoder[, coalescing=True])`
+##### `new_pipeline(name, source_config)`
 
-Create a new pipline with the name `name`, and a `decoder` instance of [SourceDecoder](#sourcedecoder).
+Create a new pipline with the name `name` and a source config object.
 
 If you're adding more than one pipeline, make sure to call `done()` before creating another pipeline.
 
@@ -68,7 +74,13 @@ This is necessary if you intend to add another pipeline.
 
 ##### `to(computation_cls)`
 
-Add a stateless computation _class_ to the current pipeline.
+Add a stateless computation _class_ to the current pipeline. Only a single instance of the computation will be created.
+
+Note that this method takes a _class_, rather than an _instance_ as its argument. `computation_cls` must be a [Computation](#computation).
+
+##### `to_parallel(computation_cls)`
+
+Add a stateless computation _class_ to the current pipeline. Creates one copy of the computation per worker in the cluster allowing you to parallelize stateless work.
 
 Note that this method takes a _class_, rather than an _instance_ as its argument. `computation_cls` must be a [Computation](#computation).
 
@@ -81,7 +93,6 @@ Add a StateComputation _instance_, along with a [StateBuilder](#statebuilder) _i
 `state_builder` must be a [StateBuilder](#statebuilder).
 
 `state_name` must be a str. `state_name` is the name of the state object that we will run computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and in this way, acts as a sort of namespace.
-
 
 ##### `to_state_partition(computation, state_builder, state_partition_name, partition_function, partition_keys)`
 
@@ -111,9 +122,9 @@ Add a partitioned stateful computation to the current pipeline.
 
 `partition_keys` must be a list of non-negative `int`.
 
-##### `to_sink(encoder)`
+##### `to_sink(sink_config)`
 
-Add a sink to the end of a pipeline. `encoder` must be an instance of [SinkEncoder](#sourcedecoder).
+Add a sink to the end of a pipeline. `sink_config` must be an instance of a sink configuration.
 
 ##### `build()`
 
@@ -133,7 +144,11 @@ Return the name of the computaiton as a string.
 
 Use `data` to perform a computation and return a new output. `data` is the python object the previous step in the pipeline returned.
 
-#### Example Computation
+##### `compute_multi(data)`
+
+Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects. Each item in the list will arrive individually at the next step; i.e. not as a list.
+
+#### Example Computations
 
 A Computation that doubles an integer, or returns 0 if its input was not an int:
 
@@ -147,6 +162,20 @@ class Computation(object):
             return data*2
         else
             return 0
+```
+
+A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, we filter aka drop the message by returning `None`.
+
+```python
+class Computation(object):
+    def name(self):
+        return "double"
+
+    def compute_multi(data):
+        if isinstance(data, int):
+            return [data, data*2]
+        else
+            return None
 ```
 
 ### Data
@@ -180,19 +209,19 @@ PartitionFunction(object):
             return ''
 ```
 
-### SinkEncoder
+### TCPSinkEncoder
 
-The `SinkEncoder` is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out over the network to any receivers.
+The `TCPSinkEncoder` is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out over a TCP connection.
 
-To do this, a `SinkEncoder` class must provide the `encode(data)` method.
+To do this, a `TCPSinkEncoder` class must provide the `encode(data)` method.
 
 ##### `encode(data)`
 
 Return a `bytes` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes`, and what information to keep or discard.
 
-#### Example SinkEncoder
+#### Example TCPSinkEncoder
 
-A complete `SinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian Longs preceded by a big-endian short representing the number of integers in the list:
+A complete `TCPSinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian Longs preceded by a big-endian short representing the number of integers in the list:
 
 ```python
 class Encoder(object):
@@ -201,13 +230,13 @@ class Encoder(object):
         return struct.pack(fmt, len(data), *data)
 ```
 
-### SourceDecoder
+### TCPSourceDecoder
 
-The `SourceDecoder` is responsible for two tasks:
+The `TCPSourceDecoder` is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input connection.
 2. Converting those bytes into an object that the rest of the application can process.
 
-To do this, a `SourceDecoder` class must implement the following three methods:
+To do this, a `TCPSourceDecoder` class must implement the following three methods:
 
 ##### `header_length()`
 
@@ -231,9 +260,9 @@ Return a python a python object of the type the next step in the pipeline expect
 
 `bs` is a `bytes` of the length returned by [payload_length](#payload-length(bs)), and it is up to the developer to translate that into a python object.
 
-#### Example SourceDecoder
+#### Example TCPSourceDecoder
 
-A complete SourceDecoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bt unsigned int in its _payload_:
+A complete TCPSourceDecoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bt unsigned int in its _payload_:
 
 ```python
 class Decoder(object):
@@ -243,6 +272,50 @@ class Decoder(object):
     def payload_length(self, bs):
          return struct.unpack('>L', bs)
 
+    def decode(self, bs):
+        return struct.unpack('>1sL', bs)
+```
+
+### KafkaSinkEncoder
+
+The `KafkaSinkEncoder` is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out to a Kafka sink, along with a `key` or `None`.
+
+To do this, a `KafkaSinkEncoder` class must provide the `encode(data)` method.
+
+##### `encode(data)`
+
+Return a tuple of `(bytes, key)` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes` and `key`, and what information to keep or discard.
+
+#### Example KafkaSinkEncoder
+
+A complete `KafkaSinkEncoder` example that takes a word and sends it to the partition corresponding to the first letter of the word:
+
+```python
+class Encoder(object):
+    def encode(self, data):
+        word = data[:]
+        letter_key = data[0]
+        return (word, letter_key)
+```
+
+### KafakSourceDecoder
+
+The `TCPSourceDecoder` is responsible for converting bytes into an object that the rest of the application can process.
+
+To do this, a `KafkaSourceDecoder` class must implement the following method:
+
+##### `decode(bs)`
+
+Return Python object of the type the next step in the pipeline expects.
+
+`bs` is a `bytes` of the length returned by [payload_length](#payload-length(bs)), and it is up to the developer to translate that into a Python object.
+
+#### Example KafkaSourceDecoder
+
+A complete KafkaSourceDecoder example that decodes messages with a 32-bit unsigned int in its _payload_:
+
+```python
+class Decoder(object):
     def decode(self, bs):
         return struct.unpack('>1sL', bs)
 ```
@@ -313,12 +386,16 @@ Return the name of the computation as a string.
 
 `data` is anything that was returned by the previous step in the pipeline, and `state` is provided by the [StateBuilder](#statebuilder) that was defined for this step in the pipeline definition.
 
-Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. The second element, is a boolean value instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
+Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. Returning `None` will stop processing and no messages will be sent to the next step. The second element is a boolean value instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
 
 Why wouldn't we always return `True`? There are two answers:
 
 1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
+
+##### `compute_multi(data, state)`
+
+Same as `compute` but the first element of the return tuple is a list of messages to send on to our next step. Allows taking a single input message and creating multiple outputs. Each item in the list will arrive individually at the next step; i.e. not as a list.
 
 #### Example StateComputation
 
@@ -336,3 +413,11 @@ class StateComputation(object):
             pass
         return (state.get_max(), True)
 ```
+
+### TCPSourceConfig
+
+A `TCPSourceConfig` object specifies the host, port, and encoder to use for a TCP source connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `new_pipeline`.
+
+### TCPSinkConfig
+
+A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `to_sink`.

@@ -1,3 +1,21 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
 """
 Market Spread App
 
@@ -15,34 +33,40 @@ giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 127.0.0.1:5555
 350 Symbols
 
 3a) market spread app (1 worker):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t --ponythreads=4 --ponynoblock
 
 3b) market spread app (2 workers):
 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock -t -w 2
 
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
 
-4) orders:
-giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
+4) initial nbbo (must be sent in or all orders will be rejected):
+giles/sender/sender -h 127.0.0.1:7001 -m 350 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 
-5) nbbo:
-giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+5) orders:
+giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
+
+6) nbbo:
+giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 
 R3K or other Symbol Set (700, 1400, 2100)
 
 3a) market spread app (1 worker):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../demos/marketspread/r3k-legal-symbols.msg -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg --ponythreads=4 --ponynoblock
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -t -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock
 
 3b) market spread app (2 workers):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../demos/marketspread/r3k-legal-symbols.msg -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg --ponythreads=4 --ponynoblock -t -w 2
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../../data/market_spread/symbols/r3k-legal-symbols.msg --ponythreads=4 --ponynoblock -t -w 2
 
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -n worker2 --ponythreads=4 --ponynoblock
 
-4) orders:
-giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/r3k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
+4) initial nbbo (must be sent in or all orders will be rejected):
+giles/sender/sender -h 127.0.0.1:7001 -m 2926 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/r3k-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 
-5) nbbo:
-giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/r3k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+5) orders:
+giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f testing/data/market_spread/orders/r3k-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
+
+6) nbbo:
+giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/r3k-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 """
 use "assert"
 use "buffered"
@@ -50,25 +74,26 @@ use "collections"
 use "net"
 use "serialise"
 use "time"
-use "sendence/bytes"
-use "sendence/fix"
-use "sendence/hub"
-use "sendence/new_fix"
-use "sendence/options"
-use "sendence/wall_clock"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/conversions"
+use "wallaroo_labs/fix"
+use "wallaroo_labs/hub"
+use "wallaroo_labs/new_fix"
+use "wallaroo_labs/options"
+use "wallaroo_labs/time"
 use "wallaroo"
-use "wallaroo/fail"
-use "wallaroo/invariant"
-use "wallaroo/metrics"
-use "wallaroo/state"
-use "wallaroo/tcp_source"
-use "wallaroo/topology"
+use "wallaroo/core/fail"
+use "wallaroo/core/invariant"
+use "wallaroo/core/metrics"
+use "wallaroo/core/sink/tcp_sink"
+use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>
     try
-      var initial_nbbo_file_path =
-        "../../demos/marketspread/initial-nbbo-fixish.msg"
       var symbols_file_path: (String | None) = None
       let options = Options(env.args, false)
 
@@ -78,8 +103,6 @@ actor Main
 
       for option in options do
         match option
-        | ("initial-nbbo-file", let arg: String) =>
-          initial_nbbo_file_path = arg
         | ("symbols-file", let arg: String) =>
           symbols_file_path = arg
         end
@@ -94,10 +117,7 @@ actor Main
               env.root as AmbientAuth))
         end
 
-      let init_file = InitFile(initial_nbbo_file_path, 46)
-
-      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn =
-        recover Array[Array[ByteSeq] val] end
+      let initial_report_msgs_trn = recover trn Array[Array[ByteSeq] val] end
       let connect_msg = HubProtocol.connect()
       let join_msg = HubProtocol.join("reports:market-spread")
       initial_report_msgs_trn.push(connect_msg)
@@ -108,17 +128,20 @@ actor Main
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixOrderMessage val, Array[ByteSeq] val](
-            "Orders", FixOrderFrameHandler)
+            "Orders",
+            TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0)))
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String,
               (Array[ByteSeq] val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
-            .to_sink(EmptyEncoder, recover [0] end,
-              initial_report_msgs)
+            .to_sink(TCPSinkConfig[Array[ByteSeq] val].from_options(EmptyEncoder,
+              TCPSinkConfigCLIParser(env.args)(0), initial_report_msgs))
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler
-              where init_file = init_file)
+            "Nbbo",
+            TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
@@ -180,12 +203,12 @@ class SymbolDataStateChange is StateChange[SymbolData]
   fun write_log_entry(out_writer: Writer) =>
     out_writer.f64_be(_last_bid)
     out_writer.f64_be(_last_offer)
-    out_writer.bool(_should_reject_trades)
+    out_writer.u8(BoolConverter.bool_to_u8(_should_reject_trades))
 
   fun ref read_log_entry(in_reader: Reader) ? =>
     _last_bid = in_reader.f64_be()
     _last_offer = in_reader.f64_be()
-    _should_reject_trades = in_reader.bool()
+    _should_reject_trades = BoolConverter.u8_to_bool(in_reader.u8())
 
 class SymbolDataStateChangeBuilder is StateChangeBuilder[SymbolData]
   fun apply(id: U64): StateChange[SymbolData] =>
@@ -224,9 +247,9 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     state_change.update(should_reject_trades, msg.bid_px(), msg.offer_px())
     (None, state_change)
 
-  fun state_change_builders(): Array[StateChangeBuilder[SymbolData] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[SymbolData]] val =>
     recover val
-      let scbs = Array[StateChangeBuilder[SymbolData] val]
+      let scbs = Array[StateChangeBuilder[SymbolData]]
       scbs.push(recover val SymbolDataStateChangeBuilder end)
     end
 
@@ -247,9 +270,9 @@ class CheckOrder is StateComputation[FixOrderMessage val, Array[ByteSeq] val,
       (None, None)
     end
 
-  fun state_change_builders(): Array[StateChangeBuilder[SymbolData] val] val =>
+  fun state_change_builders(): Array[StateChangeBuilder[SymbolData]] val =>
     recover val
-      Array[StateChangeBuilder[SymbolData] val]
+      Array[StateChangeBuilder[SymbolData]]
     end
 
 primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
@@ -382,7 +405,7 @@ class LegalSymbols
   let symbols: Array[String] val
 
   new create() =>
-    let padded: Array[String] trn = recover Array[String] end
+    let padded = recover trn Array[String] end
     for symbol in RawSymbols().values() do
       padded.push(RawSymbols.pad_symbol(symbol))
     end

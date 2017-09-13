@@ -19,13 +19,6 @@ sudo: required
 
 matrix:
   include:
-    - os: osx
-      env:
-        - LLVM_VERSION="3.9.1"
-        - LLVM_CONFIG="llvm-config-3.9"
-        - CC1=clang-3.9
-        - CXX1=clang++-3.9
-        - lto=no
     - os: linux
       addons:
         apt:
@@ -40,12 +33,15 @@ matrix:
         - CXX1=g++-5
         - lto=no
 
+before_install:
+- echo -e "machine github.com\n  login $CI_USER_TOKEN" >> ~/.netrc
+
 install:
   # Based on how travis-ci works, when this is run, we are in the source
-  # directory for Buffy. This means, when we go to git clone and install
+  # directory for Wallaroo. This means, when we go to git clone and install
   # dependencies, we need to leave that directory and then return to it when
   # done.
-  # If we clone into the Buffy directory, our recursive Makefile will try to
+  # If we clone into the Wallaroo directory, our recursive Makefile will try to
   # build the cloned dependencies and fail
   # If we clone our dependencies into another directory using `cd` and don't
   # return to our starting directory, then our `script` step will fail because
@@ -83,9 +79,9 @@ install:
       tar zxvf cmake-3.5.2-Linux-x86_64.tar.gz;
       export PATH=/tmp/dl/cmake-3.5.2-Linux-x86_64/bin:$PATH;
     fi;
-  - echo "Installing sendence/ponyc";
+  - echo "Installing WallarooLabs/ponyc";
     cd /tmp;
-    git clone git@github.com:Sendence/ponyc.git;
+    git clone git@github.com:WallarooLabs/ponyc.git;
     cd ponyc;
     make CC=$CC1 CXX=$CXX1;
     sudo make install;
@@ -95,12 +91,35 @@ install:
     cd pony-stable;
     git checkout 0054b429a54818d187100ed40f5525ec7931b31b;
     sudo make install;
+  - echo "Installing snappy and lz4";
+  - if [ "${TRAVIS_OS_NAME}" = "osx" ];
+    then
+      brew install snappy lz4;
+    fi
+  - if [ "${TRAVIS_OS_NAME}" = "linux" ];
+    then
+      sudo apt-get install libsnappy-dev;
+      cd /tmp;
+      wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz;
+      tar zxvf liblz4-1.7.5.tar.gz;
+      cd lz4-1.7.5;
+      sudo make install;
+    fi
   - cd $INSTALL_STARTED_AT
   - if [ "${TRAVIS_OS_NAME}" = "osx" ];
     then
-      brew install elixir;
+      brew install erlang@18;
+      brew link erlang@18 --force;
+      cd /tmp;
+      mkdir elixir-1.2.6;
+      wget https://github.com/elixir-lang/elixir/releases/download/v1.2.6/Precompiled.zip;
+      tar -xvf Precompiled.zip -C elixir-1.2.6;
+      ln -s /tmp/elixir-1.2.6/bin/elixir /usr/local/bin/elixir;
+      ln -s /tmp/elixir-1.2.6/bin/mix /usr/local/bin/mix;
+      ln -s /tmp/elixir-1.2.6/bin/iex /usr/local/bin/iex;
       mix local.hex --force;
       mix local.rebar --force;
+      cd $INSTALL_STARTED_AT;
     fi;
   - if [ "${TRAVIS_OS_NAME}" = "linux" ];
     then
@@ -114,5 +133,7 @@ install:
       mix local.hex --force;
       mix local.rebar --force;
     fi;
+  - echo "Installing pytest";
+    sudo python2 -m pip install pytest==3.2.2
 script:
-  - make test
+  - make test debug=true

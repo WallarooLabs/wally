@@ -1,3 +1,21 @@
+/*
+
+Copyright 2017 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
 """
 Giles Sender
 """
@@ -8,10 +26,11 @@ use "files"
 use "net"
 use "random"
 use "time"
-use "sendence/bytes"
-use "sendence/messages"
-use "sendence/options"
-use "sendence/tcp"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/options"
+use "wallaroo_labs/tcp"
+use "wallaroo_labs/time"
 
 // documentation
 // more tests
@@ -269,7 +288,7 @@ class ToDagonNotify is TCPConnectionNotify
       try
         let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: ExternalStartMsg val =>
+        | let m: ExternalStartMsg =>
             _coordinator.go()
         else
           @printf[I32]("Unexpected message from Dagon\n".cstring())
@@ -546,7 +565,7 @@ actor SendingActor
         _to_host_socket.write(i)
       end
       if _write_to_file then
-        _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
+        _store.sentv(consume d', WallClock.nanoseconds())
       end
     else
       _finished = true

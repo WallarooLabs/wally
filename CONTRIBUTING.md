@@ -1,71 +1,138 @@
 # Contributing
 
-## Public Visibility
+You want to contribute to Wallaroo? Awesome.
 
-*DO NOT COMMIT ANYTHING YOU/WE DO NOT WANT BECOMING PUBLIC LATER*.
+There are a number of ways to contribute to Wallaroo. As this document is a little long, feel free to jump to the section that applies to you currently:
 
-At this time, this repo is private and not open to the public. However, at some
-point we are going to open source all/parts of Buffy. The easiest way to do that
-is to switch this repo from private to public. It is entirely possible that
-anything you commit now will be made public later in commit comments, history
-etc. 
+* [Bug report](#bug-report)
+* [How to contribute](#how-to-contribute)
+* [Pull request](#pull-request)
 
-## Commit Messages
+Additional notes regarding formatting:
 
-Before contributing any code to this repo, please read 
-[How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/).
-And then, follow it. And remember, if you have time to commit code, you have
-time to write a good commit message; that includes you Sean.
+* [Documentation formatting](#documentation-formatting)
+* [Code formatting](#code-formatting)
+* [Standard Library File Naming](#standard-library-file-naming)
 
-## Code Formatting
+## Bug report
+
+First of all please [search existing issues](https://github.com/wallaroolabs/wallaroo/issues) to make sure your issue hasn't already been reported. If you cannot find a suitable issue — [create a new one](https://github.com/WallarooLabs/wallaroo/issues/new).
+
+Provide the following details:
+
+  - short summary of what you were trying to achieve,
+  - a code snippet causing the bug,
+  - expected result,
+  - actual results and
+  - environment details: at least operating system version
+
+If possible, try to isolate the problem and provide just enough code to demonstrate it. Add any related information which might help to fix the issue.
+
+## How to Contribute
+
+We use a fairly standard GitHub pull request workflow. If you have already contributed to a project via GitHub pull request, you can skip this section and proceed to the [specific details of what we ask for in a pull request](#pull-request). If this is your first time contributing to a project via GitHub, read on.
+
+Here is the basic GitHub workflow:
+
+1. Fork the Wallaroo repo. you can do this via the GitHub website. This will result in you having your own copy of the Wallaroo repo under your GitHub account. 
+2. Clone your Wallaroo repo to your local machine
+3. Make a branch for your change
+4. Make your change on that branch
+5. Push your change to your repo 
+6. Use the github ui to open a PR
+
+Some things to note that aren't immediately obvious to folks just starting out:
+
+1. Your fork doesn't automatically stay up to date with changes in the main repo.
+2. Any changes you make on your branch that you used for one PR will automatically appear in another PR so if you have more than 1 PR, be sure to always create different branches for them.
+3. Weird things happen with commit history if you don't create your PR branches off of `master` so always make sure you have the `master` branch checked out before creating a branch for a PR
+
+If you feel overwhelmed at any point, don't worry, it can be a lot to learn when you get started. Feel free to reach out via [IRC](https://webchat.freenode.net/?channels=%wallaroo) or the [Wallaroo mailing list](https://groups.io/g/wallaroo) for assistance.
+
+You can get help using GitHub via [the official documentation](https://help.github.com/). Some hightlights include:
+
+- [Fork A Repo](https://help.github.com/articles/fork-a-repo/)
+- [Creating a pull request](https://help.github.com/articles/creating-a-pull-request/)
+- [Syncing a fork](https://help.github.com/articles/syncing-a-fork/)
+
+## Pull request
+
+Before issuing a pull request we ask that you squash all your commits into a single logical commit. While your PR is in review, we may ask for additional changes, please do not squash those commits while the review is underway. Once everything is good, we'll then ask you to further squash those commits before merging. We ask that you not squash while a review is underway as it can make it hard to follow what is going on. Additionally, we ask that you:
+
+* [Write a good commit message](http://chris.beams.io/posts/git-commit/)
+* Issue 1 Pull Request per feature. Don't lump unrelated changes together.
+
+If you aren't sure how to squash multiple commits into one, Steve Klabnik wrote [a handy guide](http://blog.steveklabnik.com/posts/2012-11-08-how-to-squash-commits-in-a-github-pull-request) that you can refer to.
+
+Once those conditions are met, the PR can be merged.
+
+Please note, if your changes are purely to things like README, CHANGELOG etc, you can add [skip ci] as the last line of your commit message and your PR won't be run through our continuous integration systems. We ask that you use [skip ci] where appropriate as it helps to get changes through CI faster and doesn't waste resources that TravisCI is kindly donating to the Open Source community.
+
+## Documentation formatting
+
+When contributing to documentation, try to keep the following style guidelines in mind:
+
+As much as possible all documentation should be textual and in Markdown format. Diagrams are often needed to clarify a point. For any images, an original high-resolution source should be provided as well so updates can be made.
+
+Documentation is not "source code." As such, it should not be wrapped at 80 columns. Documentation should be allowed to flow naturally until the end of a paragraph. It is expected that the reader will turn on soft wrapping as needed.
+
+All code examples in documentation should be formatted in a fashion appropriate to the language in question.
+
+All command line examples in documentation should be presented in a copy and paste friendly fashion. Assume the user is using the `bash` shell. GitHub formatting on long command lines can be unfriendly to copy-and-paste. Long command lines should be broken up using `\` so that each line is no more than 80 columns. Wrapping at 80 columns should result in a good display experience in GitHub. Additionally, continuation lines should be indented two spaces. 
+
+OK:
+
+```bash
+my_command --some-option foo --path-to-file ../../wallaroo/long/line/foo \
+  --some-other-option bar
+```
+
+Not OK:
+
+```bash
+my_command --some-option foo --path-to-file ../../wallaroo/long/line/foo --some-other-option bar
+```
+
+Wherever possible when writing documentation, favor full command options rather than short versions. Full flags are usually much easier to modify because the meaning is clearer.
+
+OK:
+
+```bash
+my_command --messages 100
+```
+
+Not OK:
+
+```bash
+my_command -m 100
+```
+
+## Code formatting
+
+The basics:
 
 * Indentation
 
-We indent using spaces not tabs. Indentation is language specific: 2 spaces for
-Pony, 4 spaces for Python.
+We indent using spaces, not tabs. Indentation is language specific.
 
 * Watch your whitespace!
 
-Use an editor plugin to remove unused trailing whitespace. This includes both at
-the end of a line and at the end of a file. By the same token, remember to leave
-a single newline only line at the end of each file. It makes output files to the
-console much more pleasant.
+Use an editor plugin to remove unused trailing whitespace including both at the end of a line and at the end of a file. By the same token, remember to leave a single newline only line at the end of each file. It makes output files to the console much more pleasant.
 
 * Line Length
 
-We all have different sized monitors. What might look good on yours might look
-like awful on another. Be kind and wrap all lines at 80 columns unless you
-have a good reason not to.
+We all have different sized monitors. What might look good on yours might look like awful on another. Be kind and wrap all lines at 80 columns unless you have a good reason not to.
 
 * Reformatting code to meet standards
 
-Try to avoid doing it. A commit that changes the formatting for large chunks of
-a file makes for an ugly commit history when looking for important changes. This
-means, don't commit code that doesn't conform to coding standards in the first
-place. If you do reformat code, make sure it is either standalone reformatting
-with no logic changes or confined solely to code whose logic you touched. For
-example, changing the indentation in a file? Do not make logic changes along
-with it. Editing a line that has extra whitespace at the end? Feel free to
-remove it.
+Try to avoid doing it. A commit that changes the formatting for large chunks of a file makes for an ugly commit history when looking for changes. Don't commit code that doesn't conform to coding standards in the first place. If you do reformat code, make sure it is either standalone reformatting with no logic changes or confined solely to code whose logic you touched. For example, updating the indentation in a file? Do not make logic changes along with it. Editing a line that has extra whitespace at the end? Feel free to remove it.
 
-## Documentation
+The details:
 
-All documentation, be it textual, visual or what not, should include sources for
-that documentation so that anyone else can easily make modifications. For example,
-don't check in documentation in pdf format or as a png image.
+All Pony sources should follow the [Pony standard library style guide](https://github.com/ponylang/ponyc/blob/master/STYLE_GUIDE.md).
 
-### Appropriate Formats
+All Python sources should follow [PEP-8 formatting](https://www.python.org/dev/peps/pep-0008/).
 
-* Textual
+##  File naming
 
-We have 2 approved documentation formats. Markdown for simple documentation like
-this won't be repurposed for other mediums and org-mode format. Org-mode is used
-by more than 1 team member and makes a great end format medium. It is displayed
-with some decent formatting in GitHub and can be turned into PDF and a variety
-of other formats. Additionally, you can do basic org-mode format editing in any
-text editor although Emacs using org-mode is by far the best editor for handling
-it. 
-
-* Visual
-
-We've yet to settle on a source format for images, drawing etc.  
+Our Pony code follows the [Pony standard library file naming guidelines](https://github.com/ponylang/ponyc/blob/master/STYLE_GUIDE.md#naming).

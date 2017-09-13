@@ -1,184 +1,143 @@
-SENDENCE WALLAROO SOFTWARE EVALUATION LICENSING AGREEMENT
+# EVALUATION LICENSE AGREEMENT
 
+SENDENCE SOLUTIONS, INC. (“SENDENCE”) IS ONLY WILLING TO LICENSE THE SOFTWARE
+AND RELATED DOCUMENTATION PURSUANT TO THIS EVALUATION LICENSE AGREEMENT (
+“AGREEMENT”).  READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING AND USING SUCH
+SOFTWARE.  BY ACCESSING, INSTALLING, COPYING OR OTHERWISE USING THE SOFTWARE,
+YOU ACKNOWLEDGE AND AGREE ON BEHALF OF YOURSELF AND YOUR EMPLOYER (“LICENSEE”)
+TO BE BOUND TO THIS AGREEMENT AND THAT LICENSEE ACKNOWLEDGES THAT THIS
+AGREEMENT CREATES A LEGALLY ENFORCEABLE CONTRACT AND CONSTITUTES ACCEPTANCE OF
+ALL TERMS AND CONDITIONS OF THIS AGREEMENT WITHOUT MODIFICATION.  YOU
+REPRESENT THAT YOU ARE AUTHORIZED TO ACCEPT THIS AGREEMENT ON YOUR EMPLOYER’S
+BEHALF.  IF YOU DO NOT AGREE TO THE FOREGOING TERMS AND CONDITIONS, DO NOT
+INSTALL, COPY OR USE THE SOFTWARE.
 
-IMPORTANT--READ THESE TERMS CAREFULLY BEFORE CLONING, DOWNLOADING OR OTHERWISE
-ACCESSING SENDENCE WALLAROO SOFTWARE.
+1.  Evaluation License.  During the Term (defined below) and subject to the
+terms and conditions of this Agreement, Sendence grants to Licensee a
+nonexclusive, nonsublicensable, nontransferable, limited license to install,
+use, modify and create derivative works of the Software (defined below), on up
+to three (3) servers, for Licensee’s internal, evaluation of the Software in a
+non-production environment.  All licensed activity under this Section 1 shall
+be in accordance with and subject to Sendence’s documentation and any
+additional restrictions as are set forth herein.  “Software” means the
+Wallaroo platform software and related modules used by Licensee, in both
+object code and source code formats, and includes all updates, improvements,
+APIs and add-ons provided by Sendence with respect thereto.
 
+2.  Software Ownership; Restrictions.  Except as expressly and unambiguously
+set forth herein, Sendence and its licensors retain all right, title and
+interest in and to the Software, all copies, modifications and derivative
+works thereof, including without limitation, all rights to patent, copyright,
+trade secret and other proprietary or intellectual property rights related to
+any of the foregoing.  Licensee will maintain the copyright notice and any
+other notices or Software identifications that appear on or in the Software or
+any other media or documentation provided by Sendence hereunder.  Licensee
+will not (and will not allow any third party to) (i) use the Software in a
+production environment, (ii) provide, lease, lend, use for timesharing or
+service bureau purposes or otherwise use or allow others to use the Software
+for the benefit of any third party or (iii) allow the transfer, transmission,
+export, or re-export of the Software or any portion thereof or any technical
+data.  All the limitations and restrictions on the Software in this Agreement
+also apply to all documentation.
 
-This SOFTWARE EVALUATION LICENSE (“Agreement”) is a legal agreement between
-you (either an individual or an entity) (“Customer”) and Sendence Solutions,
-LLC. a Delaware corporation with offices at 222 Broadway, New York, NY 10038
-(“Sendence”), regarding software you have requested to clone, download, or
-otherwise access (the “Software”). BY USING THE SOFTWARE, CUSTOMER EXPRESSLY
-ACCEPTS AND AGREES TO THE TERMS OF THIS AGREEMENT. IF YOU ARE AN INDIVIDUAL
-AGREEING TO THE TERMS OF THIS AGREEMENT ON BEHALF OF AN ENTITY, SUCH AS YOUR
-EMPLOYER, YOU REPRESENT THAT YOU HAVE THE LEGAL AUTHORITY TO BIND THAT ENTITY
-AND “CUSTOMER” SHALL REFER HEREIN TO SUCH ENTITY. IF YOU DO NOT HAVE SUCH
-AUTHORITY, OR IF YOU DO NOT AGREE WITH THE TERMS OF THIS AGREEMENT, YOU MUST
-NOT ACCEPT THIS AGREEMENT AND MAY NOT USE THE SOFTWARE.
+3.  Feedback.  Licensee may, from time to time and in its sole discretion,
+make suggestions for changes, modifications or improvements to the Software (
+“Feedback”).  Sendence shall have an irrevocable, perpetual, worldwide,
+sublicenseable, transferable, full paid-up, royalty free right and license to
+use, distribute and otherwise exploit all Feedback for any purpose.
 
+4.  Confidential Information.  Each party agrees that all code, inventions,
+algorithms, know-how and ideas and all other business and technical
+information obtained from the other is the confidential property of the
+disclosing party (“Confidential Information’’ of the disclosing party).
+Except as allowed herein, during the Term of this Agreement and after any
+termination hereof, the receiving party will hold in confidence and not use or
+disclose any Confidential Information of the disclosing party and shall
+similarly bind its employees and independent contractors in writing.
+Confidential Information shall not include information the receiving party can
+document:  (i) is or has become readily publicly available without restriction
+through no fault of the receiving party or its employees or agents; or (ii) is
+received without restriction from a third party lawfully in possession of such
+information and lawfully empowered to disclose such information; or (iii) was
+rightfully in the possession of the receiving party without restriction prior
+to its disclosure by the other party; or (iv) was independently developed by
+employees or consultants of the receiving party.  If required by law, the
+receiving party may disclose Confidential Information of the disclosing party,
+but will give adequate prior notice of such disclosure to the disclosing party
+to permit the disclosing party to intervene and to request protective orders
+or other confidential treatment therefor.  Upon the expiration or termination
+of this Agreement, all of the Confidential Information (including any copies)
+will be returned to the disclosing party, and the receiving party will make no
+further use of such materials.  Money damages will not be an adequate remedy
+if this Section 4 is breached and, therefore, either party may, in addition to
+any other legal or equitable remedies, seek an injunction or other equitable
+relief against such breach or threatened breach without the necessity of
+posting any bond or surety.
 
-THIS SOFTWARE EVALUATION LICENSE AGREEMENT ("AGREEMENT") IS A LEGAL
-AGREEMENT BETWEEN SENDENCE SOLUTIONS LLC ("SENDENCE") AND THE BUSINESS ENTITY
-ON WHOSE BEHALF YOU ("YOU") ARE ACTING ("CUSTOMER") AS THE END USER OF THE
-SENDENCE SOFTWARE PRODUCT ACCOMPANYING THIS AGREEMENT, WHICH INCLUDES THE
-OBJECT CODE VERSION OF THE SOFTWARE AND MAY INCLUDE ASSOCIATED MEDIA, PRINTED
-MATERIALS,  AND DOCUMENTATION (COLLECTIVELY, THE "SOFTWARE"). THE SOFTWARE
-ALSO INCLUDES ANY UPDATES OR UPGRADES TO OR NEW VERSIONS OF THE ORIGINAL
-SOFTWARE, IF AND WHEN MADE AVAILABLE TO YOU BY SENDENCE.
+5.  No Cost License.  The Software and any related services shall be provided
+during the Term at no charge to Licensee.
 
+6.  Services.  No training or support services are provided under this
+Agreement.
 
-YOU AGREE THAT YOU ARE AN EMPLOYEE OR AGENT OF CUSTOMER AND ARE ENTERING INTO
-THIS AGREEMENT TO EVALUATE THE SOFTWARE FOR USE BY CUSTOMER FOR CUSTOMER'S
-OWN BUSINESS PURPOSES.  YOU HEREBY AGREE THAT YOU ENTER INTO THIS AGREEMENT
-ON BEHALF OF CUSTOMER AND THAT YOU HAVE THE AUTHORITY TO BIND CUSTOMER TO THE
-TERMS AND CONDITIONS OF THIS AGREEMENT.
+7.  Term and Termination.  This Agreement shall commence upon the initial
+download of the Software and shall continue for an initial term of ninety (90)
+days (the “Term”).  The licenses and services and all rights of Licensee will
+terminate on the last day of the Term.  The Term of this Agreement may only be
+renewed by mutual written agreement of the parties.  This Agreement may be
+terminated by either party upon ten (10) days prior written notice for any
+reason or no reason whatsoever.  After termination or expiration, if Licensee
+desires to continue using the Software, Licensee should contact Sendence to
+obtain pricing and other terms applicable to commercial use.  Upon any
+termination, Licensee shall immediately cease all use of the Software and
+return all Confidential Information to Sendence (including all copies and
+extracts thereof) and so certify the foregoing to Sendence.  The following
+provisions will survive termination: 2-4 and 7-10, as well as all license/use
+restrictions and confidentiality obligations. Termination is not an exclusive
+remedy and all other remedies will remain available.
 
+8.  Warranty Disclaimer.  The parties acknowledge that the Software is
+provided “AS IS” and may not be functional on any machine or in any
+environment.  SENDENCE MAKES NO WARRANTIES, EXPRESS OR IMPLIED, EITHER IN FACT
+OR BY OPERATION OF LAW, STATUTORY OR OTHERWISE, AND SENDENCE EXPRESSLY
+EXCLUDES AND DISCLAIMS ANY WARRANTY OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, TITLE, ACCURACY, FREEDOM FROM ERRORS, FREEDOM FROM
+PROGRAMMING DEFECTS, NONINTERFERENCE AND NONINFRINGEMENT, AND ALL IMPLIED
+WARRANTIES ARISING OUT OF COURSE OF DEALING, COURSE OF PERFORMANCE AND USAGE
+OF TRADE.
 
-NOW, THEREFORE, in consideration of the premises and the mutual covenants of
-this Agreement, the parties hereto agree as follows:
+9.  Limitations.  SENDENCE SHALL NOT BE RESPONSIBLE OR LIABLE WITH RESPECT TO
+ANY SUBJECT MATTER OF THIS AGREEMENT OR TERMS AND CONDITIONS RELATED THERETO
+UNDER ANY CONTRACT, NEGLIGENCE, STRICT LIABILITY OR OTHER THEORY (I) FOR LOSS
+OR INACCURACY OF DATA, OR COST OF PROCUREMENT OF SUBSTITUTE GOODS, SERVICES OR
+TECHNOLOGY, (II) FOR ANY INDIRECT, PUNITIVE, INCIDENTAL, RELIANCE, SPECIAL,
+EXEMPLARY OR CONSEQUENTIAL DAMAGES INCLUDING, BUT NOT LIMITED TO, LOSS OF
+REVENUES AND LOSS OF PROFITS TO LICENSEE OR ANY THIRD PARTIES, OR (III) FOR
+ANY DIRECT DAMAGES IN EXCESS OF $500.00, EVEN IF SENDENCE HAS BEEN ADVISED OF
+THE POSSIBILITY OF SUCH DAMAGES.  SENDENCE SHALL NOT BE RESPONSIBLE FOR ANY
+MATTER BEYOND ITS REASONABLE CONTROL.
 
-
-1.  LICENSE GRANT.  Subject to the terms of this Agreement, Sendence grants
-to Customer, during the Term, a limited, revocable, non-exclusive,
-non-transferable, non-sublicensable license to install and use the Software
-for a period of 120 days after initial clone, download, or software access
-(the "Evaluation Period") for the sole purpose of evaluating the Software.
-Customer shall not use the Software in a production environment.  Customer
-may only use the Software for evaluating the Software solely for Customer's
-own internal business purpose in accordance with the Software documentation
-and other terms and conditions of this Agreement.  Customer's right to use
-the Software shall lapse at the end of the Evaluation Period and, at that
-time, the Software will then become inoperable.  If Customer desires to
-continue using the Software, Customer must pay the applicable fees and must
-enter into another licensing agreement with Sendence unless Sendence agrees
-to extend this Agreement upon request of Customer.  If Customer is interested
-in a full commercial license, please contact:  vid@sendence.com.
-
-
-2.  RESTRICTIONS ON USE.  Customer acknowledges that the Software and the
-structure, organization, and source code thereof constitute valuable trade
-secrets of Sendence.  Accordingly, except as expressly permitted in Section 1
-or as otherwise authorized by Sendence in writing, Customer will not, and
-will not permit any third party to (a) modify, adapt, alter, translate, or
-create derivative works from the Software; (b) sublicense, lease, rent, loan,
-sell, distribute, make available or otherwise transfer the Software to any
-third party; (c) reverse engineer, decompile, disassemble, or otherwise
-attempt to derive the source code for the Software; or (d) otherwise use or
-copy the Software except as expressly allowed under Section 1 above.  Customer
-may not disclose to third parties or through publication the results of
-performance/benchmark tests run on the Software without the prior written
-consent of Sendence.
-
-
-3.  DELIVERY AND ACCEPTANCE.  The Software will be delivered electronically
-pursuant to Sendence's standard download procedures including source code
-access via GitHub and/or via AWS AMI. The Software is deemed accepted upon
-delivery.
-
-
-4.  OWNERSHIP.  As between the parties, the Software and all modifications and
-improvements to the Software, and all worldwide intellectual property rights
-and proprietary rights relating thereto or embodied therein, are the exclusive
-property of Sendence and its suppliers.  Sendence and its suppliers reserve
-all rights in and to the Software not expressly granted to Customer in Section
-1, and no other licenses or rights are granted by implication, estoppel or
-otherwise.
-
-
-5.  IMPLEMENTATION AND SUPPORT. Sendence has no obligation under this
-Agreement to provide any support or consultation concerning the Software;
-provided, however, Sendence may, in its sole discretion, provide Customer with
-certain support and consultation free of charge to assist in the evaluation
-activities of Customer under this Agreement. The furnishing of such support or
-consultation will not subject Sendence to any liability,  whether in contract,
-tort or otherwise.  Customer is responsible for providing all applicable
-hardware and any third party software or required installation and
-configuration services required for the operation of the Software.  Any third
-party software license agreements will be agreed to by Customer and the
-applicable third party software vendor.
-
-
-6.  TERM AND TERMINATION.  This Agreement is effective upon acceptance by
-Customer and shall continue until expiration of the Evaluation Period unless
-sooner terminated by Sendence for any reason whatsoever.  Customer may
-terminate this Agreement at any time by destroying the Software and notifying
-Sendence at:  vid@sendence.com.  If Customer breaches any
-provision of this Agreement, this Agreement will automatically terminate. Upon
-the expiration of the Evaluation Period or any termination of this Agreement,
-the license granted to Customer will terminate.  The provisions of Sections 2,
-4, 5, 6, 7, 8, 9, 10, 11 and 12 shall survive termination or expiration of
-this Agreement for any reason.
-
-
-7.  CONFIDENTIALITY.  Sendence may disclose certain information regarding the
-business of Sendence and its suppliers, including the Software and technical,
-marketing, financial, employee, planning, and other confidential or
-proprietary information of Sendence or its suppliers
-("Confidential Information"). Any information that Customer knew or
-should have known, under the circumstances, was considered confidential or
-proprietary by Sendence will be considered Confidential Information. Customer
-agrees (a) not to disclose Confidential information to any persons outside its
-organization, except to its consultants or agents who agree in writing to
-protect such Confidential information as required herein; and (b) to use the
-Confidential information only for the purpose of evaluating the Software.
-
-
-
-8.  DISCLAIMER.  CUSTOMER ACKNOWLEDGES AND AGREES THAT CUSTOMER'S USE OF THE
-SOFTWARE IS ENTIRELY AT ITS OWN RISK AND THE SOFTWARE PROVIDED BY SENDENCE TO
-CUSTOMER IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY KIND WHATSOEVER.
-SENDENCE, ON BEHALF OF ITSELF AND ITS SUPPLIERS, HEREBY EXPRESSLY DISCLAIMS
-ALL WARRANTIES WITH REGARD TO THE SOFTWARE, WHETHER EXPRESS, IMPLIED,
-STATUTORY OR OTHERWISE, INCLUDING, WITHOUT LIMITATION, ANY IMPLIED WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE NON-INFRINGEMENT
-AND ANY WARRANTIES ARISING FROM COURSE OF DEALING OR COURSE OF PERFORMANCE. TO
-THE EXTENT THAT, AS A MATTER OF APPLICABLE LAW, ANY IMPLIED OR STATUTORY
-WARRANTY MAY NOT BE DISCLAIMED, THE DURATION AND SCOPE OF SUCH WARRANTY SHALL
-BE THE MINIMUM PERMISSIBLE UNDER SUCH APPLICABLE LAW.
-
-
-9.  LIMITATION OF LIABILITY.  IN NO EVENT WILL SENDENCE BE LIABLE FOR
-
-ANY CONSEQUENTIAL, INDIRECT, EXEMPLARY, PUNITIVE, SPECIAL OR INCIDENTAL
-DAMAGES, INCLUDING ANY LOST DATA AND LOST PROFITS, ARISING FROM OR RELATING TO
-THE SOFTWARE OR THIS AGREEMENT, EVEN IF SENDENCE HAS BEEN ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGES. SENDENCE'S TOTAL CUMULATIVE LIABILITY IN
-CONNECTION WITH THIS AGREEMENT AND THE SOFTWARE, WHETHER IN CONTRACT OR TORT
-OR OTHERWISE, WILL NOT EXCEED $1000.  CUSTOMER ACKNOWLEDGES THAT THIS
-PROVISION REFLECTS THE AGREED UPON ALLOCATION OF RISK FOR THIS AGREEMENT AND
-THAT SENDENCE WOULD NOT ENTER INTO THIS AGREEMENT WITHOUT THESE LIMITATIONS ON
-ITS LIABILITY.
-
-
-10. COMPLIANCE WITH LAWS.  Customer shall comply with all laws, regulations,
-rules, ordinances and orders applicable to its use of the Software. Without
-limiting the foregoing, Customer shall comply with the relevant export
-administration and control laws and regulations, as may be amended from time
-to time, including, without limitation, the United States Export
-Administration Act, to ensure that the Software is not shipped, transferred or
-exported (directly or indirectly) in violation of U.S. law.
-
-
-11. U.S. GOVERNMENT END USERS.  The Software is a "commercial item" as that
-term is defined at 48 C.F.R. 2.101, consisting of "commercial computer
-software" and "commercial computer software documentation" as such terms are
-used in 48 C.F.R. 12.212.  Consistent with 48 C.F.R. 12.212 and 48 C.F.R.
-227.7202-1 through 227.7202-4, all U.S. Government end users acquire the
-Software with only those rights set forth therein.
-
-
-12. MISCELLANEOUS.  Customer may not assign or delegate, directly or
-indirectly, by operation of law or otherwise, this Agreement or any of its
-rights or obligations under this Agreement (including the license rights
-granted to Customer to the Software) to any third party.  Any attempted
-assignment or transfer in violation of the foregoing will be null and void and
-of no effect.
-
-
-This Agreement constitutes the entire understanding of the parties, and
-revokes and supersedes all prior agreements between the parties and is
-intended as a final expression of their Agreement. It shall not be modified or
-amended except in writing signed by the parties hereto and specifically
-referring to this Agreement. This Agreement shall take precedence over any
-other documents that may be in conflict therewith.
+10. Miscellaneous.  Neither this Agreement nor the licenses granted hereunder
+are assignable or transferable; any attempt to do so shall be void.  Sendence
+may assign this Agreement in whole or in part.  Any notice, report, approval
+or consent required or permitted hereunder shall be in writing.  As between
+the parties, Sendence will own all intellectual property rights in the
+Software and anything else created in pursuant to the Agreement, including but
+not limited to all copies, improvements, modifications and derivative works
+thereof, related documentation and materials. If any provision of this
+Agreement shall be adjudged by any court of competent jurisdiction to be
+unenforceable or invalid, that provision shall be limited or eliminated to the
+minimum extent necessary so that this Agreement shall otherwise remain in full
+force and effect and enforceable.  This Agreement shall be deemed to have been
+made in, and shall be construed pursuant to the laws of the State of New York,
+without regard to conflicts of laws provisions thereof, and without regard to
+the United Nations Convention on the International Sale of Goods.  All
+disputes arising in connection with this Agreement shall be subject to the
+sole and exclusive jurisdiction of, and venue in, the state and Federal courts
+located in New York, New York.  Any waivers or amendments shall be effective
+only if made in writing.  This Agreement is the complete and exclusive
+statement of the mutual understanding of the parties and supersedes and
+cancels all previous written and oral agreements and communications relating
+to the subject matter of this Agreement.  The prevailing party in any action
+to enforce this Agreement will be entitled to recover its attorney’s fees and
+costs in connection with such action.

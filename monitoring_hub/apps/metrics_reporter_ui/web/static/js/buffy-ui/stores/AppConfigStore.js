@@ -6,9 +6,15 @@ import {fromJS, List, Map} from "immutable";
 const emptyAppConfig = Map({
 	metrics: Map().set("computation", List())
 				  .set("node-ingress-egress", List())
-				  .set("start-to-end", List()),
+				  .set("start-to-end", List())
+				  .set("pipeline", List())
+				  .set("pipeline-ingestion", List())
+				  .set("node-ingress-egress-by-pipeline", Map())
+				  .set("start-to-end-by-worker", Map())
+				  .set("computation-by-worker", Map()),
 	workers: List()
 });
+
 
 class AppConfigStore extends ReduceStore {
 	constructor(dispatcher) {

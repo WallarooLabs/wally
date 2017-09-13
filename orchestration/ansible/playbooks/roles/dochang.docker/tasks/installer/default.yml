@@ -1,3 +1,0 @@
----
-- name: run docker official install script
-  shell: curl -sSL https://get.docker.com/ | sh

@@ -48,6 +48,7 @@ export default class AppDashboardContainer extends React.Component {
 		const sourceSinkKeys = appConfig.getIn(["metrics", "start-to-end"]);
 		const ingressEgressKeys = appConfig.getIn(["metrics", "node-ingress-egress"]);
 		const stepKeys = appConfig.getIn(["metrics", "computation"]);
+		const pipelineIngestionKeys = appConfig.getIn(["metrics", "pipeline-ingestion"]);
 		return(
 			<div>
 				{ this.props.children ||
@@ -56,7 +57,8 @@ export default class AppDashboardContainer extends React.Component {
 						appConfig={appConfig}
 						sourceSinkKeys={sourceSinkKeys}
 						ingressEgressKeys={ingressEgressKeys}
-						stepKeys={stepKeys} />
+						stepKeys={stepKeys}
+						pipelineIngestionKeys={pipelineIngestionKeys} />
 				}
 			</div>
 		)

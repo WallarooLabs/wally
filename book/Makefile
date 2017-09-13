@@ -1,4 +1,11 @@
-rules_mk_path := ../rules.mk
+# include root makefile
+ifndef ROOT_MAKEFILE_MK
+include ../Makefile
+endif
+
+# prevent rules from being evaluated/included multiple times
+ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
+$(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # uncomment to disable generate test related targets in this directory
 TEST_TARGET := false
@@ -15,16 +22,8 @@ TEST_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 #RECURSE_SUBMAKEFILES := false
 
-
-
-#########################################################################################
-#### don't change after this line unless to disable standard rules generation makefile
-MY_NAME := $(lastword $(MAKEFILE_LIST))
-$(MY_NAME)_PATH := $(dir $(MY_NAME))
-
-include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
-#### don't change before this line unless to disable standard rules generation makefile
-#########################################################################################
+# standard rules generation makefile
+include $(rules_mk_path)
 
 
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
@@ -38,3 +37,5 @@ include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
 #,<WESLEY TEST COMMAND> \
 #,<INCLUDE IN CI>))
 
+# end of prevent rules from being evaluated/included multiple times
+endif

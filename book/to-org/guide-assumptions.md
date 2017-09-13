@@ -2,7 +2,7 @@
 
 ## Overview
 
-We designed for programmers that want to jump right in and get started using Sendence Wallaroo.  Starting with installing all of the necessary components required for Wallaroo and launching an example application in a local development environment.
+We designed for programmers that want to jump right in and get started using  Wallaroo.  Starting with installing all of the necessary components required for Wallaroo and launching an example application in a local development environment.
 
 Although not required, you will get the most out of this tutorial if you have previous experience with an object-oriented language such as Java or C++.  Additionally, experience with stream processing and distributed computing systems and concepts would be helpful.  
 
