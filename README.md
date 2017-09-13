@@ -95,7 +95,7 @@ Are you the sort who just wants to get going? Dive right into our [documentation
 
 - [Join us on Freenode in #wallaroo][IRC]. 
 - [Join our developer mailing list][developer mailing list].
-- [Commercial support](mailto:hello@wallaroolabs.com)
+- [Commercial support][contact us email]
 
 ## How to Contribute
 
@@ -199,4 +199,4 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
 [current limitations]: LIMITATIONS.md
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
-
+[contact us email]: mailto:hello@wallaroolabs.com
