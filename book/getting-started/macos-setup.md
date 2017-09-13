@@ -34,7 +34,7 @@ brew install git
 
 ### Installing Pony Compiler Dependencies
 
-You'll need LLVM 3.9.1, LibreSSL, and the pcre2 library to build Pony and compile Wallaroo apps.
+You'll need LLVM 3.9.1, LibreSSL, and the pcre2 library to build Pony and compile Wallaroo apps.  Also, the next section will use the `wget` utility to help install the Pony language compiler.
 
 Use the following commands to install via [Homebrew](http://brew.sh):
 
@@ -42,7 +42,7 @@ Use the following commands to install via [Homebrew](http://brew.sh):
 brew update
 brew install llvm@3.9
 brew link --overwrite --force llvm@3.9
-brew install pcre2 libressl
+brew install pcre2 libressl wget
 ```
 
 ### Installing ponyc
