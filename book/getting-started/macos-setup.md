@@ -14,15 +14,17 @@ xcode-select --install
 
 You can then click “Install” to download and install Xcode Command Line Tools.
 
-## Installing Homebrew
+## Installing a package manager, Homebrew
 
 Homebrew is used for easy installation of certain packages needed by Pony.
 
-Instructions for installing Homebrew can be found [on their website](http://brew.sh/).
+Instructions for installing Homebrew can be found [on their website](http://brew.sh/).  This book assumes that you use the default installation directory, `/usr/local`.  If you choose an alternate installation directory, please configure your shell's `PATH` environment variable as needed.
+
+**NOTE:** For users of the MacPorts package manager, we strongly recommend *not* using MacPorts.  It is extremely difficult to install correctly the compiler toolchain required by Wallaroo using only MacPorts.
 
 ## Installing git
 
-If you do not already have Git installed, install it via homebrew:
+If you do not already have Git installed, install it via Homebrew:
 
 ```bash
 brew install git
@@ -34,13 +36,13 @@ brew install git
 
 You'll need LLVM 3.9.1, LibreSSL, and the pcre2 library to build Pony and compile Wallaroo apps.
 
-Installation via [Homebrew](http://brew.sh):
+Use the following commands to install via [Homebrew](http://brew.sh):
 
 ```bash
-$ brew update
-$ brew install llvm@3.9
-$ brew link --overwrite --force llvm@3.9
-$ brew install pcre2 libressl
+brew update
+brew install llvm@3.9
+brew link --overwrite --force llvm@3.9
+brew install pcre2 libressl
 ```
 
 ### Installing ponyc
