@@ -29,7 +29,58 @@ You will need three separate shells to run this application. Open each shell and
 
 ### Shell 1
 
-Set up a listener to monitor the Kafka topic to which you would the application to publish results. We usually use `kafkacat`.
+#### Start kafka and create the `test-in` and `test-out` topics
+
+You need kafka running for this example. Ideally you should go to the kafka website (https://kafka.apache.org/) to properly configure kafka for your system and needs. However, the following is a quick/easy way to get kafka running for this example:
+
+This requires `docker-compose`:
+
+Ubuntu:
+
+```bash
+sudo curl -L https://github.com/docker/compose/releases/download/1.15.0/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+OSX: Docker compose is already included as part of Docker for Mac.
+
+
+Clone local-kafka-cluster project and run it (add `sudo` to the commands, including `./cluster up 1`, if docker is not allowed to be run by your user):
+
+```bash
+cd /tmp
+git clone https://github.com/effata/local-kafka-cluster
+cd local-kafka-cluster
+./cluster up 1 # change 1 to however many brokers are desired to be started
+docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
+  zookeeper:2181 --create --partitions 4 --topic test-in --replication-factor \
+  1 # to create a test-in topic; change arguments as desired
+docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
+  zookeeper:2181 --create --partitions 4 --topic test-out --replication-factor \
+  1 # to create a test-out topic; change arguments as desired
+```
+
+#### Set up a listener to monitor the Kafka topic to which you would the application to publish results. We usually use `kafkacat`.
+
+`kafkacat` can be installed via:
+
+Ubuntu:
+
+```bash
+sudo apt-get install kafkacat
+```
+
+MacOS:
+
+```bash
+brew install kafkacat
+```
+
+To run `kafkacat` to listen to the `test-out` topic:
+
+```bash
+kafkacat -C -b 127.0.0.1:9092 -t test-out
+```
 
 ### Shell 2
 
@@ -59,10 +110,27 @@ Run `machida` with `--application-module celsius`:
 
 Send data into Kafka. Again, we use `kafakcat`.
 
-## Shutting Down The Cluster
+Run the following and then type at least 4 characters on each line and hit enter to send in data (only first 4 characters are used/interpreted as a float; the application will throw an error and possibly segfault if less than 4 characters are sent in):
 
-You can shut down the cluster with this command when you're ready:
+```bash
+kafkacat -P -b 127.0.0.1:9092 -t test-in
+```
+
+Note: You can use `ctrl-d` to exit `kafkacat`
+
+## Shutting down the cluster
+
+To shut down the cluster, you will need to use the `cluster_shutdown` tool.
 
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+```
+
+### Stop kafka
+
+If you followed the commands earlier to start kafka you can stop it by running (add `sudo` if docker is not allowed to be run by your user):
+
+```bash
+cd /tmp/local-kafka-cluster
+./cluster down # shut down cluster
 ```
