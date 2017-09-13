@@ -207,8 +207,6 @@ cd wallaroo
 git checkout 0.1.0-rc2
 ```
 
-Note: You need to login to GitHub for credentials
-
 ## Installing Machida
 
 Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:

@@ -118,8 +118,6 @@ cd wallaroo
 git checkout 0.1.0-rc2
 ```
 
-Note: You need to login to GitHub for credentials
-
 This will create a subdirectory called `wallaroo`.
 
 ## Installing Machida
