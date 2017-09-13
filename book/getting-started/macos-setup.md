@@ -115,7 +115,7 @@ cloned the Wallaroo repo, do so now:
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.0.1-rc15
+git checkout 0.1.0-rc1
 ```
 
 Note: You need to login to GitHub for credentials
