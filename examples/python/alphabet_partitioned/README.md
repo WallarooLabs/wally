@@ -1,4 +1,4 @@
-# Alphabet Paritioned
+# Alphabet Partitioned
 
 ## About The Application
 
@@ -14,7 +14,7 @@ The inputs to the "Alphabet Partitioned" application are the letter receiving th
 
 `\x00\x00\x00\x05` -- four bytes representing the number of bytes in the payload
 `A` -- a single byte representing the letter "A", which is receiving the votes
-`\x00\x00\x15\x34` -- the number `0x1534` (`5428`) represented as a big-endiant 32-bit integer
+`\x00\x00\x15\x34` -- the number `0x1534` (`5428`) represented as a big-endian 32-bit integer
 
 ### Output
 
@@ -26,7 +26,7 @@ The outputs of the alphabet application are the letter that received the votes t
 
 `\x00\x00\x00\x09` -- four bytes representing the number of bytes in the payload
 `q` -- a single byte representing the letter "q", which is receiving the votes
-`\x00\x00\x5A\x21\x10\xB7\x11\xA4` -- the number `0x5A2110B711A4` (`99098060853668`) represented as a big-endiant 64-bit integer
+`\x00\x00\x5A\x21\x10\xB7\x11\xA4` -- the number `0x5A2110B711A4` (`99098060853668`) represented as a big-endian 64-bit integer
 
 ### Processing
 
@@ -45,7 +45,7 @@ This will generate 1000 messages.
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, Giles Reciever and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
@@ -67,7 +67,7 @@ export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
-Run `machida` with `--application-module alphabet_partitioned` as an inializer:
+Run `machida` with `--application-module alphabet_partitioned` as an initializer:
 
 ```bash
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
