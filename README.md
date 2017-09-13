@@ -65,24 +65,6 @@ We have no "as a service" offering at this time.
 
 ## Status
 
-### Features
-
-- State Management
-
-point to feature status link
-
-- Scale running stateful applications with zero downtime
-
-point to feature status links
-
-- Resilience in the face of failures
-
-point to feature status link
-
-- Exactly-once message processing
-
-point to feature status link
-
 ### Language bindings
 
 - Pony
@@ -111,11 +93,10 @@ JavaScript support is currently in the planning stages with no release date targ
 
 ## Getting Started
 
-Are you the sort who just wants to get going? Dive right into our [documentation](http://docs.wallaroolabs.com) then! It will get you up and running with Wallaroo.
+Are you the sort who just wants to get going? Dive right into our [documentation][documentation website] then! It will get you up and running with Wallaroo.
 
 ## Documentation
 
-"community section of website"
 [http://docs.wallaroolabs.com][documentation website]
 
 ## Getting Help
@@ -153,7 +134,7 @@ Wallaroo documentation.
 
 Our VP of Engineering Sean T. Allen talks about one of the techniques we use to test Wallaroo.
 
-- [WallarooLabs Twitter][twitter]
+- [Wallaroo Labs Twitter][twitter]
 
 ## About this Repository
 
