@@ -2,10 +2,10 @@
 
 Welcome to the developer's guide for Wallaroo. This document is available in a variety of formats including:
 
-- [On the web](https://wallaroolabs.gitbooks.io/wallaroo/content/)
-- [PDF](https://www.gitbook.com/download/pdf/book/wallaroolabs/wallaroo)
-- [ePub](https://www.gitbook.com/download/epub/book/wallaroolabs/wallaroo)
-- [Mobi](https://www.gitbook.com/download/mobi/book/wallaroolabs/wallaroo)
+- [On the web](https://www.gitbook.com/book/wallaroo-labs/wallaroo/details)
+- [PDF](https://www.gitbook.com/download/pdf/book/wallaroo-labs/wallaroo)
+- [ePub](https://www.gitbook.com/download/epub/book/wallaroo-labs/wallaroo)
+- [Mobi](https://www.gitbook.com/download/mobi/book/wallaroo-labs/wallaroo)
 
 You can open issues and submit pull requests against [our GitHub repo](https://github.com/wallaroolabs/wallaroo).
 
