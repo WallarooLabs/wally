@@ -192,7 +192,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
 [IRC]: https://webchat.oftc.net/?channels=wallaroo
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
-[pony examples]: pony/examples
+[pony examples]: examples/pony
 [qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
 [secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
 [status section]: #status
