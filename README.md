@@ -89,7 +89,7 @@ Are you the sort who just wants to get going? Dive right into our [documentation
 
 ## Documentation
 
-[http://docs.wallaroolabs.com][documentation website]
+Our primary documentation is hosted by GitBook at [http://docs.wallaroolabs.com][documentation website]. You can find additional information on our [community site][community website].
 
 ## Getting Help
 
@@ -179,6 +179,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [about this repository section]: #about-this-repository 
 [additional links]: #additional-links
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
+[community website]: http://www.wallaroolabs.com/community
 [contact us email]: mailto:hello@wallaroolabs.com
 [contribute section]: #how-to-contribute
 [contributors guide]: CONTRIBUTING.md
