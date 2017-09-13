@@ -81,7 +81,7 @@ JavaScript support is currently in the planning stages with no release date targ
 
 ### Limitations
 
-We have numerous issues open to improve existing Wallaroo functionality. For a high-level overview, please see our [current limitations document][current limitations].
+We have [numerous issues open][open issues] to improve existing Wallaroo functionality. For a high-level overview, please see our [current limitations document][current limitations].
 
 ## Getting Started
 
@@ -198,3 +198,5 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [twitter]: https://www.twitter.com/wallaroolabs
 [secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
 [current limitations]: LIMITATIONS.md
+[open issues]: https://github.com/WallarooLabs/wallaroo/issues
+
