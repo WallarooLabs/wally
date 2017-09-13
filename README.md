@@ -79,6 +79,10 @@ We are currently working with a client who is very interested in writing Wallaro
 
 JavaScript support is currently in the planning stages with no release date targeted. 
 
+### Limitations
+
+We have numerous issues open to improve existing Wallaroo functionality. For a high-level overview, please see our [current limitations document][current limitations].
+
 ## Getting Started
 
 Are you the sort who just wants to get going? Dive right into our [documentation][documentation website] then! It will get you up and running with Wallaroo.
@@ -193,3 +197,4 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
 [twitter]: https://www.twitter.com/wallaroolabs
 [secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
+[current limitations]: LIMITATIONS.md
