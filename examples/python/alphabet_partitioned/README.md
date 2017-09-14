@@ -51,7 +51,7 @@ You will need four separate shells to run this application. Open each shell and 
 
 ### Shell 1
 
-Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
+Run Giles Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
 ../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
