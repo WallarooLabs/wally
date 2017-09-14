@@ -80,7 +80,7 @@ A data generator is bundled with the application. Use these commands to generate
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen
-./data_gen 10000
+./data_gen.py 10000
 ```
 
 This will create a `celsius.msg` file in your current working directory.
