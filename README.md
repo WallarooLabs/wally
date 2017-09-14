@@ -8,6 +8,7 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 - [Documentation][documentation section]
 - [Getting Help][getting help section]
 - [How to Contribute][contribute section]
+- [License][license section]
 - [Additional Links][additional links]
 - [About this Repository][about this repository section]
 
@@ -103,6 +104,20 @@ We're an open source project and welcome contributions. Trying to figure out how
 
 Be sure to check out our [contributors guide][contributors guide] before you get started.
 
+## License
+
+Wallaroo is an open source project. All of the source code is available to you. However, not all of the Wallaroo source code is available under an "open source" license. 
+
+Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. You should read the [Wallaroo Community License][wallaroo community license] for yourself, however, as it is somewhat unique, we want to provide an abbreviated version:
+
+- You can **run** all Wallaroo code in a non-production environment without restriction.
+- You can **run** all Wallaroo code in a production environment for free on up to 3 server or 24 cpus.
+- If you want to **run** Wallaroo Enterprise version features in production above 3 servers or 24 cpus, you have to obtain a license.
+- You can **modify** and **redistribute** any Wallaroo code
+- Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license in order to run on more than 3 servers or 24 cpus in a production environment. 
+
+Please [contact us][contact us email] if you have any questions about licensing or Wallaroo Enterprise.
+
 ## Additional Links
 
 - [Hello Wallaroo!][hello wallaroo post]
@@ -174,6 +189,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 
 [about this repository section]: #about-this-repository 
 [additional links]: #additional-links
+[apache 2 license]: https://www.apache.org/licenses/LICENSE-2.0
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
 [community website]: http://www.wallaroolabs.com/community
 [contact us email]: mailto:hello@wallaroolabs.com
@@ -187,6 +203,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [getting started section]: #getting-started
 [hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
 [IRC]: https://webchat.oftc.net/?channels=wallaroo
+[license section]: #license
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
 [pony examples]: examples/pony
 [qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
@@ -194,6 +211,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [status section]: #status
 [twitter]: https://www.twitter.com/wallaroolabs
 [unstable documentation website]: https://www.gitbook.com/book/wallaroo-labs/wallaroo-latest/details
+[wallaroo community license]: LICENSE.md
 [wallaroo labs website]: https://www.wallaroolabs.com
 [what is wallaroo section]: #what-is-wallaroo
 
