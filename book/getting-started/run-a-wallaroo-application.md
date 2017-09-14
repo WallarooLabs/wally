@@ -91,9 +91,9 @@ You will now be able to start the `sender` with the following command:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/sender
-./sender -h 127.0.0.1:7000 -m 10000 -y -s 300 \
-  -f ~/wallaroo-tutorial/wallaroo/examples/pony/celsius/data_gen/celsius.msg \
-  -r -w -g 8 --ponythreads=1
+./sender --host 127.0.0.1:7000 --messages 10000 --binary --batch-size 300 \
+  --repeat --no-write --msg-size 8 --ponythreads=1 --file \
+  ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
