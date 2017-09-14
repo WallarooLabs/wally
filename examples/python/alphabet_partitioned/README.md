@@ -45,7 +45,7 @@ This will generate 1000 messages.
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, and Giles Reciever. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Reciever and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
@@ -124,8 +124,10 @@ with open('alphabet.out', 'rb') as f:
             break
 ```
 
-Remember to shut down the cluster once finished processing
+## Shutting Down The Cluster
+
+You can shut down the cluster with this command once processing has finished:
 
 ```bash
-../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:6002
+../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```

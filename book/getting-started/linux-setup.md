@@ -235,6 +235,15 @@ cd ~/wallaroo-tutorial/wallaroo/giles/receiver
 make
 ```
 
+## Install Cluster Shutdown tool
+
+The Cluster Shutdown tool is used to tell the cluster to shut down cleanly.
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
+make
+```
+
 ## Conclusion
 
 Awesome! All set. Time to try running your first application.

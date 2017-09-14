@@ -21,7 +21,7 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 
 ## Running Celsius Kafka
 
-In order to run the application you will need Machida. To build it, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will also need access to a Kafka cluster. This example assumes that there is a Kafka broker listening on port `9092` on `127.0.0.1`.
 
@@ -58,3 +58,11 @@ Run `machida` with `--application-module celsius`:
 ### Shell 3
 
 Send data into Kafka. Again, we use `kafakcat`.
+
+## Shutting Down The Cluster
+
+You can shut down the cluster with this command when you're ready:
+
+```bash
+../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+```

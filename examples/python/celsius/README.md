@@ -33,7 +33,7 @@ This will generate a million messages.
 
 ## Running Celsius
 
-In order to run the application you will need Machida, Giles Sender, and Giles Receiver. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Reciever and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius` directory.
 
