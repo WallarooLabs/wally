@@ -65,11 +65,11 @@ Currently, Python 2.7 is our primary focus. As we add features to the Wallaroo, 
 
 - Python 3
 
-We are planning on adding Python 3 support when there is enough demand. If you are interested in writing Wallaroo applications using Python 3, please get in touch.
+We are planning on adding Python 3 support when there is enough demand. If you are interested in writing Wallaroo applications using Python 3, please [get in touch][contact us email].
 
 - C++
 
-C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. If you are interested in using Wallaroo with C++, you should contact us. We're happy to work with you.
+C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
 
 - Go
 
