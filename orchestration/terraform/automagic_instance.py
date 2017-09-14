@@ -198,7 +198,7 @@ pg_output = "ci_pg=is not using placement groups#"
 
 if cheapest_instance['InstanceType'] in pg_instances:
   cheapest_instance['PlacementGroup'] = True
-  pg_output = "ci_pg=is using placement groups#pg_arg=-var placement_group=buffy-$(cluster_name)#"
+  pg_output = "ci_pg=is using placement groups#pg_arg=-var placement_group=wallaroo-$(cluster_name)#"
 
 # if cheapest instance is a spot instance
 if cheapest_instance['Spot']:

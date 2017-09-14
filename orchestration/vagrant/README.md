@@ -1,6 +1,6 @@
-# Buffy Vagrant Orechestration
+# Wallaroo Vagrant Orechestration
 
-This module consists of the orchestration for Buffy using Vagrant.
+This module consists of the orchestration for Wallaroo using Vagrant.
 So far we have only implemented Virtualbox as a provider.
 
 ## Provisioning
@@ -21,11 +21,11 @@ Test ansible communication with the all cluster nodes:
 
 Test ansible communication with the follower nodes only:
 
-`ansible -i ../ansible/vagrant.py --ssh-extra-args="-o StrictHostKeyChecking=no" 'buffy-follower*' -m ping`
+`ansible -i ../ansible/vagrant.py --ssh-extra-args="-o StrictHostKeyChecking=no" 'wallaroo-follower*' -m ping`
 
 Test ansible communication with the leader nodes only:
 
-`ansible -i ../ansible/vagrant.py --ssh-extra-args="-o StrictHostKeyChecking=no" 'buffy-leader*' -m ping`
+`ansible -i ../ansible/vagrant.py --ssh-extra-args="-o StrictHostKeyChecking=no" 'wallaroo-leader*' -m ping`
 
 ### Playbook
 

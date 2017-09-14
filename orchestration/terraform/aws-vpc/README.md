@@ -1,6 +1,6 @@
-# Buffy Terraform Orechestration - VPC module
+# Wallaro Terraform Orechestration - VPC module
 
-This module consists of the orchestration for Buffy using Terraform for the VPC.
+This module consists of the orchestration for Wallaroo using Terraform for the VPC.
 So far we have only implemented AWS as a provider.
 
 ## Module details

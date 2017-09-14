@@ -35,7 +35,7 @@ variable "aws_detailed_monitoring" {
 
 variable "project_tag" {
   description = "Value for the project tag."
-  default = "buffy"
+  default = "wallaroo"
 }
 
 variable "placement_group" {
