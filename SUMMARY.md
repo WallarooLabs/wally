@@ -18,7 +18,7 @@
   * [MacOS Installation](book/getting-started/macos-setup.md)
   * [Ubuntu Installation](book/getting-started/linux-setup.md)
   * [Windows Installation](book/getting-started/windows-setup.md)
-* [Run a Wallaroo Application](book/getting-started/run-a-application.md)
+* [Run a Wallaroo Application](book/getting-started/run-a-wallaroo-application.md)
 * [Conclusion](book/getting-started/conclusion.md)
 
 <!--
