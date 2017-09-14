@@ -2,7 +2,7 @@
 
 Word count is the canonical streaming data application. It's canonical not because everyone needs to count words but because it's a good platform for demonstrating how to do many of the everyday tasks in a streaming application.
 
-This section will take you through our [Wallaroo word count example](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.0-rc3/examples/python/word-count/). Along the way, we will introduce you to a couple of new concepts: parallelizing stateless computations, and splitting one incoming message into several outgoing ones.
+This section will take you through our [Wallaroo word count example](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.0-rc3/examples/python/word)count/). Along the way, we will introduce you to a couple of new concepts: parallelizing stateless computations, and splitting one incoming message into several outgoing ones.
 
 ## Word count
 
