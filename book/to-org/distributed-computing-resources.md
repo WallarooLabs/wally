@@ -24,7 +24,7 @@
 * [Minimizing Faulty Executions of Distributed Systems](http://www.eecs.berkeley.edu/~rcs/research/nsdi_draft.pdf)
 * [Chain Replication for Supporting High Throughput and Availability](http://www.cs.cornell.edu/home/rvr/papers/osdi04.pdf)
 * [Managing Chain Replication with Humming Consensus](http://www.snookles.com/scott/publications/ricon-2015.pdf)
-* [Machi related to Chain Replication for Supporting High Throughtput and Availability paper uses CORFU style epoch management](https://github.com/basho/machi/tree/master/doc)
+* [Machi related to Chain Replication for Supporting High Throughtput and Availability paper uses CORFU style epoch management](https://github.com/basho/machi/tree/0.1.0-rc2/doc)
 * [CORFU: A Shared Log Design for Flash Clusters](http://research.microsoft.com/pubs/157204/corfumain-final.pdf)
 * [Replicant: Replicated State Machines Made Easy](http://hackingdistributed.com/2013/12/26/introducing-replicant/)
 * [Towards Fast Invariant Preservation in Geo-replicated Systems](http://dl.acm.org/citation.cfm?doid=2723872.2723889)
