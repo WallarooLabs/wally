@@ -6,7 +6,7 @@ The following is a list of limitations and gotchas with existing supported featu
 
 * [Issue #751](https://github.com/WallarooLabs/wallaroo/issues/751) State partitions only support a static set of keys defined at startup. 
 * [Issue #956](https://github.com/WallarooLabs/wallaroo/issues/956) [Issue #947](https://github.com/WallarooLabs/wallaroo/issues/947) Running a partition with fewer keys than there are workers in the cluster will currently lead to process failure.
-* [Issue #462]((https://github.com/WallarooLabs/wallaroo/issues/462) When we initialize state in a state partition, we do not pass in information about the key associated with that state.
+* [Issue #462](https://github.com/WallarooLabs/wallaroo/issues/462) When we initialize state in a state partition, we do not pass in information about the key associated with that state.
 * [Issue #464](https://github.com/WallarooLabs/wallaroo/issues/464) We only support a single partition function per state partition. This means that you must use that same partition function for any pipeline that interacts with that state partition.
 
 ## Metrics
@@ -20,7 +20,7 @@ The following is a list of limitations and gotchas with existing supported featu
 ### Sources
 
 * [Issue #894](https://github.com/WallarooLabs/wallaroo/issues/894) [Issue #915](https://github.com/WallarooLabs/wallaroo/issues/915) Sources currently only run on the initializer worker.
-* [Issue #900]((https://github.com/WallarooLabs/wallaroo/issues/900) Sources are not replayable. There is no mechanism for acking back to an external system from a Wallaroo source.
+* [Issue #900](https://github.com/WallarooLabs/wallaroo/issues/900) Sources are not replayable. There is no mechanism for acking back to an external system from a Wallaroo source.
 
 ### Sinks
 
