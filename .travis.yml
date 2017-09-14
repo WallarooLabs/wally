@@ -81,7 +81,7 @@ install:
     fi;
   - echo "Installing WallarooLabs/ponyc";
     cd /tmp;
-    git clone git@github.com:WallarooLabs/ponyc.git;
+    git clone https://github.com/WallarooLabs/ponyc.git;
     cd ponyc;
     make CC=$CC1 CXX=$CXX1;
     sudo make install;
