@@ -671,7 +671,7 @@ clean-docker: ## cleanup docker images and containers
 	$(if $(strip $(dangling)),$(QUIET)docker $(docker_host_arg) rmi $(dangling),)
 
 # rule to clean everything
-clean: clean-$(ROOT_TARGET_SUFFIX) clean-docker ## Clean all projects (pony & monhub) and cleanup docker images
+clean: clean-$(ROOT_TARGET_SUFFIX) ## Clean all projects (pony & monhub) and cleanup docker images
 	$(QUIET)rm -f lib/wallaroo/wallaroo lib/wallaroo/wallaroo.o
 	$(QUIET)rm -f sent.txt received.txt
 	$(QUIET)echo 'Done cleaning.'
