@@ -25,7 +25,7 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 A data generator is bundled with the application:
 
 ```bash
-cd data_gen
+cd _test
 python data_gen.py 1000000
 ```
 
@@ -69,7 +69,7 @@ Send messages:
 
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 \
-  --file data_gen/celsius.msg --batch-size 50 --interval 10_000_000 \
+  --file _test/celsius.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --repeat \
   --ponythreads=1 --binary --msg-size 8
 ```
