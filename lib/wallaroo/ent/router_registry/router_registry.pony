@@ -19,7 +19,6 @@ use "wallaroo/core/data_channel"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/w_actor"
 use "wallaroo/core/fail"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
@@ -36,7 +35,6 @@ actor RouterRegistry
   let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()
   var _omni_router: (OmniRouter | None) = None
-  var _actor_data_router: ActorSystemDataRouter = EmptyActorSystemDataRouter
 
   var _application_ready_to_work: Bool = false
 
@@ -102,7 +100,6 @@ actor RouterRegistry
 
   be set_data_router(dr: DataRouter) =>
     _data_router = dr
-    _actor_data_router = dr.actor_system_data_router()
     _distribute_data_router()
 
   be set_pre_state_data(psd: Array[PreStateData] val) =>
@@ -116,9 +113,6 @@ actor RouterRegistry
 
   be set_event_log(e: EventLog) =>
     _event_log = e
-
-  be update_actor_data_router(adr: ActorSystemDataRouter) =>
-    _actor_data_router = adr
 
   be register_source(source: Source) =>
     _sources.set(source)
@@ -212,24 +206,6 @@ actor RouterRegistry
     for source in _sources.values() do
       source.add_boundary_builders(new_boundary_builders_sendable)
     end
-
-  be register_actor_for_worker(id: U128, worker: String) =>
-    _actor_data_router.register_actor_for_worker(id, worker)
-
-  be register_as_role(role: String, w_actor: U128) =>
-    _actor_data_router.register_as_role(role, w_actor)
-
-  be forget_external_actor(id: U128) =>
-    _actor_data_router.forget_external_actor(id)
-
-  be broadcast_to_actors(data: Any val) =>
-    _actor_data_router.broadcast_to_actors(data)
-
-  be process_digest(digest: WActorRegistryDigest) =>
-    _actor_data_router.process_digest(digest)
-
-  be send_digest_to(worker: String) =>
-    _actor_data_router.send_digest_to(worker)
 
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)

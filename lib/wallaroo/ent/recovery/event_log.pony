@@ -15,7 +15,6 @@ use "collections"
 use "files"
 use "wallaroo/core/common"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/w_actor"
 use "wallaroo/core/fail"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
@@ -103,9 +102,6 @@ actor EventLog
   be start_pipeline_logging(initializer: LocalTopologyInitializer) =>
     _initialized = true
     initializer.report_event_log_ready_to_work()
-
-  be start_actor_system_logging(initializer: WActorInitializer) =>
-    _initialized = true
 
   be start_log_replay(recovery: Recovery) =>
     _recovery = recovery
