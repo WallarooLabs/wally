@@ -105,7 +105,7 @@
     ptpd_transport: unicast
     swarm_image: swarm
     consul_image: gliderlabs/consul
-    docker_users: [ ubuntu, sendence ]
+    docker_users: [ ubuntu, wallaroo ]
     docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
@@ -122,7 +122,7 @@
     leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
     swarm_image: swarm
     consul_image: gliderlabs/consul
-    docker_users: [ ubuntu, sendence ]
+    docker_users: [ ubuntu, wallaroo ]
     docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }

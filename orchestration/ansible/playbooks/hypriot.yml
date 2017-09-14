@@ -76,7 +76,7 @@
     ptpd_transport: multicast
     swarm_image: hypriot/rpi-swarm
     consul_image: hypriot/rpi-consul
-    docker_users: [ root, sendence ]
+    docker_users: [ root, wallaroo ]
     use_hostname: true
     docker_dockerpy_version: "1.9.0"
   roles:
@@ -94,7 +94,7 @@
     leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
     swarm_image: hypriot/rpi-swarm
     consul_image: hypriot/rpi-consul
-    docker_users: [ root, sendence ]
+    docker_users: [ root, wallaroo ]
     use_hostname: true
     docker_dockerpy_version: "1.9.0"
   roles:
