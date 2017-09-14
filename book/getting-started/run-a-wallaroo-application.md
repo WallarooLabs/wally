@@ -66,8 +66,11 @@ export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo/machida:$HOME/wallaroo-tutor
 Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
 
 ```bash
+cd ~/wallaroo-tutorial/wallaroo/machida
 ./build/machida --application-module celsius --in 127.0.0.1:7000 \
-  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --ponythreads=1
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
+  --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
+  --cluster-initializer --ponythreads=1
 ```
 
 This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
