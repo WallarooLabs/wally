@@ -123,3 +123,12 @@ You can then click into one of the elements within a category, to get to a detai
 ![Computation Detailed Metrics page](/book/metrics/images/computation-detailed-metrics-page.png)
 
 Feel free to click around and get a feel for how the Metrics UI is setup and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
+
+## Shutting Down The Cluster
+
+You can shut down the cluster with this command once processing has finished:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
+./cluster_shutdown 127.0.0.1:5050
+```
