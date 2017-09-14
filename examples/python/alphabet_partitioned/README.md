@@ -98,15 +98,9 @@ machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
 Send messages:
 
 ```bash
-<<<<<<< Updated upstream
 ../../../giles/sender/sender --host 127.0.0.1:7010 \
   --file votes.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --binary --msg-size 9 --repeat --ponythreads=1
-=======
-../../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
-  --batch-size 50 --interval 10_000_000 --messages 1000000 --binary \
-  --msg-size 9 --repeat --ponythreads=1
->>>>>>> Stashed changes
 ```
 ## Reading the Output
 
