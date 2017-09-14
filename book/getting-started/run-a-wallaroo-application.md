@@ -86,15 +86,17 @@ cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen
 ./data_gen.py 10000
 ```
 
-This will create a `celsius.msg` file in your current working directory.
+This will create a `celsius.msg` file in your current working directory with 10,000 messages.
 
 ### Sending Data with Giles Sender
+
+We will be sending in 25,000,000 messages using the data file generated above. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
 
 You will now be able to start the `sender` with the following command:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/sender
-./sender --host 127.0.0.1:7000 --messages 10000 --binary --batch-size 300 \
+./sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
   --repeat --no-write --msg-size 8 --ponythreads=1 --file \
   ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen/celsius.msg
 ```
