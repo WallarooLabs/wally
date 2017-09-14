@@ -151,13 +151,11 @@ sudo make install
 
 Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
 
-### Xenial Ubuntu:
+### Xenial and Trusty Ubuntu:
 
 ```bash
 sudo apt-get install -y libsnappy-dev liblz4-dev
 ```
-
-### Trusty Ubuntu:
 
 *Note:* some older versions of Ubuntu have an outdated `liblz4` package. For these you will need to install from source like this:
 
