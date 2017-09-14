@@ -20,7 +20,7 @@ use "wallaroo/core/state"
 
 // these are included because of issue #814
 use "serialise"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 
 type StateP is Pointer[U8] val
 

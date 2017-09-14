@@ -32,7 +32,7 @@ use "collections"
 use "net"
 use "time"
 use "wallaroo_labs/hub"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)

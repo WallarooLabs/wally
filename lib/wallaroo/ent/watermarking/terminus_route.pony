@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "wallaroo/core/common"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/topology"
 use "wallaroo/core/routing"

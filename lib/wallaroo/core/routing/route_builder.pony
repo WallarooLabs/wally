@@ -19,7 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
 

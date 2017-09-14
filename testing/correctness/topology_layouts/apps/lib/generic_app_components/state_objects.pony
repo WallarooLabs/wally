@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "buffered"
 use "serialise"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 

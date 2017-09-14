@@ -21,7 +21,7 @@ use "collections"
 use "time"
 use "wallaroo"
 use "wallaroo/core/common"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
 

@@ -23,7 +23,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 
 actor EmptySink is Consumer
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
