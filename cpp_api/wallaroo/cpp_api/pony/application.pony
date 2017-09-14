@@ -21,7 +21,7 @@ use "wallaroo"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 
 use @w_computation_builder_build_computation[ComputationP](fn: ComputationBuilderP)
 

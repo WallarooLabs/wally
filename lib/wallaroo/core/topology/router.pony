@@ -25,7 +25,6 @@ use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/rebalancing"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/w_actor"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/routing"
@@ -424,77 +423,13 @@ class val StepIdRouter is OmniRouter
       false
     end
 
-trait val ActorSystemDataRouter is Equatable[ActorSystemDataRouter]
-  fun route(d_msg: ActorDeliveryMsg)
-  fun register_actor_for_worker(id: U128, worker: String)
-  fun register_as_role(role: String, w_actor: U128)
-  fun forget_external_actor(id: U128)
-  fun broadcast_to_actors(data: Any val)
-  fun send_digest_to(worker: String)
-  fun process_digest(digest: WActorRegistryDigest)
-
-class val EmptyActorSystemDataRouter is ActorSystemDataRouter
-  fun route(d_msg: ActorDeliveryMsg) =>
-    Fail()
-
-  fun register_actor_for_worker(id: U128, worker: String) =>
-    Fail()
-
-  fun register_as_role(role: String, w_actor: U128) =>
-    Fail()
-
-  fun forget_external_actor(id: U128) =>
-    Fail()
-
-  fun broadcast_to_actors(data: Any val) =>
-    Fail()
-
-  fun send_digest_to(worker: String) =>
-    Fail()
-
-  fun process_digest(digest: WActorRegistryDigest) =>
-    Fail()
-
-class val ActiveActorSystemDataRouter is ActorSystemDataRouter
-  let _registry: CentralWActorRegistry
-
-  new val create(registry: CentralWActorRegistry) =>
-    _registry = registry
-
-  fun route(d_msg: ActorDeliveryMsg)
-  =>
-    ifdef "trace" then
-      @printf[I32]("Rcvd msg at ActorSystemDataRouter\n".cstring())
-    end
-    d_msg.deliver(_registry)
-
-  fun register_actor_for_worker(id: U128, worker: String) =>
-    _registry.register_actor_for_worker(id, worker)
-
-  fun register_as_role(role: String, w_actor: U128) =>
-    _registry.register_as_role(role, w_actor where external = true)
-
-  fun forget_external_actor(id: U128) =>
-    _registry.forget_external_actor(id)
-
-  fun broadcast_to_actors(data: Any val) =>
-    _registry.broadcast(data where external = true)
-
-  fun send_digest_to(worker: String) =>
-    _registry.send_digest(worker)
-
-  fun process_digest(digest: WActorRegistryDigest) =>
-    _registry.process_digest(digest)
-
 class val DataRouter is Equatable[DataRouter]
   let _data_routes: Map[U128, Consumer] val
   let _target_ids_to_route_ids: Map[U128, RouteId] val
   let _route_ids_to_target_ids: Map[RouteId, U128] val
-  let _actor_system_router: ActorSystemDataRouter
 
   new val create(data_routes: Map[U128, Consumer] val =
-      recover Map[U128, Consumer] end,
-    actor_system_router: ActorSystemDataRouter = EmptyActorSystemDataRouter)
+      recover Map[U128, Consumer] end)
   =>
     _data_routes = data_routes
     var route_id: RouteId = 0
@@ -513,20 +448,14 @@ class val DataRouter is Equatable[DataRouter]
     end
     _target_ids_to_route_ids = consume tid_map
     _route_ids_to_target_ids = consume rid_map
-    _actor_system_router = actor_system_router
 
   new val with_route_ids(data_routes: Map[U128, Consumer] val,
     target_ids_to_route_ids: Map[U128, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, U128] val,
-    actor_system_router: ActorSystemDataRouter)
+    route_ids_to_target_ids: Map[RouteId, U128] val)
   =>
     _data_routes = data_routes
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
-    _actor_system_router = actor_system_router
-
-  fun actor_system_data_router(): ActorSystemDataRouter =>
-    _actor_system_router
 
   fun step_for_id(id: U128): Consumer ? =>
     _data_routes(id)
@@ -582,9 +511,6 @@ class val DataRouter is Equatable[DataRouter]
       true
     end
 
-  fun route_to_actor(d_msg: ActorDeliveryMsg) =>
-    _actor_system_router.route(d_msg)
-
   fun register_producer(producer: Producer) =>
     for step in _data_routes.values() do
       step.register_producer(producer)
@@ -635,7 +561,7 @@ class val DataRouter is Equatable[DataRouter]
       if v != id then new_rid_map(k) = v end
     end
     DataRouter.with_route_ids(consume new_data_routes,
-      consume new_tid_map, consume new_rid_map, _actor_system_router)
+      consume new_tid_map, consume new_rid_map)
 
   fun add_route(id: U128, target: Consumer): DataRouter =>
     // TODO: Using persistent maps for our fields would make this much more
@@ -662,7 +588,7 @@ class val DataRouter is Equatable[DataRouter]
     new_rid_map(new_route_id) = id
 
     DataRouter.with_route_ids(consume new_data_routes,
-      consume new_tid_map, consume new_rid_map, _actor_system_router)
+      consume new_tid_map, consume new_rid_map)
 
   fun eq(that: box->DataRouter): Bool =>
     MapTagEquality[U128, Consumer](_data_routes, that._data_routes) and

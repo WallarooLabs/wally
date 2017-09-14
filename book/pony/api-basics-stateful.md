@@ -5,7 +5,7 @@ we showed how you define an `Application` object and hook that into Wallaroo via
 the `Startup` object. We showed how to create an application with a single
 pipeline consisting of stateless computations. In this document, we'll cover
 creating a stateful application using partitioned state. All the code can be
-found in [`examples/alphabet/pony/alphabet.pony`](https://github.com/WallarooLabs/wallaroo-examples/tree/release/examples/alphabet/pony/alphabet.pony).
+found in [`examples/alphabet/pony/alphabet.pony`](https://github.com/WallarooLabs/wallaroo-examples/tree/0.1.0-rc2/examples/alphabet/pony/alphabet.pony).
 
 ## Defining a Stateful Application
 

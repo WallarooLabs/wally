@@ -24,8 +24,6 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/w_actor"
-use "wallaroo/ent/w_actor/broadcast"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
@@ -49,11 +47,6 @@ primitive ChannelMsgEncoder
   =>
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)
-
-  fun data_channel_actor(delivery_msg: ActorDeliveryMsg, seq_id: SeqId,
-    wb: Writer, auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(ActorDataMsg(delivery_msg, seq_id), auth, wb)
 
   fun migrate_step[K: (Hashable val & Equatable[K] val)](step_id: StepId,
     state_name: String, key: K, state: ByteSeq val, worker: String,
@@ -121,11 +114,6 @@ primitive ChannelMsgEncoder
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(SpinUpLocalTopologyMsg(local_topology), auth)
-
-  fun spin_up_local_actor_system(local_actor_system: LocalActorSystem val,
-    auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(SpinUpLocalActorSystemMsg(local_actor_system), auth)
 
   fun spin_up_step(step_id: U64, step_builder: StepBuilder,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -233,44 +221,6 @@ primitive ChannelMsgEncoder
     _encode(KeyedAnnounceNewStatefulStepMsg[K](id, worker_name, key,
       state_name), auth)
 
-  fun register_actor_for_worker(id: U128, worker: String,
-    auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(RegisterActorForWorkerMsg(id, worker), auth)
-
-  fun register_as_role(role: String, w_actor: U128, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(RegisterAsRoleMsg(role, w_actor), auth)
-
-  fun forget_actor(id: U128, auth: AmbientAuth): Array[ByteSeq] val ? =>
-    _encode(ForgetActorMsg(id), auth)
-
-  fun broadcast_to_role(role: String, data: Any val, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(BroadcastToRoleMsg(role, data), auth)
-
-  fun broadcast_to_actors(data: Any val, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(BroadcastToActorsMsg(data), auth)
-
-  fun broadcast_variable(k: String, v: Any val, ts: VectorTimestamp,
-    worker: String, auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(BroadcastVariableMsg(k, v, ts, worker), auth)
-
-  fun request_w_actor_registry_digest(sender: String, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(RequestWActorRegistryDigestMsg(sender), auth)
-
-  fun w_actor_registry_digest(digest: WActorRegistryDigest, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(WActorRegistryDigestMsg(digest), auth)
-
   fun rotate_log_files(auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(RotateLogFilesMsg, auth)
 
@@ -327,12 +277,6 @@ class val SpinUpLocalTopologyMsg is ChannelMsg
 
   new val create(lt: LocalTopology) =>
     local_topology = lt
-
-class val SpinUpLocalActorSystemMsg is ChannelMsg
-  let local_actor_system: LocalActorSystem val
-
-  new val create(las: LocalActorSystem val) =>
-    local_actor_system = las
 
 class val SpinUpStepMsg is ChannelMsg
   let step_id: U64
@@ -408,53 +352,6 @@ class val ReplayCompleteMsg is ChannelMsg
     sender_name = from
     boundary_id = b_id
 
-class val RegisterActorForWorkerMsg is ChannelMsg
-  let id: U128
-  let worker: String
-
-  new val create(i: U128, w: String) =>
-    id = i
-    worker = w
-
-class val ForgetActorMsg is ChannelMsg
-  let id: U128
-
-  new val create(i: U128) =>
-    id = i
-
-class val RegisterAsRoleMsg is ChannelMsg
-  let role: String
-  let id: U128
-
-  new val create(role': String, id': U128) =>
-    role = role'
-    id = id'
-
-class val BroadcastToRoleMsg is ChannelMsg
-  let role: String
-  let data: Any val
-
-  new val create(role': String, data': Any val) =>
-    role = role'
-    data = data'
-
-class val BroadcastToActorsMsg is ChannelMsg
-  let data: Any val
-
-  new val create(data': Any val) =>
-    data = data'
-
-class val WActorRegistryDigestMsg is ChannelMsg
-  let digest: WActorRegistryDigest
-
-  new val create(digest': WActorRegistryDigest) =>
-    digest = digest'
-
-class val RequestWActorRegistryDigestMsg is ChannelMsg
-  let sender: String
-
-  new val create(sender': String) =>
-    sender = sender'
 
 trait val StepMigrationMsg is ChannelMsg
   fun state_name(): String
@@ -547,27 +444,6 @@ class val DataMsg is ChannelMsg
     metrics_id = metrics_id'
     metric_name = metric_name'
 
-class val ActorDataMsg is ChannelMsg
-  let seq_id: SeqId
-  let delivery_msg: ActorDeliveryMsg
-
-  new val create(msg: ActorDeliveryMsg, seq_id': SeqId) =>
-    seq_id = seq_id'
-    delivery_msg = msg
-
-class val BroadcastVariableMsg is ChannelMsg
-  let k: String
-  let v: Any val
-  let ts: VectorTimestamp
-  let worker: String
-
-  new val create(k': String, v': Any val, ts': VectorTimestamp,
-    worker': String)
-  =>
-    k = k'
-    v = v'
-    ts = ts'
-    worker = worker'
 
 class val ReplayMsg is ChannelMsg
   let data_bytes: Array[ByteSeq] val
@@ -575,7 +451,7 @@ class val ReplayMsg is ChannelMsg
   new val create(db: Array[ByteSeq] val) =>
     data_bytes = db
 
-  fun data_msg(auth: AmbientAuth): (DataMsg | ActorDataMsg) ? =>
+  fun data_msg(auth: AmbientAuth): DataMsg ? =>
     var size: USize = 0
     for bytes in data_bytes.values() do
       size = size + bytes.size()
@@ -592,8 +468,6 @@ class val ReplayMsg is ChannelMsg
     match ChannelMsgDecoder(consume buffer, auth)
     | let r: DataMsg =>
       r
-    | let a: ActorDataMsg =>
-      a
     else
       @printf[I32]("Trouble reconstituting replayed data msg\n".cstring())
       error
@@ -660,35 +534,6 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, producer,
       _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
-    false
-
-class val ActorDeliveryMsg is ChannelMsg
-  let _sender_name: String
-  let _target_id: U128
-  let _sender_id: (U128 | None)
-  let _data: Any val
-
-  fun input(): Any val => _data
-
-  new val create(from: String, t_id: U128, m_data: Any val,
-    sender_id: (U128 | None) = None)
-  =>
-    _target_id = t_id
-    _sender_name = from
-    _sender_id = sender_id
-    _data = m_data
-
-  fun target_id(): U128 => _target_id
-  fun sender_name(): String => _sender_name
-
-  fun deliver(registry: CentralWActorRegistry): Bool
-  =>
-    match _sender_id
-    | let id: U128 =>
-      registry.send_to(_target_id, WMessage(id, _target_id, _data))
-    else
-      registry.send_for_process(_target_id, _data)
-    end
     false
 
 class val JoinClusterMsg is ChannelMsg

@@ -1,30 +1,30 @@
 # create dynamic groups
-- hosts: buffy-follower*
+- hosts: wallaroo-follower*
   tasks:
-  - name: Create a group of all followers for buffy
-    group_by: key=buffy-followers
+  - name: Create a group of all followers for wallaroo
+    group_by: key=wallaroo-followers
 
-- hosts: buffy-leader*
+- hosts: wallaroo-leader*
   vars:
     ethernet_interface: enp0s8
   tasks:
-  - name: Create a group of all leaders for buffy
-    group_by: key=buffy-leaders
+  - name: Create a group of all leaders for wallaroo
+    group_by: key=wallaroo-leaders
   - name: Set IPs for ptpd unicast
-    set_fact: ptpd_destinations="{% if groups['buffy-followers'] is defined %}{% for host in groups['buffy-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
+    set_fact: ptpd_destinations="{% if groups['wallaroo-followers'] is defined %}{% for host in groups['wallaroo-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
 
-- hosts: buffy-leaders:buffy-followers
+- hosts: wallaroo-leaders:wallaroo-followers
   tasks:
-  - name: Create a group of all hosts for buffy
-    group_by: key=buffy-all
+  - name: Create a group of all hosts for wallaroo
+    group_by: key=wallaroo-all
 
 # Apply common configuration to all hosts
-- hosts: buffy-all
+- hosts: wallaroo-all
   roles:
   - { role: common, become: yes }
 
 # Configure and deploy leader servers.
-- hosts: buffy-leaders
+- hosts: wallaroo-leaders
   vars_files:
     - 'docker_creds.yml'
   vars:
@@ -33,7 +33,7 @@
     ptpd_transport: unicast
     swarm_image: swarm
     consul_image: gliderlabs/consul
-    docker_users: [ vagrant, sendence ]
+    docker_users: [ vagrant, wallaroo ]
     userland_proxy: true
     docker_dockerpy_version: "1.9.0"
   roles:
@@ -41,17 +41,17 @@
   - { role: docker, become: yes }
 
 # Configure and deploy follower servers.
-- hosts: buffy-followers
+- hosts: wallaroo-followers
   vars_files:
     - 'docker_creds.yml'
   vars:
     ethernet_interface: enp0s8
     ptpd_role: slave
     ptpd_transport: unicast
-    leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
+    leader_ip: "{{ hostvars[groups['wallaroo-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
     swarm_image: swarm
     consul_image: gliderlabs/consul
-    docker_users: [ vagrant, sendence ]
+    docker_users: [ vagrant, wallaroo ]
     userland_proxy: true
     docker_dockerpy_version: "1.9.0"
   roles:

@@ -32,20 +32,9 @@ The outputs of the alphabet application are the letter that received the votes t
 
 The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed with the `AddVotes` computation to the state object that stores all of the vote totals, and the `compute(...)` function modifies the state to record the new total number of votes for the letter. It then creates an `AllVotes` message, which is sent to `Encode`'s `encode(...)` method, which converts it into an outgoing message.
 
-## Generating Data
-
-A data generator is bundled with the application:
-
-```bash
-cd examples/python/alphabet/data_gen
-python gen.py
-```
-
-This will generate 1000 messages.
-
 ## Running Alphabet
 
-In order to run the application you will need Machida, Giles Sender, and Giles Reciever. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/alphabet` directory.
 
@@ -92,18 +81,21 @@ You can read the output with the following code:
 ```python
 import struct
 
-
+num_bytes = 4 + 1 + 8
 with open('alphabet.out', 'rb') as f:
     while True:
         try:
-            print struct.unpack('>LsL', f.read(9))
+            print struct.unpack('>IsQ', f.read(num_bytes))
         except:
             break
 ```
 
-## Shutting down the cluster
+## Shutdown
 
-To shut down the cluster, you will need to use the `cluster_shutdown` tool.
+You can shut down the Wallaroo cluster with this command once processing has finished:
+
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
+
+You can shut down Giles Sender by pressing `Ctrl-c` from its shell.

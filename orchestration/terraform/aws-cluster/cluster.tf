@@ -16,7 +16,7 @@ provider "aws" {
 
 # placement groups don't work with t2.nano which is our default instance type
 resource "aws_placement_group" "default" {
-  name = "buffy-${var.cluster_name}"
+  name = "wallaroo-${var.cluster_name}"
   strategy = "cluster"
 
   lifecycle {

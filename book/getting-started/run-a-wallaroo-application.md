@@ -17,6 +17,8 @@ Let's get started!
 
 ## Terminal 1, Start the Metrics UI
 
+NOTE: You might need to run with sudo depending on how you set up Docker.
+
 To start the Metrics UI run:
 
 ```bash
@@ -66,8 +68,11 @@ export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo/machida:$HOME/wallaroo-tutor
 Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
 
 ```bash
+cd ~/wallaroo-tutorial/wallaroo/machida
 ./build/machida --application-module celsius --in 127.0.0.1:7000 \
-  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --ponythreads=1
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
+  --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
+  --cluster-initializer --ponythreads=1
 ```
 
 This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
@@ -80,20 +85,22 @@ A data generator is bundled with the application. Use these commands to generate
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen
-./data_gen 10000
+./data_gen.py 10000
 ```
 
-This will create a `celsius.msg` file in your current working directory.
+This will create a `celsius.msg` file in your current working directory with 10,000 messages.
 
 ### Sending Data with Giles Sender
+
+We will be sending in 25,000,000 messages using the data file generated above. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
 
 You will now be able to start the `sender` with the following command:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/sender
-./sender -h 127.0.0.1:7000 -m 10000 -y -s 300 \
-  -f ~/wallaroo-tutorial/wallaroo/examples/pony/celsius/data_gen/celsius.msg \
-  -r -w -g 8 --ponythreads=1
+./sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
+  --repeat --no-write --msg-size 8 --ponythreads=1 --file \
+  ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
@@ -123,3 +130,12 @@ You can then click into one of the elements within a category, to get to a detai
 ![Computation Detailed Metrics page](/book/metrics/images/computation-detailed-metrics-page.png)
 
 Feel free to click around and get a feel for how the Metrics UI is setup and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
+
+## Shutting Down The Cluster
+
+You can shut down the cluster with this command once processing has finished:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
+./cluster_shutdown 127.0.0.1:5050
+```

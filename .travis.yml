@@ -12,7 +12,7 @@ branches:
   only:
     - master
     - release
-    - /^rc(\d)+-work$/
+    - /^release-(\d).(\d).(\d)-rc(\d)+$/
 
 dist: trusty
 sudo: required

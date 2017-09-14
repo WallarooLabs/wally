@@ -55,6 +55,6 @@ variable "packet_instance_os" {
 
 variable "project_tag" {
   description = "Value for the project tag."
-  default = "buffy"
+  default = "wallaroo"
 }
 

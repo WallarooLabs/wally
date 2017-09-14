@@ -25,7 +25,7 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 A data generator is bundled with the application:
 
 ```bash
-cd examples/python/celsius/data_gen
+cd _test
 python data_gen.py 1000000
 ```
 
@@ -33,7 +33,7 @@ This will generate a million messages.
 
 ## Running Celsius
 
-In order to run the application you will need Machida, Giles Sender, and Giles Receiver. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius` directory.
 
@@ -69,7 +69,7 @@ Send messages:
 
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 \
-  --file data_gen/celsius.msg --batch-size 50 --interval 10_000_000 \
+  --file _test/celsius.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --repeat \
   --ponythreads=1 --binary --msg-size 8
 ```
@@ -90,10 +90,12 @@ with open('celsius.out', 'rb') as f:
             break
 ```
 
-## Shutting Down The Cluster
+## Shutdown
 
 You can shut down the cluster with this command once processing has finished:
 
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
+
+You can shut down Giles Sender by pressing `Ctrl-c` from its shell.

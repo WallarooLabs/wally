@@ -1,6 +1,6 @@
-# Buffy Terraform Orechestration - Cluster module
+# Wallaroo Terraform Orechestration - Cluster module
 
-This module consists of the orchestration for Buffy using Terraform for the actual cluster nodes.
+This module consists of the orchestration for Wallaroo using Terraform for the actual cluster nodes.
 So far we have only implemented AWS as a provider.
 
 ## Module details

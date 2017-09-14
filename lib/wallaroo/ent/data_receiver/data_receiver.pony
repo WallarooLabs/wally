@@ -18,7 +18,7 @@ use "wallaroo/core/data_channel"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/watermarking"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/routing"
@@ -188,18 +188,6 @@ actor DataReceiver is Producer
       _last_id_seen = seq_id
       _router.route(d, pipeline_time_spent, this, seq_id, latest_ts,
         metrics_id, worker_ingress_ts)
-      _maybe_ack()
-    end
-
-  be received_actor_data(d: ActorDeliveryMsg, seq_id: SeqId) =>
-    _timer_init(this)
-    ifdef "trace" then
-      @printf[I32]("Rcvd actor msg at DataReceiver\n".cstring())
-    end
-    if seq_id > _last_id_seen then
-      _ack_counter = _ack_counter + 1
-      _last_id_seen = seq_id
-      _router.route_to_actor(d)
       _maybe_ack()
     end
 

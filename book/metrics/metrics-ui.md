@@ -16,6 +16,8 @@ You should already have Docker installed if you have followed the `Setup` instru
 
 #### Running the Metrics UI
 
+NOTE: You might need to run with sudo depending on how you set up Docker.
+
 Once you have Docker setup, you can grab the Metrics UI image by running:
 
 ```
@@ -107,7 +109,7 @@ Now that we have an understanding of what metrics we'll be showing you and the c
 
 ## Page by Page Overview
 
-In this section, we'll give a page by page overview of the information presented to you via the Wallaroo Metrics UI. This information is presented via static images and does not fully convey the experience of using the Metrics UI live with a running Wallaroo application. To follow along on your own, follow the instructions in the [Run an Apllication](/book/getting-started/run-a-application.md) section. Once you've completed the **Check Out Some Metrics** section of that page and have visited the URL for the Metrics UI, you'll be ready to follow along as we take a deep dive into the Metrics UI.
+In this section, we'll give a page by page overview of the information presented to you via the Wallaroo Metrics UI. This information is presented via static images and does not fully convey the experience of using the Metrics UI live with a running Wallaroo application. To follow along on your own, follow the instructions in the [Run a Wallaroo Application](/book/getting-started/run-a-wallaroo-application.md) section. Once you've completed the **Check Out Some Metrics** section of that page and have visited the URL for the Metrics UI, you'll be ready to follow along as we take a deep dive into the Metrics UI.
 
 ### Landing
 

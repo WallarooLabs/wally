@@ -39,7 +39,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
@@ -207,11 +207,6 @@ class DataChannelConnectNotifier is DataChannelNotify
             data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
             data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
             my_latest_ts)
-      | let data_msg: ActorDataMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received ActorDataMsg on Data Channel\n".cstring())
-        end
-        _receiver.received_actor_data(data_msg.delivery_msg, data_msg.seq_id)
       | let dc: DataConnectMsg =>
         ifdef "trace" then
           @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
@@ -254,10 +249,6 @@ class DataChannelConnectNotifier is DataChannelNotify
               data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
               data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
               my_latest_ts)
-          | let ad: ActorDataMsg =>
-            // TODO: When we introduce wactor message replay, add
-            // functionality here
-            None
           else
             Fail()
           end
@@ -309,7 +300,6 @@ trait _DataReceiverWrapper
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun received_actor_data(d: ActorDeliveryMsg, seq_id: U64)
 
 class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
@@ -323,9 +313,6 @@ class _InitDataReceiver is _DataReceiverWrapper
   fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    Fail()
-
-  fun received_actor_data(d: ActorDeliveryMsg, seq_id: U64) =>
     Fail()
 
   fun upstream_replay_finished() =>
@@ -351,6 +338,3 @@ class _DataReceiver is _DataReceiverWrapper
   =>
     data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
-
-  fun received_actor_data(d: ActorDeliveryMsg, seq_id: U64) =>
-    data_receiver.received_actor_data(d, seq_id)

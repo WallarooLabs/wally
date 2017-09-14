@@ -4,35 +4,35 @@ The following is a list of limitations and gotchas with existing supported featu
 
 ## State Partitions
 
-* State partitions only support a static set of keys defined at startup (https://github.com/WallarooLabs/wallaroo/issues/751).
-* Running a partition with fewer keys than there are workers in the cluster will currently lead to process failure (https://github.com/WallarooLabs/wallaroo/issues/956 and https://github.com/WallarooLabs/wallaroo/issues/947).
-* When we initialize state in a state partition, we do not pass in information about the key associated with that state (https://github.com/WallarooLabs/wallaroo/issues/462).
-* We only support a single partition function per state partition. This means that you must use that same partition function for any pipeline that interacts with that state partition (https://github.com/WallarooLabs/wallaroo/issues/464).
+* [Issue #751](https://github.com/WallarooLabs/wallaroo/issues/751) State partitions only support a static set of keys defined at startup. 
+* [Issue #956](https://github.com/WallarooLabs/wallaroo/issues/956) [Issue #947](https://github.com/WallarooLabs/wallaroo/issues/947) Running a partition with fewer keys than there are workers in the cluster will currently lead to process failure.
+* [Issue #462](https://github.com/WallarooLabs/wallaroo/issues/462) When we initialize state in a state partition, we do not pass in information about the key associated with that state.
+* [Issue #464](https://github.com/WallarooLabs/wallaroo/issues/464) We only support a single partition function per state partition. This means that you must use that same partition function for any pipeline that interacts with that state partition.
 
 ## Metrics
 
-* Metric collection is not optional. This means `--metrics` command line argument is required, and that even if you are not using metrics, you will still get the small performance hit (https://github.com/WallarooLabs/wallaroo/issues/766).
+* [Issue #766](https://github.com/WallarooLabs/wallaroo/issues/766) Metric collection is not optional. This means `--metrics` command line argument is required, and that even if you are not using metrics, you will still get the small performance hit.
 
 ## Pipelines
 
-* We do not currently support arbitrary computation graphs. Pipelines are linear (with the exception of partitions) (https://github.com/WallarooLabs/wallaroo/issues/906).
+* [Issue #906](https://github.com/WallarooLabs/wallaroo/issues/906) We do not currently support arbitrary computation graphs. Pipelines are linear (with the exception of partitions.
 
 ### Sources
 
-* Sources currently only run on the initializer worker (https://github.com/WallarooLabs/wallaroo/issues/894 and https://github.com/WallarooLabs/wallaroo/issues/915).
-* Sources are not replayable. There is no mechanism for acking back to an external system from a Wallaroo source (https://github.com/WallarooLabs/wallaroo/issues/900).
+* [Issue #894](https://github.com/WallarooLabs/wallaroo/issues/894) [Issue #915](https://github.com/WallarooLabs/wallaroo/issues/915) Sources currently only run on the initializer worker.
+* [Issue #900](https://github.com/WallarooLabs/wallaroo/issues/900) Sources are not replayable. There is no mechanism for acking back to an external system from a Wallaroo source.
 
 ### Sinks
 
-* A pipeline currently supports at most one sink (https://github.com/WallarooLabs/wallaroo/issues/1084).
-* Each sink is currently duplicated on every worker to reduce latency. But with enough workers, this will cause an excessive number of connections to external systems (https://github.com/WallarooLabs/wallaroo/issues/1009).
-* We support dynamically created Sources (for example, as connections are created over TCP to a Wallaroo application), but we do not currently support dynamically created sinks (https://github.com/WallarooLabs/wallaroo/issues/1059).
+* [Issue #1084](https://github.com/WallarooLabs/wallaroo/issues/1084) A pipeline currently supports at most one sink.
+* [Issue #1009](https://github.com/WallarooLabs/wallaroo/issues/1009) Each sink is currently duplicated on every worker to reduce latency. But with enough workers, this will cause an excessive number of connections to external systems.
+* [Issue #1059](https://github.com/WallarooLabs/wallaroo/issues/1059) We support dynamically created Sources (for example, as connections are created over TCP to a Wallaroo application), but we do not currently support dynamically created sinks.
 
 ## Clustering
 
-* We can only recover from one worker failure at a time. If more than one worker crashes simultaneously, recovery will deadlock (https://github.com/WallarooLabs/wallaroo/issues/1018 and https://github.com/WallarooLabs/wallaroo/issues/1019).
-* No matter what name you give to the initializer worker, it will currently be renamed "initializer" (https://github.com/WallarooLabs/wallaroo/issues/1191).
+* [Issue #1018](https://github.com/WallarooLabs/wallaroo/issues/1018) [Issue #1019](https://github.com/WallarooLabs/wallaroo/issues/1019) We can only recover from one worker failure at a time. If more than one worker crashes simultaneously, recovery will deadlock.
+* [Issue #1191](https://github.com/WallarooLabs/wallaroo/issues/1191) No matter what name you give to the initializer worker, it will currently be renamed "initializer".
 
 ## Logging
 
-* We do not yet provide a logger, so you must currently rely on print statements (https://github.com/WallarooLabs/wallaroo/issues/106).
+* [Issue #106](https://github.com/WallarooLabs/wallaroo/issues/106) We do not yet provide a logger, so you must currently rely on print statements.

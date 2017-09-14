@@ -1,6 +1,6 @@
 # Writing Your Own Wallaroo Python Application
 
-In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `reverse.py` application from the [examples](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/reverse/) section, then move on to an application that maintains and modifies state and, finally, a stateful application that also uses partitioning to divide its work.
+In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `reverse.py` application from the [examples](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc2/examples/python/reverse/) section, then move on to an application that maintains and modifies state and, finally, a stateful application that also uses partitioning to divide its work.
 
 ## A Stateless Application - Reverse Words
 
@@ -65,7 +65,7 @@ To read more about this, please refer to the [Creating A Decoder](/book/core-con
 
 For our application purposes, we will simply define the structure and how it is going to get parsed:
 
-1. input messages have the following structure: A fixed length `PAYLOAD_SIZE` followed by `PAYLOAD`
+1. Input messages have the following structure: A fixed length `PAYLOAD_SIZE` followed by `PAYLOAD`
 2. Wallaroo requires three methods to parse this type of message:
   1. `header_length()`, which returns the number of bytes used for the `PAYLOAD_SIZE` in the message. This value tells Wallaroo how many bytes to read from the stream as `HEADER`.
   2. `payload_length(bs)`, which reads `PAYLOAD_SIZE` bytestring of the size returned by `header_length()` and computes the size of `PAYLOAD`. It then returns that size as an integer to Wallaroo, which will then read that many bytes from the stream.
@@ -80,8 +80,8 @@ In our case:
 
 So now that we have input decoding, computation, and output decoding defined, how do we build it all into an application?
 For this, two things are needed:
-1. an entry point for Wallaroo to create the application. This is the function `application_setup` that you need to define.
-2. the actual topology `application_setup` is going to return for Wallaroo to create the application.
+1. An entry point for Wallaroo to create the application. This is the function `application_setup` that you need to define.
+2. The actual topology `application_setup` is going to return for Wallaroo to create the application.
 
 #### Application Builder and Pipelines
 
@@ -127,7 +127,7 @@ def application_setup(args):
 
 Configuration objects are used to pass information about sources and sinks to the application builder. Currently the only supported source is the TCP source, and the only supported sink is the TCP sink.
 
-Wallaroo provides convenience the functions `tcp_parse_input_addrs` and `tcp_parse_output_addrs` to parse host and port information that is passed on the command line, or the user can supply their own code for getting these values. When using the convenience functions, host/port pairs are represented on the command line as colon-separated values and multiple host/port values are represented by a comma-separated list of host/port values. The functions assume that `--in` is used for input addresses, and `--out` is used for output addresses. For example, this set of commandline arguments would specify two input host/port values and one output:
+Wallaroo provides convenience the functions `tcp_parse_input_addrs` and `tcp_parse_output_addrs` to parse host and port information that is passed on the command line, or the user can supply their own code for getting these values. When using the convenience functions, host/port pairs are represented on the command line as colon-separated values and multiple host/port values are represented by a comma-separated list of host/port values. The functions assume that `--in` is used for input addresses, and `--out` is used for output addresses. For example, this set of command line arguments would specify two input host/port values and one output:
 
 ```
 --in localhost:7001,localhost:7002 --out localhost:7010
@@ -135,7 +135,7 @@ Wallaroo provides convenience the functions `tcp_parse_input_addrs` and `tcp_par
 
 ### Miscellaneous
 
-Of course, no python module is complete without its imports. In this case, only two imports are required:
+Of course, no Python module is complete without its imports. In this case, only two imports are required:
 
 ```python
 import struct
@@ -144,8 +144,8 @@ import wallaroo
 
 ## Running `reverse.py`
 
-The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/reverse/). To run it, follow the [Reverse application instructions](https://github.com/WallarooLabs/wallaroo/tree/release/examples/python/reverse/README.md)
+The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc2/examples/python/reverse/). To run it, follow the [Reverse application instructions](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc2/examples/python/reverse/README.md)
 
 ## Next Steps
 
-To learn how to write a stateful application, continue to [Writing Your Own Stateful Appliaction](writing-your-own-stateful-application.md).
+To learn how to write a stateful application, continue to [Writing Your Own Stateful Application](writing-your-own-stateful-application.md).

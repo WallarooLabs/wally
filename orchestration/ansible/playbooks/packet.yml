@@ -9,16 +9,16 @@
 # create dynamic groups
 - hosts: tag_{{ cluster_project_name | replace('-', '_') }}:&tag_Role_follower:&tag_Cluster_{{ cluster_name | replace('-', '_') }}:&{{ packet_region }}
   tasks:
-  - name: Create a group of all followers for buffy
-    group_by: key=buffy-followers
+  - name: Create a group of all followers for wallaroo
+    group_by: key=wallaroo-followers
   - name: set hostname
-    hostname: name=buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}
+    hostname: name=wallaroo-follower-{{ groups['wallaroo-followers'].index(inventory_hostname) + 1 }}
     become: yes
   - name: "Add hostname to hosts file"
     lineinfile:
       dest: /etc/hosts
-      regexp: .*buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}$
-      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}"
+      regexp: .*wallaroo-follower-{{ groups['wallaroo-followers'].index(inventory_hostname) + 1 }}$
+      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} wallaroo-follower-{{ groups['wallaroo-followers'].index(inventory_hostname) + 1 }}"
       state: present
     become: yes
 
@@ -27,25 +27,25 @@
   vars:
     ethernet_interface: "{{ ansible_default_ipv4.interface }}"
   tasks:
-  - name: Create a group of all leaders for buffy
-    group_by: key=buffy-leaders
+  - name: Create a group of all leaders for wallaroo
+    group_by: key=wallaroo-leaders
   - name: Set IPs for ptpd unicast
-    set_fact: ptpd_destinations="{% if groups['buffy-followers'] is defined %}{% for host in groups['buffy-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
+    set_fact: ptpd_destinations="{% if groups['wallaroo-followers'] is defined %}{% for host in groups['wallaroo-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
   - name: set hostname
-    hostname: name=buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}
+    hostname: name=wallaroo-leader-{{ groups['wallaroo-leaders'].index(inventory_hostname) + 1 }}
     become: yes
   - name: "Add hostname to hosts file"
     lineinfile:
       dest: /etc/hosts
-      regexp: .*buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}$
-      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}"
+      regexp: .*wallaroo-leader-{{ groups['wallaroo-leaders'].index(inventory_hostname) + 1 }}$
+      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} wallaroo-leader-{{ groups['wallaroo-leaders'].index(inventory_hostname) + 1 }}"
       state: present
     become: yes
 
-- hosts: buffy-leaders:buffy-followers
+- hosts: wallaroo-leaders:wallaroo-followers
   tasks:
-  - name: Create a group of all hosts for buffy
-    group_by: key=buffy-all
+  - name: Create a group of all hosts for wallaroo
+    group_by: key=wallaroo-all
   - name: set variable for disks that can be raided
     set_fact:
       disks: "{{ hostvars[inventory_hostname]['ansible_devices'].keys() | difference(['xvda','sda','xvdb','sdb']) }}"
@@ -78,7 +78,7 @@
     become: yes
 
 # Apply common configuration to all hosts
-- hosts: buffy-all
+- hosts: wallaroo-all
   vars:
     software_raid_create_kwargs: "--run" # force the creation if there are any prompts
     software_raid_devices:
@@ -96,7 +96,7 @@
 #  - { role: jacoelho.softwareraid, become: yes, when: disks_list | length > 0}
 
 # Configure and deploy leader servers.
-- hosts: buffy-leaders
+- hosts: wallaroo-leaders
   vars_files:
     - 'docker_creds.yml'
   vars:
@@ -105,24 +105,24 @@
     ptpd_transport: unicast
     swarm_image: swarm
     consul_image: gliderlabs/consul
-    docker_users: [ ubuntu, sendence ]
+    docker_users: [ ubuntu, wallaroo ]
     docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
 
 # Configure and deploy follower servers.
-- hosts: buffy-followers
+- hosts: wallaroo-followers
   vars_files:
     - 'docker_creds.yml'
   vars:
     ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: slave
     ptpd_transport: unicast
-    leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
+    leader_ip: "{{ hostvars[groups['wallaroo-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
     swarm_image: swarm
     consul_image: gliderlabs/consul
-    docker_users: [ ubuntu, sendence ]
+    docker_users: [ ubuntu, wallaroo ]
     docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }

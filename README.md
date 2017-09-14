@@ -81,7 +81,7 @@ JavaScript support is currently in the planning stages with no release date targ
 
 ### Limitations
 
-We have numerous issues open to improve existing Wallaroo functionality. For a high-level overview, please see our [current limitations document][current limitations].
+We have [numerous issues open][open issues] to improve existing Wallaroo functionality. For a high-level overview, please see our [current limitations document][current limitations].
 
 ## Getting Started
 
@@ -89,13 +89,13 @@ Are you the sort who just wants to get going? Dive right into our [documentation
 
 ## Documentation
 
-[http://docs.wallaroolabs.com][documentation website]
+Our primary documentation is hosted by GitBook at [http://docs.wallaroolabs.com][documentation website]. You can find additional information on our [community site][community website].
 
 ## Getting Help
 
 - [Join us on Freenode in #wallaroo][IRC]. 
 - [Join our developer mailing list][developer mailing list].
-- [Commercial support](mailto:hello@wallaroolabs.com)
+- [Commercial support][contact us email]
 
 ## How to Contribute
 
@@ -131,10 +131,6 @@ Our VP of Engineering Sean T. Allen talks about one of the techniques we use to 
 ## About this Repository
 
 Wallaroo currently exists as a mono-repo. All the source that makes Wallaroo go is in this repo. Let's take a quick walk through what you'll find in each top-level directory:
-
-- atkin
-
-Source for runner application that powers our still prototype Python "Actor" API.
 
 - book
 
@@ -176,26 +172,27 @@ Tools we have written that are used to test Wallaroo.
 
 End user utilities designed to make it easier to do various Wallaroo tasks like cleanly shut down a cluster.
 
-[what is wallaroo section]: #what-is-wallaroo
-[status section]: #status
-[getting started section]: #getting-started
-[documentation section]: #documentation
-[getting help section]: #getting-help
-[contribute section]: #how-to-contribute
-[additional links]: #additional-links
 [about this repository section]: #about-this-repository 
-
-[hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
-[documentation website]: http://docs.wallaroolabs.com
-[unstable documentation website]: https://www.gitbook.com/book/wallaroo-labs/wallaroo-latest/details
-[IRC]: https://webchat.oftc.net/?channels=wallaroo
-[developer mailing list]: https://groups.io/g/wallaroo
-[contributors guide]: CONTRIBUTING.md
-[pony examples]: pony/examples
-[wallaroo labs website]: https://www.wallaroolabs.com
-[qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
+[additional links]: #additional-links
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
-[twitter]: https://www.twitter.com/wallaroolabs
-[secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
+[community website]: http://www.wallaroolabs.com/community
+[contact us email]: mailto:hello@wallaroolabs.com
+[contribute section]: #how-to-contribute
+[contributors guide]: CONTRIBUTING.md
 [current limitations]: LIMITATIONS.md
-
+[developer mailing list]: https://groups.io/g/wallaroo
+[documentation section]: #documentation
+[documentation website]: http://docs.wallaroolabs.com
+[getting help section]: #getting-help
+[getting started section]: #getting-started
+[hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
+[IRC]: https://webchat.oftc.net/?channels=wallaroo
+[open issues]: https://github.com/WallarooLabs/wallaroo/issues
+[pony examples]: examples/pony
+[qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
+[secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
+[status section]: #status
+[twitter]: https://www.twitter.com/wallaroolabs
+[unstable documentation website]: https://www.gitbook.com/book/wallaroo-labs/wallaroo-latest/details
+[wallaroo labs website]: https://www.wallaroolabs.com
+[what is wallaroo section]: #what-is-wallaroo

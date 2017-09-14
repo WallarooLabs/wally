@@ -19,7 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "time"
 use "wallaroo_labs/guid"
 use "wallaroo/core/common"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"

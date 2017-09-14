@@ -1,4 +1,4 @@
-# Alphabet Paritioned
+# Alphabet Partitioned
 
 ## About The Application
 
@@ -14,7 +14,7 @@ The inputs to the "Alphabet Partitioned" application are the letter receiving th
 
 `\x00\x00\x00\x05` -- four bytes representing the number of bytes in the payload
 `A` -- a single byte representing the letter "A", which is receiving the votes
-`\x00\x00\x15\x34` -- the number `0x1534` (`5428`) represented as a big-endiant 32-bit integer
+`\x00\x00\x15\x34` -- the number `0x1534` (`5428`) represented as a big-endian 32-bit integer
 
 ### Output
 
@@ -26,32 +26,21 @@ The outputs of the alphabet application are the letter that received the votes t
 
 `\x00\x00\x00\x09` -- four bytes representing the number of bytes in the payload
 `q` -- a single byte representing the letter "q", which is receiving the votes
-`\x00\x00\x5A\x21\x10\xB7\x11\xA4` -- the number `0x5A2110B711A4` (`99098060853668`) represented as a big-endiant 64-bit integer
+`\x00\x00\x5A\x21\x10\xB7\x11\xA4` -- the number `0x5A2110B711A4` (`99098060853668`) represented as a big-endian 64-bit integer
 
 ### Processing
 
 The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed with the `AddVotes` computation to the state object that handles the letter being voted on, and the `AddVotes` function modifies the state to record the new total number of votes for the letter. It then creates an `AllVotes` message, which is sent to `Encode`'s `encode(...)` method, which converts it into an outgoing message.
 
-## Generating Data
-
-A data generator is bundled with the application:
-
-```bash
-cd examples/python/alphabet_partitioned/data_gen
-python gen.py
-```
-
-This will generate 1000 messages.
-
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, and Giles Reciever. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
 ### Shell 1
 
-Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
+Run Giles Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
 ../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
@@ -67,7 +56,7 @@ export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
-Run `machida` with `--application-module alphabet_partitioned` as an inializer:
+Run `machida` with `--application-module alphabet_partitioned` as an initializer:
 
 ```bash
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
@@ -98,15 +87,9 @@ machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
 Send messages:
 
 ```bash
-<<<<<<< Updated upstream
 ../../../giles/sender/sender --host 127.0.0.1:7010 \
   --file votes.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --binary --msg-size 9 --repeat --ponythreads=1
-=======
-../../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
-  --batch-size 50 --interval 10_000_000 --messages 1000000 --binary \
-  --msg-size 9 --repeat --ponythreads=1
->>>>>>> Stashed changes
 ```
 ## Reading the Output
 
@@ -115,17 +98,21 @@ You can read the output with the following code:
 ```python
 import struct
 
-
+num_bytes = 4 + 1 + 8
 with open('alphabet.out', 'rb') as f:
     while True:
         try:
-            print struct.unpack('>LsL', f.read(9))
+            print struct.unpack('>IsQ', f.read(num_bytes))
         except:
             break
 ```
 
-Remember to shut down the cluster once finished processing
+## Shutdown
+
+You can shut down the cluster with this command once processing has finished:
 
 ```bash
-../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:6002
+../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
+
+You can shut down Giles Sender and Giles Receiver by pressing `Ctrl-c` from their respective shells.

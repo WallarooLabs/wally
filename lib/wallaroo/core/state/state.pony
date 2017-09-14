@@ -18,7 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "buffered"
 use "serialise"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 
 trait ref State
   fun write_log_entry(out_writer: Writer, auth: AmbientAuth) =>

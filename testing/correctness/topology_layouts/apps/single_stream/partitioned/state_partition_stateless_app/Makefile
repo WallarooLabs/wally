@@ -22,7 +22,7 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 # RECURSE_SUBMAKEFILES := false
 
-TOPOLOGY_LAYOUT_VALIDATOR_PATH = $(buffy_path)/testing/correctness/topology_layouts/apps/validator
+TOPOLOGY_LAYOUT_VALIDATOR_PATH = $(wallaroo_path)/testing/correctness/topology_layouts/apps/validator
 SINGLE_STREAM_PARTITIONED_STATE_PARTITION_STATELESS_APP_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
@@ -72,17 +72,6 @@ three_worker_single_stream_partitioned_state_partition_stateless_app_test:
 	--log-level error \
 	--command './state_partition_stateless_app' \
 	--sink-expect 100
-
-# args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
-# NOTE: all paths must be relative to buffy directory (use buffy_path variable)
-
-##<NAME OF TARGET>: #used as part of `make help` command ## <DESCRIPTION OF TARGET>
-#$(eval $(call RUN_DAGON\
-#,<NAME OF TARGET> \
-#,$(buffy_path)/<PATH TO INI FILE> \
-#,<TIMEOUT VALUE> \
-#,<WESLEY TEST COMMAND> \
-#,<INCLUDE IN CI>))
 
 # end of prevent rules from being evaluated/included multiple times
 endif

@@ -1,6 +1,6 @@
 # Performance Testing on AWS/Packet
 
-If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
+If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/WallarooLabs/wallaroo/tree/master/orchestration/terraform) please do so before continuing.
 
 ## Configuring Cluster:
 
@@ -50,7 +50,7 @@ ssh -i ~/.ssh/ec2/us-east-1.pem sendence@<IP_ADDRESS>
 You need to create a docker network for the UI's with the following command:
 
 ```bash
-docker network create buffy-leader
+docker network create wallaroo-leader
 ```
 
 To run the Metrics UI:
@@ -62,7 +62,7 @@ docker run -d -u root --cpuset-cpus 0,18 --privileged  \
 -v /tmp:/apps/metrics_reporter_ui/log  \
 -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
 -e "BINS_TYPE=demo" -e "RELX_REPLACE_OS_VARS=true" \
---name mui -h mui --net=buffy-leader \
+--name mui -h mui --net=wallaroo-leader \
 docker.sendence.com:5043/sendence/monitoring_hub-apps-metrics_reporter_ui.amd64:sendence-2.3.0-2462-gf6421db
 ```
 

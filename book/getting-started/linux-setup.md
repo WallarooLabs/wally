@@ -159,7 +159,13 @@ sudo apt-get install -y libsnappy-dev liblz4-dev
 
 ### Trusty Ubuntu:
 
-*Note:* some older versions of Ubuntu have an outdated `liblz4` package. For these you will need to install from source like this:
+Install libsnappy:
+
+```bash
+sudo apt-get install -y libsnappy-dev
+```
+
+Trusty Ubuntu has an outdated `liblz4` package. You will need to install from source like this:
 
 ```bash
 cd ~/
@@ -204,10 +210,8 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.1.0-rc1
+git checkout 0.1.0-rc2
 ```
-
-Note: You need to login to GitHub for credentials
 
 ## Installing Machida
 
@@ -234,6 +238,15 @@ Giles Receiver receives data from Wallaroo over TCP.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
+make
+```
+
+## Install Cluster Shutdown tool
+
+The Cluster Shutdown tool is used to tell the cluster to shut down cleanly.
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
 make
 ```
 

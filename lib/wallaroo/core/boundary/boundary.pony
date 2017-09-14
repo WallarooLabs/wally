@@ -37,7 +37,7 @@ use "wallaroo/core/common"
 use "wallaroo/ent/network"
 use "wallaroo/ent/spike"
 use "wallaroo/ent/watermarking"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
@@ -342,26 +342,6 @@ actor OutgoingBoundary is Consumer
       end
 
       _metrics_reporter.worker_metric(metric_name, end_ts - worker_ingress_ts)
-    else
-      Fail()
-    end
-
-    _maybe_mute_or_unmute_upstreams()
-
-  be forward_actor_data(delivery_msg: ActorDeliveryMsg) =>
-    ifdef "trace" then
-      @printf[I32]("Rcvd actor message at OutgoingBoundary\n".cstring())
-    end
-    try
-      let seq_id = (_seq_id = _seq_id + 1)
-
-      let outgoing_msg = ChannelMsgEncoder.data_channel_actor(delivery_msg,
-        seq_id, _wb, _auth)
-      _add_to_upstream_backup(outgoing_msg)
-
-      if _connection_initialized then
-        _writev(outgoing_msg)
-      end
     else
       Fail()
     end
