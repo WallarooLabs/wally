@@ -25,7 +25,7 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 A data generator is bundled with the application:
 
 ```bash
-cd examples/python/celsius/data_gen
+cd data_gen
 python data_gen.py 1000000
 ```
 
