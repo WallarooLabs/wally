@@ -114,10 +114,12 @@ To send order messages, run this command:
   --repeat --ponythreads=1 --msg-size 57 --no-write
 ```
 
-## Shutting Down The Cluster
+## Shutdown
 
-The sender commands will send data forever, so processing never really finishes. When you are ready to shut down the cluster you can run this command:
+The sender commands will send data for a long time, so processing never really finishes. When you are ready to shut down the cluster you can run this command:
 
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
+
+You can shut down Giles Sender by pressing `Ctrl-c` from its shell.
