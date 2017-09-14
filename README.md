@@ -132,10 +132,6 @@ Our VP of Engineering Sean T. Allen talks about one of the techniques we use to 
 
 Wallaroo currently exists as a mono-repo. All the source that makes Wallaroo go is in this repo. Let's take a quick walk through what you'll find in each top-level directory:
 
-- atkin
-
-Source for runner application that powers our still prototype Python "Actor" API.
-
 - book
 
 Markdown source used to build [http://docs.wallaroolabs.com][documentation website]. [http://docs.wallaroolabs.com][documentation website] gets built from the latest commit to the `release` branch. There's also ["Wallaroo-Latest" documentation][unstable documentation website]. "Wallaroo-Latest" is built from master so it will be as up to date as possible. Be aware many of the external links in our documentation point to the `release` branch. "Wallaroo-Latest" is intended only for the most adventurous amongst us.

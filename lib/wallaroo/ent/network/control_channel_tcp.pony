@@ -20,8 +20,6 @@ use "wallaroo"
 use "wallaroo/core/common"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/w_actor"
-use "wallaroo/ent/w_actor/broadcast"
 use "wallaroo/core/fail"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
@@ -42,7 +40,6 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
-  let _broadcast_variables: (BroadcastVariables | None)
   let _recovery_file: FilePath
   let _event_log: EventLog
   let _recovery_file_cleaner: RecoveryFileCleaner
@@ -53,8 +50,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     recovery_file: FilePath, data_host: String, data_service: String,
-    event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner,
-    broadcast_variables: (BroadcastVariables | None) = None)
+    event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner)
   =>
     _auth = auth
     _name = name
@@ -67,7 +63,6 @@ class ControlChannelListenNotifier is TCPListenNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
-    _broadcast_variables = broadcast_variables
     _recovery_file = recovery_file
     _event_log = event_log
     _recovery_file_cleaner = recovery_file_cleaner
@@ -111,7 +106,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
-      _router_registry, _broadcast_variables, _d_host, _d_service, _event_log,
+      _router_registry, _d_host, _d_service, _event_log,
       _recovery_file_cleaner)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
@@ -123,7 +118,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
-  let _broadcast_variables: (BroadcastVariables | None)
   let _d_host: String
   let _d_service: String
   let _event_log: EventLog
@@ -134,7 +128,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     connections: Connections, initializer: (ClusterInitializer | None),
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
-    broadcast_variables: (BroadcastVariables | None),
     data_host: String, data_service: String, event_log: EventLog,
     recovery_file_cleaner: RecoveryFileCleaner)
   =>
@@ -146,7 +139,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
-    _broadcast_variables = broadcast_variables
     _d_host = data_host
     _d_service = data_service
     _event_log = event_log
@@ -233,70 +225,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
-      | let m: SpinUpLocalActorSystemMsg =>
-        ifdef "trace" then
-          @printf[I32](("Received SpinUpLocalActorSystemMsg on Control" +
-            "Channel\n").cstring())
-        end
-        match _layout_initializer
-        | let wai: WActorInitializer =>
-          wai.update_local_actor_system(m.local_actor_system)
-          wai.initialize()
-        else
-          Fail()
-        end
-      | let m: RegisterActorForWorkerMsg =>
-        ifdef "trace" then
-          @printf[I32](("Received RegisterActorForWorkerMsg on Control" +
-            "Channel\n").cstring())
-        end
-        _router_registry.register_actor_for_worker(m.id, m.worker)
-      | let m: ForgetActorMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received ForgetActor on Control Channel\n".cstring())
-        end
-        _router_registry.forget_external_actor(m.id)
-      | let m: RegisterAsRoleMsg =>
-        ifdef "trace" then
-          @printf[I32](("Received RegisterAsRoleMsg on Control" +
-            "Channel\n").cstring())
-        end
-        _router_registry.register_as_role(m.role, m.id)
-      | let m: BroadcastToActorsMsg =>
-        ifdef "trace" then
-          @printf[I32](("Received BroadcastToActorsMsg on Control" +
-            "Channel\n").cstring())
-        end
-        // TODO: If we actually want to use broadcast_to_actors, this will
-        // create a bottleneck through the router registry and the central
-        // actor registry.
-        _router_registry.broadcast_to_actors(m.data)
-      | let m: BroadcastVariableMsg =>
-        ifdef "trace" then
-          @printf[I32](("Received BroadcastVariable on Control Channel\n")
-            .cstring())
-        end
-        match _broadcast_variables
-        | let bv: BroadcastVariables =>
-          bv.external_update(m.k, m.v, m.ts, m.worker)
-        else
-          Fail()
-        end
-      | let m: WActorRegistryDigestMsg =>
-        ifdef "trace" then
-          @printf[I32](("Received WActorRegistryDigestMsg on Control" +
-            "Channel\n").cstring())
-        end
-        _router_registry.process_digest(m.digest)
-        // Assumption: We only receive this digest message during
-        // registry recovery phase of Recovery
-        _recovery.w_actor_registry_recovery_finished()
-      | let m: RequestWActorRegistryDigestMsg =>
-        ifdef "trace" then
-          @printf[I32](("Received RequestWActorRegistryDigestMsg on Control" +
-            "Channel\n").cstring())
-        end
-        _router_registry.send_digest_to(m.sender)
       | let m: TopologyReadyMsg =>
         ifdef "trace" then
           @printf[I32]("Received TopologyReadyMsg on Control Channel\n"
