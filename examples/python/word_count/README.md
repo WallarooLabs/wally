@@ -70,10 +70,12 @@ In a third shell, send some messages:
 
 There will be a stream of output messages in the first shell (where you ran `nc`).
 
-## Shutting Down The Cluster
+## Shutdown
 
 You can shut down the cluster with this command once processing has finished:
 
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
+
+You can shut down Giles Sender by pressing `Ctrl-c` from its shell.

@@ -124,10 +124,12 @@ with open('alphabet.out', 'rb') as f:
             break
 ```
 
-## Shutting Down The Cluster
+## Shutdown
 
 You can shut down the cluster with this command once processing has finished:
 
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
+
+You can shut down Giles Sender and Giles Receiver by pressing `Ctrl-c` from their respective shells.
