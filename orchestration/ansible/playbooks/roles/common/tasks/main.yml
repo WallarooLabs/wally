@@ -20,33 +20,33 @@
   command: groups {{ ansible_ssh_user }}
   register: my_groups
 
-- name: Add sendence group
-  group: name=sendence state=present gid=1111
+- name: Add wallaroo group
+  group: name=wallaroo state=present gid=1111
 
-- name: Add sendence user
+- name: Add wallaroo user
   user:
-    name: sendence
+    name: wallaroo
     uid: 1111
-    group: sendence
+    group: wallaroo
     shell: /bin/bash
     groups: "{{ my_groups.stdout.split(':')[1] | replace(' ', ',') }}"
 
-- name: Copy ssh keys for sendence user
-  command: creates=/home/sendence/.ssh cp -rf /home/{{ ansible_user_id }}/.ssh /home/sendence/
+- name: Copy ssh keys for wallaroo user
+  command: creates=/home/wallaroo/.ssh cp -rf /home/{{ ansible_user_id }}/.ssh /home/wallaroo/
   when: (ansible_ssh_user != "root")
 
-- name: Copy ssh keys for sendence user
-  command: creates=/home/sendence/.ssh cp -rf /root/.ssh /home/sendence/
+- name: Copy ssh keys for wallaroo user
+  command: creates=/home/wallaroo/.ssh cp -rf /root/.ssh /home/wallaroo/
   when: (ansible_ssh_user == "root")
 
-- name: Change ownership ssh keys for sendence user
-  file: path=/home/sendence/.ssh owner=sendence group=sendence recurse=yes state=directory
+- name: Change ownership ssh keys for wallaroo user
+  file: path=/home/wallaroo/.ssh owner=wallaroo group=wallaroo recurse=yes state=directory
 
-- name: allow sendence user to sudo without password
+- name: allow wallaroo user to sudo without password
   lineinfile:
     dest: /etc/sudoers
-    regexp: '^sendence'
-    line: 'sendence ALL=(ALL) NOPASSWD:ALL'
+    regexp: '^wallaroo'
+    line: 'wallaroo ALL=(ALL) NOPASSWD:ALL'
     state: present
     backup: true
 
