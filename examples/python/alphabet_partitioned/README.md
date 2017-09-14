@@ -98,11 +98,11 @@ You can read the output with the following code:
 ```python
 import struct
 
-
+num_bytes = 4 + 1 + 8
 with open('alphabet.out', 'rb') as f:
     while True:
         try:
-            print struct.unpack('>LsL', f.read(9))
+            print struct.unpack('>IsQ', f.read(num_bytes))
         except:
             break
 ```
