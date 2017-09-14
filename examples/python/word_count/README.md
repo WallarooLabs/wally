@@ -26,7 +26,7 @@ The `Decoder`'s `decode(...)` method turns the input message into a string. That
 
 ## Running Word Count
 
-In order to run the application you will need Machida, Giles Sender and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/word_count` directory.
 
