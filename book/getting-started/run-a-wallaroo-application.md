@@ -17,6 +17,8 @@ Let's get started!
 
 ## Terminal 1, Start the Metrics UI
 
+NOTE: You might need to run with sudo depending on how you set up Docker.
+
 To start the Metrics UI run:
 
 ```bash

@@ -45,7 +45,9 @@ sudo chmod +x /usr/local/bin/docker-compose
 OSX: Docker compose is already included as part of Docker for Mac.
 
 
-Clone local-kafka-cluster project and run it (add `sudo` to the commands, including `./cluster up 1`, if docker is not allowed to be run by your user):
+NOTE: You might need to run with sudo depending on how you set up Docker.
+
+Clone local-kafka-cluster project and run it:
 
 ```bash
 cd /tmp
@@ -128,7 +130,9 @@ To shut down the cluster, you will need to use the `cluster_shutdown` tool.
 
 ### Stop kafka
 
-If you followed the commands earlier to start kafka you can stop it by running (add `sudo` if docker is not allowed to be run by your user):
+NOTE: You might need to run with sudo depending on how you set up Docker.
+
+If you followed the commands earlier to start kafka you can stop it by running:
 
 ```bash
 cd /tmp/local-kafka-cluster

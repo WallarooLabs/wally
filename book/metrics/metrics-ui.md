@@ -16,6 +16,8 @@ You should already have Docker installed if you have followed the `Setup` instru
 
 #### Running the Metrics UI
 
+NOTE: You might need to run with sudo depending on how you set up Docker.
+
 Once you have Docker setup, you can grab the Metrics UI image by running:
 
 ```
