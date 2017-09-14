@@ -27,13 +27,13 @@ include $(rules_mk_path)
 
 
 # Set up our machida specific paths. We don't know what directory make was
-# run from, so we get an absolute path based on $(buffy_path). This will work
+# run from, so we get an absolute path based on $(wallaroo_path). This will work
 # whether make was run from the top level of Wallaroo or from within the
 # machida directory.
-MACHIDA_PATH = $(buffy_path)/machida
+MACHIDA_PATH = $(wallaroo_path)/machida
 MACHIDA_BUILD = $(MACHIDA_PATH)/build
 MACHIDA_CPP = $(MACHIDA_PATH)/cpp
-WALLAROO_LIB =  $(buffy_path)/lib
+WALLAROO_LIB =  $(wallaroo_path)/lib
 
 # Our top level Makefile has 3 rules that would have been generated for us if
 # we hadn't turned them off at the top of the Makefile. Here we recreate them
@@ -64,18 +64,6 @@ $(MACHIDA_BUILD)/libpython-wallaroo.a: $(MACHIDA_BUILD)/python-wallaroo.o
 $(MACHIDA_BUILD)/python-wallaroo.o: $(MACHIDA_CPP)/python-wallaroo.c
 	mkdir -p $(MACHIDA_BUILD)
 	cc -g -o $(MACHIDA_BUILD)/python-wallaroo.o -c $(MACHIDA_CPP)/python-wallaroo.c
-
-
-# args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
-# NOTE: all paths must be relative to buffy directory (use buffy_path variable)
-
-##<NAME OF TARGET>: #used as part of `make help` command ## <DESCRIPTION OF TARGET>
-#$(eval $(call RUN_DAGON\
-#,<NAME OF TARGET> \
-#,$(buffy_path)/<PATH TO INI FILE> \
-#,<TIMEOUT VALUE> \
-#,<WESLEY TEST COMMAND> \
-#,<INCLUDE IN CI>))
 
 # end of prevent rules from being evaluated/included multiple times
 endif

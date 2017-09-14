@@ -34,8 +34,8 @@ build-testing-correctness-apps-sequence_window_simple_state: build-testing-corre
 
 # This will build three different binaries of sequence_window, but respect PONYCFLAGS passed
 # to Make
--include $(subst $(abs_buffy_dir)/,,$(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))).d
-$(subst $(abs_buffy_dir)/,,$(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))):
+-include $(subst $(abs_wallaroo_dir)/,,$(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))).d
+$(subst $(abs_wallaroo_dir)/,,$(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))):
 	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace -D validate)
 	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%)))
@@ -67,19 +67,6 @@ clean-testing-correctness-apps-sequence_window_simple_state: sequence_window_sim
 
 sequence_window_simple_state_clean:
 	$(QUIET)rm -fr $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH)/sequence_window_simple_state*
-
-
-
-# args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
-# NOTE: all paths must be relative to buffy directory (use buffy_path variable)
-
-##<NAME OF TARGET>: #used as part of `make help` command ## <DESCRIPTION OF TARGET>
-#$(eval $(call RUN_DAGON\
-#,<NAME OF TARGET> \
-#,$(buffy_path)/<PATH TO INI FILE> \
-#,<TIMEOUT VALUE> \
-#,<WESLEY TEST COMMAND> \
-#,<INCLUDE IN CI>))
 
 # end of prevent rules from being evaluated/included multiple times
 endif

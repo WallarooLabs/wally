@@ -34,17 +34,17 @@ ifndef VERBOSE
  QUIET := @
 endif
 
-# set buffy project directory
-buffy_dir := $(RULES_MK_PATH)
-abs_buffy_dir := $(abspath $(buffy_dir))
-buffy_path := $(abs_buffy_dir)
+# set wallaroo project directory
+wallaroo_dir := $(RULES_MK_PATH)
+abs_wallaroo_dir := $(abspath $(wallaroo_dir))
+wallaroo_path := $(abs_wallaroo_dir)
 
 # Set global path variables
-integration_path := $(buffy_path)/testing/tools
+integration_path := $(wallaroo_path)/testing/tools
 integration_bin_path := $(integration_path)/integration
-wallaroo_lib :=  $(buffy_path)/lib
-wallaroo_python_path := $(buffy_path)/machida
-machida_bin_path := $(buffy_path)/machida/build
+wallaroo_lib :=  $(wallaroo_path)/lib
+wallaroo_python_path := $(wallaroo_path)/machida
+machida_bin_path := $(wallaroo_path)/machida/build
 
 EMPTY :=
 SPACE := $(EMPTY) $(EMPTY)
@@ -55,11 +55,11 @@ export PATH = $(ORIGNAL_PATH):$(subst :$(SPACE),:,$(subst $(SPACE):,:,$(strip $(
 CUSTOM_PATH = $(integration_bin_path):$(machida_bin_path)
 
 # initialize default for some normal targets and variables
-build-buffyroot-all :=
-test-buffyroot-all :=
-clean-buffyroot-all :=
-build-docker-buffyroot-all :=
-push-docker-buffyroot-all :=
+build-wallarooroot-all :=
+test-wallarooroot-all :=
+clean-wallarooroot-all :=
+build-docker-wallarooroot-all :=
+push-docker-wallarooroot-all :=
 
 ifndef TEST_TARGET
   TEST_TARGET :=
@@ -262,7 +262,7 @@ ifneq ($(arch),native)
   ifneq ($(in_docker),true)
     quote = '
     ponyc_docker_args = docker run --rm -i $(docker_user_arg) -v \
-        $(abs_buffy_dir):$(abs_buffy_dir) $(docker_cpu_arg) \
+        $(abs_wallaroo_dir):$(abs_wallaroo_dir) $(docker_cpu_arg) \
         -v $(HOME)/.gitconfig:/.gitconfig \
         -v $(HOME)/.gitconfig:/root/.gitconfig \
         -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
@@ -271,7 +271,7 @@ ifneq ($(arch),native)
         $(ponyc_runner):$(ponyc_tag) -c $(quote)
 
     monhub_docker_args = docker run --rm -i -v \
-        $(abs_buffy_dir):$(abs_buffy_dir) $(docker_cpu_arg) \
+        $(abs_wallaroo_dir):$(abs_wallaroo_dir) $(docker_cpu_arg) \
         -v $(HOME)/.gitconfig:/.gitconfig \
         -v $(HOME)/.gitconfig:/root/.gitconfig \
         -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
@@ -292,7 +292,7 @@ define PONYC
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
     $(debug_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
     $(PONYCFLAGS) . --pass import --files $(if $(filter \
-    $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_buffy_dir).*.pony" \
+    $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_wallaroo_dir).*.pony" \
     | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \
     >> $(notdir $(abspath $(1:%/=%))).d
   $(QUIET)cd $(1) && echo "$(abspath $(1))/bundle.json:" >> $(notdir $(abspath $(1:%/=%))).d
@@ -356,11 +356,11 @@ $(subst dagon-,dagon-docker-,$1): dagon_timeout=$$(if $$(custom_dagon_timeout),$
 $(subst dagon-,dagon-docker-,$1): dagon_phone_home=$$(if $$(custom_dagon_phone_home),$$(custom_dagon_phone_home),$$(if $$(filter $$(dagon_in_docker),true),dagon-$(strip $(unix_timestamp)),$(host_ip)):8080)
 $(subst dagon-,dagon-docker-,$1): dagon_cmd=$$(if $$(filter $$(dagon_in_docker),true),\
 docker --host=$$(if $$(custom_dagon_host),$$(custom_dagon_host),$(dagon_docker_host)) \
-run -v $(abs_buffy_dir):$(abs_buffy_dir) -w $(abs_buffy_dir) \
+run -v $(abs_wallaroo_dir):$(abs_wallaroo_dir) -w $(abs_wallaroo_dir) \
 -v /bin:/bin:ro -v /lib:/lib:ro -v /lib64:/lib64:ro -v /usr:/usr:ro -v /tmp:/tmp -w /tmp \
 -it --name dagon-$(unix_timestamp) -h dagon-$(unix_timestamp) \
---net buffy-$(unix_timestamp) $(dagon_docker_repo).$(if $(filter $(arch),native),amd64,$(arch)):$(docker_image_version), \
-cd $(abs_buffy_dir) && $(abs_buffy_dir:%/=%)/dagon/dagon)
+--net wallaroo-$(unix_timestamp) $(dagon_docker_repo).$(if $(filter $(arch),native),amd64,$(arch)):$(docker_image_version), \
+cd $(abs_wallaroo_dir) && $(abs_wallaroo_dir:%/=%)/dagon/dagon)
 $(subst dagon-,dagon-docker-,$1):
 	$$(call run-dagon)
 	$$(if $$(filter $$(dont_validate),true),,$4)
@@ -369,11 +369,11 @@ $1: dagon_timeout=$$(if $$(custom_dagon_timeout),$$(custom_dagon_timeout),$3)
 $1: dagon_phone_home=$$(if $$(custom_dagon_phone_home),$$(custom_dagon_phone_home),127.0.0.1:8080)
 $1: dagon_cmd=$$(if $$(filter $$(dagon_in_docker),true),\
 docker --host=$$(if $$(custom_dagon_host),$$(custom_dagon_host),$(dagon_docker_host)) \
-run -v $(abs_buffy_dir):$(abs_buffy_dir) -w $(abs_buffy_dir) \
+run -v $(abs_wallaroo_dir):$(abs_wallaroo_dir) -w $(abs_wallaroo_dir) \
 -v /bin:/bin:ro -v /lib:/lib:ro -v /lib64:/lib64:ro -v /usr:/usr:ro -v /tmp:/tmp -w /tmp \
 -it --name dagon-$(unix_timestamp) -h dagon-$(unix_timestamp) \
---net buffy-$(unix_timestamp) $(dagon_docker_repo).$(if $(filter $(arch),native),amd64,$(arch)):$(docker_image_version), \
-cd $(abs_buffy_dir) && $(abs_buffy_dir:%/=%)/dagon/dagon)
+--net wallaroo-$(unix_timestamp) $(dagon_docker_repo).$(if $(filter $(arch),native),amd64,$(arch)):$(docker_image_version), \
+cd $(abs_wallaroo_dir) && $(abs_wallaroo_dir:%/=%)/dagon/dagon)
 $1:
 	$$(call run-dagon)
 	$$(if $$(filter $$(dont_validate),true),,$4)
@@ -382,21 +382,21 @@ endef
 # function call for running dagon
 define run-dagon
   $(if $(dagon_use_docker),$(QUIET)docker --host=$(if $(custom_dagon_host),$(custom_dagon_host),$(dagon_docker_host)) \
-network create buffy-$(unix_timestamp),)
+network create wallaroo-$(unix_timestamp),)
   $(QUIET)$(dagon_cmd) --timeout=$(dagon_timeout) -f $(dagon_config_file) \
-          -h $(dagon_phone_home) $(dagon_use_docker) --docker-network=buffy-$(unix_timestamp) $(dagon_extra_args)
+          -h $(dagon_phone_home) $(dagon_use_docker) --docker-network=wallaroo-$(unix_timestamp) $(dagon_extra_args)
 endef
 
 # function call for running dagon-notifier
 define run-dagon-notifier
   $(QUIET)$(if $(filter $(dagon_in_docker),true),\
 docker --host=$(if $(custom_dagon_host),$(custom_dagon_host),$(dagon_docker_host)) \
-run --privileged -v $(abs_buffy_dir):$(abs_buffy_dir) -w $(abs_buffy_dir) \
+run --privileged -v $(abs_wallaroo_dir):$(abs_wallaroo_dir) -w $(abs_wallaroo_dir) \
 -v /bin:/bin:ro -v /lib:/lib:ro -v /lib64:/lib64:ro -v /usr:/usr:ro -v /tmp:/tmp -w /tmp \
 -it --name dagon-notifier-$(unix_timestamp) -h dagon-notifier-$(unix_timestamp) \
---net $(if $(custom_dagon_network),$(custom_dagon_network),buffy-$(unix_timestamp)) \
+--net $(if $(custom_dagon_network),$(custom_dagon_network),wallaroo-$(unix_timestamp)) \
 $(dagon_notifier_docker_repo).$(if $(filter $(arch),native),amd64,$(arch)):$(docker_image_version),\
-cd $(abs_buffy_dir) && $(abs_buffy_dir:%/=%)/dagon/dagon-notifier/dagon-notifier) \
+cd $(abs_wallaroo_dir) && $(abs_wallaroo_dir:%/=%)/dagon/dagon-notifier/dagon-notifier) \
 --dagon-addr=$(dagon_phone_home) --msg-type StartGilesSenders
 endef
 
@@ -419,35 +419,35 @@ endef
 
 # rule to generate targets for build-* for devs to use
 define pony-build-goal
-build-pony-all: build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-build-docker-pony-all: build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-push-docker-pony-all: push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): $(1:%/=%)/$(notdir $(abspath $(1:%/=%)))
-.PHONY: build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+build-pony-all: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+build-docker-pony-all: build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+push-docker-pony-all: push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(1:%/=%)/$(notdir $(abspath $(1:%/=%)))
+.PHONY: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
 # rule to generate targets for test-* for devs to use
 define pony-test-goal
-test-pony-all: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+test-pony-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 ifneq ($(TEST_TARGET),false)
 	cd $(abspath $(1:%/=%)) && ./$(notdir $(abspath $(1:%/=%)))
 endif
-.PHONY: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
 # rule to generate targets for clean-* for devs to use
 define pony-clean-goal
-clean-pony-all: clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))):
+clean-pony-all: clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))):
 	$(QUIET)rm -f $(abspath $1)/$(notdir $(abspath $(1:%/=%))) $(abspath $1)/$(notdir $(abspath $(1:%/=%))).o
 	$(QUIET)rm -f $(abspath $1)/$(notdir $(abspath $(1:%/=%))).d
 	$(QUIET)rm -rf $(abspath $1)/.deps
 	$(QUIET)rm -rf $(abspath $1)/$(notdir $(abspath $(1:%/=%))).dSYM
-.PHONY: clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+.PHONY: clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
 # rule to generate targets for building actual monhub executable including dependencies to relevant files so incremental builds work properly
@@ -460,72 +460,72 @@ endef
 define monhub-release-goal
 $(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%))): $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
 	$$(call MONHUBR,$(abspath $(1:%/=%)))
-release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): monhub-arch-check $(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
-release-monhub-all: release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-.PHONY: release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): monhub-arch-check $(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
+release-monhub-all: release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+.PHONY: release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
 
 .PHONY: build-monhub-all build-docker-monhub-all push-docker-monhub-all test-monhub-all clean-monhub-all release-monhub-all
 
 # rule to generate targets for build-* for devs to use
 define monhub-build-goal
-build-monhub-all: build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-build-docker-monhub-all: build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-push-docker-monhub-all: push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): $(1:%/=%)/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app
-.PHONY: build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+build-monhub-all: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+build-docker-monhub-all: build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+push-docker-monhub-all: push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(1:%/=%)/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app
+.PHONY: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
 # rule to generate targets for test-* for devs to use
 define monhub-test-goal
-test-monhub-all: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+test-monhub-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 ifneq ($(TEST_TARGET),false)
 	cd $(abspath $(1:%/=%)) && mix test
 endif
-.PHONY: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
 # rule to generate targets for clean-* for devs to use
 define monhub-clean-goal
-clean-monhub-all: clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))):
+clean-monhub-all: clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))):
 	$(QUIET)rm -rf $(abspath $1)/rel
 	$(QUIET)rm -rf $(abspath $1)/node_modules
 	$(QUIET)rm -rf $(abspath $1)/../../_build
-.PHONY: clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+.PHONY: clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
 # rule to generate targets for build-docker-* for devs to use
 define build-docker-goal
-build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): docker-arch-check $(if $(wildcard $(PREV_PATH)/package.json),release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))),)
+build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): docker-arch-check $(if $(wildcard $(PREV_PATH)/package.json),release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))),)
 	docker $(docker_host_arg) build -t \
-          $(docker_image_repo)/$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))).$(arch):$(docker_image_version) \
+          $(docker_image_repo)/$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))).$(arch):$(docker_image_version) \
           $(abspath $1)
-.PHONY: build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+.PHONY: build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
 
 # rule to generate targets for push-docker-* for devs to use
 define push-docker-goal
-push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
-push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 	docker $(docker_host_arg) push \
-          $(docker_image_repo)/$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))).$(arch):$(docker_image_version)
-.PHONY: push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+          $(docker_image_repo)/$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))).$(arch):$(docker_image_version)
+.PHONY: push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
 
 # rule to generate targets for *-all for devs to use
 define subdir-goal
 $(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
-$(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_buffy_dir),$(abspath $1)),buffyroot-all,$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all))
+$(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $1)),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all))
 
-$(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(eval build-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval test-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval clean-$(MY_TARGET_SUFFIX:%-all=%):)
@@ -533,8 +533,8 @@ $(eval build-$(MY_TARGET_SUFFIX): build-$(MY_TARGET_SUFFIX:%-all=%) $(build-$(MY
 $(eval test-$(MY_TARGET_SUFFIX): test-$(MY_TARGET_SUFFIX:%-all=%) $(test-$(MY_TARGET_SUFFIX)))
 $(eval clean-$(MY_TARGET_SUFFIX): clean-$(MY_TARGET_SUFFIX:%-all=%) $(clean-$(MY_TARGET_SUFFIX)))
 
-$(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(eval build-docker-$(MY_TARGET_SUFFIX): $(build-docker-$(MY_TARGET_SUFFIX)))
 $(eval push-docker-$(MY_TARGET_SUFFIX): $(push-docker-$(MY_TARGET_SUFFIX)))
 
@@ -542,7 +542,7 @@ $(eval push-docker-$(MY_TARGET_SUFFIX): $(push-docker-$(MY_TARGET_SUFFIX)))
 endef
 
 
-ROOT_TARGET_SUFFIX := $(if $(filter $(abs_buffy_dir),$(abspath $(ROOT_PATH))),buffyroot-all,$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(ROOT_PATH))))-all)
+ROOT_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $(ROOT_PATH))),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(ROOT_PATH))))-all)
 
 # phony targets
 .PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony dagon-spike-test dagon-test list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help build-docker-pony push-docker-pony build-docker-monhub push-docker-monhub dagon-docker-test dagon-docker-spike-test
@@ -569,7 +569,7 @@ start-demo: setup-demo ## Signal senders to start sending data for a demo
 	$(call run-dagon-notifier)
 
 setup-demo: temp_dagon_host=$(if $(demo_cluster_name),$(shell aws ec2 describe-instances \
-              --filters Name=tag:Name,Values=$(demo_cluster_name):buffy-leader-1 --query \
+              --filters Name=tag:Name,Values=$(demo_cluster_name):wallaroo-leader-1 --query \
               'Reservations[*].Instances[*].PublicIpAddress' --output text),127.0.0.1)
 setup-demo: custom_dagon_phone_home=$(if $(demo_cluster_name),$(shell ps aux | \
               grep -o 'name.*dagon' | awk '{print $$2}'),$(temp_dagon_host)):8080
@@ -589,7 +589,7 @@ $(QUIET)echo "running demo locally")
 	$(eval dagon_extra_args=$(dagon_extra_args))
 	$(eval dagon_in_docker=$(dagon_in_docker))
 	$(if $(demo_cluster_name), $(QUIET)cd orchestration/terraform && \
-          make sync-buffy cluster_name=$(demo_cluster_name),)
+          make sync-wallaroo cluster_name=$(demo_cluster_name),)
 
 run-demo: setup-demo $(if $(demo_cluster_name),dagon-docker-,dagon-)$(subst dagon-,,$(subst dagon-docker-,,$(demo_to_run)))## Run demo locally or on a cluster with senders waiting to send
 
@@ -599,17 +599,17 @@ create-demo: $(if $(demo_cluster_name),create-demo-cluster check-demo-cluster fi
 demo-cluster-options = num_followers=0 force_instance=c4.4xlarge spot_bid_factor=100 \
           # ansible_system_cpus=0,8 ansible_isolcpus=true
 
-check-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):buffy-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
+check-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):wallaroo-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
 check-demo-cluster: # Check a cluster for running the demo
 	$(if $(demo_host),,$(QUIET)cd orchestration/terraform && make configure cluster_name=$(demo_cluster_name) \
           $(demo-cluster-options) \
           no_spot=$(if $(filter $(demo_cluster_spot_pricing),false),true,false))
 
-final-check-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):buffy-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
+final-check-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):wallaroo-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
 final-check-demo-cluster: # Final check a cluster for running the demo
 	$(if $(demo_host),,$(error unable to look up demo host! destroy and try again.))
 
-create-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):buffy-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
+create-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):wallaroo-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
 create-demo-cluster: demo_cluster_command=$(if $(demo_host),configure,cluster)
 create-demo-cluster: ## Create a cluster for running the demo
 	$(if $(demo_cluster_name),,$(error Must supply demo_cluster_name when creating demo cluster!))
@@ -672,7 +672,7 @@ clean-docker: ## cleanup docker images and containers
 
 # rule to clean everything
 clean: clean-$(ROOT_TARGET_SUFFIX) clean-docker ## Clean all projects (pony & monhub) and cleanup docker images
-	$(QUIET)rm -f lib/buffy/buffy lib/buffy/buffy.o
+	$(QUIET)rm -f lib/wallaroo/wallaroo lib/wallaroo/wallaroo.o
 	$(QUIET)rm -f sent.txt received.txt
 	$(QUIET)echo 'Done cleaning.'
 
@@ -753,4 +753,4 @@ ifneq ($(RECURSE_SUBMAKEFILES),false)
   $(eval $(call make-goal,$(PREV_PATH)))
 endif
 
-include $(buffy_dir)/Makefile
+include $(wallaroo_dir)/Makefile
