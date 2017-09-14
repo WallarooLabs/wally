@@ -16,7 +16,7 @@ use "files"
 use "format"
 use "wallaroo_labs/conversions"
 use "wallaroo/core/common"
-use "wallaroo/core/fail"
+use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 
