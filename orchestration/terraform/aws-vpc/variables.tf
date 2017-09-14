@@ -10,7 +10,7 @@ variable "aws_profile" {
 
 variable "project_tag" {
   description = "Value for the project tag."
-  default = "buffy"
+  default = "wallaroo"
 }
 
 variable "aws_availability_zone_1" {

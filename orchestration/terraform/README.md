@@ -1,6 +1,6 @@
-# Buffy Terraform Orchestration
+# Wallaroo Terraform Orchestration
 
-This module consists of the orchestration for Buffy using Terraform.
+This module consists of the orchestration for Wallaroo using Terraform.
 So far we have only implemented AWS and Packet as the providers.
 
 ## Modules
@@ -230,30 +230,30 @@ cases for the Packet provider.
 
 Test ansible communication with the all cluster nodes:
 
-`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy' -m ping`
+`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_wallaroo' -m ping`
 
 Test ansible communication with the follower nodes only:
 
-`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy:&tag_Role_follower' -m ping`
+`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_wallaroo:&tag_Role_follower' -m ping`
 
 Test ansible communication with the leader nodes only:
 
-`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy:&tag_Role_leader' -m ping`
+`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_wallaroo:&tag_Role_leader' -m ping`
 
 
 ## Debugging Ansible for Packet
 
 Test ansible communication with the all cluster nodes:
 
-`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_buffy' -m ping`
+`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_wallaroo' -m ping`
 
 Test ansible communication with the follower nodes only:
 
-`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_buffy:&tag_Role_follower' -m ping`
+`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_wallaroo:&tag_Role_follower' -m ping`
 
 Test ansible communication with the leader nodes only:
 
-`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_Project_buffy:&tag_Role_leader' -m ping`
+`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_Project_wallaroo:&tag_Role_leader' -m ping`
 
 ## Manually cleaning up AWS resources
 
@@ -264,7 +264,7 @@ Go into `AWS Console (Web UI) -> EC2 -> Auto Scaling Groups` and find/delete the
 
 Go into `AWS Console (Web UI) -> EC2 -> Launch Configurations` and find/delete the entries related to your cluster (the cluster_name is at the beginning of the resource name).
 
-Go into `AWS Console (Web UI) -> EC2 -> Placement Groups` and find/delete the entry related to your cluster (the cluster_name is at the end of the resource name with a format of `buffy-<CLUSTER_NAME>`).
+Go into `AWS Console (Web UI) -> EC2 -> Placement Groups` and find/delete the entry related to your cluster (the cluster_name is at the end of the resource name with a format of `wallaroo-<CLUSTER_NAME>`).
 
 ## Major recovery
 

@@ -1,6 +1,6 @@
 current_dir := $(shell pwd)
 cluster_name ?= ## Cluster name to manage.
-cluster_project_name ?= buffy## Project name to assign as a tag to the cluster.
+cluster_project_name ?= wallaroo## Project name to assign as a tag to the cluster.
 provider ?= aws## Provider to launch cluster in (aws, packet).
 region ?= us-east-1## Region to launch cluster in. For Packet: ewr1==New York, sjc1==San Jose,CA, ams1==Amsterdam
 availability_zone ?= ## Availability Zone to launch cluster in.
@@ -225,7 +225,7 @@ ifeq ($(use_placement_group),true)
         following! $(valid_instances))
     endif
   endif
-  pg_arg := -var placement_group=buffy-$(cluster_name)
+  pg_arg := -var placement_group=wallaroo-$(cluster_name)
 endif
 
 ifneq (,$(findstring -var leader_spot_price=,$(terraform_args)))
@@ -338,8 +338,8 @@ test-ansible-connection: check-cluster-name ## Check ansible connectivity/authen
 	@echo "\033[36m==> Successfully ran ansible connectivity/authentication check for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
 
-sync-buffy: check-cluster-name ## Rsync buffy repo to nodes
-	@echo "\033[36m==> Running ansible to rsync buffy repo to cluster \
+sync-wallaroo: check-cluster-name ## Rsync wallaroo repo to nodes
+	@echo "\033[36m==> Running ansible to rsync wallaroo repo to cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
 	PACKET_NET_API_KEY=$(packet_api_key) ansible $(all_instances) \
           -i ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no \
@@ -351,7 +351,7 @@ sync-buffy: check-cluster-name ## Rsync buffy repo to nodes
           $(dir $(MAKEFILE_LIST))/../..) dest=$(abspath $(dir $(MAKEFILE_LIST))/../../..) \
           recursive=yes rsync_opts=\"--exclude=.git -e 'ssh  -o StrictHostKeyChecking=no \
           -i $(cluster_full_pem)'\""
-	@echo "\033[36m==> Successfully ran ansible to rsync buffy repo to cluster \
+	@echo "\033[36m==> Successfully ran ansible to rsync wallaroo repo to cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'!\033[0m"
 
 
@@ -437,10 +437,10 @@ availability_zone='$(ci_az)' and $(ci_pg).\033[0m",)
 setup_packet_ci_arg: exists=$(shell egrep 'resources' \
                 ./$(provider)-cluster/.terraform/terraform.tfstate | sort -u | sed \
                 -e 's/.*: \(.*\)/\1/')
-setup_packet_ci_arg: old_num_followers=$(shell egrep -o 'buffy-follower-\d+' \
+setup_packet_ci_arg: old_num_followers=$(shell egrep -o 'wallaroo-follower-\d+' \
                 ./$(provider)-cluster/.terraform/terraform.tfstate | wc -l \
                 | awk '{print ($$1>0)?$$1:$$9}')
-setup_packet_ci_arg: old_num_leaders=$(shell egrep -o 'buffy-leader-\d+' \
+setup_packet_ci_arg: old_num_leaders=$(shell egrep -o 'wallaroo-leader-\d+' \
                 ./$(provider)-cluster/.terraform/terraform.tfstate | wc -l \
                 | awk '{print ($$1>0)?$$1:$$9}')
 setup_packet_ci_arg: leader_num=$(if $(num_leaders),$(num_leaders),$(old_num_leaders))
@@ -558,7 +558,7 @@ region '$(region)' at provider '$(provider)'!\033[0m"
 setup_aws_az_arg: tmp_az_arg=$(if $(availability_zone),-var aws_subnet_id=$(shell \
                 aws ec2 --region $(region) describe-subnets --filters \
                 Name=availabilityZone,Values=$(availability_zone) \
-                Name=tag:Project,Values=buffy --query \
+                Name=tag:Project,Values=wallaroo --query \
                 'Subnets[*].{SubnetId:SubnetId}' --output text | head -n 1),)
 setup_aws_az_arg: # set up availability zone arg
 	$(if $(availability_zone),$(if $(subst -var \

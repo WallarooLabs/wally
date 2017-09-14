@@ -1,6 +1,6 @@
-# Ansible for Buffy Orchestration
+# Ansible for Wallaroo Orchestration
 
-This module consists of Ansible playbooks and roles for Buffy Orchestration for
+This module consists of Ansible playbooks and roles for Wallaroo Orchestration for
 the different targets.
 
 The following are the currently supported targets:

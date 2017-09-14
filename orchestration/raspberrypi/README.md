@@ -1,6 +1,6 @@
-# Buffy Raspberry Pi Orchestration
+# Wallaroo Raspberry Pi Orchestration
 
-This module consists of the orchestration for Buffy on Raspberry Pis.
+This module consists of the orchestration for Wallaroo on Raspberry Pis.
 
 ## Hypriot on RPi
 
@@ -35,11 +35,11 @@ Create a `hosts` file with the following format identifying all leader/follower
 nodes:
 
 ```
-[buffy-leaders]
+[wallaroo-leaders]
 <LEADER_HOSTNAME>.local
 <LEADER_HOSTNAME>.local
 
-[buffy-followers]
+[wallaroo-followers]
 <FOLLOWER_HOSTNAME>.local
 <FOLLOWER_HOSTNAME>.local
 <FOLLOWER_HOSTNAME>.local

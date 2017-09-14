@@ -4,7 +4,7 @@ provider "packet" {
 }
 
 resource "packet_device" "leaders" {
-  hostname = "${format("${var.cluster_name}.buffy-leader-%01d", count.index+1)}"
+  hostname = "${format("${var.cluster_name}.wallaroo-leader-%01d", count.index+1)}"
   operating_system = "${var.packet_instance_os}"
   plan = "${var.leader_instance_type}"
   user_data = "${file("${var.leader_user_data}")}"
@@ -17,7 +17,7 @@ resource "packet_device" "leaders" {
 }
 
 resource "packet_device" "followers" {
-  hostname = "${format("${var.cluster_name}.buffy-follower-%01d", count.index+1)}"
+  hostname = "${format("${var.cluster_name}.wallaroo-follower-%01d", count.index+1)}"
   operating_system = "${var.packet_instance_os}"
   plan = "${var.follower_instance_type}"
   user_data = "${file("${var.follower_user_data}")}"

@@ -32,7 +32,7 @@ Vagrant.configure(2) do |config|
   ip_next = START_IP
 
   leaders.each do |i, ip|
-    node_name = "buffy-leader-#{i+1}"
+    node_name = "wallaroo-leader-#{i+1}"
     config.vm.define node_name do |c|
       c.vm.hostname = node_name
       c.vm.network :private_network, ip: ip
@@ -50,7 +50,7 @@ Vagrant.configure(2) do |config|
   end
 
   followers.each do |i, ip|
-    node_name = "buffy-follower-#{i+1}"
+    node_name = "wallaroo-follower-#{i+1}"
     config.vm.define node_name do |c|
       c.vm.hostname = node_name
       c.vm.network :private_network, ip: ip
