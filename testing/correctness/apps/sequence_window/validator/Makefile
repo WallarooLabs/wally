@@ -43,17 +43,6 @@ validator_test:
 	$(VALIDATOR_PATH)/validator -i $(VALIDATOR_EXAMPLES)/pass_with_atleastonce.txt -a
 	$(VALIDATOR_PATH)/validator -i $(VALIDATOR_EXAMPLES)/fail_expect_max.txt -e 1002
 
-# args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
-# NOTE: all paths must be relative to buffy directory (use buffy_path variable)
-
-##<NAME OF TARGET>: #used as part of `make help` command ## <DESCRIPTION OF TARGET>
-#$(eval $(call RUN_DAGON\
-#,<NAME OF TARGET> \
-#,$(buffy_path)/<PATH TO INI FILE> \
-#,<TIMEOUT VALUE> \
-#,<WESLEY TEST COMMAND> \
-#,<INCLUDE IN CI>))
-
 # end of prevent rules from being evaluated/included multiple times
 endif
 

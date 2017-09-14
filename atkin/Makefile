@@ -24,13 +24,13 @@ include $(rules_mk_path)
 
 
 # Set up our atkin specific paths. We don't know what directory make was
-# run from, so we get an absolute path based on $(buffy_path). This will work
+# run from, so we get an absolute path based on $(wallaroo_path). This will work
 # whether make was run from the top level of Wallaroo or from within the
 # atkin directory.
-ATKIN_PATH = $(buffy_path)/atkin
+ATKIN_PATH = $(wallaroo_path)/atkin
 ATKIN_BUILD = $(ATKIN_PATH)/build
 ATKIN_CPP = $(ATKIN_PATH)/cpp
-WALLAROO_LIB =  $(buffy_path)/lib
+WALLAROO_LIB =  $(wallaroo_path)/lib
 
 # Our top level Makefile has 3 rules that would have been generated for us if
 # we hadn't turned them off at the top of the Makefile. Here we recreate them
@@ -58,17 +58,6 @@ $(ATKIN_BUILD)/libpython-wactor.a: $(ATKIN_BUILD)/python-wactor.o
 $(ATKIN_BUILD)/python-wactor.o: $(ATKIN_CPP)/python-wactor.c
 	mkdir -p $(ATKIN_BUILD)
 	cc -g -o $(ATKIN_BUILD)/python-wactor.o -c $(ATKIN_CPP)/python-wactor.c
-
-# args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
-# NOTE: all paths must be relative to buffy directory (use buffy_path variable)
-
-##<NAME OF TARGET>: #used as part of `make help` command ## <DESCRIPTION OF TARGET>
-#$(eval $(call RUN_DAGON\
-#,<NAME OF TARGET> \
-#,$(buffy_path)/<PATH TO INI FILE> \
-#,<TIMEOUT VALUE> \
-#,<WESLEY TEST COMMAND> \
-#,<INCLUDE IN CI>))
 
 # end of prevent rules from being evaluated/included multiple times
 endif
