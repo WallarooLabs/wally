@@ -32,17 +32,6 @@ The outputs of the alphabet application are the letter that received the votes t
 
 The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed with the `AddVotes` computation to the state object that handles the letter being voted on, and the `AddVotes` function modifies the state to record the new total number of votes for the letter. It then creates an `AllVotes` message, which is sent to `Encode`'s `encode(...)` method, which converts it into an outgoing message.
 
-## Generating Data
-
-A data generator is bundled with the application:
-
-```bash
-cd examples/python/alphabet_partitioned/data_gen
-python gen.py
-```
-
-This will generate 1000 messages.
-
 ## Running Alphabet Partitioned
 
 In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
