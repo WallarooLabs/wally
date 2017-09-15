@@ -61,7 +61,7 @@ The Order messages are handled by the `OrderDecoder`'s `decode(...)` method, whi
 
 In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
 
-You will need three separate shells to run this application. Open each shell and go to the `examples/python/market_spread` directory.
+You will need five separate shells to run this application. Open each shell and go to the `examples/python/market_spread` directory.
 
 ### Shell 1
 
