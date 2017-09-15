@@ -84,7 +84,7 @@ This tells the "Celsius to Fahrenheit" application that it should listen on port
 A data generator is bundled with the application. Use these commands to generate data:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen
+cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/_test
 ./data_gen.py 10000
 ```
 
