@@ -256,6 +256,7 @@ actor TCPSink is Consumer
     _no_more_reconnect = true
     _timers.dispose()
     close()
+    _notify.dispose()
 
   fun ref _unit_finished(number_finished: ISize,
     number_tracked_finished: ISize,
@@ -785,10 +786,11 @@ actor TCPSink is Consumer
     end
 
   be reconnect() =>
-    if not _connected then
+    if not _connected and not _no_more_reconnect then
       _connect_count = @pony_os_connect_tcp[U32](this,
         _host.cstring(), _service.cstring(),
         _from.cstring())
+      _notify_connecting()
     end
 
   fun ref _apply_backpressure() =>
