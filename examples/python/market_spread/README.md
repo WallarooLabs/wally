@@ -92,6 +92,17 @@ machida --application-module market_spread \
 
 ### Shell 3
 
+First prime the market data state with these initial messages, sent in via Giles Sender:
+
+```
+../../../giles/sender/sender --host 127.0.0.1:7011 --file \
+  ../../../testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg \
+  --batch-size 20 --interval 100_000_000 --messages 350 --binary \
+  --ponythreads=1 --msg-size 46 --no-write
+```
+
+### Shell 4
+
 To send market messages, run this command:
 
 ```bash
@@ -103,7 +114,7 @@ To send market messages, run this command:
 
 Once you've started sending Market messages, go to the next section to start sending order messages.
 
-### Shell 4
+### Shell 5
 
 To send order messages, run this command:
 
