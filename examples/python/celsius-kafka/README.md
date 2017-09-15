@@ -101,7 +101,7 @@ machida --application-module celsius \
   --kafka_sink_topic test-out --kafka_sink_brokers 127.0.0.1:9092 \
   --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:12500 --data 127.0.0.1:12501 \
-  --cluster-initializer --ponythreads=1
+  --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1
 ```
 
 `kafka_sink_max_message_size` controls maximum size of message sent to kafka in a single produce request. Kafka will return errors if this is bigger than server is configured to accept.
@@ -127,6 +127,8 @@ To shut down the cluster, you will need to use the `cluster_shutdown` tool.
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
+
+Note: This might not fully shut down the cluster in which case you'll need to use `ctrl-c` to shut it down.
 
 ### Stop kafka
 
