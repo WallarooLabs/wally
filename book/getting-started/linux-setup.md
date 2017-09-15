@@ -149,7 +149,7 @@ sudo make install
 
 ## Install Compression Development Libraries
 
-Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
+Wallaroo's Kakfa support requires `libsnappy` and `liblz` to be installed.
 
 ### Xenial Ubuntu:
 
