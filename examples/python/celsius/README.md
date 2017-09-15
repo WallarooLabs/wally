@@ -20,14 +20,6 @@ The inputs and outputs of the "Celsius" application are binary 32-bits float enc
 
 The `Decoder`'s `decode(...)` method creates a float from the value represented by the payload. The float value is then sent to the `Multiply` computation where it is multiplied by `1.8`, and the result of that computation is sent to the `Add` computation where `32` is added to it. The resulting float is then sent to the `Encoder`, which converts it to an outgoing sequence of bytes.
 
-## Generating Data
-
-A data generator is bundled with the application:
-
-```bash
-cd _test
-python data_gen.py 1000000
-```
 
 This will generate a million messages.
 
@@ -38,6 +30,13 @@ In order to run the application you will need Machida, Giles Sender, Giles Recei
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius` directory.
 
 ### Shell 1
+
+Generate some data
+
+```bash
+cd _test
+python data_gen.py 1000000
+```
 
 Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
 
