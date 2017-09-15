@@ -96,7 +96,7 @@ export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 Run `machida` with `--application-module celsius`:
 
 ```bash
-./machida --application-module celsius \
+machida --application-module celsius \
   --kafka_source_topic test-in --kafka_source_brokers 127.0.0.1:9092 \
   --kafka_sink_topic test-out --kafka_sink_brokers 127.0.0.1:9092 \
   --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10 \
