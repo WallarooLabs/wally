@@ -18,7 +18,7 @@ sudo apt-get install git
 
 ## Install LLVM 3.9
 
-Visit [http://apt.llvm.org](http://apt.llvm.org) and select the correct apt mirror for you version of Ubuntu.
+You can find the instructions for Xenial and Trusty below. We currently only support these two, but you can visit [http://apt.llvm.org](http://apt.llvm.org) to select the correct apt mirror for other distributions.
 
 ### Xenial Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
 
