@@ -31,7 +31,7 @@ The IP address supplied to `--external` must be unique amongst each worker in a 
 
 ## Example
 
-Imagine for a moment you have a Wallaroo Python application like our [Alphabet Partitioned example](https://github.com/WallarooLabs/wallaroo/tree/0.1.0/examples/python/alphabet_partitioned). Alphabet Partitioned starts up a 2 worker cluster. However, it does it on a single machine so it might be less than obvious what the specific IP addresses are that we are passing.
+Imagine for a moment you have a Wallaroo Python application like our [Alphabet Partitioned example](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.1/examples/python/alphabet_partitioned). Alphabet Partitioned starts up a 2 worker cluster. However, it does it on a single machine so it might be less than obvious what the specific IP addresses are that we are passing.
 
 For the duration of this example, let's assume that we are starting a 2 worker cluster where:
 
@@ -89,4 +89,4 @@ Resilience files are based on the name you supply the worker so starting differe
 
 ## Shutting down a cluster
 
-Wallaroo comes with a [cluster shutdown tool](https://github.com/WallarooLabs/wallaroo/tree/0.1.0/utils/cluster_shutdown) that can be used to shut down a running cluster.
+Wallaroo comes with a [cluster shutdown tool](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.1/utils/cluster_shutdown) that can be used to shut down a running cluster.
