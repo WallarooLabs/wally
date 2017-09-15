@@ -189,7 +189,7 @@ actor TCPSourceListener is SourceListener
         _router.routes(), _route_builder, _outgoing_boundary_builders,
         _layout_initializer, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size,
-        _metrics_reporter.clone())
+        _metrics_reporter.clone(), _router_registry)
       // TODO: We need to figure out how to unregister this when the
       // connection dies
       _router_registry.register_source(source)

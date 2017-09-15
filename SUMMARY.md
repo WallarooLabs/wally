@@ -10,14 +10,13 @@
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Partitioning](book/core-concepts/partitioning.md)
 * [Decoders and Encoders](book/core-concepts/decoders-and-encoders.md)
-* [Clustered Wallaroo](book/clustering.md)
+* [Clustered Wallaroo](book/core-concepts/clustering.md)
 
 ## Developing with Wallaroo
 
 * [Setting up Your Environment](book/getting-started/setup.md)
   * [MacOS Installation](book/getting-started/macos-setup.md)
   * [Ubuntu Installation](book/getting-started/linux-setup.md)
-  * [Windows Installation](book/getting-started/windows-setup.md)
 * [Run a Wallaroo Application](book/getting-started/run-a-wallaroo-application.md)
 * [Conclusion](book/getting-started/conclusion.md)
 
@@ -61,8 +60,6 @@
 
 ### Debugging Python Wallaroo Applications
 * [Debugging](book/python/debugging.md)
-* [Remote Debugging Setup for Windows](book/python/windows-remote-debugging-setup.md)
-   * [Remote Debugging Using Wing IDE](book/python/wing-remote-debugging.md)
 
 ## Appendix
 * [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)

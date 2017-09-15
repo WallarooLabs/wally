@@ -4,7 +4,7 @@ As you're developing Python Wallaroo applications, there will come a time where 
 
 ## Debugging Using `print`
 
-The simplest way to do some debugging would be tossing a `print` statement in your code to analyze data. You can see several examples of this in our reverse [example](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc2/examples/python/reverse/reverse.py) where we have `print` statements in our `Encoder`, `Decoder`, and `Reverse` classes. Here's an example in our `compute` function in our `Reverse` class:
+The simplest way to do some debugging would be tossing a `print` statement in your code to analyze data. You can see several examples of this in our reverse [example](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc3/examples/python/reverse/reverse.py) where we have `print` statements in our `Encoder`, `Decoder`, and `Reverse` classes. Here's an example in our `compute` function in our `Reverse` class:
 
 ```bash
 def compute(self, data):
@@ -31,11 +31,6 @@ def application_setup(arg):
 
 The above will insert a breakpoint in the current stack frame and allow you to inspect the `application_setup` function. `pdb` comes with a nice set of features so if you're interested in using it go have a look at the official [documentation](https://docs.python.org/2/library/pdb.html).
 
-For Windows users who would prefer to do remote debugging due to Bash/WSL, continue to our [Setting up Windows for Remote Debugging using Wing IDE](/book/python/wing-on-windows-remote-debugging-setup.md) instructions.
-
-
 ## Other Debugging Options
 
 Debugging using `print` or `pdb` is great because they're available on all platforms. However, we realize you might have your own debugging process. We encourage you to use the tools that best fit your needs and we are available to help get you set up if needed.
-
-We've had a user base reach out to us to help them get set up in using [Wing IDE](https://wingware.com/) to do remote debugging. Wing is available on all platforms and includes its own powerful debugger that allows for interactive debugging via the IDE. Because of the unique nature of developing Wallaroo on Windows (all programs are run in Linux via Bash/WSL) we've included a section for [Setting up Windows for Remote Debugging using Wing IDE](book/python/wing-on-windows-remote-debugging-setup.md) and [Setting up Wing IDE for Remote Debugging a Python Wallaroo Application](book/python/wing-remote-debugging.md).

@@ -21,6 +21,7 @@ use "pony-kafka"
 use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/ent/router_registry"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -52,14 +53,16 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
   let _partition_id: I32
   let _kc: KafkaClient tag
 
-  new create(listen: KafkaSourceListener[In], notify: KafkaSourceNotify[In] iso,
+  new create(listen: KafkaSourceListener[In],
+    notify: KafkaSourceNotify[In] iso,
     routes: Array[Consumer] val, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     default_target: (Consumer | None) = None,
     forward_route_builder: (RouteBuilder | None) = None,
     metrics_reporter: MetricsReporter iso,
-    topic: String, partition_id: I32, kafka_client: KafkaClient tag)
+    topic: String, partition_id: I32, kafka_client: KafkaClient tag,
+    router_registry: RouterRegistry)
   =>
     _topic = topic
     _partition_id = partition_id
@@ -73,8 +76,10 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
-      _outgoing_boundaries(target_worker_name) = builder.build_and_initialize(
-        _step_id_gen(), _layout_initializer)
+      let new_boundary =
+        builder.build_and_initialize(_step_id_gen(), _layout_initializer)
+      router_registry.register_disposable(new_boundary)
+      _outgoing_boundaries(target_worker_name) = new_boundary
     end
 
     for consumer in routes.values() do

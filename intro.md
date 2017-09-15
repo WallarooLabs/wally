@@ -19,7 +19,7 @@ Although not required, you will get the most out of this tutorial if you have pr
 
 ## Supported development environments
 
-It is currently possible to develop Wallaroo applications on MacOS, Linux or Windows. This guide has installation instructions for MacOS, Ubuntu Linux, and Windows 10 Pro via Bash/WSL. It's assumed if you are using a different Linux distribution that you are able to translate the Ubuntu instructions to your distribution of choice.
+It is currently possible to develop Wallaroo applications on MacOS and Linux. This guide has installation instructions for MacOS, and Ubuntu Linux. It's assumed if you are using a different Linux distribution that you are able to translate the Ubuntu instructions to your distribution of choice.
 
 ## What to Expect
 
@@ -47,7 +47,7 @@ How to develop Wallaroo applications using Python.
 
 ### Code Examples
 
-The [Wallaroo Examples](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc2/examples) section has examples for each of the languages currently supported by Wallaroo.
+The [Wallaroo Examples](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc3/examples) section has examples for each of the languages currently supported by Wallaroo.
 
 ### Appendix
 

@@ -30,7 +30,7 @@ objects.
 The method returns an object that is made up of the message data to
 pass along to the next step and a state change object handle that
 represents the change to apply to the state. For more information, see
-the example application in [`examples/cpp/alphabet-cpp`](https://github.com/WallarooLabs/wallaroo-examples/tree/0.1.0-rc2/examples/cpp/alphabet-cpp).
+the example application in [`examples/cpp/alphabet-cpp`](https://github.com/WallarooLabs/wallaroo-examples/tree/0.1.0-rc3/examples/cpp/alphabet-cpp).
 
 #### `virtual size_t get_number_of_state_change_builders()`
 

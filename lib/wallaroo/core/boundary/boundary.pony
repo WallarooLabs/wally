@@ -242,10 +242,12 @@ actor OutgoingBoundary is Consumer
     end
 
   be reconnect() =>
-    _connect_count = @pony_os_connect_tcp[U32](this,
-      _host.cstring(), _service.cstring(),
-      _from.cstring())
-    _notify_connecting()
+    if not _connected and not _no_more_reconnect then
+      _connect_count = @pony_os_connect_tcp[U32](this,
+        _host.cstring(), _service.cstring(),
+        _from.cstring())
+      _notify_connecting()
+    end
 
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
       + "\n").cstring())
@@ -408,6 +410,7 @@ actor OutgoingBoundary is Consumer
     """
     @printf[I32]("Shutting down OutgoingBoundary\n".cstring())
     _no_more_reconnect = true
+    _timers.dispose()
     close()
     _notify.dispose()
 

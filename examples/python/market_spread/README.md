@@ -61,7 +61,7 @@ The Order messages are handled by the `OrderDecoder`'s `decode(...)` method, whi
 
 In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
 
-You will need three separate shells to run this application. Open each shell and go to the `examples/python/market_spread` directory.
+You will need five separate shells to run this application. Open each shell and go to the `examples/python/market_spread` directory.
 
 ### Shell 1
 
@@ -92,6 +92,17 @@ machida --application-module market_spread \
 
 ### Shell 3
 
+First prime the market data state with these initial messages, sent in via Giles Sender:
+
+```
+../../../giles/sender/sender --host 127.0.0.1:7011 --file \
+  ../../../testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg \
+  --batch-size 20 --interval 100_000_000 --messages 350 --binary \
+  --ponythreads=1 --msg-size 46 --no-write
+```
+
+### Shell 4
+
 To send market messages, run this command:
 
 ```bash
@@ -103,7 +114,7 @@ To send market messages, run this command:
 
 Once you've started sending Market messages, go to the next section to start sending order messages.
 
-### Shell 4
+### Shell 5
 
 To send order messages, run this command:
 

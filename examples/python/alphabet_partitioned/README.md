@@ -62,7 +62,7 @@ Run `machida` with `--application-module alphabet_partitioned` as an initializer
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --worker-count 2 --cluster-initializer \
-  --external 127.0.1:6002 --ponythreads=1
+  --external 127.0.0.1:6002 --ponythreads=1
 ```
 
 ### Shell 3
@@ -79,7 +79,7 @@ Run `machida` with `--application-module alphabet_partitioned` as a worker:
 ```bash
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --name worker-2 --external 127.0.1:6010 --ponythreads=1
+  --name worker-2 --external 127.0.0.1:6010 --ponythreads=1
 ```
 
 ### Shell 4
@@ -91,28 +91,13 @@ Send messages:
   --file votes.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --binary --msg-size 9 --repeat --ponythreads=1
 ```
-## Reading the Output
-
-You can read the output with the following code:
-
-```python
-import struct
-
-num_bytes = 4 + 1 + 8
-with open('alphabet.out', 'rb') as f:
-    while True:
-        try:
-            print struct.unpack('>IsQ', f.read(num_bytes))
-        except:
-            break
-```
 
 ## Shutdown
 
 You can shut down the cluster with this command once processing has finished:
 
 ```bash
-../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:6002
 ```
 
 You can shut down Giles Sender and Giles Receiver by pressing `Ctrl-c` from their respective shells.

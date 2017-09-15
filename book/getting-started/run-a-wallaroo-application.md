@@ -9,7 +9,7 @@ There's a couple Wallaroo support applications that you'll be interacting with f
 - Giles sender is used to send test data into Wallaroo applications over TCP.
 - Machida, our program for running Wallaroo Python applications.
 
-You're going to setup our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
+You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
 
 The Metrics UI process will be run in the background via Docker.  The other three processes (receiver, sender, and Wallaroo) will run in the foreground.  We recommend that you run each process in a separate terminal.
 
@@ -52,7 +52,7 @@ We'll use Giles Receiver to listen for data from our Wallaroo application.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-./receiver -l 127.0.0.1:5555 --ponythreads=1
+./receiver -l 127.0.0.1:5555 --no-write --ponythreads=1
 ```
 
 You should see the `Listening for data` that indicates that Giles receiver is running.
@@ -84,7 +84,7 @@ This tells the "Celsius to Fahrenheit" application that it should listen on port
 A data generator is bundled with the application. Use these commands to generate data:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen
+cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/_test
 ./data_gen.py 10000
 ```
 

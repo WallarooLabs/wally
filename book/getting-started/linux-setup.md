@@ -6,7 +6,7 @@ There are a few applications/tools which are required to be installed before you
 
 ## Memory requirements
 
-In order to compile all of the Wallaroo applications your system will need to have approximately 6 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
+In order to compile the Wallaroo example applications, your system will need to have approximately 6 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
 
 ## Installing git
 
@@ -64,7 +64,7 @@ sudo apt-get install -y build-essential zlib1g-dev \
 
 ### Install GCC 5 or Higher
 
-You'll need to be using at least `gcc-5`. We rely on its atomics support. If you have at least `gcc-5` installed on your machine, you don't need to do anything. If you have gcc 4 or lower, you'll need to upgrade. You can check you `gcc` version by running:
+You'll need to be using at least `gcc-5`. We rely on its atomics support. If you have at least `gcc-5` installed on your machine, you don't need to do anything. If you have gcc 4 or lower, you'll need to upgrade. You can check your `gcc` version by running:
 
 ```bash
 gcc --version
@@ -149,7 +149,7 @@ sudo make install
 
 ## Install Compression Development Libraries
 
-Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
+Wallaroo's Kakfa support requires `libsnappy` and `liblz` to be installed.
 
 ### Xenial Ubuntu:
 
@@ -210,7 +210,7 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.1.0-rc2
+git checkout 0.1.0-rc3
 ```
 
 ## Installing Machida

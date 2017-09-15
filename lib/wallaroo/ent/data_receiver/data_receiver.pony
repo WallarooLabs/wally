@@ -235,6 +235,10 @@ actor DataReceiver is Producer
   be dispose() =>
     @printf[I32]("Shutting down DataReceiver\n".cstring())
     _timers.dispose()
+    match _latest_conn
+    | let conn: DataChannel =>
+      conn.dispose()
+    end
 
   fun ref route_to(c: Consumer): (Route | None) =>
     None
