@@ -9,7 +9,7 @@ There's a couple Wallaroo support applications that you'll be interacting with f
 - Giles sender is used to send test data into Wallaroo applications over TCP.
 - Machida, our program for running Wallaroo Python applications.
 
-You're going to setup our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
+You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
 
 The Metrics UI process will be run in the background via Docker.  The other three processes (receiver, sender, and Wallaroo) will run in the foreground.  We recommend that you run each process in a separate terminal.
 
