@@ -52,7 +52,7 @@ We'll use Giles Receiver to listen for data from our Wallaroo application.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-./receiver -l 127.0.0.1:5555 --ponythreads=1
+./receiver -l 127.0.0.1:5555 --no-write --ponythreads=1
 ```
 
 You should see the `Listening for data` that indicates that Giles receiver is running.
