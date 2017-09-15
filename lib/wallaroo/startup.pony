@@ -632,6 +632,8 @@ actor Startup
     ws
 
   fun ref _print_link_to_community_license() =>
-    @printf[I32](("****This is an enterprise feature. See the community " +
-      "license at https://github.com/WallarooLabs/wallaroo/blob/master/" +
-      "LICENSE****\n").cstring())
+    @printf[I32](("****This is an enterprise feature. You may need to " +
+      "obtain a paid usage agreement to use this feature in production. See " +
+      "the Wallaroo Community License at https://github.com/WallarooLabs/" +
+      "wallaroo/blob/master/LICENSE.md for details, and also please visit " +
+      "the page at http://www.wallaroolabs.com/pricing****\n").cstring())
