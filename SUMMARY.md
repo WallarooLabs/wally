@@ -66,6 +66,7 @@
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
 * [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
+* [Decoding Giles Receiver Output](book/appendix/decoding-giles-receiver-output.md)
 
 ## Legal
 * [Terms and Conditions](book/legal/terms.md)
