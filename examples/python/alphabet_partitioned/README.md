@@ -62,7 +62,7 @@ Run `machida` with `--application-module alphabet_partitioned` as an initializer
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --worker-count 2 --cluster-initializer \
-  --external 127.0.1:6002 --ponythreads=1
+  --external 127.0.0.1:6002 --ponythreads=1
 ```
 
 ### Shell 3
