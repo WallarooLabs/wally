@@ -91,21 +91,6 @@ Send messages:
   --file votes.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --binary --msg-size 9 --repeat --ponythreads=1
 ```
-## Reading the Output
-
-You can read the output with the following code:
-
-```python
-import struct
-
-num_bytes = 4 + 1 + 8
-with open('alphabet.out', 'rb') as f:
-    while True:
-        try:
-            print struct.unpack('>IsQ', f.read(num_bytes))
-        except:
-            break
-```
 
 ## Shutdown
 
