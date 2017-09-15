@@ -207,7 +207,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
               _router.routes(), _route_builder, _outgoing_boundary_builders,
               _layout_initializer, _default_target,
               _default_in_route_builder,
-              _metrics_reporter.clone(), topic, part_id, _kc)
+              _metrics_reporter.clone(), topic, part_id, _kc,
+              _router_registry)
             partitions_sources(part_id) = source
             _router_registry.register_source(source)
           else
