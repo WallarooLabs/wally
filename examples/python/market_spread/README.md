@@ -15,7 +15,7 @@ You can read more about Market Spread in [What is Wallaroo](/book/what-is-wallar
 
 ### Input
 
-As mentioned above, Market Spread has two input streams, each of which takes messages in a specific format. Both streams use the [source message framing protocol](/book/appendix/writing-your-own-feed.md#source-message-framing-protocol).
+As mentioned above, Market Spread has two input streams, each of which takes messages in a specific format. Both streams use the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol).
 
 #### NBBO Messages
 
@@ -40,7 +40,7 @@ Order messages have the following parts:
 
 ### Output
 
-The output messages use the [source message framing protocol](/book/appendix/writing-your-own-feed.md#source-message-framing-protocol) and have the following parts:
+The output messages use the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol) and have the following parts:
 * *side* -- the side of the order (buy or sell), 1 byte
 * *account* -- the account that placed this order, 32-bit integer
 * *order id* -- the id of the order, 6 byte string
@@ -59,7 +59,7 @@ The Order messages are handled by the `OrderDecoder`'s `decode(...)` method, whi
 
 ## Running Market Spread
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
 
 You will need five separate shells to run this application. Open each shell and go to the `examples/python/market_spread` directory.
 
