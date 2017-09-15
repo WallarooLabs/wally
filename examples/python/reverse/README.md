@@ -6,7 +6,7 @@ This is an example application that receives strings as input and outputs the re
 
 ### Input
 
-The inputs of the "Reverse" application are strings encoded in the [source message framing protocol](/book/appendix/writing-your-own-feed.md#source-message-framing-protocol). Here's an example input message, written as a Python string:
+The inputs of the "Reverse" application are strings encoded in the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol). Here's an example input message, written as a Python string:
 
 ```
 "\x00\x00\x00\x05hello"
@@ -28,7 +28,7 @@ The `Decoders`'s `decode(...)` method creates a string from the value represente
 
 ## Running Reverse
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/reverse` directory.
 
