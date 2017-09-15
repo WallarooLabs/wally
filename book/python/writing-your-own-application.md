@@ -1,6 +1,6 @@
 # Writing Your Own Wallaroo Python Application
 
-In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `reverse.py` application from the [examples](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc3/examples/python/reverse/) section, then move on to an application that maintains and modifies state and, finally, a stateful application that also uses partitioning to divide its work.
+In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `reverse.py` application from the [examples](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.0-rc4/examples/python/reverse/) section, then move on to an application that maintains and modifies state and, finally, a stateful application that also uses partitioning to divide its work.
 
 ## A Stateless Application - Reverse Words
 
@@ -144,7 +144,7 @@ import wallaroo
 
 ## Running `reverse.py`
 
-The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc3/examples/python/reverse/). To run it, follow the [Reverse application instructions](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc3/examples/python/reverse/README.md)
+The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.0-rc4/examples/python/reverse/). To run it, follow the [Reverse application instructions](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.0-rc4/examples/python/reverse/README.md)
 
 ## Next Steps
 
