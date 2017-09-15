@@ -6,7 +6,7 @@ This is an example application that receives strings of text, splits it into ind
 
 ### Input
 
-The inputs of the "Word Count" application are strings encoded in the [source message framing protocol](/book/appendix/writing-your-own-feed.md#source-message-framing-protocol). Here's an example of an input message, written as a Python string:
+The inputs of the "Word Count" application are strings encoded in the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol). Here's an example of an input message, written as a Python string:
 
 ```
 "\x00\x00\x00\x4cMy solitude is cheered by that elegant hope."
@@ -26,7 +26,7 @@ The `Decoder`'s `decode(...)` method turns the input message into a string. That
 
 ## Running Word Count
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/linux-setup.md) or [Mac OS](/book/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/word_count` directory.
 
