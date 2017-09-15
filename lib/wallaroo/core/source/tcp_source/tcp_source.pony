@@ -34,6 +34,7 @@ use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/router_registry"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -99,7 +100,7 @@ actor TCPSource is Producer
     fd: U32, default_target: (Consumer | None) = None,
     forward_route_builder: (RouteBuilder | None) = None,
     init_size: USize = 64, max_size: USize = 16384,
-    metrics_reporter: MetricsReporter iso)
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
   =>
     """
     A new connection accepted on a server.
@@ -126,8 +127,10 @@ actor TCPSource is Producer
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        _outgoing_boundaries(target_worker_name) =
+        let new_boundary =
           builder.build_and_initialize(_step_id_gen(), _layout_initializer)
+        router_registry.register_disposable(new_boundary)
+        _outgoing_boundaries(target_worker_name) = new_boundary
       end
     end
 

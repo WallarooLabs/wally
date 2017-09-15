@@ -408,6 +408,7 @@ actor OutgoingBoundary is Consumer
     """
     @printf[I32]("Shutting down OutgoingBoundary\n".cstring())
     _no_more_reconnect = true
+    _timers.dispose()
     close()
     _notify.dispose()
 
