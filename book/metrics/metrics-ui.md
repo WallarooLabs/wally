@@ -6,13 +6,14 @@ In this section, we'll introduce you to the Wallaroo Metrics UI. The Metrics UI 
 
 Metrics are reported for 3 top level categories in a Wallaroo application: `Pipelines`, `Workers`, and `Computations`. Each top level category is an aggregation of elements in its own subcategory. The Metrics UI also provides metrics for each subcategory. All metrics are provided using a time window of the last 5 minutes of processing.
 
-At this point we assume you've made your way through the [Setting Up Your Environment for Wallaroo](book/getting-started/setup.md) and [Core Concepts](/book/core-concepts/intro.md) sections of the documentation. If you haven't, please do so and return here once you have.
+
+At this point we assume you've made your way through the [Setting Up Your Environment for Wallaroo](/book/getting-started/setup.md) and [Core Concepts](/book/core-concepts/intro.md) sections of the documentation. If you haven't, please do so and return here once you have.
 
 ## Getting Started with the Metrics UI
 
 ### In Docker
 
-You should already have Docker installed if you have followed the `Setup` instructions in the [Setting Up Your Environment for Wallaroo](book/getting-started/setup.md) section of the documentation.
+You should already have Docker installed if you have followed the `Setup` instructions in the [Setting Up Your Environment for Wallaroo](/book/getting-started/setup.md) section of the documentation.
 
 #### Running the Metrics UI
 
