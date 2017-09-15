@@ -9,7 +9,7 @@ The languages currently supported by Wallaroo are:
 
 ## Licensing
 
-Any files included in the examples direcotry and its subdirectories are provided under the Apcache 2.0 license.
+Any files included in the examples directory and its subdirectories are provided under the Apcache 2.0 license.
 
 Copyright 2017 The Wallaroo Authors.
 
