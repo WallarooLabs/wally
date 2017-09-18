@@ -88,7 +88,7 @@ We'll add `import wingdbstub` in order to use our debugger and we'll also set a 
 
 ### Reverse Example Debugging
 
-Now that we're setup, let's run our `reverse` example. You can find the instructions [here](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.1/examples/python/reverse/README.md).
+Now that we're setup, let's run our `reverse` example. You can find the instructions [here](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.2/examples/python/reverse/README.md).
 
 Once you've successfully run `reverse` via `machida` and sent over messages, we'll see that we've hit our breakpoint and can inspect the `data` variable. If we continue, we'll hit the breakpoint as every new message arrives.
 

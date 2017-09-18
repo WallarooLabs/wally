@@ -22,4 +22,4 @@ To read about the structure and requirements of each API class, refer to [Wallar
 
 To read about the command-line arguments Wallaroo takes, refer to [Appendix: Wallaroo Command-Line Options](/book/appendix/wallaroo-command-line-options.md).
 
-To browse complete examples, go to [Wallaroo Python Examples](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.1/examples/python).
+To browse complete examples, go to [Wallaroo Python Examples](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.2/examples/python).
