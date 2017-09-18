@@ -235,6 +235,10 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     _notify.received(this, msg, network_received_timestamp)
 
   be dispose() =>
+    @printf[I32]("Shutting down KafkaSource\n".cstring())
+
     for b in _outgoing_boundaries.values() do
       b.dispose()
     end
+
+    _kc.dispose()

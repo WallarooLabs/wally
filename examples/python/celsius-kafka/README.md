@@ -144,8 +144,6 @@ To shut down the cluster, you will need to use the `cluster_shutdown` tool.
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
 
-Note: This might not fully shut down the cluster in which case you'll need to use `ctrl-c` to shut it down.
-
 You can shut down the kafkacat producer by pressing Ctrl-d from its shell.
 
 You can shut down the kafkacat consumer by pressing Ctrl-c from its shell.
