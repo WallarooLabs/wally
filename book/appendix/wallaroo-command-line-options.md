@@ -35,12 +35,6 @@ When running a Wallaroo application, we use some of the following command line p
     parameter]
   --stop-world/u [Sets pause before state migration after the stop the
     world]
-
--------------------------------------------------------------------------
-To set Wallaroo modes, compile with the following -D flags:
-  resilience - Sets resilience mode
-  autoscale - Sets autoscaling mode
-  clustering - Sets clustering mode
 ```
 
 Wallaroo currently supports one input stream per pipeline. We provide comma-separated IP addresses for TCP source listeners via the `--in` parameter. Currently, the order of these addresses corresponds to the order in which pipelines are defined in your application code.
