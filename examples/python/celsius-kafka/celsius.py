@@ -43,8 +43,9 @@ def application_setup(args):
 
 class Decoder(object):
     def decode(self, bs):
-        return struct.unpack('>f', bs)[0]
-
+        if len(bs) < 4:
+          return 0.0
+        return struct.unpack('>f', bs[:4])[0]
 
 class Multiply(object):
     def name(self):
