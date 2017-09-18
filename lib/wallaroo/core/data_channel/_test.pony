@@ -235,7 +235,7 @@ class _TestDataChannelWritevNotifyClient is DataChannelNotify
 
   fun ref connected(conn: DataChannel ref) =>
     _h.complete_action("client connect")
-    conn.writev(recover ["hello", ", hello"] end)
+    conn.writev(recover ["hello"; ", hello"] end)
 
   fun ref connect_failed(conn: DataChannel ref) =>
     _h.fail_action("client connect")

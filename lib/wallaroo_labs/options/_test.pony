@@ -48,7 +48,7 @@ class iso _TestLongOptions is UnitTest
   fun name(): String => "options/Options.longOptions"
 
   fun apply(h: TestHelper) =>
-    let options = Options(["--none", "--i64", "12345", "--f64=67.890"])
+    let options = Options(["--none"; "--i64"; "12345"; "--f64=67.890"])
     var none: Bool = false
     var i64: I64 = -1
     var f64: F64 = -1
@@ -76,7 +76,7 @@ class iso _TestShortOptions is UnitTest
   fun name(): String => "options/Options.shortOptions"
 
   fun apply(h: TestHelper) =>
-    let options = Options(["-n", "-i", "12345", "-f67.890"])
+    let options = Options(["-n"; "-i"; "12345"; "-f67.890"])
     var none: Bool = false
     var i64: I64 = -1
     var f64: F64 = -1
@@ -128,7 +128,7 @@ class iso _TestCombineShortArg is UnitTest
   fun name(): String => "options/Options.combineShortArg"
 
   fun apply(h: TestHelper) =>
-    let options = Options(["-ab99", "-ac", "99"])
+    let options = Options(["-ab99"; "-ac"; "99"])
     var aaa: Bool = false
     var bbb: I64 = -1
     var ccc: I64 = -1
@@ -156,7 +156,7 @@ class iso _TestArgLeadingDash is UnitTest
   fun name(): String => "options/Options.testArgLeadingDash"
 
   fun apply(h: TestHelper) =>
-    let options = Options(["--aaa", "-2", "--bbb=-2"])
+    let options = Options(["--aaa"; "-2"; "--bbb=-2"])
     var aaa: I64 = -1
     var bbb: I64 = -1
     options
