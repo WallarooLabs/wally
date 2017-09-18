@@ -461,7 +461,7 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
     let out_p = @PyTuple_GetItem(out_and_key, 0)
     let key_p = @PyTuple_GetItem(out_and_key, 1)
 
-    let out = wb.write(recover val
+    let out = wb.>write(recover val
         // create a temporary Array[U8] wrapper for the C array, then clone it
         Array[U8].from_cpointer(@PyString_AsString(out_p),
           @PyString_Size(out_p)).clone()
@@ -470,7 +470,7 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
     let key = if Machida.is_py_none(key_p) then
         None
       else
-        wb.write(recover
+        wb.>write(recover
           Array[U8].from_cpointer(@PyString_AsString(out_p),
             @PyString_Size(out_p)).clone()
           end).done()
