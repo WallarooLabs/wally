@@ -8,7 +8,9 @@ use Mix.Config
 # with brunch.io to recompile .js and .css sources.
 config :metrics_reporter_ui, MetricsReporterUI.Endpoint,
   http: [port: System.get_env("PHX_HTTP_PORT") || 4000],
-  tcp: [port: System.get_env("PHX_TCP_PORT") || 5001],
+  tcp: [port: System.get_env("PHX_TCP_PORT") || 5001,
+        tcp_server: MonitoringHubUtils.TCPServer,
+        protocol_options: [serializer: MonitoringHubUtils.Serializers.HubProtocol]],
   debug_errors: true,
   code_reloader: true,
   check_origin: false,
