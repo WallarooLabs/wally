@@ -13,7 +13,9 @@ use Mix.Config
 # which you typically run after static files are built.
 config :metrics_reporter_ui, MetricsReporterUI.Endpoint,
   http: [port: 4000],
-  tcp: [port: 5001],
+  tcp: [port: 5001,
+        tcp_server: MonitoringHubUtils.TCPServer,
+        protocol_options: [serializer: MonitoringHubUtils.Serializers.HubProtocol]],
   check_origin: false,
   # url: [host: "example.com", port: 80],
   cache_static_manifest: "priv/static/manifest.json",
