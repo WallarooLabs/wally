@@ -44,3 +44,6 @@ class JoiningConnectNotifier is TCPConnectionNotify
     n: USize): Bool
   =>
     true
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    @printf[I32](("JoiningConnectNotifier: connection failed!\n").cstring())

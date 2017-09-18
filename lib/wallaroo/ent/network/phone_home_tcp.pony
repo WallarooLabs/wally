@@ -65,3 +65,7 @@ class HomeConnectNotify is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref) =>
     @printf[I32](("HomeConnectNotify: " + _name + ": server closed\n")
       .cstring())
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    @printf[I32](("HomeConnectNotify: " + _name + ": connection failed!\n")
+      .cstring())
