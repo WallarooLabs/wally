@@ -67,6 +67,7 @@
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
 * [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
 * [Decoding Giles Receiver Output](book/appendix/decoding-giles-receiver-output.md)
+* [Wallaroo and Long-Running Data Processing and Other Workflows](book/appendix/wallaroo-and-long-running-data-processing-and-other-workflows.md)
 
 ## Legal
 * [Terms and Conditions](book/legal/terms.md)
