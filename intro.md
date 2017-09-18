@@ -9,7 +9,7 @@ Welcome to the developer's guide for Wallaroo. This document is available in a v
 
 You can open issues and submit pull requests against [our GitHub repo](https://github.com/wallaroolabs/wallaroo).
 
-This document is has been written to take an application developer from zero knowledge about Wallaroo to being able to develop streaming Wallaroo applications in a local development environment.
+This document is has been written to take an application developer from zero knowledge about Wallaroo to being able to develop streaming Wallaroo applications in a local development environment in Python. (For other languages such as GoLang and C++, and for long-running data jobs such as large-scale analysis or model training, please contact us. Support and documentation are coming soon.)
 
 ## Intended Audience
 
