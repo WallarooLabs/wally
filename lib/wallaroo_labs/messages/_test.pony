@@ -68,6 +68,7 @@ class iso _TestFallorTimestampRaw is UnitTest
     let msg: Array[U8] val = recover val
       let a': Array[U8] = Array[U8]
       a'.append(text)
+      a'
     end
     let byteseqs = FallorMsgEncoder.timestamp_raw(at, consume msg)
     // Decoder expects a single stream of bytes, so we need to join

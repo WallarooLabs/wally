@@ -231,7 +231,7 @@ class _TestDataChannelWritevNotifyClient is DataChannelNotify
     _h = h
 
   fun ref sentv(conn: DataChannel ref, data: ByteSeqIter): ByteSeqIter =>
-    recover Array[ByteSeq].concat(data.values()).push(" (from client)") end
+    recover Array[ByteSeq].>concat(data.values()).>push(" (from client)") end
 
   fun ref connected(conn: DataChannel ref) =>
     _h.complete_action("client connect")

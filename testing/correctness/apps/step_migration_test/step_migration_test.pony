@@ -144,6 +144,7 @@ primitive CountComputation is StateComputation[U64, U64, CountState]
     recover val
       let scbs = Array[StateChangeBuilder[CountState]]
       scbs.push(recover val CountStateChangeBuilder end)
+      scbs
     end
 
 class CountState is State
