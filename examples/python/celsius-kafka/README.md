@@ -81,7 +81,7 @@ brew install kafkacat
 To run `kafkacat` to listen to the `test-out` topic:
 
 ```bash
-kafkacat -C -b 127.0.0.1:9092 -t test-out
+kafkacat -C -b 127.0.0.1:9092 -t test-out > celsius.out
 ```
 
 ### Shell 2
@@ -119,6 +119,22 @@ kafkacat -P -b 127.0.0.1:9092 -t test-in
 ```
 
 Note: You can use `ctrl-d` to exit `kafkacat`
+
+## Reading the Output
+
+The output data will be in the file that `kafkacat` is writing to in shell 1. You can read the output data with the following code:
+
+```python
+import struct
+
+
+with open('celsius.out', 'rb') as f:
+    while True:
+        try:
+            print struct.unpack('>f', f.read(4))
+        except:
+            break
+```
 
 ## Shutting down the cluster
 
