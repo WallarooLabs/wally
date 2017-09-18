@@ -87,8 +87,10 @@ class iso _TestOnlyTriggersOnce is UnitTest
         1_000)
 
     let multi_triggering_metrics_list =
-      recover val [_TestMetricData(trigger_histogram),
-        _TestMetricData(trigger_histogram)] end
+      recover val [
+        _TestMetricData(trigger_histogram)
+        _TestMetricData(trigger_histogram)
+      ] end
 
     let test_worker_request = _TestNewWorkerRequester(h)
 

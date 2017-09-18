@@ -32,7 +32,7 @@ class iso _TestFallorMsgEncoder is UnitTest
   fun name(): String => "messages/_TestFallorMsgEncoder"
 
   fun apply(h: TestHelper) ? =>
-    let test: Array[String] val = recover val ["hi", "there", "man", "!"] end
+    let test: Array[String] val = recover val ["hi"; "there"; "pal"; "!"] end
 
     let byteseqs = FallorMsgEncoder(test)
     let bytes: Array[U8] iso = recover Array[U8] end
