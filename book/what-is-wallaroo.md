@@ -2,7 +2,7 @@
 
 Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is key. If you are familiar with the “big data” landscape, Wallaroo falls into the “streaming data” category along with tools like Storm, Heron, and Samza. 
 
-When we set out to build Wallaroo, we had a few goals in mind. We wanted to improve the state of the art for streaming data processing by providing better per-worker throughput, dramatically lower latencies, easier state management, and an easier operational experience. In this introduction, we're going to touch on some of these points but not all of them. Over the course of this guide, we will explore Wallaroo more in-depth. To that end, this introduction will:
+When we set out to build Wallaroo, we had a few goals in mind. We wanted to improve the state of the art for distributed data processing by providing better per-worker throughput, dramatically lower latencies, easier state management, and an easier operational experience. In this introduction, we're going to touch on some of these points but not all of them. Over the course of this guide, we will explore Wallaroo more in-depth. To that end, this introduction will:
 
 - Take you through what Wallaroo is
 - Describe the problems Wallaroo is solving
