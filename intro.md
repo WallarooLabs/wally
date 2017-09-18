@@ -11,6 +11,8 @@ You can open issues and submit pull requests against [our GitHub repo](https://g
 
 This document is has been written to take an application developer from zero knowledge about Wallaroo to being able to develop streaming Wallaroo applications in a local development environment in Python. (For other languages such as GoLang and C++, and for long-running data jobs such as large-scale analysis or model training, please contact us. Support and documentation are coming soon.)
 
+Please contact us at hello@wallaroolabs.com if you'd like to talk to us about how we can help you with your particular distributed streaming data processing applications.
+
 ## Intended Audience
 
 We designed this document for programmers that want to jump right in and get started using Wallaroo.  Starting with installing all of the necessary components required for Wallaroo and launching an example application in a local development environment.
