@@ -155,8 +155,11 @@ primitive _PartitionFunctionGenerator
 
 primitive _PreStateDataArrayGenerator
   fun apply(rb: RunnerBuilder): Array[PreStateData] val =>
-    recover [_PreStateDataGenerator(rb), _PreStateDataGenerator(rb),
-      _PreStateDataGenerator(rb)] end
+    recover [
+      _PreStateDataGenerator(rb)
+      _PreStateDataGenerator(rb)
+      _PreStateDataGenerator(rb)
+    ] end
 
 primitive _PreStateDataGenerator
   fun apply(rb: RunnerBuilder): PreStateData =>
@@ -186,10 +189,10 @@ primitive _DefaultTargetGenerator
 
 primitive _BaseWorkerNamesGenerator
   fun apply(): Array[String] val =>
-    recover ["w1", "w2", "w3"] end
+    recover ["w1"; "w2"; "w3"] end
 
 primitive _TargetWorkerNamesGenerator
   fun apply(): Array[String] val =>
-    recover ["w1", "w2", "w3", "w4"] end
+    recover ["w1"; "w2"; "w3"; "w4"] end
 
 

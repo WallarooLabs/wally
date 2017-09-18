@@ -23,16 +23,16 @@ use "wallaroo/ent/spike"
 class StartupOptions
   var m_arg: (Array[String] | None) = None
   var input_addrs: Array[Array[String]] val = recover Array[Array[String]] end
-  var c_addr: Array[String] = ["", "0"]
+  var c_addr: Array[String] = [""; "0"]
   var c_host: String = ""
   var c_service: String = "0"
-  var d_addr: Array[String] val = recover ["", "0"] end
+  var d_addr: Array[String] val = recover [""; "0"] end
   var d_host: String = ""
   var d_service: String = "0"
-  var my_c_addr: Array[String] = ["", "0"]
+  var my_c_addr: Array[String] = [""; "0"]
   var my_c_host: String = ""
   var my_c_service: String = "0"
-  var my_d_addr: Array[String] = ["", "0"]
+  var my_d_addr: Array[String] = [""; "0"]
   var my_d_host: String = ""
   var my_d_service: String = "0"
   var p_arg: (Array[String] | None) = None
