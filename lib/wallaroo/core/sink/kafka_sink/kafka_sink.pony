@@ -309,4 +309,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     Fail()
 
   be dispose() =>
-    None
+    @printf[I32]("Shutting down KafkaSink\n".cstring())
+    try
+      (_kc as KafkaClient tag).dispose()
+    end
