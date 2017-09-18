@@ -1,6 +1,6 @@
 # What is Wallaroo?
 
-Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is key. If you are familiar with the “big data” landscape, Wallaroo falls into the “streaming data” category along with tools like Storm, Heron, and Samza. 
+Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is key. If you are familiar with the “big data” landscape, Wallaroo falls into the “streaming data” category along with tools like Storm, Heron, and Samza.
 
 When we set out to build Wallaroo, we had a few goals in mind. We wanted to improve the state of the art for distributed data processing by providing better per-worker throughput, dramatically lower latencies, easier state management, and an easier operational experience. In this introduction, we're going to touch on some of these points but not all of them. Over the course of this guide, we will explore Wallaroo more in-depth. To that end, this introduction will:
 
@@ -10,7 +10,7 @@ When we set out to build Wallaroo, we had a few goals in mind. We wanted to impr
 
 ## Wallaroo by example: Market Spread
 
-Let’s start talking about what Wallaroo is by way of an example. Our primary demo application is one called “Market Spread.” It’s based on a proof-of-concept we did for a large bank that was looking at ways to modernize their infrastructure. Market Spread is an application designed to run alongside a trading system. Its goal is to monitor market data for irregularities around different symbols and potentially withdraw some trades that have been sent to market should certain anomalies occur. 
+Let’s start talking about what Wallaroo can do by way of an example. One demo application is one called “Market Spread.” It’s based on a proof-of-concept we did for a large bank that was looking at ways to modernize their infrastructure. Market Spread is an application designed to run alongside a trading system. Its goal is to monitor market data for irregularities around different symbols and potentially withdraw some trades that have been sent to market should certain anomalies occur.
 
 When we break the application down into its key components we get:
 
@@ -21,7 +21,7 @@ When we break the application down into its key components we get:
 
 ![Market Spread Diagram](images/market-spread-overview.png)
 
-For the proof of concept, our client was looking to handle hundreds of thousands of messages a second with median latencies measured in microseconds. Further, they needed flat, predictable tail latencies that were measured in single-digit milliseconds. While the proof of concept was only run on a single machine, the goal was to have an application that would be able to respond to ever-increasing rates of data and seamlessly scale to run on multiple machines while handling millions of messages a second. 
+For the proof of concept, our client was looking to handle hundreds of thousands of messages a second with median latencies measured in microseconds. Further, they needed flat, predictable tail latencies that were measured in single-digit milliseconds. While the proof of concept was only run on a single machine, the goal was to have an application that would be able to respond to ever-increasing rates of data and seamlessly scale to run on multiple machines while handling millions of messages a second.
 
 Distributed data processing applications are hard. We know; over the course of our careers, we’ve been involved in building a lot of them. Here’s a quick checklist of things we’d need to worry about for an application like Market Spread if we were to start from scratch:
 
@@ -29,7 +29,7 @@ Distributed data processing applications are hard. We know; over the course of o
 - Ensuring message replay occurs when a message fails to process.
 - Ensuring messages aren’t processed twice on message replay
 - Efficient sharding of data across multiple machines
-- Optimizing computations for performance 
+- Optimizing computations for performance
 - Minimizing administrative messages
 - Minimizing data movement
 - Handling message source back-pressure
@@ -49,9 +49,9 @@ How does one go about building a Wallaroo application? Via our developer framewo
 - Source
 - Sink
 
-The most important of these is a `Computation`. Computations come in two varieties: stateless and stateful. A stateless computation takes some data as an input and creates some new data as an output. For example, a “double computation” might take in an integer such as 2 and output 4. A stateful computation is similar to a stateless computation except it takes an additional input: the state it will operate on. An example of a stateful computation would be a counter that keeps track of the running total of all numbers it has processed. 
+The most important of these is a `Computation`. Computations come in two varieties: stateless and stateful. A stateless computation takes some data as an input and creates some new data as an output. For example, a “double computation” might take in an integer such as 2 and output 4. A stateful computation is similar to a stateless computation except it takes an additional input: the state it will operate on. An example of a stateful computation would be a counter that keeps track of the running total of all numbers it has processed.
 
-You can combine computations together using another abstraction we provide: `Pipeline`. A pipeline allows you to say, for example, that the output from computation A will be processed by computation B. A pipeline begins with a `Source` step, which is responsible for receiving and decoding incoming external messages. Likewise, the pipeline may end at a `Sink`, if it has anything to output, which encodes data and sends it to an external receiver. In this way, you can take individual computations and start turning them into applications that take in data from various external sources and ultimately produce outputs that are sent to external systems via sinks. 
+You can combine computations together using another abstraction we provide: `Pipeline`. A pipeline allows you to say, for example, that the output from computation A will be processed by computation B. A pipeline begins with a `Source` step, which is responsible for receiving and decoding incoming external messages. Likewise, the pipeline may end at a `Sink`, if it has anything to output, which encodes data and sends it to an external receiver. In this way, you can take individual computations and start turning them into applications that take in data from various external sources and ultimately produce outputs that are sent to external systems via sinks.
 
 ## Market Spread in Wallaroo
 
@@ -63,7 +63,7 @@ You can see we end up with two pipelines, one for our `NBBO Feed` and another fo
 
 ## Market Spread Performance
 
-Wallaroo has been developed to provide correct results quickly. What does quickly mean? Wallaroo is designed to process millions of events on a single machine, with median latencies that are measured in microseconds and tail latencies that are measured in single digit milliseconds. Low latencies are all well and good, but what does that mean in practice? 
+Wallaroo has been developed to provide correct results quickly. What does quickly mean? Wallaroo is designed to process millions of events on a single machine, with median latencies that are measured in microseconds and tail latencies that are measured in single digit milliseconds. Low latencies are all well and good, but what does that mean in practice?
 
 Performance is, in the end, highly dependent on the type of data, the computations being performed, etc.  This guide isn't the place to present detailed benchmarks so let's give a quick idea of what the performance of a Wallaroo application can look like.
 
