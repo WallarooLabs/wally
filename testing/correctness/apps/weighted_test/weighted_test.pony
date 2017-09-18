@@ -134,6 +134,7 @@ primitive UpdateState is StateComputation[String, Result val, NormalState]
     recover val
       let scbs = Array[StateChangeBuilder[NormalState]]
       scbs.push(recover val NormalStateChangeBuilder end)
+      scbs
     end
 
 
