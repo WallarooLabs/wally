@@ -1,6 +1,6 @@
 # Python API Introduction
 
-The Wallaroo Python API can be used to write Wallaroo applications entirely in Python. This lets developers quickly get started with Wallaroo by leveraging their existing Python knowledge. It currently supports Python 2.7.
+The Wallaroo Python API can be used to write Wallaroo applications entirely in Python without needing Java or a JVM. This lets developers quickly get started with Wallaroo by leveraging their existing Python knowledge. It currently supports Python 2.7. Support for Python 3.X is in the works and we encourage you to contact us if that is a requirement.
 
 In order to write a Wallaroo application in Python, the developer creates classes that provide the methods expected by the API (see [Wallaroo Python API Classes](api.md) for more detail on this) and writes an entry point function that uses the Wallaroo `ApplicationBuilder` to define the layout of their application.
 
