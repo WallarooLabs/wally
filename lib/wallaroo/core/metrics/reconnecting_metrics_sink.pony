@@ -33,6 +33,7 @@ use "net"
 use "time"
 use "wallaroo_labs/hub"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/asio_event"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
@@ -104,7 +105,7 @@ actor ReconnectingMetricsSink
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _application_name = application_name
@@ -126,7 +127,7 @@ actor ReconnectingMetricsSink
     """
     Connect via IPv4.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _application_name = application_name
@@ -148,7 +149,7 @@ actor ReconnectingMetricsSink
     """
     Connect via IPv6.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _application_name = application_name
@@ -179,7 +180,7 @@ actor ReconnectingMetricsSink
     Do nothing on windows.
     """
     ifdef not windows then
-      _pending_writev.push(data.cpointer().usize()).push(data.size())
+      _pending_writev.>push(data.cpointer().usize()).>push(data.size())
       _pending_writev_total = _pending_writev_total + data.size()
       _pending.push((data, 0))
     end
@@ -217,7 +218,7 @@ actor ReconnectingMetricsSink
         end
       else
         for bytes in _notify.sentv(this, data).values() do
-          _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+          _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
           _pending_writev_total = _pending_writev_total + bytes.size()
           _pending.push((bytes, 0))
         end
@@ -236,7 +237,7 @@ actor ReconnectingMetricsSink
 
     ifdef not windows then
       for bytes in _notify.sentv(this, data).values() do
-        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+        _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
         _pending_writev_total = _pending_writev_total + bytes.size()
         _pending.push((bytes, 0))
       end
@@ -460,7 +461,7 @@ actor ReconnectingMetricsSink
           end
         end
       else
-        _pending_writev.push(data.cpointer().usize()).push(data.size())
+        _pending_writev.>push(data.cpointer().usize()).>push(data.size())
         _pending_writev_total = _pending_writev_total + data.size()
         _pending.push((data, 0))
         _pending_writes()
@@ -668,7 +669,7 @@ actor ReconnectingMetricsSink
           ifdef linux then
             // this is safe because asio thread isn't currently subscribed
             // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
+            AsioEventHelper.set_readable(_event, false)
             _readable = false
             @pony_asio_event_resubscribe_read(_event)
           else
@@ -810,8 +811,8 @@ actor ReconnectingMetricsSink
       _readable = false
       _writeable = false
       ifdef linux then
-        AsioEvent.set_readable(_event, false)
-        AsioEvent.set_writeable(_event, false)
+        AsioEventHelper.set_readable(_event, false)
+        AsioEventHelper.set_writeable(_event, false)
       end
     end
 
@@ -852,7 +853,7 @@ actor ReconnectingMetricsSink
         ifdef linux then
           // this is safe because asio thread isn't currently subscribed
           // for a write event so will not be writing to the readable flag
-          AsioEvent.set_writeable(_event, false)
+          AsioEventHelper.set_writeable(_event, false)
           @pony_asio_event_resubscribe_write(_event)
         end
       end
