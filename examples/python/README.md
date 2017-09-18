@@ -10,6 +10,7 @@ To get set up for running examples, if you haven't already, refer to [Building a
 
 - [reverse](reverse/): a string reversing stream application.
 - [celsius](celsius/): a Celsius-to-Fahrenheit stream application.
+- [celsius-kafka](celsius-kafka/): A Celsius-to-Fahrenheit stream application using a Kafka source and a Kafka sink (instead of a TCP source and a TCP sink).
 
 ### Simple Stateful Applications
 
