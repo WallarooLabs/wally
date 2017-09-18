@@ -360,6 +360,10 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
   =>
     true
 
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    @printf[I32]("ControlSenderConnectNotifier: connection failed!\n"
+      .cstring())
+
 class JoiningControlSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _worker_name: String
@@ -413,3 +417,7 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
       _header = true
     end
     true
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    @printf[I32]("JoiningControlSenderConnectNotifier: connection failed!\n"
+      .cstring())
