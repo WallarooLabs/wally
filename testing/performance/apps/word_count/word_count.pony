@@ -160,6 +160,7 @@ primitive AddCount is StateComputation[String, RunningTotal, WordTotals]
     recover val
       let scbs = Array[StateChangeBuilder[WordTotals]]
       scbs.push(recover WordTotalsStateChangeBuilder end)
+      scbs
     end
 
 primitive StringFrameHandler is FramedSourceHandler[String]
