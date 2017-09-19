@@ -281,8 +281,8 @@ actor Startup
           @printf[I32](("Some resilience/recovery files are missing! "
             + "Cannot continue!\n").cstring())
             let files_missing = required_files.without(existing_files)
-            let files_missing_str: String val = "\n    ".join(
-              Iter[String](files_missing.values()).collect(Array[String]))
+            let files_missing_str: String val = "\n    "
+              .join(files_missing.values())
             @printf[I32]("The missing files are:\n    %s\n".cstring(),
               files_missing_str.cstring())
           Fail()
