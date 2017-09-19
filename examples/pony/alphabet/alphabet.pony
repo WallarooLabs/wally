@@ -117,6 +117,7 @@ primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
     recover val
       let scbs = Array[StateChangeBuilder[LetterState]]
       scbs.push(recover val AddVotesStateChangeBuilder end)
+      scbs
     end
 
 primitive VotesDecoder is FramedSourceHandler[Votes val]

@@ -32,7 +32,7 @@ class iso _TestFallorMsgEncoder is UnitTest
   fun name(): String => "messages/_TestFallorMsgEncoder"
 
   fun apply(h: TestHelper) ? =>
-    let test: Array[String] val = recover val ["hi", "there", "man", "!"] end
+    let test: Array[String] val = recover val ["hi"; "there"; "pal"; "!"] end
 
     let byteseqs = FallorMsgEncoder(test)
     let bytes: Array[U8] iso = recover Array[U8] end
@@ -68,6 +68,7 @@ class iso _TestFallorTimestampRaw is UnitTest
     let msg: Array[U8] val = recover val
       let a': Array[U8] = Array[U8]
       a'.append(text)
+      a'
     end
     let byteseqs = FallorMsgEncoder.timestamp_raw(at, consume msg)
     // Decoder expects a single stream of bytes, so we need to join

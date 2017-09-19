@@ -76,6 +76,7 @@ class val OutgoingBoundaryBuilder
     let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
       _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
+    boundary
 
   fun build_and_initialize(step_id: StepId,
     layout_initializer: LayoutInitializer): OutgoingBoundary
@@ -87,6 +88,7 @@ class val OutgoingBoundaryBuilder
       _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary.quick_initialize(layout_initializer)
+    boundary
 
 actor OutgoingBoundary is Consumer
   // Steplike
@@ -174,7 +176,7 @@ actor OutgoingBoundary is Consumer
     _service = service
     _from = from
     _metrics_reporter = consume metrics_reporter
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = 65_536
 
@@ -583,7 +585,7 @@ actor OutgoingBoundary is Consumer
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
-      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
       data_size = data_size + bytes.size()
@@ -599,7 +601,7 @@ actor OutgoingBoundary is Consumer
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
-    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev.>push(data.cpointer().usize()).>push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
 
     _pending.push((data, 0))
@@ -673,8 +675,8 @@ actor OutgoingBoundary is Consumer
     _readable = false
     _writeable = false
     ifdef linux then
-      AsioEvent.set_readable(_event, false)
-      AsioEvent.set_writeable(_event, false)
+      @pony_asio_event_set_readable[None](_event, false)
+      @pony_asio_event_set_writeable[None](_event, false)
     end
 
     @pony_os_socket_close[None](_fd)
@@ -710,7 +712,7 @@ actor OutgoingBoundary is Consumer
           ifdef linux then
             // this is safe because asio thread isn't currently subscribed
             // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
+            @pony_asio_event_set_readable[None](_event, false)
             _readable = false
             @pony_asio_event_resubscribe_read(_event)
           else
@@ -860,11 +862,11 @@ actor OutgoingBoundary is Consumer
       _read_buf_size()
     end
 
-  fun local_address(): IPAddress =>
+  fun local_address(): NetAddress =>
     """
     Return the local IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
@@ -888,7 +890,7 @@ actor OutgoingBoundary is Consumer
       ifdef linux then
         // this is safe because asio thread isn't currently subscribed
         // for a write event so will not be writing to the readable flag
-        AsioEvent.set_writeable(_event, false)
+        @pony_asio_event_set_writeable[None](_event, false)
         @pony_asio_event_resubscribe_write(_event)
       end
       _notify.throttled(this)

@@ -118,7 +118,7 @@ actor TCPSource is Producer
         AsioEvent.read_write(), 0, true, false)
     end
     _connected = true
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
 
@@ -382,7 +382,7 @@ actor TCPSource is Producer
     @pony_asio_event_unsubscribe(_event)
     _readable = false
     ifdef linux then
-      AsioEvent.set_readable(_event, false)
+      @pony_asio_event_set_readable[None](_event, false)
     end
 
 
@@ -435,7 +435,7 @@ actor TCPSource is Producer
           ifdef linux then
             // this is safe because asio thread isn't currently subscribed
             // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
+            @pony_asio_event_set_readable[None](_event, false)
             _readable = false
             @pony_asio_event_resubscribe_read(_event)
           else
