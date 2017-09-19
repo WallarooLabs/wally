@@ -44,6 +44,7 @@ PayloadSize [x bytes] : Payload [bytes specified in PayloadSize]
 So if our header is 4 bytes long, an incoming message would look something like:
 
 | header | payload |
+| - | - |
 | xxxx | some data here |
 
 Let's make that a bit more concrete. Let's say we are sending in two messages; each contains a string. The first has "first" as a payload and the second payload is "not first". Our stream of bytes would be:
