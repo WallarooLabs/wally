@@ -255,6 +255,10 @@ Above we can see the `Computation Detailed Metrics` page for our `Add 32` comput
 
 The only table on our page is our `Computation on Worker` table, which in this case is titled `Add 32 on Worker`. This table lists all of the workers which contribute to our `Add 32` computation. Since we're only running a single worker for this application, we'll only see `Initializer` in this list. The stats reported in the Stats Overview Section for our `Computation Detailed Metrics` page are a direct aggregation of each element in the `Computations on Worker` table. Since we only have one worker we can note that the stats are exactly the same.
 
+## Limitations
+
+Currently, the Metrics UI throughput graphs do not continue to update if new metrics data has not been processed. Thus the graphs represent the last 5 minutes of processed data. This will be addressed in a future release.
+
 ## Conclusion
 
 By this point, we've covered what the Metrics UI is and what Metrics are collected by the Metrics UI from Wallaroo. We have also gone over the pages that make up the Metrics UI. You should now be able to direct metrics from your own Wallaroo application to the Metrics UI and understand how to monitor your application.
