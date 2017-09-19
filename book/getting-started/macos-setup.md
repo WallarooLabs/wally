@@ -50,11 +50,8 @@ brew install pcre2 libressl wget
 Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`.
 
 ```bash
-cd ~/
-wget https://github.com/WallarooLabs/ponyc/archive/wallaroolabs-19.2.14.tar.gz
-tar xzfv wallaroolabs-19.2.14.tar.gz
-cd ponyc-wallaroolabs-19.2.14
-sudo make config=release install
+brew update
+brew install ponyc
 ```
 
 You can check that the installation was successful by running:
@@ -72,7 +69,7 @@ Next, you need to install `pony-stable`, a Pony dependency management library:
 cd ~/
 git clone https://github.com/ponylang/pony-stable
 cd pony-stable
-git checkout 0054b429a54818d187100ed40f5525ec7931b31b
+git checkout 0.1.0
 make
 sudo make install
 ```
