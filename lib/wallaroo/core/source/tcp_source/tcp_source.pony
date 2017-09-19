@@ -110,13 +110,8 @@ actor TCPSource is Producer
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    ifdef linux then
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true, true)
-    else
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write(), 0, true, false)
-    end
+    _event = @pony_asio_event_create(this, fd,
+      AsioEvent.read_write_oneshot(), 0, true, true)
     _connected = true
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
@@ -381,9 +376,7 @@ actor TCPSource is Producer
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
     _readable = false
-    ifdef linux then
-      @pony_asio_event_set_readable[None](_event, false)
-    end
+    @pony_asio_event_set_readable[None](_event, false)
 
 
     @pony_os_socket_close[None](_fd)
@@ -432,15 +425,11 @@ actor TCPSource is Producer
         match len
         | 0 =>
           // Would block, try again later.
-          ifdef linux then
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            @pony_asio_event_set_readable[None](_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
-          else
-            _readable = false
-          end
+          // this is safe because asio thread isn't currently subscribed
+          // for a read event so will not be writing to the readable flag
+          @pony_asio_event_set_readable[None](_event, false)
+          _readable = false
+          @pony_asio_event_resubscribe_read(_event)
           _reading = false
           return
         | _next_size =>
