@@ -15,7 +15,7 @@ See [Wallaroo Environment Setup Instructions](https://github.com/WallarooLabs/wa
 Build Celsius-kafka with
 
 ```bash
-stable env ponyc
+make
 ```
 
 ## Celsius-kafka argument
