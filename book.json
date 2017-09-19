@@ -12,7 +12,7 @@
         "footerTemplate": "©2017 All Rights Reserved, Wallaroo Labs"
     }
 
-    "variables": {
+    variables: {
         wallaroo_version: "release-0.1.2"
   }
 }
