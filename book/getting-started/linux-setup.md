@@ -208,9 +208,8 @@ cd ~/wallaroo-tutorial
 This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
 
 ```bash
-git clone https://github.com/WallarooLabs/wallaroo
+git clone --depth 1 -b release-0.1.2 https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout release-0.1.2
 ```
 
 ## Installing Machida
