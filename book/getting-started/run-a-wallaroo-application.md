@@ -79,17 +79,6 @@ This tells the "Celsius to Fahrenheit" application that it should listen on port
 
 ## Terminal 4
 
-### Generating Data
-
-A data generator is bundled with the application. Use these commands to generate data:
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/_test
-./data_gen.py 10000
-```
-
-This will create a `celsius.msg` file in your current working directory with 10,000 messages.
-
 ### Sending Data with Giles Sender
 
 We will be sending in 25,000,000 messages using the data file generated above. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
@@ -100,7 +89,7 @@ You will now be able to start the `sender` with the following command:
 cd ~/wallaroo-tutorial/wallaroo/giles/sender
 ./sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
   --repeat --no-write --msg-size 8 --ponythreads=1 --file \
-  ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen/celsius.msg
+  ~/wallaroo-tutorial/wallaroo/examples/python/celsius/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
