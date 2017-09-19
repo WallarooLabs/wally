@@ -13,6 +13,7 @@ branches:
     - master
     - release
     - /^release-(\d).(\d).(\d)-rc(\d)+$/
+    - /^release-(\d).(\d).(\d)$/
 
 dist: trusty
 sudo: required

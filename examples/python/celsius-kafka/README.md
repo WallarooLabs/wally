@@ -81,7 +81,7 @@ brew install kafkacat
 To run `kafkacat` to listen to the `test-out` topic:
 
 ```bash
-kafkacat -C -b 127.0.0.1:9092 -t test-out
+kafkacat -C -b 127.0.0.1:9092 -t test-out > celsius.out
 ```
 
 ### Shell 2
@@ -120,7 +120,23 @@ kafkacat -P -b 127.0.0.1:9092 -t test-in
 
 Note: You can use `ctrl-d` to exit `kafkacat`
 
-## Shutting down the cluster
+## Reading the Output
+
+The output data will be in the file that `kafkacat` is writing to in shell 1. You can read the output data with the following code:
+
+```python
+import struct
+
+
+with open('celsius.out', 'rb') as f:
+    while True:
+        try:
+            print struct.unpack('>f', f.read(4))
+        except:
+            break
+```
+
+## Shutdown
 
 To shut down the cluster, you will need to use the `cluster_shutdown` tool.
 
@@ -128,7 +144,9 @@ To shut down the cluster, you will need to use the `cluster_shutdown` tool.
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
 ```
 
-Note: This might not fully shut down the cluster in which case you'll need to use `ctrl-c` to shut it down.
+You can shut down the kafkacat producer by pressing Ctrl-d from its shell.
+
+You can shut down the kafkacat consumer by pressing Ctrl-c from its shell.
 
 ### Stop kafka
 

@@ -72,7 +72,7 @@ NOTE: Currently, worker 1 is automatically assigned the name "initializer" no ma
 
 ### Resilience
 
-If [resilience is turned on](/book/core-concepts/resilience.md), you can optionally specify the target directory for resilience files via the `--resilience-dir/-r` parameter (default is `/tmp`).
+If resilience is turned on, you can optionally specify the target directory for resilience files via the `--resilience-dir/-r` parameter (default is `/tmp`).
 
 ## Performance Flags
 

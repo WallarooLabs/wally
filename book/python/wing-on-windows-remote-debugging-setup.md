@@ -2,7 +2,7 @@
 
 We understand that as a Windows Developer, you may have the preference to do your development on Windows instead of on Linux. To encourage you to do so, we're providing this guide to help you set up Windows and Ubuntu for remote debugging. This portion of the instructions will help you get the initial set up done so you can use Wing IDE for remote debugging.
 
-We've tested these instructions with Windows 10 Pro version 1607 build 14393.x and version 1703 build 15063.x with Wing Pro 6 IDE. We assume that you've gone through the setup process for [Windows](book/getting-started/windows-setup.md) and the Python [building](/book/python/building.md) section. By this point, you should've been able to successfully build and run a Python Wallaroo example application.
+We've tested these instructions with Windows 10 Pro version 1607 build 14393.x and version 1703 build 15063.x with Wing Pro 6 IDE. We assume that you've gone through the setup process for [Windows](/book/getting-started/windows-setup.md) and the Python [building](/book/python/building.md) section. By this point, you should've been able to successfully build and run a Python Wallaroo example application.
 
 Before you can start remote debugging using Wing, there are a few one time set up/installation steps that need to occur on Windows and Ubuntu.
 
