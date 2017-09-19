@@ -1,10 +1,10 @@
 # Debugging Python Wallaroo Applications
 
-As you're developing Python Wallaroo applications, there will come a time where you will need to do some debugging during your development process. Debugging can be as simple as inserting a `print` statement in your code (we even do it in our examples) or a bit more involved by using a debugger to get backtraces and such. In this section we'll cover how to debug using `print`, an interactive debugger, and a remote debugger. It will help if you've gone through the [Python API Introduction](/book/python/intro.md) and [Writing Your Own Wallaroo Python Application](/book/python/writing-your-own-application.md) sections prior to continuing so you're aware of the components that make up a Python Wallaroo application and how they interact with each other.
+As you're developing Python Wallaroo applications, there will come a time where you will need to do some debugging during your development process. Debugging can be as simple as inserting a `print` statement in your code (we even do it in our examples) or a bit more involved by using a debugger to get backtraces and such. In this section we'll cover how to debug using `print`, an interactive debugger, and a remote debugger. It will help if you've gone through the [Python API Introduction](/book/python/intro.md), [Setting Up Your Environment for Wallaroo](/book/getting-started/setup.md), and [Writing Your Own Wallaroo Python Application](/book/python/writing-your-own-application.md) sections prior to continuing so you're aware of the components that make up a Python Wallaroo application and how they interact with each other.
 
 ## Debugging Using `print`
 
-The simplest way to do some debugging would be tossing a `print` statement in your code to analyze data. You can see several examples of this in our reverse [example](https://github.com/WallarooLabs/wallaroo/tree/0.1.0/examples/python/reverse/reverse.py) where we have `print` statements in our `Encoder`, `Decoder`, and `Reverse` classes. Here's an example in our `compute` function in our `Reverse` class:
+The simplest way to do some debugging would be tossing a `print` statement in your code to analyze data. You can see several examples of this in our reverse [example](https://github.com/WallarooLabs/wallaroo/tree/0.1.1/examples/python/reverse/reverse.py) where we have `print` statements in our `Encoder`, `Decoder`, and `Reverse` classes. Here's an example in our `compute` function in our `Reverse` class:
 
 ```bash
 def compute(self, data):
