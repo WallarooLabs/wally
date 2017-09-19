@@ -122,6 +122,10 @@ cd wallaroo
 git checkout {{ book.wallaroo_version }}
 ```
 
+git clone https://github.com/WallarooLabs/wallaroo
+cd wallaroo
+git checkout {{ book.wallaroo_version }}
+
 This will create a subdirectory called `wallaroo`.
 
 ## Installing Machida
