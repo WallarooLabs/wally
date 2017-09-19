@@ -21,7 +21,7 @@ Compile the `giles-sender` binary:
 
 ```bash
 cd wallaroo/giles/sender
-stable env ponyc
+make
 ```
 
 ## Command Line Arguments
