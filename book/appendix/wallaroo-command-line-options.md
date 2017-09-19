@@ -4,31 +4,54 @@ Every Wallaroo option exposes a set of command-line options that are used to con
 
 ## Command-Line Parameters
 
-When running a Wallaroo application binary, we use some of the following command line parameters (a star indicates it is required, a plus that it is required for multi-worker runs):
+When running a Wallaroo application, we use some of the following command line parameters (a star indicates it is required, a plus that it is required for multi-worker runs):
 
-```
-      --in/-i *[Comma-separated list of input addresses sources listen on]
-      --out/-o *[Sets address for sink outputs]
-      --control/-c +[Sets address for control channel]
-      --data/-d +[Sets address for data channel]
-      --worker-count/-w +[Sets total number of workers, including topology
-        initializer]
-      --worker-name/-n +[Sets name for this worker]
-      --metrics/-m [Sets address for external metrics (e.g. monitoring hub)]
-      --cluster-initializer/-t [Flag that sets this process as the
-        initializer]
-      --resilience-dir/-r [Sets directory to write resilience files to,
-        e.g. -r /tmp/data (no trailing slash)]
-      --ponythreads [Number of application threads. Used as part of a high-performance configuration.]
-      --ponypinasio [Used as part of a high-performance configuration.]
-      --ponynoblock [Used as part of a high-performance configuration.]
+```bash
+  --in/-i *[Comma-separated list of input addresses sources listen on]
+  --control/-c +[Sets address for initializer control channel; sets
+    control address to connect to for non-initializers]
+  --data/-d +[Sets address for initializer data channel]
+  --my-control [Optionally sets address for my data channel]
+  --my-data [Optionally sets address for my data channel]
+  --phone-home/-p [Sets address for phone home connection]
+  --external/-e [Sets address for external message channel]
+  --worker-count/-w +[Sets cluster initialier's total number of workers,
+    including cluster initializer itself]
+  --name/-n +[Sets name for this worker]
+
+  --metrics/-m [Sets address for external metrics (e.g. monitoring hub)]
+  --cluster-initializer/-t [Sets this process as the cluster
+    initializing process (that status is meaningless after init is done)]
+  --resilience-dir/-r [Sets directory to write resilience files to,
+    e.g. -r /tmp/data (no trailing slash)]
+  --log-rotation [Enables log rotation. Default: off]
+  --event-log-file-size/-l [Optionally set a file size for triggering
+    event log file rotation. If no file size is set, log rotation is only
+    triggered by external control messages sent to the address used with
+    --external]
+
+  --join/j [When a new worker is joining a running cluster, pass the
+    control channel address of any worker as the value for this
+    parameter]
+  --stop-world/u [Sets pause before state migration after the stop the
+    world]
 ```
 
 Wallaroo currently supports one input stream per pipeline. We provide comma-separated IP addresses for TCP source listeners via the `--in` parameter. Currently, the order of these addresses corresponds to the order in which pipelines are defined in your application code.
 
-Wallaroo currently supports one sink per app. Use the `--out` parameter to specify the address that this sink will write out to over TCP.
+Wallaroo currently supports one sink per application. If you are using a `TCPSInk`, use the `--out` parameter to specify the address (in a `host:port` format) that this sink will write out to over TCP. For other types of sinks, please refer to the specific sink's documentation.
 
-In order to monitor metrics, we must specify the target address for metrics data via the `--metrics` parameter.
+In order to monitor metrics, we must specify the target address for metrics data via the `--metrics/-m` parameter.
+
+## Machida specific parameters
+
+In addition to the Wallaroo command line paramters, Machida, the python-wallaroo interface, takes the additional argument
+
+```bash
+  --application-module [Specify the Machida application module]
+```
+
+`--application-module` specifies the _name_ that machida will attempt to import as the Python Wallaroo application file. For example, if you write a Python Wallaroo application and save it as `my_application.py`, then you should provide that name to machida as `--application-module my_application`.
 
 ### Multi-Worker Setup
 
@@ -36,34 +59,35 @@ A Wallaroo application can be distributed over multiple Wallaroo processes, or "
 
 We specify that a worker will play the role of initializer via the `--cluster-initializer` flag. We specify the total number of workers at startup (including the initializer) via the `--worker-count` parameter.
 
-Workers communicate with each other over two channels, a control channel and a data channel. We need to tell every worker which addresses the initializer is listening on for each of these channels. `--control` specifies the initializer's control address and `--data` specifies the initializer's data address.
+Workers communicate with each other over two channels: a control channel and a data channel. We need to tell every worker which addresses the initializer is listening on for each of these channels. `--control` specifies the initializer's control address and `--data` specifies the initializer's data address.
 
 Remember that multi-worker runs require that you distribute the same binary to all machines that are involved. Attempting to connect different binaries into a multi-worker cluster will fail.
 
 #### Example Single-Worker Run
 
-In order to run a single worker for a Wallaroo app, we need to specify the input address (`-i`), the target output address (`-o`), and the metrics target address (`-m`). For example, using the Celsius Converter application (after navigating to `examples/pony/celsius` and compiling) we would run:
+In order to run a single worker for a Wallaroo app, we need to specify the input address (`--in`), the target output address for the TCP sink (`--out`), and the metrics target address (`--metrics`). For example, using the Celsius Converter application (after navigating to `examples/pony/celsius` and compiling) we would run:
 
 ```bash
-./celsius -i 127.0.0.1:6000 -o 127.0.0.1:5555 -m 127.0.0.1:5001
+./celsius --in 127.0.0.1:6000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001
 ```
 
 #### Example Multi-Worker Run
 
-Sticking with our Celsius Converter app, here is an example of how you might run it over two workers. Beyond the parameters specified in the last section, we need to specify the control channel address (`-c`), data channel address (`-d`), number of workers (`-w`), and, for the initializer process, the fact that it is the cluster initializer (`-t` flag):
+Sticking with our Celsius Converter app, here is an example of how you might run it over two workers. Beyond the parameters specified in the last section, we need to specify the control channel address (`--control`), data channel address (`--data`), number of workers (`--worker-count`), and, for the initializer process, the fact that it is the cluster initializer (`--cluster-initializer` flag):
 
 *Worker 1*
 
 ```bash
-./celsius -i 127.0.0.1:6000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
--c 127.0.0.1:6500 -d 127.0.0.1:6501 -w 2 -t
+./celsius --in 127.0.0.1:6000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+--control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
+--clutser-initializer
 ```
 
 *Worker 2*
 
 ```bash
-./celsius -i 127.0.0.1:6000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
--c 127.0.0.1:6500 -n Worker2
+./celsius --in 127.0.0.1:6000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+--control 127.0.0.1:6500 --name Worker2
 ```
 
 These example commands assume that both workers are run on the same machine. To run each worker on a separate machine you must use the appropriate IP address or hostname for each worker.
@@ -72,7 +96,7 @@ NOTE: Currently, worker 1 is automatically assigned the name "initializer" no ma
 
 ### Resilience
 
-If resilience is turned on, you can optionally specify the target directory for resilience files via the `--resilience-dir/-r` parameter (default is `/tmp`).
+If resilience is turned on, you can optionally specify the target directory for resilience files via the `--resilience-dir/-r` parameter (default is `/tmp`), and whether or not log should be rotated (`--log-rotation`, off by default). If log rotation is enabled, you may also set the file size on which to trigger log rotation (per worker, in bytes). If no file size is set, log rotation will only happen if it is requested via an external control channel message sent to the address specified in the cluster intializer worker's `--external` parameter. If a file size _is_ set, log rotation may trigger if either the log file reaches the specified file size, or if a log rotation is requested for the worker via the external control channel.
 
 ## Performance Flags
 
