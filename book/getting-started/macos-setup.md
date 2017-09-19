@@ -100,7 +100,7 @@ Installing Docker will result in it running on your machine. After you reboot yo
 ## Install the Metrics UI
 
 ```bash
-docker pull sendence/wallaroo-metrics-ui:0.1
+docker pull wallaroolabs/wallaroo-metrics-ui:0.1
 ```
 
 ## Set up Environment for the Wallaroo Tutorial

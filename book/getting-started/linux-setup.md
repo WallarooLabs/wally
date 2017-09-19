@@ -192,7 +192,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Install the Metrics UI
 
 ```bash
-sudo docker pull sendence/wallaroo-metrics-ui:0.1
+sudo docker pull wallaroolabs/wallaroo-metrics-ui:0.1
 ```
 
 ## Set up Environment for the Wallaroo Tutorial

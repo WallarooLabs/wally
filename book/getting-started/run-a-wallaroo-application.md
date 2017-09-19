@@ -23,7 +23,7 @@ To start the Metrics UI run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  sendence/wallaroo-metrics-ui:0.1
+  wallaroolabs/wallaroo-metrics-ui:0.1
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
