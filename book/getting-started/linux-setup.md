@@ -121,7 +121,7 @@ Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`. Run
 
 ```bash
 cd ~/
-wget https://github.com/WallarooLabs/ponyc/archive/wallaroolabs-19.2.14.tar.gz
+wget https://github.com/ponylang/ponyc
 tar xzfv wallaroolabs-19.2.14.tar.gz
 cd ponyc-wallaroolabs-19.2.14
 sudo make config=release install
@@ -142,7 +142,7 @@ Next, you need to install `pony-stable`, a Pony dependency management library. N
 cd ~/
 git clone https://github.com/ponylang/pony-stable
 cd pony-stable
-git checkout 0054b429a54818d187100ed40f5525ec7931b31b
+git checkout 0.1.0
 make
 sudo make install
 ```

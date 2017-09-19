@@ -527,10 +527,8 @@ actor TCPSink is Consumer
     _pending_writev_total = 0
     _readable = false
     _writeable = false
-    ifdef linux then
-      @pony_asio_event_set_readable[None](_event, false)
-      @pony_asio_event_set_writeable[None](_event, false)
-    end
+    @pony_asio_event_set_readable[None](_event, false)
+    @pony_asio_event_set_writeable[None](_event, false)
 
     @pony_os_socket_close[None](_fd)
     _fd = -1
@@ -562,15 +560,11 @@ actor TCPSink is Consumer
         | 0 =>
           // Would block, try again later.
           _readable = false
-          ifdef linux then
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            @pony_asio_event_set_readable[None](_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
-          else
-            _readable = false
-          end
+          // this is safe because asio thread isn't currently subscribed
+          // for a read event so will not be writing to the readable flag
+          @pony_asio_event_set_readable[None](_event, false)
+          _readable = false
+          @pony_asio_event_resubscribe_read(_event)
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -797,12 +791,10 @@ actor TCPSink is Consumer
     if not _throttled then
       _throttled = true
       _writeable = false
-      ifdef linux then
-        // this is safe because asio thread isn't currently subscribed
-        // for a write event so will not be writing to the readable flag
-        @pony_asio_event_set_writeable[None](_event, false)
-        @pony_asio_event_resubscribe_write(_event)
-      end
+      // this is safe because asio thread isn't currently subscribed
+      // for a write event so will not be writing to the readable flag
+      @pony_asio_event_set_writeable[None](_event, false)
+      @pony_asio_event_resubscribe_write(_event)
       _notify.throttled(this)
       _maybe_mute_or_unmute_upstreams()
     end
