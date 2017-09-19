@@ -52,10 +52,6 @@ In addition to the Wallaroo command line paramters, Machida, the python-wallaroo
 ```
 
 `--application-module` specifies the _name_ that machida will attempt to import as the Python Wallaroo application file. For example, if you write a Python Wallaroo application and save it as `my_application.py`, then you should provide that name to machida as `--application-module my_application`.
-The application should be available to import from the location where `machida` is run. You can achieve this by:
-1. Having `machida` and `my_application.py` in the same directory
-2. Adding path to `my_application.py` to your ENV's `PYTHONPATH`
-3. Adding the current directory path (`.`) to your ENV's `PYTHONPATH` and executing the `machida` command from the directory where `my_application.py` is located.
 
 ### Multi-Worker Setup
 
