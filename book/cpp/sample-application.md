@@ -1,6 +1,6 @@
 # C++ Sample Application
 
-In order to understand how a Wallaroo application is created, it is useful to look at a sample application. The source code for the sample application can be found [`examples/cpp/alphabet-cpp`](https://github.com/WallarooLabs/wallaroo/tree/release-0.1.2/examples/cpp/alphabet-cpp).
+In order to understand how a Wallaroo application is created, it is useful to look at a sample application. The source code for the sample application can be found [`examples/cpp/alphabet-cpp`](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/cpp/alphabet-cpp).
 
 ## About The Application
 
