@@ -462,13 +462,13 @@ class ForwarderNotify is TCPConnectionNotify
     _name = name
 
   fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("%s outgoing connected\n".cstring(),
+    @printf[I32]("%s outgoing connected\n".cstring(),
       _name.cstring())
 
   fun ref throttled(sock: TCPConnection ref) =>
-    @printf[None]("%s outgoing throttled\n".cstring(),
+    @printf[I32]("%s outgoing throttled\n".cstring(),
       _name.cstring())
 
   fun ref unthrottled(sock: TCPConnection ref) =>
-    @printf[None]("%s outgoing no longer throttled\n".cstring(),
+    @printf[I32]("%s outgoing no longer throttled\n".cstring(),
       _name.cstring())
