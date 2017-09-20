@@ -172,7 +172,7 @@ actor Main
           let fs: Array[String] = recover f.split(",") end
           try
             for str in (consume fs).values() do
-              let path = FilePath(env.root as AmbientAuth, str)
+              let path = FilePath(env.root as AmbientAuth, str)?
               if not path.exists() then
                 @printf[I32](("Error opening file '" + str + "'.\n").cstring())
                 required_args_are_present = false
@@ -186,13 +186,13 @@ actor Main
           let to_host_addr = h_arg as Array[String]
 
           let store = Store(env.root as AmbientAuth)
-          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
+          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)?
 
           let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
           let to_host_socket = TCPConnection(tcp_auth,
             ToHostNotify(coordinator),
-            to_host_addr(0),
-            to_host_addr(1))
+            to_host_addr(0)?,
+            to_host_addr(1)?)
 
           let data_source =
             match f_arg
@@ -201,7 +201,7 @@ actor Main
               let paths: Array[FilePath] iso =
                 recover Array[FilePath] end
               for str in (consume fs).values() do
-                paths.push(FilePath(env.root as AmbientAuth, str))
+                paths.push(FilePath(env.root as AmbientAuth, str)?)
               end
               if binary_fmt then
                 if variable_size then
@@ -286,7 +286,7 @@ class ToDagonNotify is TCPConnectionNotify
   Bool =>
     for chunked in _framer.chunk(consume data).values() do
       try
-        let decoded = ExternalMsgDecoder(consume chunked)
+        let decoded = ExternalMsgDecoder(consume chunked)?
         match decoded
         | let m: ExternalStartMsg =>
             _coordinator.go()
@@ -317,8 +317,8 @@ primitive CoordinatorFactory
       let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
       let to_dagon_socket = TCPConnection(tcp_auth,
         ToDagonNotify(coordinator, env.err),
-        ph(0),
-        ph(1))
+        ph(0)?,
+        ph(1)?)
 
       coordinator
     else
@@ -535,7 +535,7 @@ actor SendingActor
       for i in Range(0, current_batch_size) do
         try
           if _binary_fmt then
-            let n = _data_source.next()
+            let n = _data_source.next()?
             if n.size() > 0 then
               d'.push(n)
               if _variable_size then
@@ -545,7 +545,7 @@ actor SendingActor
               _messages_sent = _messages_sent + 1
             end
           else
-            let n = _data_source.next()
+            let n = _data_source.next()?
             if n.size() > 0 then
               d'.push(n)
               _wb.u32_be(n.size().u32())
@@ -593,7 +593,7 @@ actor Store
 
   new create(auth: AmbientAuth) =>
     _sent_file = try
-      let f = File(FilePath(auth, "sent.txt"))
+      let f = File(FilePath(auth, "sent.txt")?)
       f.set_length(0)
       f
     else
@@ -620,9 +620,9 @@ class SentLogEncoder
 
     recover
       String(time.size() + ", ".size() + payload.size())
-      .append(time)
-      .append(", ")
-      .append(payload)
+      .>append(time)
+      .>append(", ")
+      .>append(payload)
     end
 
 //
@@ -666,7 +666,7 @@ class FileDataSource is Iterator[String]
 
   fun ref next(): String ? =>
     if has_next() then
-      _lines.next()
+      _lines.next()?
     else
       error
     end
@@ -682,7 +682,7 @@ class MultiFileDataSource is Iterator[String]
     _paths = paths
     _cur_source =
       try
-        FileDataSource(_paths(_idx))
+        FileDataSource(_paths(_idx)?)
       else
         None
       end
@@ -696,14 +696,14 @@ class MultiFileDataSource is Iterator[String]
       else
         _idx = _idx + 1
         try
-          _cur_source = FileDataSource(_paths(_idx))
+          _cur_source = FileDataSource(_paths(_idx)?)
           has_next()
         else
           if _should_repeat then
             _idx = 0
             _cur_source =
               try
-                FileDataSource(_paths(_idx))
+                FileDataSource(_paths(_idx)?)
               else
                 None
               end
@@ -721,7 +721,7 @@ class MultiFileDataSource is Iterator[String]
     if has_next() then
       match _cur_source
       | let f: FileDataSource =>
-        f.next()
+        f.next()?
       else
         error
       end
@@ -742,7 +742,7 @@ class MultiFileBinaryDataSource is Iterator[Array[U8 val] val]
     _msg_size = msg_size
     _cur_source =
       try
-        BinaryFileDataSource(_paths(_idx), _msg_size)
+        BinaryFileDataSource(_paths(_idx)?, _msg_size)
       else
         None
       end
@@ -756,14 +756,14 @@ class MultiFileBinaryDataSource is Iterator[Array[U8 val] val]
       else
         _idx = _idx + 1
         try
-          _cur_source = BinaryFileDataSource(_paths(_idx), _msg_size)
+          _cur_source = BinaryFileDataSource(_paths(_idx)?, _msg_size)
           has_next()
         else
           if _should_repeat then
             _idx = 0
             _cur_source =
               try
-                BinaryFileDataSource(_paths(_idx), _msg_size)
+                BinaryFileDataSource(_paths(_idx)?, _msg_size)
               else
                 None
               end
@@ -799,7 +799,7 @@ class MultiFileVariableBinaryDataSource is Iterator[Array[U8 val] val]
     _paths = paths
     _cur_source =
       try
-        VariableLengthBinaryFileDataSource(_paths(_idx))
+        VariableLengthBinaryFileDataSource(_paths(_idx)?)
       else
         None
       end
@@ -813,14 +813,14 @@ class MultiFileVariableBinaryDataSource is Iterator[Array[U8 val] val]
       else
         _idx = _idx + 1
         try
-          _cur_source = VariableLengthBinaryFileDataSource(_paths(_idx))
+          _cur_source = VariableLengthBinaryFileDataSource(_paths(_idx)?)
           has_next()
         else
           if _should_repeat then
             _idx = 0
             _cur_source =
               try
-                VariableLengthBinaryFileDataSource(_paths(_idx))
+                VariableLengthBinaryFileDataSource(_paths(_idx)?)
               else
                 None
               end
@@ -880,7 +880,7 @@ class VariableLengthBinaryFileDataSource is Iterator[Array[U8] val]
   fun ref next(): Array[U8] val =>
     let h = _file.read(4)
     try
-      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
+      let expect: USize = Bytes.to_u32(h(0)?, h(1)?, h(2)?, h(3)?).usize()
       _file.read(expect)
     else
       ifdef debug then
