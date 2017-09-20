@@ -52,6 +52,11 @@ Wallaroo applications are user hosted. It's equally at home "in the cloud" or "o
 
 We have no "as a service" offering at this time. 
 
+### Roadmap
+
+Interested in where we are taking Wallaroo? Check out our [roadmap][roadmap].
+
+
 ## Status
 
 ### Language bindings
@@ -207,6 +212,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
 [pony examples]: examples/pony
 [qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
+[roadmap]: ROADMAP.md
 [secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
 [status section]: #status
 [twitter]: https://www.twitter.com/wallaroolabs
