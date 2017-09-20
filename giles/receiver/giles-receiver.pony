@@ -120,7 +120,7 @@ actor Main
 
           let store = Store(env.root as AmbientAuth, e_arg)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg, e_arg,
-            use_metrics)
+            use_metrics)?
 
           SignalHandler(TermHandler(coordinator), Sig.term())
           SignalHandler(TermHandler(coordinator), Sig.int())
@@ -128,8 +128,8 @@ actor Main
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
             FromBuffyListenerNotify(coordinator, store, env.err, no_write),
-            listener_addr(0),
-            listener_addr(1))
+            listener_addr(0)?,
+            listener_addr(1)?)
 
         else
           error
@@ -190,7 +190,7 @@ class FromBuffyNotify is TCPConnectionNotify
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
         conn.expect(expect)
         _header = false
@@ -211,6 +211,8 @@ class FromBuffyNotify is TCPConnectionNotify
     conn.expect(4)
     _coordinator.connection_added(consume conn)
 
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    @printf[I32]("FromBuffyNotify: connection failed.\n".cstring())
 
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
@@ -233,7 +235,7 @@ class ToDagonNotify is TCPConnectionNotify
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
         conn.expect(expect)
         _header = false
       else
@@ -241,7 +243,7 @@ class ToDagonNotify is TCPConnectionNotify
       end
     else
       try
-        let decoded = ExternalMsgDecoder(consume data)
+        let decoded = ExternalMsgDecoder(consume data)?
         match decoded
         | let d: ExternalShutdownMsg =>
           _coordinator.finished()
@@ -278,8 +280,8 @@ primitive CoordinatorFactory
       let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
       let to_dagon_socket = TCPConnection(tcp_auth,
         ToDagonNotify(coordinator, env.err),
-        ph(0),
-        ph(1))
+        ph(0)?,
+        ph(1)?)
 
       coordinator
     else
@@ -455,7 +457,7 @@ actor Store
   new create(auth: AmbientAuth, expected: (USize | None)) =>
     _received_file =
       try
-        let f = File(FilePath(auth, "received.txt"))
+        let f = File(FilePath(auth, "received.txt")?)
         f.set_length(0)
         f
       else
