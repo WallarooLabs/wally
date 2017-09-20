@@ -16,52 +16,6 @@ If you do not already have Git installed, install it:
 sudo apt-get install git
 ```
 
-<!-- ## Install LLVM 3.9
-
-Visit [http://apt.llvm.org](http://apt.llvm.org) and select the correct apt mirror for you version of Ubuntu.
-
-### Xenial Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
-
-Open `/etc/apt/sources.list` and add the following lines to the end of
-the file:
-
-```
-deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main
-deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main
-```
-
-### Trusty Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
-
-Open `/etc/apt/sources.list` and add the following lines to the end of
-the file:
-
-```
-deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
-deb-src http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
-```
- -->
-<!-- ### Add the LLVM repo as a trusted source
-
-```bash
-cd ~/
-wget -O llvm-snapshot.gpg.key http://apt.llvm.org/llvm-snapshot.gpg.key
-sudo apt-key add llvm-snapshot.gpg.key
-```
-
-### Install
-
-```bash
-sudo apt-get update
-sudo apt-get install -y llvm-3.9
-```
-
-## Install Pony compiler dependencies
-
-```bash
-sudo apt-get install -y build-essential zlib1g-dev \
-  libncurses5-dev libssl-dev
-```
- -->
 ## Install make
 
 ```bash
@@ -108,29 +62,15 @@ sudo apt-get update
 sudo apt-get -V install ponyc
 ```
 
-You can check that the installation was successful by running:
-
-```bash
-cd ~/
-mkdir -p ponyc-example/helloworld
-touch ponyc-example/helloworld/helloworld.pony
-echo 'actor Main new create(env: Env) => env.out.print("Hello World\n")' \
-  > ponyc-example/helloworld/helloworld.pony
-ponyc ponyc-example/helloworld
-./helloworld
-```
-
 ## Installing pony-stable
 
 Next, you need to install `pony-stable`, a Pony dependency management library. Navigate to a directory where you will put the `pony-stable` repo and execute the following commands:
 
 ```bash
-cd ~/
-git clone https://github.com/ponylang/pony-stable
-cd pony-stable
-git checkout 0.1.0
-make
-sudo make install
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
+echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list
+sudo apt-get update
+sudo apt-get -V install pony-stable
 ```
 
 ## Install Compression Development Libraries
