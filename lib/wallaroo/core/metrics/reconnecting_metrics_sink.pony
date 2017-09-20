@@ -35,7 +35,7 @@ use "wallaroo_labs/hub"
 use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
+  flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
@@ -963,7 +963,7 @@ class MetricsSinkNotify is _MetricsSinkNotify
     _metrics_conn = metrics_conn
 
   fun ref connected(sock: MetricsSink ref) =>
-    @printf[None]("%s outgoing connected\n".cstring(),
+    @printf[I32]("%s outgoing connected\n".cstring(),
       _name.cstring())
 		let connect_msg = HubProtocol.connect()
 		let metrics_join_msg = HubProtocol.join_metrics(
@@ -990,11 +990,11 @@ class MetricsSinkNotify is _MetricsSinkNotify
       _name.cstring())
 
   fun ref throttled(sock: MetricsSink ref) =>
-    @printf[None]("%s outgoing throttled\n".cstring(),
+    @printf[I32]("%s outgoing throttled\n".cstring(),
       _name.cstring())
 
   fun ref unthrottled(sock: MetricsSink ref) =>
-    @printf[None]("%s outgoing no longer throttled\n".cstring(),
+    @printf[I32]("%s outgoing no longer throttled\n".cstring(),
       _name.cstring())
 
 class _PauseBeforeReconnect is TimerNotify

@@ -45,7 +45,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
+  flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
@@ -887,10 +887,10 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
     qty
 
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[None]("TCPSink is experiencing back pressure\n".cstring())
+    @printf[I32]("TCPSink is experiencing back pressure\n".cstring())
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[None](("TCPSink is no longer experiencing" +
+    @printf[I32](("TCPSink is no longer experiencing" +
       " back pressure\n").cstring())
 
 class PauseBeforeReconnectTCPSink is TimerNotify
