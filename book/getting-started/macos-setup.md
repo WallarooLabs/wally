@@ -57,7 +57,12 @@ brew install ponyc
 You can check that the installation was successful by running:
 
 ```bash
-ponyc examples/helloworld
+cd ~/
+mkdir -p ponyc-example/helloworld
+touch ponyc-example/helloworld/helloworld.pony
+echo 'actor Main new create(env: Env) => env.out.print("Hello World\n")' \
+  > ponyc-example/helloworld/helloworld.pony
+ponyc ponyc-example/helloworld
 ./helloworld
 ```
 
@@ -66,12 +71,8 @@ ponyc examples/helloworld
 Next, you need to install `pony-stable`, a Pony dependency management library:
 
 ```bash
-cd ~/
-git clone https://github.com/ponylang/pony-stable
-cd pony-stable
-git checkout 0.1.0
-make
-sudo make install
+brew update
+brew install pony-stable
 ```
 
 ## Install Compression Development Libraries
