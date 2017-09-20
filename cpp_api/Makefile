@@ -32,7 +32,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 
 # `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
 # (and by recursion every makefile in the tree that is referenced)
-$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
 # standard rules generation makefile
@@ -42,21 +42,21 @@ include $(rules_mk_path)
 CPPAPI_PATH = $(wallaroo_path)/cpp_api/cpp/cppapi
 CPPAPI_BUILD_PATH = $(CPPAPI_PATH)/build
 
-build-cpp_api: cpp_api_clean cpp_api_build
-unit-tests-cpp_api: build-cpp_api
-clean-cpp_api: cpp_api_clean
+#build-cpp_api: cpp_api_clean cpp_api_build
+#unit-tests-cpp_api: build-cpp_api
+#clean-cpp_api: cpp_api_clean
 
-cpp_api_build:
-	$(QUIET)mkdir -p $(CPPAPI_BUILD_PATH)
-	$(QUIET)cd $(CPPAPI_BUILD_PATH) && cmake -DCMAKE_INSTALL_PREFIX=/tmp/cpp_api ..
-	$(QUIET)cd $(CPPAPI_BUILD_PATH) && make
-	$(QUIET)cd $(CPPAPI_BUILD_PATH) && make install/local
+#cpp_api_build:
+#	$(QUIET)mkdir -p $(CPPAPI_BUILD_PATH)
+#	$(QUIET)cd $(CPPAPI_BUILD_PATH) && cmake -DCMAKE_INSTALL_PREFIX=/tmp/cpp_api ..
+#	$(QUIET)cd $(CPPAPI_BUILD_PATH) && make
+#	$(QUIET)cd $(CPPAPI_BUILD_PATH) && make install/local
 
-cpp_api_clean:
-	$(QUIET)rm -rf $(CPPAPI_BUILD_PATH)
+#cpp_api_clean:
+#	$(QUIET)rm -rf $(CPPAPI_BUILD_PATH)
 
-cpp_api_test:
-	$(QUIET)echo "cpp_api tests"
+# cpp_api_test:
+# 	$(QUIET)echo "cpp_api tests"
 
 # end of prevent rules from being evaluated/included multiple times
 endif
