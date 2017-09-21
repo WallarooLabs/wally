@@ -14,7 +14,7 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 
 ## What is Wallaroo?
 
-Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is essential. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
+Wallaroo is an ultrafast and scalable data processing engine that rapidly takes you from prototype to production by making the infrastructure virtually disappear. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is essential. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
 
 ### Features
 
