@@ -403,8 +403,9 @@ endef
 # rule to generate includes for makefiles in subdirs of first argument
 define make-goal
 $(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
+$(eval MAKEFILES := $(sort $(wildcard $(1:%/=%)/*/Makefile)))
 $(foreach mdir,$(MAKEDIRS),$(eval $(notdir $(mdir:%/=%)) := $(mdir)))
-$(foreach mdir,$(MAKEDIRS),$(eval include $($(notdir $(mdir:%/=%)))Makefile))
+$(eval include $(MAKEFILES))
 endef
 
 # rule to generate targets for building actual pony executable including dependencies to relevant *.pony files so incremental builds work properly
