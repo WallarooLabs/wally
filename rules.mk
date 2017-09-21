@@ -111,8 +111,8 @@ endef
 
 # how to get the latest ponyc tag
 latest_ponyc_tag_src = $(shell curl -s \
-  https://hub.docker.com/r/sendence/ponyc/tags/ | grep -o \
-  'sendence-[0-9.-]*-' | sed 's/sendence-\([0-9.-]*\)-/\1/' \
+  https://hub.docker.com/r/wallaroolabs/ponyc/tags/ | grep -o \
+  'wallaroolabs-[0-9.-]*-' | sed 's/wallaroolabs-\([0-9.-]*\)-/\1/' \
   | sort -un | tail -n 1)# latest ponyc tag
 
 # latest_ponyc_tag - a lazy init of latest_ponyc_tag (will only be evaluated if used)
@@ -134,8 +134,8 @@ docker_image_repo_host ?= docker.sendence.com:5043## Docker Repository to use
 docker_image_repo ?= $(docker_image_repo_host)/sendence## Docker Repository to use
 arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
-ponyc_tag ?= sendence-$(strip $(latest_ponyc_tag))-release## tag for ponyc docker to use
-ponyc_runner ?= sendence/ponyc## ponyc docker image to use
+ponyc_tag ?= wallaroolabs-$(strip $(latest_ponyc_tag))-release## tag for ponyc docker to use
+ponyc_runner ?= wallaroolabs/ponyc## ponyc docker image to use
 debug ?= false## Use ponyc debug option (-d)
 debug_arg :=# Final argument string for debug option
 docker_host ?= $(DOCKER_HOST)## docker host to build/run containers on

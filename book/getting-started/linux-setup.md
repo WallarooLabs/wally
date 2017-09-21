@@ -192,7 +192,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Install the Metrics UI
 
 ```bash
-sudo docker pull sendence/wallaroo-metrics-ui:0.1
+sudo docker pull wallaroolabs/wallaroo-metrics-ui:0.1
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -210,7 +210,7 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.1.1
+git checkout 0.1.2
 ```
 
 ## Installing Machida

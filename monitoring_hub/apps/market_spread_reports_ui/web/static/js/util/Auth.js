@@ -1,6 +1,6 @@
 function pretendRequest(email, pass, cb) {
 	setTimeout(() => {
-		if (email === 'user@sendence.com' && pass === 'sendence1') {
+		if (email === 'user@wallaroolabs.com' && pass === 'wallaroo') {
 			cb({
 				authenticated: true,
 				token: Math.random().toString(36).substring(7)

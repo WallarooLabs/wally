@@ -19,7 +19,7 @@ following compiler argument:
 This means the full command to compile with resilience will be:
 
 ```bash
-stable env ponyc -D resilience
+make PONYCFLAGS="-D resilience"
 ```
 
 When running a resilience-enabled Wallaroo app, you can optionally specify the 

@@ -20,7 +20,7 @@ Compile the `giles-receiver` binary:
 
 ```bash
 cd wallaroo/giles/receiver
-stable env ponyc
+make
 ```
 
 ## Command Line Arguments

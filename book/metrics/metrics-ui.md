@@ -21,14 +21,14 @@ NOTE: You might need to run with sudo depending on how you set up Docker.
 Once you have Docker setup, you can grab the Metrics UI image by running:
 
 ```
-docker pull sendence/wallaroo-metrics-ui:0.1
+docker pull wallaroolabs/wallaroo-metrics-ui:0.1
 ```
 
 To start the Metrics UI you will run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  sendence/wallaroo-metrics-ui:0.1
+  wallaroolabs/wallaroo-metrics-ui:0.1
 ```
 
 If you are running locally, open [http://localhost:4000](http://localhost:4000)
@@ -254,6 +254,10 @@ Above we can see the `Computation Detailed Metrics` page for our `Add 32` comput
 ![Computation on Worker Table](/book/metrics/images/computation-on-worker-table.png)
 
 The only table on our page is our `Computation on Worker` table, which in this case is titled `Add 32 on Worker`. This table lists all of the workers which contribute to our `Add 32` computation. Since we're only running a single worker for this application, we'll only see `Initializer` in this list. The stats reported in the Stats Overview Section for our `Computation Detailed Metrics` page are a direct aggregation of each element in the `Computations on Worker` table. Since we only have one worker we can note that the stats are exactly the same.
+
+## Limitations
+
+Currently, the Metrics UI throughput graphs do not continue to update if new metrics data has not been processed. Thus the graphs represent the last 5 minutes of processed data. This will be addressed in a future release.
 
 ## Conclusion
 

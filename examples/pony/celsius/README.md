@@ -15,21 +15,15 @@ See [Wallaroo Environment Setup Instructions](https://github.com/WallarooLabs/wa
 Build Celsius with
 
 ```bash
-stable env ponyc
+make
 ```
 
 ## Generating Data
 
-A data generator is bundled with the application. It needs to be built:
+A data generator is bundled with the application. Use it to generate a file with a fixed number of psuedo-random votes:
 
-```bash
+```
 cd data_gen
-stable env ponyc
-```
-
-Then you can generate a file with a fixed number of psuedo-random votes:
-
-```
 ./data_gen --message-count 10000
 ```
 

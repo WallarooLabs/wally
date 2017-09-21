@@ -47,7 +47,7 @@ primitive TCPSinkConfigCLIParser
     let opts = recover trn Array[TCPSinkConfigOptions] end
 
     for output in outputs.split(",").values() do
-      let o = outputs.split(":")
+      let o = output.split(":")
       opts.push(TCPSinkConfigOptions(o(0), o(1)))
     end
 

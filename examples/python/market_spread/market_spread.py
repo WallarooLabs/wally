@@ -108,7 +108,6 @@ class CheckOrder(object):
 
     def compute(self, data, state):
         if state.should_reject_trades:
-            print "rejecting"
             ts = int(time.time() * 100000)
             return (OrderResult(data, state.last_bid,
                                 state.last_offer, ts),
@@ -235,6 +234,4 @@ class UpdateMarketData(object):
         state.last_offer = data.offer
         state.should_reject_trades = should_reject_trades
 
-        if should_reject_trades:
-            print "Should reject trades"
         return (None, True)

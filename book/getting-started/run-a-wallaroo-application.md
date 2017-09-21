@@ -23,7 +23,7 @@ To start the Metrics UI run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  sendence/wallaroo-metrics-ui:0.1
+  wallaroolabs/wallaroo-metrics-ui:0.1
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -79,17 +79,6 @@ This tells the "Celsius to Fahrenheit" application that it should listen on port
 
 ## Terminal 4
 
-### Generating Data
-
-A data generator is bundled with the application. Use these commands to generate data:
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/examples/python/celsius/_test
-./data_gen.py 10000
-```
-
-This will create a `celsius.msg` file in your current working directory with 10,000 messages.
-
 ### Sending Data with Giles Sender
 
 We will be sending in 25,000,000 messages using the data file generated above. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
@@ -100,7 +89,7 @@ You will now be able to start the `sender` with the following command:
 cd ~/wallaroo-tutorial/wallaroo/giles/sender
 ./sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
   --repeat --no-write --msg-size 8 --ponythreads=1 --file \
-  ~/wallaroo-tutorial/wallaroo/examples/python/celsius/data_gen/celsius.msg
+  ~/wallaroo-tutorial/wallaroo/examples/python/celsius/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
@@ -131,11 +120,19 @@ You can then click into one of the elements within a category, to get to a detai
 
 Feel free to click around and get a feel for how the Metrics UI is setup and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
 
-## Shutting Down The Cluster
+## Shutdown
 
 You can shut down the cluster with this command once processing has finished:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
 ./cluster_shutdown 127.0.0.1:5050
+```
+
+You can shut down Giles Sender and Giles Receiver by pressing Ctrl-c from their respective shells.
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+docker stop mui
 ```
