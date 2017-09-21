@@ -20,7 +20,7 @@ EXS_TARGET := false
 DOCKER_TARGET := false
 
 # uncomment to disable generate recursing into Makefiles of subdirectories
-#RECURSE_SUBMAKEFILES := false
+RECURSE_SUBMAKEFILES := false
 
 # standard rules generation makefile
 include $(rules_mk_path)

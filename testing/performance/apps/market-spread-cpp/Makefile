@@ -38,21 +38,21 @@ WALLAROO_CPP_LIB = $(WALLAROO_CPP_INSTALL)/lib/WallarooCppApi
 WALLAROO_CPP_INCLUDE = $(WALLAROO_CPP_INSTALL)/include/
 
 
-build-testing-performance-apps-market-spread-cpp-all = build-cpp_api-all marketspread_cpp_clean marketspread_cpp_build
-test-testing-performance-apps-market-spread-cpp-all = build-testing-performance-apps-market-spread-cpp-all marketspread_cpp_test
-clean-testing-performance-apps-market-spread-cpp-all = clean-cpp_api-all marketspread_cpp_clean
+# build-testing-performance-apps-market-spread-cpp-all = build-cpp_api-all marketspread_cpp_clean marketspread_cpp_build
+# test-testing-performance-apps-market-spread-cpp-all = build-testing-performance-apps-market-spread-cpp-all marketspread_cpp_test
+# clean-testing-performance-apps-market-spread-cpp-all = clean-cpp_api-all marketspread_cpp_clean
 
-marketspread_cpp_build:
-	mkdir -p $(MSCPP_BUILD)
-	c++ --debug -c -o $(MSCPP_BUILD)/market-spread-cpp.o $(MSCPP_CPP)/market-spread-cpp.cpp -Wall -std=c++11 -I$(MSCPP_HPP) -I$(WALLAROO_CPP_INCLUDE)
-	ar rs $(MSCPP_BUILD)/libmarket-spread-cpp.a $(MSCPP_BUILD)/market-spread-cpp.o
-	ponyc $(PONY_LINKER) --debug --export --output=$(MSCPP_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(MSCPP_BUILD) $(MSCPP_PONY_SOURCE)
+# marketspread_cpp_build:
+# 	mkdir -p $(MSCPP_BUILD)
+# 	c++ --debug -c -o $(MSCPP_BUILD)/market-spread-cpp.o $(MSCPP_CPP)/market-spread-cpp.cpp -Wall -std=c++11 -I$(MSCPP_HPP) -I$(WALLAROO_CPP_INCLUDE)
+# 	ar rs $(MSCPP_BUILD)/libmarket-spread-cpp.a $(MSCPP_BUILD)/market-spread-cpp.o
+# 	ponyc $(PONY_LINKER) --debug --export --output=$(MSCPP_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(MSCPP_BUILD) $(MSCPP_PONY_SOURCE)
 
-marketspread_cpp_clean:
-	rm -rf $(MSCPP_BUILD)
+# marketspread_cpp_clean:
+# 	rm -rf $(MSCPP_BUILD)
 
-marketspread_cpp_test:
-	$(QUIET)echo "market-spread-cpp tests"
+# marketspread_cpp_test:
+# 	$(QUIET)echo "market-spread-cpp tests"
 
 # standard rules generation makefile
 include $(rules_mk_path)
