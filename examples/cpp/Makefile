@@ -32,7 +32,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 
 # `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
 # (and by recursion every makefile in the tree that is referenced)
-$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
 # standard rules generation makefile

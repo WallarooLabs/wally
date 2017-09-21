@@ -51,21 +51,21 @@ WALLAROO_CPP_LIB = $(WALLAROO_CPP_INSTALL)/lib/WallarooCppApi
 WALLAROO_CPP_INCLUDE = $(WALLAROO_CPP_INSTALL)/include/
 
 
-build-testing-performance-apps-market-spread-cpp-all = build-cpp_api-all marketspread_cpp_clean marketspread_cpp_build
-unit-tests-testing-performance-apps-market-spread-cpp-all = build-testing-performance-apps-market-spread-cpp-all marketspread_cpp_test
-clean-testing-performance-apps-market-spread-cpp-all = clean-cpp_api-all marketspread_cpp_clean
+# build-testing-performance-apps-market-spread-cpp-all = build-cpp_api-all marketspread_cpp_clean marketspread_cpp_build
+# unit-tests-testing-performance-apps-market-spread-cpp-all = build-testing-performance-apps-market-spread-cpp-all marketspread_cpp_test
+# clean-testing-performance-apps-market-spread-cpp-all = clean-cpp_api-all marketspread_cpp_clean
 
-marketspread_cpp_build:
-	$(QUIET)mkdir -p $(MSCPP_BUILD)
-	$(QUIET)c++ $(debug_arg) -c -o $(MSCPP_BUILD)/market-spread-cpp.o $(MSCPP_CPP)/market-spread-cpp.cpp -Wall -std=c++11 -I$(MSCPP_HPP) -I$(WALLAROO_CPP_INCLUDE)
-	$(QUIET)ar rs $(MSCPP_BUILD)/libmarket-spread-cpp.a $(MSCPP_BUILD)/market-spread-cpp.o
-	$(QUIET)ponyc $(PONY_LINKER) $(debug_arg) --export --output=$(MSCPP_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(MSCPP_BUILD) $(MSCPP_PONY_SOURCE)
+# marketspread_cpp_build:
+# 	$(QUIET)mkdir -p $(MSCPP_BUILD)
+# 	$(QUIET)c++ $(debug_arg) -c -o $(MSCPP_BUILD)/market-spread-cpp.o $(MSCPP_CPP)/market-spread-cpp.cpp -Wall -std=c++11 -I$(MSCPP_HPP) -I$(WALLAROO_CPP_INCLUDE)
+# 	$(QUIET)ar rs $(MSCPP_BUILD)/libmarket-spread-cpp.a $(MSCPP_BUILD)/market-spread-cpp.o
+# 	$(QUIET)ponyc $(PONY_LINKER) $(debug_arg) --export --output=$(MSCPP_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(MSCPP_BUILD) $(MSCPP_PONY_SOURCE)
 
-marketspread_cpp_clean:
-	$(QUIET)rm -rf $(MSCPP_BUILD)
+# marketspread_cpp_clean:
+# 	$(QUIET)rm -rf $(MSCPP_BUILD)
 
-marketspread_cpp_test:
-	$(QUIET)echo "market-spread-cpp tests"
+# marketspread_cpp_test:
+# 	$(QUIET)echo "market-spread-cpp tests"
 
 # standard rules generation makefile
 include $(rules_mk_path)
