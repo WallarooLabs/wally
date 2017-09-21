@@ -91,7 +91,7 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
         _PartitionFunctionGenerator(), _DefaultRouterGenerator())
     h.assert_eq[Bool](false, base_router == target_router)
 
-    base_router = base_router.update_route[String]("k1", new_proxy_router)
+    base_router = base_router.update_route[String]("k1", new_proxy_router)?
 
     h.assert_eq[Bool](true, base_router == target_router)
 

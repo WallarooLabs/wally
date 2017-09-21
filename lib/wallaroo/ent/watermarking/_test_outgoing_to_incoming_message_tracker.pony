@@ -170,8 +170,8 @@ class iso _TestProducerHighsBelow1 is UnitTest
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
     try
-      h.assert_eq[U64](SeqId(3), highs((o1, o1route)))
-      h.assert_eq[U64](SeqId(2), highs((o2, o2route)))
+      h.assert_eq[U64](SeqId(3), highs((o1, o1route))?)
+      h.assert_eq[U64](SeqId(2), highs((o2, o2route))?)
     else
       h.fail()
     end
@@ -203,7 +203,7 @@ class iso _TestProducerHighsBelow2 is UnitTest
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_false(highs.contains((o2, o2route)))
     try
-      h.assert_eq[U64](SeqId(1), highs((o1, o1route)))
+      h.assert_eq[U64](SeqId(1), highs((o1, o1route))?)
     else
       h.fail()
     end
@@ -234,7 +234,7 @@ class iso _TestProducerHighsBelowWithOneToManyPartiallyAcked is UnitTest
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_false(highs.contains((o2, o2route)))
     try
-      h.assert_eq[U64](SeqId(1), highs((o1, o1route)))
+      h.assert_eq[U64](SeqId(1), highs((o1, o1route))?)
     else
       h.fail()
     end
@@ -265,8 +265,8 @@ class iso _TestProducerHighsBelowWithOneToManyFullyAcked1 is UnitTest
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
     try
-      h.assert_eq[U64](SeqId(1), highs((o1, o1route)))
-      h.assert_eq[U64](SeqId(1), highs((o2, o2route)))
+      h.assert_eq[U64](SeqId(1), highs((o1, o1route))?)
+      h.assert_eq[U64](SeqId(1), highs((o2, o2route))?)
     else
       h.fail()
     end
@@ -298,8 +298,8 @@ class iso _TestProducerHighsBelowWithOneToManyFullyAcked2 is UnitTest
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
     try
-      h.assert_eq[U64](SeqId(3), highs((o1, o1route)))
-      h.assert_eq[U64](SeqId(2), highs((o2, o2route)))
+      h.assert_eq[U64](SeqId(3), highs((o1, o1route))?)
+      h.assert_eq[U64](SeqId(2), highs((o2, o2route))?)
     else
       h.fail()
     end
@@ -330,8 +330,8 @@ class iso _TestProducerHighsBelowWithOneToManyFullyAcked3 is UnitTest
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
     try
-      h.assert_eq[U64](SeqId(3), highs((o1, o1route)))
-      h.assert_eq[U64](SeqId(1), highs((o2, o2route)))
+      h.assert_eq[U64](SeqId(3), highs((o1, o1route))?)
+      h.assert_eq[U64](SeqId(1), highs((o2, o2route))?)
     else
       h.fail()
     end

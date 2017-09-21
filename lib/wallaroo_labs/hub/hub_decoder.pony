@@ -22,7 +22,7 @@ use "wallaroo/core/metrics"
 
 primitive HubProtocolDecoder
   fun apply(data: Array[U8 val] val): HubProtocolMsg ? =>
-    match _decode(data)
+    match _decode(data)?
     | (_Join(), let d: Array[U8 val] val) =>
       HubJoinMsg
     | (_Connect(), let d: Array[U8 val] val) =>
@@ -36,9 +36,9 @@ primitive HubProtocolDecoder
   fun _decode(data: Array[U8 val] val): (U8, Array[U8 val] val) ? =>
     let rb = Reader
     rb.append(data)
-    let msg_id = rb.u8()
+    let msg_id = rb.u8()?
     let data_len = data.size() - 1
-    let data' = rb.block(data_len)
+    let data' = rb.block(data_len)?
     (msg_id, consume data')
 
 primitive _Join    fun apply(): U8 => 1
@@ -57,15 +57,15 @@ primitive HubPayloadMsg is HubProtocolMsg
     try
       let rb = Reader
       rb.append(data)
-      let event_size = rb.u32_be().usize()
-      let event = String.from_array(rb.block(event_size))
-      let topic_size = rb.u32_be().usize()
-      let topic = String.from_array(rb.block(topic_size))
-      let data_size = rb.u32_be().usize()
-      let data' = rb.block(data_size)
+      let event_size = rb.u32_be()?.usize()
+      let event = String.from_array(rb.block(event_size)?)
+      let topic_size = rb.u32_be()?.usize()
+      let topic = String.from_array(rb.block(topic_size)?)
+      let data_size = rb.u32_be()?.usize()
+      let data' = rb.block(data_size)?
       match event
       | "metrics" =>
-        HubMetricsMsg(consume data')
+        HubMetricsMsg(consume data')?
       else
         @printf[I32]("event: %s\n".cstring(), event.cstring())
         HubOtherMsg
@@ -90,16 +90,16 @@ class val HubMetricsMsg is HubProtocolMsg
     try
       let rb = Reader
       rb.append(data)
-      let header_size = rb.u32_be().usize()
-      let name_size = rb.u32_be().usize()
-      name = String.from_array(rb.block(name_size))
-      let category_size = rb.u32_be().usize()
-      category = String.from_array(rb.block(category_size))
-      let worker_name_size = rb.u32_be().usize()
-      worker_name = String.from_array(rb.block(worker_name_size))
-      let pipeline_name_size = rb.u32_be().usize()
-      pipeline_name = String.from_array(rb.block(pipeline_name_size))
-      id = rb.u16_be()
+      let header_size = rb.u32_be()?.usize()
+      let name_size = rb.u32_be()?.usize()
+      name = String.from_array(rb.block(name_size)?)
+      let category_size = rb.u32_be()?.usize()
+      category = String.from_array(rb.block(category_size)?)
+      let worker_name_size = rb.u32_be()?.usize()
+      worker_name = String.from_array(rb.block(worker_name_size)?)
+      let pipeline_name_size = rb.u32_be()?.usize()
+      pipeline_name = String.from_array(rb.block(pipeline_name_size)?)
+      id = rb.u16_be()?
       match category
         | "start-to-end" =>
           name = pipeline_name + "@" + worker_name
@@ -110,13 +110,13 @@ class val HubMetricsMsg is HubProtocolMsg
             + ": " + id.string() + " - " + name
         end
       for i in Range[U64](0, 65) do
-        let bin = rb.u64_be()
+        let bin = rb.u64_be()?
         histogram.push(bin)
       end
-      histogram_min = rb.u64_be()
-      histogram_max = rb.u64_be()
-      period = rb.u64_be()
-      period_ends_at = rb.u64_be()
+      histogram_min = rb.u64_be()?
+      histogram_max = rb.u64_be()?
+      period = rb.u64_be()?
+      period_ends_at = rb.u64_be()?
     else
       error
     end

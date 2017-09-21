@@ -102,13 +102,13 @@ actor Startup
 
     try
       let auth = _env.root as AmbientAuth
-      _startup_options = WallarooConfig.wallaroo_args(_env.args)
+      _startup_options = WallarooConfig.wallaroo_args(_env.args)?
 
       (_ph_host, _ph_service) =
         match _startup_options.p_arg
         | let addr: Array[String] =>
           try
-            (addr(0), addr(1))
+            (addr(0)?, addr(1)?)
           else
             Fail()
             ("", "")
@@ -121,7 +121,7 @@ actor Startup
         match _startup_options.x_arg
         | let addr: Array[String] =>
           try
-            (addr(0), addr(1))
+            (addr(0)?, addr(1)?)
           else
             Fail()
             ("", "")
@@ -133,7 +133,7 @@ actor Startup
       @printf[I32](("||| Resilience directory: " +
         _startup_options.resilience_dir + "|||\n").cstring())
 
-      if not FilePath(auth, _startup_options.resilience_dir).exists() then
+      if not FilePath(auth, _startup_options.resilience_dir)?.exists() then
         @printf[I32](("Resilience directory: " +
           _startup_options.resilience_dir + " doesn't exist\n").cstring())
         error
@@ -174,10 +174,10 @@ actor Startup
           JoiningControlSenderConnectNotifier(auth,
             _startup_options.worker_name, this)
         let control_conn: TCPConnection =
-          TCPConnection(auth, consume control_notifier, j_addr(0), j_addr(1))
+          TCPConnection(auth, consume control_notifier, j_addr(0)?, j_addr(1)?)
         _disposables.set(control_conn)
         let cluster_join_msg =
-          ChannelMsgEncoder.join_cluster(_startup_options.worker_name, auth)
+          ChannelMsgEncoder.join_cluster(_startup_options.worker_name, auth)?
         control_conn.writev(cluster_join_msg)
         @printf[I32]("Attempting to join cluster...\n".cstring())
         // This only exists to keep joining worker alive while it waits for
@@ -208,8 +208,8 @@ actor Startup
 
       // TODO::joining
       let connect_auth = TCPConnectAuth(auth)
-      let metrics_conn = ReconnectingMetricsSink(m_addr(0),
-          m_addr(1), _application.name(), _startup_options.worker_name)
+      let metrics_conn = ReconnectingMetricsSink(m_addr(0)?,
+          m_addr(1)?, _application.name(), _startup_options.worker_name)
 
       var is_recovering: Bool = false
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
@@ -220,12 +220,12 @@ actor Startup
 
       let event_log_filepath = try
         let elf: FilePath = LastLogFilePath(_event_log_file_basename,
-          _event_log_file_suffix, event_log_dir_filepath)
+          _event_log_file_suffix, event_log_dir_filepath)?
         existing_files.set(elf.path)
         elf
       else
         let elf = FilePath(event_log_dir_filepath,
-          _event_log_file_basename + _event_log_file_suffix)
+          _event_log_file_basename + _event_log_file_suffix)?
         if elf.exists() then
           existing_files.set(elf.path)
         end
@@ -233,31 +233,31 @@ actor Startup
       end
 
       let local_topology_filepath: FilePath = FilePath(auth,
-        _local_topology_file)
+        _local_topology_file)?
       if local_topology_filepath.exists() then
         existing_files.set(local_topology_filepath.path)
       end
 
       let data_channel_filepath: FilePath = FilePath(auth,
-        _data_channel_file)
+        _data_channel_file)?
       if data_channel_filepath.exists() then
         existing_files.set(data_channel_filepath.path)
       end
 
       let control_channel_filepath: FilePath = FilePath(auth,
-        _control_channel_file)
+        _control_channel_file)?
       if control_channel_filepath.exists() then
         existing_files.set(control_channel_filepath.path)
       end
 
       let worker_names_filepath: FilePath = FilePath(auth,
-        _worker_names_file)
+        _worker_names_file)?
       if worker_names_filepath.exists() then
         existing_files.set(worker_names_filepath.path)
       end
 
       let connection_addresses_filepath: FilePath = FilePath(auth,
-        _connection_addresses_file)
+        _connection_addresses_file)?
       if connection_addresses_filepath.exists() then
         existing_files.set(connection_addresses_filepath.path)
       end
@@ -316,7 +316,7 @@ actor Startup
         _startup_options.c_host, _startup_options.c_service,
         _startup_options.d_host, _startup_options.d_service,
         _ph_host, _ph_service, _external_host, _external_service,
-        metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
+        metrics_conn, m_addr(0)?, m_addr(1)?, _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
@@ -429,16 +429,16 @@ actor Startup
       // initializer?
       (let c_host, let c_service) =
         if m.sender_name == "initializer" then
-          (info_sending_host, m.control_addrs("initializer")._2)
+          (info_sending_host, m.control_addrs("initializer")?._2)
         else
-          m.control_addrs("initializer")
+          m.control_addrs("initializer")?
         end
 
       (let d_host, let d_service) =
         if m.sender_name == "initializer" then
-          (info_sending_host, m.data_addrs("initializer")._2)
+          (info_sending_host, m.data_addrs("initializer")?._2)
         else
-          m.data_addrs("initializer")
+          m.data_addrs("initializer")?
         end
 
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
@@ -522,7 +522,7 @@ actor Startup
       end
 
       let control_channel_filepath: FilePath = FilePath(auth,
-        _control_channel_file)
+        _control_channel_file)?
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
@@ -555,7 +555,7 @@ actor Startup
 
   fun ref _set_recovery_file_names(auth: AmbientAuth) =>
     try
-      _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)
+      _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)?
     else
       Fail()
     end
@@ -585,10 +585,10 @@ actor Startup
 
     try
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
-      let base_dir = Directory(event_log_dir_filepath)
+      let base_dir = Directory(event_log_dir_filepath)?
 
       let event_log_filenames = FilterLogFiles(_event_log_file_basename,
-        _event_log_file_suffix, base_dir.entries())
+        _event_log_file_suffix, base_dir.entries()?)
       for fn in event_log_filenames.values() do
         _remove_file(event_log_dir_filepath.path + "/" + fn)
       end

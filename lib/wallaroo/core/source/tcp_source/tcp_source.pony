@@ -196,14 +196,14 @@ actor TCPSource is Producer
 
   be reconnect_boundary(target_worker_name: String) =>
     try
-      _outgoing_boundaries(target_worker_name).reconnect()
+      _outgoing_boundaries(target_worker_name)?.reconnect()
     else
       Fail()
     end
 
   be remove_route_for(step: Consumer) =>
     try
-      _routes.remove(step)
+      _routes.remove(step)?
     else
       Fail()
     end
@@ -249,7 +249,7 @@ actor TCPSource is Producer
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
-      _routes(c)
+      _routes(c)?
     else
       None
     end

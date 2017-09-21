@@ -51,13 +51,13 @@ class iso _TestFallorMsgEncoder is UnitTest
         end
       end
     end
-    let msgs = FallorMsgDecoder(consume bytes)
+    let msgs = FallorMsgDecoder(consume bytes)?
 
     h.assert_eq[USize](msgs.size(), 4)
-    h.assert_eq[String](msgs(0), "hi")
-    h.assert_eq[String](msgs(1), "there")
-    h.assert_eq[String](msgs(2), "man")
-    h.assert_eq[String](msgs(3), "!")
+    h.assert_eq[String](msgs(0)?, "hi")
+    h.assert_eq[String](msgs(1)?, "there")
+    h.assert_eq[String](msgs(2)?, "man")
+    h.assert_eq[String](msgs(3)?, "!")
 
 class iso _TestFallorTimestampRaw is UnitTest
   fun name(): String => "messages/_TestFallorTimestampRaw"
@@ -77,7 +77,7 @@ class iso _TestFallorTimestampRaw is UnitTest
     for seq in byteseqs.values() do
       encoded.append(seq)
     end
-    let tup = FallorMsgDecoder.with_timestamp(consume encoded)
+    let tup = FallorMsgDecoder.with_timestamp(consume encoded)?
     h.assert_eq[USize](tup.size(), 2)
-    h.assert_eq[String](tup(0), at.string())
-    h.assert_eq[String](tup(1), text)
+    h.assert_eq[String](tup(0)?, at.string())
+    h.assert_eq[String](tup(1)?, text)

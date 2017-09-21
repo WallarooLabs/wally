@@ -50,7 +50,7 @@ class iso _TestDropsConnectionWhenConnectingWhenSpiked is UnitTest
 
     let notify = ConnectingNotify(h, connection, connection_count)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("connecting")
     h.expect_action("closed")
@@ -69,7 +69,7 @@ class iso _TestDoesntDropConnectionWhenConnectingWhenNotSpiked is UnitTest
 
     let notify = ConnectingNotify(h, connection, connection_count)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-    margin'=0), consume notify) end
+    margin'=0)?, consume notify) end
 
     h.expect_action("connecting")
 
@@ -135,7 +135,7 @@ class iso _TestDropsConnectionWhenConnectedWhenSpiked is UnitTest
 
     let notify = ConnectedNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-    margin'=0), consume notify) end
+    margin'=0)?, consume notify) end
 
     h.expect_action("connected")
     h.expect_action("closed")
@@ -154,7 +154,7 @@ class iso _TestDoesntDropConnectionWhenConnectedWhenNotSpiked is UnitTest
 
     let notify = ConnectedNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-    margin'=0), consume notify) end
+    margin'=0)?, consume notify) end
 
     h.expect_action("connected")
 
@@ -214,7 +214,7 @@ class iso _TestDoesntDropConnectionWhenConnectFailedWhenSpiked is UnitTest
 
     let notify = ConnectFailedNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-    margin'=0), consume notify) end
+    margin'=0)?, consume notify) end
 
     h.expect_action("connect_failed")
 
@@ -231,7 +231,7 @@ class iso _TestDoesntDropConnectionWhenConnectFailedWhenNotSpiked is UnitTest
 
     let notify = ConnectFailedNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-    margin'=0), consume notify) end
+    margin'=0)?, consume notify) end
 
     h.expect_action("connect_failed")
 
@@ -291,7 +291,7 @@ class iso _TestDoesntDropConnectionWhenClosedWhenSpiked is UnitTest
 
     let notify = ClosedNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-    margin'=0), consume notify) end
+    margin'=0)?, consume notify) end
 
     h.expect_action("closed")
 
@@ -308,7 +308,7 @@ class iso _TestDoesntDropConnectionWhenClosedWhenNotSpiked is UnitTest
 
     let notify = ClosedNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("closed")
 
@@ -369,7 +369,7 @@ class iso _TestDropsConnectionWhenSentvWhenSpiked is UnitTest
 
     let notify = SentvNotify(h, connection, data)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("sentv")
     h.expect_action("closed")
@@ -388,7 +388,7 @@ class iso _TestDoesntDropConnectionWhenSentvWhenNotSpiked is UnitTest
 
     let notify = SentvNotify(h, connection, data)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("sentv")
 
@@ -456,7 +456,7 @@ class iso _TestDropsConnectionWhenReceivedWhenSpiked is UnitTest
 
     let notify = ReceivedNotify(h, connection, expected_data, times)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("received")
     h.expect_action("closed")
@@ -477,7 +477,7 @@ class iso _TestDoesntDropConnectionWhenReceivedWhenNotSpiked is UnitTest
 
     let notify = ReceivedNotify(h, connection, expected_data, times)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("received")
 
@@ -545,7 +545,7 @@ class iso _TestDoesntDropConnectionWhenExpectWhenSpiked is UnitTest
 
     let notify = ExpectNotify(h, connection, qty)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("expect")
 
@@ -563,7 +563,7 @@ class iso _TestDoesntDropConnectionWhenExpectWhenNotSpiked is UnitTest
 
     let notify = ExpectNotify(h, connection, qty)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("expect")
 
@@ -628,7 +628,7 @@ class iso _TestDoesntDropConnectionWhenThrottledWhenSpiked is UnitTest
 
     let notify = ThrottledNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("throttled")
 
@@ -645,7 +645,7 @@ class iso _TestDoesntDropConnectionWhenThrottledWhenNotSpiked is UnitTest
 
     let notify = ThrottledNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("throttled")
 
@@ -705,7 +705,7 @@ class iso _TestDoesntDropConnectionWhenUnthrottledWhenSpiked is UnitTest
 
     let notify = UnthrottledNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("unthrottled")
 
@@ -722,7 +722,7 @@ class iso _TestDoesntDropConnectionWhenUnthrottledWhenNotSpiked is UnitTest
 
     let notify = UnthrottledNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
-      margin'=0), consume notify) end
+      margin'=0)?, consume notify) end
 
     h.expect_action("unthrottled")
 
@@ -783,7 +783,7 @@ class iso _TestDropsConnectionWhenSpikedWithMargin is UnitTest
 
     let notify = ConnectedNotify(h, connection)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
-    margin'=3), consume notify) end
+    margin'=3)?, consume notify) end
     // if margin = 3, the 4th action should drop
     h.expect_action("connected")
     h.expect_action("connected")

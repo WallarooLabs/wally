@@ -194,7 +194,7 @@ actor TCPSink is Consumer
       @printf[I32]("Rcvd msg at TCPSink\n".cstring())
     end
     try
-      let encoded = _encoder.encode[D](data, _wb)
+      let encoded = _encoder.encode[D](data, _wb)?
 
       let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
       _writev(encoded, next_tracking_id)
@@ -640,7 +640,7 @@ actor TCPSink is Consumer
           num_to_send = writev_batch_size
           bytes_to_send = 0
           for d in Range[USize](1, num_to_send*2, 2) do
-            bytes_to_send = bytes_to_send + _pending_writev(d)
+            bytes_to_send = bytes_to_send + _pending_writev(d)?
           end
         end
 
@@ -653,17 +653,17 @@ actor TCPSink is Consumer
 
         if len < bytes_to_send then
           while len > 0 do
-            let iov_p = _pending_writev(0)
-            let iov_s = _pending_writev(1)
+            let iov_p = _pending_writev(0)?
+            let iov_s = _pending_writev(1)?
             if iov_s <= len then
               len = len - iov_s
-              _pending_writev.shift()
-              _pending_writev.shift()
-              _pending.shift()
+              _pending_writev.shift()?
+              _pending_writev.shift()?
+              _pending.shift()?
               _pending_writev_total = _pending_writev_total - iov_s
             else
-              _pending_writev.update(0, iov_p+len)
-              _pending_writev.update(1, iov_s-len)
+              _pending_writev.update(0, iov_p+len)?
+              _pending_writev.update(1, iov_s-len)?
               _pending_writev_total = _pending_writev_total - len
               len = 0
             end
@@ -681,9 +681,9 @@ actor TCPSink is Consumer
             return true
           else
            for d in Range[USize](0, num_to_send, 1) do
-             _pending_writev.shift()
-             _pending_writev.shift()
-             _pending.shift()
+             _pending_writev.shift()?
+             _pending_writev.shift()?
+             _pending.shift()?
            end
 
           end
@@ -716,12 +716,12 @@ actor TCPSink is Consumer
 
       try
         while bytes_sent > 0 do
-          let node = _pending_tracking.head()
-          (let bytes, let tracking_id) = node()
+          let node = _pending_tracking.head()?
+          (let bytes, let tracking_id) = node()?
           if bytes <= bytes_sent then
             num_sent = num_sent + 1
             bytes_sent = bytes_sent - bytes
-            _pending_tracking.shift()
+            _pending_tracking.shift()?
             match tracking_id
             | let id: SeqId =>
               tracked_sent = tracked_sent + 1
@@ -731,7 +731,7 @@ actor TCPSink is Consumer
             let bytes_remaining = bytes - bytes_sent
             bytes_sent = 0
             // update remaining for this message
-            node() = (bytes_remaining, tracking_id)
+            node()? = (bytes_remaining, tracking_id)
           end
         end
 

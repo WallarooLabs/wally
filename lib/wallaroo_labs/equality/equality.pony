@@ -24,7 +24,7 @@ primitive MapEquality[K: (Hashable #read & Equatable[K] #read),
     if m1.size() != m2.size() then return false end
     try
       for (k, v) in m1.pairs() do
-        if m2(k) != v then return false end
+        if m2(k)? != v then return false end
       end
       true
     else
@@ -37,7 +37,7 @@ primitive MapEquality2[K: (Hashable #read & Equatable[K] #read),
     if m1.size() != m2.size() then return false end
     try
       for (k, v) in m1.pairs() do
-        if not OrEq2[V1, V2](m2(k), v) then return false end
+        if not OrEq2[V1, V2](m2(k)?, v) then return false end
       end
       true
     else
@@ -52,7 +52,7 @@ primitive MapEquality3[K: (Hashable #read & Equatable[K] #read),
     if m1.size() != m2.size() then return false end
     try
       for (k, v) in m1.pairs() do
-        if not OrEq3[V1, V2, V3](m2(k), v) then return false end
+        if not OrEq3[V1, V2, V3](m2(k)?, v) then return false end
       end
       true
     else
@@ -64,7 +64,7 @@ primitive MapTagEquality[K: (Hashable #read & Equatable[K] #read), V: Any tag]
     if m1.size() != m2.size() then return false end
     try
       for (k, v) in m1.pairs() do
-        if m2(k) isnt v then return false end
+        if m2(k)? isnt v then return false end
       end
       true
     else
@@ -76,7 +76,7 @@ primitive ArrayEquality[V: Equatable[V] #read]
     if a1.size() != a2.size() then return false end
     try
       for idx in Range(0, a1.size()) do
-        if a1(idx) != a2(idx) then return false end
+        if a1(idx)? != a2(idx)? then return false end
       end
       true
     else

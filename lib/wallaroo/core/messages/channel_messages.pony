@@ -33,7 +33,7 @@ primitive ChannelMsgEncoder
     wb: Writer = Writer): Array[ByteSeq] val ?
   =>
     let serialised: Array[U8] val =
-      Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
+      Serialised(SerialiseAuth(auth), msg)?.output(OutputSerialisedAuth(auth))
     let size = serialised.size()
     if size > 0 then
       wb.u32_be(size.u32())
@@ -46,14 +46,14 @@ primitive ChannelMsgEncoder
     latest_ts: U64, metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
   =>
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, metric_name), auth, wb)
+      metrics_id, metric_name), auth, wb)?
 
   fun migrate_step[K: (Hashable val & Equatable[K] val)](step_id: StepId,
     state_name: String, key: K, state: ByteSeq val, worker: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(KeyedStepMigrationMsg[K](step_id, state_name, key, state, worker),
-      auth)
+      auth)?
 
   fun migration_batch_complete(sender: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -62,7 +62,7 @@ primitive ChannelMsgEncoder
     Sent to signal to joining worker that a batch of steps has finished
     emigrating from this step.
     """
-    _encode(MigrationBatchCompleteMsg(sender), auth)
+    _encode(MigrationBatchCompleteMsg(sender), auth)?
 
   fun ack_migration_batch_complete(worker: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -70,7 +70,7 @@ primitive ChannelMsgEncoder
     """
     Sent to ack that a batch of steps has finished immigrating to this step
     """
-    _encode(AckMigrationBatchCompleteMsg(worker), auth)
+    _encode(AckMigrationBatchCompleteMsg(worker), auth)?
 
   fun step_migration_complete(step_id: StepId,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -78,13 +78,13 @@ primitive ChannelMsgEncoder
     """
     Sent when the migration of step step_id is complete
     """
-    _encode(StepMigrationCompleteMsg(step_id), auth)
+    _encode(StepMigrationCompleteMsg(step_id), auth)?
 
   fun mute_request(originating_worker: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
-    _encode(MuteRequestMsg(originating_worker), auth)
+    _encode(MuteRequestMsg(originating_worker), auth)?
 
   fun unmute_request(originating_worker: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
-    _encode(UnmuteRequestMsg(originating_worker), auth)
+    _encode(UnmuteRequestMsg(originating_worker), auth)?
 
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, msg_data: D,
@@ -93,82 +93,82 @@ primitive ChannelMsgEncoder
     frac_ids: FractionalMessageId): Array[ByteSeq] val ?
   =>
     _encode(ForwardMsg[D](target_id, from_worker_name,
-      msg_data, metric_name, proxy_address, msg_uid, frac_ids), auth)
+      msg_data, metric_name, proxy_address, msg_uid, frac_ids), auth)?
 
   fun identify_control_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(IdentifyControlPortMsg(worker_name, service), auth)
+    _encode(IdentifyControlPortMsg(worker_name, service), auth)?
 
   fun identify_data_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(IdentifyDataPortMsg(worker_name, service), auth)
+    _encode(IdentifyDataPortMsg(worker_name, service), auth)?
 
   fun reconnect_data_port(worker_name: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ReconnectDataPortMsg(worker_name), auth)
+    _encode(ReconnectDataPortMsg(worker_name), auth)?
 
   fun spin_up_local_topology(local_topology: LocalTopology,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(SpinUpLocalTopologyMsg(local_topology), auth)
+    _encode(SpinUpLocalTopologyMsg(local_topology), auth)?
 
   fun spin_up_step(step_id: U64, step_builder: StepBuilder,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(SpinUpStepMsg(step_id, step_builder), auth)
+    _encode(SpinUpStepMsg(step_id, step_builder), auth)?
 
   fun topology_ready(worker_name: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(TopologyReadyMsg(worker_name), auth)
+    _encode(TopologyReadyMsg(worker_name), auth)?
 
   fun create_connections(
     c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(CreateConnectionsMsg(c_addrs, d_addrs), auth)
+    _encode(CreateConnectionsMsg(c_addrs, d_addrs), auth)?
 
   fun connections_ready(worker_name: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(ConnectionsReadyMsg(worker_name), auth)
+    _encode(ConnectionsReadyMsg(worker_name), auth)?
 
   fun create_data_channel_listener(workers: Array[String] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(CreateDataChannelListener(workers), auth)
+    _encode(CreateDataChannelListener(workers), auth)?
 
   fun data_connect(sender_name: String, sender_step_id: StepId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(DataConnectMsg(sender_name, sender_step_id), auth)
+    _encode(DataConnectMsg(sender_name, sender_step_id), auth)?
 
   fun ack_data_connect(last_id_seen: SeqId, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(AckDataConnectMsg(last_id_seen), auth)
+    _encode(AckDataConnectMsg(last_id_seen), auth)?
 
   fun start_normal_data_sending(auth: AmbientAuth): Array[ByteSeq] val ? =>
-    _encode(StartNormalDataSendingMsg, auth)
+    _encode(StartNormalDataSendingMsg, auth)?
 
   fun replay_complete(sender_name: String, boundary_id: U128,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ReplayCompleteMsg(sender_name, boundary_id), auth)
+    _encode(ReplayCompleteMsg(sender_name, boundary_id), auth)?
 
   fun ack_watermark(sender_name: String, sender_step_id: StepId, seq_id: SeqId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)
+    _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)?
 
   fun replay(delivery_bytes: Array[ByteSeq] val, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(ReplayMsg(delivery_bytes), auth)
+    _encode(ReplayMsg(delivery_bytes), auth)?
 
   fun join_cluster(worker_name: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -177,7 +177,7 @@ primitive ChannelMsgEncoder
     This message is sent from a worker requesting to join a running cluster to
     any existing worker in the cluster.
     """
-    _encode(JoinClusterMsg(worker_name), auth)
+    _encode(JoinClusterMsg(worker_name), auth)?
 
   // TODO: Update this once new workers become first class citizens
   fun inform_joining_worker(worker_name: String, metric_app_name: String,
@@ -192,22 +192,22 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
       metric_host, metric_service, control_addrs, data_addrs, worker_names),
-      auth)
+      auth)?
 
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
     d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)
+    _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)?
 
   fun request_boundary_count(sender: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(RequestBoundaryCountMsg(sender), auth)
+    _encode(RequestBoundaryCountMsg(sender), auth)?
 
   fun replay_boundary_count(sender: String, count: USize, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(ReplayBoundaryCountMsg(sender, count), auth)
+    _encode(ReplayBoundaryCountMsg(sender, count), auth)?
 
   fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: U128, worker_name: String, key: K, state_name: String,
@@ -219,20 +219,20 @@ primitive ChannelMsgEncoder
     updated.
     """
     _encode(KeyedAnnounceNewStatefulStepMsg[K](id, worker_name, key,
-      state_name), auth)
+      state_name), auth)?
 
   fun rotate_log_files(auth: AmbientAuth): Array[ByteSeq] val ? =>
-    _encode(RotateLogFilesMsg, auth)
+    _encode(RotateLogFilesMsg, auth)?
 
   fun clean_shutdown(auth: AmbientAuth, msg: String = ""): Array[ByteSeq] val ?
   =>
-    _encode(CleanShutdownMsg(msg), auth)
+    _encode(CleanShutdownMsg(msg), auth)?
 
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
       match Serialised.input(InputSerialisedAuth(auth), data)(
-        DeserialiseAuth(auth))
+        DeserialiseAuth(auth))?
       | let m: ChannelMsg =>
         m
       else

@@ -82,7 +82,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
 
   fun ref listening(listen: DataChannelListener ref) =>
     try
-      (_host, _service) = listen.local_address().name()
+      (_host, _service) = listen.local_address().name()?
       if _host == "::1" then _host = "127.0.0.1" end
 
       if not _is_initializer then
@@ -99,12 +99,12 @@ class DataChannelListenNotifier is DataChannelListenNotify
         //TODO: Do we actually need to do this? Isn't this sent as
         // part of joining worker initialized message?
         let message = ChannelMsgEncoder.identify_data_port(_name, _service,
-          _auth)
+          _auth)?
         _connections.send_control_to_cluster(message)
       else
         if not _recovery_file.exists() then
           let message = ChannelMsgEncoder.identify_data_port(_name, _service,
-            _auth)
+            _auth)?
           _connections.send_control_to_cluster(message)
         end
       end
@@ -181,7 +181,7 @@ class DataChannelConnectNotifier is DataChannelNotify
         @printf[I32]("Rcvd msg header on data channel\n".cstring())
       end
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
         conn.expect(expect)
         _header = false
@@ -240,7 +240,7 @@ class DataChannelConnectNotifier is DataChannelNotify
           @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
         end
         try
-          match r.data_msg(_auth)
+          match r.data_msg(_auth)?
           | let data_msg: DataMsg =>
             _metrics_reporter.step_metric(data_msg.metric_name,
               "Before replay receive on data channel (network time)",
