@@ -142,7 +142,7 @@ class Ring[A: Any val]
     """
     Get the value at i. 0 is the most recent, and `size()-1` is the least.
     """
-    _buf(_index(i))
+    _buf(_index(i)?)?
 
   fun size(): USize =>
     """
@@ -173,7 +173,7 @@ class Ring[A: Any val]
       if _buf.size() < _size then
         _buf.push(consume value)
       else
-        _buf.update(_count % _size, consume value)
+        _buf.update(_count % _size, consume value)?
       end
       _count = _count + 1
     end
@@ -217,7 +217,7 @@ class Ring[A: Any val]
       | let s': Stringable =>
         a.push(s'.string())
       else
-        a.push(f(v))
+        a.push(f(v)?)
       end
     end
     for x in Range[USize](0, _size - _buf.size()) do
@@ -259,7 +259,7 @@ class RingValues[A: Any val, B: Ring[A] #read] is Iterator[B->A]
     _i < _ring.size()
 
   fun ref next(): B->A ? =>
-    _ring(_i = _i + 1)
+    _ring(_i = _i + 1)?
 
   fun ref rewind(): RingValues[A, B] =>
     _i = 0
@@ -277,4 +277,4 @@ class RingPairs[A: Any val, B: Ring[A] #read] is Iterator[(USize, B->A)]
     _i < _ring.size()
 
   fun ref next(): (USize, B->A) ? =>
-    (_i, _ring(_i = _i + 1))
+    (_i, _ring(_i = _i + 1)?)

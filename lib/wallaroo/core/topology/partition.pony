@@ -69,7 +69,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
     match k
     | let key: Key =>
       try
-        _addresses(key)
+        _addresses(key)?
       else
         None
       end
@@ -121,7 +121,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
     match k
     | let key: Key =>
       try
-        _addresses(key)
+        _addresses(key)?
       else
         None
       end
@@ -217,7 +217,7 @@ class val KeyedStateSubpartition[PIn: Any val,
           partition_count = partition_count + 1
         else
           try
-            let boundary = outgoing_boundaries(pa.worker)
+            let boundary = outgoing_boundaries(pa.worker)?
 
             routes(key) = ProxyRouter(worker_name, boundary,
               pa, auth)
@@ -241,7 +241,7 @@ class val KeyedStateSubpartition[PIn: Any val,
   =>
     match k
     | let key: Key =>
-      match _partition_addresses.update_key[Key](key, pa)
+      match _partition_addresses.update_key[Key](key, pa)?
       | let kpa: KeyedPartitionAddresses[Key] val =>
         KeyedStateSubpartition[PIn, Key](kpa, _id_map, _runner_builder,
           _partition_function, _pipeline_name)
@@ -276,13 +276,13 @@ primitive PartitionFileReader
     let keys = recover trn Array[WeightedKey[String]] end
 
     try
-      let file = File(FilePath(auth, filename))
+      let file = File(FilePath(auth, filename)?)
       for line in file.lines() do
         let els = line.split(",")
         match els.size()
         | 0 => None
-        | 1 => keys.push((els(0), 1))
-        | 2 => keys.push((els(0), els(1).usize()))
+        | 1 => keys.push((els(0)?, 1))
+        | 2 => keys.push((els(0)?, els(1)?.usize()?))
         else
           error
         end

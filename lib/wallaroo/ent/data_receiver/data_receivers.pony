@@ -65,7 +65,7 @@ actor DataReceivers
     let boundary_id = BoundaryId(sender_name, sender_boundary_id)
     let dr =
       try
-        _data_receivers(boundary_id)
+        _data_receivers(boundary_id)?
       else
         let new_dr = DataReceiver(_auth, _worker_name, sender_name,
           _initialized)

@@ -195,7 +195,7 @@ actor Step is (Producer & Consumer)
       let old_router = _router
       _router = router
       for outdated_consumer in old_router.routes_not_in(_router).values() do
-        let outdated_route = _routes(outdated_consumer)
+        let outdated_route = _routes(outdated_consumer)?
         _acker_x.remove_route(outdated_route)
       end
       for consumer in _router.routes().values() do
@@ -215,7 +215,7 @@ actor Step is (Producer & Consumer)
       _omni_router = omni_router
       for outdated_consumer in old_router.routes_not_in(_omni_router).values()
       do
-        let outdated_route = _routes(outdated_consumer)
+        let outdated_route = _routes(outdated_consumer)?
         _acker_x.remove_route(outdated_route)
       end
     else
@@ -234,7 +234,7 @@ actor Step is (Producer & Consumer)
 
   be remove_route_for(step: Consumer) =>
     try
-      _routes.remove(step)
+      _routes.remove(step)?
     else
       @printf[I32](("Tried to remove route for step but there was no route " +
         "to remove\n").cstring())
@@ -383,7 +383,7 @@ actor Step is (Producer & Consumer)
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
-      _routes(c)
+      _routes(c)?
     else
       None
     end

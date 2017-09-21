@@ -53,11 +53,11 @@ actor Main
         Application("Weighted Test App")
           .new_pipeline[String, Result val]("Weighted Test",
             TCPSourceConfig[String].from_options(WeightedTestFrameHandler,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_state_partition[String, String, Result val, NormalState](UpdateState, NormalStateBuilder, "normal-state",
               symbol_data_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[Result val].from_options(ResultEncoder,
-              TCPSinkConfigCLIParser(env.args)(0)))
+              TCPSinkConfigCLIParser(env.args)?(0)?))?
       end
       Startup(env, application, None)//, 1)
     else
@@ -100,9 +100,9 @@ class NormalStateChange is StateChange[NormalState]
     out_writer.write(_last_string)
 
   fun ref read_log_entry(in_reader: Reader) ? =>
-    _count = in_reader.u64_be()
-    let last_string_size = in_reader.u32_be().usize()
-    _last_string = String.from_array(in_reader.block(last_string_size))
+    _count = in_reader.u64_be()?
+    let last_string_size = in_reader.u32_be()?.usize()
+    _last_string = String.from_array(in_reader.block(last_string_size)?)
 
 class NormalStateChangeBuilder is StateChangeBuilder[NormalState]
   fun apply(id: U64): StateChange[NormalState] =>
@@ -118,7 +118,7 @@ primitive UpdateState is StateComputation[String, Result val, NormalState]
     // @printf[I32]("!!Update Normal State\n".cstring())
     let state_change: NormalStateChange ref =
       try
-        sc_repo.lookup_by_name("NormalStateChange") as NormalStateChange
+        sc_repo.lookup_by_name("NormalStateChange")? as NormalStateChange
       else
         NormalStateChange(0, "NormalStateChange")
       end
@@ -144,7 +144,7 @@ primitive WeightedTestFrameHandler is FramedSourceHandler[String]
     4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
   fun decode(data: Array[U8] val): String ? =>
     let str = String.from_array(data)

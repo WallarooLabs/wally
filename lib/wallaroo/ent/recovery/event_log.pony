@@ -72,7 +72,7 @@ actor EventLog
             match _config.log_dir
             | let ld: FilePath =>
               RotatingFileBackend(ld, f, _config.suffix, this,
-                _config.backend_file_length)
+                _config.backend_file_length)?
             else
               Fail()
               DummyBackend(this)
@@ -80,9 +80,9 @@ actor EventLog
           else
             match _config.log_dir
             | let ld: FilePath =>
-              FileBackend(FilePath(ld, f), this)
+              FileBackend(FilePath(ld, f)?, this)
             | let ld: AmbientAuth =>
-              FileBackend(FilePath(ld, f), this)
+              FileBackend(FilePath(ld, f)?, this)
             else
               Fail()
               DummyBackend(this)
@@ -120,7 +120,7 @@ actor EventLog
     statechange_id: U64, payload: ByteSeq val)
   =>
     try
-      _producers(producer_id).replay_log_entry(uid, frac_ids,
+      _producers(producer_id)?.replay_log_entry(uid, frac_ids,
         statechange_id, payload)
     else
       @printf[I32](("FATAL: Unable to replay event log, because a replay " +
@@ -131,7 +131,7 @@ actor EventLog
   be initialize_seq_ids(seq_ids: Map[U128, SeqId] val) =>
     for (producer_id, seq_id) in seq_ids.pairs() do
       try
-        _producers(producer_id).initialize_seq_id_on_recovery(seq_id)
+        _producers(producer_id)?.initialize_seq_id_on_recovery(seq_id)
       else
         @printf[I32]("Could not initialize seq id. Producer does not exist\n"
           .cstring())
@@ -176,7 +176,7 @@ actor EventLog
       num_encoded = 0
 
       // write buffer to disk
-      _backend.write()
+      _backend.write()?
     else
       @printf[I32]("error writing log entries to disk!\n".cstring())
       Fail()
@@ -206,7 +206,7 @@ actor EventLog
       //   _backend.datasync()
       // end
 
-      _producers(producer_id).log_flushed(low_watermark)
+      _producers(producer_id)?.log_flushed(low_watermark)
     else
       @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
       Fail()
@@ -275,7 +275,7 @@ actor EventLog
   fun ref _rotate_file() =>
     try
       match _backend
-      | let b: RotatingFileBackend => b.rotate_file()
+      | let b: RotatingFileBackend => b.rotate_file()?
       else
         @printf[I32](("Unsupported operation requested on log Backend: " +
                       "'rotate_file'. Request ignored.\n").cstring())
@@ -288,8 +288,8 @@ actor EventLog
   fun ref rotation_complete() =>
     @printf[I32]("Steps snapshotting to new log file complete.\n".cstring())
     try
-      _backend.sync()
-      _backend.datasync()
+      _backend.sync()?
+      _backend.datasync()?
       _backend_bytes_after_snapshot = _backend.bytes_written()
     else
       Fail()

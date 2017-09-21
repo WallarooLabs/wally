@@ -162,7 +162,7 @@ class MetricsReporter
       name
     end
     let metrics = try
-      _step_metrics_map(metric_name)
+      _step_metrics_map(metric_name)?
     else
       let reporter =
         _MetricsReporter(_metrics_conn, _app_name, _worker_name, pipeline,
@@ -188,7 +188,7 @@ class MetricsReporter
     part of this metric.
     """
     let metrics = try
-        _pipeline_ingestion_map(source_name)
+        _pipeline_ingestion_map(source_name)?
       else
         let reporter =
           _MetricsReporter(_metrics_conn, _app_name, _worker_name, pipeline,
@@ -203,7 +203,7 @@ class MetricsReporter
 
   fun ref pipeline_metric(source_name: String val, time_spent: U64) =>
     let metrics = try
-        _pipeline_metrics_map(source_name)
+        _pipeline_metrics_map(source_name)?
       else
         let reporter =
           _MetricsReporter(_metrics_conn, _app_name, _worker_name, source_name,
@@ -218,7 +218,7 @@ class MetricsReporter
 
   fun ref worker_metric(pipeline_name: String val, time_spent: U64) =>
     let metrics = try
-        _worker_metrics_map(pipeline_name)
+        _worker_metrics_map(pipeline_name)?
       else
         let reporter =
           _MetricsReporter(_metrics_conn, _app_name, _worker_name, pipeline_name,

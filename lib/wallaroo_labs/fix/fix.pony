@@ -24,11 +24,11 @@ use "collections"
 primitive  FixParser
   fun apply(i: String): (FixMessage val | None) =>
     try
-      let raw = _parse(i)
-      if (raw("35") == "S") then
-        _nbbo(raw)
-      elseif (raw("35") == "D") then
-        _order(raw)
+      let raw = _parse(i)?
+      if (raw("35")? == "S") then
+        _nbbo(raw)?
+      elseif (raw("35")? == "D") then
+        _order(raw)?
       else
         OtherFixMessage
       end
@@ -39,44 +39,44 @@ primitive  FixParser
   fun _parse(i: String): Map[String, String] ? =>
     let out: Map[String, String] = Map[String, String]
     let split = i.split("\x01")
-      split.pop()
+      split.pop()?
     for part in (consume split).values() do
       let tuple = part.split("=")
-      out(tuple(0)) = tuple(1)
+      out(tuple(0)?) = tuple(1)?
     end
     out
 
   fun _nbbo(i: Map[String, String]): FixNbboMessage val  ? =>
-    let padded_symbol = pad_symbol(i("55"))
+    let padded_symbol = pad_symbol(i("55")?)
     let symbol = _with_max_length(padded_symbol, 4)
     FixNbboMessage(
       symbol
-      , i("60")
-      , i("132").f64()
-      , i("133").f64()
+      , i("60")?
+      , i("132")?.f64()
+      , i("133")?.f64()
       )
 
   fun _order(i: Map[String, String]): FixOrderMessage val ? =>
-    let side = match i("54")
+    let side = match i("54")?
       | "1" => Buy
       | "2" => Sell
     else
       error
     end
 
-    let account = i("1").substring(6).u32()
+    let account = i("1")?.substring(6).u32()?
 
-    let padded_symbol = pad_symbol(i("55"))
+    let padded_symbol = pad_symbol(i("55")?)
     let symbol = _with_max_length(padded_symbol, 4)
 
     FixOrderMessage(
       side
       , account
-      , i("11")
+      , i("11")?
       , symbol
-      , i("38").f64()
-      , i("44").f64()
-      , i("60")
+      , i("38")?.f64()
+      , i("44")?.f64()
+      , i("60")?
       )
 
   fun pad_symbol(symbol': String): String =>
@@ -136,10 +136,10 @@ class FixNbboMessage is (Equatable[FixNbboMessage] & Stringable)
 
   fun string(): String iso^ =>
     (_symbol.clone()
-      .append(_transact_time)
-      .append(_bid_px.string())
-      .append(_offer_px.string())
-      .append(_mid.string())).clone()
+      .>append(_transact_time)
+      .>append(_bid_px.string())
+      .>append(_offer_px.string())
+      .>append(_mid.string())).clone()
 
 class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
   let _side: Side val
@@ -186,13 +186,13 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
     and (_transact_time == o._transact_time)
 
   fun string(): String iso^ =>
-    (_side.string().clone().append(", ")
-      .append(_account.string()).append(", ")
-      .append(_order_id).append(", ")
-      .append(_symbol).append(", ")
-      .append(_order_qty.string()).append(", ")
-      .append(_price.string()).append(", ")
-      .append(_transact_time)).clone()
+    (_side.string().clone().>append(", ")
+      .>append(_account.string()).>append(", ")
+      .>append(_order_id).>append(", ")
+      .>append(_symbol).>append(", ")
+      .>append(_order_qty.string()).>append(", ")
+      .>append(_price.string()).>append(", ")
+      .>append(_transact_time)).clone()
 
 primitive OtherFixMessage
 

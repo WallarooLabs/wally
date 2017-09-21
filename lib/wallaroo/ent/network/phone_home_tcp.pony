@@ -35,7 +35,7 @@ class HomeConnectNotify is TCPConnectionNotify
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
         conn.expect(expect)
         _header = false
       else
@@ -43,7 +43,7 @@ class HomeConnectNotify is TCPConnectionNotify
       end
     else
       try
-        let external_msg = ExternalMsgDecoder(consume data)
+        let external_msg = ExternalMsgDecoder(consume data)?
         match external_msg
         | let m: ExternalShutdownMsg =>
           @printf[I32]("Received ExternalShutdownMsg\n".cstring())

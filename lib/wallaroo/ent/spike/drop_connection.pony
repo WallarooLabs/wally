@@ -33,7 +33,7 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
   fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
     ifdef "spiketrace" then
       try
-        _c.upsert("connecting", 1, {(x: USize=0, y: USize): USize => x+y})
+        _c.upsert("connecting", 1, {(x: USize=0, y: USize): USize => x+y})?
       end
     end
     spike(conn)
@@ -42,7 +42,7 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     ifdef "spiketrace" then
       try
-        _c.upsert("connected", 1, {(x: USize=0, y: USize): USize => x+y})
+        _c.upsert("connected", 1, {(x: USize=0, y: USize): USize => x+y})?
       end
     end
     spike(conn)
@@ -59,7 +59,7 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
   =>
     ifdef "spiketrace" then
       try
-        _c.upsert("sentv", 1, {(x: USize=0, y: USize): USize => x+y})
+        _c.upsert("sentv", 1, {(x: USize=0, y: USize): USize => x+y})?
       end
     end
     spike(conn)
@@ -70,7 +70,7 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
   =>
     ifdef "spiketrace" then
       try
-        _c.upsert("received", 1, {(x: USize=0, y: USize): USize => x+y})
+        _c.upsert("received", 1, {(x: USize=0, y: USize): USize => x+y})?
       end
     end
     spike(conn)
@@ -123,8 +123,8 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
         a.append(v.string())
         a.append(", ")
       end
-      a.pop()
-      a.pop()
+      a.pop()?
+      a.pop()?
       a.append("}\n")
       let s = String.from_array(consume a)
       @printf[I32](s.cstring())
