@@ -59,10 +59,10 @@ class StateChangeRepository[S: State ref]
     idx
 
   fun ref apply(index: U64): StateChange[S] ref ? =>
-    _state_changes(index.usize())
+    _state_changes(index.usize())?
 
   fun ref lookup_by_name(name: String): StateChange[S] ref ? =>
-    _state_changes(_named_lookup(name).usize())
+    _state_changes(_named_lookup(name)?.usize())?
 
   fun size() : USize =>
     _state_changes.size()

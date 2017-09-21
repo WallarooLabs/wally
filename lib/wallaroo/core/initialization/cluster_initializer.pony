@@ -120,7 +120,7 @@ actor ClusterInitializer
       for (worker, topology) in ts.pairs() do
         try
           let spin_up_msg = ChannelMsgEncoder.spin_up_local_topology(
-            topology, _auth)
+            topology, _auth)?
           _connections.send_control(worker, spin_up_msg)
         end
       end
@@ -178,7 +178,7 @@ actor ClusterInitializer
 
     try
       let create_data_channel_listener_msg =
-        ChannelMsgEncoder.create_data_channel_listener(workers, _auth)
+        ChannelMsgEncoder.create_data_channel_listener(workers, _auth)?
       for key in _control_addrs.keys() do
         _connections.send_control(key, create_data_channel_listener_msg)
       end
@@ -196,7 +196,7 @@ actor ClusterInitializer
     (let c_addrs, let d_addrs) = _generate_addresses_map()
     try
       let message = ChannelMsgEncoder.create_connections(c_addrs, d_addrs,
-        _auth)
+        _auth)?
       for key in _control_addrs.keys() do
         _connections.send_control(key, message)
       end

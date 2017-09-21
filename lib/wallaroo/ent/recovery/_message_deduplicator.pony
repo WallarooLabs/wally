@@ -46,7 +46,7 @@ primitive MessageDeduplicator
         var i = USize(0)
         while (i < x.size()) do
           try
-            if x(i) != y(i) then
+            if x(i)? != y(i)? then
               return false
             end
           else

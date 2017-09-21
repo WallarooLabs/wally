@@ -374,7 +374,7 @@ actor RouterRegistry
       .cstring())
     for target in _migration_target_ack_list.values() do
       try
-        _outgoing_boundaries(target).send_migration_batch_complete()
+        _outgoing_boundaries(target)?.send_migration_batch_complete()
       else
         Fail()
       end
@@ -466,8 +466,8 @@ actor RouterRegistry
     try
       @printf[I32]("Migrating steps for %s partition to %s\n".cstring(),
         state_name.cstring(), target_worker.cstring())
-      let boundary = _outgoing_boundaries(target_worker)
-      let partition_router = _partition_routers(state_name)
+      let boundary = _outgoing_boundaries(target_worker)?
+      let partition_router = _partition_routers(state_name)?
       partition_router.rebalance_steps(boundary, target_worker,
         _worker_count(), state_name, this)
     else
@@ -520,9 +520,9 @@ actor RouterRegistry
   =>
     try
       let proxy_router = ProxyRouter(_worker_name,
-        _outgoing_boundaries(proxy_address.worker), proxy_address, _auth)
+        _outgoing_boundaries(proxy_address.worker)?, proxy_address, _auth)
       let partition_router =
-        _partition_routers(state_name).update_route[K](key, proxy_router)
+        _partition_routers(state_name)?.update_route[K](key, proxy_router)?
       _partition_routers(state_name) = partition_router
       _distribute_partition_router(partition_router)
     else
@@ -531,7 +531,7 @@ actor RouterRegistry
 
   fun ref _remove_step_from_data_router(id: U128) =>
     try
-      let moving_step = _data_router.step_for_id(id)
+      let moving_step = _data_router.step_for_id(id)?
 
       let new_data_router = _data_router.remove_route(id)
       _data_router = new_data_router
@@ -584,7 +584,7 @@ actor RouterRegistry
           Fail()
         end
         let partition_router =
-          _partition_routers(state_name).update_route[K](key, step)
+          _partition_routers(state_name)?.update_route[K](key, step)?
         _distribute_partition_router(partition_router)
         // Add routes to state computation targets to state step
         match _pre_state_data
@@ -593,7 +593,7 @@ actor RouterRegistry
             if psd.state_name() == state_name then
               match psd.target_id()
               | let tid: U128 =>
-                let target_router = DirectRouter(_data_router.step_for_id(tid))
+                let target_router = DirectRouter(_data_router.step_for_id(tid)?)
                 step.register_routes(target_router,
                   psd.forward_route_builder())
               end
@@ -666,7 +666,7 @@ class _StringSet
     _map(s) = s
 
   fun ref unset(s: String) =>
-    try _map.remove(s) end
+    try _map.remove(s)? end
 
   fun size(): USize =>
     _map.size()

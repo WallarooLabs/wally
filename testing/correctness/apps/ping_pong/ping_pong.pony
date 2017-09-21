@@ -70,18 +70,18 @@ actor Main
             Application("Ping App")
               .new_pipeline[U8, U8]("Ping",
                 TCPSourceConfig[U8].from_options(PongDecoder,
-                  TCPSourceConfigCLIParser(env.args)(0)))
+                  TCPSourceConfigCLIParser(env.args)?(0)?))
                 .to[U8]({(): Pingify => Pingify})
                 .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
-                  TCPSinkConfigCLIParser(env.args)(0)))
+                  TCPSinkConfigCLIParser(env.args)?(0)?))?
           | Pong =>
             Application("Pong App")
               .new_pipeline[U8, U8]("Pong",
                 TCPSourceConfig[U8].from_options(PingDecoder,
-                  TCPSourceConfigCLIParser(env.args)(0)))
+                  TCPSourceConfigCLIParser(env.args)?(0)?))
                 .to[U8]({(): Pongify => Pongify})
                 .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
-                  TCPSinkConfigCLIParser(env.args)(0)))
+                  TCPSinkConfigCLIParser(env.args)?(0)?))?
           else
             @printf[I32]("Use --ping or --pong to start app.\n".cstring())
             error
@@ -118,20 +118,20 @@ primitive PingDecoder is FramedSourceHandler[U8]
     4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
   fun decode(data: Array[U8] val): U8 ? =>
-    if data(0) == 1 then 1 else error end
+    if data(0)? == 1 then 1 else error end
 
 primitive PongDecoder is FramedSourceHandler[U8]
   fun header_length(): USize =>
     4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
   fun decode(data: Array[U8] val): U8 ? =>
-    if data(0) == 0 then 0 else error end
+    if data(0)? == 0 then 0 else error end
 
 primitive PingPongEncoder
   fun apply(byte: U8, wb: Writer): Array[ByteSeq] val =>

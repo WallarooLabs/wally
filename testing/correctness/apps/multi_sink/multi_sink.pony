@@ -33,18 +33,18 @@ actor Main
         Application("Celsius Conversion App")
           .new_pipeline[F32, F32]("Celsius Conversion",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
             .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
-               TCPSinkConfigCLIParser(env.args)(0)))
+               TCPSinkConfigCLIParser(env.args)?(0)?))?
           .new_pipeline[F32, F32]("Celsius Conversion",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
             .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
-               TCPSinkConfigCLIParser(env.args)(0)))
+               TCPSinkConfigCLIParser(env.args)?(0)?))?
       end
       Startup(env, application, "celsius-conversion")
     else
@@ -71,7 +71,7 @@ primitive CelsiusDecoder is FramedSourceHandler[F32]
     4
 
   fun decode(data: Array[U8] val): F32 ? =>
-    Bytes.to_f32(data(0), data(1), data(2), data(3))
+    Bytes.to_f32(data(0)?, data(1)?, data(2)?, data(3)?)
 
 primitive FahrenheitEncoder
   fun apply(f: F32, wb: Writer): Array[ByteSeq] val =>

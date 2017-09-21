@@ -24,7 +24,7 @@ trait ref State
   fun write_log_entry(out_writer: Writer, auth: AmbientAuth) =>
     try
       let serialized =
-        Serialised(SerialiseAuth(auth), this).output(OutputSerialisedAuth(auth))
+        Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(auth))
       out_writer.write(serialized)
     else
       Fail()
@@ -32,9 +32,9 @@ trait ref State
 
   fun read_log_entry(in_reader: Reader, auth: AmbientAuth): State ? =>
     try
-      let data: Array[U8] iso = in_reader.block(in_reader.size())
+      let data: Array[U8] iso = in_reader.block(in_reader.size())?
       match Serialised.input(InputSerialisedAuth(auth), consume data)(
-        DeserialiseAuth(auth))
+        DeserialiseAuth(auth))?
       | let s: State => s
       else
         error

@@ -69,7 +69,7 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   fun ref listening(listen: TCPListener ref) =>
     try
-      (_host, _service) = listen.local_address().name()
+      (_host, _service) = listen.local_address().name()?
       if _host == "::1" then _host = "127.0.0.1" end
 
       if not _is_initializer then
@@ -82,7 +82,7 @@ class ControlChannelListenNotifier is TCPListenNotify
       end
 
       let message = ChannelMsgEncoder.identify_control_port(_name,
-        _service, _auth)
+        _service, _auth)?
       _connections.send_control_to_cluster(message)
 
       let f = File(_recovery_file)
@@ -152,7 +152,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
         conn.expect(expect)
         _header = false
       else
@@ -170,7 +170,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             .cstring())
         end
         try
-          (let host, _) = conn.remote_address().name()
+          (let host, _) = conn.remote_address().name()?
           match _initializer
           | let i: ClusterInitializer =>
             i.identify_control_address(m.worker_name, host, m.service)
@@ -184,7 +184,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             .cstring())
         end
         try
-          (let host, _) = conn.remote_address().name()
+          (let host, _) = conn.remote_address().name()?
           match _initializer
           | let i: ClusterInitializer =>
             i.identify_data_address(m.worker_name, host, m.service)
@@ -276,7 +276,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             "supported in autoscale mode\n").cstring())
           try
             let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth,
-              "Joining a cluster is only supported in autoscale mode.")
+              "Joining a cluster is only supported in autoscale mode.")?
             conn.writev(clean_shutdown_msg)
           else
             Fail()
@@ -288,7 +288,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _router_registry.step_migration_complete(m.step_id)
       | let m: JoiningWorkerInitializedMsg =>
         try
-          (let joining_host, _) = conn.remote_address().name()
+          (let joining_host, _) = conn.remote_address().name()?
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
             lti.add_new_worker(m.worker_name, joining_host, m.control_addr,
@@ -386,7 +386,7 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
         conn.expect(expect)
         _header = false
       else
@@ -400,7 +400,7 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
           // We need to get the host here because the sender didn't know
           // how its host string appears externally. We'll use it to
           // make sure we have the correct addresses in Connections
-          (let remote_host, _) = conn.remote_address().name()
+          (let remote_host, _) = conn.remote_address().name()?
           @printf[I32]("***Received cluster information!***\n".cstring())
           _startup.complete_join(remote_host, m)
         else

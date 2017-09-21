@@ -137,7 +137,7 @@ primitive KafkaSinkConfigCLIParser
       | ("kafka_sink_topic", let input: String) =>
         topic = input
       | ("kafka_sink_brokers", let input: String) =>
-        brokers = _brokers_from_input_string(input)
+        brokers = _brokers_from_input_string(input)?
       | ("kafka_sink_log_level", let input: String) =>
         log_level = input
       end
@@ -161,8 +161,8 @@ primitive KafkaSinkConfigCLIParser
 
     for input in inputs.split(",").values() do
       let i = input.split(":")
-      let host = i(0)
-      let port: I32 = try i(1).i32() else 9092 end
+      let host = i(0)?
+      let port: I32 = try i(1)?.i32()? else 9092 end
       brokers.push((host, port))
     end
 

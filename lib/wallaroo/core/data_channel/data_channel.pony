@@ -459,22 +459,22 @@ actor DataChannel
 
       if rem == 0 then
         // IOCP reported a failed write on this chunk. Non-graceful shutdown.
-        try _pending.shift() end
+        try _pending.shift()? end
         _hard_close()
         return
       end
 
       while rem > 0 do
         try
-          let node = _pending.head()
-          (let data, let offset) = node()
+          let node = _pending.head()?
+          (let data, let offset) = node()?
           let total = rem + offset
 
           if total < data.size() then
-            node() = (data, total)
+            node()? = (data, total)
             rem = 0
           else
-            _pending.shift()
+            _pending.shift()?
             rem = total - data.size()
           end
         end
@@ -513,7 +513,7 @@ actor DataChannel
             num_to_send = writev_batch_size
             bytes_to_send = 0
             for d in Range[USize](1, num_to_send*2, 2) do
-              bytes_to_send = bytes_to_send + _pending_writev(d)
+              bytes_to_send = bytes_to_send + _pending_writev(d)?
             end
           end
 
@@ -523,17 +523,17 @@ actor DataChannel
 
           if len < bytes_to_send then
             while len > 0 do
-              let iov_p = _pending_writev(0)
-              let iov_s = _pending_writev(1)
+              let iov_p = _pending_writev(0)?
+              let iov_s = _pending_writev(1)?
               if iov_s <= len then
                 len = len - iov_s
-                _pending_writev.shift()
-                _pending_writev.shift()
-                _pending.shift()
+                _pending_writev.shift()?
+                _pending_writev.shift()?
+                _pending.shift()?
                 _pending_writev_total = _pending_writev_total - iov_s
               else
-                _pending_writev.update(0, iov_p+len)
-                _pending_writev.update(1, iov_s-len)
+                _pending_writev.update(0, iov_p+len)?
+                _pending_writev.update(1, iov_s-len)?
                 _pending_writev_total = _pending_writev_total - len
                 len = 0
               end
@@ -548,9 +548,9 @@ actor DataChannel
               return true
             else
               for d in Range[USize](0, num_to_send, 1) do
-                _pending_writev.shift()
-                _pending_writev.shift()
-                _pending.shift()
+                _pending_writev.shift()?
+                _pending_writev.shift()?
+                _pending.shift()?
               end
             end
           end

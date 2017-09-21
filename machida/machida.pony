@@ -568,7 +568,7 @@ primitive Machida
 
         let source_config = recover val
           let sct = @PyTuple_GetItem(item, 2)
-          _SourceConfig.from_tuple(sct, env)
+          _SourceConfig.from_tuple(sct, env)?
         end
 
         latest = (latest as Application).new_pipeline[PyData val, PyData val](
@@ -671,12 +671,12 @@ primitive Machida
       | "to_sink" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_sink(
-          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env))
+          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env)?)?
         sink_idx = sink_idx + 1
         latest
       | "done" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.done()
+        latest = pb.done()?
         latest
       end
     end
@@ -915,12 +915,12 @@ primitive _SourceConfig
       let decoder = recover val
         let d = @PyTuple_GetItem(source_config_tuple, 3)
         Machida.inc_ref(d)
-        PyFramedSourceHandler(d)
+        PyFramedSourceHandler(d)?
       end
 
       TCPSourceConfig[PyData val](decoder, host, port)
     | "kafka" =>
-      let conf = _kafka_config(source_config_tuple, env.out)
+      let conf = _kafka_config(source_config_tuple, env.out)?
 
       let decoder = recover val
         let d = @PyTuple_GetItem(source_config_tuple, 4)
@@ -948,7 +948,7 @@ primitive _SourceConfig
         let broker = @PyList_GetItem(brokers_list, i)
         let host = recover val String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 0))) end
         let port = try
-          String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 1))).i32()
+          String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 1))).i32()?
         else
           9092
         end
@@ -997,7 +997,7 @@ primitive _SinkConfig
 
       TCPSinkConfig[PyData val](encoder, host, port)
     | "kafka" =>
-      let conf = _kafka_config(sink_config_tuple, env.out)
+      let conf = _kafka_config(sink_config_tuple, env.out)?
 
       let encoderp = @PyTuple_GetItem(sink_config_tuple, 6)
       Machida.inc_ref(encoderp)
@@ -1025,7 +1025,7 @@ primitive _SinkConfig
         let broker = @PyList_GetItem(brokers_list, i)
         let host = recover val String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 0))) end
         let port = try
-          String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 1))).i32()
+          String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(broker, 1))).i32()?
         else
           9092
         end

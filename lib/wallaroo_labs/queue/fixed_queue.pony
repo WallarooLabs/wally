@@ -65,7 +65,7 @@ class FixedQueue[A]
     raising an error if the index is out of bounds.
     """
     if i < _size then
-      _data((i + _front_ptr) and _mod)
+      _data((i + _front_ptr) and _mod)?
     else
       error
     end
@@ -82,14 +82,14 @@ class FixedQueue[A]
       _data.push(consume a)
       _back_ptr = (_back_ptr + 1) and _mod
     else
-      _data(_back_ptr) = consume a
+      _data(_back_ptr)? = consume a
       _back_ptr = (_back_ptr + 1) and _mod
     end
     _size = _size + 1
 
   fun ref dequeue(): A! ? =>
     if _size > 0 then
-      let a = _data(_front_ptr)
+      let a = _data(_front_ptr)?
       _front_ptr = (_front_ptr + 1) and _mod
       _size = _size - 1
       a
@@ -99,7 +99,7 @@ class FixedQueue[A]
 
   fun peek(): this->A ? =>
     if _size > 0 then
-      _data(_front_ptr)
+      _data(_front_ptr)?
     else
       error
     end
@@ -129,15 +129,15 @@ class FixedQueue[A]
     try
       if _front_ptr < _back_ptr then
         for i in Range(_front_ptr, _back_ptr) do
-          if pred(_data(i), a) then return true end
+          if pred(_data(i)?, a) then return true end
         end
         return false
       else
         for i in Range(_front_ptr, _data.size()) do
-          if pred(_data(i), a) then return true end
+          if pred(_data(i)?, a) then return true end
         end
         for i in Range(0, _back_ptr) do
-          if pred(_data(i), a) then return true end
+          if pred(_data(i)?, a) then return true end
         end
         return false
       end

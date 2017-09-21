@@ -40,7 +40,7 @@ class ExternalChannelListenNotifier is TCPListenNotify
 
   fun ref listening(listen: TCPListener ref) =>
     try
-      (_host, _service) = listen.local_address().name()
+      (_host, _service) = listen.local_address().name()?
       if _host == "::1" then _host = "127.0.0.1" end
 
       @printf[I32]("%s external: listening on %s:%s\n".cstring(),
@@ -83,7 +83,7 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
         conn.expect(expect)
         _header = false
       else
@@ -94,7 +94,7 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Received msg on External Channel\n".cstring())
       end
       try
-        let msg = ExternalMsgDecoder(consume data)
+        let msg = ExternalMsgDecoder(consume data)?
         match msg
         | let m: ExternalPrintMsg =>
           ifdef "trace" then
@@ -117,7 +117,7 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
             @printf[I32]("External Clean Shutdown received.\n".cstring())
           end
           try
-            let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)
+            let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)?
             _connections.send_control_to_cluster(clean_shutdown_msg)
             _recovery_file_cleaner.clean_recovery_files()
           else

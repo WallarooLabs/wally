@@ -175,7 +175,7 @@ class val ProxyRouter is Equatable[ProxyRouter]
     ProxyRouter
   =>
     try
-      let new_target = ob(_target_proxy_address.worker)
+      let new_target = ob(_target_proxy_address.worker)?
       if new_target isnt _target then
         ProxyRouter(_worker_name, new_target, _target_proxy_address, _auth)
       else
@@ -271,7 +271,7 @@ class val StepIdRouter is OmniRouter
 
     if _data_routes.contains(target_id) then
       try
-        let target = _data_routes(target_id)
+        let target = _data_routes(target_id)?
 
         let might_be_route = producer.route_to(target)
         match might_be_route
@@ -296,11 +296,11 @@ class val StepIdRouter is OmniRouter
     else
       // This target_id step exists on another worker
       try
-        match _step_map(target_id)
+        match _step_map(target_id)?
         | let pa: ProxyAddress =>
           try
             // Try as though we have a reference to the right boundary
-            let boundary = _outgoing_boundaries(pa.worker)
+            let boundary = _outgoing_boundaries(pa.worker)?
             let might_be_route = producer.route_to(boundary)
             match might_be_route
             | let r: Route =>
@@ -458,7 +458,7 @@ class val DataRouter is Equatable[DataRouter]
     _route_ids_to_target_ids = route_ids_to_target_ids
 
   fun step_for_id(id: U128): Consumer ? =>
-    _data_routes(id)
+    _data_routes(id)?
 
   fun route(d_msg: DeliveryMsg, pipeline_time_spent: U64,
     producer: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
@@ -469,12 +469,12 @@ class val DataRouter is Equatable[DataRouter]
     end
     let target_id = d_msg.target_id()
     try
-      let target = _data_routes(target_id)
+      let target = _data_routes(target_id)?
       ifdef "trace" then
         @printf[I32]("DataRouter found Step\n".cstring())
       end
       try
-        let route_id = _target_ids_to_route_ids(target_id)
+        let route_id = _target_ids_to_route_ids(target_id)?
         d_msg.deliver(pipeline_time_spent, target, producer, seq_id, route_id,
           latest_ts, metrics_id, worker_ingress_ts)
         ifdef "resilience" then
@@ -495,9 +495,9 @@ class val DataRouter is Equatable[DataRouter]
   =>
     try
       let target_id = r_msg.target_id()
-      let route_id = _target_ids_to_route_ids(target_id)
+      let route_id = _target_ids_to_route_ids(target_id)?
       //TODO: create and deliver envelope
-      r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id),
+      r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id)?,
         producer, seq_id, route_id, latest_ts, metrics_id, worker_ingress_ts)
       ifdef "resilience" then
         producer.bookkeeping(route_id, seq_id)
@@ -524,8 +524,8 @@ class val DataRouter is Equatable[DataRouter]
   fun request_ack(r_ids: Array[RouteId]) =>
     try
       for r_id in r_ids.values() do
-        let t_id = _route_ids_to_target_ids(r_id)
-        _data_routes(t_id).request_ack()
+        let t_id = _route_ids_to_target_ids(r_id)?
+        _data_routes(t_id)?.request_ack()
       end
     else
       Fail()
@@ -599,7 +599,7 @@ class val DataRouter is Equatable[DataRouter]
 
   fun migrate_state(target_id: U128, s: ByteSeq val) =>
     try
-      let target = _data_routes(target_id)
+      let target = _data_routes(target_id)?
       target.receive_state(s)
     else
       Fail()
@@ -651,7 +651,7 @@ class val LocalPartitionRouter[In: Any val,
     match k
     | let key: Key =>
       try
-        match _partition_routes(key)
+        match _partition_routes(key)?
         | let s: Step => s.send_state[Key](boundary, state_name, key)
         else
           Fail()
@@ -678,7 +678,7 @@ class val LocalPartitionRouter[In: Any val,
       | let input: In =>
         let key = _partition_function(input)
         try
-          match _partition_routes(key)
+          match _partition_routes(key)?
           | let s: Step =>
             let might_be_route = producer.route_to(s)
             match might_be_route
@@ -788,7 +788,7 @@ class val LocalPartitionRouter[In: Any val,
     // efficient
     match raw_k
     | let key: Key =>
-      let target_id = _step_ids(key)
+      let target_id = _step_ids(key)?
       let new_local_map = recover trn Map[U128, Step] end
       let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
       match target
@@ -853,7 +853,7 @@ class val LocalPartitionRouter[In: Any val,
           if left_to_send == 0 then break end
           match target
           | let s: Step =>
-            let step_id = _step_ids(key)
+            let step_id = _step_ids(key)?
             steps_to_migrate.push((key, step_id, s))
             left_to_send = left_to_send - 1
           end
@@ -902,9 +902,9 @@ class val LocalPartitionRouter[In: Any val,
       for (k, v) in _partition_routes.pairs() do
         match v
         | let s: Step =>
-          if opr(k) isnt v then return false end
+          if opr(k)? isnt v then return false end
         | let pr: ProxyRouter =>
-          match opr(k)
+          match opr(k)?
           | let pr2: ProxyRouter =>
             pr == pr2
           else
@@ -955,7 +955,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     let stateless_partition_id = producer.current_sequence_id() % size().u64()
 
     try
-      match _partition_routes(stateless_partition_id)
+      match _partition_routes(stateless_partition_id)?
       | let s: Step =>
         let might_be_route = producer.route_to(s)
         match might_be_route
@@ -1025,7 +1025,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
   =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
-    let target_id = _step_ids(partition_id)
+    let target_id = _step_ids(partition_id)?
     let new_partition_routes = recover trn Map[U64, (Step | ProxyRouter)] end
     match target
     | let step: Step =>
@@ -1085,9 +1085,9 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       for (p_id, v) in _partition_routes.pairs() do
         match v
         | let s: Step =>
-          if opr(p_id) isnt v then return false end
+          if opr(p_id)? isnt v then return false end
         | let pr: ProxyRouter =>
-          match opr(p_id)
+          match opr(p_id)?
           | let pr2: ProxyRouter =>
             pr == pr2
           else

@@ -103,7 +103,7 @@ class _TestDataChannel is DataChannelListenNotify
     try
       let auth = _h.env.root as AmbientAuth
       let notify = (_client_conn_notify = None) as DataChannelNotify iso^
-      (let host, let port) = listen.local_address().name()
+      (let host, let port) = listen.local_address().name()?
       _h.dispose_when_done(DataChannel(auth, consume notify, host, port))
       _h.complete_action("client create")
     else
