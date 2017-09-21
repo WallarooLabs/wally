@@ -520,12 +520,8 @@ endef
 
 # rule to generate targets for *-all for devs to use
 define subdir-goal
-$(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
 $(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $1)),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all))
 
-$(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(eval build-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval test-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval clean-$(MY_TARGET_SUFFIX:%-all=%):)
@@ -533,14 +529,22 @@ $(eval build-$(MY_TARGET_SUFFIX): build-$(MY_TARGET_SUFFIX:%-all=%) $(build-$(MY
 $(eval test-$(MY_TARGET_SUFFIX): test-$(MY_TARGET_SUFFIX:%-all=%) $(test-$(MY_TARGET_SUFFIX)))
 $(eval clean-$(MY_TARGET_SUFFIX): clean-$(MY_TARGET_SUFFIX:%-all=%) $(clean-$(MY_TARGET_SUFFIX)))
 
-$(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(eval build-docker-$(MY_TARGET_SUFFIX): $(build-docker-$(MY_TARGET_SUFFIX)))
 $(eval push-docker-$(MY_TARGET_SUFFIX): $(push-docker-$(MY_TARGET_SUFFIX)))
 
 .PHONY: build-$(MY_TARGET_SUFFIX) test-$(MY_TARGET_SUFFIX) clean-$(MY_TARGET_SUFFIX) build-docker-$(MY_TARGET_SUFFIX) push-docker-$(MY_TARGET_SUFFIX)
 endef
 
+# rule to generate targets for *-all for devs to use
+define subdir-recurse-goal
+$(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
+$(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $1)),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+endef
 
 ROOT_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $(ROOT_PATH))),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(ROOT_PATH))))-all)
 
@@ -737,6 +741,11 @@ ifneq ($(DOCKER_TARGET),false)
   endif
 endif
 
+# include rules for directory level "-all" targets for recursing
+ifneq ($(RECURSE_SUBMAKEFILES),false)
+  $(eval $(call subdir-recurse-goal,$(PREV_PATH)))
+endif
+
 # include rules for directory level "-all" targets
 $(eval $(call subdir-goal,$(PREV_PATH)))
 
@@ -746,11 +755,13 @@ PONY_TARGET :=
 PONYC_TARGET :=
 DOCKER_TARGET :=
 EXS_TARGET :=
-RECURSE_SUBMAKEFILES :=
 
 # include makefiles from 1 level down in directory tree if they exist (and by recursion every makefile in the tree that is referenced) unless disabled
 ifneq ($(RECURSE_SUBMAKEFILES),false)
+  RECURSE_SUBMAKEFILES :=
   $(eval $(call make-goal,$(PREV_PATH)))
+else
+  RECURSE_SUBMAKEFILES :=
 endif
 
 include $(wallaroo_dir)/Makefile
