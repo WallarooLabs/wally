@@ -41,8 +41,9 @@ primitive StartupHelp
           initializing process (that status is meaningless after init is done)]
         --resilience-dir/-r [Sets directory to write resilience files to,
           e.g. -r /tmp/data (no trailing slash)]
-        --event_log-file-length/-l [Optionally sets initial file length for
-          event_log backend file]
+        --log-rotation [Enables log rotation. Default: off]
+        --event-log-file-size/-l [Optionally sets rotation size for the event
+          log file backend]
 
         --join/-j [When a new worker is joining a running cluster, pass the
           control channel address of any worker as the value for this

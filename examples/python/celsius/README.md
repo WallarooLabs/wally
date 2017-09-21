@@ -20,17 +20,6 @@ The inputs and outputs of the "Celsius" application are binary 32-bits float enc
 
 The `Decoder`'s `decode(...)` method creates a float from the value represented by the payload. The float value is then sent to the `Multiply` computation where it is multiplied by `1.8`, and the result of that computation is sent to the `Add` computation where `32` is added to it. The resulting float is then sent to the `Encoder`, which converts it to an outgoing sequence of bytes.
 
-## Generating Data
-
-A data generator is bundled with the application:
-
-```bash
-cd _test
-python data_gen.py 1000000
-```
-
-This will generate a million messages.
-
 ## Running Celsius
 
 In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
@@ -69,7 +58,7 @@ Send messages:
 
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 \
-  --file _test/celsius.msg --batch-size 50 --interval 10_000_000 \
+  --file celsius.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --repeat \
   --ponythreads=1 --binary --msg-size 8
 ```

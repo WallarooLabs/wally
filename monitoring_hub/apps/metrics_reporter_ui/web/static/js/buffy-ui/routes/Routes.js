@@ -10,7 +10,7 @@
 // const rootRoute = {
 //     component: require("../components/App"),
 //     path: "/",
-//     title: "Sendence",
+//     title: "WallarooLabs",
 //     childRoutes:[ {
 //         path: AppConfig.getSystemPath("MARKET_SPREAD_CHECK"),
 //         component: require("../components/pipelines/MarketDataPipeline"),

@@ -7,22 +7,13 @@ You will need [pony-stable](https://github.com/ponylang/pony-stable)
 to build the project. Compile and install it, then run these
 commands.
 
-Build dagon:
+Build `dagon` and `dagon-child`:
 ```
-stable fetch
-stable env ponyc --debug
-```
-
-Build dagon-child:
-```
-cd dagon-child
-stable fetch
-stable env ponyc --debug
-cd ..
+make debug=true
 ```
 
 ## Quickstart
-dagon-pony takes four arguments:
+`dagon` takes four arguments:
 ```
 -t time in seconds to wait for processing to finish after Giles
    Sender is done

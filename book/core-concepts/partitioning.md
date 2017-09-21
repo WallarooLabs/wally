@@ -63,7 +63,7 @@ class UpdateStock(object):
         return (None, True)
 ```
 
-### Parition Key
+### Partition Key
 
 Currently, the partition keys for a particular partition need to be defined along with the application. The specific details of keys vary between the different language APIs, but they are typically an object of some type that can support comparison and hashing. In the stock example, the partition key would be the symbol name (a string). All of the expected stock symbols are passed to the application setup code.
 

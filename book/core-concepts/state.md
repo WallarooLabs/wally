@@ -48,4 +48,4 @@ Our partitioning function would take a message as input and return `IBM` as outp
 
 ## Conclusion
 
-Wallaroo gives you serialized access to state. by properly partitioning your state along transactional boundaries you can parallelize access to independent pieces of state. wallaroo takes care of this parallelization for you, all you have to do is give it a function that can tell it which pieces of state should be accessed for a particular message.
+Wallaroo gives you serialized access to state. by properly partitioning your state along transactional boundaries you can parallelize access to independent pieces of state. Wallaroo takes care of this parallelization for you, all you have to do is give it a function that can tell it which pieces of state should be accessed for a particular message.
