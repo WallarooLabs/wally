@@ -113,13 +113,13 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 
 Wallaroo is an open source project. All of the source code is available to you. However, not all of the Wallaroo source code is available under an "open source" license. 
 
-Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. The [Wallaroo Community License][wallaroo community license] is based on [Apache version 2][apache 2 license]. However, you should should read the it for yourself. Here we provide a summary of the main points of the [Wallaroo Community License Agreement][wallaroo community license].
+Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. The [Wallaroo Community License][wallaroo community license] is based on [Apache version 2][apache 2 license]. However, you should read it for yourself. Here we provide a summary of the main points of the [Wallaroo Community License Agreement][wallaroo community license].
 
 - You can **run** all Wallaroo code in a non-production environment without restriction.
 - You can **run** all Wallaroo code in a production environment for free on up to 3 server or 24 cpus.
 - If you want to **run** Wallaroo Enterprise version features in production above 3 servers or 24 cpus, you have to obtain a license.
 - You can **modify** and **redistribute** any Wallaroo code
-- Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license in order to run on more than 3 servers or 24 cpus in a production environment. 
+- Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license to run on more than 3 servers or 24 cpus in a production environment. 
 
 Please [contact us][contact us email] if you have any questions about licensing or Wallaroo Enterprise.
 
