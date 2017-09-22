@@ -51,7 +51,7 @@ actor Main
 
       let rand = MT(Time.nanos())
 
-      let file = File(FilePath(auth, file_path))
+      let file = File(FilePath(auth, file_path)?)
 
       if message_count == 0 then
         @printf[I32](("Please specify a message count " +
@@ -62,7 +62,7 @@ actor Main
       for idx in Range[I32](0, message_count) do
         let next_vote = rand.int(100).u32()
         let next_letter = try
-          letters(rand.int(letters.size().u64()).usize())
+          letters(rand.int(letters.size().u64()).usize())?
         else
           "."
         end
