@@ -225,7 +225,7 @@ class Ring[A: Any val]
     end
     let s: Array[U8] iso = recover Array[U8] end
     s.append("[")
-    s.append(delim.join((consume a).reverse()))
+    s.append(delim.join((consume a).reverse().values()))
     s.append("]")
     String.from_array(consume s)
 
