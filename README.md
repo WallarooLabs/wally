@@ -14,7 +14,7 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 
 ## What is Wallaroo?
 
-Wallaroo is an ultrafast and scalable data processing engine that rapidly takes you from prototype to production by making the infrastructure virtually disappear. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is essential. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
+Wallaroo is an ultrafast and elastic data processing engine that rapidly takes you from prototype to production by making the infrastructure virtually disappear. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is essential. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
 
 ### Features
 
@@ -48,14 +48,13 @@ Wallaroo is open source software with an expanding software community. Please se
 
 ### Deployment model
 
-Wallaroo applications are user hosted. It's equally at home "in the cloud" or "on premises."
+Wallaroo applications are user hosted. It's equally at home "in the cloud" or "on-premise."
 
 We have no "as a service" offering at this time. 
 
 ### Roadmap
 
 Interested in where we are taking Wallaroo? Check out our [roadmap][roadmap].
-
 
 ## Status
 
@@ -71,19 +70,19 @@ Currently, Python 2.7 is our primary focus. As we add features to the Wallaroo, 
 
 - Python 3
 
-We are planning on adding Python 3 support when there is enough demand. If you are interested in writing Wallaroo applications using Python 3, please [get in touch][contact us email].
+We are currently working with a client who needs Python 3 bindings. We plan to introduce Python 3 bindings by the end of 2017. 
 
 - C++
 
-C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
+C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the near future to improve its ergonomics. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
 
 - Go
 
-We are currently working with a client who is very interested in writing Wallaroo applications in Go. We plan to introduce Go language bindings by the end of 2017. 
+We are currently working with a client who needs Go bindings. We plan to introduce Go bindings by the end of 2017. 
 
 - JavaScript 
 
-JavaScript support is currently in the planning stages with no release date targeted. 
+JavaScript support is currently in the planning stages with a release in 2018.
 
 ### Limitations
 
