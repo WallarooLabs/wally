@@ -32,6 +32,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 
+
 actor Connections is Cluster
   let _app_name: String
   let _worker_name: String
@@ -41,7 +42,8 @@ actor Connections is Cluster
   var _my_data_addr: (String, String) = ("", "")
   let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
   let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
-  let _control_conns: Map[String, TCPConnection] = _control_conns.create()
+  let _control_conns: Map[String, ControlConnection] =
+    _control_conns.create()
   let _data_conn_builders: Map[String, OutgoingBoundaryBuilder] =
     _data_conn_builders.create()
   let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
@@ -523,11 +525,12 @@ actor Connections is Cluster
     service: String)
   =>
     _control_addrs(target_name) = (host, service)
+    let tcp_conn_wrapper = ControlConnection
     let control_notifier: TCPConnectionNotify iso =
-      ControlSenderConnectNotifier(_auth, target_name)
+      ControlSenderConnectNotifier(_auth, target_name, tcp_conn_wrapper)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
-    _control_conns(target_name) = control_conn
+    _control_conns(target_name) = tcp_conn_wrapper
 
   be reconnect_data_connection(target_name: String) =>
     if _data_conns.contains(target_name) then

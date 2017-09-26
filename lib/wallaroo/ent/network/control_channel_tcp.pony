@@ -341,29 +341,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     @printf[I32](("ControlChannelConnectNotifier :" + _name +
       ": server closed\n").cstring())
 
-class ControlSenderConnectNotifier is TCPConnectionNotify
-  let _auth: AmbientAuth
-  let _worker_name: String
-  var _header: Bool = true
-
-  new iso create(auth: AmbientAuth, worker_name: String)
-  =>
-    _auth = auth
-    _worker_name = worker_name
-
-  fun ref connected(conn: TCPConnection ref) =>
-    conn.expect(4)
-    _header = true
-
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
-    n: USize): Bool
-  =>
-    true
-
-  fun ref connect_failed(conn: TCPConnection ref) =>
-    @printf[I32]("ControlSenderConnectNotifier: connection failed!\n"
-      .cstring())
-
 class JoiningControlSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _worker_name: String
