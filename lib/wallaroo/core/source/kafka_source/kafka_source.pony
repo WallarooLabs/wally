@@ -171,6 +171,9 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
   be log_flushed(low_watermark: SeqId) =>
     None
 
+  fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
+    None
+
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
     ifdef debug then
       @printf[I32]("KafkaSource received update_watermark\n".cstring())
