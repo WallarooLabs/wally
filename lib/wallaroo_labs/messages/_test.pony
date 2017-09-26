@@ -56,7 +56,7 @@ class iso _TestFallorMsgEncoder is UnitTest
     h.assert_eq[USize](msgs.size(), 4)
     h.assert_eq[String](msgs(0)?, "hi")
     h.assert_eq[String](msgs(1)?, "there")
-    h.assert_eq[String](msgs(2)?, "man")
+    h.assert_eq[String](msgs(2)?, "pal")
     h.assert_eq[String](msgs(3)?, "!")
 
 class iso _TestFallorTimestampRaw is UnitTest
