@@ -93,7 +93,7 @@ actor ClusterInitializer
       _control_addrs(worker) = (host, service)
       _control_identified = _control_identified + 1
       if _control_identified == _expected then
-        @printf[I32]("All worker channels identified\n".cstring())
+        @printf[I32]("All worker control channels identified\n".cstring())
 
         _create_data_channel_listeners()
       end
@@ -106,7 +106,7 @@ actor ClusterInitializer
       _data_addrs(worker) = (host, service)
       _data_identified = _data_identified + 1
       if _data_identified == _expected then
-        @printf[I32]("All worker channels identified\n".cstring())
+        @printf[I32]("All worker data channels identified\n".cstring())
 
         _create_interconnections()
       end
