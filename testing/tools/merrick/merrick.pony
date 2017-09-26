@@ -108,7 +108,7 @@ actor Main
         let listener_addr = l_arg as Array[String]
 
         let store = Store(env.root as AmbientAuth, o_arg)
-        let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
+        let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)?
 
         SignalHandler(TermHandler(coordinator), Sig.term())
         SignalHandler(TermHandler(coordinator), Sig.int())
@@ -120,15 +120,15 @@ actor Main
           let forward_addr = f_addr_arg as Array[String]
           let forward_conn = TCPConnection(tcp_connect_auth,
             ForwarderNotify(),
-            forward_addr(0),
-            forward_addr(1))
+            forward_addr(0)?,
+            forward_addr(1)?)
           forwarding_actor = MsgForwarder(forward_conn)
         end
         let from_wallaroo_listener = TCPListener(tcp_listen_auth,
           FromWallarooListenerNotify(coordinator, store, env.err,
             forward, forwarding_actor),
-          listener_addr(0),
-          listener_addr(1))
+          listener_addr(0)?,
+          listener_addr(1)?)
       end
     else
       @printf[I32](
@@ -158,15 +158,18 @@ class FromWallarooListenerNotify is TCPListenNotify
     _forward = forward
     _forwarding_actor = forwarding_actor
 
-    fun ref not_listening(listen: TCPListener ref) =>
-      _coordinator.from_wallaroo_listener(listen, Failed)
+  fun ref not_listening(listen: TCPListener ref) =>
+    _coordinator.from_wallaroo_listener(listen, Failed)
 
-    fun ref listening(listen: TCPListener ref) =>
-      _coordinator.from_wallaroo_listener(listen, Ready)
+  fun ref listening(listen: TCPListener ref) =>
+    _coordinator.from_wallaroo_listener(listen, Ready)
 
-    fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-      FromWallarooNotify(_coordinator, _store, _stderr,
-        _forward, _forwarding_actor)
+  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+    FromWallarooNotify(_coordinator, _store, _stderr,
+      _forward, _forwarding_actor)
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    None
 
 class FromWallarooNotify is TCPConnectionNotify
   let _coordinator: Coordinator
@@ -193,7 +196,7 @@ class FromWallarooNotify is TCPConnectionNotify
     if _header then
       try
 
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
         conn.expect(expect)
         _header = false
       else
@@ -216,6 +219,9 @@ class FromWallarooNotify is TCPConnectionNotify
     conn.expect(4)
     _coordinator.connection_added(consume conn)
 
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    None
+
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
   let _stderr: StdStream
@@ -237,7 +243,7 @@ class ToDagonNotify is TCPConnectionNotify
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
         conn.expect(expect)
         _header = false
       else
@@ -245,7 +251,7 @@ class ToDagonNotify is TCPConnectionNotify
       end
     else
       try
-        let decoded = ExternalMsgDecoder(consume data)
+        let decoded = ExternalMsgDecoder(consume data)?
         match decoded
         | let d: ExternalShutdownMsg =>
           _coordinator.finished()
@@ -279,8 +285,8 @@ primitive CoordinatorFactory
       let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
       let to_dagon_socket = TCPConnection(tcp_auth,
         ToDagonNotify(coordinator, env.err),
-        ph(0),
-        ph(1))
+        ph(0)?,
+        ph(1)?)
 
       coordinator
     else
@@ -398,7 +404,7 @@ actor Store
   new create(auth: AmbientAuth, output_file_path: String) =>
     _received_file =
       try
-        let f = File(FilePath(auth, output_file_path))
+        let f = File(FilePath(auth, output_file_path)?)
         f.set_length(0)
         f
       else
@@ -472,3 +478,6 @@ class ForwarderNotify is TCPConnectionNotify
   fun ref unthrottled(sock: TCPConnection ref) =>
     @printf[I32]("%s outgoing no longer throttled\n".cstring(),
       _name.cstring())
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    None

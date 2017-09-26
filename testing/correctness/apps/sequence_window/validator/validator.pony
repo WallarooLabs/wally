@@ -74,24 +74,24 @@ actor Main
 
     try
       let auth = env.root as AmbientAuth
-      let fp = FilePath(auth, input_file_path)
-      Fact(fp.exists(), "Input file '" + fp.path + "' does not exist.")
+      let fp = FilePath(auth, input_file_path)?
+      Fact(fp.exists(), "Input file '" + fp.path + "' does not exist.")?
       let input = ReceiverFileDataSource(fp)
       let validator = WindowValidator(expected, at_least_once)
 
       for bytes in input do
         let fields =
           try
-            FallorMsgDecoder.with_timestamp(bytes)
+            FallorMsgDecoder.with_timestamp(bytes)?
           else
             @printf[I32]("Problem decoding!\n".cstring())
             error
           end
-        let ts = fields(0)
-        let v = WindowU64Decoder(fields(1))
-        validator(consume v, consume ts)
+        let ts = fields(0)?
+        let v = WindowU64Decoder(fields(1)?)?
+        validator(consume v, consume ts)?
       end
-      validator.finalize()
+      validator.finalize()?
       @printf[I32]("Validation successful!\n".cstring())
     else
       @printf[I32]("Error validating file.\n".cstring())
@@ -118,8 +118,8 @@ class WindowValidator
     the `--expected/-e` value.
   """
 
-  var ring_0: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4, 0)
-  var ring_1: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4 ,0)
+  var ring_0: Ring[U64] = Ring[U64].from_array(recover [0;0;0;0] end, 4, 0)
+  var ring_1: Ring[U64] = Ring[U64].from_array(recover [0;0;0;0] end, 4 ,0)
   var count_0: U64 = 0
   var count_1: U64 = 0
   var counter: USize = 0
@@ -139,45 +139,45 @@ class WindowValidator
 
     let val_string: String val = recover
       var s: Array[U8] iso = recover Array[U8] end
-      s.append("[")
-      s.append(",".join(values))
-      s.append("]")
+      s.>append("[")
+       .>append(",".join(values.values()))
+       .>append("]")
       String.from_array(consume s)
     end
 
     Fact(test_size(values), "Size test failed at " + ts + " on " + val_string
-      + " after " + counter.string() + " values")
+      + " after " + counter.string() + " values")?
 
     Fact(test_no_nonlead_zeroes(values), "No non-leading zeroes test failed at "
-      + ts + " on " + val_string + " after " + counter.string() + " values")
+      + ts + " on " + val_string + " after " + counter.string() + " values")?
 
     Fact(test_parity(values), "Parity test failed at " + ts + " on "
-      + val_string + " after " + counter.string() + " values")
+      + val_string + " after " + counter.string() + " values")?
 
     Fact(test_testable_range(values), "Testable range test failed at " + ts +
-      " on " + val_string + " after " + counter.string() + " values")
+      " on " + val_string + " after " + counter.string() + " values")?
 
-    let cat = get_category(values)
+    let cat = get_category(values)?
 
     Fact(test_increments(values), "Increments test failed at " + ts +
-      " on " + val_string + " after " + counter.string() + " values")
+      " on " + val_string + " after " + counter.string() + " values")?
 
     Fact(test_sequentiality(values, cat), "Sequentiality test failed at " +
       ts + ". Expected " + (if cat then ring_0 else ring_1 end).string(
-        where fill = "0") + " but got " + val_string + " after " +
-      counter.string() + " values")
+        where fill = "0")? + " but got " + val_string + " after " +
+      counter.string() + " values")?
 
   fun finalize() ? =>
     """
     Test expected_max and expected_difference.
     """
     Fact(test_expected_max(), "Expected max test failed with final windows " +
-      ring_0.string() + " and " + ring_1.string() + " and expected value " +
-      expect.string() + " after " + counter.string() + " values")
+      ring_0.string()? + " and " + ring_1.string()? + " and expected value " +
+      expect.string() + " after " + counter.string() + " values")?
     Fact(test_expected_difference(), "Expected difference test failed with " +
-      "final windows " +ring_0.string() + " and " + ring_1.string() +
+      "final windows " +ring_0.string()? + " and " + ring_1.string()? +
       " and expected value " + expect.string() + " after " + counter.string()
-      + " values")
+      + " values")?
 
   fun test_expected_max(): Bool =>
     """
@@ -185,8 +185,8 @@ class WindowValidator
     value given by `--expected`
     """
     try
-      let r0 = ring_0(0)
-      let r1 = ring_1(0)
+      let r0 = ring_0(0)?
+      let r1 = ring_1(0)?
       if r0 > r1 then
         if r0 != expect then
           return false
@@ -207,8 +207,8 @@ class WindowValidator
     is exactly 1 greater than the maximum in the other category.
     """
     try
-      let r0 = ring_0(0)
-      let r1 = ring_1(0)
+      let r0 = ring_0(0)?
+      let r1 = ring_1(0)?
       if r0 > r1 then
         if r1 != (expect - 1) then
           return false
@@ -255,8 +255,8 @@ class WindowValidator
     """
   try
     for x in Range[USize](0,3) do
-      if values(x) != 0 then
-        if (values(x) % 2) != (values(x + 1) % 2) then
+      if values(x)? != 0 then
+        if (values(x)? % 2) != (values(x + 1)? % 2) then
           return false
         end
       end
@@ -272,9 +272,9 @@ class WindowValidator
   """
     // diff may be 0, 1, or 2, and only 2 after 1 or 2
     try
-      var previous: U64 = values(0)
+      var previous: U64 = values(0)?
       for pos in Range[USize](1,4) do
-        let cur = values(pos)
+        let cur = values(pos)?
         let diff = cur - previous
         if (diff == 0) or (diff == 1) then
           if previous != 0 then
@@ -298,7 +298,7 @@ class WindowValidator
     Return true if the maximum value in the sequence is in the testable range.
     """
     try
-      if (values(0) >= 0) and (values(3) <= test_upper_bound) then
+      if (values(0)? >= 0) and (values(3)? <= test_upper_bound) then
         return true
       end
     end
@@ -326,8 +326,8 @@ class WindowValidator
 
     try
       if at_least_once then
-        let last = values(3)
-        if last < r(0) then
+        let last = values(3)?
+        if last < r(0)? then
           let ilast = last.i64()
           for i in Range[I64](ilast - 6, ilast + 2, 2) do
             let i':U64 = if i < 0 then 0 else i.u64() end
@@ -346,7 +346,7 @@ class WindowValidator
 
     for x in Range[USize](0,4) do
       try
-        if values(x) != r(3 - x) then
+        if values(x)? != r(3 - x)? then
           return false
         end
       else
@@ -360,7 +360,7 @@ class WindowValidator
     Returns true if even, false if odd.
     Requires parity, size, and no-nonleading zeroes tests.
     """
-    if (ar(3) % 2) == 0 then
+    if (ar(3)? % 2) == 0 then
       true
     else
       false
@@ -383,7 +383,7 @@ class ReceiverFileDataSource is Iterator[Array[U8] val]
     // 4 bytes LENGTH HEADER + 8 byte U64 giles receiver timestamp
     let h = _file.read(12)
     try
-      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
+      let expect: USize = Bytes.to_u32(h(0)?, h(1)?, h(2)?, h(3)?).usize()
       h.append(_file.read(expect))
       h
     else

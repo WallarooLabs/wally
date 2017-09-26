@@ -73,7 +73,7 @@ primitive UpdateU64Counter is StateComputation[U64, U64, U64Counter]
   =>
     let state_change: U64CounterStateChange ref =
       try
-        sc_repo.lookup_by_name("U64CounterStateChange")
+        sc_repo.lookup_by_name("U64CounterStateChange")?
           as U64CounterStateChange
       else
         U64CounterStateChange(0)
@@ -100,7 +100,7 @@ primitive UpdateU64Counter2 is StateComputation[U64, U64, U64Counter]
   =>
     let state_change: U64CounterStateChange ref =
       try
-        sc_repo.lookup_by_name("U64CounterStateChange")
+        sc_repo.lookup_by_name("U64CounterStateChange")?
           as U64CounterStateChange
       else
         U64CounterStateChange(0)

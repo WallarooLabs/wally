@@ -48,19 +48,19 @@ actor Main
     try
       let auth = env.root as AmbientAuth
 
-      let fp = FilePath(auth, input_file_path)
+      let fp = FilePath(auth, input_file_path)?
       let input = ReceiverFileDataSource(fp)
-      let output_file = File(FilePath(auth, output_file_path))
+      let output_file = File(FilePath(auth, output_file_path)?)
 
       for bytes in input do
         let fields =
           try
-            FallorMsgDecoder.with_timestamp(bytes)
+            FallorMsgDecoder.with_timestamp(bytes)?
           else
             @printf[I32]("Problem decoding!\n".cstring())
             error
           end
-        output_file.print(", ".join(fields))
+        output_file.print(", ".join(fields.values()))
       end
       output_file.dispose()
     else
@@ -84,7 +84,7 @@ class ReceiverFileDataSource is Iterator[Array[U8] val]
     // 4 bytes LENGTH HEADER + 8 byte U64 giles receiver timestamp
     let h = _file.read(12)
     try
-      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
+      let expect: USize = Bytes.to_u32(h(0)?, h(1)?, h(2)?, h(3)?).usize()
       h.append(_file.read(expect))
       h
     else
