@@ -39,9 +39,9 @@ primitive InstrumentParser
   fun apply(i: String): (InstrumentData val | None) =>
     try
       let split = i.split(",")
-      let name = split(1)
-      let ticker = split(3)
-      let price = split(2).f64()
+      let name = split(1)?
+      let ticker = split(3)?
+      let price = split(2)?.f64()
       InstrumentData(name, ticker, price)
     else
       None
@@ -50,10 +50,10 @@ primitive InstrumentParser
 class RandomNumberGenerator
   let _rand: Random
   let _alphanumerics: Array[String] =
-    ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-    "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q", "R",
-    "S","T","U","V","W","X","Y","Z","a","b","c","d","e","f","g","h", "i","j",
-    "k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]
+    ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"
+    "A";"B";"C";"D";"E";"F";"G";"H";"I";"J";"K";"L";"M";"N";"O";"P";"Q"; "R"
+    "S";"T";"U";"V";"W";"X";"Y";"Z";"a";"b";"c";"d";"e";"f";"g";"h"; "i";"j"
+    "k";"l";"m";"n";"o";"p";"q";"r";"s";"t";"u";"v";"w";"x";"y";"z"]
 
   new create(seed: U64 = Time.nanos()) =>
     _rand = MT(seed)
@@ -73,10 +73,10 @@ class RandomNumberGenerator
     for i in Range[U64](0, length) do
       var selected_char = "0"
       try
-        selected_char = _alphanumerics(rand_int(alphanumerics_length).usize())
+        selected_char = _alphanumerics(rand_int(alphanumerics_length).usize())?
       end
       string = (string.clone()
-        .append(selected_char))
+        .>append(selected_char))
         .clone()
     end
     string
@@ -157,67 +157,67 @@ class FixMessageStringify
         "2"
       end
     (_quote.clone()
-      .append(_fix_version)
-      .append(_delimiter)
-      .append(_order_header)
-      .append(_delimiter)
-      .append(_symbol_header)
-      .append(fix_order_message.symbol())
-      .append(_delimiter)
-      .append(_timestamp_header)
-      .append(fix_order_message.transact_time())
-      .append(_delimiter)
-      .append(_side_header)
-      .append(side_num)
-      .append(_delimiter)
-      .append(_acct_header)
-      .append(_client_prefix)
-      .append(fix_order_message.account().string())
-      .append(_delimiter)
-      .append(_order_id_header)
-      .append(fix_order_message.order_id())
-      .append(_delimiter)
-      .append(_price_header)
-      .append(fix_order_message.price().string())
-      .append(_delimiter)
-      .append(_qty_header)
-      .append(fix_order_message.order_qty().string())
-      .append(_delimiter)
-      .append(_quote)
-      .append(_new_line)
+      .>append(_fix_version)
+      .>append(_delimiter)
+      .>append(_order_header)
+      .>append(_delimiter)
+      .>append(_symbol_header)
+      .>append(fix_order_message.symbol())
+      .>append(_delimiter)
+      .>append(_timestamp_header)
+      .>append(fix_order_message.transact_time())
+      .>append(_delimiter)
+      .>append(_side_header)
+      .>append(side_num)
+      .>append(_delimiter)
+      .>append(_acct_header)
+      .>append(_client_prefix)
+      .>append(fix_order_message.account().string())
+      .>append(_delimiter)
+      .>append(_order_id_header)
+      .>append(fix_order_message.order_id())
+      .>append(_delimiter)
+      .>append(_price_header)
+      .>append(fix_order_message.price().string())
+      .>append(_delimiter)
+      .>append(_qty_header)
+      .>append(fix_order_message.order_qty().string())
+      .>append(_delimiter)
+      .>append(_quote)
+      .>append(_new_line)
       ).clone()
 
   fun nbbo(fix_nbbo_message: FixNbboMessage val): String =>
     (_quote.clone()
-      .append(_fix_version)
-      .append(_delimiter)
-      .append(_nbbo_header)
-      .append(_delimiter)
-      .append(_symbol_header)
-      .append(fix_nbbo_message.symbol())
-      .append(_delimiter)
-      .append(_timestamp_header)
-      .append(fix_nbbo_message.transact_time())
-      .append(_delimiter)
-      .append(_bid_header)
-      .append(fix_nbbo_message.bid_px().string())
-      .append(_delimiter)
-      .append(_offer_header)
-      .append(fix_nbbo_message.offer_px().string())
-      .append(_delimiter)
-      .append(_quote)
-      .append(_new_line)
+      .>append(_fix_version)
+      .>append(_delimiter)
+      .>append(_nbbo_header)
+      .>append(_delimiter)
+      .>append(_symbol_header)
+      .>append(fix_nbbo_message.symbol())
+      .>append(_delimiter)
+      .>append(_timestamp_header)
+      .>append(fix_nbbo_message.transact_time())
+      .>append(_delimiter)
+      .>append(_bid_header)
+      .>append(fix_nbbo_message.bid_px().string())
+      .>append(_delimiter)
+      .>append(_offer_header)
+      .>append(fix_nbbo_message.offer_px().string())
+      .>append(_delimiter)
+      .>append(_quote)
+      .>append(_new_line)
     ).clone()
 
   fun heartbeat(timestamp: String): String =>
     (_quote.clone()
-      .append(_fix_version)
-      .append(_delimiter)
-      .append(_heartbeat_header)
-      .append(_delimiter)
-      .append(_timestamp_header)
-      .append(timestamp)
-      .append(_delimiter)
-      .append(_quote)
-      .append(_new_line)
+      .>append(_fix_version)
+      .>append(_delimiter)
+      .>append(_heartbeat_header)
+      .>append(_delimiter)
+      .>append(_timestamp_header)
+      .>append(timestamp)
+      .>append(_delimiter)
+      .>append(_quote)
+      .>append(_new_line)
     ).clone()

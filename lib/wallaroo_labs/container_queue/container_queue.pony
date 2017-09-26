@@ -56,7 +56,7 @@ class ContainerQueue[Data, A: _Container[Data] ref]
     raising an error if the index is out of bounds.
     """
     if i < _size then
-      _data((i + _front_ptr) and _mod).read()
+      _data((i + _front_ptr) and _mod)?.read()
     else
       error
     end
@@ -65,7 +65,7 @@ class ContainerQueue[Data, A: _Container[Data] ref]
     """
     Change the i-th element, raising an error if the index is out of bounds.
     """
-    _data(i).write(d)
+    _data(i)?.write(d)
 
   fun ref enqueue(d: Data!) ? =>
     """
@@ -79,12 +79,12 @@ class ContainerQueue[Data, A: _Container[Data] ref]
         _back_ptr = _data.size()
       elseif _back_ptr >= space() then
         _back_ptr = 0
-        _data(0).write(d)
+        _data(0)?.write(d)
       elseif _back_ptr >= _data.size() then
         _data.push(_container_builder(d))
         _back_ptr = (_back_ptr + 1) and _mod
       else
-        _data(_back_ptr).write(d)
+        _data(_back_ptr)?.write(d)
         _back_ptr = (_back_ptr + 1) and _mod
       end
     else
@@ -97,12 +97,12 @@ class ContainerQueue[Data, A: _Container[Data] ref]
         _back_ptr = _data.size()
       elseif _front_ptr > _back_ptr then
         for i in Range(0, _back_ptr) do
-          _data.push(_data(i))
+          _data.push(_data(i)?)
         end
         _data.push(_container_builder(d))
         _back_ptr = _data.size() and _mod
       else
-        _data(_back_ptr).write(d)
+        _data(_back_ptr)?.write(d)
         _back_ptr = _back_ptr + 1
       end
     end
@@ -110,7 +110,7 @@ class ContainerQueue[Data, A: _Container[Data] ref]
 
   fun ref dequeue(): Data! ? =>
     if _size > 0 then
-      let a = _data(_front_ptr)
+      let a = _data(_front_ptr)?
       _front_ptr = (_front_ptr + 1) and _mod
       _size = _size - 1
       a.read()
@@ -120,7 +120,7 @@ class ContainerQueue[Data, A: _Container[Data] ref]
 
   fun ref peek(): Data! ? =>
     if _size > 0 then
-      _data(_front_ptr).read()
+      _data(_front_ptr)?.read()
     else
       error
     end

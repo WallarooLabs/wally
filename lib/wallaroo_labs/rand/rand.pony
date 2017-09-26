@@ -64,11 +64,11 @@ class EnhancedRandom
 
   fun ref pick[V: Any val](a: box->Array[V]): V ? =>
     let idx = (_rand.int(a.size().u64())).usize()
-    a(idx)
+    a(idx)?
 
   fun ref pick_ref[V: Any ref](a: Array[V]): V ? =>
     let idx = (_rand.int(a.size().u64())).usize()
-    a(idx)
+    a(idx)?
 
   fun ref pick_k_items[V: Any val](k: USize, a: Array[V] val):
     Array[V] val ?
@@ -81,13 +81,13 @@ class EnhancedRandom
     end
     let result = recover trn Array[V] end
     for i in idxs.values() do
-      result.push(a(i))
+      result.push(a(i)?)
     end
     consume result
 
   fun ref pick_subset[V: Any val](a: Array[V] val): Array[V] val ? =>
     let k = usize_between(1, a.size())
-    pick_k_items[V](k, a)
+    pick_k_items[V](k, a)?
 
   fun ref shuffle_array[V](a: box->Array[V]): box->Array[V] ? =>
     let size = a.size()
@@ -97,7 +97,7 @@ class EnhancedRandom
     end
     for (i, value) in _indices.pairs() do
       let r = usize_between(i + 1, size - 1)
-      _indices(i) = _indices(r)
+      _indices(i)? = _indices(r)?
     end
-    a.permute(_indices.values())
+    a.permute(_indices.values())?
     a
