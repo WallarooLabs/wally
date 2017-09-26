@@ -62,10 +62,20 @@ actor Main
       nbbo_files_generator.write_to_files()
     end
 
-  fun generate_instruments(instruments_file: File): Array[InstrumentData val] val =>
+  fun generate_instruments(instruments_file: File):
+    Array[InstrumentData val] val
+  =>
     let instruments = recover trn Array[InstrumentData val] end
     var is_header = true
-    for line in instruments_file.lines() do
+    let reader = Reader
+    reader.append(instruments_file.read(instruments_file.size()))
+    while true do
+      let line = try
+        reader.line()
+      else
+        break
+      end
+
       if is_header then
         is_header = false
         continue
