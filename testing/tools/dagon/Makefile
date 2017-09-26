@@ -16,7 +16,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := false
 
 # `true`/`false` to enable/disable generate final file build target using ponyc command for the pony build target so
 # it can be overridden manually
@@ -32,7 +32,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 
 # `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
 # (and by recursion every makefile in the tree that is referenced)
-$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
 # standard rules generation makefile

@@ -86,8 +86,8 @@ class ResultsList[V: (Equatable[V] #read & Stringable)] is CanonicalForm
       if (results.size() == rl.results.size()) then
         try
           for (i, v) in results.pairs() do
-            if (v != rl.results(i)) then
-              let msg = v.string() + " expected, " + rl.results(i).string()
+            if (v != rl.results(i)?) then
+              let msg = v.string() + " expected, " + rl.results(i)?.string()
                 + " received."
               return (ResultsDoNotMatch, msg)
             end

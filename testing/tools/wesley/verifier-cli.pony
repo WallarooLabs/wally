@@ -59,12 +59,12 @@ primitive VerifierCLI[S: Message val, R: Message val]
   =>
     (let prog: String, let sent_file: String, let received_file: String,
       let expectation_str: String) = try
-      _parse_args(env.args)
+      _parse_args(env.args)?
     else
       if env.args.size() == 1 then
-        return SetupErrorNoArgs(try env.args(0) else "???" end)
+        return SetupErrorNoArgs(try env.args(0)? else "???" end)
       else
-        return SetupErrorWrongArgs(try env.args(0) else "???" end)
+        return SetupErrorWrongArgs(try env.args(0)? else "???" end)
       end
     end
 
@@ -73,9 +73,9 @@ primitive VerifierCLI[S: Message val, R: Message val]
       | let m: MatchStatus val => m
       | let ini_file_name: String =>
         let test_ini: IniMap =
-          _read_expected_match_status_file(expectation_str, env.root)
+          _read_expected_match_status_file(expectation_str, env.root)?
         try
-          _get_expected_match_status_value(test_ini)
+          _get_expected_match_status_value(test_ini)?
         else
           return SetupErrorCouldNotFindMatchStatusInFile(ini_file_name)
         end
@@ -88,14 +88,14 @@ primitive VerifierCLI[S: Message val, R: Message val]
 
     try
       _read_text_message_file_with_parser(sent_file, sent_parser, env.root,
-        env)
+        env)?
     else
       return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
       _read_received_message_file_with_parser(received_file, received_parser,
-        env.root, env)
+        env.root, env)?
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
@@ -114,12 +114,12 @@ primitive VerifierCLI[S: Message val, R: Message val]
     (let prog: String, let init_file: String, let sent_file: String,
       let received_file: String, let expectation_str: String) =
       try
-        _parse_args_with_initialization(env.args)
+        _parse_args_with_initialization(env.args)?
       else
         if env.args.size() == 1 then
-          return SetupErrorNoArgs(try env.args(0) else "???" end)
+          return SetupErrorNoArgs(try env.args(0)? else "???" end)
         else
-          return SetupErrorWrongArgs(try env.args(0) else "???" end)
+          return SetupErrorWrongArgs(try env.args(0)? else "???" end)
         end
       end
 
@@ -128,9 +128,9 @@ primitive VerifierCLI[S: Message val, R: Message val]
       | let m: MatchStatus val => m
       | let ini_file_name: String =>
         let test_ini: IniMap =
-          _read_expected_match_status_file(expectation_str, env.root)
+          _read_expected_match_status_file(expectation_str, env.root)?
         try
-          _get_expected_match_status_value(test_ini)
+          _get_expected_match_status_value(test_ini)?
         else
           return SetupErrorCouldNotFindMatchStatusInFile(ini_file_name)
         end
@@ -143,21 +143,21 @@ primitive VerifierCLI[S: Message val, R: Message val]
 
     try
       _read_text_message_file_with_parser(init_file, init_parser, env.root,
-        env)
+        env)?
     else
       return SetupErrorProblemReadingMessageFile(init_file)
     end
 
     try
       _read_text_message_file_with_parser(sent_file, sent_parser, env.root,
-        env)
+        env)?
     else
       return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
       _read_received_message_file_with_parser(received_file, received_parser,
-       env.root, env)
+       env.root, env)?
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
@@ -172,7 +172,7 @@ primitive VerifierCLI[S: Message val, R: Message val]
     : (String, String, String, String) ?
   =>
     if args.size() == 4 then
-       (args(0), args(1), args(2), args(3))
+       (args(0)?, args(1)?, args(2)?, args(3)?)
     else
       error
     end
@@ -181,7 +181,7 @@ primitive VerifierCLI[S: Message val, R: Message val]
    : (String, String, String, String, String) ?
   =>
     if args.size() == 5 then
-       (args(0), args(1), args(2), args(3), args(4))
+       (args(0)?, args(1)?, args(2)?, args(3)?, args(4)?)
     else
       error
     end
@@ -198,16 +198,16 @@ primitive VerifierCLI[S: Message val, R: Message val]
   fun _read_expected_match_status_file(file_name: String,
     root: (AmbientAuth | None)): IniMap ? =>
     var test_ini: IniMap = IniMap
-    let caps = recover val FileCaps.set(FileRead).set(FileStat) end
-    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps))
+    let caps = recover val FileCaps.>set(FileRead).>set(FileStat) end
+    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)?)
       as File do
-      test_ini = IniParse(file.lines())
+      test_ini = IniParse(file.lines())?
     end
     test_ini
 
   fun _get_expected_match_status_value(test_ini: IniMap): MatchStatus val ? =>
-    let test_config = test_ini("test_config")
-    let expected_result = test_config("expected_result")
+    let test_config = test_ini("test_config")?
+    let expected_result = test_config("expected_result")?
     match expected_result
     | "match" => ResultsMatch
     | "nomatch" => ResultsDoNotMatch
@@ -219,10 +219,10 @@ primitive VerifierCLI[S: Message val, R: Message val]
     parser: TextMessageFileParser, root: (AmbientAuth | None),
     env: Env) ?
   =>
-    let caps = recover val FileCaps.set(FileRead).set(FileStat) end
-    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps))
+    let caps = recover val FileCaps.>set(FileRead).>set(FileStat) end
+    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)?)
       as File do
-      TextMessageFileReader(file.read_string(file.size()), parser, env)
+      TextMessageFileReader(file.read_string(file.size()), parser, env)?
     else
       error
     end
@@ -230,10 +230,10 @@ primitive VerifierCLI[S: Message val, R: Message val]
   fun _read_received_message_file_with_parser(file_name: String,
     parser: MessageFileParser, root: (AmbientAuth | None), env: Env) ?
   =>
-    let caps = recover val FileCaps.set(FileRead).set(FileStat) end
-    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps))
+    let caps = recover val FileCaps.>set(FileRead).>set(FileStat) end
+    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)?)
       as File do
-      ReceivedMessageFileReader(file.read(file.size()), parser, env)
+      ReceivedMessageFileReader(file.read(file.size()), parser, env)?
     else
       error
     end

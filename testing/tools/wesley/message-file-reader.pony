@@ -77,7 +77,7 @@ class TextMessageFileReader
                 cur_line = l
                 let values: Array[String] val = l.split(fs, parser.fn())
                 if values.size() > 0 then
-                  parser(values)
+                  parser(values)?
                 end
               end
             else
@@ -94,11 +94,11 @@ class TextMessageFileReader
             end
         else  // no field separator, return the parser over the entire line
           for l in lines.values() do
-            parser(recover val [l] end)
+            parser(recover val [l] end)?
           end
         end
     else  // No line separator, return the parser over the entire input
-      parser(recover val [input] end)
+      parser(recover val [input] end)?
     end
 
 class ReceivedMessageFileReader
@@ -113,14 +113,14 @@ class ReceivedMessageFileReader
     while bytes_left > 0 do
       // Msg size, msg size u32, and timestamp together make up next payload
       // size
-      let next_payload_size = rb.peek_u32_be() + 12
+      let next_payload_size = rb.peek_u32_be()? + 12
       let fields =
         try
-          FallorMsgDecoder.with_timestamp(rb.block(next_payload_size.usize()))
+          FallorMsgDecoder.with_timestamp(rb.block(next_payload_size.usize())?)?
         else
           @printf[I32]("Problem decoding!\n".cstring())
           error
         end
       bytes_left = bytes_left - next_payload_size.usize()
-      parser(fields)
+      parser(fields)?
     end
