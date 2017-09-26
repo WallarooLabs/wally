@@ -23,7 +23,7 @@ DOCKER_TARGET := false
 RECURSE_SUBMAKEFILES := false
 
 # standard rules generation makefile
-# include $(rules_mk_path)
+include $(rules_mk_path)
 
 # end of prevent rules from being evaluated/included multiple times
 endif
