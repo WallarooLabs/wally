@@ -22,7 +22,7 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 
 ## Running Celsius
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius` directory.
 
