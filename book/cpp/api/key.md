@@ -20,7 +20,7 @@ public:
 
 ### `virtual uint64_t hash()`
 
-This method returns a 64-bit integer that is used for paritioning. It
+This method returns a 64-bit integer that is used for partitioning. It
 is not the actual partition key, but it is used during key lookup.
 
 ### `virtual bool eq(Key *other_)`
