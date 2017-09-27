@@ -16,6 +16,13 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 
 Wallaroo is an ultrafast and elastic data processing engine that rapidly takes you from prototype to production by making the infrastructure virtually disappear. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is essential. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
 
+We've done a [15-minute video of our engineering presentation][scale independence with wallaroo] that has helped people understand what Wallaroo is. If you watch it, you will get:
+
+- An overview of the problem we are solving with our Scale-Independent API
+- A short intro to the Python API
+- A demonstration of our Autoscale functionality (for stateful applications)
+- To see the power of Scale-Independent APIs in action
+
 ### Features
 
 - [State Management][state management website]
@@ -124,6 +131,10 @@ Please [contact us][contact us email] if you have any questions about licensing 
 
 ## Additional Links
 
+- [Scale-Independence with Wallaroo][scale independence with wallaroo]
+
+15 minute overview of key Wallaroo features. Includes actual code and a demonstration of our stateful autoscaling functionality.
+
 - [Hello Wallaroo!][hello wallaroo post]
 
 An introduction to Wallaroo.
@@ -213,6 +224,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
 [pony examples]: examples/pony
 [qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
+[scale independence with wallaroo]: https://vimeo.com/234753585
 [resilience website]: http://www.wallaroolabs.com/technology/exactly-once
 [roadmap]: ROADMAP.md
 [secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
