@@ -59,7 +59,7 @@ Start the Metrics UI if it isn't already running:
 
 In a separate shell each:
 
-1. Start a listener with Giles Receiver
+1. Start a listener with using `nc`
     ```bash
     nc -l 127.0.0.1 7002 > counter.out
     ```
