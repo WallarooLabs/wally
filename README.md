@@ -18,10 +18,10 @@ Wallaroo is an ultrafast and elastic data processing engine that rapidly takes y
 
 ### Features
 
-- State Management
-- Scale running stateful applications with zero downtime
-- Resilience in the face of failures
-- Exactly-once message processing
+- [State Management][state management website]
+- [Scale running stateful applications with zero downtime][autoscaling website]
+- [Resilience in the face of failures][resilience website]
+- [Exactly-once message processing][exactly-once website]
 
 ### Language Bindings
 
@@ -194,6 +194,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [about this repository section]: #about-this-repository 
 [additional links]: #additional-links
 [apache 2 license]: https://www.apache.org/licenses/LICENSE-2.0
+[autoscaling website]: http://www.wallaroolabs.com/technology/autoscaling
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
 [community website]: http://www.wallaroolabs.com/community
 [contact us email]: mailto:hello@wallaroolabs.com
@@ -203,6 +204,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [developer mailing list]: https://groups.io/g/wallaroo
 [documentation section]: #documentation
 [documentation website]: http://docs.wallaroolabs.com
+[exactly-once website]: http://www.wallaroolabs.com/technology/exactly-once
 [getting help section]: #getting-help
 [getting started section]: #getting-started
 [hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
@@ -211,8 +213,10 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
 [pony examples]: examples/pony
 [qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
+[resilience website]: http://www.wallaroolabs.com/technology/exactly-once
 [roadmap]: ROADMAP.md
 [secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
+[state management website]: http://www.wallaroolabs.com/technology/state-management
 [status section]: #status
 [twitter]: https://www.twitter.com/wallaroolabs
 [unstable documentation website]: https://www.gitbook.com/book/wallaroo-labs/wallaroo-latest/details
