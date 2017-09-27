@@ -63,7 +63,7 @@ In a third shell, send some messages:
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 --file count_this.txt \
   --batch-size 5 --interval 100_000_000 --messages 10000000 \
-  --ponythreads=1 --repeat
+  --ponythreads=1 --repeat --no-write
 ```
 
 ## Reading the Output

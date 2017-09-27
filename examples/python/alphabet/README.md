@@ -72,7 +72,7 @@ Send messages:
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
   --batch-size 50 --interval 10_000_000 --messages 1000000 --binary \
-  --msg-size 9 --repeat --ponythreads=1
+  --msg-size 9 --repeat --ponythreads=1 --no-write
 ```
 ## Reading the Output
 
