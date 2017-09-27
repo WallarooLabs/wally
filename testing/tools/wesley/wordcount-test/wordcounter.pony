@@ -18,7 +18,7 @@ class WordCounter is CanonicalForm
   let _punctuation: String = """ !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ """
 
   fun apply(key: String): U64 ? =>
-    counts(key)
+    counts(key)?
 
   fun ref update(key': String, value: U64) =>
     let key = clean(key')
@@ -36,7 +36,7 @@ class WordCounter is CanonicalForm
     let word = lower(word')
     if word == "" then return end
     try
-      counts(word) = counts(word) + 1
+      counts(word) = counts(word)? + 1
     else
       counts(word) = 1
     end
@@ -49,9 +49,9 @@ class WordCounter is CanonicalForm
       end
       for (key, count) in counts.pairs() do
         try
-          if count != wc(key) then
+          if count != wc(key)? then
             let msg = "Expected " + key + " to have a count of "
-              + count.string() + " instead of " + wc(key).string()
+              + count.string() + " instead of " + wc(key)?.string()
   					return (ResultsDoNotMatch, msg)
   				end
         else
@@ -67,7 +67,7 @@ class WordCounter is CanonicalForm
   fun clean(s: String): String =>
     """Strip characters based on a rule."""
     let charset = _punctuation
-    recover val s.clone().lower().lstrip(charset).rstrip(charset) end
+    recover val s.clone().>lower().>lstrip(charset).>rstrip(charset) end
 
   fun lower(s: String): String =>
     recover s.lower() end
@@ -78,4 +78,4 @@ class WordCounter is CanonicalForm
     for (word, count) in counts.pairs() do
       pairs.append([word + ": " + count.string()])
     end
-    "{ " + ", ".join(pairs) + " }"
+    "{ " + ", ".join(pairs.values()) + " }"

@@ -49,8 +49,8 @@ class WordcountSentParser is SentParser[WordcountSentMessage val]
   fun fn(): USize => 2
 
   fun ref apply(fields: Array[String] val) ? =>
-    let timestamp = fields(0).clone().strip().u64()
-    let text = fields(1)
+    let timestamp = fields(0)?.clone().>strip().u64()?
+    let text = fields(1)?
     _messages.push(WordcountSentMessage(timestamp, text))
 
   fun ref sent_messages(): Array[WordcountSentMessage val] =>
@@ -61,9 +61,9 @@ class WordcountReceivedParser is ReceivedParser[WordcountReceivedMessage val]
     Array[WordcountReceivedMessage val]
 
   fun ref apply(fields: Array[String] val) ? =>
-    let timestamp = fields(0).clone().strip().u64()
-    let word = fields(1)
-    let count = fields(2).clone().strip().u64()
+    let timestamp = fields(0)?.clone().>strip().u64()?
+    let word = fields(1)?
+    let count = fields(2)?.clone().>strip().u64()?
     _messages.push(WordcountReceivedMessage(timestamp, consume word, count))
 
   fun ref received_messages(): Array[WordcountReceivedMessage val] =>
@@ -87,7 +87,7 @@ class WordcountResultMapper is ResultMapper[WordcountSentMessage val,
 
     for m in received.values() do
       try
-        if wc(m.word) < m.count then
+        if wc(m.word)? < m.count then
           wc(m.word) = m.count
         end
       else
