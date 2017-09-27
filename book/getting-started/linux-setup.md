@@ -172,6 +172,7 @@ cd ~/
 wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
 tar zxvf liblz4-1.7.5.tar.gz
 cd lz4-1.7.5
+make
 sudo make install
 ```
 
