@@ -1,6 +1,8 @@
 import struct
 import time
 
+from enum import IntEnum
+
 import wallaroo
 
 
@@ -44,21 +46,23 @@ def application_setup(args):
         ).to_state_partition_u64(
             CheckOrder(), SymbolDataBuilder(), "symbol-data",
             SymbolPartitionFunction(), symbol_partitions
-       ).to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
-                                        OrderResultEncoder())
-       ).new_pipeline(
+        ).to_sink(
+                wallaroo.TCPSinkConfig(
+                    out_host, out_port, OrderResultEncoder())
+        ).new_pipeline(
             "Market Data",
-            wallaroo.TCPSourceConfig(nbbo_host, nbbo_port,
-                                     MarketDataDecoder())
+            wallaroo.TCPSourceConfig(nbbo_host, nbbo_port, MarketDataDecoder())
         ).to_state_partition_u64(
             UpdateMarketData(), SymbolDataBuilder(), "symbol-data",
             SymbolPartitionFunction(), symbol_partitions
         ).done()
     return ab.build()
 
-from enum import IntEnum
 
 class SerializedTypes(IntEnum):
+    """
+    Define the types of data that can be serialised
+    """
     UPDATEMARKETDATA = 1
     SYMBOLPARTITIONFUNCTION = 2
     CHECKORDER = 3
@@ -68,38 +72,42 @@ class SerializedTypes(IntEnum):
     MARKETDATADECODER = 7
     ORDERMESSAGE = 8
     ORDERDECODER = 9
-    
 
-import struct
+
 def serialize(o):
+    """
+    Pack objects according to the following schema:
+    0 - 4b object class (SerializedTypes)
+    1 - ?b object data (if required)
+    """
     if type(o) is UpdateMarketData:
-	s = struct.Struct('>I')
+        s = struct.Struct('>I')
         return s.pack(SerializedTypes.UPDATEMARKETDATA)
     elif type(o) is SymbolPartitionFunction:
-	s = struct.Struct('>I')
+        s = struct.Struct('>I')
         return s.pack(SerializedTypes.SYMBOLPARTITIONFUNCTION)
     elif type(o) is CheckOrder:
-	s = struct.Struct('>I')
+        s = struct.Struct('>I')
         return s.pack(SerializedTypes.CHECKORDER)
     elif type(o) is SymbolDataBuilder:
-	s = struct.Struct('>I')
+        s = struct.Struct('>I')
         return s.pack(SerializedTypes.SYMBOLDATABUILDER)
     elif type(o) is OrderResultEncoder:
-	s = struct.Struct('>I')
+        s = struct.Struct('>I')
         return s.pack(SerializedTypes.ORDERRESULTENCODER)
     elif type(o) is MarketDataMessage:
-	s = struct.Struct('>I4s21sdd')
+        s = struct.Struct('>I4s21sdd')
         return s.pack(SerializedTypes.MARKETDATAMESSAGE,
-		      o.symbol, o.transact_time, o.bid, o.offer)
+                      o.symbol, o.transact_time, o.bid, o.offer)
     elif type(o) is MarketDataDecoder:
-	s = struct.Struct('>I')
+        s = struct.Struct('>I')
         return s.pack(SerializedTypes.MARKETDATADECODER)
     elif type(o) is Order:
-	s = struct.Struct('>IBI6s4sdd21s')
+        s = struct.Struct('>IBI6s4sdd21s')
         return s.pack(SerializedTypes.ORDERMESSAGE, o.side, o.account,
-		      o.order_id, o.symbol, o.qty, o.price, o.transact_time)
+                      o.order_id, o.symbol, o.qty, o.price, o.transact_time)
     elif type(o) is OrderDecoder:
-	s = struct.Struct('>I')
+        s = struct.Struct('>I')
         return s.pack(SerializedTypes.ORDERDECODER)
     else:
         print("Don't know how to serialize {}".format(type(o).__name__))
@@ -107,9 +115,14 @@ def serialize(o):
 
 
 def deserialize(bs):
+    """
+    Unpack objects according to the following schema:
+    0 - 4b object class (SerializedTypes)
+    1 - ?b object data (if required)
+    """
     (obj_type,), bs = struct.unpack('>I', bs[:4]), bs[4:]
     if obj_type == SerializedTypes.UPDATEMARKETDATA:
-	return UpdateMarketData()
+        return UpdateMarketData()
     elif obj_type == SerializedTypes.SYMBOLPARTITIONFUNCTION:
         return SymbolPartitionFunction()
     elif obj_type == SerializedTypes.CHECKORDER:
@@ -124,7 +137,8 @@ def deserialize(bs):
     elif obj_type == SerializedTypes.MARKETDATADECODER:
         return MarketDataDecoder()
     elif obj_type == SerializedTypes.ORDERMESSAGE:
-	(side, acct, oid, symbol, qty, price, t_time)  = struct.unpack('>BI6s4sdd21s', bs)
+        (side, acct, oid, symbol, qty, price, t_time) = struct.unpack(
+                '>BI6s4sdd21s', bs)
         return Order(side, acct, oid, symbol, qty, price, t_time)
     elif obj_type == SerializedTypes.ORDERDECODER:
         return OrderDecoder()
@@ -200,8 +214,9 @@ class OrderDecoder(object):
         """
         order_type = struct.unpack(">B", bs[0:1])[0]
         if order_type != FIXTYPE_ORDER:
-            raise MarketSpreadError("Wrong Fix message type {}. Did you connect "
-                                    "the senders the wrong way around?".format(order_type))
+            raise MarketSpreadError("Wrong Fix message type {}. Did you "
+                                    "connect the senders the wrong way "
+                                    "around?".format(order_type))
         side = struct.unpack(">B", bs[1:2])[0]
         account = struct.unpack(">I", bs[2:6])[0]
         order_id = struct.unpack("6s", bs[6:12])[0]
