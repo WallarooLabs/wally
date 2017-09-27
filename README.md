@@ -135,6 +135,10 @@ Please [contact us][contact us email] if you have any questions about licensing 
 
 15 minute overview of key Wallaroo features. Includes actual code and a demonstration of our stateful autoscaling functionality.
 
+- [Open Sourcing Wallaroo][open sourcing wallaroo]
+
+Our open source annoucement.
+
 - [Hello Wallaroo!][hello wallaroo post]
 
 An introduction to Wallaroo.
@@ -222,6 +226,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [IRC]: https://webchat.oftc.net/?channels=wallaroo
 [license section]: #license
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
+[open sourcing wallaroo]: https://blog.wallaroolabs.com/2017/09/open-sourcing-wallaroo/
 [pony examples]: examples/pony
 [qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
 [scale independence with wallaroo]: https://vimeo.com/234753585
