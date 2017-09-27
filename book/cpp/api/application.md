@@ -73,7 +73,7 @@ partitions, keeps them separate and in this way, acts as a sort of namespace.
 
 ### `Application *to_state_partition(StateComputation *state_computation_, StateBuilder *state_builder_, const char* state_name_, Partition *partition_, bool multi_worker_)`
 
-Add a paritioned stateful computation to the current pipeline.
+Add a partitioned stateful computation to the current pipeline.
 
 ###  `Application *to_state_partition_u64(StateComputation *state_computation_, StateBuilder *state_builder_, const char* state_name_, PartitionU64 *partition_, bool multi_worker_)`
 
