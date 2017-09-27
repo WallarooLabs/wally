@@ -44,7 +44,7 @@ In a separate shell each:
 1. Start a listener with Giles Receiver
     ```bash
     ../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
-      --ponypinasio -l 127.0.0.1:7002
+      --ponypinasio -l 127.0.0.1:7002 --no-write
     ```
 2. Start the application
     ```bash
