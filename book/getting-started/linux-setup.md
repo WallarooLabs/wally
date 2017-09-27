@@ -190,7 +190,7 @@ Installing Docker will result in it running on your machine. After you reboot yo
 
 All of the Docker commands throughout the rest of this manual assume that you have permission to run Docker commands as a non-root user. Follow the [Manage Docker as a non-root user](https://docs.docker.com/engine/installation/linux/linux-postinstall/#manage-docker-as-a-non-root-user) instructions to set that up. If you don't want to allow a non-root user to run Docker commands, you'll need to run `sudo docker` anywhere you see `docker` for a command.
 
-## Install the Metrics UI
+## Download the Metrics UI
 
 ```bash
 sudo docker pull wallaroolabs/wallaroo-metrics-ui:0.1
@@ -214,7 +214,7 @@ cd wallaroo
 git checkout 0.1.2
 ```
 
-## Installing Machida
+## Compiling Machida
 
 Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
 
@@ -223,7 +223,7 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 make
 ```
 
-## Install Giles Sender
+## Compiling Giles Sender
 
 Giles Sender is used to supply data to Wallaroo applications over TCP.
 
@@ -232,7 +232,7 @@ cd ~/wallaroo-tutorial/wallaroo/giles/sender
 make
 ```
 
-## Install Giles Receiver
+## Compiling Giles Receiver
 
 Giles Receiver receives data from Wallaroo over TCP.
 
@@ -242,7 +242,7 @@ cd ~/wallaroo-tutorial/wallaroo/giles/receiver
 make
 ```
 
-## Install Cluster Shutdown tool
+## Compiling Cluster Shutdown tool
 
 The Cluster Shutdown tool is used to tell the cluster to shut down cleanly.
 

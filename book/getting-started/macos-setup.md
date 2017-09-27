@@ -97,7 +97,7 @@ You'll need Docker to run the Wallaroo metrics UI. There are [instructions](http
 
 Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/docker-for-mac/#general).
 
-## Install the Metrics UI
+## Download the Metrics UI
 
 ```bash
 docker pull wallaroolabs/wallaroo-metrics-ui:0.1
@@ -124,7 +124,7 @@ git checkout 0.1.2
 
 This will create a subdirectory called `wallaroo`.
 
-## Installing Machida
+## Compiling Machida
 
 Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
 
@@ -133,7 +133,7 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 make
 ```
 
-## Install Giles Sender
+## Compiling Giles Sender
 
 Giles Sender is used to supply data to Wallaroo applications over TCP.
 
@@ -142,7 +142,7 @@ cd ~/wallaroo-tutorial/wallaroo/giles/sender
 make
 ```
 
-## Install Giles Receiver
+## Compiling Giles Receiver
 
 Giles Receiver receives data from Wallaroo over TCP.
 
@@ -151,7 +151,7 @@ cd ~/wallaroo-tutorial/wallaroo/giles/receiver
 make
 ```
 
-## Install Cluster Shutdown tool
+## Compiling Cluster Shutdown tool
 
 The Cluster Shutdown tool is used to tell the cluster to shut down cleanly.
 
