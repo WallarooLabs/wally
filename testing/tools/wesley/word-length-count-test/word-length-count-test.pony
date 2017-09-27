@@ -45,8 +45,8 @@ class WordLengthCountSentParser is SentParser[WordLengthCountSentMessage val]
   let _messages: Array[WordLengthCountSentMessage val] = Array[WordLengthCountSentMessage val]
 
   fun ref apply(fields: Array[String] val) ? =>
-    let ts: U64 val = fields(0).clone().strip().u64()
-    let text: String val = recover val fields(1).clone().strip() end
+    let ts: U64 val = fields(0)?.clone().>strip().u64()?
+    let text: String val = recover val fields(1)?.clone().>strip() end
     _messages.push(WordLengthCountSentMessage(ts, text))
 
   fun ref sent_messages(): Array[WordLengthCountSentMessage val] =>
@@ -57,13 +57,13 @@ class WordLengthReceivedReceivedParser is ReceivedParser[WordLengthCountReceived
   let _messages: Array[WordLengthCountReceivedMessage val] = Array[WordLengthCountReceivedMessage val]
 
   fun ref apply(fields: Array[String] val) ? =>
-    let ts: U64 val = fields(0).clone().strip().u64()
-    let values = fields(1).split(":")
+    let ts: U64 val = fields(0)?.clone().>strip().u64()?
+    let values = fields(1)?.split(":")
     if (values.size() != 2) then
       error
     end
-    let text: String val = recover val values(0).clone().strip() end
-    let len: U64 val = values(1).clone().strip().u64()
+    let text: String val = recover val values(0)?.clone().>strip() end
+    let len: U64 val = values(1)?.clone().>strip().u64()?
     _messages.push(WordLengthCountReceivedMessage(ts, text, len))
 
   fun ref received_messages(): Array[WordLengthCountReceivedMessage val] =>
@@ -94,10 +94,10 @@ class ResultStore is CanonicalForm
   let lengths: Map[String, U64] = Map[String, U64]
 
   fun apply(key: String): U64 ? =>
-    lengths(key)
+    lengths(key)?
 
   fun ref update(key: String, value: U64) =>
-    let k: String val = recover val key.clone().strip() end
+    let k: String val = recover val key.clone().>strip() end
     if k == "" then return end
     lengths(k) = value
 
@@ -110,8 +110,8 @@ class ResultStore is CanonicalForm
 
       for (key, len) in lengths.pairs() do
         try
-          if len != rs(key) then
-            let msg: String = "Expected " + key + " to have a length of " + len.string() + " instead of " + rs(key).string()
+          if len != rs(key)? then
+            let msg: String = "Expected " + key + " to have a length of " + len.string() + " instead of " + rs(key)?.string()
             return (ResultsDoNotMatch, msg)
           end
         else
