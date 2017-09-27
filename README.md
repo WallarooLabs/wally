@@ -9,6 +9,7 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 - [Getting Help][getting help section]
 - [How to Contribute][contribute section]
 - [License][license section]
+- [Frequently Asked Questions][FAQ]
 - [Additional Links][additional links]
 - [About this Repository][about this repository section]
 
@@ -220,6 +221,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [documentation section]: #documentation
 [documentation website]: http://docs.wallaroolabs.com
 [exactly-once website]: http://www.wallaroolabs.com/technology/exactly-once
+[FAQ]: http://www.wallaroolabs.com/faq
 [getting help section]: #getting-help
 [getting started section]: #getting-started
 [hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
