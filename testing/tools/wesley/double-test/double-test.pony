@@ -45,8 +45,8 @@ class DoubleSentParser is SentParser[DoubleSentMessage val]
     Array[DoubleSentMessage val]
 
   fun ref apply(fields: Array[String] val): None ? =>
-    let timestamp = fields(0).clone().strip().u64()
-    let i = fields(1).clone().strip().i64()
+    let timestamp = fields(0)?.clone().>strip().u64()?
+    let i = fields(1)?.clone().>strip().i64()?
     _messages.push(DoubleSentMessage(timestamp, i))
 
   fun ref sent_messages(): Array[DoubleSentMessage val] =>
@@ -57,8 +57,8 @@ class DoubleReceivedParser is ReceivedParser[DoubleReceivedMessage val]
     Array[DoubleReceivedMessage val]
 
   fun ref apply(fields: Array[String] val): None ? =>
-    let timestamp = fields(0).clone().strip().u64()
-    let i = fields(1).clone().strip().i64()
+    let timestamp = fields(0)?.clone().>strip().u64()?
+    let i = fields(1)?.clone().>strip().i64()?
     _messages.push(DoubleReceivedMessage(timestamp, i))
 
   fun ref received_messages(): Array[DoubleReceivedMessage val] =>
