@@ -42,7 +42,7 @@ docker start mui
 1. Start a listener
 
 ```bash
-../../../../giles/receiver/receiver --listen 127.0.0.1:7002
+../../../../giles/receiver/receiver --listen 127.0.0.1:7002 --no-write
 ```
 
 2. Start the application

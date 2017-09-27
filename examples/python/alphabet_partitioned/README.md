@@ -44,7 +44,7 @@ Run Giles Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
 ../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
-  --listen 127.0.0.1:7002
+  --listen 127.0.0.1:7002 --no-write
 ```
 
 ### Shell 2
