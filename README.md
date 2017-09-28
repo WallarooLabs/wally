@@ -118,9 +118,11 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 
 ## License
 
-Wallaroo is an open source project. All of the source code is available to you. However, not all of the Wallaroo source code is available under an "open source" license. 
+Wallaroo is an open source project. All of the source code is available to you. Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. However, not all of the Wallaroo source code is a[Apache 2[apache 2 license] licensed. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. Source files in this repository have a header indicating which license they are under. 
 
-Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. Source files in this repository have a header indicating which license they are under. The [Wallaroo Community License][wallaroo community license] is based on [Apache version 2][apache 2 license]. However, you should read it for yourself. Here we provide a summary of the main points of the [Wallaroo Community License Agreement][wallaroo community license].
+The core stream processing engine and state management facilities are all licensed under the the [Apache version 2][apache 2 license]. Autoscaling, exactly-once message processing and resiliency features are licensed under the [Wallaroo Community License Agreement][wallaroo community license].
+
+The [Wallaroo Community License][wallaroo community license] is based on [Apache version 2][apache 2 license]. However, you should read it for yourself. Here we provide a summary of the main points of the [Wallaroo Community License Agreement][wallaroo community license].
 
 - You can **run** all Wallaroo code in a non-production environment without restriction.
 - You can **run** all Wallaroo code in a production environment for free on up to 3 server or 24 cpus.
@@ -128,7 +130,7 @@ Most of the Wallaroo code base is available under the [Apache License, version 2
 - You can **modify** and **redistribute** any Wallaroo code
 - Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license to run on more than 3 servers or 24 cpus in a production environment. 
 
-The core stream processing engine and state management facilities are all licensed under the the [Apache version 2][apache 2 license]. Autoscaling, exactly-once message processing and resiliency features are licensed under the [Wallaroo Community License Agreement][wallaroo community license].
+
 
 Please [contact us][contact us email] if you have any questions about licensing or Wallaroo Enterprise.
 
