@@ -8,7 +8,7 @@ ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # uncomment to disable generate test related targets in this directory
-TEST_TARGET := false
+#TEST_TARGET := false
 
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
 PONY_TARGET := false
@@ -37,21 +37,21 @@ WALLAROO_CPP_INSTALL = /tmp/cpp_api
 WALLAROO_CPP_LIB = $(WALLAROO_CPP_INSTALL)/lib/WallarooCppApi
 WALLAROO_CPP_INCLUDE = $(WALLAROO_CPP_INSTALL)/include/
 
-# build-examples-cpp-counter-app-all = build-cpp_api-all counter_app_clean counter_app_build
-# test-examples-cpp-counter-app-all = build-examples-cpp-counter-app-all counter_app_test
-# clean-examples-cpp-counter-app-all = clean-cpp_api-all counter_app_clean
+build-examples-cpp-counter-app-all = build-cpp_api-all counter_app_clean counter_app_build
+test-examples-cpp-counter-app-all = build-examples-cpp-counter-app-all counter_app_test
+clean-examples-cpp-counter-app-all = clean-cpp_api-all counter_app_clean
 
-# counter_app_build:
-# 	mkdir -p $(COUNTER_BUILD)
-# 	c++ --debug -c -o $(COUNTER_BUILD)/Counter.o $(COUNTER_CPP)/Counter.cpp -Wall -std=c++11 -I$(COUNTER_HPP) -I$(WALLAROO_CPP_INCLUDE)
-# 	ar rs $(COUNTER_BUILD)/libcounter.a $(COUNTER_BUILD)/Counter.o
-# 	ponyc $(PONY_LINKER) --debug --export --output=$(COUNTER_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(COUNTER_BUILD) $(COUNTER_PONY_SOURCE)
+counter_app_build:
+	mkdir -p $(COUNTER_BUILD)
+	c++ --debug -c -o $(COUNTER_BUILD)/Counter.o $(COUNTER_CPP)/Counter.cpp -Wall -std=c++11 -I$(COUNTER_HPP) -I$(WALLAROO_CPP_INCLUDE)
+	ar rs $(COUNTER_BUILD)/libcounter.a $(COUNTER_BUILD)/Counter.o
+	ponyc $(PONY_LINKER) --debug --export --output=$(COUNTER_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(COUNTER_BUILD) $(COUNTER_PONY_SOURCE)
 
-# counter_app_clean:
-# 	rm -rf $(COUNTER_BUILD)
+counter_app_clean:
+	rm -rf $(COUNTER_BUILD)
 
-# counter_app_test:
-# 	$(QUIET)echo "counter-app tests"
+counter_app_test:
+	$(QUIET)echo "counter-app tests"
 
 # standard rules generation makefile
 include $(rules_mk_path)

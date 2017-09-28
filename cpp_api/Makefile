@@ -22,7 +22,7 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-#standard rules generation makefile
+# standard rules generation makefile
 include $(rules_mk_path)
 
 CPPAPI_PATH = $(wallaroo_path)/cpp_api/cpp/cppapi
@@ -44,5 +44,5 @@ CPPAPI_BUILD_PATH = $(CPPAPI_PATH)/build
 # cpp_api_test:
 # 	$(QUIET)echo "cpp_api tests"
 
-#end of prevent rules from being evaluated/included multiple times
+# end of prevent rules from being evaluated/included multiple times
 endif
