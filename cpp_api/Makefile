@@ -44,16 +44,16 @@ CPPAPI_BUILD_PATH = $(CPPAPI_PATH)/build
 
 build-cpp_api: cpp_api_clean cpp_api_build
 test-cpp_api: build-cpp_api
-clean-cpp_api = cpp_api_clean
+clean-cpp_api: cpp_api_clean
 
 cpp_api_build:
-	mkdir -p $(CPPAPI_BUILD_PATH)
-	cd $(CPPAPI_BUILD_PATH) && cmake -DCMAKE_INSTALL_PREFIX=/tmp/cpp_api ..
-	cd $(CPPAPI_BUILD_PATH) && make
-	cd $(CPPAPI_BUILD_PATH) && make install/local
+	$(QUIET)mkdir -p $(CPPAPI_BUILD_PATH)
+	$(QUIET)cd $(CPPAPI_BUILD_PATH) && cmake -DCMAKE_INSTALL_PREFIX=/tmp/cpp_api ..
+	$(QUIET)cd $(CPPAPI_BUILD_PATH) && make
+	$(QUIET)cd $(CPPAPI_BUILD_PATH) && make install/local
 
 cpp_api_clean:
-	rm -rf $(CPPAPI_BUILD_PATH)
+	$(QUIET)rm -rf $(CPPAPI_BUILD_PATH)
 
 cpp_api_test:
 	$(QUIET)echo "cpp_api tests"

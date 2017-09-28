@@ -57,7 +57,9 @@ test-machida: build-machida
 clean-machida: machida_clean
 
 machida_clean:
-	rm -rf $(MACHIDA_BUILD)
+	$(QUIET)rm -rf $(MACHIDA_BUILD)
+	$(QUIET)rm -f $(MACHIDA_PATH)/machida.d
+	$(QUIET)rm -rf $(MACHIDA_PATH)/.deps
 
 machida_build: $(MACHIDA_BUILD)/machida
 
@@ -66,17 +68,17 @@ $(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a
 	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD))
 	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
-	mv $(abspath $(MACHIDA_BUILD:%/=%))/machida $(abspath $(MACHIDA_BUILD:%/=%))/machida_resilience
+	$(QUIET)mv $(abspath $(MACHIDA_BUILD:%/=%))/machida $(abspath $(MACHIDA_BUILD:%/=%))/machida_resilience
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS) --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD))
 	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS))
 
 $(MACHIDA_BUILD)/libpython-wallaroo.a: $(MACHIDA_BUILD)/python-wallaroo.o
-	ar rvs $(MACHIDA_BUILD)/libpython-wallaroo.a $(MACHIDA_BUILD)/python-wallaroo.o
+	$(QUIET)ar rvs $(MACHIDA_BUILD)/libpython-wallaroo.a $(MACHIDA_BUILD)/python-wallaroo.o
 
 $(MACHIDA_BUILD)/python-wallaroo.o: $(MACHIDA_CPP)/python-wallaroo.c
-	mkdir -p $(MACHIDA_BUILD)
-	cc -g -o $(MACHIDA_BUILD)/python-wallaroo.o -c $(MACHIDA_CPP)/python-wallaroo.c
+	$(QUIET)mkdir -p $(MACHIDA_BUILD)
+	$(QUIET)cc -g -o $(MACHIDA_BUILD)/python-wallaroo.o -c $(MACHIDA_CPP)/python-wallaroo.c
 
 # end of prevent rules from being evaluated/included multiple times
 endif

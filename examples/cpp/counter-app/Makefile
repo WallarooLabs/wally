@@ -55,13 +55,13 @@ test-examples-cpp-counter-app-all = build-examples-cpp-counter-app-all counter_a
 clean-examples-cpp-counter-app-all = clean-cpp_api-all counter_app_clean
 
 counter_app_build:
-	mkdir -p $(COUNTER_BUILD)
-	c++ --debug -c -o $(COUNTER_BUILD)/Counter.o $(COUNTER_CPP)/Counter.cpp -Wall -std=c++11 -I$(COUNTER_HPP) -I$(WALLAROO_CPP_INCLUDE)
-	ar rs $(COUNTER_BUILD)/libcounter.a $(COUNTER_BUILD)/Counter.o
-	ponyc $(PONY_LINKER) --debug --export --output=$(COUNTER_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(COUNTER_BUILD) $(COUNTER_PONY_SOURCE)
+	$(QUIET)mkdir -p $(COUNTER_BUILD)
+	$(QUIET)c++ $(debug_arg) -c -o $(COUNTER_BUILD)/Counter.o $(COUNTER_CPP)/Counter.cpp -Wall -std=c++11 -I$(COUNTER_HPP) -I$(WALLAROO_CPP_INCLUDE)
+	$(QUIET)ar rs $(COUNTER_BUILD)/libcounter.a $(COUNTER_BUILD)/Counter.o
+	$(QUIET)ponyc $(PONY_LINKER) $(debug_arg) --export --output=$(COUNTER_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(COUNTER_BUILD) $(COUNTER_PONY_SOURCE)
 
 counter_app_clean:
-	rm -rf $(COUNTER_BUILD)
+	$(QUIET)rm -rf $(COUNTER_BUILD)
 
 counter_app_test:
 	$(QUIET)echo "counter-app tests"

@@ -205,7 +205,7 @@ $(eval \
     $$(call host_ip_src)))
 
 ifeq ($(debug),true)
-  debug_arg := -d
+  debug_arg := --debug
 endif
 
 # validation of variable
