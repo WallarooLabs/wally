@@ -55,13 +55,13 @@ test-examples-cpp-alphabet-cpp-all = build-examples-cpp-alphabet-cpp-all alphabe
 clean-examples-cpp-alphabet-cpp-all = clean-cpp_api-all alphabet_cpp_clean
 
 alphabet_cpp_build:
-	mkdir -p $(ALPHABET_BUILD)
-	c++ --debug -c -o $(ALPHABET_BUILD)/alphabet.o $(ALPHABET_CPP)/alphabet.cpp -Wall -std=c++11 -I$(ALPHABET_HPP) -I$(WALLAROO_CPP_INCLUDE)
-	ar rs $(ALPHABET_BUILD)/libalphabet.a $(ALPHABET_BUILD)/alphabet.o
-	ponyc $(PONY_LINKER) --debug --export --output=$(ALPHABET_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(ALPHABET_BUILD) $(ALPHABET_PONY_SOURCE)
+	$(QUIET)mkdir -p $(ALPHABET_BUILD)
+	$(QUIET)c++ $(debug_arg) -c -o $(ALPHABET_BUILD)/alphabet.o $(ALPHABET_CPP)/alphabet.cpp -Wall -std=c++11 -I$(ALPHABET_HPP) -I$(WALLAROO_CPP_INCLUDE)
+	$(QUIET)ar rs $(ALPHABET_BUILD)/libalphabet.a $(ALPHABET_BUILD)/alphabet.o
+	$(QUIET)ponyc $(PONY_LINKER) $(debug_arg) --export --output=$(ALPHABET_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(ALPHABET_BUILD) $(ALPHABET_PONY_SOURCE)
 
 alphabet_cpp_clean:
-	rm -rf $(ALPHABET_BUILD)
+	$(QUIET)rm -rf $(ALPHABET_BUILD)
 
 alphabet_cpp_test:
 	$(QUIET)echo "alphabet-cpp tests"
