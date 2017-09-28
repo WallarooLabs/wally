@@ -10,9 +10,9 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
-# `true`/`false` to enable/disable the actual test command so it can be overridden (the targets are still created)
+# `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_TEST_COMMAND := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -41,9 +41,9 @@ ALPHABET_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-examples-python-alphabet: build-machida
-test-examples-python-alphabet: build-examples-python-alphabet
+integration-tests-examples-python-alphabet: build-examples-python-alphabet
 
-test-examples-python-alphabet: alphabet_py_test
+integration-tests-examples-python-alphabet: alphabet_py_test
 
 alphabet_py_test:
 	cd $(ALPHABET_PY_PATH) && \

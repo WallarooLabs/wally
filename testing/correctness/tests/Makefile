@@ -10,9 +10,9 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
-# `true`/`false` to enable/disable the actual test command so it can be overridden (the targets are still created)
+# `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_TEST_COMMAND := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -41,8 +41,8 @@ CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH
 build-testing-correctness-tests: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests: build-testing-tools-external_sender
 build-testing-correctness-tests: build-machida
-test-testing-correctness-tests: build-testing-correctness-tests
-test-testing-correctness-tests: correctness_tests
+integration-tests-testing-correctness-tests: build-testing-correctness-tests
+integration-tests-testing-correctness-tests: correctness_tests
 
 # standard rules generation makefile
 include $(rules_mk_path)

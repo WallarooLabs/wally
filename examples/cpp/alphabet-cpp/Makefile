@@ -10,9 +10,9 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
-# `true`/`false` to enable/disable the actual test command so it can be overridden (the targets are still created)
+# `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_TEST_COMMAND := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := true
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -51,7 +51,7 @@ ALPHABET_HPP = $(ALPHABET_PATH)/include
 ALPHABET_PONY_SOURCE = $(ALPHABET_PATH)/alphabet-app
 
 build-examples-cpp-alphabet-cpp-all = build-cpp_api-all alphabet_cpp_clean alphabet_cpp_build
-test-examples-cpp-alphabet-cpp-all = build-examples-cpp-alphabet-cpp-all alphabet_cpp_test
+unit-tests-examples-cpp-alphabet-cpp-all = build-examples-cpp-alphabet-cpp-all alphabet_cpp_test
 clean-examples-cpp-alphabet-cpp-all = clean-cpp_api-all alphabet_cpp_clean
 
 alphabet_cpp_build:

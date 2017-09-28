@@ -58,6 +58,8 @@ CUSTOM_PATH = $(integration_bin_path):$(machida_bin_path)
 # initialize default for some normal targets and variables
 build-wallarooroot-all :=
 test-wallarooroot-all :=
+unit-tests-wallarooroot-all :=
+integration-tests-wallarooroot-all :=
 clean-wallarooroot-all :=
 build-docker-wallarooroot-all :=
 push-docker-wallarooroot-all :=
@@ -399,11 +401,15 @@ endef
 define pony-test-goal
 test-pony-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-ifneq ($($(ABS_PREV_MAKEFILE)_TEST_COMMAND),false)
+test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+ifneq ($($(ABS_PREV_MAKEFILE)_UNIT_TEST_COMMAND),false)
 	cd $(abspath $(1:%/=%)) && ./$(notdir $(abspath $(1:%/=%)))
 endif
-.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
 
 # rule to generate targets for clean-* for devs to use
@@ -449,11 +455,15 @@ endef
 define monhub-test-goal
 test-monhub-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-ifneq ($($(ABS_PREV_MAKEFILE)_TEST_COMMAND),false)
+test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+ifneq ($($(ABS_PREV_MAKEFILE)_UNIT_TEST_COMMAND),false)
 	cd $(abspath $(1:%/=%)) && mix test
 endif
-.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
+.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
 
 # rule to generate targets for clean-* for devs to use
@@ -492,15 +502,19 @@ $(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $1)),wall
 
 $(eval build-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval test-$(MY_TARGET_SUFFIX:%-all=%):)
+$(eval unit-tests-$(MY_TARGET_SUFFIX:%-all=%):)
+$(eval integration-tests-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval clean-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval build-$(MY_TARGET_SUFFIX): build-$(MY_TARGET_SUFFIX:%-all=%) $(build-$(MY_TARGET_SUFFIX)))
 $(eval test-$(MY_TARGET_SUFFIX): test-$(MY_TARGET_SUFFIX:%-all=%) $(test-$(MY_TARGET_SUFFIX)))
+$(eval unit-tests-$(MY_TARGET_SUFFIX): unit-tests-$(MY_TARGET_SUFFIX:%-all=%) $(unit-tests-$(MY_TARGET_SUFFIX)))
+$(eval integration-tests-$(MY_TARGET_SUFFIX): integration-tests-$(MY_TARGET_SUFFIX:%-all=%) $(integration-tests-$(MY_TARGET_SUFFIX)))
 $(eval clean-$(MY_TARGET_SUFFIX): clean-$(MY_TARGET_SUFFIX:%-all=%) $(clean-$(MY_TARGET_SUFFIX)))
 
 $(eval build-docker-$(MY_TARGET_SUFFIX): $(build-docker-$(MY_TARGET_SUFFIX)))
 $(eval push-docker-$(MY_TARGET_SUFFIX): $(push-docker-$(MY_TARGET_SUFFIX)))
 
-.PHONY: build-$(MY_TARGET_SUFFIX) test-$(MY_TARGET_SUFFIX) clean-$(MY_TARGET_SUFFIX) build-docker-$(MY_TARGET_SUFFIX) push-docker-$(MY_TARGET_SUFFIX)
+.PHONY: build-$(MY_TARGET_SUFFIX) test-$(MY_TARGET_SUFFIX) unit-tests-$(MY_TARGET_SUFFIX) integration-tests-$(MY_TARGET_SUFFIX) clean-$(MY_TARGET_SUFFIX) build-docker-$(MY_TARGET_SUFFIX) push-docker-$(MY_TARGET_SUFFIX)
 endef
 
 # rule to generate targets for *-all for devs to use
@@ -509,6 +523,8 @@ $(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
 $(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $1)),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all))
 $(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval unit-tests-$(MY_TARGET_SUFFIX) += unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval integration-tests-$(MY_TARGET_SUFFIX) += integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
@@ -522,7 +538,9 @@ ROOT_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $(ROOT_PATH)))
 # default targets
 .DEFAULT_GOAL := build
 build: build-$(ROOT_TARGET_SUFFIX) ## Build all projects (pony & monhub) (DEFAULT)
-test: test-$(ROOT_TARGET_SUFFIX) ## Test all projects (pony & monhub)
+test: unit-tests integration-tests ## Test all projects (pony & monhub)
+unit-tests: unit-tests-$(ROOT_TARGET_SUFFIX) ## Test all projects (pony & monhub)
+integration-tests: integration-tests-$(ROOT_TARGET_SUFFIX) ## Test all projects (pony & monhub)
 build-pony: build-pony-all ## Build all pony projects
 test-pony: test-pony-all ## Test all pony projects
 clean-pony: clean-pony-all ## Clean all pony projects
@@ -677,7 +695,7 @@ help: ## this help message
 endif # RULES_MK
 
 # check control variables for valid values
-$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_TEST_COMMAND,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_UNIT_TEST_COMMAND,false true))
 $(evel $(call check-values,$(ABS_PREV_MAKEFILE)_PONY_TARGET,false true))
 $(evel $(call check-values,$(ABS_PREV_MAKEFILE)_PONYC_TARGET,false true))
 $(evel $(call check-values,$(ABS_PREV_MAKEFILE)_DOCKER_TARGET,false true))
