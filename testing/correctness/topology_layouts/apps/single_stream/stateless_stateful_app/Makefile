@@ -10,9 +10,9 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
-# `true`/`false` to enable/disable the actual test command so it can be overridden (the targets are still created)
+# `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_TEST_COMMAND := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -41,7 +41,7 @@ SINGLE_STREAM_STATELESS_STATEFUL_APP_PATH := $(dir $(abspath $(lastword $(MAKEFI
 include $(rules_mk_path)
 
 
-test-testing-correctness-topology_layouts-apps-single_stream-stateless_stateful_app: single_stream_stateless_stateful_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-stateless_stateful_app: single_stream_stateless_stateful_app_test
 
 single_stream_stateless_stateful_app_test:
 	cd $(SINGLE_STREAM_STATELESS_STATEFUL_APP_PATH) && \
@@ -52,7 +52,7 @@ single_stream_stateless_stateful_app_test:
 	--command './stateless_stateful_app' \
 	--sink-expect 100
 
-test-testing-correctness-topology_layouts-apps-single_stream-stateless_stateful_app: two_worker_single_stream_stateless_stateful_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-stateless_stateful_app: two_worker_single_stream_stateless_stateful_app_test
 
 two_worker_single_stream_stateless_stateful_app_test:
 	cd $(SINGLE_STREAM_STATELESS_STATEFUL_APP_PATH) && \
@@ -64,7 +64,7 @@ two_worker_single_stream_stateless_stateful_app_test:
 	--command './stateless_stateful_app' \
 	--sink-expect 100
 
-test-testing-correctness-topology_layouts-apps-single_stream-stateless_stateful_app: three_worker_single_stream_stateless_stateful_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-stateless_stateful_app: three_worker_single_stream_stateless_stateful_app_test
 
 three_worker_single_stream_stateless_stateful_app_test:
 	cd $(SINGLE_STREAM_STATELESS_STATEFUL_APP_PATH) && \

@@ -10,9 +10,9 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
-# `true`/`false` to enable/disable the actual test command so it can be overridden (the targets are still created)
+# `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_TEST_COMMAND := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -41,7 +41,7 @@ SINGLE_STREAM_FILTERING_STATELESS_FILTERERED_STATELESS_APP_PATH := $(dir $(abspa
 include $(rules_mk_path)
 
 
-test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: single_worker_filtering_stateless_filtered_stateless_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: single_worker_filtering_stateless_filtered_stateless_app_test
 
 single_worker_filtering_stateless_filtered_stateless_app_test:
 	cd $(SINGLE_STREAM_FILTERING_STATELESS_FILTERERED_STATELESS_APP_PATH) && \
@@ -53,7 +53,7 @@ single_worker_filtering_stateless_filtered_stateless_app_test:
 	--command './filtered_stateless_app' \
 	--sink-expect 50
 
-test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: two_worker_single_worker_filtering_stateless_filtered_stateless_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: two_worker_single_worker_filtering_stateless_filtered_stateless_app_test
 
 two_worker_single_worker_filtering_stateless_filtered_stateless_app_test:
 	rm -f /tmp/filtered_stateless_app*
@@ -67,7 +67,7 @@ two_worker_single_worker_filtering_stateless_filtered_stateless_app_test:
 	--command './filtered_stateless_app' \
 	--sink-expect 50
 
-test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: three_worker_single_worker_filtering_stateless_filtered_stateless_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateless_app: three_worker_single_worker_filtering_stateless_filtered_stateless_app_test
 
 three_worker_single_worker_filtering_stateless_filtered_stateless_app_test:
 	rm -f /tmp/filtered_stateless_app*

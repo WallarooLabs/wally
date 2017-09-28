@@ -10,9 +10,9 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
-# `true`/`false` to enable/disable the actual test command so it can be overridden (the targets are still created)
+# `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
 # applies to both the pony and elixir test targets
-$(abspath $(lastword $(MAKEFILE_LIST)))_TEST_COMMAND := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := true
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
@@ -52,7 +52,7 @@ WALLAROO_CPP_INCLUDE = $(WALLAROO_CPP_INSTALL)/include/
 
 
 build-testing-performance-apps-market-spread-cpp-all = build-cpp_api-all marketspread_cpp_clean marketspread_cpp_build
-test-testing-performance-apps-market-spread-cpp-all = build-testing-performance-apps-market-spread-cpp-all marketspread_cpp_test
+unit-tests-testing-performance-apps-market-spread-cpp-all = build-testing-performance-apps-market-spread-cpp-all marketspread_cpp_test
 clean-testing-performance-apps-market-spread-cpp-all = clean-cpp_api-all marketspread_cpp_clean
 
 marketspread_cpp_build:
