@@ -454,9 +454,11 @@ actor OutgoingBoundary is Consumer
             _event = event
             _connected = true
             _writeable = true
+            _readable = true
 
             _notify.connected(this)
             _on_connected()
+            _pending_reads()
 
             ifdef not windows then
               if _pending_writes() then
@@ -485,6 +487,7 @@ actor OutgoingBoundary is Consumer
 
             _connected = true
             _writeable = true
+            _readable = true
 
             // set replaying to true since we might need to replay to
             // downstream before resuming
@@ -495,6 +498,7 @@ actor OutgoingBoundary is Consumer
             _shutdown_peer = false
 
             _notify.connected(this)
+            _pending_reads()
 
             try
               let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,

@@ -345,9 +345,11 @@ actor ReconnectingMetricsSink
             _event = event
             _connected = true
             _writeable = true
+            _readable = true
 
             _notify.connected(this)
             _queue_read()
+            _pending_reads()
 
             ifdef not windows then
               if _pending_writes() then
@@ -373,12 +375,14 @@ actor ReconnectingMetricsSink
 
             _connected = true
             _writeable = true
+            _readable = true
 
             _closed = false
             _shutdown = false
             _shutdown_peer = false
 
             _notify.connected(this)
+            _pending_reads()
 
             ifdef not windows then
               if _pending_writes() then
