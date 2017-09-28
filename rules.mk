@@ -12,6 +12,7 @@
 # detemine makefile that included this one and it's path
 PREV_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),x $(MAKEFILE_LIST))
 PREV_PATH := $(dir $(PREV_MAKEFILE))
+ABS_PREV_MAKEFILE := $(abspath $(PREV_MAKEFILE))
 
 # prevent rules from being evaluated/included multiple times
 ifndef RULES_MK
@@ -61,30 +62,6 @@ clean-wallarooroot-all :=
 build-docker-wallarooroot-all :=
 push-docker-wallarooroot-all :=
 
-ifndef TEST_TARGET
-  TEST_TARGET :=
-endif
-
-ifndef PONY_TARGET
-  PONY_TARGET :=
-endif
-
-ifndef PONYC_TARGET
-  PONYC_TARGET :=
-endif
-
-ifndef DOCKER_TARGET
-  DOCKER_TARGET :=
-endif
-
-ifndef EXS_TARGET
-  EXS_TARGET :=
-endif
-
-ifndef RECURSE_SUBMAKEFILES
-  RECURSE_SUBMAKEFILES :=
-endif
-
 ifndef ponyc_docker_args
   ponyc_docker_args :=
 endif
@@ -107,6 +84,12 @@ endif
 define lazy-init
  $1 = $$(redefine-$1) $$($1)
  redefine-$1 = $$(eval $1 := $2)
+endef
+
+# function to check value of a variable is one of a list of valid values
+define check-values
+$(if $(filter $($(1)),$(2)),,\
+  $(error Unknown $(1) option "$($(1))". Valid values are "$(2)".))
 endef
 
 # how to get the latest ponyc tag
@@ -159,9 +142,7 @@ resilience ?= off## Build with Resilience or not
 
 # validation of variable
 ifdef autoscale
-  ifeq (,$(filter $(autoscale),on off))
-    $(error Unknown autoscale option "$(autoscale)". Valid values are "on off".)
-  endif
+  $(eval $(call check-values,autoscale,on off))
 endif
 
 ifeq ($(autoscale),on)
@@ -170,9 +151,7 @@ endif
 
 # validation of variable
 ifdef clustering
-  ifeq (,$(filter $(clustering),on off))
-    $(error Unknown autoscale option "$(clustering)". Valid values are "on off".)
-  endif
+  $(eval $(call check-values,clustering,on off))
 endif
 
 ifeq ($(clustering),on)
@@ -181,9 +160,7 @@ endif
 
 # validation of variable
 ifdef resilience
-  ifeq (,$(filter $(resilience),on off))
-    $(error Unknown autoscale option "$(resilience)". Valid values are "on off".)
-  endif
+  $(eval $(call check-values,resilience,on off))
 endif
 
 ifeq ($(resilience),on)
@@ -192,23 +169,17 @@ endif
 
 # validation of variable
 ifdef dagon_in_docker
-  ifeq (,$(filter $(dagon_in_docker),false true))
-    $(error Unknown dagon_in_docker option "$(dagon_in_docker)". Valid values are "false true".)
-  endif
+  $(eval $(call check-values,dagon_in_docker,false true))
 endif
 
 # validation of variable
 ifdef demo_cluster_spot_pricing
-  ifeq (,$(filter $(demo_cluster_spot_pricing),false true))
-    $(error Unknown demo_cluster_spot_pricing option "$(demo_cluster_spot_pricing)". Valid values are "false true")
-  endif
+  $(eval $(call check-values,demo_cluster_spot_pricing,false true))
 endif
 
 # validation of variable
 ifdef debug
-  ifeq (,$(filter $(debug),false true))
-    $(error Unknown debug option "$(debug)". Valid values are "false true")
-  endif
+  $(eval $(call check-values,debug,false true))
 endif
 
 ifeq ($(dagon_docker_host),)
@@ -239,16 +210,12 @@ endif
 
 # validation of variable
 ifdef arch
-  ifeq (,$(filter $(arch),amd64 armhf native))
-    $(error Unknown architecture "$(arch)". Valid values are "amd64 armhf native")
-  endif
+  $(eval $(call check-values,arch,amd64 armhf native))
 endif
 
 # validation of variable
 ifdef in_docker
-  ifeq (,$(filter $(in_docker),false true))
-    $(error Unknown in_docker option "$(in_docker)". Valid values are "false true")
-  endif
+  $(eval $(call check-values,in_docker,false true))
 endif
 
 # additional ponyc arguments when building for armhf
@@ -433,7 +400,7 @@ define pony-test-goal
 test-pony-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-ifneq ($(TEST_TARGET),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_TEST_COMMAND),false)
 	cd $(abspath $(1:%/=%)) && ./$(notdir $(abspath $(1:%/=%)))
 endif
 .PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
@@ -483,7 +450,7 @@ define monhub-test-goal
 test-monhub-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-ifneq ($(TEST_TARGET),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_TEST_COMMAND),false)
 	cd $(abspath $(1:%/=%)) && mix test
 endif
 .PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
@@ -709,10 +676,18 @@ help: ## this help message
 
 endif # RULES_MK
 
+# check control variables for valid values
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_TEST_COMMAND,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_PONY_TARGET,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_PONYC_TARGET,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_DOCKER_TARGET,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_EXS_TARGET,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_RECURSE_SUBMAKEFILES,false true))
+
 # if there's a pony source file, create the appropriate rules for it unless disabled
-ifneq ($(PONY_TARGET),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_PONY_TARGET),false)
   ifneq ($(wildcard $(PREV_PATH)/*.pony),)
-    ifneq ($(PONYC_TARGET),false)
+    ifneq ($($(ABS_PREV_MAKEFILE)_PONYC_TARGET),false)
       $(eval $(call ponyc-goal,$(PREV_PATH)))
     endif
     $(eval $(call pony-build-goal,$(PREV_PATH)))
@@ -722,7 +697,7 @@ ifneq ($(PONY_TARGET),false)
 endif
 
 # if there's a exs source file, create the appropriate rules for it unless disabled
-ifneq ($(EXS_TARGET),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_EXS_TARGET),false)
   ifneq ($(wildcard $(PREV_PATH)/*.exs),)
     $(eval $(call monhub-goal,$(PREV_PATH)))
     $(eval $(call monhub-build-goal,$(PREV_PATH)))
@@ -735,7 +710,7 @@ ifneq ($(EXS_TARGET),false)
 endif
 
 # if there's a Dockerfile, create the appropriate rules for it unless disabled
-ifneq ($(DOCKER_TARGET),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_DOCKER_TARGET),false)
   ifneq ($(wildcard $(PREV_PATH)/Dockerfile),)
     $(eval $(call build-docker-goal,$(PREV_PATH)))
     $(eval $(call push-docker-goal,$(PREV_PATH)))
@@ -743,26 +718,16 @@ ifneq ($(DOCKER_TARGET),false)
 endif
 
 # include rules for directory level "-all" targets for recursing
-ifneq ($(RECURSE_SUBMAKEFILES),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_RECURSE_SUBMAKEFILES),false)
   $(eval $(call subdir-recurse-goal,$(PREV_PATH)))
 endif
 
 # include rules for directory level "-all" targets
 $(eval $(call subdir-goal,$(PREV_PATH)))
 
-# reset variables before including sub-makefiles
-TEST_TARGET :=
-PONY_TARGET :=
-PONYC_TARGET :=
-DOCKER_TARGET :=
-EXS_TARGET :=
-
 # include makefiles from 1 level down in directory tree if they exist (and by recursion every makefile in the tree that is referenced) unless disabled
-ifneq ($(RECURSE_SUBMAKEFILES),false)
-  RECURSE_SUBMAKEFILES :=
+ifneq ($($(ABS_PREV_MAKEFILE)_RECURSE_SUBMAKEFILES),false)
   $(eval $(call make-goal,$(PREV_PATH)))
-else
-  RECURSE_SUBMAKEFILES :=
 endif
 
 include $(wallaroo_dir)/Makefile
