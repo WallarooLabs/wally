@@ -317,6 +317,7 @@ actor TCPSink is Consumer
             _event = event
             _connected = true
             _writeable = true
+            _readable = true
 
             match _initializer
             | let initializer: LocalTopologyInitializer =>
@@ -327,6 +328,7 @@ actor TCPSink is Consumer
             end
 
             _notify.connected(this)
+            _pending_reads()
 
             for msg in _initial_msgs.values() do
               _writev(msg, None)
@@ -357,12 +359,14 @@ actor TCPSink is Consumer
 
             _connected = true
             _writeable = true
+            _readable = true
 
             _closed = false
             _shutdown = false
             _shutdown_peer = false
 
             _notify.connected(this)
+            _pending_reads()
 
             ifdef not windows then
               if _pending_writes() then

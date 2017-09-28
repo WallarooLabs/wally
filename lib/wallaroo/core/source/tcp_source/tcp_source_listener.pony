@@ -233,11 +233,11 @@ actor TCPSourceListener is SourceListener
     _closed = true
 
     if not _event.is_null() then
-      @pony_os_socket_close[None](_fd)
-      _fd = -1
-
       // When not on windows, the unsubscribe is done immediately.
       ifdef not windows then
         @pony_asio_event_unsubscribe(_event)
       end
+
+      @pony_os_socket_close[None](_fd)
+      _fd = -1
     end

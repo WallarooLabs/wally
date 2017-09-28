@@ -145,7 +145,10 @@ actor DataChannel
     _max_size = max_size
 
     _notify.accepted(this)
+
+    _readable = true
     _queue_read()
+    _pending_reads()
 
   be identify_data_receiver(dr: DataReceiver, sender_step_id: StepId) =>
     """
@@ -349,9 +352,11 @@ actor DataChannel
             _event = event
             _connected = true
             _writeable = true
+            _readable = true
 
             _notify.connected(this)
             _queue_read()
+            _pending_reads()
 
             // Don't call _complete_writes, as Windows will see this as a
             // closed connection.

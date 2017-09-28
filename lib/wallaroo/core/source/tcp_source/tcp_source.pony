@@ -133,6 +133,9 @@ actor TCPSource is Producer
     //listening until we are done recovering
     _notify.accepted(this)
 
+    _readable = true
+    _pending_reads()
+
     for consumer in routes.values() do
       _routes(consumer) =
         _route_builder(this, consumer, _metrics_reporter)
@@ -274,8 +277,11 @@ actor TCPSource is Producer
             _fd = fd
             _event = event
             _connected = true
+            _readable = true
 
             _notify.connected(this)
+
+            _pending_reads()
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
