@@ -185,7 +185,7 @@ actor TCPSourceListener is SourceListener
     Spawn a new connection.
     """
     try
-      let source = TCPSource._accept(this, _notify_connected(),
+      let source = TCPSource._accept(this, _notify_connected()?,
         _router.routes(), _route_builder, _outgoing_boundary_builders,
         _layout_initializer, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size,

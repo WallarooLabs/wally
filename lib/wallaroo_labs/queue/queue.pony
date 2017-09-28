@@ -50,7 +50,7 @@ class Queue[A: Any #alias]
     raising an error if the index is out of bounds.
     """
     if i < _size then
-      _data((i + _front_ptr) and _mod)
+      _data((i + _front_ptr) and _mod)?
     else
       error
     end
@@ -59,7 +59,7 @@ class Queue[A: Any #alias]
     """
     Change the i-th element, raising an error if the index is out of bounds.
     """
-    _data(i) = consume value
+    _data(i)? = consume value
 
   fun ref enqueue(a: A) ? =>
     """
@@ -73,12 +73,12 @@ class Queue[A: Any #alias]
         _back_ptr = _data.size()
       elseif _back_ptr >= space() then
         _back_ptr = 0
-        _data(0) = consume a
+        _data(0)? = consume a
       elseif _back_ptr >= _data.size() then
         _data.push(consume a)
         _back_ptr = (_back_ptr + 1) and _mod
       else
-        _data(_back_ptr) = consume a
+        _data(_back_ptr)? = consume a
         _back_ptr = (_back_ptr + 1) and _mod
       end
     else
@@ -91,12 +91,12 @@ class Queue[A: Any #alias]
         _back_ptr = _data.size()
       elseif _front_ptr > _back_ptr then
         for i in Range(0, _back_ptr) do
-          _data.push(_data(i))
+          _data.push(_data(i)?)
         end
         _data.push(consume a)
         _back_ptr = _data.size() and _mod
       else
-        _data(_back_ptr) = consume a
+        _data(_back_ptr)? = consume a
         _back_ptr = _back_ptr + 1
       end
     end
@@ -104,7 +104,7 @@ class Queue[A: Any #alias]
 
   fun ref dequeue(): A! ? =>
     if _size > 0 then
-      let a = _data(_front_ptr)
+      let a = _data(_front_ptr)?
       _front_ptr = (_front_ptr + 1) and _mod
       _size = _size - 1
       a
@@ -114,7 +114,7 @@ class Queue[A: Any #alias]
 
   fun peek(): this->A ? =>
     if _size > 0 then
-      _data(_front_ptr)
+      _data(_front_ptr)?
     else
       error
     end
@@ -144,15 +144,15 @@ class Queue[A: Any #alias]
     try
       if _front_ptr < _back_ptr then
         for i in Range(_front_ptr, _back_ptr) do
-          if pred(_data(i), a) then return true end
+          if pred(_data(i)?, a) then return true end
         end
         return false
       else
         for i in Range(_front_ptr, _data.size()) do
-          if pred(_data(i), a) then return true end
+          if pred(_data(i)?, a) then return true end
         end
         for i in Range(0, _back_ptr) do
-          if pred(_data(i), a) then return true end
+          if pred(_data(i)?, a) then return true end
         end
         return false
       end
@@ -189,7 +189,7 @@ class QueueValues[A, B: Array[A] #read] is Iterator[B->A]
 
   fun ref next(): B->A ? =>
     _last_front = _front
-    _data(_front = (_front + 1) % _data.size())
+    _data(_front = (_front + 1) % _data.size())?
 
   fun ref rewind(): QueueValues[A, B] =>
     _front = _initial_front
@@ -225,5 +225,5 @@ class QueuePairs[A, B: Array[A] #read] is Iterator[(USize, B->A)]
       else
         _front + (_data.size() - _initial_front)
       end
-    (relative_idx, _data(_front = (_front + 1) % _data.size()))
+    (relative_idx, _data(_front = (_front + 1) % _data.size())?)
 

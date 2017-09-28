@@ -41,7 +41,7 @@ primitive WindowU64Decoder
     let a = recover iso Array[U64] end
     let parts:Array[String] val = s.split(delim)
     for p in parts.slice(1,parts.size()-1).values() do
-      a.push(p.u64())
+      a.push(p.u64()?)
     end
     consume a
 
@@ -60,13 +60,13 @@ primitive WindowStateEncoder
 primitive WindowStateDecoder
   fun apply(in_reader: Reader): (USize, Array[U64] iso^, USize, USize) ?
   =>
-    let index = in_reader.u64_be().usize()
+    let index = in_reader.u64_be()?.usize()
     let a: Array[U64] iso = recover Array[U64 val] end
     for x in Range[USize](0,4) do
-      a.push(in_reader.u64_be())
+      a.push(in_reader.u64_be()?)
     end
-    let size = in_reader.u64_be().usize()
-    let count = in_reader.u64_be().usize()
+    let size = in_reader.u64_be()?.usize()
+    let count = in_reader.u64_be()?.usize()
     (index, consume a, size, count)
 
 primitive U64FramedHandler is FramedSourceHandler[U64 val]
@@ -74,8 +74,8 @@ primitive U64FramedHandler is FramedSourceHandler[U64 val]
     4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
   fun decode(data: Array[U8] val): U64 ? =>
-    Bytes.to_u64(data(0), data(1), data(2), data(3),
-      data(4), data(5), data(6), data(7))
+    Bytes.to_u64(data(0)?, data(1)?, data(2)?, data(3)?,
+      data(4)?, data(5)?, data(6)?, data(7)?)

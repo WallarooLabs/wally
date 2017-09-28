@@ -32,7 +32,7 @@ class Dag[V: Any val]
     _nodes.contains(id)
 
   fun get_node(id: U128): this->DagNode[V] ? =>
-    _nodes(id)
+    _nodes(id)?
 
   fun nodes(): Iterator[this->DagNode[V]] =>
     _nodes.values()
@@ -44,14 +44,14 @@ class Dag[V: Any val]
     try
       let from =
         try
-          _nodes(from_id)
+          _nodes(from_id)?
         else
           @printf[I32]("There is no node for from_id\n".cstring())
           error
         end
       let to =
         try
-          _nodes(to_id)
+          _nodes(to_id)?
         else
           @printf[I32]("There is no node for to_id\n".cstring())
           error
@@ -80,7 +80,7 @@ class Dag[V: Any val]
       c.add_node(node.value, node.id)
     end
     for edge in _edges.values() do
-      c.add_edge(edge._1.id, edge._2.id)
+      c.add_edge(edge._1.id, edge._2.id)?
     end
     consume c
 

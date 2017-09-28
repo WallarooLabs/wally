@@ -35,7 +35,7 @@ use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
+  flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
@@ -84,7 +84,7 @@ actor DataChannel
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _notify = consume notify
@@ -100,7 +100,7 @@ actor DataChannel
     """
     Connect via IPv4.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _notify = consume notify
@@ -116,7 +116,7 @@ actor DataChannel
     """
     Connect via IPv6.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _notify = consume notify
@@ -135,19 +135,12 @@ actor DataChannel
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    ifdef linux then
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true, true)
-    else
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write(), 0, true, false)
-    end
+    _event = @pony_asio_event_create(this, fd,
+      AsioEvent.read_write_oneshot(), 0, true)
     _connected = true
-    ifdef linux then
-      AsioEvent.set_writeable(_event, true)
-    end
+    @pony_asio_event_set_writeable[None](_event, true)
     _writeable = true
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
 
@@ -180,7 +173,7 @@ actor DataChannel
     Do nothing on windows.
     """
     ifdef not windows then
-      _pending_writev.push(data.cpointer().usize()).push(data.size())
+      _pending_writev.>push(data.cpointer().usize()).>push(data.size())
       _pending_writev_total = _pending_writev_total + data.size()
       _pending.push((data, 0))
     end
@@ -199,7 +192,7 @@ actor DataChannel
         end
       else
         for bytes in _notify.sentv(this, data).values() do
-          _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+          _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
           _pending_writev_total = _pending_writev_total + bytes.size()
           _pending.push((bytes, 0))
         end
@@ -218,7 +211,7 @@ actor DataChannel
 
     ifdef not windows then
       for bytes in _notify.sentv(this, data).values() do
-        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+        _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
         _pending_writev_total = _pending_writev_total + bytes.size()
         _pending.push((bytes, 0))
       end
@@ -279,19 +272,19 @@ actor DataChannel
     @printf[I32]("Shutting down DataChannel\n".cstring())
     close()
 
-  fun local_address(): IPAddress =>
+  fun local_address(): NetAddress =>
     """
     Return the local IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
-  fun remote_address(): IPAddress =>
+  fun remote_address(): NetAddress =>
     """
     Return the remote IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_peername[Bool](_fd, ip)
     ip
 
@@ -442,7 +435,7 @@ actor DataChannel
           end
         end
       else
-        _pending_writev.push(data.cpointer().usize()).push(data.size())
+        _pending_writev.>push(data.cpointer().usize()).>push(data.size())
         _pending_writev_total = _pending_writev_total + data.size()
         _pending.push((data, 0))
         _pending_writes()
@@ -459,22 +452,22 @@ actor DataChannel
 
       if rem == 0 then
         // IOCP reported a failed write on this chunk. Non-graceful shutdown.
-        try _pending.shift() end
+        try _pending.shift()? end
         _hard_close()
         return
       end
 
       while rem > 0 do
         try
-          let node = _pending.head()
-          (let data, let offset) = node()
+          let node = _pending.head()?
+          (let data, let offset) = node()?
           let total = rem + offset
 
           if total < data.size() then
-            node() = (data, total)
+            node()? = (data, total)
             rem = 0
           else
-            _pending.shift()
+            _pending.shift()?
             rem = total - data.size()
           end
         end
@@ -513,7 +506,7 @@ actor DataChannel
             num_to_send = writev_batch_size
             bytes_to_send = 0
             for d in Range[USize](1, num_to_send*2, 2) do
-              bytes_to_send = bytes_to_send + _pending_writev(d)
+              bytes_to_send = bytes_to_send + _pending_writev(d)?
             end
           end
 
@@ -523,17 +516,17 @@ actor DataChannel
 
           if len < bytes_to_send then
             while len > 0 do
-              let iov_p = _pending_writev(0)
-              let iov_s = _pending_writev(1)
+              let iov_p = _pending_writev(0)?
+              let iov_s = _pending_writev(1)?
               if iov_s <= len then
                 len = len - iov_s
-                _pending_writev.shift()
-                _pending_writev.shift()
-                _pending.shift()
+                _pending_writev.shift()?
+                _pending_writev.shift()?
+                _pending.shift()?
                 _pending_writev_total = _pending_writev_total - iov_s
               else
-                _pending_writev.update(0, iov_p+len)
-                _pending_writev.update(1, iov_s-len)
+                _pending_writev.update(0, iov_p+len)?
+                _pending_writev.update(1, iov_s-len)?
                 _pending_writev_total = _pending_writev_total - len
                 len = 0
               end
@@ -548,9 +541,9 @@ actor DataChannel
               return true
             else
               for d in Range[USize](0, num_to_send, 1) do
-                _pending_writev.shift()
-                _pending_writev.shift()
-                _pending.shift()
+                _pending_writev.shift()?
+                _pending_writev.shift()?
+                _pending.shift()?
               end
             end
           end
@@ -645,15 +638,11 @@ actor DataChannel
           match len
           | 0 =>
             // Would block, try again later.
-            ifdef linux then
-              // this is safe because asio thread isn't currently subscribed
-              // for a read event so will not be writing to the readable flag
-              AsioEvent.set_readable(_event, false)
-              _readable = false
-              @pony_asio_event_resubscribe_read(_event)
-            else
-              _readable = false
-            end
+            // this is safe because asio thread isn't currently subscribed
+            // for a read event so will not be writing to the readable flag
+            @pony_asio_event_set_readable[None](_event, false)
+            _readable = false
+            @pony_asio_event_resubscribe_read(_event)
             return
           | _next_size =>
             // Increase the read buffer size.
@@ -778,10 +767,8 @@ actor DataChannel
       _pending_writev_total = 0
       _readable = false
       _writeable = false
-      ifdef linux then
-        AsioEvent.set_readable(_event, false)
-        AsioEvent.set_writeable(_event, false)
-      end
+      @pony_asio_event_set_readable[None](_event, false)
+      @pony_asio_event_set_writeable[None](_event, false)
     end
 
     // On windows, this will also cancel all outstanding IOCP operations.
@@ -797,12 +784,10 @@ actor DataChannel
       _throttled = true
       ifdef not windows then
         _writeable = false
-        ifdef linux then
-          // this is safe because asio thread isn't currently subscribed
-          // for a write event so will not be writing to the readable flag
-          AsioEvent.set_writeable(_event, false)
-          @pony_asio_event_resubscribe_write(_event)
-        end
+        // this is safe because asio thread isn't currently subscribed
+        // for a write event so will not be writing to the readable flag
+        @pony_asio_event_set_writeable[None](_event, false)
+        @pony_asio_event_resubscribe_write(_event)
       end
 
       _notify.throttled(this)

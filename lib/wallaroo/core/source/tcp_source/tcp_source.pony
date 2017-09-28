@@ -44,7 +44,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
+  flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
@@ -110,15 +110,10 @@ actor TCPSource is Producer
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    ifdef linux then
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true, true)
-    else
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write(), 0, true, false)
-    end
+    _event = @pony_asio_event_create(this, fd,
+      AsioEvent.read_write_oneshot(), 0, true)
     _connected = true
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
 
@@ -196,14 +191,14 @@ actor TCPSource is Producer
 
   be reconnect_boundary(target_worker_name: String) =>
     try
-      _outgoing_boundaries(target_worker_name).reconnect()
+      _outgoing_boundaries(target_worker_name)?.reconnect()
     else
       Fail()
     end
 
   be remove_route_for(step: Consumer) =>
     try
-      _routes.remove(step)
+      _routes.remove(step)?
     else
       Fail()
     end
@@ -249,7 +244,7 @@ actor TCPSource is Producer
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
-      _routes(c)
+      _routes(c)?
     else
       None
     end
@@ -381,9 +376,7 @@ actor TCPSource is Producer
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
     _readable = false
-    ifdef linux then
-      AsioEvent.set_readable(_event, false)
-    end
+    @pony_asio_event_set_readable[None](_event, false)
 
 
     @pony_os_socket_close[None](_fd)
@@ -432,15 +425,11 @@ actor TCPSource is Producer
         match len
         | 0 =>
           // Would block, try again later.
-          ifdef linux then
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
-          else
-            _readable = false
-          end
+          // this is safe because asio thread isn't currently subscribed
+          // for a read event so will not be writing to the readable flag
+          @pony_asio_event_set_readable[None](_event, false)
+          _readable = false
+          @pony_asio_event_resubscribe_read(_event)
           _reading = false
           return
         | _next_size =>

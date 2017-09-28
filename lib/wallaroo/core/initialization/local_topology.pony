@@ -98,7 +98,7 @@ class val LocalTopology
   =>
     let subpartition =
       try
-        _state_builders(state_name)
+        _state_builders(state_name)?
       else
         @printf[I32](("Tried to update state map with nonexistent state " +
           "name " + state_name + "\n").cstring())
@@ -132,7 +132,7 @@ class val LocalTopology
     Equatable[Key] val)](
     state_name: String, key: Key, pa: ProxyAddress): LocalTopology ?
   =>
-    let new_subpartition = _state_builders(state_name).update_key[Key](key, pa)
+    let new_subpartition = _state_builders(state_name)?.update_key[Key](key, pa)?
     let new_state_builders = recover trn Map[String, StateSubpartition] end
     for (k, v) in _state_builders.pairs() do
       new_state_builders(k) = v
@@ -173,7 +173,7 @@ class val LocalTopology
       end
     end
 
-    LocalTopology(_app_name, new_worker, g.clone(),
+    LocalTopology(_app_name, new_worker, g.clone()?,
       _step_map, _state_builders, _pre_state_data, _proxy_ids,
       default_target, default_state_name, default_target_id,
       w_names)
@@ -353,7 +353,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     cluster_initializer: (ClusterInitializer | None) = None)
   =>
     try
-      let data_channel_filepath = FilePath(_auth, _data_channel_file)
+      let data_channel_filepath = FilePath(_auth, _data_channel_file)?
       if not _is_initializer then
         let data_notifier: DataChannelListenNotify iso =
           DataChannelListenNotifier(_worker_name, _auth, _connections,
@@ -396,7 +396,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _recovered_worker_names = ws
 
     try
-      let data_channel_filepath = FilePath(_auth, _data_channel_file)
+      let data_channel_filepath = FilePath(_auth, _data_channel_file)?
       if not _is_initializer then
         let data_notifier: DataChannelListenNotify iso =
           DataChannelListenNotifier(_worker_name, _auth, _connections,
@@ -433,7 +433,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       | let t: LocalTopology =>
         @printf[I32](("Saving worker names to file: " + _worker_names_file +
           "\n").cstring())
-        let worker_names_filepath = FilePath(_auth, _worker_names_file)
+        let worker_names_filepath = FilePath(_auth, _worker_names_file)?
         let file = File(worker_names_filepath)
         // Clear file
         file.set_length(0)
@@ -456,14 +456,14 @@ actor LocalTopologyInitializer is LayoutInitializer
     | let t: LocalTopology =>
       @printf[I32]("Saving topology!\n".cstring())
       try
-        let local_topology_file = FilePath(_auth, _local_topology_file)
+        let local_topology_file = FilePath(_auth, _local_topology_file)?
         // TODO: Back up old file before clearing it?
         let file = File(local_topology_file)
         // Clear contents of file.
         file.set_length(0)
         let wb = Writer
         let sa = SerialiseAuth(_auth)
-        let s = Serialised(sa, t)
+        let s = Serialised(sa, t)?
         let osa = OutputSerialisedAuth(_auth)
         let serialised_topology: Array[U8] val = s.output(osa)
         wb.write(serialised_topology)
@@ -495,7 +495,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _cluster_initializer = cluster_initializer
     try
       try
-        let local_topology_file = FilePath(_auth, _local_topology_file)
+        let local_topology_file = FilePath(_auth, _local_topology_file)?
         if local_topology_file.exists() then
           //we are recovering an existing worker topology
           let data = recover val
@@ -503,7 +503,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             file.read(file.size())
           end
           match Serialised.input(InputSerialisedAuth(_auth), data)(
-            DeserialiseAuth(_auth))
+            DeserialiseAuth(_auth))?
           | let t: LocalTopology val =>
             _topology = t
           else
@@ -578,7 +578,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           @printf[I32]("A default target exists!\n".cstring())
           let pre_state_initializer =
             try
-              targets(0)
+              targets(0)?
             else
               @printf[I32]("No StepInitializer for prestate default target\n"
                 .cstring())
@@ -590,7 +590,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
           let state_builder =
             try
-              targets(1)
+              targets(1)?
             else
               @printf[I32]("No StepInitializer for state default target\n"
                 .cstring())
@@ -613,7 +613,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           let proxy_router =
             try
               ProxyRouter(_worker_name,
-                _outgoing_boundaries(proxy_target.worker), proxy_target, _auth)
+                _outgoing_boundaries(proxy_target.worker)?, proxy_target, _auth)
             else
               @printf[I32]("Can't find outgoing boundary for %s\n".cstring(),
                 proxy_target.worker.cstring())
@@ -682,7 +682,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         while frontier.size() > 0 do
           let next_node =
             try
-              frontier.pop()
+              frontier.pop()?
             else
               @printf[I32](("Graph frontier stack was empty when node was " +
                 "still expected\n").cstring())
@@ -733,7 +733,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                       // We need a default router
                       let default_state_router =
                         try
-                          state_map(dsn)
+                          state_map(dsn)?
                         else
                           @printf[I32](("Default state router not found in " +
                             "state_map\n").cstring())
@@ -768,7 +768,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                     t.update_state_map(builder.state_name(), state_map,
                       _metrics_conn, _event_log, _recovery_replayer, _auth,
                       _outgoing_boundaries, _initializables,
-                      data_routes_ref, default_router)
+                      data_routes_ref, default_router)?
                   else
                     @printf[I32]("Failed to update state_map\n".cstring())
                     error
@@ -778,7 +778,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let partition_router =
                   try
                     builder.clone_router_and_set_input_type(
-                      state_map(builder.state_name()), default_router)
+                      state_map(builder.state_name())?, default_router)
                   else
                     // Not a partition, so we need a direct target router
                     @printf[I32](("No partition router found for " +
@@ -790,7 +790,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   match builder.pre_state_target_id()
                   | let id: U128 =>
                     try
-                      built_routers(id)
+                      built_routers(id)?
                     else
                       @printf[I32]("No router found to prestate target step\n"
                         .cstring())
@@ -823,7 +823,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let out_id: (U128 | None) =
                   try
                     match _get_output_node_id(next_node,
-                      default_target_id, default_target_state_step_id)
+                      default_target_id, default_target_state_step_id)?
                     | let id: U128 => id
                     else
                       None
@@ -838,7 +838,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   | let id: U128 =>
                     try
                       builder.clone_router_and_set_input_type(
-                        built_routers(id))
+                        built_routers(id)?)
                     else
                       @printf[I32](("Invariant was violated: node was not " +
                         "built before one of its inputs.\n").cstring())
@@ -880,7 +880,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   match in_node.value.pre_state_target_id()
                   | let id: U128 =>
                     try
-                      built_routers(id)
+                      built_routers(id)?
                     else
                       targets_ready = false
                     end
@@ -916,7 +916,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                       match b.pre_state_target_id()
                       | let id: U128 =>
                         try
-                          built_routers(id)
+                          built_routers(id)?
                         else
                           @printf[I32](("Prestate comp target not built! We " +
                             "should have already caught this\n").cstring())
@@ -972,7 +972,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let sink =
                   try
                     egress_builder(_worker_name,
-                      consume sink_reporter, _auth, _outgoing_boundaries)
+                      consume sink_reporter, _auth, _outgoing_boundaries)?
                   else
                     @printf[I32]("Failed to build sink from egress_builder\n"
                       .cstring())
@@ -1016,7 +1016,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             //////////////////////
               try
                 let local_step_ids =
-                  pre_stateless_data.worker_to_step_id(_worker_name)
+                  pre_stateless_data.worker_to_step_id(_worker_name)?
 
                 // Make sure all local steps for this stateless partition
                 // have already been initialized on this worker.
@@ -1038,7 +1038,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                     pre_stateless_data.partition_id_to_step_id.pairs()
                   do
                     if local_step_ids.contains(step_id) then
-                      match built_stateless_steps(step_id)
+                      match built_stateless_steps(step_id)?
                       | let s: Step =>
                         partition_routes(p_id) = s
                       else
@@ -1048,11 +1048,11 @@ actor LocalTopologyInitializer is LayoutInitializer
                       end
                     else
                       let target_worker =
-                        pre_stateless_data.partition_id_to_worker(p_id)
+                        pre_stateless_data.partition_id_to_worker(p_id)?
                       let proxy_address = ProxyAddress(target_worker, step_id)
 
                       partition_routes(p_id) = ProxyRouter(target_worker,
-                        _outgoing_boundaries(target_worker),
+                        _outgoing_boundaries(target_worker)?,
                         proxy_address, _auth)
                     end
                   end
@@ -1091,7 +1091,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                     // We need a default router
                     let default_state_router =
                       try
-                        state_map(dsn)
+                        state_map(dsn)?
                       else
                         @printf[I32](("Failed to find default state router " +
                           "in state_map\n").cstring())
@@ -1124,7 +1124,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   t.update_state_map(source_data.state_name(), state_map,
                     _metrics_conn, _event_log, _recovery_replayer, _auth,
                     _outgoing_boundaries, _initializables,
-                    data_routes_ref, default_router)
+                    data_routes_ref, default_router)?
                 else
                   @printf[I32]("Failed to update state map\n".cstring())
                   error
@@ -1136,7 +1136,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   match source_data.pre_state_target_id()
                   | let id: U128 =>
                     try
-                      built_routers(id)
+                      built_routers(id)?
                     else
                       @printf[I32](("Prestate comp target not built! We " +
                         "should have already caught this\n").cstring())
@@ -1159,7 +1159,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   let out_id: (U128 | None) =
                     try
                       _get_output_node_id(next_node,
-                        default_target_id, default_target_state_step_id)
+                        default_target_id, default_target_state_step_id)?
                     else
                       @printf[I32]("Failed to get output node id\n".cstring())
                       error
@@ -1168,7 +1168,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   match out_id
                   | let id: U128 => id
                     try
-                      built_routers(id)
+                      built_routers(id)?
                     else
                       @printf[I32](("Invariant was violated: node was not " +
                         "built before one of its inputs.\n").cstring())
@@ -1184,7 +1184,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   // state steps.
                   try
                     source_data.clone_router_and_set_input_type(
-                      state_map(source_data.state_name()), default_router)
+                      state_map(source_data.state_name())?, default_router)
                   else
                     @printf[I32]("State doesn't exist for state computation.\n"
                       .cstring())
@@ -1245,7 +1245,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               | let ds: Step =>
                 let target_router =
                   try
-                    built_routers(tid)
+                    built_routers(tid)?
                   else
                     @printf[I32]("Failed to build router for default target\n"
                       .cstring())
@@ -1262,7 +1262,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   t.update_state_map(psd.state_name(), state_map,
                     _metrics_conn, _event_log, _recovery_replayer, _auth,
                     _outgoing_boundaries, _initializables,
-                    data_routes_ref, None)
+                    data_routes_ref, None)?
                 else
                   @printf[I32]("Failed to update state map\n".cstring())
                   error
@@ -1271,7 +1271,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               let partition_router =
                 try
                   psd.clone_router_and_set_input_type(state_map(
-                    psd.state_name()))
+                    psd.state_name())?)
                 else
                   @printf[I32](("PartitionRouter was not built for expected " +
                     "state partition.\n").cstring())
@@ -1279,7 +1279,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 end
               let target_router =
                 try
-                  built_routers(tid)
+                  built_routers(tid)?
                 else
                   @printf[I32](("Failed to find built router for " +
                     "target_router\n").cstring())
@@ -1315,7 +1315,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           // listeners.
           let topology_ready_msg =
             try
-              ChannelMsgEncoder.topology_ready(_worker_name, _auth)
+              ChannelMsgEncoder.topology_ready(_worker_name, _auth)?
             else
               @printf[I32]("ChannelMsgEncoder failed\n".cstring())
               error
@@ -1388,7 +1388,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               // Create a sink or OutgoingBoundary. If the latter,
               // egress_builder finds it from _outgoing_boundaries
               let sink = egress_builder(_worker_name,
-                consume sink_reporter, _auth, _outgoing_boundaries)
+                consume sink_reporter, _auth, _outgoing_boundaries)?
 
               match sink
               | let d: DisposableActor =>
@@ -1473,7 +1473,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       match _topology
       | let t: LocalTopology =>
         _topology = t.update_proxy_address_for_state_key[Key](state_name,
-        key, pa)
+        key, pa)?
         // TODO: We should find a way to batch changes before writing out.
         _save_local_topology()
       end
@@ -1485,7 +1485,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     try
       match _topology
       | let t: LocalTopology =>
-        let subpartition = t.state_builders()(msg.state_name())
+        let subpartition = t.state_builders()(msg.state_name())?
         let runner_builder = subpartition.runner_builder()
         let reporter = MetricsReporter(t.name(), t.worker_name(),
           _metrics_conn)

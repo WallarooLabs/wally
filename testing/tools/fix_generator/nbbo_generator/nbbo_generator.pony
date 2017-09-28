@@ -41,17 +41,17 @@ actor Main
 
     try
       var auth = env.root as AmbientAuth
-      let ini_file = File(FilePath(env.root as AmbientAuth, ini_file_path))
-      let sections = IniParse(ini_file.lines())
-      let nbbo_section = sections("nbbo")
+      let ini_file = File(FilePath(env.root as AmbientAuth, ini_file_path)?)
+      let sections = IniParse(ini_file.lines())?
+      let nbbo_section = sections("nbbo")?
       nonrejected_instruments_file_path =
-        nbbo_section("nonrejected_instruments_file")
-      output_folder = nbbo_section("output_folder")
-      output_msgs_per_sec = nbbo_section("output_msgs_per_sec").u64()
-      messages_duration_secs = nbbo_section("messages_duration_secs").u64()
+        nbbo_section("nonrejected_instruments_file")?
+      output_folder = nbbo_section("output_folder")?
+      output_msgs_per_sec = nbbo_section("output_msgs_per_sec")?.u64()?
+      messages_duration_secs = nbbo_section("messages_duration_secs")?.u64()?
 
       let instruments_file = File(FilePath(auth,
-        nonrejected_instruments_file_path))
+        nonrejected_instruments_file_path)?)
       let instruments = generate_instruments(instruments_file)
 
       let nbbo_files_generator = NbboFilesGenerator(env, auth,
@@ -111,8 +111,8 @@ actor NbboFilesGenerator
     _wb.reserve_chunks(_file_limit)
     _output_path = recover val
       _output_folder.clone()
-        .append(_file_counter.string())
-        .append(_file_extension)
+        .>append(_file_counter.string())
+        .>append(_file_extension)
     end
 
   fun ref check_output_file_size(output_file: File): File ?  =>
@@ -124,10 +124,10 @@ actor NbboFilesGenerator
       _file_counter = _file_counter + 1
       _output_path = recover val
         _output_folder.clone()
-          .append(_file_counter.string())
-          .append(_file_extension)
+          .>append(_file_counter.string())
+          .>append(_file_extension)
       end
-      var new_output_file = File(FilePath(_auth, _output_path))
+      var new_output_file = File(FilePath(_auth, _output_path)?)
       new_output_file.set_length(0)
       new_output_file
     else
@@ -139,7 +139,7 @@ actor NbboFilesGenerator
       generate_for_sec(_current_sec)
     else
       try
-        var output_file = File(FilePath(_auth, _output_path))
+        var output_file = File(FilePath(_auth, _output_path)?)
         output_file.writev(_wb.done())
         output_file.dispose()
       end
@@ -149,12 +149,12 @@ actor NbboFilesGenerator
 
   be generate_for_sec(sec: U64) =>
     try
-      var output_file = File(FilePath(_auth, _output_path))
+      var output_file = File(FilePath(_auth, _output_path)?)
       let date = Date(_time._1 + sec.i64(), _time._2)
       let utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
       for x in Range[U64](0, _output_msgs_per_sec) do
-        output_file = check_output_file_size(output_file)
-        generate_nbbo(utc_timestamp)
+        output_file = check_output_file_size(output_file)?
+        generate_nbbo(utc_timestamp)?
       end
       _current_sec = _current_sec + 1
       write_to_files()
@@ -162,7 +162,7 @@ actor NbboFilesGenerator
 
   fun ref generate_nbbo(timestamp: String) ? =>
     let index = _dice(1, _instruments.size().u64()).usize() - 1
-    let instrument = _instruments(index)
+    let instrument = _instruments(index)?
     let fix_nbbo_msg = RandomFixNbboGenerator(instrument,
       _number_generator, false, timestamp)
     let fix_nbbo_string = FixMessageStringify.nbbo(fix_nbbo_msg)

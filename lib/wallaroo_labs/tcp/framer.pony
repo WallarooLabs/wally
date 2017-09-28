@@ -43,16 +43,16 @@ class Framer
       while d.size() > 0 do
         if _left == 0 then
           if _len_bytes.size() < 4 then
-            let next = d(_data_index = _data_index + 1)
+            let next = d(_data_index = _data_index + 1)?
             _len_bytes.push(next)
           else
             // Set _left to the length of the current message in bytes
-            _left = Bytes.to_u32(_len_bytes(0), _len_bytes(1), _len_bytes(2),
-              _len_bytes(3))
+            _left = Bytes.to_u32(_len_bytes(0)?, _len_bytes(1)?, _len_bytes(2)?,
+              _len_bytes(3)?)
             _len_bytes = Array[U8]
           end
         else
-          _buffer.push(d(_data_index = _data_index + 1))
+          _buffer.push(d(_data_index = _data_index + 1)?)
           _left = _left - 1
           if _left == 0 then
             let copy: Array[U8] iso = recover Array[U8] end

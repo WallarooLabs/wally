@@ -105,12 +105,12 @@ actor Main
         Application("Sequence Window Printer")
           .new_pipeline[U64 val, String val]("Sequence Window",
             TCPSourceConfig[U64 val].from_options(U64FramedHandler,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
           .to_state_partition[U64 val, U64 val, String val,
             WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
               partition where multi_worker = true)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
-              TCPSinkConfigCLIParser(env.args)(0)))
+              TCPSinkConfigCLIParser(env.args)?(0)?))?
       end
       Startup(env, application, "sequence_window")
     else
@@ -128,11 +128,11 @@ class val WindowStateBuilder
 
 class WindowState is State
   var idx: USize = 0
-  var ring: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4, 0)
+  var ring: Ring[U64] = Ring[U64].from_array(recover [0; 0; 0; 0] end, 4, 0)
 
   fun string(): String =>
     try
-      ring.string(where fill = "0")
+      ring.string(where fill = "0")?
     else
       "Error: failed to convert sequence window into a string."
     end
@@ -146,7 +146,7 @@ class WindowState is State
         // Test validity of updated window
         let values = to_array()
         Fact(TestIncrements(values), "Increments test failed on " +
-          string())
+          string())?
       else
         Fail()
       end

@@ -30,14 +30,14 @@ class ref Watermarker
 
   fun ref remove_route(id: RouteId) =>
     try
-      let old_route = _routes(id)
+      let old_route = _routes(id)?
       ifdef debug then
         // We currently assume stop the world and finishing all in-flight
         // processing before any route migration.
         Invariant(old_route.is_fully_acked())
       end
 
-      _routes.remove(id)
+      _routes.remove(id)?
     else
       Fail()
     end
@@ -48,7 +48,7 @@ class ref Watermarker
     end
 
     try
-      _routes(o_route_id).sent(o_seq_id)
+      _routes(o_route_id)?.sent(o_seq_id)
     else
       Fail()
     end
@@ -63,11 +63,11 @@ class ref Watermarker
     ifdef debug then
       Invariant(_routes.contains(route_id))
       LazyInvariant({()(_routes, route_id, seq_id): Bool ? =>
-          _routes(route_id).highest_seq_id_sent() >= seq_id})
+          _routes(route_id)?.highest_seq_id_sent() >= seq_id})
     end
 
     try
-      _routes(route_id).ack_received(seq_id)
+      _routes(route_id)?.ack_received(seq_id)
     else
       Fail()
     end

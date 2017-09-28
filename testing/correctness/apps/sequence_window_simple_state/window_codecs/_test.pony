@@ -37,7 +37,7 @@ class iso _TestWindowEncoder is UnitTest
   fun apply(h: TestHelper) ? =>
     let s = "[1,2,3,4]"
     let byteseqs = WindowEncoder(s)
-    let encoded = match byteseqs(1)
+    let encoded = match byteseqs(1)?
     | let m: String val => m
     | let m: Array[U8] val => String.from_array(m)
     else ""
@@ -49,11 +49,11 @@ class iso _TestWindowDecoder is UnitTest
 
   fun apply(h: TestHelper) ? =>
     let s: String val = "[1,2,3,4]"
-    let decoded: Array[U64] val = WindowU64Decoder(s)
-    h.assert_eq[U64](1, decoded(0))
-    h.assert_eq[U64](2, decoded(1))
-    h.assert_eq[U64](3, decoded(2))
-    h.assert_eq[U64](4, decoded(3))
+    let decoded: Array[U64] val = WindowU64Decoder(s)?
+    h.assert_eq[U64](1, decoded(0)?)
+    h.assert_eq[U64](2, decoded(1)?)
+    h.assert_eq[U64](3, decoded(2)?)
+    h.assert_eq[U64](4, decoded(3)?)
 
 class iso _TestWindowState is UnitTest
   fun name(): String => "window_codecs/WindowState"
@@ -62,7 +62,7 @@ class iso _TestWindowState is UnitTest
     // Encode
     let out_writer: Writer = Writer
     let index: USize = 15
-    let buf: Array[U64] iso = recover [12,13,14,11] end
+    let buf: Array[U64] iso = recover [12; 13; 14; 11] end
     let size: USize = 4
     let count: USize = 15
 
@@ -79,15 +79,15 @@ class iso _TestWindowState is UnitTest
     let in_reader: Reader = Reader
     in_reader.append(consume s)
     (let index', let buf', let size', let count') =
-      WindowStateDecoder(in_reader)
+      WindowStateDecoder(in_reader)?
     h.assert_eq[USize](index, index')
     h.assert_eq[USize](size, size')
     h.assert_eq[USize](count, count')
     // we have to make another copy of the original buffer since we used it up
     let buf'': Array[U64] val = consume buf'
-    let buf_clone: Array[U64] val = recover [12,13,14,11] end
+    let buf_clone: Array[U64] val = recover [12; 13; 14; 11] end
     for (i, v) in buf_clone.pairs() do
-      h.assert_eq[U64](v, buf''(i))
+      h.assert_eq[U64](v, buf''(i)?)
     end
 
 

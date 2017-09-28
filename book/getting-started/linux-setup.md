@@ -16,50 +16,11 @@ If you do not already have Git installed, install it:
 sudo apt-get install git
 ```
 
-## Install LLVM 3.9
-
-Visit [http://apt.llvm.org](http://apt.llvm.org) and select the correct apt mirror for you version of Ubuntu.
-
-### Xenial Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
-
-Open `/etc/apt/sources.list` and add the following lines to the end of
-the file:
-
-```
-deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main
-deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main
-```
-
-### Trusty Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
-
-Open `/etc/apt/sources.list` and add the following lines to the end of
-the file:
-
-```
-deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
-deb-src http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
-```
-
-### Add the LLVM repo as a trusted source
-
-```bash
-cd ~/
-wget -O llvm-snapshot.gpg.key http://apt.llvm.org/llvm-snapshot.gpg.key
-sudo apt-key add llvm-snapshot.gpg.key
-```
-
-### Install
+## Install make
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y llvm-3.9
-```
-
-## Install Pony compiler dependencies
-
-```bash
-sudo apt-get install -y build-essential zlib1g-dev \
-  libncurses5-dev libssl-dev
+sudo apt-get install -y build-essential
 ```
 
 ### Install GCC 5 or Higher
@@ -90,48 +51,15 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
   /usr/bin/gcc-5 60 --slave /usr/bin/g++ g++ /usr/bin/g++-5
 ```
 
-### Install prce2
-
-#### Xenial Ubuntu:
-
-```bash
-sudo apt-get install -y libpcre2-dev
-```
-
-#### Trusty Ubuntu:
-
-*Note:* some older versions of Ubuntu do not supply a prce2
-package. If you get an error that no package exists (`E: Package
-'libpcre2-dev' has no installation candidate`) then you will need to
-install from source like this:
-
-```bash
-cd ~/
-wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2
-tar xjvf pcre2-10.21.tar.bz2
-cd pcre2-10.21
-./configure --prefix=/usr
-make
-sudo make install
-```
-
 ### Installing ponyc
 
-Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`. Run:
+Now you need to install Pony compiler `ponyc`. Run:
 
 ```bash
-cd ~/
-wget https://github.com/WallarooLabs/ponyc/archive/wallaroolabs-19.2.14.tar.gz
-tar xzfv wallaroolabs-19.2.14.tar.gz
-cd ponyc-wallaroolabs-19.2.14
-sudo make config=release install
-```
-
-You can check that the installation was successful by running:
-
-```bash
-ponyc examples/helloworld
-./helloworld
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "8756 C4F7 65C9 AC3C B6B8  5D62 379C E192 D401 AB61"
+echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
+sudo apt-get update
+sudo apt-get -V install ponyc
 ```
 
 ## Installing pony-stable
@@ -139,12 +67,10 @@ ponyc examples/helloworld
 Next, you need to install `pony-stable`, a Pony dependency management library. Navigate to a directory where you will put the `pony-stable` repo and execute the following commands:
 
 ```bash
-cd ~/
-git clone https://github.com/ponylang/pony-stable
-cd pony-stable
-git checkout 0054b429a54818d187100ed40f5525ec7931b31b
-make
-sudo make install
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
+echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list
+sudo apt-get update
+sudo apt-get -V install pony-stable
 ```
 
 ## Install Compression Development Libraries

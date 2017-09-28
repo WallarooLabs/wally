@@ -81,11 +81,11 @@ actor DataChannelListener
     """
     close()
 
-  fun local_address(): IPAddress =>
+  fun local_address(): NetAddress =>
     """
     Return the bound IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
@@ -173,7 +173,7 @@ actor DataChannelListener
     """
     try
       let data_channel = DataChannel._accept(this, _notify.connected(this,
-        _router_registry), ns, _init_size, _max_size)
+        _router_registry)?, ns, _init_size, _max_size)
       _router_registry.register_data_channel(data_channel)
       _count = _count + 1
     else

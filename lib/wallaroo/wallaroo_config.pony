@@ -23,16 +23,16 @@ use "wallaroo/ent/spike"
 class StartupOptions
   var m_arg: (Array[String] | None) = None
   var input_addrs: Array[Array[String]] val = recover Array[Array[String]] end
-  var c_addr: Array[String] = ["", "0"]
+  var c_addr: Array[String] = [""; "0"]
   var c_host: String = ""
   var c_service: String = "0"
-  var d_addr: Array[String] val = recover ["", "0"] end
+  var d_addr: Array[String] val = recover [""; "0"] end
   var d_host: String = ""
   var d_service: String = "0"
-  var my_c_addr: Array[String] = ["", "0"]
+  var my_c_addr: Array[String] = [""; "0"]
   var my_c_host: String = ""
   var my_c_service: String = "0"
-  var my_d_addr: Array[String] = ["", "0"]
+  var my_d_addr: Array[String] = [""; "0"]
   var my_d_host: String = ""
   var my_d_service: String = "0"
   var p_arg: (Array[String] | None) = None
@@ -51,18 +51,18 @@ class StartupOptions
 
 primitive WallarooConfig
   fun application_args(args: Array[String] val): Array[String] val ? =>
-    (let z, let remaining) = _parse(args where handle_help = false)
+    (let z, let remaining) = _parse(args where handle_help = false)?
     remaining
 
   fun wallaroo_args(args: Array[String] val): StartupOptions ? =>
-    (let so, let z) = _parse(args where handle_help = true)
+    (let so, let z) = _parse(args where handle_help = true)?
     so
 
   fun wactor_args(args: Array[String] val): StartupOptions ? =>
     // The wactor system expects to get input addresses from this function,
     // Wallaroo expects applications to parse this information themselves.
     (let so, let z) = _parse(args where handle_help = true,
-      include_input_addrs = true)
+      include_input_addrs = true)?
     so
 
   fun _parse(args: Array[String] val, handle_help: Bool,
@@ -125,24 +125,24 @@ primitive WallarooConfig
         so.input_addrs = consume i_addrs_write
       | ("control", let arg: String) =>
         so.c_addr = arg.split(":")
-        so.c_host = so.c_addr(0)
-        so.c_service = so.c_addr(1)
+        so.c_host = so.c_addr(0)?
+        so.c_service = so.c_addr(1)?
       | ("data", let arg: String) =>
         let d_addr_ref = arg.split(":")
         let d_addr_trn = recover trn Array[String] end
-        d_addr_trn.push(d_addr_ref(0))
-        d_addr_trn.push(d_addr_ref(1))
+        d_addr_trn.push(d_addr_ref(0)?)
+        d_addr_trn.push(d_addr_ref(1)?)
         so.d_addr = consume d_addr_trn
-        so.d_host = so.d_addr(0)
-        so.d_service = so.d_addr(1)
+        so.d_host = so.d_addr(0)?
+        so.d_service = so.d_addr(1)?
       | ("my-control", let arg: String) =>
         so.my_c_addr = arg.split(":")
-        so.my_c_host = so.my_c_addr(0)
-        so.my_c_service = so.my_c_addr(1)
+        so.my_c_host = so.my_c_addr(0)?
+        so.my_c_service = so.my_c_addr(1)?
       | ("my-data", let arg: String) =>
         so.my_d_addr = arg.split(":")
-        so.my_d_host = so.my_d_addr(0)
-        so.my_d_service = so.my_d_addr(1)
+        so.my_d_host = so.my_d_addr(0)?
+        so.my_d_service = so.my_d_addr(1)?
       | ("phone-home", let arg: String) =>
         so.p_arg = arg.split(":")
       | ("external", let arg: String) =>
@@ -218,7 +218,7 @@ primitive WallarooConfig
 
     ifdef "spike" then
       so.spike_config = SpikeConfig(spike_drop, spike_prob, spike_margin,
-        spike_seed)
+        spike_seed)?
       let sc = so.spike_config as SpikeConfig
 
       @printf[I32](("|||Spike seed: " + sc.seed.string() +

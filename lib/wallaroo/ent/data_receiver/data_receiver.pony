@@ -83,7 +83,7 @@ actor DataReceiver is Producer
 
   fun _ack_data_connect() =>
     try
-      let ack_msg = ChannelMsgEncoder.ack_data_connect(_last_id_seen, _auth)
+      let ack_msg = ChannelMsgEncoder.ack_data_connect(_last_id_seen, _auth)?
       _write_on_conn(ack_msg)
     else
       Fail()
@@ -91,7 +91,7 @@ actor DataReceiver is Producer
 
   fun _inform_boundary_to_send_normal_messages() =>
     try
-      let start_msg = ChannelMsgEncoder.start_normal_data_sending(_auth)
+      let start_msg = ChannelMsgEncoder.start_normal_data_sending(_auth)?
       _write_on_conn(start_msg)
     else
       Fail()
@@ -126,7 +126,7 @@ actor DataReceiver is Producer
         end
 
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
-          _sender_step_id, watermark, _auth)
+          _sender_step_id, watermark, _auth)?
         _write_on_conn(ack_msg)
         _last_id_acked = watermark
       end
@@ -225,7 +225,7 @@ actor DataReceiver is Producer
         end
         _last_id_acked = _last_id_seen
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
-          _sender_step_id, _last_id_seen, _auth)
+          _sender_step_id, _last_id_seen, _auth)?
         _write_on_conn(ack_msg)
       end
     else

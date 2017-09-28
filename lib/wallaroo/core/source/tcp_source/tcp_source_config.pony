@@ -35,7 +35,7 @@ primitive TCPSourceConfigCLIParser
       | ("help", let arg: None) =>
         StartupHelp()
       | (in_arg, let input: String) =>
-        return _from_input_string(input)
+        return _from_input_string(input)?
       end
     end
 
@@ -46,7 +46,7 @@ primitive TCPSourceConfigCLIParser
 
     for input in inputs.split(",").values() do
       let i = input.split(":")
-      opts.push(TCPSourceConfigOptions(i(0), i(1)))
+      opts.push(TCPSourceConfigOptions(i(0)?, i(1)?))
     end
 
     consume opts

@@ -41,8 +41,8 @@ actor Main
           match option
           | ("external", let arg: String) =>
             let x_addr = arg.split(":")
-            x_host = x_addr(0)
-            x_service = x_addr(1)
+            x_host = x_addr(0)?
+            x_service = x_addr(1)?
           | ("message", let arg: String) => message = arg
           | ("type", let arg: String) => message_type = arg
           | ("help", None) =>
@@ -95,3 +95,6 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
     n: USize): Bool
   =>
     true
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    None

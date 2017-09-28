@@ -45,7 +45,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
+  flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
@@ -137,7 +137,7 @@ actor TCPSink is Consumer
     """
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _notify = TCPSinkNotify
@@ -194,7 +194,7 @@ actor TCPSink is Consumer
       @printf[I32]("Rcvd msg at TCPSink\n".cstring())
     end
     try
-      let encoded = _encoder.encode[D](data, _wb)
+      let encoded = _encoder.encode[D](data, _wb)?
 
       let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
       _writev(encoded, next_tracking_id)
@@ -425,7 +425,7 @@ actor TCPSink is Consumer
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
-      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
       data_size = data_size + bytes.size()
@@ -448,7 +448,7 @@ actor TCPSink is Consumer
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
-    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev.>push(data.cpointer().usize()).>push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
     ifdef "resilience" then
       match tracking_id
@@ -527,10 +527,8 @@ actor TCPSink is Consumer
     _pending_writev_total = 0
     _readable = false
     _writeable = false
-    ifdef linux then
-      AsioEvent.set_readable(_event, false)
-      AsioEvent.set_writeable(_event, false)
-    end
+    @pony_asio_event_set_readable[None](_event, false)
+    @pony_asio_event_set_writeable[None](_event, false)
 
     @pony_os_socket_close[None](_fd)
     _fd = -1
@@ -562,15 +560,11 @@ actor TCPSink is Consumer
         | 0 =>
           // Would block, try again later.
           _readable = false
-          ifdef linux then
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
-          else
-            _readable = false
-          end
+          // this is safe because asio thread isn't currently subscribed
+          // for a read event so will not be writing to the readable flag
+          @pony_asio_event_set_readable[None](_event, false)
+          _readable = false
+          @pony_asio_event_resubscribe_read(_event)
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -640,7 +634,7 @@ actor TCPSink is Consumer
           num_to_send = writev_batch_size
           bytes_to_send = 0
           for d in Range[USize](1, num_to_send*2, 2) do
-            bytes_to_send = bytes_to_send + _pending_writev(d)
+            bytes_to_send = bytes_to_send + _pending_writev(d)?
           end
         end
 
@@ -653,17 +647,17 @@ actor TCPSink is Consumer
 
         if len < bytes_to_send then
           while len > 0 do
-            let iov_p = _pending_writev(0)
-            let iov_s = _pending_writev(1)
+            let iov_p = _pending_writev(0)?
+            let iov_s = _pending_writev(1)?
             if iov_s <= len then
               len = len - iov_s
-              _pending_writev.shift()
-              _pending_writev.shift()
-              _pending.shift()
+              _pending_writev.shift()?
+              _pending_writev.shift()?
+              _pending.shift()?
               _pending_writev_total = _pending_writev_total - iov_s
             else
-              _pending_writev.update(0, iov_p+len)
-              _pending_writev.update(1, iov_s-len)
+              _pending_writev.update(0, iov_p+len)?
+              _pending_writev.update(1, iov_s-len)?
               _pending_writev_total = _pending_writev_total - len
               len = 0
             end
@@ -681,9 +675,9 @@ actor TCPSink is Consumer
             return true
           else
            for d in Range[USize](0, num_to_send, 1) do
-             _pending_writev.shift()
-             _pending_writev.shift()
-             _pending.shift()
+             _pending_writev.shift()?
+             _pending_writev.shift()?
+             _pending.shift()?
            end
 
           end
@@ -716,12 +710,12 @@ actor TCPSink is Consumer
 
       try
         while bytes_sent > 0 do
-          let node = _pending_tracking.head()
-          (let bytes, let tracking_id) = node()
+          let node = _pending_tracking.head()?
+          (let bytes, let tracking_id) = node()?
           if bytes <= bytes_sent then
             num_sent = num_sent + 1
             bytes_sent = bytes_sent - bytes
-            _pending_tracking.shift()
+            _pending_tracking.shift()?
             match tracking_id
             | let id: SeqId =>
               tracked_sent = tracked_sent + 1
@@ -731,7 +725,7 @@ actor TCPSink is Consumer
             let bytes_remaining = bytes - bytes_sent
             bytes_sent = 0
             // update remaining for this message
-            node() = (bytes_remaining, tracking_id)
+            node()? = (bytes_remaining, tracking_id)
           end
         end
 
@@ -751,11 +745,11 @@ actor TCPSink is Consumer
       _read_buf.undefined(_next_size)
     end
 
-  fun local_address(): IPAddress =>
+  fun local_address(): NetAddress =>
     """
     Return the local IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
@@ -797,12 +791,10 @@ actor TCPSink is Consumer
     if not _throttled then
       _throttled = true
       _writeable = false
-      ifdef linux then
-        // this is safe because asio thread isn't currently subscribed
-        // for a write event so will not be writing to the readable flag
-        AsioEvent.set_writeable(_event, false)
-        @pony_asio_event_resubscribe_write(_event)
-      end
+      // this is safe because asio thread isn't currently subscribed
+      // for a write event so will not be writing to the readable flag
+      @pony_asio_event_set_writeable[None](_event, false)
+      @pony_asio_event_resubscribe_write(_event)
       _notify.throttled(this)
       _maybe_mute_or_unmute_upstreams()
     end
@@ -895,10 +887,10 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
     qty
 
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[None]("TCPSink is experiencing back pressure\n".cstring())
+    @printf[I32]("TCPSink is experiencing back pressure\n".cstring())
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[None](("TCPSink is no longer experiencing" +
+    @printf[I32](("TCPSink is no longer experiencing" +
       " back pressure\n").cstring())
 
 class PauseBeforeReconnectTCPSink is TimerNotify

@@ -32,6 +32,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 
+
 actor Connections is Cluster
   let _app_name: String
   let _worker_name: String
@@ -41,7 +42,8 @@ actor Connections is Cluster
   var _my_data_addr: (String, String) = ("", "")
   let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
   let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
-  let _control_conns: Map[String, TCPConnection] = _control_conns.create()
+  let _control_conns: Map[String, ControlConnection] =
+    _control_conns.create()
   let _data_conn_builders: Map[String, OutgoingBoundaryBuilder] =
     _data_conn_builders.create()
   let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
@@ -158,8 +160,8 @@ actor Connections is Cluster
     if recovery_addr_file.exists() then
       try
         let file = File(recovery_addr_file)
-        let host' = file.line()
-        let port' = file.line()
+        let host' = file.line()?
+        let port' = file.line()?
 
         @printf[I32]("Restarting a listener ...\n\n".cstring())
 
@@ -182,8 +184,8 @@ actor Connections is Cluster
     if recovery_addr_file.exists() then
       try
         let file = File(recovery_addr_file)
-        var host': String = file.line()
-        let port': String = file.line()
+        var host': String = file.line()?
+        let port': String = file.line()?
 
         @printf[I32]("Restarting a data channel listener on %s:%s...\n\n"
           .cstring(), host'.cstring(), port'.cstring())
@@ -227,7 +229,7 @@ actor Connections is Cluster
 
   fun _send_control(worker: String, data: Array[ByteSeq] val) =>
     try
-      _control_conns(worker).writev(data)
+      _control_conns(worker)?.writev(data)
       @printf[I32](("Sent control message to " + worker + "\n").cstring())
     else
       @printf[I32](("No control connection for worker " + worker + "\n")
@@ -261,7 +263,7 @@ actor Connections is Cluster
 
   fun _send_data(worker: String, data: Array[ByteSeq] val) =>
     try
-      _data_conns(worker).writev(data)
+      _data_conns(worker)?.writev(data)
     else
       @printf[I32](("No outgoing boundary to worker " + worker + "\n")
         .cstring())
@@ -278,7 +280,7 @@ actor Connections is Cluster
   =>
     try
       let new_step_msg = ChannelMsgEncoder.announce_new_stateful_step[K](id,
-        _worker_name, key, state_name, _auth)
+        _worker_name, key, state_name, _auth)?
       for (target, ch) in _control_conns.pairs() do
         // Only send to workers that don't already know about this step
         if not exclusions.contains(target) then
@@ -286,9 +288,9 @@ actor Connections is Cluster
         end
       end
       let migration_complete_msg =
-        ChannelMsgEncoder.step_migration_complete(id, _auth)
+        ChannelMsgEncoder.step_migration_complete(id, _auth)?
       for producer in exclusions.values() do
-        _control_conns(producer).writev(migration_complete_msg)
+        _control_conns(producer)?.writev(migration_complete_msg)
       end
     else
       Fail()
@@ -298,7 +300,7 @@ actor Connections is Cluster
   =>
     try
       let mute_request_msg =
-        ChannelMsgEncoder.mute_request(_worker_name, _auth)
+        ChannelMsgEncoder.mute_request(_worker_name, _auth)?
       for (target, ch) in _control_conns.pairs() do
         if
           (target != _worker_name) and
@@ -315,7 +317,7 @@ actor Connections is Cluster
   be request_cluster_unmute() =>
     try
       let unmute_request_msg = ChannelMsgEncoder.unmute_request(_worker_name,
-        _auth)
+        _auth)?
       for (target, ch) in _control_conns.pairs() do
         if target != _worker_name then
           ch.writev(unmute_request_msg)
@@ -337,7 +339,7 @@ actor Connections is Cluster
     local_topology_initializer: LocalTopologyInitializer)
   =>
     try
-      (let host, let service) = _data_addrs(target)
+      (let host, let service) = _data_addrs(target)?
       let reporter = MetricsReporter(_app_name,
         _worker_name, _metrics_conn)
       let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
@@ -409,7 +411,7 @@ actor Connections is Cluster
 
       if not _is_joining then
         let connections_ready_msg = ChannelMsgEncoder.connections_ready(
-          _worker_name, _auth)
+          _worker_name, _auth)?
 
         _send_control("initializer", connections_ready_msg)
       end
@@ -446,11 +448,11 @@ actor Connections is Cluster
 
     try
       let connection_addresses_file = FilePath(_auth,
-        _connection_addresses_file)
+        _connection_addresses_file)?
       let file = File(connection_addresses_file)
       let wb = Writer
       let serialised_connection_addresses: Array[U8] val =
-        Serialised(SerialiseAuth(_auth), addresses).output(
+        Serialised(SerialiseAuth(_auth), addresses)?.output(
           OutputSerialisedAuth(_auth))
       wb.write(serialised_connection_addresses)
       file.writev(recover val wb.done() end)
@@ -472,7 +474,7 @@ actor Connections is Cluster
       @printf[I32]("Recovering connection addresses!\n".cstring())
       try
         let connection_addresses_file = FilePath(_auth,
-          _connection_addresses_file)
+          _connection_addresses_file)?
         if connection_addresses_file.exists() then
           //we are recovering an existing worker topology
           let data = recover val
@@ -480,7 +482,7 @@ actor Connections is Cluster
             file.read(file.size())
           end
           match Serialised.input(InputSerialisedAuth(_auth), data)(
-            DeserialiseAuth(_auth))
+            DeserialiseAuth(_auth))?
           | let a: Map[String, Map[String, (String, String)]] val =>
             addresses = a
           else
@@ -491,8 +493,8 @@ actor Connections is Cluster
       else
         Fail()
       end
-      let control_addrs = addresses("control")
-      let data_addrs = addresses("data")
+      let control_addrs = addresses("control")?
+      let data_addrs = addresses("data")?
       for (target, address) in control_addrs.pairs() do
         if target != _worker_name then
           _create_control_connection(target, address._1, address._2)
@@ -523,16 +525,17 @@ actor Connections is Cluster
     service: String)
   =>
     _control_addrs(target_name) = (host, service)
+    let tcp_conn_wrapper = ControlConnection
     let control_notifier: TCPConnectionNotify iso =
-      ControlSenderConnectNotifier(_auth, target_name)
+      ControlSenderConnectNotifier(_auth, target_name, tcp_conn_wrapper)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
-    _control_conns(target_name) = control_conn
+    _control_conns(target_name) = tcp_conn_wrapper
 
   be reconnect_data_connection(target_name: String) =>
     if _data_conns.contains(target_name) then
       try
-        let outgoing_boundary = _data_conns(target_name)
+        let outgoing_boundary = _data_conns(target_name)?
         outgoing_boundary.reconnect()
       end
     else
@@ -573,7 +576,7 @@ actor Connections is Cluster
   be update_boundary_ids(boundary_ids: Map[String, U128] val) =>
     for (worker, boundary) in _data_conns.pairs() do
       try
-        boundary.register_step_id(boundary_ids(worker))
+        boundary.register_step_id(boundary_ids(worker)?)
       else
         @printf[I32](("Could not register step id for boundary to " + worker +
           "\n").cstring())
@@ -597,9 +600,9 @@ actor Connections is Cluster
 
     try
       let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
-        _app_name, local_topology.for_new_worker(worker), _metrics_host,
+        _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
         _metrics_service, consume c_addrs, consume d_addrs,
-        local_topology.worker_names, _auth)
+        local_topology.worker_names, _auth)?
       conn.writev(inform_msg)
       @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
         "necessary information.***\n").cstring(), worker.cstring())
@@ -616,7 +619,7 @@ actor Connections is Cluster
         Fail()
       end
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
-        _my_control_addr, _my_data_addr, _auth)
+        _my_control_addr, _my_data_addr, _auth)?
       _send_control_to_cluster(msg)
     else
       Fail()
@@ -625,7 +628,7 @@ actor Connections is Cluster
   be inform_worker_of_boundary_count(target_worker: String, count: USize) =>
     try
       let msg = ChannelMsgEncoder.replay_boundary_count(_worker_name, count,
-        _auth)
+        _auth)?
       _send_control(target_worker, msg)
       @printf[I32]("Informed %s that I have %lu boundaries to it\n".cstring(),
         target_worker.cstring(), count)
@@ -648,8 +651,8 @@ actor Connections is Cluster
     """
     try
       let ack_migration_batch_complete_msg =
-        ChannelMsgEncoder.ack_migration_batch_complete(_worker_name, _auth)
-      _control_conns(ack_target).writev(ack_migration_batch_complete_msg)
+        ChannelMsgEncoder.ack_migration_batch_complete(_worker_name, _auth)?
+      _control_conns(ack_target)?.writev(ack_migration_batch_complete_msg)
     else
       Fail()
     end
@@ -698,7 +701,7 @@ actor Connections is Cluster
         _event_log.start_rotation()
       elseif _control_conns.contains(worker_name) then
         try
-          let rotate_log_files_msg = ChannelMsgEncoder.rotate_log_files(_auth)
+          let rotate_log_files_msg = ChannelMsgEncoder.rotate_log_files(_auth)?
           _send_control(worker_name, rotate_log_files_msg)
         else
           Fail()

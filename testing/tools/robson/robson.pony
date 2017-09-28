@@ -118,7 +118,7 @@ actor MetricsCollector
   be print_metrics() =>
     try
       let auth = _env.root as AmbientAuth
-      let output_file = File(FilePath(auth, _output_file_path))
+      let output_file = File(FilePath(auth, _output_file_path)?)
       output_file.write(TextFormatter.main_header())
       output_file.write(TextFormatter.main_header())
       output_file.print("Wallaroo Metrics Report")
@@ -159,7 +159,7 @@ actor MetricsCollector
     try
       let auth = _env.root as AmbientAuth
 
-      let input_file = File(FilePath(auth, _input_file_path))
+      let input_file = File(FilePath(auth, _input_file_path)?)
       let input: Array[U8] val = input_file.read(input_file.size())
 
       let rb = Reader
@@ -167,9 +167,9 @@ actor MetricsCollector
       var bytes_left = input.size()
 
       while bytes_left > 0 do
-        let next_payload_size = rb.u32_be().usize()
+        let next_payload_size = rb.u32_be()?.usize()
         try
-          let hub_msg = HubProtocolDecoder(rb.block(next_payload_size))
+          let hub_msg = HubProtocolDecoder(rb.block(next_payload_size)?)?
           match hub_msg
           | HubJoinMsg =>
             @printf[I32]("Decoded HubJoinMsg\n".cstring())
@@ -203,30 +203,30 @@ actor MetricsCollector
   fun ref generate_overall_metrics_data() =>
    for (name, metrics_msgs) in _overall_metrics_msgs.pairs() do
     try
-      let metrics_msg = metrics_msgs(0)
+      let metrics_msg = metrics_msgs(0)?
       let metrics_data = MetricsData(metrics_msg.name, metrics_msg.category,
         metrics_msg.period, metrics_msgs)
-      _overall_metrics_data.insert(name, metrics_data)
+      _overall_metrics_data.insert(name, metrics_data)?
     end
    end
 
   fun ref generate_computation_metrics_data() =>
     for (name, metrics_msgs) in _computation_metrics_msgs.pairs() do
     try
-       let metrics_msg = metrics_msgs(0)
+       let metrics_msg = metrics_msgs(0)?
        let metrics_data = MetricsData(metrics_msg.name, metrics_msg.category,
          metrics_msg.period, metrics_msgs)
-       _computation_metrics_data.insert(name, metrics_data)
+       _computation_metrics_data.insert(name, metrics_data)?
      end
     end
 
   fun ref generate_worker_metrics_data() =>
     for (name, metrics_msgs) in _worker_metrics_msgs.pairs() do
     try
-       let metrics_msg = metrics_msgs(0)
+       let metrics_msg = metrics_msgs(0)?
        let metrics_data = MetricsData(metrics_msg.name, metrics_msg.category,
          metrics_msg.period, metrics_msgs)
-       _worker_metrics_data.insert(name, metrics_data)
+       _worker_metrics_data.insert(name, metrics_data)?
      end
     end
 
@@ -254,14 +254,14 @@ class MetricsData
     period = period'
     try
       for metrics_msg in metrics_msgs.values() do
-        update_total_counts_per_bin(metrics_msg.histogram)
+        update_total_counts_per_bin(metrics_msg.histogram)?
         update_min(metrics_msg.histogram_min)
         update_max(metrics_msg.histogram_max)
         update_min_period_ends_at(metrics_msg.period_ends_at)
         update_max_period_ends_at(metrics_msg.period_ends_at)
         let throughput_for_period =
           calculate_throughput_for_period(metrics_msg.histogram)
-        update_throughput_by_period_end(throughput_for_period, metrics_msg.period_ends_at)
+        update_throughput_by_period_end(throughput_for_period, metrics_msg.period_ends_at)?
       end
     end
     calculate_total_throughput()
@@ -280,11 +280,11 @@ class MetricsData
 
   fun ref update_total_counts_per_bin(counts_by_bin: Array[U64 val] val) ? =>
     for idx in Range(0, 65) do
-      let count_in_bin = counts_by_bin(idx)
+      let count_in_bin = counts_by_bin(idx)?
       if count_in_bin != 0 then
-        let total_count_in_bin = total_counts_per_bin(idx)
+        let total_count_in_bin = total_counts_per_bin(idx)?
         let updated_count_in_bin = total_count_in_bin + count_in_bin
-        total_counts_per_bin.update(idx, updated_count_in_bin)
+        total_counts_per_bin.update(idx, updated_count_in_bin)?
       end
     end
 
@@ -314,7 +314,7 @@ class MetricsData
     throughputs_by_period.upsert(period_end, throughput,
       {(prev_throughput: U64, current_throughput: U64): U64 =>
         prev_throughput + current_throughput
-      })
+      })?
 
   fun ref calculate_throughput_min_max() =>
     for (period_end, throughput) in throughputs_by_period.pairs() do
@@ -345,17 +345,17 @@ class MetricsData
 
   fun ref print_stats(): String iso^ =>
     let header = (TextFormatter.secondary_header()).clone()
-      .append("Stats for: ")
-      .append(name)
-      .append(TextFormatter.line_break())
-      .append(TextFormatter.secondary_header())
-      .append("Initial metric timestamp: ")
-      .append(min_period_ends_at.string())
-      .append(TextFormatter.line_break())
-      .append("Final metric timestamp:   ")
-      .append(max_period_ends_at.string())
-      .append(TextFormatter.line_break())
-      .append(TextFormatter.line_break())
+      .>append("Stats for: ")
+      .>append(name)
+      .>append(TextFormatter.line_break())
+      .>append(TextFormatter.secondary_header())
+      .>append("Initial metric timestamp: ")
+      .>append(min_period_ends_at.string())
+      .>append(TextFormatter.line_break())
+      .>append("Final metric timestamp:   ")
+      .>append(max_period_ends_at.string())
+      .>append(TextFormatter.line_break())
+      .>append(TextFormatter.line_break())
 
 
     let throughput_stats_text = if throughput_stats is None then
@@ -370,8 +370,8 @@ class MetricsData
       latency_stats.string()
     end
 
-    header.append(throughput_stats_text)
-      .append(latency_stats_text).clone()
+    header.>append(throughput_stats_text)
+      .>append(latency_stats_text).clone()
 
 
 class ThroughputStats
@@ -430,22 +430,22 @@ class ThroughputStats
       else
         return "Under 100".clone()
       end
-    formatted_throughput.clone().append("k").clone()
+    formatted_throughput.clone().>append("k").clone()
 
   fun string(): String iso^ =>
     (TextFormatter.secondary_header()).clone()
-      .append("Throughput Stats\n")
-      .append(TextFormatter.secondary_header())
-      .append("Minimum Throughput per sec: ")
-      .append(format_throughput(min_throughput_per_sec))
-      .append(TextFormatter.line_break())
-      .append("Average Throughput per sec: ")
-      .append(format_throughput(avg_throughput_per_sec))
-      .append(TextFormatter.line_break())
-      .append("Maximum Throughput per sec: ")
-      .append(format_throughput(max_throughput_per_sec))
-      .append(TextFormatter.line_break())
-      .append(TextFormatter.line_break())
+      .>append("Throughput Stats\n")
+      .>append(TextFormatter.secondary_header())
+      .>append("Minimum Throughput per sec: ")
+      .>append(format_throughput(min_throughput_per_sec))
+      .>append(TextFormatter.line_break())
+      .>append("Average Throughput per sec: ")
+      .>append(format_throughput(avg_throughput_per_sec))
+      .>append(TextFormatter.line_break())
+      .>append("Maximum Throughput per sec: ")
+      .>append(format_throughput(max_throughput_per_sec))
+      .>append(TextFormatter.line_break())
+      .>append(TextFormatter.line_break())
       .clone()
 
 class LatencyStats
@@ -527,30 +527,30 @@ class LatencyStats
 
   fun string(): String iso^ =>
     (TextFormatter.secondary_header()).clone()
-      .append("Latency Stats\n")
-      .append(TextFormatter.secondary_header())
-      .append("   50% of latencies are: ")
-      .append(_bin_to_time_converter.get_time_for_bin(_bin_at_50_percent))
-      .append(TextFormatter.line_break())
-      .append("   75% of latencies are: ")
-      .append(_bin_to_time_converter.get_time_for_bin(_bin_at_75_percent))
-      .append(TextFormatter.line_break())
-      .append("   90% of latencies are: ")
-      .append(_bin_to_time_converter.get_time_for_bin(_bin_at_90_percent))
-      .append(TextFormatter.line_break())
-      .append("   95% of latencies are: ")
-      .append(_bin_to_time_converter.get_time_for_bin(_bin_at_95_percent))
-      .append(TextFormatter.line_break())
-      .append("   99% of latencies are: ")
-      .append(_bin_to_time_converter.get_time_for_bin(_bin_at_99_percent))
-      .append(TextFormatter.line_break())
-      .append(" 99.9% of latencies are: ")
-      .append(_bin_to_time_converter.get_time_for_bin(_bin_at_99_9_percent))
-      .append(TextFormatter.line_break())
-      .append("99.99% of latencies are: ")
-      .append(_bin_to_time_converter.get_time_for_bin(_bin_at_99_99_percent))
-      .append(TextFormatter.line_break())
-      .append(TextFormatter.line_break())
+      .>append("Latency Stats\n")
+      .>append(TextFormatter.secondary_header())
+      .>append("   50% of latencies are: ")
+      .>append(_bin_to_time_converter.get_time_for_bin(_bin_at_50_percent))
+      .>append(TextFormatter.line_break())
+      .>append("   75% of latencies are: ")
+      .>append(_bin_to_time_converter.get_time_for_bin(_bin_at_75_percent))
+      .>append(TextFormatter.line_break())
+      .>append("   90% of latencies are: ")
+      .>append(_bin_to_time_converter.get_time_for_bin(_bin_at_90_percent))
+      .>append(TextFormatter.line_break())
+      .>append("   95% of latencies are: ")
+      .>append(_bin_to_time_converter.get_time_for_bin(_bin_at_95_percent))
+      .>append(TextFormatter.line_break())
+      .>append("   99% of latencies are: ")
+      .>append(_bin_to_time_converter.get_time_for_bin(_bin_at_99_percent))
+      .>append(TextFormatter.line_break())
+      .>append(" 99.9% of latencies are: ")
+      .>append(_bin_to_time_converter.get_time_for_bin(_bin_at_99_9_percent))
+      .>append(TextFormatter.line_break())
+      .>append("99.99% of latencies are: ")
+      .>append(_bin_to_time_converter.get_time_for_bin(_bin_at_99_99_percent))
+      .>append(TextFormatter.line_break())
+      .>append(TextFormatter.line_break())
       .clone()
 
   primitive TextFormatter
@@ -569,38 +569,38 @@ class LatencyStats
 
   new create() =>
     try
-      _power_to_time_map.insert(0, "Unable to determine the latency bin")
-      _power_to_time_map.insert(1, "≤   1 ns")
-      _power_to_time_map.insert(2, "≤   2 ns")
-      _power_to_time_map.insert(4, "≤   4 ns")
-      _power_to_time_map.insert(8, "≤   8 ns")
-      _power_to_time_map.insert(16, "≤  16 ns")
-      _power_to_time_map.insert(32, "≤  32 ns")
-      _power_to_time_map.insert(64, "≤  64 ns")
-      _power_to_time_map.insert(128, "≤ 128 ns")
-      _power_to_time_map.insert(256, "≤ 256 ns")
-      _power_to_time_map.insert(512, "≤ 512 ns")
-      _power_to_time_map.insert(1_024, "≤   1 μs")
-      _power_to_time_map.insert(2_048, "≤   2 μs")
-      _power_to_time_map.insert(4_096, "≤   4 μs")
-      _power_to_time_map.insert(8_192, "≤   8 μs")
-      _power_to_time_map.insert(16_384, "≤  16 μs")
-      _power_to_time_map.insert(32_768, "≤  32 μs")
-      _power_to_time_map.insert(65_536, "≤  66 μs")
-      _power_to_time_map.insert(131_072, "≤ 130 μs")
-      _power_to_time_map.insert(262_144, "≤ 260 μs")
-      _power_to_time_map.insert(524_288, "≤ 0.5 ms")
-      _power_to_time_map.insert(1_048_576, "≤   1 ms")
-      _power_to_time_map.insert(2_097_152, "≤   2 ms")
-      _power_to_time_map.insert(4_194_304, "≤   4 ms")
-      _power_to_time_map.insert(8_388_608, "≤   8 ms")
-      _power_to_time_map.insert(16_777_216, "≤  16 ms")
-      _power_to_time_map.insert(33_554_432, "≤  34 ms")
-      _power_to_time_map.insert(67_108_864, "≤  66 ms")
-      _power_to_time_map.insert(134_217_728, "≤ 134 ms")
-      _power_to_time_map.insert(268_435_456, "≤ 260 ms")
-      _power_to_time_map.insert(536_870_912, "≤ 0.5 s")
-      _power_to_time_map.insert(1_073_741_824, "≤   1 s")
+      _power_to_time_map.insert(0, "Unable to determine the latency bin")?
+      _power_to_time_map.insert(1, "≤   1 ns")?
+      _power_to_time_map.insert(2, "≤   2 ns")?
+      _power_to_time_map.insert(4, "≤   4 ns")?
+      _power_to_time_map.insert(8, "≤   8 ns")?
+      _power_to_time_map.insert(16, "≤  16 ns")?
+      _power_to_time_map.insert(32, "≤  32 ns")?
+      _power_to_time_map.insert(64, "≤  64 ns")?
+      _power_to_time_map.insert(128, "≤ 128 ns")?
+      _power_to_time_map.insert(256, "≤ 256 ns")?
+      _power_to_time_map.insert(512, "≤ 512 ns")?
+      _power_to_time_map.insert(1_024, "≤   1 μs")?
+      _power_to_time_map.insert(2_048, "≤   2 μs")?
+      _power_to_time_map.insert(4_096, "≤   4 μs")?
+      _power_to_time_map.insert(8_192, "≤   8 μs")?
+      _power_to_time_map.insert(16_384, "≤  16 μs")?
+      _power_to_time_map.insert(32_768, "≤  32 μs")?
+      _power_to_time_map.insert(65_536, "≤  66 μs")?
+      _power_to_time_map.insert(131_072, "≤ 130 μs")?
+      _power_to_time_map.insert(262_144, "≤ 260 μs")?
+      _power_to_time_map.insert(524_288, "≤ 0.5 ms")?
+      _power_to_time_map.insert(1_048_576, "≤   1 ms")?
+      _power_to_time_map.insert(2_097_152, "≤   2 ms")?
+      _power_to_time_map.insert(4_194_304, "≤   4 ms")?
+      _power_to_time_map.insert(8_388_608, "≤   8 ms")?
+      _power_to_time_map.insert(16_777_216, "≤  16 ms")?
+      _power_to_time_map.insert(33_554_432, "≤  34 ms")?
+      _power_to_time_map.insert(67_108_864, "≤  66 ms")?
+      _power_to_time_map.insert(134_217_728, "≤ 134 ms")?
+      _power_to_time_map.insert(268_435_456, "≤ 260 ms")?
+      _power_to_time_map.insert(536_870_912, "≤ 0.5 s")?
+      _power_to_time_map.insert(1_073_741_824, "≤   1 s")?
     end
 
   fun get_time_for_bin(bin: U64): String =>
