@@ -130,14 +130,15 @@ To concatenate the files, in order, use
 
 ```bash
 sender --host 127.0.0.1:7000 --file=file1,file2 --messages=100 --batch-size=1 \
-  --interval=10_000_000 --no-write
+  --interval=10_000_000 --no-write --ponythreads=1 --ponynoblock 
 ```
 
 To send the contents of the first file twice, then the contents of the second file once, use
 
 ```bash
 sender --host 127.0.0.1:7000 --file=file1,file1,file2 --messages=100 \
-  --batch-size=1 --interval=10_000_000 --no-write
+  --batch-size=1 --interval=10_000_000 --no-write \
+  --ponythreads=1 --ponynoblock 
 ```
 
 Multiple input files are also supported for binary input, but they must all be either fixed length or variable length.
@@ -150,7 +151,7 @@ To send the sequence `'1', '2', '3', ..., '100'`
 Use
 
 ```bash
-sender --host 127.0.0.1:7000 --messages 100
+sender --host 127.0.0.1:7000 --messages 100 --ponythreads=1 --ponynoblock 
 ```
 
 ### Send a sequence of numbers, encoded as big-endian U64
@@ -160,7 +161,8 @@ To send the sequence `1,2,3,...,100`
 Use
 
 ```bash
-sender --host 127.0.0.1:7000 --messages 100 --u64
+sender --host 127.0.0.1:7000 --messages 100 --u64 \
+  --ponythreads=1 --ponynoblock 
 ```
 
 To send the sequence `101,102,...,200`
@@ -168,7 +170,8 @@ To send the sequence `101,102,...,200`
 Use
 
 ```bash
-sender --host 127.0.0.1:7000 --messages 100 --u64 --start-from 100
+sender --host 127.0.0.1:7000 --messages 100 --u64 --start-from 100 \
+  --ponythreads=1 --ponynoblock 
 ```
 
 ## Preparing Data Files for Giles Sender
