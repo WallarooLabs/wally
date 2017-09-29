@@ -62,7 +62,7 @@ Run `machida` with `--application-module alphabet`:
 machida --application-module alphabet --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --external 127.0.0.1:5050 --cluster-initializer --data 127.0.0.1:6001 \
-  --name worker-name --ponythreads=1
+  --name worker-name --ponythreads=1 --ponynoblock
 ```
 
 ### Shell 3
@@ -72,7 +72,7 @@ Send messages:
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
   --batch-size 50 --interval 10_000_000 --messages 1000000 --binary \
-  --msg-size 9 --repeat --ponythreads=1 --no-write
+  --msg-size 9 --repeat --ponythreads=1 --ponynoblock --no-write
 ```
 ## Reading the Output
 

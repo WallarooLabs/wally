@@ -37,7 +37,7 @@ make
 ### Listen for Wallaroo output and save to `received.txt`
 
 ```bash
-receiver --listen 127.0.0.1:5555
+receiver --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock 
 ```
 
 ### Listen for Wallaroo output, but don't save anything (e.g. "A Very Fast Sink Receiver")
@@ -45,7 +45,7 @@ receiver --listen 127.0.0.1:5555
 If you just want your application to run as fast as possible without spending any resources on _saving output data_, use
 
 ```bash
-receiver --listen 127.0.0.1:5555 --no-write
+receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock 
 ```
 
 ## Pony Runtime Options

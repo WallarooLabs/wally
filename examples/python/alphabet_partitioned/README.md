@@ -62,7 +62,7 @@ Run `machida` with `--application-module alphabet_partitioned` as an initializer
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --worker-count 2 --cluster-initializer \
-  --external 127.0.0.1:6002 --ponythreads=1
+  --external 127.0.0.1:6002 --ponythreads=1 --ponynoblock
 ```
 
 ### Shell 3
@@ -79,7 +79,7 @@ Run `machida` with `--application-module alphabet_partitioned` as a worker:
 ```bash
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --name worker-2 --external 127.0.0.1:6010 --ponythreads=1
+  --name worker-2 --external 127.0.0.1:6010 --ponythreads=1 --ponynoblock
 ```
 
 ### Shell 4
@@ -89,7 +89,8 @@ Send messages:
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 \
   --file votes.msg --batch-size 50 --interval 10_000_000 \
-  --messages 1000000 --binary --msg-size 9 --repeat --ponythreads=1 --no-write
+  --messages 1000000 --binary --msg-size 9 --repeat --ponythreads=1 \
+  --ponynoblock --no-write
 ```
 
 ## Shutdown

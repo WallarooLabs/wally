@@ -67,11 +67,12 @@ In a separate shell each:
     ```bash
     ./build/counter-app --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-      --worker-name worker-name --cluster-initializer --ponythreads=1
+      --worker-name worker-name --cluster-initializer --ponythreads=1 \
+      --ponynoblock
     ```
 3. Start sending data
     ```bash
      ../../../../giles/sender/sender --host 127.0.0.1:7010 --file data_gen/numbers.msg \
        --batch-size 50 --interval 10_000_000 --binary --msg-size 44 --repeat \
-       --ponythreads=1 --messages 1000000 --no-write
+       --ponythreads=1 --ponynoblock --messages 1000000 --no-write
     ```
