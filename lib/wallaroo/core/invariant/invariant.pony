@@ -69,7 +69,7 @@ primitive LazyInvariant is _InvariantFailure
   fun apply(f: {(): Bool ?}, loc: SourceLoc = __loc) =>
     ifdef debug then
       try
-        if not f() then
+        if not f()? then
           fail(loc)
         end
       else

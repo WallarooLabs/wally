@@ -35,7 +35,7 @@ use "wallaroo_labs/hub"
 use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
+  flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
@@ -104,7 +104,7 @@ actor ReconnectingMetricsSink
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _application_name = application_name
@@ -126,7 +126,7 @@ actor ReconnectingMetricsSink
     """
     Connect via IPv4.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _application_name = application_name
@@ -148,7 +148,7 @@ actor ReconnectingMetricsSink
     """
     Connect via IPv6.
     """
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _application_name = application_name
@@ -179,7 +179,7 @@ actor ReconnectingMetricsSink
     Do nothing on windows.
     """
     ifdef not windows then
-      _pending_writev.push(data.cpointer().usize()).push(data.size())
+      _pending_writev.>push(data.cpointer().usize()).>push(data.size())
       _pending_writev_total = _pending_writev_total + data.size()
       _pending.push((data, 0))
     end
@@ -190,7 +190,7 @@ actor ReconnectingMetricsSink
       for i in Range(0,metrics.size()) do
         (let metric_name, let category, let pipeline, let worker_name, let id,
           let histogram, let period, let period_ends_at, let topic, let event) =
-          metrics(i)
+          metrics(i)?
         HubProtocol.metrics(metric_name, category, pipeline,
           worker_name, id, histogram, period, period_ends_at, payload_wb)
         HubProtocol.payload(event, topic, payload_wb.done(), _wb)
@@ -217,7 +217,7 @@ actor ReconnectingMetricsSink
         end
       else
         for bytes in _notify.sentv(this, data).values() do
-          _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+          _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
           _pending_writev_total = _pending_writev_total + bytes.size()
           _pending.push((bytes, 0))
         end
@@ -236,7 +236,7 @@ actor ReconnectingMetricsSink
 
     ifdef not windows then
       for bytes in _notify.sentv(this, data).values() do
-        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+        _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
         _pending_writev_total = _pending_writev_total + bytes.size()
         _pending.push((bytes, 0))
       end
@@ -280,19 +280,19 @@ actor ReconnectingMetricsSink
     _timers.dispose()
     close()
 
-  fun local_address(): IPAddress =>
+  fun local_address(): NetAddress =>
     """
     Return the local IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
-  fun remote_address(): IPAddress =>
+  fun remote_address(): NetAddress =>
     """
     Return the remote IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_peername[Bool](_fd, ip)
     ip
 
@@ -345,9 +345,11 @@ actor ReconnectingMetricsSink
             _event = event
             _connected = true
             _writeable = true
+            _readable = true
 
             _notify.connected(this)
             _queue_read()
+            _pending_reads()
 
             ifdef not windows then
               if _pending_writes() then
@@ -373,12 +375,14 @@ actor ReconnectingMetricsSink
 
             _connected = true
             _writeable = true
+            _readable = true
 
             _closed = false
             _shutdown = false
             _shutdown_peer = false
 
             _notify.connected(this)
+            _pending_reads()
 
             ifdef not windows then
               if _pending_writes() then
@@ -460,7 +464,7 @@ actor ReconnectingMetricsSink
           end
         end
       else
-        _pending_writev.push(data.cpointer().usize()).push(data.size())
+        _pending_writev.>push(data.cpointer().usize()).>push(data.size())
         _pending_writev_total = _pending_writev_total + data.size()
         _pending.push((data, 0))
         _pending_writes()
@@ -477,7 +481,7 @@ actor ReconnectingMetricsSink
 
       if rem == 0 then
         // IOCP reported a failed write on this chunk. Non-graceful shutdown.
-        try _pending.shift() end
+        try _pending.shift()? end
         _hard_close()
         _schedule_reconnect()
         return
@@ -485,15 +489,15 @@ actor ReconnectingMetricsSink
 
       while rem > 0 do
         try
-          let node = _pending.head()
-          (let data, let offset) = node()
+          let node = _pending.head()?
+          (let data, let offset) = node()?
           let total = rem + offset
 
           if total < data.size() then
-            node() = (data, total)
+            node()? = (data, total)
             rem = 0
           else
-            _pending.shift()
+            _pending.shift()?
             rem = total - data.size()
           end
         end
@@ -532,7 +536,7 @@ actor ReconnectingMetricsSink
             num_to_send = writev_batch_size
             bytes_to_send = 0
             for d in Range[USize](1, num_to_send*2, 2) do
-              bytes_to_send = bytes_to_send + _pending_writev(d)
+              bytes_to_send = bytes_to_send + _pending_writev(d)?
             end
           end
 
@@ -542,17 +546,17 @@ actor ReconnectingMetricsSink
 
           if len < bytes_to_send then
             while len > 0 do
-              let iov_p = _pending_writev(0)
-              let iov_s = _pending_writev(1)
+              let iov_p = _pending_writev(0)?
+              let iov_s = _pending_writev(1)?
               if iov_s <= len then
                 len = len - iov_s
-                _pending_writev.shift()
-                _pending_writev.shift()
-                _pending.shift()
+                _pending_writev.shift()?
+                _pending_writev.shift()?
+                _pending.shift()?
                 _pending_writev_total = _pending_writev_total - iov_s
               else
-                _pending_writev.update(0, iov_p+len)
-                _pending_writev.update(1, iov_s-len)
+                _pending_writev.update(0, iov_p+len)?
+                _pending_writev.update(1, iov_s-len)?
                 _pending_writev_total = _pending_writev_total - len
                 len = 0
               end
@@ -567,9 +571,9 @@ actor ReconnectingMetricsSink
               return true
             else
               for d in Range[USize](0, num_to_send, 1) do
-                _pending_writev.shift()
-                _pending_writev.shift()
-                _pending.shift()
+                _pending_writev.shift()?
+                _pending_writev.shift()?
+                _pending.shift()?
               end
             end
           end
@@ -665,15 +669,11 @@ actor ReconnectingMetricsSink
         match len
         | 0 =>
           // Would block, try again later.
-          ifdef linux then
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
-          else
-            _readable = false
-          end
+          // this is safe because asio thread isn't currently subscribed
+          // for a read event so will not be writing to the readable flag
+          @pony_asio_event_set_readable[None](_event, false)
+          _readable = false
+          @pony_asio_event_resubscribe_read(_event)
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -809,10 +809,8 @@ actor ReconnectingMetricsSink
       _pending_writev_total = 0
       _readable = false
       _writeable = false
-      ifdef linux then
-        AsioEvent.set_readable(_event, false)
-        AsioEvent.set_writeable(_event, false)
-      end
+      @pony_asio_event_set_readable[None](_event, false)
+      @pony_asio_event_set_writeable[None](_event, false)
     end
 
     // On windows, this will also cancel all outstanding IOCP operations.
@@ -849,12 +847,10 @@ actor ReconnectingMetricsSink
       _throttled = true
       ifdef not windows then
         _writeable = false
-        ifdef linux then
-          // this is safe because asio thread isn't currently subscribed
-          // for a write event so will not be writing to the readable flag
-          AsioEvent.set_writeable(_event, false)
-          @pony_asio_event_resubscribe_write(_event)
-        end
+        // this is safe because asio thread isn't currently subscribed
+        // for a write event so will not be writing to the readable flag
+        @pony_asio_event_set_writeable[None](_event, false)
+        @pony_asio_event_resubscribe_write(_event)
       end
       _notify.throttled(this)
     end
@@ -971,7 +967,7 @@ class MetricsSinkNotify is _MetricsSinkNotify
     _metrics_conn = metrics_conn
 
   fun ref connected(sock: MetricsSink ref) =>
-    @printf[None]("%s outgoing connected\n".cstring(),
+    @printf[I32]("%s outgoing connected\n".cstring(),
       _name.cstring())
 		let connect_msg = HubProtocol.connect()
 		let metrics_join_msg = HubProtocol.join_metrics(
@@ -998,11 +994,11 @@ class MetricsSinkNotify is _MetricsSinkNotify
       _name.cstring())
 
   fun ref throttled(sock: MetricsSink ref) =>
-    @printf[None]("%s outgoing throttled\n".cstring(),
+    @printf[I32]("%s outgoing throttled\n".cstring(),
       _name.cstring())
 
   fun ref unthrottled(sock: MetricsSink ref) =>
-    @printf[None]("%s outgoing no longer throttled\n".cstring(),
+    @printf[I32]("%s outgoing no longer throttled\n".cstring(),
       _name.cstring())
 
 class _PauseBeforeReconnect is TimerNotify

@@ -46,7 +46,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
+  flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
@@ -76,6 +76,7 @@ class val OutgoingBoundaryBuilder
     let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
       _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
+    boundary
 
   fun build_and_initialize(step_id: StepId,
     layout_initializer: LayoutInitializer): OutgoingBoundary
@@ -87,6 +88,7 @@ class val OutgoingBoundaryBuilder
       _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary.quick_initialize(layout_initializer)
+    boundary
 
 actor OutgoingBoundary is Consumer
   // Steplike
@@ -174,7 +176,7 @@ actor OutgoingBoundary is Consumer
     _service = service
     _from = from
     _metrics_reporter = consume metrics_reporter
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = 65_536
 
@@ -204,7 +206,7 @@ actor OutgoingBoundary is Consumer
       end
 
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
-        _auth)
+        _auth)?
       _writev(connect_msg)
     else
       Fail()
@@ -235,7 +237,7 @@ actor OutgoingBoundary is Consumer
       end
 
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
-        _auth)
+        _auth)?
       _writev(connect_msg)
     else
       Fail()
@@ -257,7 +259,7 @@ actor OutgoingBoundary is Consumer
   =>
     try
       let outgoing_msg = ChannelMsgEncoder.migrate_step[K](step_id,
-        state_name, key, state, _worker_name, _auth)
+        state_name, key, state, _worker_name, _auth)?
       _writev(outgoing_msg)
     else
       Fail()
@@ -266,7 +268,7 @@ actor OutgoingBoundary is Consumer
   be send_migration_batch_complete() =>
     try
       let migration_batch_complete_msg =
-        ChannelMsgEncoder.migration_batch_complete(_worker_name, _auth)
+        ChannelMsgEncoder.migration_batch_complete(_worker_name, _auth)?
       _writev(migration_batch_complete_msg)
     else
       Fail()
@@ -328,7 +330,7 @@ actor OutgoingBoundary is Consumer
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
-        new_metrics_id, metric_name)
+        new_metrics_id, metric_name)?
       _add_to_upstream_backup(outgoing_msg)
 
       if _connection_initialized then
@@ -387,11 +389,11 @@ actor OutgoingBoundary is Consumer
       var cur_id = _lowest_queue_id
       for msg in _queue.values() do
         if cur_id >= idx then
-          _writev(ChannelMsgEncoder.replay(msg, _auth))
+          _writev(ChannelMsgEncoder.replay(msg, _auth)?)
         end
         cur_id = cur_id + 1
       end
-      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _step_id, _auth))
+      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _step_id, _auth)?)
     else
       Fail()
     end
@@ -452,9 +454,11 @@ actor OutgoingBoundary is Consumer
             _event = event
             _connected = true
             _writeable = true
+            _readable = true
 
             _notify.connected(this)
             _on_connected()
+            _pending_reads()
 
             ifdef not windows then
               if _pending_writes() then
@@ -483,6 +487,7 @@ actor OutgoingBoundary is Consumer
 
             _connected = true
             _writeable = true
+            _readable = true
 
             // set replaying to true since we might need to replay to
             // downstream before resuming
@@ -493,10 +498,11 @@ actor OutgoingBoundary is Consumer
             _shutdown_peer = false
 
             _notify.connected(this)
+            _pending_reads()
 
             try
               let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-                _step_id, _auth)
+                _step_id, _auth)?
               _writev(connect_msg)
             else
               @printf[I32]("error creating data connect message on reconnect\n"
@@ -583,7 +589,7 @@ actor OutgoingBoundary is Consumer
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
-      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
       data_size = data_size + bytes.size()
@@ -599,7 +605,7 @@ actor OutgoingBoundary is Consumer
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
-    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev.>push(data.cpointer().usize()).>push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
 
     _pending.push((data, 0))
@@ -672,10 +678,8 @@ actor OutgoingBoundary is Consumer
     _pending_writev_total = 0
     _readable = false
     _writeable = false
-    ifdef linux then
-      AsioEvent.set_readable(_event, false)
-      AsioEvent.set_writeable(_event, false)
-    end
+    @pony_asio_event_set_readable[None](_event, false)
+    @pony_asio_event_set_writeable[None](_event, false)
 
     @pony_os_socket_close[None](_fd)
     _fd = -1
@@ -707,15 +711,11 @@ actor OutgoingBoundary is Consumer
         match len
         | 0 =>
           // Would block, try again later.
-          ifdef linux then
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
-          else
-            _readable = false
-          end
+          // this is safe because asio thread isn't currently subscribed
+          // for a read event so will not be writing to the readable flag
+          @pony_asio_event_set_readable[None](_event, false)
+          _readable = false
+          @pony_asio_event_resubscribe_read(_event)
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -785,7 +785,7 @@ actor OutgoingBoundary is Consumer
           num_to_send = writev_batch_size
           bytes_to_send = 0
           for d in Range[USize](1, num_to_send*2, 2) do
-            bytes_to_send = bytes_to_send + _pending_writev(d)
+            bytes_to_send = bytes_to_send + _pending_writev(d)?
           end
         end
 
@@ -798,17 +798,17 @@ actor OutgoingBoundary is Consumer
 
         if len < bytes_to_send then
           while len > 0 do
-            let iov_p = _pending_writev(0)
-            let iov_s = _pending_writev(1)
+            let iov_p = _pending_writev(0)?
+            let iov_s = _pending_writev(1)?
             if iov_s <= len then
               len = len - iov_s
-              _pending_writev.shift()
-              _pending_writev.shift()
-              _pending.shift()
+              _pending_writev.shift()?
+              _pending_writev.shift()?
+              _pending.shift()?
               _pending_writev_total = _pending_writev_total - iov_s
             else
-              _pending_writev.update(0, iov_p+len)
-              _pending_writev.update(1, iov_s-len)
+              _pending_writev.update(0, iov_p+len)?
+              _pending_writev.update(1, iov_s-len)?
               _pending_writev_total = _pending_writev_total - len
               len = 0
             end
@@ -824,9 +824,9 @@ actor OutgoingBoundary is Consumer
             return true
           else
             for d in Range[USize](0, num_to_send, 1) do
-              _pending_writev.shift()
-              _pending_writev.shift()
-              _pending.shift()
+              _pending_writev.shift()?
+              _pending_writev.shift()?
+              _pending.shift()?
             end
           end
         end
@@ -860,11 +860,11 @@ actor OutgoingBoundary is Consumer
       _read_buf_size()
     end
 
-  fun local_address(): IPAddress =>
+  fun local_address(): NetAddress =>
     """
     Return the local IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
@@ -885,12 +885,10 @@ actor OutgoingBoundary is Consumer
     if not _throttled then
       _throttled = true
       _writeable = false
-      ifdef linux then
-        // this is safe because asio thread isn't currently subscribed
-        // for a write event so will not be writing to the readable flag
-        AsioEvent.set_writeable(_event, false)
-        @pony_asio_event_resubscribe_write(_event)
-      end
+      // this is safe because asio thread isn't currently subscribed
+      // for a write event so will not be writing to the readable flag
+      @pony_asio_event_set_writeable[None](_event, false)
+      @pony_asio_event_resubscribe_write(_event)
       _notify.throttled(this)
       _maybe_mute_or_unmute_upstreams()
     end
@@ -956,7 +954,7 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   =>
     if _header then
       try
-        let e = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let e = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
         conn.expect(e)
         _header = false

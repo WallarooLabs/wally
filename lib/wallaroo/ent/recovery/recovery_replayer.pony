@@ -79,7 +79,7 @@ actor RecoveryReplayer
 
   be add_expected_boundary_count(worker: String, count: USize) =>
     try
-      _replay_phase.add_expected_boundary_count(worker, count)
+      _replay_phase.add_expected_boundary_count(worker, count)?
     else
       _print_replay_phase_error()
       Fail()
@@ -89,7 +89,7 @@ actor RecoveryReplayer
     dr: DataReceiver)
   =>
     try
-      _replay_phase.add_reconnected_boundary(worker, boundary_step_id)
+      _replay_phase.add_reconnected_boundary(worker, boundary_step_id)?
     else
       _print_replay_phase_error()
       Fail()
@@ -97,7 +97,7 @@ actor RecoveryReplayer
 
   be add_boundary_replay_complete(worker: String, boundary_id: U128) =>
     try
-      _replay_phase.add_boundary_replay_complete(worker, boundary_id)
+      _replay_phase.add_boundary_replay_complete(worker, boundary_id)?
     else
       _print_replay_phase_error()
       Fail()
@@ -132,7 +132,7 @@ actor RecoveryReplayer
       _reconnected_boundaries, this)
 
     try
-      let msg = ChannelMsgEncoder.request_boundary_count(_worker_name, _auth)
+      let msg = ChannelMsgEncoder.request_boundary_count(_worker_name, _auth)?
       _cluster.send_control_to_cluster(msg)
     else
       Fail()
@@ -143,7 +143,7 @@ actor RecoveryReplayer
     | 0 => true
     | 1 =>
       try
-        workers(0) == _worker_name
+        workers(0)? == _worker_name
       else
         true
       end
@@ -156,7 +156,7 @@ actor RecoveryReplayer
       if not _reconnected_boundaries.contains(worker) then
         _reconnected_boundaries(worker) = SetIs[U128]
       end
-      _reconnected_boundaries(worker).set(boundary_step_id)
+      _reconnected_boundaries(worker)?.set(boundary_step_id)
     else
       Fail()
     end
@@ -169,7 +169,7 @@ actor RecoveryReplayer
     _replay_phase = _WaitForReconnections(expected_boundaries,
       reconnected_boundaries, this)
     try
-      let msg = ChannelMsgEncoder.reconnect_data_port(_worker_name, _auth)
+      let msg = ChannelMsgEncoder.reconnect_data_port(_worker_name, _auth)?
       _cluster.send_control_to_cluster(msg)
     else
       Fail()
@@ -281,7 +281,7 @@ class _WaitingForBoundaryCounts is _ReplayPhase
     end
 
   fun ref add_reconnected_boundary(worker: String, boundary_id: U128) ? =>
-    _reconnected_boundaries(worker).set(boundary_id)
+    _reconnected_boundaries(worker)?.set(boundary_id)
 
 class _WaitForReconnections is _ReplayPhase
   let _expected_boundaries: Map[String, USize] box
@@ -302,7 +302,7 @@ class _WaitForReconnections is _ReplayPhase
   fun name(): String => "Wait for Reconnections Phase"
 
   fun ref add_reconnected_boundary(worker: String, boundary_id: U128) ? =>
-    _reconnected_boundaries(worker).set(boundary_id)
+    _reconnected_boundaries(worker)?.set(boundary_id)
     if _all_boundaries_reconnected() then
       _replayer._start_replay_phase(_expected_boundaries)
     end
@@ -329,7 +329,7 @@ class _Replay is _ReplayPhase
   fun name(): String => "Replay Phase"
 
   fun ref add_boundary_replay_complete(worker: String, boundary_id: U128) ? =>
-    _replay_completes(worker).set(boundary_id)
+    _replay_completes(worker)?.set(boundary_id)
     if _all_replays_complete(_replay_completes) then
       _data_receivers.start_normal_message_processing()
       _replayer._end_replay_phase()
@@ -348,9 +348,9 @@ primitive CheckCounts[Key: (Hashable #read & Equatable[Key] #read),
     try
       for (key, count) in expected_counts.pairs() do
         ifdef debug then
-          Invariant(counted(key).size() <= count)
+          Invariant(counted(key)?.size() <= count)
         end
-        if counted(key).size() < count then
+        if counted(key)?.size() < count then
           return false
         end
       end

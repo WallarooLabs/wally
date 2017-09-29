@@ -82,7 +82,9 @@ We are currently working with a client who needs Python 3 bindings. We plan to i
 
 - C++
 
-C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the near future to improve its ergonomics. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
+C++ is currently unsupported and apps created with the C++ API will not build unless you checkout the `last-working-C++-commit` tag. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
+
+C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. 
 
 - Go
 

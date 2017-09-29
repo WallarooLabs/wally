@@ -113,7 +113,7 @@ class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
   fun ref apply(consumers: Array[KafkaConsumer tag] val,
     msg: KafkaMessage val): (KafkaConsumer tag | None)
   =>
-    try _consumers(msg.get_partition_id()) end
+    try _consumers(msg.get_partition_id())? end
 
   fun clone(): KafkaConsumerMessageHandler iso^ =>
     recover iso MapPartitionConsumerMessageHandler(_consumers) end
@@ -188,7 +188,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
         continue
       end
       let partitions_sources = try
-             _kafka_topic_partition_sources(topic)
+             _kafka_topic_partition_sources(topic)?
            else
              let m = Map[I32, KafkaSource[In]]
              _kafka_topic_partition_sources(topic) = m
@@ -203,7 +203,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
           partitions_changed = true
 
           try
-            let source = KafkaSource[In](this, _notify.build_source(),
+            let source = KafkaSource[In](this, _notify.build_source()?,
               _router.routes(), _route_builder, _outgoing_boundary_builders,
               _layout_initializer, _default_target,
               _default_in_route_builder,

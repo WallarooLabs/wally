@@ -103,7 +103,7 @@ class _TestDataChannel is DataChannelListenNotify
     try
       let auth = _h.env.root as AmbientAuth
       let notify = (_client_conn_notify = None) as DataChannelNotify iso^
-      (let host, let port) = listen.local_address().name()
+      (let host, let port) = listen.local_address().name()?
       _h.dispose_when_done(DataChannel(auth, consume notify, host, port))
       _h.complete_action("client create")
     else
@@ -231,11 +231,11 @@ class _TestDataChannelWritevNotifyClient is DataChannelNotify
     _h = h
 
   fun ref sentv(conn: DataChannel ref, data: ByteSeqIter): ByteSeqIter =>
-    recover Array[ByteSeq].concat(data.values()).push(" (from client)") end
+    recover Array[ByteSeq].>concat(data.values()).>push(" (from client)") end
 
   fun ref connected(conn: DataChannel ref) =>
     _h.complete_action("client connect")
-    conn.writev(recover ["hello", ", hello"] end)
+    conn.writev(recover ["hello"; ", hello"] end)
 
   fun ref connect_failed(conn: DataChannel ref) =>
     _h.fail_action("client connect")

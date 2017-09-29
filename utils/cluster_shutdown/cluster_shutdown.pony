@@ -22,9 +22,9 @@ use "wallaroo_labs/messages"
 actor Main
   new create(env: Env) =>
     try
-      let split = env.args(1).split(":")
-      let host = split(0)
-      let service = split(1)
+      let split = env.args(1)?.split(":")
+      let host = split(0)?
+      let service = split(1)?
 
       let auth = env.root as AmbientAuth
       let tcp_auth = TCPConnectAuth(auth)

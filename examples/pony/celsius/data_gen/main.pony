@@ -51,9 +51,9 @@ actor Main
 
       let rand = MT(Time.nanos())
 
-      let out_file = File(FilePath(auth, output_file_path))
+      let out_file = File(FilePath(auth, output_file_path)?)
       let exp_file = if expected_file_path != "" then
-        File(FilePath(auth, expected_file_path))
+        File(FilePath(auth, expected_file_path)?)
       else
         None
       end

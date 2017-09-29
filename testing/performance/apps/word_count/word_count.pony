@@ -45,13 +45,13 @@ actor Main
         Application("Word Count App")
           .new_pipeline[String, RunningTotal]("Word Count",
             TCPSourceConfig[String].from_options(StringFrameHandler,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_parallel[String](SplitBuilder)
             .to_state_partition[String, String, RunningTotal, WordTotals](
               AddCount, WordTotalsBuilder, "word-totals",
               word_totals_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[RunningTotal].from_options(
-              RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)(0)))
+              RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))?
       end
       Startup(env, application, "word-count")
     else
@@ -66,8 +66,8 @@ primitive Split
     let words = recover trn Array[String] end
     for line in s.split("\n").values() do
       let cleaned =
-        recover val s.clone().lower().lstrip(punctuation)
-          .rstrip(punctuation) end
+        recover val s.clone().>lower().>lstrip(punctuation)
+          .>rstrip(punctuation) end
       for word in cleaned.split(punctuation).values() do
         words.push(word)
       end
@@ -121,9 +121,9 @@ class WordTotalsStateChange is StateChange[WordTotals]
     out_writer.u64_be(_count)
 
   fun ref read_log_entry(in_reader: Reader) ? =>
-    let word_size = in_reader.u32_be().usize()
-    let word = String.from_array(in_reader.block(word_size))
-    let count = in_reader.u64_be()
+    let word_size = in_reader.u32_be()?.usize()
+    let word = String.from_array(in_reader.block(word_size)?)
+    let count = in_reader.u64_be()?
     _word = word
     _count = count
 
@@ -140,14 +140,14 @@ primitive AddCount is StateComputation[String, RunningTotal, WordTotals]
   =>
     let state_change: WordTotalsStateChange ref =
       try
-        sc_repo.lookup_by_name("WordTotalsStateChange") as
+        sc_repo.lookup_by_name("WordTotalsStateChange")? as
           WordTotalsStateChange
       else
         WordTotalsStateChange(0, "WordTotalsStateChange")
       end
     let new_count =
       if state.word_totals.contains(word) then
-        try state.word_totals(word) + 1 else 1 end
+        try state.word_totals(word)? + 1 else 1 end
       else
         1
       end
@@ -160,6 +160,7 @@ primitive AddCount is StateComputation[String, RunningTotal, WordTotals]
     recover val
       let scbs = Array[StateChangeBuilder[WordTotals]]
       scbs.push(recover WordTotalsStateChangeBuilder end)
+      scbs
     end
 
 primitive StringFrameHandler is FramedSourceHandler[String]
@@ -167,7 +168,7 @@ primitive StringFrameHandler is FramedSourceHandler[String]
     4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
   fun decode(data: Array[U8] val): String =>
     String.from_array(data)
@@ -175,7 +176,7 @@ primitive StringFrameHandler is FramedSourceHandler[String]
 primitive WordPartitionFunction
   fun apply(input: String): String =>
     try
-      let first = input(0)
+      let first = input(0)?
       if (first >= 'a') and (first <= 'z') then
         recover String.from_utf32(first.u32()) end
       else
@@ -194,8 +195,8 @@ primitive RunningTotalEncoder
     // Option A: Write out output as String
     let result =
       recover val
-        String().append(t.word).append(", ").append(t.count.string())
-          .append("\n")
+        String().>append(t.word).>append(", ").>append(t.count.string())
+          .>append("\n")
       end
     @printf[I32]("!!%s".cstring(), result.cstring())
     wb.write(result)

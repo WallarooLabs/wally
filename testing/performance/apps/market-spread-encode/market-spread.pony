@@ -130,22 +130,22 @@ actor Main
           .new_pipeline[FixOrderMessage val, Array[ByteSeq] val](
             "Orders",
             TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String,
               (Array[ByteSeq] val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
             .to_sink(TCPSinkConfig[Array[ByteSeq] val].from_options(EmptyEncoder,
-              TCPSinkConfigCLIParser(env.args)(0), initial_report_msgs))
+              TCPSinkConfigCLIParser(env.args)?(0)?, initial_report_msgs))?
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
-            .done()
+            .done()?
       end
       Startup(env, application, "market-spread")
     else
@@ -206,9 +206,9 @@ class SymbolDataStateChange is StateChange[SymbolData]
     out_writer.u8(BoolConverter.bool_to_u8(_should_reject_trades))
 
   fun ref read_log_entry(in_reader: Reader) ? =>
-    _last_bid = in_reader.f64_be()
-    _last_offer = in_reader.f64_be()
-    _should_reject_trades = BoolConverter.u8_to_bool(in_reader.u8())
+    _last_bid = in_reader.f64_be()?
+    _last_offer = in_reader.f64_be()?
+    _should_reject_trades = BoolConverter.u8_to_bool(in_reader.u8()?)
 
 class SymbolDataStateChangeBuilder is StateChangeBuilder[SymbolData]
   fun apply(id: U64): StateChange[SymbolData] =>
@@ -224,7 +224,7 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     ifdef debug then
       try
         Assert(sc_repo.contains("SymbolDataStateChange"),
-        "Invariant violated: sc_repo.contains('SymbolDataStateChange')")
+        "Invariant violated: sc_repo.contains('SymbolDataStateChange')")?
       else
         //TODO: how do we bail out here?
         None
@@ -234,7 +234,7 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     // @printf[I32]("!!Update NBBO\n".cstring())
     let state_change: SymbolDataStateChange ref =
       try
-        sc_repo.lookup_by_name("SymbolDataStateChange") as SymbolDataStateChange
+        sc_repo.lookup_by_name("SymbolDataStateChange")? as SymbolDataStateChange
       else
         //TODO: ideally, this should also register it. Not sure how though.
         SymbolDataStateChange(0, "SymbolDataStateChange")
@@ -251,6 +251,7 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     recover val
       let scbs = Array[StateChangeBuilder[SymbolData]]
       scbs.push(recover val SymbolDataStateChangeBuilder end)
+      scbs
     end
 
 class CheckOrder is StateComputation[FixOrderMessage val, Array[ByteSeq] val,
@@ -280,10 +281,10 @@ primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
     4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
   fun decode(data: Array[U8] val): FixOrderMessage val ? =>
-    match FixishMsgDecoder(data)
+    match FixishMsgDecoder(data)?
     | let m: FixOrderMessage val => m
     | let m: FixNbboMessage val => @printf[I32]("Got FixNbbo\n".cstring()); Fail(); error
     else
@@ -297,10 +298,10 @@ primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
     4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
   fun decode(data: Array[U8] val): FixNbboMessage val ? =>
-    match FixishMsgDecoder(data)
+    match FixishMsgDecoder(data)?
     | let m: FixNbboMessage val => m
     | let m: FixOrderMessage val => @printf[I32]("Got FixOrder\n".cstring()); Fail(); error
     else
@@ -331,15 +332,15 @@ class OrderResult
     timestamp = timestamp'
 
   fun string(): String =>
-    (order.symbol().clone().append(", ")
-      .append(order.order_id()).append(", ")
-      .append(order.account().string()).append(", ")
-      .append(order.price().string()).append(", ")
-      .append(order.order_qty().string()).append(", ")
-      .append(order.side().string()).append(", ")
-      .append(bid.string()).append(", ")
-      .append(offer.string()).append(", ")
-      .append(timestamp.string())).clone()
+    (order.symbol().clone().>append(", ")
+      .>append(order.order_id()).>append(", ")
+      .>append(order.account().string()).>append(", ")
+      .>append(order.price().string()).>append(", ")
+      .>append(order.order_qty().string()).>append(", ")
+      .>append(order.side().string()).>append(", ")
+      .>append(bid.string()).>append(", ")
+      .>append(offer.string()).>append(", ")
+      .>append(timestamp.string())).clone()
 
 primitive EmptyEncoder
   fun apply(a: Array[ByteSeq] val, wb: Writer = Writer): Array[ByteSeq] val =>
@@ -427,354 +428,354 @@ primitive RawSymbols
   fun apply(): Array[String] val =>
     recover
       [
-"AA",
-"BAC",
-"AAPL",
-"FCX",
-"SUNE",
-"FB",
-"RAD",
-"INTC",
-"GE",
-"WMB",
-"S",
-"ATML",
-"YHOO",
-"F",
-"T",
-"MU",
-"PFE",
-"CSCO",
-"MEG",
-"HUN",
-"GILD",
-"MSFT",
-"SIRI",
-"SD",
-"C",
-"NRF",
-"TWTR",
-"ABT",
-"VSTM",
-"NLY",
-"AMAT",
-"X",
-"NFLX",
-"SDRL",
-"CHK",
-"KO",
-"JCP",
-"MRK",
-"WFC",
-"XOM",
-"KMI",
-"EBAY",
-"MYL",
-"ZNGA",
-"FTR",
-"MS",
-"DOW",
-"ATVI",
-"ORCL",
-"JPM",
-"FOXA",
-"HPQ",
-"JBLU",
-"RF",
-"CELG",
-"HST",
-"QCOM",
-"AKS",
-"EXEL",
-"ABBV",
-"CY",
-"VZ",
-"GRPN",
-"HAL",
-"GPRO",
-"CAT",
-"OPK",
-"AAL",
-"JNJ",
-"XRX",
-"GM",
-"MHR",
-"DNR",
-"PIR",
-"MRO",
-"NKE",
-"MDLZ",
-"V",
-"HLT",
-"TXN",
-"SWN",
-"AGN",
-"EMC",
-"CVX",
-"BMY",
-"SLB",
-"SBUX",
-"NVAX",
-"ZIOP",
-"NE",
-"COP",
-"EXC",
-"OAS",
-"VVUS",
-"BSX",
-"SE",
-"NRG",
-"MDT",
-"WFM",
-"ARIA",
-"WFT",
-"MO",
-"PG",
-"CSX",
-"MGM",
-"SCHW",
-"NVDA",
-"KEY",
-"RAI",
-"AMGN",
-"HTZ",
-"ZTS",
-"USB",
-"WLL",
-"MAS",
-"LLY",
-"WPX",
-"CNW",
-"WMT",
-"ASNA",
-"LUV",
-"GLW",
-"BAX",
-"HCA",
-"NEM",
-"HRTX",
-"BEE",
-"ETN",
-"DD",
-"XPO",
-"HBAN",
-"VLO",
-"DIS",
-"NRZ",
-"NOV",
-"MET",
-"MNKD",
-"MDP",
-"DAL",
-"XON",
-"AEO",
-"THC",
-"AGNC",
-"ESV",
-"FITB",
-"ESRX",
-"BKD",
-"GNW",
-"KN",
-"GIS",
-"AIG",
-"SYMC",
-"OLN",
-"NBR",
-"CPN",
-"TWO",
-"SPLS",
-"AMZN",
-"UAL",
-"MRVL",
-"BTU",
-"ODP",
-"AMD",
-"GLNG",
-"APC",
-"HL",
-"PPL",
-"HK",
-"LNG",
-"CVS",
-"CYH",
-"CCL",
-"HD",
-"AET",
-"CVC",
-"MNK",
-"FOX",
-"CRC",
-"TSLA",
-"UNH",
-"VIAB",
-"P",
-"AMBA",
-"SWFT",
-"CNX",
-"BWC",
-"SRC",
-"WETF",
-"CNP",
-"ENDP",
-"JBL",
-"YUM",
-"MAT",
-"PAH",
-"FINL",
-"BK",
-"ARWR",
-"SO",
-"MTG",
-"BIIB",
-"CBS",
-"ARNA",
-"WYNN",
-"TAP",
-"CLR",
-"LOW",
-"NYMT",
-"AXTA",
-"BMRN",
-"ILMN",
-"MCD",
-"NAVI",
-"FNFG",
-"AVP",
-"ON",
-"DVN",
-"DHR",
-"OREX",
-"CFG",
-"DHI",
-"IBM",
-"HCP",
-"UA",
-"KR",
-"AES",
-"STWD",
-"BRCM",
-"APA",
-"STI",
-"MDVN",
-"EOG",
-"QRVO",
-"CBI",
-"CL",
-"ALLY",
-"CALM",
-"SN",
-"FEYE",
-"VRTX",
-"KBH",
-"ADXS",
-"HCBK",
-"OXY",
-"TROX",
-"NBL",
-"MON",
-"PM",
-"MA",
-"HDS",
-"EMR",
-"CLF",
-"AVGO",
-"INCY",
-"M",
-"PEP",
-"WU",
-"KERX",
-"CRM",
-"BCEI",
-"PEG",
-"NUE",
-"UNP",
-"SWKS",
-"SPW",
-"COG",
-"BURL",
-"MOS",
-"CIM",
-"CLNY",
-"BBT",
-"UTX",
-"LVS",
-"DE",
-"ACN",
-"DO",
-"LYB",
-"MPC",
-"SNDK",
-"AGEN",
-"GGP",
-"RRC",
-"CNC",
-"PLUG",
-"JOY",
-"HP",
-"CA",
-"LUK",
-"AMTD",
-"GERN",
-"PSX",
-"LULU",
-"SYY",
-"HON",
-"PTEN",
-"NWSA",
-"MCK",
-"SVU",
-"DSW",
-"MMM",
-"CTL",
-"BMR",
-"PHM",
-"CIE",
-"BRCD",
-"ATW",
-"BBBY",
-"BBY",
-"HRB",
-"ISIS",
-"NWL",
-"ADM",
-"HOLX",
-"MM",
-"GS",
-"AXP",
-"BA",
-"FAST",
-"KND",
-"NKTR",
-"ACHN",
-"REGN",
-"WEN",
-"CLDX",
-"BHI",
-"HFC",
-"GNTX",
-"GCA",
-"CPE",
-"ALL",
-"ALTR",
-"QEP",
-"NSAM",
-"ITCI",
-"ALNY",
-"SPF",
-"INSM",
-"PPHM",
-"NYCB",
-"NFX",
-"TMO",
-"TGT",
-"GOOG",
-"SIAL",
-"GPS",
-"MYGN",
-"MDRX",
-"TTPH",
-"NI",
-"IVR",
+"AA"
+"BAC"
+"AAPL"
+"FCX"
+"SUNE"
+"FB"
+"RAD"
+"INTC"
+"GE"
+"WMB"
+"S"
+"ATML"
+"YHOO"
+"F"
+"T"
+"MU"
+"PFE"
+"CSCO"
+"MEG"
+"HUN"
+"GILD"
+"MSFT"
+"SIRI"
+"SD"
+"C"
+"NRF"
+"TWTR"
+"ABT"
+"VSTM"
+"NLY"
+"AMAT"
+"X"
+"NFLX"
+"SDRL"
+"CHK"
+"KO"
+"JCP"
+"MRK"
+"WFC"
+"XOM"
+"KMI"
+"EBAY"
+"MYL"
+"ZNGA"
+"FTR"
+"MS"
+"DOW"
+"ATVI"
+"ORCL"
+"JPM"
+"FOXA"
+"HPQ"
+"JBLU"
+"RF"
+"CELG"
+"HST"
+"QCOM"
+"AKS"
+"EXEL"
+"ABBV"
+"CY"
+"VZ"
+"GRPN"
+"HAL"
+"GPRO"
+"CAT"
+"OPK"
+"AAL"
+"JNJ"
+"XRX"
+"GM"
+"MHR"
+"DNR"
+"PIR"
+"MRO"
+"NKE"
+"MDLZ"
+"V"
+"HLT"
+"TXN"
+"SWN"
+"AGN"
+"EMC"
+"CVX"
+"BMY"
+"SLB"
+"SBUX"
+"NVAX"
+"ZIOP"
+"NE"
+"COP"
+"EXC"
+"OAS"
+"VVUS"
+"BSX"
+"SE"
+"NRG"
+"MDT"
+"WFM"
+"ARIA"
+"WFT"
+"MO"
+"PG"
+"CSX"
+"MGM"
+"SCHW"
+"NVDA"
+"KEY"
+"RAI"
+"AMGN"
+"HTZ"
+"ZTS"
+"USB"
+"WLL"
+"MAS"
+"LLY"
+"WPX"
+"CNW"
+"WMT"
+"ASNA"
+"LUV"
+"GLW"
+"BAX"
+"HCA"
+"NEM"
+"HRTX"
+"BEE"
+"ETN"
+"DD"
+"XPO"
+"HBAN"
+"VLO"
+"DIS"
+"NRZ"
+"NOV"
+"MET"
+"MNKD"
+"MDP"
+"DAL"
+"XON"
+"AEO"
+"THC"
+"AGNC"
+"ESV"
+"FITB"
+"ESRX"
+"BKD"
+"GNW"
+"KN"
+"GIS"
+"AIG"
+"SYMC"
+"OLN"
+"NBR"
+"CPN"
+"TWO"
+"SPLS"
+"AMZN"
+"UAL"
+"MRVL"
+"BTU"
+"ODP"
+"AMD"
+"GLNG"
+"APC"
+"HL"
+"PPL"
+"HK"
+"LNG"
+"CVS"
+"CYH"
+"CCL"
+"HD"
+"AET"
+"CVC"
+"MNK"
+"FOX"
+"CRC"
+"TSLA"
+"UNH"
+"VIAB"
+"P"
+"AMBA"
+"SWFT"
+"CNX"
+"BWC"
+"SRC"
+"WETF"
+"CNP"
+"ENDP"
+"JBL"
+"YUM"
+"MAT"
+"PAH"
+"FINL"
+"BK"
+"ARWR"
+"SO"
+"MTG"
+"BIIB"
+"CBS"
+"ARNA"
+"WYNN"
+"TAP"
+"CLR"
+"LOW"
+"NYMT"
+"AXTA"
+"BMRN"
+"ILMN"
+"MCD"
+"NAVI"
+"FNFG"
+"AVP"
+"ON"
+"DVN"
+"DHR"
+"OREX"
+"CFG"
+"DHI"
+"IBM"
+"HCP"
+"UA"
+"KR"
+"AES"
+"STWD"
+"BRCM"
+"APA"
+"STI"
+"MDVN"
+"EOG"
+"QRVO"
+"CBI"
+"CL"
+"ALLY"
+"CALM"
+"SN"
+"FEYE"
+"VRTX"
+"KBH"
+"ADXS"
+"HCBK"
+"OXY"
+"TROX"
+"NBL"
+"MON"
+"PM"
+"MA"
+"HDS"
+"EMR"
+"CLF"
+"AVGO"
+"INCY"
+"M"
+"PEP"
+"WU"
+"KERX"
+"CRM"
+"BCEI"
+"PEG"
+"NUE"
+"UNP"
+"SWKS"
+"SPW"
+"COG"
+"BURL"
+"MOS"
+"CIM"
+"CLNY"
+"BBT"
+"UTX"
+"LVS"
+"DE"
+"ACN"
+"DO"
+"LYB"
+"MPC"
+"SNDK"
+"AGEN"
+"GGP"
+"RRC"
+"CNC"
+"PLUG"
+"JOY"
+"HP"
+"CA"
+"LUK"
+"AMTD"
+"GERN"
+"PSX"
+"LULU"
+"SYY"
+"HON"
+"PTEN"
+"NWSA"
+"MCK"
+"SVU"
+"DSW"
+"MMM"
+"CTL"
+"BMR"
+"PHM"
+"CIE"
+"BRCD"
+"ATW"
+"BBBY"
+"BBY"
+"HRB"
+"ISIS"
+"NWL"
+"ADM"
+"HOLX"
+"MM"
+"GS"
+"AXP"
+"BA"
+"FAST"
+"KND"
+"NKTR"
+"ACHN"
+"REGN"
+"WEN"
+"CLDX"
+"BHI"
+"HFC"
+"GNTX"
+"GCA"
+"CPE"
+"ALL"
+"ALTR"
+"QEP"
+"NSAM"
+"ITCI"
+"ALNY"
+"SPF"
+"INSM"
+"PPHM"
+"NYCB"
+"NFX"
+"TMO"
+"TGT"
+"GOOG"
+"SIAL"
+"GPS"
+"MYGN"
+"MDRX"
+"TTPH"
+"NI"
+"IVR"
 "SLH"]
 end

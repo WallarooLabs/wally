@@ -84,8 +84,8 @@ primitive FixishMsgEncoder
 
 primitive FixishMsgDecoder
   fun apply(data: Array[U8] val): FixMessage val ? =>
-    match data(0)
-    | FixTypes.order() => _order(data)
+    match data(0)?
+    | FixTypes.order() => _order(data)?
     | FixTypes.nbbo() => _nbbo(data)
     else
       OtherFixMessage
@@ -103,13 +103,13 @@ primitive FixishMsgDecoder
     //     --
     //     53b (+ header -> 57b)
 
-    let side = match data(1)
+    let side = match data(1)?
     | SideTypes.buy() => Buy
     | SideTypes.sell() => Sell
     else
       error
     end
-    let account = Bytes.to_u32(data(2), data(3), data(4), data(5))
+    let account = Bytes.to_u32(data(2)?, data(3)?, data(4)?, data(5)?)
     let order_id = _trim_string(data, 6, 6)
     let symbol = _trim_string(data, 12, 4)
     let order_qty: F64 = F64.from_bits(_u64_for(data, 16))
@@ -137,22 +137,22 @@ primitive FixishMsgDecoder
     FixNbboMessage(symbol, transact_time, bid_px, offer_px)
 
   fun _size_for(data: Array[U8] val, idx: USize): USize ? =>
-    Bytes.to_u32(data(idx), data(idx + 1), data(idx + 2),
-      data(idx + 3)).usize()
+    Bytes.to_u32(data(idx)?, data(idx + 1)?, data(idx + 2)?,
+      data(idx + 3)?).usize()
 
   fun _trim_string(data: Array[U8] val, idx: USize, size: USize): String =>
     String.from_array(data.trim(idx, idx + size))
 
   fun _u64_for(data: Array[U8] val, idx: USize): U64 =>
     try
-      (data(idx).u64() << 56)
-        or (data(idx + 1).u64() << 48)
-        or (data(idx + 2).u64() << 40)
-        or (data(idx + 3).u64() << 32)
-        or (data(idx + 4).u64() << 24)
-        or (data(idx + 5).u64() << 16)
-        or (data(idx + 6).u64() << 8)
-        or data(idx + 7).u64()
+      (data(idx)?.u64() << 56)
+        or (data(idx + 1)?.u64() << 48)
+        or (data(idx + 2)?.u64() << 40)
+        or (data(idx + 3)?.u64() << 32)
+        or (data(idx + 4)?.u64() << 24)
+        or (data(idx + 5)?.u64() << 16)
+        or (data(idx + 6)?.u64() << 8)
+        or data(idx + 7)?.u64()
     else
       @printf[I32]("Problem decoding bits for 8 byte chunk.")
       0

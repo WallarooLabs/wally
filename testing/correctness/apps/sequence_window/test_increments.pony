@@ -25,9 +25,9 @@ primitive TestIncrements
   """
     // diff may be 0, 1, or 2, and only 2 after 1 or 2
     try
-      var previous: U64 = values(0)
+      var previous: U64 = values(0)?
       for pos in Range[USize](1,4) do
-        let cur = values(pos)
+        let cur = values(pos)?
         let diff = cur - previous
         if (diff == 0) or (diff == 1) then
           if previous != 0 then

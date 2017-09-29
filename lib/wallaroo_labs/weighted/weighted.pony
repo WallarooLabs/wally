@@ -24,7 +24,7 @@ primitive Weighted[V: Any val]
   =>
     try
       recover
-        let items = sort(unsorted_items)
+        let items = sort(unsorted_items)?
         let buckets: Array[Array[V]] = buckets.create()
         let bucket_weights: Array[USize] = bucket_weights.create()
         for i in Range(0, bucket_count) do
@@ -35,12 +35,12 @@ primitive Weighted[V: Any val]
         // Keep adding the next highest weighted item to the bucket with
         // the lowest weight
         while items.size() > 0 do
-          let next_bucket_idx = _lowest_weight_idx(bucket_weights)
-          let next_item = items.pop()
-          buckets(next_bucket_idx).push(next_item._1)
+          let next_bucket_idx = _lowest_weight_idx(bucket_weights)?
+          let next_item = items.pop()?
+          buckets(next_bucket_idx)?.push(next_item._1)
           let new_bucket_weight_total =
-            bucket_weights(next_bucket_idx) + next_item._2
-          bucket_weights(next_bucket_idx) = new_bucket_weight_total
+            bucket_weights(next_bucket_idx)? + next_item._2
+          bucket_weights(next_bucket_idx)? = new_bucket_weight_total
         end
         consume buckets
       end
@@ -55,11 +55,11 @@ primitive Weighted[V: Any val]
   fun _lowest_weight_idx(bucket_weights: Array[USize]): USize ? =>
     try
       var idx: USize = 0
-      var lowest_weight: USize = bucket_weights(0)
+      var lowest_weight: USize = bucket_weights(0)?
       for i in Range(0, bucket_weights.size()) do
-        if bucket_weights(i) < lowest_weight then
+        if bucket_weights(i)? < lowest_weight then
           idx = i
-          lowest_weight = bucket_weights(i)
+          lowest_weight = bucket_weights(i)?
         end
       end
       idx
@@ -80,8 +80,8 @@ primitive Weighted[V: Any val]
       end
 
       while to_sort.size() > 0 do
-        let next_idx = _lowest_sort_idx(to_sort)
-        sorted.push(to_sort.delete(next_idx))
+        let next_idx = _lowest_sort_idx(to_sort)?
+        sorted.push(to_sort.delete(next_idx)?)
       end
       sorted
     else
@@ -92,9 +92,9 @@ primitive Weighted[V: Any val]
   fun _lowest_sort_idx(a: Array[(V, USize)]): USize ? =>
     try
       var idx: USize = 0
-      var lowest_weight: USize = a(0)._2
+      var lowest_weight: USize = a(0)?._2
       for i in Range(0, a.size()) do
-        let next_weight = a(i)._2
+        let next_weight = a(i)?._2
         if next_weight < lowest_weight then
           idx = i
           lowest_weight = next_weight

@@ -54,8 +54,8 @@ class ref _OutgoingToIncomingMessageTracker
 
     try
       for i in Reverse(index, 0) do
-        (let o, let r, let s) = _seq_id_to_incoming(i)._2
-        high_by_producer_route.insert_if_absent((o, r), s)
+        (let o, let r, let s) = _seq_id_to_incoming(i)?._2
+        high_by_producer_route.insert_if_absent((o, r), s)?
       end
     else
       Fail()
@@ -75,7 +75,7 @@ class ref _OutgoingToIncomingMessageTracker
 
     try
       while i < s do
-        let rid = _seq_id_to_incoming(i)._1
+        let rid = _seq_id_to_incoming(i)?._1
         if id == rid then
           return i
         elseif id > rid then

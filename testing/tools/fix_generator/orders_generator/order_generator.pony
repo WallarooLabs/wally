@@ -46,32 +46,32 @@ actor Main
 
     try
       let auth = env.root as AmbientAuth
-      let ini_file = File(FilePath(auth, ini_file_path))
-      let sections = IniParse(ini_file.lines())
-      let orders_section = sections("orders")
-      output_folder = orders_section("output_folder")
+      let ini_file = File(FilePath(auth, ini_file_path)?)
+      let sections = IniParse(ini_file.lines())?
+      let orders_section = sections("orders")?
+      output_folder = orders_section("output_folder")?
       rejected_instruments_file_path =
-        orders_section("rejected_instruments_file")
+        orders_section("rejected_instruments_file")?
       nonrejected_instruments_file_path =
-        orders_section("nonrejected_instruments_file")
-      output_msgs_per_sec = orders_section("output_msgs_per_sec").u64()
+        orders_section("nonrejected_instruments_file")?
+      output_msgs_per_sec = orders_section("output_msgs_per_sec")?.u64()?
       msgs_processable_percent =
-        orders_section("msgs_processable_percent").u64()
-      messages_duration_secs = orders_section("messages_duration_secs").u64()
+        orders_section("msgs_processable_percent")?.u64()?
+      messages_duration_secs = orders_section("messages_duration_secs")?.u64()?
       instruments_skew_percent =
-        orders_section("instruments_skew_percent").u64()
+        orders_section("instruments_skew_percent")?.u64()?
       messages_skew_percent =
-        orders_section("messages_skew_percent").u64()
+        orders_section("messages_skew_percent")?.u64()?
       total_rejections =
-        orders_section("total_rejections").u64()
+        orders_section("total_rejections")?.u64()?
       rejection_percent_per_sec =
         (total_rejections.f64() /
           (messages_duration_secs * output_msgs_per_sec).f64())
 
       let rejected_instruments_file = File(FilePath(auth,
-        rejected_instruments_file_path))
+        rejected_instruments_file_path)?)
       let nonrejected_instruments_file = File(FilePath(auth,
-        nonrejected_instruments_file_path))
+        nonrejected_instruments_file_path)?)
 
       let instruments = generate_instruments(nonrejected_instruments_file)
       let rejected_instruments =
@@ -153,8 +153,8 @@ actor OrderFileGenerator
     _wb.reserve_chunks(_file_limit)
     _output_path = recover val
       _output_folder.clone()
-        .append(_file_counter.string())
-        .append(_file_extension)
+        .>append(_file_counter.string())
+        .>append(_file_extension)
     end
 
   be write_to_files() =>
@@ -162,7 +162,7 @@ actor OrderFileGenerator
       generate_for_sec(_current_sec)
     else
       try
-        var output_file = File(FilePath(_auth, _output_path))
+        var output_file = File(FilePath(_auth, _output_path)?)
         output_file.writev(_wb.done())
         output_file.dispose()
       end
@@ -178,10 +178,10 @@ actor OrderFileGenerator
       _file_counter = _file_counter + 1
       _output_path = recover val
         _output_folder.clone()
-          .append(_file_counter.string())
-          .append(_file_extension)
+          .>append(_file_counter.string())
+          .>append(_file_extension)
       end
-      var new_output_file = File(FilePath(_auth, _output_path))
+      var new_output_file = File(FilePath(_auth, _output_path)?)
       new_output_file.set_length(0)
       new_output_file
     else
@@ -203,7 +203,7 @@ actor OrderFileGenerator
     let instrument_index =
       _number_generator.rand_int(_rejected_instruments.size().u64()).usize()
     let instrument =
-      _rejected_instruments(instrument_index)
+      _rejected_instruments(instrument_index)?
     let fix_order_msg = RandomFixOrderGenerator(instrument, _dice,
       _number_generator, timestamp)
     let fix_order_string = FixMessageStringify.order(fix_order_msg)
@@ -212,7 +212,7 @@ actor OrderFileGenerator
 
   fun ref generate_standard_order(timestamp: String) ? =>
     let instrument_index = generate_skewed_index()
-    let instrument = _instruments(instrument_index.usize())
+    let instrument = _instruments(instrument_index.usize())?
     let fix_order_msg = RandomFixOrderGenerator(instrument,
       _dice, _number_generator, timestamp)
     let fix_order_string = FixMessageStringify.order(fix_order_msg)
@@ -235,18 +235,18 @@ actor OrderFileGenerator
   let rejected_instruments_size = _rejected_instruments.size().u64()
   let instruments_size = _instruments.size().u64()
   try
-    var output_file = File(FilePath(_auth, _output_path))
+    var output_file = File(FilePath(_auth, _output_path)?)
     let date = Date(_time._1 + sec.i64(), _time._2)
     let utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
     for x in Range[U64](0, _output_msgs_per_sec) do
-      output_file = check_output_file_size(output_file)
+      output_file = check_output_file_size(output_file)?
       if should_reject_order() then
-        generate_rejected_order(utc_timestamp)
+        generate_rejected_order(utc_timestamp)?
       else
         if should_be_heartbeat() then
           generate_heartbeat(utc_timestamp)
         else
-          generate_standard_order(utc_timestamp)
+          generate_standard_order(utc_timestamp)?
         end
       end
     end

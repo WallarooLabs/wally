@@ -37,7 +37,7 @@ primitive TCPSinkConfigCLIParser
       | ("help", let arg: None) =>
         StartupHelp()
       | (out_arg, let output: String) =>
-        return _from_output_string(output)
+        return _from_output_string(output)?
       end
     end
 
@@ -48,7 +48,7 @@ primitive TCPSinkConfigCLIParser
 
     for output in outputs.split(",").values() do
       let o = output.split(":")
-      opts.push(TCPSinkConfigOptions(o(0), o(1)))
+      opts.push(TCPSinkConfigOptions(o(0)?, o(1)?))
     end
 
     consume opts

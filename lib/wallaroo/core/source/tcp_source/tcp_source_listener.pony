@@ -185,7 +185,7 @@ actor TCPSourceListener is SourceListener
     Spawn a new connection.
     """
     try
-      let source = TCPSource._accept(this, _notify_connected(),
+      let source = TCPSource._accept(this, _notify_connected()?,
         _router.routes(), _route_builder, _outgoing_boundary_builders,
         _layout_initializer, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size,
@@ -233,11 +233,11 @@ actor TCPSourceListener is SourceListener
     _closed = true
 
     if not _event.is_null() then
-      @pony_os_socket_close[None](_fd)
-      _fd = -1
-
       // When not on windows, the unsubscribe is done immediately.
       ifdef not windows then
         @pony_asio_event_unsubscribe(_event)
       end
+
+      @pony_os_socket_close[None](_fd)
+      _fd = -1
     end

@@ -81,11 +81,11 @@ actor DataChannelListener
     """
     close()
 
-  fun local_address(): IPAddress =>
+  fun local_address(): NetAddress =>
     """
     Return the bound IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
@@ -173,7 +173,7 @@ actor DataChannelListener
     """
     try
       let data_channel = DataChannel._accept(this, _notify.connected(this,
-        _router_registry), ns, _init_size, _max_size)
+        _router_registry)?, ns, _init_size, _max_size)
       _router_registry.register_data_channel(data_channel)
       _count = _count + 1
     else
@@ -202,13 +202,13 @@ actor DataChannelListener
     _closed = true
 
     if not _event.is_null() then
-      @pony_os_socket_close[None](_fd)
-      _fd = -1
-
       // When not on windows, the unsubscribe is done immediately.
       ifdef not windows then
         @pony_asio_event_unsubscribe(_event)
       end
+
+      @pony_os_socket_close[None](_fd)
+      _fd = -1
 
       _notify.closed(this)
     end

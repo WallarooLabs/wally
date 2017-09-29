@@ -48,14 +48,14 @@ class ThroughputBasedClusterGrowthTrigger is MetricsMonitor
   fun ref on_send(metrics: MetricDataList val) =>
     if state is _Untriggered then
       try
-        _monitor_throughput_for(metrics)
+        _monitor_throughput_for(metrics)?
       end
     end
 
   fun ref _monitor_throughput_for(metrics: MetricDataList val) ? =>
     let metrics_size = metrics.size()
     for i in Range(0, metrics_size) do
-      let metric = metrics(i)
+      let metric = metrics(i)?
       if _throughput_per_sec(metric) >= _throughput_trigger_amount.f64() then
         _new_worker_requester.request_new_worker()
         _transition_to(_Triggered)

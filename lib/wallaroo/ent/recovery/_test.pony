@@ -44,7 +44,7 @@ class _TestHexOffset is UnitTest
     let expected: String = "000000000001875A"
     let hex: String = HexOffset(u)
     let s: String val = consume hex
-    let hex_decoded: U64 = HexOffset.u64(s)
+    let hex_decoded: U64 = HexOffset.u64(s)?
     h.assert_eq[String](expected, s)
     h.assert_eq[U64](u, hex_decoded)
 
@@ -78,5 +78,5 @@ class _TestFilterLogFiles is UnitTest
     let filtered = FilterLogFiles(base_name, suffix, consume dir_files)
 
     for idx in filtered.keys() do
-      h.assert_eq[String](filtered(idx), expected(idx))
+      h.assert_eq[String](filtered(idx)?, expected(idx)?)
     end

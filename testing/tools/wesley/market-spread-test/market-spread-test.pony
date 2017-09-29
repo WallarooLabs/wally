@@ -41,7 +41,7 @@ class MarketSpreadInitParser is InitializationParser[FixNbboMessage val]
   fun fs(): (String|None) => None
 
   fun ref apply(fields: Array[String] val) ? =>
-    let fix_raw = fields(0)
+    let fix_raw = fields(0)?
     let fix_message = FixParser(fix_raw)
     match fix_message
     | let nbbo: FixNbboMessage val =>
@@ -57,7 +57,7 @@ class MarketSpreadSentParser is SentParser[FixOrderMessage val]
   fun fs(): (String|None) => None
 
   fun ref apply(fields: Array[String] val) ? =>
-    let fix_raw = fields(0)
+    let fix_raw = fields(0)?
     let fix_message = FixParser(fix_raw)
     match fix_message
     | let trade: FixOrderMessage val =>
@@ -74,9 +74,9 @@ class MarketSpreadReceivedParser is
     Array[MarketSpreadReceivedMessage val]
 
   fun ref apply(fields: Array[String] val) ? =>
-    let timestamp = fields(0).clone().strip().u64()
-    let symbol: String val = fields(1).clone().strip().clone()
-    let is_rejected = fields(10).bool()
+    let timestamp = fields(0)?.clone().>strip().u64()?
+    let symbol: String val = fields(1)?.clone().>strip().clone()
+    let is_rejected = fields(10)?.bool()?
     _messages.push(MarketSpreadReceivedMessage(timestamp, consume symbol,
       is_rejected))
 
@@ -123,7 +123,7 @@ class MarketSpreadResultMapper is StatefulResultMapper[FixOrderMessage val,
 class TradeResults is CanonicalForm
   let results: Map[String, Bool] = Map[String, Bool]
 
-  fun apply(s: String): Bool ? => results(s)
+  fun apply(s: String): Bool ? => results(s)?
 
   fun ref update(key: String, value: Bool) => results(key) = value
 
@@ -135,7 +135,7 @@ class TradeResults is CanonicalForm
       end
       for (symbol, is_rejected) in results.pairs() do
         try
-          if is_rejected != tr(symbol) then
+          if is_rejected != tr(symbol)? then
             let msg = "Expected " + symbol + " rejection to be "
               + is_rejected.string() + " but it was "
               + (not is_rejected).string()
@@ -158,7 +158,7 @@ class MarketData
 
   fun is_rejected(symbol: String): Bool =>
     try
-      _data(symbol)
+      _data(symbol)?
     else
       true
     end

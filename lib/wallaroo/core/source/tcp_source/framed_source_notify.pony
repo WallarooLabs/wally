@@ -76,7 +76,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
       try
-        let payload_size: USize = _handler.payload_length(consume data)
+        let payload_size: USize = _handler.payload_length(consume data)?
 
         conn.expect(payload_size)
         _header = false
@@ -98,7 +98,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
         try
           let decoded =
             try
-              _handler.decode(consume data)
+              _handler.decode(consume data)?
             else
               ifdef debug then
                 @printf[I32]("Error decoding message at source\n".cstring())
