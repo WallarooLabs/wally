@@ -380,8 +380,8 @@ endef
 # rule to generate targets for building actual pony executable including dependencies to relevant *.pony files so incremental builds work properly
 define ponyc-goal
 # include dependencies for already compiled executables
--include $(1:%/=%)/$(notdir $(abspath $(1:%/=%))).d
-$(1:%/=%)/$(notdir $(abspath $(1:%/=%))):
+-include $(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))).d
+$(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))):
 	$$(call PONYC,$(abspath $(1:%/=%)))
 endef
 
@@ -393,7 +393,7 @@ build-pony-all: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 build-docker-pony-all: build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 push-docker-pony-all: push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(1:%/=%)/$(notdir $(abspath $(1:%/=%)))
+build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%)))
 .PHONY: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
@@ -426,15 +426,15 @@ endef
 
 # rule to generate targets for building actual monhub executable including dependencies to relevant files so incremental builds work properly
 define monhub-goal
-$(1:%/=%)/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app: $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
+$(abspath $(1:%/=%))/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app: $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
 	$$(call MONHUBC,$(abspath $(1:%/=%)))
 endef
 
 # rule to generate targets for building actual monhub executable including dependencies to relevant files so incremental builds work properly
 define monhub-release-goal
-$(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%))): $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
+$(abspath $(1:%/=%))/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%))): $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
 	$$(call MONHUBR,$(abspath $(1:%/=%)))
-release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): monhub-arch-check $(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
+release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): monhub-arch-check $(abspath $(1:%/=%))/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
 release-monhub-all: release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 .PHONY: release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
@@ -447,7 +447,7 @@ build-monhub-all: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))
 build-docker-monhub-all: build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 push-docker-monhub-all: push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(1:%/=%)/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app
+build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(abspath $(1:%/=%))/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app
 .PHONY: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
