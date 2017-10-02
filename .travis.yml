@@ -138,3 +138,5 @@ install:
     sudo python2 -m pip install pytest==3.2.2
 script:
   - make test debug=true
+  - make clean
+  - make integration-tests-testing-correctness-tests-all resilience=on debug=true

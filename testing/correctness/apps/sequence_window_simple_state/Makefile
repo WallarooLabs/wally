@@ -20,7 +20,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := true
 
 # `true`/`false` to enable/disable generate final file build target using ponyc command for the pony build target so
 # it can be overridden manually
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
 
 # `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
 # otherwise targets only get created if there are elixir sources (*.exs) in this directory.
@@ -43,21 +43,6 @@ include $(rules_mk_path)
 
 # Reuse the validator from sequence_window
 build-testing-correctness-apps-sequence_window_simple_state: build-testing-correctness-apps-sequence_window-validator
-
-# This will build three different binaries of sequence_window, but respect PONYCFLAGS passed
-# to Make
--include $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))).d
-$(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/$(notdir $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))):
-	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D resilience -D spike -D spiketrace -D validate)
-	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%)))
-	mv $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/sequence_window_simple_state $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/sequence_window_simple_state_resilience
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS) -D spike -D spiketrace)
-	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%)))
-	mv $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/sequence_window_simple_state $(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%))/sequence_window_simple_state_spike
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS))
-	$(call PONYC,$(abspath $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH:%/=%)))
-
 
 integration-tests-testing-correctness-apps-sequence_window_simple_state: build-testing-correctness-apps-sequence_window_simple_state
 
