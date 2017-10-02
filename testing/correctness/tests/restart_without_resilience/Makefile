@@ -7,7 +7,6 @@ endif
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
-
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
 # `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
@@ -16,53 +15,43 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := false
 
 # `true`/`false` to enable/disable generate final file build target using ponyc command for the pony build target so
 # it can be overridden manually
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := false
 
 # `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
 # otherwise targets only get created if there are elixir sources (*.exs) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := false
 
 # `true`/`false` to enable/disable generate docker related targets (build/push) for a Dockerfile in this directory
 # otherwise targets only get created if there is a Dockerfile in this directory
-$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 
 # `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
 # (and by recursion every makefile in the tree that is referenced)
-$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
+RESTART_WITHOUT_RESILIENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
 
-SEQUENCE_WINDOW_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+build-testing-correctness-tests-restart_without_resilience: build-testing-correctness-apps-sequence_window
+build-testing-correctness-tests-restart_without_resilience: build-testing-tools-external_sender
+build-testing-correctness-tests-restart_without_resilience: build-machida
+integration-tests-testing-correctness-tests-restart_without_resilience: build-testing-correctness-tests-restart_without_resilience
+integration-tests-testing-correctness-tests-restart_without_resilience: restart_without_resilience_tests
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
+ifeq ($(resilience),on)
+restart_without_resilience_tests:
+	$(QUIET)printf "restart_without_resilience_tests not run.\nRun make with 'resilience=off' to run this test.\n"
+else
+restart_without_resilience_tests:
+	cd $(RESTART_WITHOUT_RESILIENCE_PATH) && \
+	python2 -m pytest --color=yes --tb=native --verbose restart_without_resilience.py
+endif
 
-build-testing-correctness-apps-sequence_window: build-testing-correctness-apps-sequence_window-validator
-
-integration-tests-testing-correctness-apps-sequence_window: build-testing-correctness-apps-sequence_window
-
-integration-tests-testing-correctness-apps-sequence_window: sequence_window_test
-
-sequence_window_test:
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	integration_test --sequence-sender '(0,1000]' \
-	  --log-level error \
-		--command './sequence_window' \
-		--validation-cmd './validator/validator -e 1000 -a -i' \
-		--output 'received.txt' \
-		--giles-mode \
-		--workers 2 \
-		--batch-size 10 \
-		--sink-expect 1000
-
-clean-testing-correctness-apps-sequence_window: sequence_window_clean
-
-sequence_window_clean:
-	$(QUIET)rm -fr $(SEQUENCE_WINDOW_PATH)/sequence_window*
-
-# end of prevent rules from being evaluated/included multiple times
 endif
