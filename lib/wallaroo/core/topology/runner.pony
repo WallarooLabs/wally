@@ -667,7 +667,6 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
     _event_log = event_log
     _id = None
     _auth = auth
-    _wb.reserve(8)
 
   fun ref set_step_id(id: U128) =>
     _id = id
@@ -737,7 +736,6 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
         ifdef "resilience" then
           sc.write_log_entry(_wb)
           let payload = _wb.done()
-          _wb.reserve(8)
           match _id
           | let buffer_id: U128 =>
             _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
@@ -755,7 +753,6 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
           | let buffer_id: U128 =>
             _state.write_log_entry(_wb, _auth)
             let payload = _wb.done()
-            _wb.reserve(8)
             _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
               U64.max_value(), producer.current_sequence_id(), consume payload)
           end
