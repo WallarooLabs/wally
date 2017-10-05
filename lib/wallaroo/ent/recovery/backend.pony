@@ -22,7 +22,7 @@ use "wallaroo/core/messages"
 
 // (is_watermark, producer_id, uid, frac_ids, statechange_id, seq_id, payload)
 type LogEntry is (Bool, U128, U128, FractionalMessageId, U64, U64,
-  Array[ByteSeq] iso)
+  Array[ByteSeq] val)
 
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
@@ -256,7 +256,7 @@ class FileBackend is Backend
     (let is_watermark: Bool, let producer_id: U128,
      let uid: U128, let frac_ids: FractionalMessageId,
      let statechange_id: U64, let seq_id: U64,
-     let payload: Array[ByteSeq] val) = consume entry
+     let payload: Array[ByteSeq] val) = entry
 
     ifdef "trace" then
       if is_watermark then

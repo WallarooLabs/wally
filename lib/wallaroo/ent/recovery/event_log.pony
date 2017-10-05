@@ -144,22 +144,22 @@ actor EventLog
 
   be queue_log_entry(producer_id: U128, uid: U128,
     frac_ids: FractionalMessageId, statechange_id: U64, seq_id: U64,
-    payload: Array[ByteSeq] iso)
+    payload: Array[ByteSeq] val)
   =>
     _queue_log_entry(producer_id, uid, frac_ids, statechange_id, seq_id,
-      consume payload)
+      payload)
 
   fun ref _queue_log_entry(producer_id: U128, uid: U128,
     frac_ids: FractionalMessageId,
     statechange_id: U64, seq_id: U64,
-    payload: Array[ByteSeq] iso, force_write: Bool = false)
+    payload: Array[ByteSeq] val, force_write: Bool = false)
   =>
     ifdef "resilience" then
       // add to backend buffer after encoding
       // encode right away to amortize encoding cost per entry when received
       // as opposed to when writing a batch to disk
       _backend.encode_entry((false, producer_id, uid, frac_ids, statechange_id,
-        seq_id, consume payload))
+        seq_id, payload))
 
       num_encoded = num_encoded + 1
 
@@ -214,7 +214,7 @@ actor EventLog
 
   be snapshot_state(producer_id: U128, uid: U128,
     statechange_id: U64, seq_id: U64,
-    payload: Array[ByteSeq] iso)
+    payload: Array[ByteSeq] val)
   =>
     ifdef "trace" then
       @printf[I32]("Snapshotting state for step %lu\n".cstring(), producer_id)
@@ -233,7 +233,7 @@ actor EventLog
     // https://github.com/WallarooLabs/wallaroo/issues/1132
     _flush_buffer(producer_id, seq_id)
     _queue_log_entry(producer_id, uid, None, statechange_id, seq_id,
-      consume payload, true)
+      payload, true)
     if _steps_to_snapshot.size() == 0 then
       rotation_complete()
     end
