@@ -53,7 +53,7 @@ class Split(object):
         return words
 
 
-class CountWord():
+class CountWord(object):
     def name(self):
         return "Count Word"
 
