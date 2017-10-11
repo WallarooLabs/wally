@@ -12,6 +12,10 @@ Machida is the program that runs Wallaroo applications written using the Wallaro
 
 Machida runs Wallaroo Python applications using an embedded CPython interpreter. You should be able to use any Python modules that you would normally use when creating a Python application.
 
+## Python Packages
+
+Wallaroo programs that use the Python API can use any packages that would be used with a normal Python program, including your own packages and third party packages. In order to use them, they must be installed on every machine in the Wallaroo cluster and must be accessible via the `PYTHONPATH`.
+
 ## Next Steps
 
 To set up your environment for writing and running Wallaroo Python application, refer to [Running a Wallaroo Python Application](running-a-wallaroo-python-application.md).
