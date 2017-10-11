@@ -52,7 +52,7 @@ We'll use Giles Receiver to listen for data from our Wallaroo application.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-./receiver -l 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock 
+./receiver -l 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
 ```
 
 You should see the `Listening for data` that indicates that Giles receiver is running.
@@ -72,7 +72,7 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 ./build/machida --application-module celsius --in 127.0.0.1:7000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
-  --cluster-initializer --ponythreads=1 --ponynoblock 
+  --cluster-initializer --ponythreads=1 --ponynoblock
 ```
 
 This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
@@ -81,7 +81,7 @@ This tells the "Celsius to Fahrenheit" application that it should listen on port
 
 ### Sending Data with Giles Sender
 
-We will be sending in 25,000,000 messages using the data file generated above. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
+We will be sending in 25,000,000 messages using a pre-generated data file. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
 
 You will now be able to start the `sender` with the following command:
 
