@@ -118,6 +118,8 @@ install:
     fi;
   - echo "Installing pytest";
     sudo python2 -m pip install pytest==3.2.2
+  - echo "Installing enum";
+    sudo python2 -m pip install --upgrade pip enum34
 script:
   - make test debug=true
   # Make sure to run `make clean` between separate test runs to clear any conflicting dependencies
