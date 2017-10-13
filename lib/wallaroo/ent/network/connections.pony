@@ -586,28 +586,40 @@ actor Connections is Cluster
   be inform_joining_worker(conn: TCPConnection, worker: String,
     local_topology: LocalTopology)
   =>
-    let c_addrs = recover trn Map[String, (String, String)] end
-    for (w, addr) in _control_addrs.pairs() do
-      c_addrs(w) = addr
-    end
-    c_addrs(_worker_name) = _my_control_addr
+    if not _control_addrs.contains(worker) then
+      let c_addrs = recover trn Map[String, (String, String)] end
+      for (w, addr) in _control_addrs.pairs() do
+        c_addrs(w) = addr
+      end
+      c_addrs(_worker_name) = _my_control_addr
 
-    let d_addrs = recover trn Map[String, (String, String)] end
-    for (w, addr) in _data_addrs.pairs() do
-      d_addrs(w) = addr
-    end
-    d_addrs(_worker_name) = _my_data_addr
+      let d_addrs = recover trn Map[String, (String, String)] end
+      for (w, addr) in _data_addrs.pairs() do
+        d_addrs(w) = addr
+      end
+      d_addrs(_worker_name) = _my_data_addr
 
-    try
-      let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
-        _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
-        _metrics_service, consume c_addrs, consume d_addrs,
-        local_topology.worker_names, _auth)?
-      conn.writev(inform_msg)
-      @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
-        "necessary information.***\n").cstring(), worker.cstring())
+      try
+        let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
+          _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
+          _metrics_service, consume c_addrs, consume d_addrs,
+          local_topology.worker_names, _auth)?
+        conn.writev(inform_msg)
+        @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
+          "necessary information.***\n").cstring(), worker.cstring())
+      else
+        Fail()
+      end
     else
-      Fail()
+      @printf[I32](("Worker trying to join the cluster is using a name " +
+        "that's already been reserved\n").cstring())
+      try
+        let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth,
+          "Proposed worker name is already reserved by the cluster.")?
+        conn.writev(clean_shutdown_msg)
+      else
+        Fail()
+      end
     end
 
   be inform_cluster_of_join() =>
