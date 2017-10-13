@@ -2,7 +2,7 @@
 
 Since Giles-Receiver is designed to be a fast sink receiver, it doesn't decode the data it receives from Wallaroo, but instead saves as frame encoded binary data.
 
-As the obvious next step is for a user to want to consume this data, we also provide [Fallor](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/testing/tools/fallor) to decode this data.
+At some point, you will want to consume this data. [Fallor](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/testing/tools/fallor) allows you decode the frame encoded data to text.
 
 ## Fallor Command-Line Options
 
