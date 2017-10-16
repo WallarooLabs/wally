@@ -622,7 +622,7 @@ class val DataRouter is Equatable[DataRouter]
     end
 
 trait val PartitionRouter is (Router & Equatable[PartitionRouter])
-  fun local_map(): Map[U128, Step] val
+  fun local_map(): Map[StepId, Step] val
   fun register_routes(router: Router, route_builder: RouteBuilder)
   fun update_route[K: (Hashable val & Equatable[K] val)](
     raw_k: K, target: (Step | ProxyRouter)): PartitionRouter ?
@@ -640,14 +640,14 @@ trait val AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)]
 
 class val LocalPartitionRouter[In: Any val,
   Key: (Hashable val & Equatable[Key] val)] is AugmentablePartitionRouter[Key]
-  let _local_map: Map[U128, Step] val
-  let _step_ids: Map[Key, U128] val
+  let _local_map: Map[StepId, Step] val
+  let _step_ids: Map[Key, StepId] val
   let _partition_routes: Map[Key, (Step | ProxyRouter)] val
   let _partition_function: PartitionFunction[In, Key] val
   let _default_router: (Router | None)
 
-  new val create(local_map': Map[U128, Step] val,
-    s_ids: Map[Key, U128] val,
+  new val create(local_map': Map[StepId, Step] val,
+    s_ids: Map[Key, StepId] val,
     partition_routes: Map[Key, (Step | ProxyRouter)] val,
     partition_function: PartitionFunction[In, Key] val,
     default_router: (Router | None) = None)
@@ -795,7 +795,7 @@ class val LocalPartitionRouter[In: Any val,
     end
     consume diff
 
-  fun local_map(): Map[U128, Step] val => _local_map
+  fun local_map(): Map[StepId, Step] val => _local_map
 
   fun update_route[K: (Hashable val & Equatable[K] val)](
     raw_k: K, target: (Step | ProxyRouter)): PartitionRouter ?
@@ -805,7 +805,7 @@ class val LocalPartitionRouter[In: Any val,
     match raw_k
     | let key: Key =>
       let target_id = _step_ids(key)?
-      let new_local_map = recover trn Map[U128, Step] end
+      let new_local_map = recover trn Map[StepId, Step] end
       let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
       match target
       | let step: Step =>
@@ -864,7 +864,7 @@ class val LocalPartitionRouter[In: Any val,
       var left_to_send = PartitionRebalancer.step_count_to_send(size(),
         _local_map.size(), worker_count - 1)
       if left_to_send > 0 then
-        let steps_to_migrate = Array[(Key, U128, Step)]
+        let steps_to_migrate = Array[(Key, StepId, Step)]
         for (key, target) in _partition_routes.pairs() do
           if left_to_send == 0 then break end
           match target
@@ -899,8 +899,8 @@ class val LocalPartitionRouter[In: Any val,
   fun eq(that: box->PartitionRouter): Bool =>
     match that
     | let o: box->LocalPartitionRouter[In, Key] =>
-      MapTagEquality[U128, Step](_local_map, o._local_map) and
-        MapEquality[Key, U128](_step_ids, o._step_ids) and
+      MapTagEquality[StepId, Step](_local_map, o._local_map) and
+        MapEquality[Key, StepId](_step_ids, o._step_ids) and
         _partition_routes_eq(o._partition_routes) and
         (_partition_function is o._partition_function) and
         (_default_router is o._default_router)
@@ -946,12 +946,12 @@ trait val StatelessPartitionRouter is (Router &
 
 class val LocalStatelessPartitionRouter is StatelessPartitionRouter
   // Maps stateless partition id to step id
-  let _step_ids: Map[U64, U128] val
+  let _step_ids: Map[U64, StepId] val
   // Maps stateless partition id to step or proxy router
   let _partition_routes: Map[U64, (Step | ProxyRouter)] val
   let _partition_size: USize
 
-  new val create(s_ids: Map[U64, U128] val,
+  new val create(s_ids: Map[U64, StepId] val,
     partition_routes: Map[U64, (Step | ProxyRouter)] val)
   =>
     _step_ids = s_ids
