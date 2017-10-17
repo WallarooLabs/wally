@@ -73,7 +73,7 @@ nc -l 127.0.0.1 7002 > marketspread.out
 
 ### Shell 2
 
-Set `PYTHONPATH` to refer to the current directory (where `celsius.py` is) and the `machida` directory (where `wallaroo.py` is). Set `PATH` to refer to the directory that contains the `machida` executable. Assuming you installed Machida according to the tutorial instructions you would do:
+Set `PYTHONPATH` to refer to the current directory (where `market_spread.py` is) and the `machida` directory (where `wallaroo.py` is). Set `PATH` to refer to the directory that contains the `machida` executable. Assuming you installed Machida according to the tutorial instructions you would do:
 
 ```bash
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
@@ -87,7 +87,7 @@ machida --application-module market_spread \
   --in 127.0.0.1:7010,127.0.0.1:7011 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --worker-name worker1 --external 127.0.0.1:5050 --cluster-initializer \
-  --ponythreads=1 --ponynoblock 
+  --ponythreads=1 --ponynoblock
 ```
 
 ### Shell 3
