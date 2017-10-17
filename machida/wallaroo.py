@@ -228,3 +228,15 @@ def _kafka_parse_broker(broker):
         port = host_and_port[1]
 
     return (host, port)
+
+
+#### Batching markers ####
+
+class ChunkMarker_Start(object):
+    pass
+
+
+class ChunkMarker_End(object):
+    pass
+
+
