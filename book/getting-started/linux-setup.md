@@ -57,12 +57,19 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
   /usr/bin/gcc-5 60 --slave /usr/bin/g++ g++ /usr/bin/g++-5
 ```
 
+## Add ponyc and pony-stable apt-key keyserver
+
+In order to install `ponyc` and `pony-stable` via `apt-get` the following keyserver must be added to the APT key management utility.
+
+```bash
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
+```
+
 ### Installing ponyc
 
 Now you need to install Pony compiler `ponyc`. Run:
 
 ```bash
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "8756 C4F7 65C9 AC3C B6B8  5D62 379C E192 D401 AB61"
 echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
 sudo apt-get update
 sudo apt-get -V install ponyc
@@ -73,7 +80,6 @@ sudo apt-get -V install ponyc
 Next, you need to install `pony-stable`, a Pony dependency management library. Navigate to a directory where you will put the `pony-stable` repo and execute the following commands:
 
 ```bash
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
 echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list
 sudo apt-get update
 sudo apt-get -V install pony-stable
