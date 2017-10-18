@@ -176,9 +176,6 @@ actor Startup
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0)?, j_addr(1)?)
         _disposables.set(control_conn)
-        let cluster_join_msg =
-          ChannelMsgEncoder.join_cluster(_startup_options.worker_name, auth)?
-        control_conn.writev(cluster_join_msg)
         @printf[I32]("Attempting to join cluster...\n".cstring())
         // This only exists to keep joining worker alive while it waits for
         // cluster information.

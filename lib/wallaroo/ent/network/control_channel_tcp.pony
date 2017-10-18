@@ -355,6 +355,13 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
     _startup = startup
 
   fun ref connected(conn: TCPConnection ref) =>
+    try
+      let cluster_join_msg =
+        ChannelMsgEncoder.join_cluster(_worker_name, _auth)?
+      conn.writev(cluster_join_msg)
+    else
+      Fail()
+    end
     conn.expect(4)
     _header = true
 
