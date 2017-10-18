@@ -35,7 +35,7 @@ Once you have finished the "Developing with Wallaroo" section, you can then jump
 
 ### Core Concepts
 
-Covers the concepts you'll need to understand in order to build a Wallaroo application. As much as possible, we will avoid being language specific and try to keep it generic, but from time to time we will have some examples in Pony.
+Covers the concepts you'll need to understand in order to build a Wallaroo application. Example code is presented using our Python API.
 
 ### Developing with Wallaroo
 

@@ -65,7 +65,7 @@ class NoneFixedQueue[A]
     raising an error if the index is out of bounds.
     """
     if i < _size then
-      let a = _data((i + _front_ptr) and _mod)
+      let a = _data((i + _front_ptr) and _mod)?
       match a
       | let item: this->A => item
       else
@@ -87,15 +87,15 @@ class NoneFixedQueue[A]
       _data.push(consume a)
       _back_ptr = (_back_ptr + 1) and _mod
     else
-      _data(_back_ptr) = consume a
+      _data(_back_ptr)? = consume a
       _back_ptr = (_back_ptr + 1) and _mod
     end
     _size = _size + 1
 
   fun ref dequeue(): A! ? =>
     if _size > 0 then
-      let a = _data(_front_ptr)
-      _data(_front_ptr) = None
+      let a = _data(_front_ptr)?
+      _data(_front_ptr)? = None
       _front_ptr = (_front_ptr + 1) and _mod
       _size = _size - 1
       match a
@@ -109,7 +109,7 @@ class NoneFixedQueue[A]
 
   fun peek(): this->A ? =>
     if _size > 0 then
-      let a = _data(_front_ptr)
+      let a = _data(_front_ptr)?
       match a
       | let item: this->A => item
       else
@@ -128,7 +128,7 @@ class NoneFixedQueue[A]
     _front_ptr = 0
     _back_ptr = 0
     for i in Range(0, _data.size()) do
-      try _data(i) = None end
+      try _data(i)? = None end
     end
     this
 
@@ -136,7 +136,7 @@ class NoneFixedQueue[A]
     if (_size > 0) and (n > 0) then
       let to_clear = if _size < (n - 1) then (_size - 1) else n end
       for i in Range(0, to_clear) do
-        try _data(_front_ptr) = None end
+        try _data(_front_ptr)? = None end
         _front_ptr = (_front_ptr + 1) and _mod
       end
       _size = _size - to_clear

@@ -62,32 +62,32 @@ actor Main
     try
       let auth = env.root as AmbientAuth
       let validator = U64SetValidator
-      let ifp = FilePath(auth, input_file_path)
-      Fact(ifp.exists(), "Input file: '" + ifp.path + "' does not exist." )
+      let ifp = FilePath(auth, input_file_path)?
+      Fact(ifp.exists(), "Input file: '" + ifp.path + "' does not exist." )?
       let input = ReceiverFileDataSource(ifp)
 
       for bytes in input do
         let fields =
           try
-            FallorMsgDecoder.with_timestamp(bytes)
+            FallorMsgDecoder.with_timestamp(bytes)?
           else
             @printf[I32]("Problem decoding received data!\n")
             error
           end
-          let ts = fields(0)
-          let data = U64Decoder(fields(1))
+          let ts = fields(0)?
+          let data = U64Decoder(fields(1)?)?
           validator.add_received(consume data)
       end
 
-      let efp = FilePath(auth, expected_file_path)
-      Fact(efp.exists(), "Expected file: '" + efp.path + "' does not exist." )
+      let efp = FilePath(auth, expected_file_path)?
+      Fact(efp.exists(), "Expected file: '" + efp.path + "' does not exist." )?
       let expected = ExpectedFileDataSource(efp)
 
       for bytes in input do
-          let data = U64Decoder.decode(bytes)
+          let data = U64Decoder.decode(bytes)?
           validator.add_expected(consume data)
       end
-      validator.finalize()
+      validator.finalize()?
       @printf[I32]("Validation successful!\n".cstring())
     else
       @printf[I32]("Error validating received file.\n".cstring())
@@ -114,7 +114,7 @@ class U64SetValidator
 
   fun finalize() ? =>
   Fact(test_received_expected_equality(),
-    "Received data set does not match expected data set.\n")
+    "Received data set does not match expected data set.\n")?
 
   fun test_received_expected_equality(): Bool =>
     """
@@ -140,7 +140,7 @@ class ReceiverFileDataSource is Iterator[Array[U8] val]
     // 4 bytes LENGTH HEADER + 8 byte U64 giles receiver timestamp
     let h = _file.read(12)
     try
-      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
+      let expect: USize = Bytes.to_u32(h(0)?, h(1)?, h(2)?, h(3)?).usize()
       h.append(_file.read(expect))
       h
     else
@@ -167,7 +167,7 @@ class ExpectedFileDataSource is Iterator[Array[U8] val]
     // 4 bytes LENGTH HEADER
     let h = _file.read(4)
     try
-      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
+      let expect: USize = Bytes.to_u32(h(0)?, h(1)?, h(2)?, h(3)?).usize()
       expect
       let expected = _file.read(expect)
       expected

@@ -7,27 +7,40 @@ endif
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
-# uncomment to disable generate test related targets in this directory
-TEST_TARGET := false
 
-# uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
-#PONY_TARGET := false
+# The following are control variables that determine what logic from `rules.mk` is enabled
 
-# uncomment to disable generate exs related targets (build/test/clean) for elixir sources in this directory
-EXS_TARGET := false
+# `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
+# applies to both the pony and elixir test targets
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
-# uncomment to disable generate docker related targets (build/push) for Dockerfile in this directory
-DOCKER_TARGET := false
+# `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
+# otherwise targets only get created if there are pony sources (*.pony) in this directory.
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := true
 
-# uncomment to disable generate recursing into Makefiles of subdirectories
-# RECURSE_SUBMAKEFILES := false
+# `true`/`false` to enable/disable generate final file build target using ponyc command for the pony build target so
+# it can be overridden manually
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
+
+# `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
+# otherwise targets only get created if there are elixir sources (*.exs) in this directory.
+$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := true
+
+# `true`/`false` to enable/disable generate docker related targets (build/push) for a Dockerfile in this directory
+# otherwise targets only get created if there is a Dockerfile in this directory
+$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
+
+# `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
+# (and by recursion every makefile in the tree that is referenced)
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
+
 
 SINGLE_STREAM_FILTERING_STATELESS_FILTERED_STATEFUL_APP_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
-test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateful_app: single_worker_filtering_stateless_filtered_stateful_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateful_app: single_worker_filtering_stateless_filtered_stateful_app_test
 
 single_worker_filtering_stateless_filtered_stateful_app_test:
 	cd $(SINGLE_STREAM_FILTERING_STATELESS_FILTERED_STATEFUL_APP_PATH) && \
@@ -44,7 +57,7 @@ single_worker_filtering_stateless_filtered_stateful_app_test:
 # This should never happen: failure in lib/wallaroo/initialization/local_topology.pony at line 1236
 # See Issue: 947
 
-# test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateful_app: two_worker_single_worker_filtering_stateless_filtered_stateful_app_test
+# integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateful_app: two_worker_single_worker_filtering_stateless_filtered_stateful_app_test
 
 two_worker_single_worker_filtering_stateless_filtered_stateful_app_test:
 	cd $(SINGLE_STREAM_FILTERING_STATELESS_FILTERED_STATEFUL_APP_PATH) && \
@@ -57,7 +70,7 @@ two_worker_single_worker_filtering_stateless_filtered_stateful_app_test:
 	--command './filtered_stateful_app' \
 	--sink-expect 50
 
-# test-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateful_app: three_worker_single_worker_filtering_stateless_filtered_stateful_app_test
+# integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering_stateless-filtered_stateful_app: three_worker_single_worker_filtering_stateless_filtered_stateful_app_test
 
 three_worker_single_worker_filtering_stateless_filtered_stateful_app_test:
 	cd $(SINGLE_STREAM_FILTERING_STATELESS_FILTERED_STATEFUL_APP_PATH) && \

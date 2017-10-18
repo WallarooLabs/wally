@@ -384,7 +384,7 @@ size_t AddVotesStateChangeBuilder::serialize_get_size ()
 
 Messages can be partitioned between Wallaroo workers based on a partition function. This allows a Wallaroo system to scale by adding workers. The application developer is responsible for defining a partition function that takes in message data and returns a partition key. The application developer is also responsible for specifying the known partition keys.
 
-Each parition creates a separate state object that only stores state for the given partition.
+Each partition creates a separate state object that only stores state for the given partition.
 
 Wallaroo takes care of deciding which partitions will live on which workers and routes messages to the appropriate workers.
 
@@ -414,7 +414,7 @@ uint64_t LetterPartition::get_key(size_t idx_)
 }
 ```
 
-The partition is responsible for returning a new partition function via the `get_parition_function` method, and returning partition keys via the `get_key` method. Wallaroo uses the `get_number_of_keys` method to determine how many keys it should get from the partition.
+The partition is responsible for returning a new partition function via the `get_partition_function` method, and returning partition keys via the `get_key` method. Wallaroo uses the `get_number_of_keys` method to determine how many keys it should get from the partition.
 
 In our case, there are 26 partition keys, one for each letter of the alphabet. The `get_key` method returns a 64-bit value that is the ASCII value of the given letter.
 

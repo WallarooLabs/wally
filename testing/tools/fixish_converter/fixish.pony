@@ -54,8 +54,8 @@ actor Main
     try
       let auth = env.root as AmbientAuth
 
-      let input_file = File(FilePath(auth, input_file_path))
-      let output_file = File(FilePath(auth, output_file_path))
+      let input_file = File(FilePath(auth, input_file_path)?)
+      let output_file = File(FilePath(auth, output_file_path)?)
       output_file.set_length(0)
 
       if readable then
@@ -64,9 +64,9 @@ actor Main
         rb.append(input)
         var left = input.size()
         while left > 0 do
-          let size = rb.u32_be().usize()
-          let next = rb.block(size)
-          match FixishMsgDecoder(consume next)
+          let size = rb.u32_be()?.usize()
+          let next = rb.block(size)?
+          match FixishMsgDecoder(consume next)?
           | let m: FixOrderMessage val =>
             output_file.print(m.string())
           | let m: FixNbboMessage val =>

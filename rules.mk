@@ -12,6 +12,7 @@
 # detemine makefile that included this one and it's path
 PREV_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),x $(MAKEFILE_LIST))
 PREV_PATH := $(dir $(PREV_MAKEFILE))
+ABS_PREV_MAKEFILE := $(abspath $(PREV_MAKEFILE))
 
 # prevent rules from being evaluated/included multiple times
 ifndef RULES_MK
@@ -57,33 +58,11 @@ CUSTOM_PATH = $(integration_bin_path):$(machida_bin_path)
 # initialize default for some normal targets and variables
 build-wallarooroot-all :=
 test-wallarooroot-all :=
+unit-tests-wallarooroot-all :=
+integration-tests-wallarooroot-all :=
 clean-wallarooroot-all :=
 build-docker-wallarooroot-all :=
 push-docker-wallarooroot-all :=
-
-ifndef TEST_TARGET
-  TEST_TARGET :=
-endif
-
-ifndef PONY_TARGET
-  PONY_TARGET :=
-endif
-
-ifndef PONYC_TARGET
-  PONYC_TARGET :=
-endif
-
-ifndef DOCKER_TARGET
-  DOCKER_TARGET :=
-endif
-
-ifndef EXS_TARGET
-  EXS_TARGET :=
-endif
-
-ifndef RECURSE_SUBMAKEFILES
-  RECURSE_SUBMAKEFILES :=
-endif
 
 ifndef ponyc_docker_args
   ponyc_docker_args :=
@@ -107,6 +86,12 @@ endif
 define lazy-init
  $1 = $$(redefine-$1) $$($1)
  redefine-$1 = $$(eval $1 := $2)
+endef
+
+# function to check value of a variable is one of a list of valid values
+define check-values
+$(if $(filter $($(1)),$(2)),,\
+  $(error Unknown $(1) option "$($(1))". Valid values are "$(2)".))
 endef
 
 # how to get the latest ponyc tag
@@ -159,9 +144,7 @@ resilience ?= off## Build with Resilience or not
 
 # validation of variable
 ifdef autoscale
-  ifeq (,$(filter $(autoscale),on off))
-    $(error Unknown autoscale option "$(autoscale)". Valid values are "on off".)
-  endif
+  $(eval $(call check-values,autoscale,on off))
 endif
 
 ifeq ($(autoscale),on)
@@ -170,9 +153,7 @@ endif
 
 # validation of variable
 ifdef clustering
-  ifeq (,$(filter $(clustering),on off))
-    $(error Unknown autoscale option "$(clustering)". Valid values are "on off".)
-  endif
+  $(eval $(call check-values,clustering,on off))
 endif
 
 ifeq ($(clustering),on)
@@ -181,9 +162,7 @@ endif
 
 # validation of variable
 ifdef resilience
-  ifeq (,$(filter $(resilience),on off))
-    $(error Unknown autoscale option "$(resilience)". Valid values are "on off".)
-  endif
+  $(eval $(call check-values,resilience,on off))
 endif
 
 ifeq ($(resilience),on)
@@ -192,23 +171,17 @@ endif
 
 # validation of variable
 ifdef dagon_in_docker
-  ifeq (,$(filter $(dagon_in_docker),false true))
-    $(error Unknown dagon_in_docker option "$(dagon_in_docker)". Valid values are "false true".)
-  endif
+  $(eval $(call check-values,dagon_in_docker,false true))
 endif
 
 # validation of variable
 ifdef demo_cluster_spot_pricing
-  ifeq (,$(filter $(demo_cluster_spot_pricing),false true))
-    $(error Unknown demo_cluster_spot_pricing option "$(demo_cluster_spot_pricing)". Valid values are "false true")
-  endif
+  $(eval $(call check-values,demo_cluster_spot_pricing,false true))
 endif
 
 # validation of variable
 ifdef debug
-  ifeq (,$(filter $(debug),false true))
-    $(error Unknown debug option "$(debug)". Valid values are "false true")
-  endif
+  $(eval $(call check-values,debug,false true))
 endif
 
 ifeq ($(dagon_docker_host),)
@@ -220,7 +193,7 @@ ifeq ($(shell uname -s),Linux)
   docker_user_arg := -u `id -u`
   extra_awk_arg := \\
   host_ip_src = $(shell ifconfig `route -n | grep '^0.0.0.0' | awk '{print $$8}'` | egrep -o 'inet addr:[^ ]+' | awk -F: '{print $$2}')
-  system_cpus := $(shell which cset && sudo cset set -l -r | grep '/system' | awk '{print $$2}')
+  system_cpus := $(shell which cset > /dev/null && sudo cset set -l -r | grep '/system' | awk '{print $$2}')
   ifneq (,$(system_cpus))
     docker_cpu_arg := --cpuset-cpus $(system_cpus)
   endif
@@ -234,21 +207,17 @@ $(eval \
     $$(call host_ip_src)))
 
 ifeq ($(debug),true)
-  debug_arg := -d
+  debug_arg := --debug
 endif
 
 # validation of variable
 ifdef arch
-  ifeq (,$(filter $(arch),amd64 armhf native))
-    $(error Unknown architecture "$(arch)". Valid values are "amd64 armhf native")
-  endif
+  $(eval $(call check-values,arch,amd64 armhf native))
 endif
 
 # validation of variable
 ifdef in_docker
-  ifeq (,$(filter $(in_docker),false true))
-    $(error Unknown in_docker option "$(in_docker)". Valid values are "false true")
-  endif
+  $(eval $(call check-values,in_docker,false true))
 endif
 
 # additional ponyc arguments when building for armhf
@@ -403,15 +372,16 @@ endef
 # rule to generate includes for makefiles in subdirs of first argument
 define make-goal
 $(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
+$(eval MAKEFILES := $(sort $(wildcard $(1:%/=%)/*/Makefile)))
 $(foreach mdir,$(MAKEDIRS),$(eval $(notdir $(mdir:%/=%)) := $(mdir)))
-$(foreach mdir,$(MAKEDIRS),$(eval include $($(notdir $(mdir:%/=%)))Makefile))
+$(eval include $(MAKEFILES))
 endef
 
 # rule to generate targets for building actual pony executable including dependencies to relevant *.pony files so incremental builds work properly
 define ponyc-goal
 # include dependencies for already compiled executables
--include $(1:%/=%)/$(notdir $(abspath $(1:%/=%))).d
-$(1:%/=%)/$(notdir $(abspath $(1:%/=%))):
+-include $(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))).d
+$(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%))):
 	$$(call PONYC,$(abspath $(1:%/=%)))
 endef
 
@@ -423,7 +393,7 @@ build-pony-all: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 build-docker-pony-all: build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 push-docker-pony-all: push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(1:%/=%)/$(notdir $(abspath $(1:%/=%)))
+build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%)))
 .PHONY: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
@@ -431,11 +401,15 @@ endef
 define pony-test-goal
 test-pony-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-ifneq ($(TEST_TARGET),false)
+test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+ifneq ($($(ABS_PREV_MAKEFILE)_UNIT_TEST_COMMAND),false)
 	cd $(abspath $(1:%/=%)) && ./$(notdir $(abspath $(1:%/=%)))
 endif
-.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
 
 # rule to generate targets for clean-* for devs to use
@@ -452,15 +426,15 @@ endef
 
 # rule to generate targets for building actual monhub executable including dependencies to relevant files so incremental builds work properly
 define monhub-goal
-$(1:%/=%)/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app: $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
+$(abspath $(1:%/=%))/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app: $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
 	$$(call MONHUBC,$(abspath $(1:%/=%)))
 endef
 
 # rule to generate targets for building actual monhub executable including dependencies to relevant files so incremental builds work properly
 define monhub-release-goal
-$(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%))): $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
+$(abspath $(1:%/=%))/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%))): $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
 	$$(call MONHUBR,$(abspath $(1:%/=%)))
-release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): monhub-arch-check $(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
+release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): monhub-arch-check $(abspath $(1:%/=%))/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
 release-monhub-all: release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 .PHONY: release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
@@ -473,7 +447,7 @@ build-monhub-all: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))
 build-docker-monhub-all: build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 push-docker-monhub-all: push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(1:%/=%)/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app
+build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(abspath $(1:%/=%))/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app
 .PHONY: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
@@ -481,11 +455,15 @@ endef
 define monhub-test-goal
 test-monhub-all: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
-ifneq ($(TEST_TARGET),false)
+test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
+ifneq ($($(ABS_PREV_MAKEFILE)_UNIT_TEST_COMMAND),false)
 	cd $(abspath $(1:%/=%)) && mix test
 endif
-.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
+.PHONY: test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
 
 # rule to generate targets for clean-* for devs to use
@@ -520,27 +498,37 @@ endef
 
 # rule to generate targets for *-all for devs to use
 define subdir-goal
-$(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
 $(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $1)),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all))
 
-$(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(eval build-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval test-$(MY_TARGET_SUFFIX:%-all=%):)
+$(eval unit-tests-$(MY_TARGET_SUFFIX:%-all=%):)
+$(eval integration-tests-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval clean-$(MY_TARGET_SUFFIX:%-all=%):)
 $(eval build-$(MY_TARGET_SUFFIX): build-$(MY_TARGET_SUFFIX:%-all=%) $(build-$(MY_TARGET_SUFFIX)))
 $(eval test-$(MY_TARGET_SUFFIX): test-$(MY_TARGET_SUFFIX:%-all=%) $(test-$(MY_TARGET_SUFFIX)))
+$(eval unit-tests-$(MY_TARGET_SUFFIX): unit-tests-$(MY_TARGET_SUFFIX:%-all=%) $(unit-tests-$(MY_TARGET_SUFFIX)))
+$(eval integration-tests-$(MY_TARGET_SUFFIX): integration-tests-$(MY_TARGET_SUFFIX:%-all=%) $(integration-tests-$(MY_TARGET_SUFFIX)))
 $(eval clean-$(MY_TARGET_SUFFIX): clean-$(MY_TARGET_SUFFIX:%-all=%) $(clean-$(MY_TARGET_SUFFIX)))
 
-$(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
-$(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
 $(eval build-docker-$(MY_TARGET_SUFFIX): $(build-docker-$(MY_TARGET_SUFFIX)))
 $(eval push-docker-$(MY_TARGET_SUFFIX): $(push-docker-$(MY_TARGET_SUFFIX)))
 
-.PHONY: build-$(MY_TARGET_SUFFIX) test-$(MY_TARGET_SUFFIX) clean-$(MY_TARGET_SUFFIX) build-docker-$(MY_TARGET_SUFFIX) push-docker-$(MY_TARGET_SUFFIX)
+.PHONY: build-$(MY_TARGET_SUFFIX) test-$(MY_TARGET_SUFFIX) unit-tests-$(MY_TARGET_SUFFIX) integration-tests-$(MY_TARGET_SUFFIX) clean-$(MY_TARGET_SUFFIX) build-docker-$(MY_TARGET_SUFFIX) push-docker-$(MY_TARGET_SUFFIX)
 endef
 
+# rule to generate targets for *-all for devs to use
+define subdir-recurse-goal
+$(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
+$(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $1)),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval unit-tests-$(MY_TARGET_SUFFIX) += unit-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval integration-tests-$(MY_TARGET_SUFFIX) += integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(mdir))))-all))
+endef
 
 ROOT_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $(ROOT_PATH))),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(ROOT_PATH))))-all)
 
@@ -550,7 +538,9 @@ ROOT_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $(ROOT_PATH)))
 # default targets
 .DEFAULT_GOAL := build
 build: build-$(ROOT_TARGET_SUFFIX) ## Build all projects (pony & monhub) (DEFAULT)
-test: test-$(ROOT_TARGET_SUFFIX) ## Test all projects (pony & monhub)
+test: unit-tests integration-tests ## Test all projects (pony & monhub)
+unit-tests: unit-tests-$(ROOT_TARGET_SUFFIX) ## Test all projects (pony & monhub)
+integration-tests: integration-tests-$(ROOT_TARGET_SUFFIX) ## Test all projects (pony & monhub)
 build-pony: build-pony-all ## Build all pony projects
 test-pony: test-pony-all ## Test all pony projects
 clean-pony: clean-pony-all ## Clean all pony projects
@@ -704,10 +694,18 @@ help: ## this help message
 
 endif # RULES_MK
 
+# check control variables for valid values
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_UNIT_TEST_COMMAND,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_PONY_TARGET,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_PONYC_TARGET,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_DOCKER_TARGET,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_EXS_TARGET,false true))
+$(evel $(call check-values,$(ABS_PREV_MAKEFILE)_RECURSE_SUBMAKEFILES,false true))
+
 # if there's a pony source file, create the appropriate rules for it unless disabled
-ifneq ($(PONY_TARGET),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_PONY_TARGET),false)
   ifneq ($(wildcard $(PREV_PATH)/*.pony),)
-    ifneq ($(PONYC_TARGET),false)
+    ifneq ($($(ABS_PREV_MAKEFILE)_PONYC_TARGET),false)
       $(eval $(call ponyc-goal,$(PREV_PATH)))
     endif
     $(eval $(call pony-build-goal,$(PREV_PATH)))
@@ -717,7 +715,7 @@ ifneq ($(PONY_TARGET),false)
 endif
 
 # if there's a exs source file, create the appropriate rules for it unless disabled
-ifneq ($(EXS_TARGET),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_EXS_TARGET),false)
   ifneq ($(wildcard $(PREV_PATH)/*.exs),)
     $(eval $(call monhub-goal,$(PREV_PATH)))
     $(eval $(call monhub-build-goal,$(PREV_PATH)))
@@ -730,26 +728,23 @@ ifneq ($(EXS_TARGET),false)
 endif
 
 # if there's a Dockerfile, create the appropriate rules for it unless disabled
-ifneq ($(DOCKER_TARGET),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_DOCKER_TARGET),false)
   ifneq ($(wildcard $(PREV_PATH)/Dockerfile),)
     $(eval $(call build-docker-goal,$(PREV_PATH)))
     $(eval $(call push-docker-goal,$(PREV_PATH)))
   endif
 endif
 
+# include rules for directory level "-all" targets for recursing
+ifneq ($($(ABS_PREV_MAKEFILE)_RECURSE_SUBMAKEFILES),false)
+  $(eval $(call subdir-recurse-goal,$(PREV_PATH)))
+endif
+
 # include rules for directory level "-all" targets
 $(eval $(call subdir-goal,$(PREV_PATH)))
 
-# reset variables before including sub-makefiles
-TEST_TARGET :=
-PONY_TARGET :=
-PONYC_TARGET :=
-DOCKER_TARGET :=
-EXS_TARGET :=
-RECURSE_SUBMAKEFILES :=
-
 # include makefiles from 1 level down in directory tree if they exist (and by recursion every makefile in the tree that is referenced) unless disabled
-ifneq ($(RECURSE_SUBMAKEFILES),false)
+ifneq ($($(ABS_PREV_MAKEFILE)_RECURSE_SUBMAKEFILES),false)
   $(eval $(call make-goal,$(PREV_PATH)))
 endif
 

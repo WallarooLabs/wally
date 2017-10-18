@@ -40,13 +40,13 @@ actor Main
         Application("Alphabet Popularity Contest")
           .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes",
             TCPSourceConfig[Votes val].from_options(VotesDecoder,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_state_partition[Votes val, String, LetterTotal val,
               LetterState](AddVotes, LetterStateBuilder, "letter-state",
               letter_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[LetterTotal val].from_options(
               LetterTotalEncoder,
-              TCPSinkConfigCLIParser(env.args)(0)))
+              TCPSinkConfigCLIParser(env.args)?(0)?))?
       end
       Startup(env, application, "alphabet-contest")
     else
@@ -84,9 +84,9 @@ class AddVotesStateChange is StateChange[LetterState]
     out_writer.u64_be(_votes.count)
 
   fun ref read_log_entry(in_reader: Reader) ? =>
-    let letter_size = in_reader.u32_be().usize()
-    let letter = String.from_array(in_reader.block(letter_size))
-    let count = in_reader.u64_be()
+    let letter_size = in_reader.u32_be()?.usize()
+    let letter = String.from_array(in_reader.block(letter_size)?)
+    let count = in_reader.u64_be()?
     _votes = Votes(letter, count)
 
 class AddVotesStateChangeBuilder is StateChangeBuilder[LetterState]
@@ -102,7 +102,7 @@ primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
   =>
     let state_change: AddVotesStateChange ref =
       try
-        sc_repo.lookup_by_name("AddVotes") as AddVotesStateChange
+        sc_repo.lookup_by_name("AddVotes")? as AddVotesStateChange
       else
         AddVotesStateChange(0)
       end
@@ -117,6 +117,7 @@ primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
     recover val
       let scbs = Array[StateChangeBuilder[LetterState]]
       scbs.push(recover val AddVotesStateChangeBuilder end)
+      scbs
     end
 
 primitive VotesDecoder is FramedSourceHandler[Votes val]
@@ -129,7 +130,7 @@ primitive VotesDecoder is FramedSourceHandler[Votes val]
   fun decode(data: Array[U8] val): Votes val ? =>
     // Assumption: 1 byte for letter
     let letter = String.from_array(data.trim(0, 1))
-    let count = Bytes.to_u32(data(1), data(2), data(3), data(4))
+    let count = Bytes.to_u32(data(1)?, data(2)?, data(3)?, data(4)?)
     Votes(letter, count.u64())
 
 primitive LetterPartitionFunction

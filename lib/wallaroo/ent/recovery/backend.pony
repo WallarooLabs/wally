@@ -22,7 +22,7 @@ use "wallaroo/core/messages"
 
 // (is_watermark, producer_id, uid, frac_ids, statechange_id, seq_id, payload)
 type LogEntry is (Bool, U128, U128, FractionalMessageId, U64, U64,
-  Array[ByteSeq] iso)
+  Array[ByteSeq] val)
 
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
@@ -38,7 +38,7 @@ primitive HexOffset
       fill=48)
 
   fun u64(hex: String): U64 ? =>
-    hex.u64(16)
+    hex.u64(16)?
 
 primitive FilterLogFiles
   fun apply(base_name: String, suffix: String = ".evlog",
@@ -49,8 +49,8 @@ primitive FilterLogFiles
       let filtered: Array[String] ref = Array[String]
       for e in es.values() do
         try
-          if (e.find(base_name) == 0) and
-             (e.rfind(suffix) == (e.size() - suffix.size()).isize()) then
+          if (e.find(base_name)? == 0) and
+             (e.rfind(suffix)? == (e.size() - suffix.size()).isize()) then
             filtered.push(e)
           end
         end
@@ -63,10 +63,10 @@ primitive LastLogFilePath
   fun apply(base_name: String, suffix: String = ".evlog", base_dir: FilePath):
     FilePath ?
   =>
-    let dir = Directory(base_dir)
-    let filtered = FilterLogFiles(base_name, suffix, dir.entries())
-    let last_string = filtered(filtered.size()-1)
-    FilePath(base_dir, last_string)
+    let dir = Directory(base_dir)?
+    let filtered = FilterLogFiles(base_name, suffix, dir.entries()?)
+    let last_string = filtered(filtered.size()-1)?
+    FilePath(base_dir, last_string)?
 
 /////////////////////////////////
 // BACKENDS
@@ -149,14 +149,14 @@ class FileBackend is Backend
         //start iterating until we reach original EOF
         while _file.position() < size do
           r.append(_file.read(25))
-          let is_watermark = BoolConverter.u8_to_bool(r.u8())
-          let producer_id = r.u128_be()
-          let seq_id = r.u64_be()
+          let is_watermark = BoolConverter.u8_to_bool(r.u8()?)
+          let producer_id = r.u128_be()?
+          let seq_id = r.u64_be()?
           if is_watermark then
             ifdef debug then
               Invariant(
                 try
-                  let last_seq_id = watermarks_trn(producer_id)
+                  let last_seq_id = watermarks_trn(producer_id)?
                   seq_id > last_seq_id
                 else
                   true
@@ -168,15 +168,15 @@ class FileBackend is Backend
             watermarks_trn(producer_id) = seq_id
           else
             r.append(_file.read(24))
-            let uid = r.u128_be()
-            let fractional_size = r.u64_be()
+            let uid = r.u128_be()?
+            let fractional_size = r.u64_be()?
             let frac_ids = recover val
               if fractional_size > 0 then
                 let bytes_to_read = fractional_size.usize() * 4
                 r.append(_file.read(bytes_to_read))
                 let l = Array[U32]
                 for i in Range(0,fractional_size.usize()) do
-                  l.push(r.u32_be())
+                  l.push(r.u32_be()?)
                 end
                 l
               else
@@ -186,8 +186,8 @@ class FileBackend is Backend
               end
             end
             r.append(_file.read(16))
-            let statechange_id = r.u64_be()
-            let payload_length = r.u64_be()
+            let statechange_id = r.u64_be()?
+            let payload_length = r.u64_be()?
             let payload = recover val
               if payload_length > 0 then
                 _file.read(payload_length.usize())
@@ -256,7 +256,7 @@ class FileBackend is Backend
     (let is_watermark: Bool, let producer_id: U128,
      let uid: U128, let frac_ids: FractionalMessageId,
      let statechange_id: U64, let seq_id: U64,
-     let payload: Array[ByteSeq] val) = consume entry
+     let payload: Array[ByteSeq] val) = entry
 
     ifdef "trace" then
       if is_watermark then
@@ -340,27 +340,27 @@ class RotatingFileBackend is Backend
     // scan existing files matching _base_path, and identify the latest one
     // based on the hex offset
     _offset = try
-      let last_file_path = LastLogFilePath(_base_name, _suffix, _base_dir)
+      let last_file_path = LastLogFilePath(_base_name, _suffix, _base_dir)?
       let parts = last_file_path.path.split("-.")
-      let offset_str = parts(parts.size()-2)
-      HexOffset.u64(offset_str)
+      let offset_str = parts(parts.size()-2)?
+      HexOffset.u64(offset_str)?
     else // create a new file with offset 0
       0
     end
     let p = _base_name + "-" + HexOffset(_offset) + _suffix
-    let fp = FilePath(_base_dir, p)
+    let fp = FilePath(_base_dir, p)?
     _backend = FileBackend(fp, _event_log)
 
   fun bytes_written(): USize => _backend.bytes_written()
 
-  fun ref sync() ? => _backend.sync()
+  fun ref sync() ? => _backend.sync()?
 
-  fun ref datasync() ? => _backend.datasync()
+  fun ref datasync() ? => _backend.datasync()?
 
   fun ref start_log_replay() => _backend.start_log_replay()
 
   fun ref write(): USize ? =>
-    let bytes_written' = _backend.write()
+    let bytes_written' = _backend.write()?
     match _file_length
     | let l: USize =>
       if bytes_written' >= l then
@@ -378,15 +378,15 @@ class RotatingFileBackend is Backend
     // only do this if current backend has actually written anything
     if _backend.bytes_written() > 0 then
       // 1. sync/datasync the current backend to ensure everything is written
-      _backend.sync()
-      _backend.datasync()
+      _backend.sync()?
+      _backend.datasync()?
       // 2. close the file by disposing the backend
       _backend.dispose()
       // 3. update _offset
       _offset = _offset + _backend.bytes_written().u64()
       // 4. open new backend with new file set to new offset.
       let p = _base_name + "-" + HexOffset(_offset) + _suffix
-      let fp = FilePath(_base_dir, p)
+      let fp = FilePath(_base_dir, p)?
       _backend = FileBackend(fp, _event_log)
     end
     _rotate_requested = false

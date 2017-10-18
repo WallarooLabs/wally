@@ -57,21 +57,21 @@ actor Recovery
 
     _initializer = initializer
     try
-      _recovery_phase.start_recovery(workers, this)
+      _recovery_phase.start_recovery(workers, this)?
     else
       Fail()
     end
 
   be log_replay_finished() =>
     try
-      _recovery_phase.log_replay_finished()
+      _recovery_phase.log_replay_finished()?
     else
       Fail()
     end
 
   be recovery_replay_finished() =>
     try
-      _recovery_phase.msg_replay_finished()
+      _recovery_phase.msg_replay_finished()?
     else
       Fail()
     end
@@ -82,7 +82,7 @@ actor Recovery
     end
     _recovery_phase = _LogReplay(workers, this)
     try
-      _recovery_phase.start_log_replay(_event_log)
+      _recovery_phase.start_log_replay(_event_log)?
     else
       Fail()
     end
@@ -100,7 +100,7 @@ actor Recovery
       .cstring())
     _recovery_phase = _BoundaryMsgReplay(workers, _recovery_replayer, this)
     try
-      _recovery_phase.start_msg_replay()
+      _recovery_phase.start_msg_replay()?
     else
       Fail()
     end

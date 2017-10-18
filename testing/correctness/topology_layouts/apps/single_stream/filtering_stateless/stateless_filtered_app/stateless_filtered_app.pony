@@ -40,12 +40,12 @@ actor Main
         Application("single_stream-filtering_stateless-stateless_filter_app")
           .new_pipeline[U64, U64]("U64 Double",
             TCPSourceConfig[U64].from_options(U64Decoder,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
             .to[U64]({(): Double => Double})
             .to[U64]({(): OddFilter => OddFilter})
           .to_sink(TCPSinkConfig[U64].from_options(
               FramedU64Encoder,
-              TCPSinkConfigCLIParser(env.args)(0)))
+              TCPSinkConfigCLIParser(env.args)?(0)?))?
       end
       Startup(env, application,
         "single_stream-filtering_stateless-stateless_filter_app")

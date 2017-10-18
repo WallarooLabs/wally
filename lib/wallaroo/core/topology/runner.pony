@@ -95,27 +95,27 @@ class val RunnerSequenceBuilder is RunnerBuilder
     _runner_builders = bs
     _id =
       try
-        bs(0).id()
+        bs(0)?.id()
       else
         StepIdGenerator()
       end
     _forward_route_builder =
       try
-        _runner_builders(_runner_builders.size() - 1).forward_route_builder()
+        _runner_builders(_runner_builders.size() - 1)?.forward_route_builder()
       else
         BoundaryOnlyRouteBuilder
       end
 
     _in_route_builder =
       try
-        _runner_builders(_runner_builders.size() - 1).in_route_builder()
+        _runner_builders(_runner_builders.size() - 1)?.in_route_builder()
       else
         None
       end
 
     _state_name =
       try
-        _runner_builders(_runner_builders.size() - 1).state_name()
+        _runner_builders(_runner_builders.size() - 1)?.state_name()
       else
         ""
       end
@@ -133,7 +133,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
     while remaining > 0 do
       let next_builder: (RunnerBuilder | None) =
         try
-          _runner_builders(remaining - 1)
+          _runner_builders(remaining - 1)?
         else
           None
         end
@@ -156,7 +156,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
   fun state_name(): String => _state_name
   fun default_state_name(): String =>
     try
-      match _runner_builders(_runner_builders.size() - 1)
+      match _runner_builders(_runner_builders.size() - 1)?
       | let ds: DefaultStateable val =>
         ds.default_state_name()
       else
@@ -167,7 +167,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
     end
   fun is_prestate(): Bool =>
     try
-      _runner_builders(_runner_builders.size() - 1).is_prestate()
+      _runner_builders(_runner_builders.size() - 1)?.is_prestate()
     else
       false
     end
@@ -175,14 +175,14 @@ class val RunnerSequenceBuilder is RunnerBuilder
   fun is_stateless_parallel(): Bool => _parallelized
   fun is_multi(): Bool =>
     try
-      _runner_builders(_runner_builders.size() - 1).is_multi()
+      _runner_builders(_runner_builders.size() - 1)?.is_multi()
     else
       false
     end
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder =>
     try
-      _runner_builders(_runner_builders.size() - 1).route_builder()
+      _runner_builders(_runner_builders.size() - 1)?.route_builder()
     else
       BoundaryOnlyRouteBuilder
     end
@@ -192,7 +192,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
     default_r: (Router | None) = None): Router
   =>
     try
-      _runner_builders(_runner_builders.size() - 1)
+      _runner_builders(_runner_builders.size() - 1)?
         .clone_router_and_set_input_type(r, default_r)
     else
       r
@@ -420,13 +420,13 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
       | let wks: Array[WeightedKey[Key]] val =>
         for wkey in wks.values() do
           try
-            m(wkey._1) = ProxyAddress(w, _step_id_map(wkey._1))
+            m(wkey._1) = ProxyAddress(w, _step_id_map(wkey._1)?)
           end
         end
       | let ks: Array[Key] val =>
         for key in ks.values() do
           try
-            m(key) = ProxyAddress(w, _step_id_map(key))
+            m(key) = ProxyAddress(w, _step_id_map(key)?)
           end
         end
       end
@@ -440,10 +440,10 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
         // Using weighted keys, we need to create a distribution that
         // balances the weight across workers
         try
-          let buckets = Weighted[Key](wks, ws.size())
+          let buckets = Weighted[Key](wks, ws.size())?
           for worker_idx in Range(0, buckets.size()) do
-            for key in buckets(worker_idx).values() do
-              m(key) = ProxyAddress(ws(worker_idx), _step_id_map(key))
+            for key in buckets(worker_idx)?.values() do
+              m(key) = ProxyAddress(ws(worker_idx)?, _step_id_map(key)?)
             end
           end
         end
@@ -452,7 +452,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
         // the workers
         for key in ks.values() do
           try
-            m(key) = ProxyAddress(ws(idx), _step_id_map(key))
+            m(key) = ProxyAddress(ws(idx)?, _step_id_map(key)?)
           end
           idx = (idx + 1) % w_count
         end
@@ -667,7 +667,6 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
     _event_log = event_log
     _id = None
     _auth = auth
-    _wb.reserve(8)
 
   fun ref set_step_id(id: U128) =>
     _id = id
@@ -682,10 +681,10 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
       replace_serialized_state(payload)
     else
       try
-        let sc = _state_change_repository(statechange_id)
+        let sc = _state_change_repository(statechange_id)?
         _rb.append(payload as Array[U8] val)
         try
-          sc.read_log_entry(_rb)
+          sc.read_log_entry(_rb)?
           sc.apply(_state)
         end
       else
@@ -737,7 +736,6 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
         ifdef "resilience" then
           sc.write_log_entry(_wb)
           let payload = _wb.done()
-          _wb.reserve(8)
           match _id
           | let buffer_id: U128 =>
             _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
@@ -755,7 +753,6 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
           | let buffer_id: U128 =>
             _state.write_log_entry(_wb, _auth)
             let payload = _wb.done()
-            _wb.reserve(8)
             _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
               U64.max_value(), producer.current_sequence_id(), consume payload)
           end
@@ -782,7 +779,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
 
   fun ref serialize_state(): ByteSeq val =>
     try
-      Serialised(SerialiseAuth(_auth), _state)
+      Serialised(SerialiseAuth(_auth), _state)?
         .output(OutputSerialisedAuth(_auth))
     else
       Fail()
@@ -792,7 +789,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
   fun ref replace_serialized_state(payload: ByteSeq val) =>
     try
       _rb.append(payload as Array[U8] val)
-      match _state.read_log_entry(_rb, _auth)
+      match _state.read_log_entry(_rb, _auth)?
       | let s: S =>
         _state = s
       else

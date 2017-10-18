@@ -25,7 +25,7 @@ class val SpikeConfig
     drop = drop'
     match prob'
     | let arg: F64 =>
-      Fact(arg <= 1, "prob' must be between 0 and 1")
+      Fact(arg <= 1, "prob' must be between 0 and 1")?
       prob = arg
     else
       prob = 0.001

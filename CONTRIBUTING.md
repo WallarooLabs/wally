@@ -34,11 +34,11 @@ We use a fairly standard GitHub pull request workflow. If you have already contr
 
 Here is the basic GitHub workflow:
 
-1. Fork the Wallaroo repo. you can do this via the GitHub website. This will result in you having your own copy of the Wallaroo repo under your GitHub account. 
+1. Fork the Wallaroo repo. you can do this via the GitHub website. This will result in you having your own copy of the Wallaroo repo under your GitHub account.
 2. Clone your Wallaroo repo to your local machine
 3. Make a branch for your change
 4. Make your change on that branch
-5. Push your change to your repo 
+5. Push your change to your repo
 6. Use the github ui to open a PR
 
 Some things to note that aren't immediately obvious to folks just starting out:
@@ -56,6 +56,8 @@ You can get help using GitHub via [the official documentation](https://help.gith
 - [Syncing a fork](https://help.github.com/articles/syncing-a-fork/)
 
 ## Pull request
+
+*Note*: You must sign our [Contributor License Agreement](https://gist.github.com/WallarooLabsTeam/e06d4fed709e0e7035fdaa7249bf88fb) (CLA) before your pull request can be accepted. You can [sign the CLA now](https://cla-assistant.io/wallaroolabs/wallaroo), or you can wait until you submit a pull request, at which point you will be promted to sign it. Your pull request cannot be accepted until you have signed the CLA.
 
 Before issuing a pull request we ask that you squash all your commits into a single logical commit. While your PR is in review, we may ask for additional changes, please do not squash those commits while the review is underway. Once everything is good, we'll then ask you to further squash those commits before merging. We ask that you not squash while a review is underway as it can make it hard to follow what is going on. Additionally, we ask that you:
 
@@ -78,7 +80,7 @@ Documentation is not "source code." As such, it should not be wrapped at 80 colu
 
 All code examples in documentation should be formatted in a fashion appropriate to the language in question.
 
-All command line examples in documentation should be presented in a copy and paste friendly fashion. Assume the user is using the `bash` shell. GitHub formatting on long command lines can be unfriendly to copy-and-paste. Long command lines should be broken up using `\` so that each line is no more than 80 columns. Wrapping at 80 columns should result in a good display experience in GitHub. Additionally, continuation lines should be indented two spaces. 
+All command line examples in documentation should be presented in a copy and paste friendly fashion. Assume the user is using the `bash` shell. GitHub formatting on long command lines can be unfriendly to copy-and-paste. Long command lines should be broken up using `\` so that each line is no more than 80 columns. Wrapping at 80 columns should result in a good display experience in GitHub. Additionally, continuation lines should be indented two spaces.
 
 OK:
 

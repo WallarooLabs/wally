@@ -53,7 +53,7 @@ Run `machida` with `--application-module word_count`:
 machida --application-module word_count --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
-  --ponythreads=1
+  --ponythreads=1 --ponynoblock 
 ```
 
 ### Shell 3
@@ -63,7 +63,7 @@ In a third shell, send some messages:
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 --file count_this.txt \
   --batch-size 5 --interval 100_000_000 --messages 10000000 \
-  --ponythreads=1 --repeat
+  --ponythreads=1 --ponynoblock --repeat --no-write
 ```
 
 ## Reading the Output

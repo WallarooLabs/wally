@@ -41,7 +41,7 @@ class Histogram
     Get the count at the i-th bin, raising an error if the index is out
     of bounds.
     """
-    _counts(i)
+    _counts(i)?
 
   fun size(): U64 =>
     var s = U64(0)
@@ -62,7 +62,7 @@ class Histogram
   """
     let idx = get_idx(v)
     try
-      _counts(idx) =  _counts(idx) + 1
+      _counts(idx)? =  _counts(idx)? + 1
       if v < _min then _min = v end
       if v > _max then _max = v end
     end

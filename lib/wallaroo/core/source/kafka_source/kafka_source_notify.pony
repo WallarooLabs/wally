@@ -91,7 +91,7 @@ class KafkaSourceNotify[In: Any val]
         src.next_sequence_id()
         let decoded =
           try
-            _handler.decode(consume data)
+            _handler.decode(consume data)?
           else
             ifdef debug then
               @printf[I32]("Error decoding message at source\n".cstring())

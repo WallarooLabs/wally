@@ -1,6 +1,6 @@
 # Wallaroo
 
-Wallaroo is a fast, scalable data processing engine that rapidly takes you from prototype to production by eliminating infrastructure complexity.
+Wallaroo is a fast, elastic data processing engine that rapidly takes you from prototype to production by eliminating infrastructure complexity.
 
 - [What is Wallaroo?][what is wallaroo section]
 - [Status][status section]
@@ -9,19 +9,27 @@ Wallaroo is a fast, scalable data processing engine that rapidly takes you from 
 - [Getting Help][getting help section]
 - [How to Contribute][contribute section]
 - [License][license section]
+- [Frequently Asked Questions][FAQ]
 - [Additional Links][additional links]
 - [About this Repository][about this repository section]
 
 ## What is Wallaroo?
 
-Wallaroo is a framework for writing event-by-event distributed data processing applications. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is essential. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
+Wallaroo is a fast and elastic data processing engine that rapidly takes you from prototype to production by making the infrastructure virtually disappear. We’ve designed it to handle demanding high-throughput, low-latency tasks where the accuracy of results is essential. Wallaroo takes care of mechanics of scaling, resilience, state management, and message delivery. We've designed Wallaroo to make it easy scale applications with no code changes, and allow programmers to focus on business logic. You can learn more about Wallaroo from our ["Hello Wallaroo!" blog post][hello wallaroo post].
+
+We've done a [15-minute video of our engineering presentation][scale independence with wallaroo] that has helped people understand what Wallaroo is. If you watch it, you will get:
+
+- An overview of the problem we are solving with our Scale-Independent API
+- A short intro to the Python API
+- A demonstration of our Autoscale functionality (for stateful applications)
+- To see the power of Scale-Independent APIs in action
 
 ### Features
 
-- State Management
-- Scale running stateful applications with zero downtime
-- Resilience in the face of failures
-- Exactly-once message processing
+- [State Management][state management website]
+- [Scale running stateful applications with zero downtime][autoscaling website]
+- [Resilience in the face of failures][resilience website]
+- [Exactly-once message processing][exactly-once website]
 
 ### Language Bindings
 
@@ -48,14 +56,13 @@ Wallaroo is open source software with an expanding software community. Please se
 
 ### Deployment model
 
-Wallaroo applications are user hosted. It's equally at home "in the cloud" or "on premises."
+Wallaroo applications are user hosted. It's equally at home "in the cloud" or "on-premise."
 
 We have no "as a service" offering at this time. 
 
 ### Roadmap
 
 Interested in where we are taking Wallaroo? Check out our [roadmap][roadmap].
-
 
 ## Status
 
@@ -71,19 +78,21 @@ Currently, Python 2.7 is our primary focus. As we add features to the Wallaroo, 
 
 - Python 3
 
-We are planning on adding Python 3 support when there is enough demand. If you are interested in writing Wallaroo applications using Python 3, please [get in touch][contact us email].
+We are currently working with a client who needs Python 3 bindings. We plan to introduce Python 3 bindings by the end of 2017. 
 
 - C++
 
-C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
+C++ is currently unsupported and apps created with the C++ API will not build unless you checkout the `last-working-C++-commit` tag. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
+
+C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. 
 
 - Go
 
-We are currently working with a client who is very interested in writing Wallaroo applications in Go. We plan to introduce Go language bindings by the end of 2017. 
+We are currently working with a client who needs Go bindings. We plan to introduce Go bindings by the end of 2017. 
 
 - JavaScript 
 
-JavaScript support is currently in the planning stages with no release date targeted. 
+JavaScript support is currently in the planning stages with a release in 2018.
 
 ### Limitations
 
@@ -111,19 +120,31 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 
 ## License
 
-Wallaroo is an open source project. All of the source code is available to you. However, not all of the Wallaroo source code is available under an "open source" license. 
+Wallaroo is an open source project. All of the source code is available to you. Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. However, not all of the Wallaroo source code is a[Apache 2[apache 2 license] licensed. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. Source files in this repository have a header indicating which license they are under. 
 
-Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. The [Wallaroo Community License][wallaroo community license] is based on [Apache version 2][apache 2.0]. However, you should should read the it for yourself. Here we provide a summary of the main points of the [Wallaroo Community License Agreement][wallaroo community license].
+The core stream processing engine and state management facilities are all licensed under the the [Apache version 2][apache 2 license]. Autoscaling, exactly-once message processing and resiliency features are licensed under the [Wallaroo Community License Agreement][wallaroo community license].
+
+The [Wallaroo Community License][wallaroo community license] is based on [Apache version 2][apache 2 license]. However, you should read it for yourself. Here we provide a summary of the main points of the [Wallaroo Community License Agreement][wallaroo community license].
 
 - You can **run** all Wallaroo code in a non-production environment without restriction.
 - You can **run** all Wallaroo code in a production environment for free on up to 3 server or 24 cpus.
 - If you want to **run** Wallaroo Enterprise version features in production above 3 servers or 24 cpus, you have to obtain a license.
 - You can **modify** and **redistribute** any Wallaroo code
-- Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license in order to run on more than 3 servers or 24 cpus in a production environment. 
+- Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license to run on more than 3 servers or 24 cpus in a production environment. 
+
+
 
 Please [contact us][contact us email] if you have any questions about licensing or Wallaroo Enterprise.
 
 ## Additional Links
+
+- [Scale-Independence with Wallaroo][scale independence with wallaroo]
+
+15 minute overview of key Wallaroo features. Includes actual code and a demonstration of our stateful autoscaling functionality.
+
+- [Open Sourcing Wallaroo][open sourcing wallaroo]
+
+Our open source annoucement.
 
 - [Hello Wallaroo!][hello wallaroo post]
 
@@ -154,7 +175,7 @@ Wallaroo currently exists as a mono-repo. All the source that makes Wallaroo go 
 
 - book
 
-Markdown source used to build [http://docs.wallaroolabs.com][documentation website]. [http://docs.wallaroolabs.com][documentation website] gets built from the latest commit to the `release` branch. There's also ["Wallaroo-Latest" documentation][unstable documentation website]. "Wallaroo-Latest" is built from master so it will be as up to date as possible. Be aware many of the external links in our documentation point to the `release` branch. "Wallaroo-Latest" is intended only for the most adventurous amongst us.
+Markdown source used to build [http://docs.wallaroolabs.com][documentation website]. [http://docs.wallaroolabs.com][documentation website] gets built from the latest commit to the `release` branch.
 
 - cpp_api
 
@@ -195,6 +216,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [about this repository section]: #about-this-repository 
 [additional links]: #additional-links
 [apache 2 license]: https://www.apache.org/licenses/LICENSE-2.0
+[autoscaling website]: http://www.wallaroolabs.com/technology/autoscaling
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
 [community website]: http://www.wallaroolabs.com/community
 [contact us email]: mailto:hello@wallaroolabs.com
@@ -204,22 +226,25 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [developer mailing list]: https://groups.io/g/wallaroo
 [documentation section]: #documentation
 [documentation website]: http://docs.wallaroolabs.com
+[exactly-once website]: http://www.wallaroolabs.com/technology/exactly-once
+[FAQ]: http://www.wallaroolabs.com/faq
 [getting help section]: #getting-help
 [getting started section]: #getting-started
 [hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
 [IRC]: https://webchat.oftc.net/?channels=wallaroo
 [license section]: #license
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
+[open sourcing wallaroo]: https://blog.wallaroolabs.com/2017/09/open-sourcing-wallaroo/
 [pony examples]: examples/pony
 [qcon16 how did i get here]: https://www.infoq.com/presentations/trust-distributed-systems
+[scale independence with wallaroo]: https://vimeo.com/234753585
+[resilience website]: http://www.wallaroolabs.com/technology/exactly-once
 [roadmap]: ROADMAP.md
 [secret sauce post]: https://blog.wallaroolabs.com/2017/06/whats-the-secret-sauce/
+[state management website]: http://www.wallaroolabs.com/technology/state-management
 [status section]: #status
 [twitter]: https://www.twitter.com/wallaroolabs
 [unstable documentation website]: https://www.gitbook.com/book/wallaroo-labs/wallaroo-latest/details
 [wallaroo community license]: LICENSE.md
 [wallaroo labs website]: https://www.wallaroolabs.com
 [what is wallaroo section]: #what-is-wallaroo
-
-
-

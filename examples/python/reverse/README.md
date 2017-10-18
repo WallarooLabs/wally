@@ -28,7 +28,7 @@ The `Decoders`'s `decode(...)` method creates a string from the value represente
 
 ## Running Reverse
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/reverse` directory.
 
@@ -55,7 +55,7 @@ Run `machida` with `--application-module reverse`:
 machida --application-module reverse --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
-  --ponythreads=1
+  --ponythreads=1 --ponynoblock 
 ```
 
 ### Shell 3
@@ -65,7 +65,7 @@ Send some messages:
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 --file words.txt \
   --batch-size 5 --interval 100_000_000 --messages 150 --repeat \
-  --ponythreads=1
+  --ponythreads=1 --ponynoblock --no-write
 ```
 
 ## Reading the Output

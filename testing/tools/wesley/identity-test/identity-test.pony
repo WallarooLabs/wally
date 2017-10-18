@@ -45,8 +45,8 @@ class IdentitySentParser is SentParser[IdentitySentMessage val]
     Array[IdentitySentMessage val]
 
   fun ref apply(fields: Array[String] val): None ? =>
-    let timestamp = fields(0).clone().strip().u64()
-    let i = fields(1).clone().strip().i64()
+    let timestamp = fields(0)?.clone().>strip().u64()?
+    let i = fields(1)?.clone().>strip().i64()?
     _messages.push(IdentitySentMessage(timestamp, i))
 
   fun ref sent_messages(): Array[IdentitySentMessage val] =>
@@ -58,8 +58,8 @@ class IdentityReceivedParser is ReceivedParser[IdentityReceivedMessage val]
 
   fun ref apply(fields: Array[String] val): None ? =>
     try
-      let timestamp = fields(0).clone().strip().u64()
-      let i = fields(1).clone().strip().i64()
+      let timestamp = fields(0)?.clone().>strip().u64()?
+      let i = fields(1)?.clone().>strip().i64()?
       _messages.push(IdentityReceivedMessage(timestamp, i))
     else
       @printf[I32]("Parser problem!\n".cstring())

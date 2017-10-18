@@ -43,7 +43,8 @@ docker start mui
 1. Start a listener
 
 ```bash
-../../../../giles/receiver/receiver --listen 127.0.0.1:7002
+../../../../giles/receiver/receiver --listen 127.0.0.1:7002 --no-write \
+  --ponythreads=1 --ponynoblock
 ```
 
 2. Start the application
@@ -51,7 +52,7 @@ docker start mui
 ```bash
 ./alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:12500 --data 127.0.0.1:12501 --external 127.0.0.1:5050 \
-  --cluster-initializer
+  --cluster-initializer --ponynoblock --ponythreads=1
 ```
 
 3. Start a sender
@@ -59,7 +60,8 @@ docker start mui
 ```bash
 ../../../../giles/sender/sender --host 127.0.0.1:7010 \
   --file data_gen/votes.msg \ --batch-size 5 --interval 100_000_000 \
-  --messages 150000000 --binary --variable-size --repeat --ponythreads=1 --no-write
+  --messages 150000000 --binary --variable-size --repeat --ponythreads=1 \
+  --ponynoblock --no-write
 ```
 
 4. Shut down cluster once finished processing

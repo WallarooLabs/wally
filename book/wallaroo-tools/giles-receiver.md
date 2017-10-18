@@ -4,9 +4,9 @@
 
 Giles components act as external testers for Wallaroo. Giles Receiver is used to mimic the behavior of an external sink for outgoing data from Wallaroo. Giles Receiver has the option to run in one of two ways:
 
-- With no other commandline options given, it will write incoming binary data to file, preceded by a timestamp of when the message was received. For example, `./giles/receiver -l 127.0.0.1:5555` will write any data received on port 5555.
+- With no other commandline options given, it will write incoming binary data to file, preceded by a timestamp of when the message was received. For example, `./giles/receiver --listen 127.0.0.1:5555` will write any data received on port 5555.
 
-- With the `--no-write/-w` flag given as a commandline argument, it will drop all incoming binary data and not write to file. For example, `./giles/receiver -l 127.0.0.1:5555 -w` will receive and drop any data received on port 5555.
+- With the `--no-write/-w` flag given as a commandline argument, it will drop all incoming binary data and not write to file. For example, `./giles/receiver --listen 127.0.0.1:5555 --no-write` will receive and drop any data received on port 5555.
 
 ### Building `giles/receiver`
 
@@ -37,7 +37,7 @@ make
 ### Listen for Wallaroo output and save to `received.txt`
 
 ```bash
-receiver --listen 127.0.0.1:5555
+receiver --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock
 ```
 
 ### Listen for Wallaroo output, but don't save anything (e.g. "A Very Fast Sink Receiver")
@@ -45,7 +45,7 @@ receiver --listen 127.0.0.1:5555
 If you just want your application to run as fast as possible without spending any resources on _saving output data_, use
 
 ```bash
-receiver --listen 127.0.0.1:5555 --no-write
+receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
 ```
 
 ## Pony Runtime Options

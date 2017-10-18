@@ -44,17 +44,18 @@ In a separate shell each:
 1. Start a listener with Giles Receiver
     ```bash
     ../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
-      --ponypinasio -l 127.0.0.1:7002
+      --ponypinasio -l 127.0.0.1:7002 --no-write
     ```
 2. Start the application
     ```bash
     ./build/alphabet-app --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-      --worker-name worker-name --cluster-initializer --ponythreads=1
+      --worker-name worker-name --cluster-initializer --ponythreads=1 \
+      --ponynoblock
     ```
 3. Start sending data
     ```bash
      ../../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
        --batch-size 50 --interval 10_000_000 --binary --msg-size 9 --repeat \
-       --ponythreads=1 --messages 1000000
+       --ponythreads=1 --ponynoblock --messages 1000000 --no-write
     ```

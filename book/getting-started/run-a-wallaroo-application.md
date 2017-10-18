@@ -52,7 +52,7 @@ We'll use Giles Receiver to listen for data from our Wallaroo application.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-./receiver -l 127.0.0.1:5555 --no-write --ponythreads=1
+./receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
 ```
 
 You should see the `Listening for data` that indicates that Giles receiver is running.
@@ -72,7 +72,7 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 ./build/machida --application-module celsius --in 127.0.0.1:7000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
-  --cluster-initializer --ponythreads=1
+  --cluster-initializer --ponythreads=1 --ponynoblock
 ```
 
 This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
@@ -81,15 +81,15 @@ This tells the "Celsius to Fahrenheit" application that it should listen on port
 
 ### Sending Data with Giles Sender
 
-We will be sending in 25,000,000 messages using the data file generated above. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
+We will be sending in 25,000,000 messages using a pre-generated data file. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
 
 You will now be able to start the `sender` with the following command:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/giles/sender
 ./sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
-  --repeat --no-write --msg-size 8 --ponythreads=1 --file \
-  ~/wallaroo-tutorial/wallaroo/examples/python/celsius/celsius.msg
+  --repeat --no-write --msg-size 8 --ponythreads=1 --ponynoblock \
+  --file ~/wallaroo-tutorial/wallaroo/examples/python/celsius/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
@@ -121,6 +121,8 @@ You can then click into one of the elements within a category, to get to a detai
 Feel free to click around and get a feel for how the Metrics UI is setup and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
 
 ## Shutdown
+
+### Terminal 5, Cluster Shutdown
 
 You can shut down the cluster with this command once processing has finished:
 

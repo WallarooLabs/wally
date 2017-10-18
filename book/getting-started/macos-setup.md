@@ -32,36 +32,13 @@ brew install git
 
 ## Installing the Pony Compiler
 
-### Installing Pony Compiler Dependencies
-
-You'll need LLVM 3.9.1, LibreSSL, and the pcre2 library to build Pony and compile Wallaroo apps.  Also, the next section will use the `wget` utility to help install the Pony language compiler.
-
-Use the following commands to install via [Homebrew](http://brew.sh):
-
-```bash
-brew update
-brew install llvm@3.9
-brew link --overwrite --force llvm@3.9
-brew install pcre2 libressl wget
-```
-
 ### Installing ponyc
 
 Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`.
 
 ```bash
-cd ~/
-wget https://github.com/WallarooLabs/ponyc/archive/wallaroolabs-19.2.14.tar.gz
-tar xzfv wallaroolabs-19.2.14.tar.gz
-cd ponyc-wallaroolabs-19.2.14
-sudo make config=release install
-```
-
-You can check that the installation was successful by running:
-
-```bash
-ponyc examples/helloworld
-./helloworld
+brew update
+brew install ponyc
 ```
 
 ## Installing pony-stable
@@ -69,12 +46,8 @@ ponyc examples/helloworld
 Next, you need to install `pony-stable`, a Pony dependency management library:
 
 ```bash
-cd ~/
-git clone https://github.com/ponylang/pony-stable
-cd pony-stable
-git checkout 0054b429a54818d187100ed40f5525ec7931b31b
-make
-sudo make install
+brew update
+brew install pony-stable
 ```
 
 ## Install Compression Development Libraries
@@ -97,7 +70,7 @@ You'll need Docker to run the Wallaroo metrics UI. There are [instructions](http
 
 Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/docker-for-mac/#general).
 
-## Install the Metrics UI
+## Download the Metrics UI
 
 ```bash
 docker pull wallaroolabs/wallaroo-metrics-ui:0.1
@@ -105,7 +78,7 @@ docker pull wallaroolabs/wallaroo-metrics-ui:0.1
 
 ## Set up Environment for the Wallaroo Tutorial
 
-Create a directory called `~/wallaroo-tutorial` and navigate there by running
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running
 
 ```bash
 cd ~/
@@ -119,12 +92,12 @@ cloned the Wallaroo repo, do so now:
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.1.2
+git checkout 0.2.0
 ```
 
 This will create a subdirectory called `wallaroo`.
 
-## Installing Machida
+## Compiling Machida
 
 Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
 
@@ -133,7 +106,7 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 make
 ```
 
-## Install Giles Sender
+## Compiling Giles Sender
 
 Giles Sender is used to supply data to Wallaroo applications over TCP.
 
@@ -142,7 +115,7 @@ cd ~/wallaroo-tutorial/wallaroo/giles/sender
 make
 ```
 
-## Install Giles Receiver
+## Compiling Giles Receiver
 
 Giles Receiver receives data from Wallaroo over TCP.
 
@@ -151,7 +124,7 @@ cd ~/wallaroo-tutorial/wallaroo/giles/receiver
 make
 ```
 
-## Install Cluster Shutdown tool
+## Compiling Cluster Shutdown tool
 
 The Cluster Shutdown tool is used to tell the cluster to shut down cleanly.
 

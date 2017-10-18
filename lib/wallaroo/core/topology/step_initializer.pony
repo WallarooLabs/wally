@@ -210,7 +210,7 @@ class val EgressBuilder
     match _proxy_addr
     | let p: ProxyAddress =>
       try
-        proxies(p.worker)
+        proxies(p.worker)?
       else
         @printf[I32](("Couldn't find proxy for " + p.worker + ".\n").cstring())
         error

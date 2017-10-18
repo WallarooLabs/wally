@@ -59,9 +59,9 @@ actor Main
       let auth = env.root as AmbientAuth
 
       let nonrejected_symbols_file =
-        File(FilePath(auth, symbols_file_path))
+        File(FilePath(auth, symbols_file_path)?)
       let rejected_symbols_file =
-        File(FilePath(auth, rejected_symbols_file_path))
+        File(FilePath(auth, rejected_symbols_file_path)?)
       let rejected_instruments =
         generate_instruments(rejected_symbols_file)
       let nonrejected_instruments =
@@ -143,7 +143,7 @@ actor InitialNbboFileGenerator
 
   be write_to_file() =>
     try
-      let output_file = File(FilePath(_auth, _output_file_path))
+      let output_file = File(FilePath(_auth, _output_file_path)?)
       output_file.set_length(0)
       output_file.writev(_wb.done())
     end

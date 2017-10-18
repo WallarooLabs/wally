@@ -1,6 +1,6 @@
 # PartitionFunction
 
-A parition function is applied to message data to get a key, which is
+A partition function is applied to message data to get a key, which is
 then used to route the message to the appropriate worker.
 
 ```c++

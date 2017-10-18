@@ -7,20 +7,33 @@ endif
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
-# uncomment to disable generate test related targets in this directory
-#TEST_TARGET := false
 
-# uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
-PONY_TARGET := false
+# The following are control variables that determine what logic from `rules.mk` is enabled
 
-# uncomment to disable generate exs related targets (build/test/clean) for elixir sources in this directory
-EXS_TARGET := false
+# `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
+# applies to both the pony and elixir test targets
+$(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := true
 
-# uncomment to disable generate docker related targets (build/push) for Dockerfile in this directory
-DOCKER_TARGET := false
+# `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
+# otherwise targets only get created if there are pony sources (*.pony) in this directory.
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := false
 
-# uncomment to disable generate recursing into Makefiles of subdirectories
-RECURSE_SUBMAKEFILES := false
+# `true`/`false` to enable/disable generate final file build target using ponyc command for the pony build target so
+# it can be overridden manually
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
+
+# `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
+# otherwise targets only get created if there are elixir sources (*.exs) in this directory.
+$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := false
+
+# `true`/`false` to enable/disable generate docker related targets (build/push) for a Dockerfile in this directory
+# otherwise targets only get created if there is a Dockerfile in this directory
+$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
+
+# `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
+# (and by recursion every makefile in the tree that is referenced)
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
+
 
 ifeq ($(shell uname -s),Linux)
 	PONY_LINKER = --linker g++
@@ -38,17 +51,17 @@ ALPHABET_HPP = $(ALPHABET_PATH)/include
 ALPHABET_PONY_SOURCE = $(ALPHABET_PATH)/alphabet-app
 
 build-examples-cpp-alphabet-cpp-all = build-cpp_api-all alphabet_cpp_clean alphabet_cpp_build
-test-examples-cpp-alphabet-cpp-all = build-examples-cpp-alphabet-cpp-all alphabet_cpp_test
+unit-tests-examples-cpp-alphabet-cpp-all = build-examples-cpp-alphabet-cpp-all alphabet_cpp_test
 clean-examples-cpp-alphabet-cpp-all = clean-cpp_api-all alphabet_cpp_clean
 
 alphabet_cpp_build:
-	mkdir -p $(ALPHABET_BUILD)
-	c++ --debug -c -o $(ALPHABET_BUILD)/alphabet.o $(ALPHABET_CPP)/alphabet.cpp -Wall -std=c++11 -I$(ALPHABET_HPP) -I$(WALLAROO_CPP_INCLUDE)
-	ar rs $(ALPHABET_BUILD)/libalphabet.a $(ALPHABET_BUILD)/alphabet.o
-	ponyc $(PONY_LINKER) --debug --export --output=$(ALPHABET_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(ALPHABET_BUILD) $(ALPHABET_PONY_SOURCE)
+	$(QUIET)mkdir -p $(ALPHABET_BUILD)
+	$(QUIET)c++ $(debug_arg) -c -o $(ALPHABET_BUILD)/alphabet.o $(ALPHABET_CPP)/alphabet.cpp -Wall -std=c++11 -I$(ALPHABET_HPP) -I$(WALLAROO_CPP_INCLUDE)
+	$(QUIET)ar rs $(ALPHABET_BUILD)/libalphabet.a $(ALPHABET_BUILD)/alphabet.o
+	$(QUIET)ponyc $(PONY_LINKER) $(debug_arg) --export --output=$(ALPHABET_BUILD) --path $(WALLAROO_LIB):$(CPP_PONY_LIB):$(WALLAROO_CPP_LIB):$(ALPHABET_BUILD) $(ALPHABET_PONY_SOURCE)
 
 alphabet_cpp_clean:
-	rm -rf $(ALPHABET_BUILD)
+	$(QUIET)rm -rf $(ALPHABET_BUILD)
 
 alphabet_cpp_test:
 	$(QUIET)echo "alphabet-cpp tests"

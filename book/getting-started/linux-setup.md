@@ -16,50 +16,17 @@ If you do not already have Git installed, install it:
 sudo apt-get install git
 ```
 
-## Install LLVM 3.9
-
-Visit [http://apt.llvm.org](http://apt.llvm.org) and select the correct apt mirror for you version of Ubuntu.
-
-### Xenial Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
-
-Open `/etc/apt/sources.list` and add the following lines to the end of
-the file:
-
-```
-deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main
-deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main
-```
-
-### Trusty Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
-
-Open `/etc/apt/sources.list` and add the following lines to the end of
-the file:
-
-```
-deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
-deb-src http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
-```
-
-### Add the LLVM repo as a trusted source
-
-```bash
-cd ~/
-wget -O llvm-snapshot.gpg.key http://apt.llvm.org/llvm-snapshot.gpg.key
-sudo apt-key add llvm-snapshot.gpg.key
-```
-
-### Install
+## Install make
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y llvm-3.9
+sudo apt-get install -y build-essential
 ```
 
-## Install Pony compiler dependencies
+## Install libssl-dev
 
 ```bash
-sudo apt-get install -y build-essential zlib1g-dev \
-  libncurses5-dev libssl-dev
+sudo apt-get install -y libssl-dev
 ```
 
 ### Install GCC 5 or Higher
@@ -90,48 +57,22 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
   /usr/bin/gcc-5 60 --slave /usr/bin/g++ g++ /usr/bin/g++-5
 ```
 
-### Install prce2
+## Add ponyc and pony-stable apt-key keyserver
 
-#### Xenial Ubuntu:
-
-```bash
-sudo apt-get install -y libpcre2-dev
-```
-
-#### Trusty Ubuntu:
-
-*Note:* some older versions of Ubuntu do not supply a prce2
-package. If you get an error that no package exists (`E: Package
-'libpcre2-dev' has no installation candidate`) then you will need to
-install from source like this:
+In order to install `ponyc` and `pony-stable` via `apt-get` the following keyserver must be added to the APT key management utility.
 
 ```bash
-cd ~/
-wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2
-tar xjvf pcre2-10.21.tar.bz2
-cd pcre2-10.21
-./configure --prefix=/usr
-make
-sudo make install
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
 ```
 
 ### Installing ponyc
 
-Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`. Run:
+Now you need to install Pony compiler `ponyc`. Run:
 
 ```bash
-cd ~/
-wget https://github.com/WallarooLabs/ponyc/archive/wallaroolabs-19.2.14.tar.gz
-tar xzfv wallaroolabs-19.2.14.tar.gz
-cd ponyc-wallaroolabs-19.2.14
-sudo make config=release install
-```
-
-You can check that the installation was successful by running:
-
-```bash
-ponyc examples/helloworld
-./helloworld
+echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
+sudo apt-get update
+sudo apt-get -V install ponyc
 ```
 
 ## Installing pony-stable
@@ -139,12 +80,9 @@ ponyc examples/helloworld
 Next, you need to install `pony-stable`, a Pony dependency management library. Navigate to a directory where you will put the `pony-stable` repo and execute the following commands:
 
 ```bash
-cd ~/
-git clone https://github.com/ponylang/pony-stable
-cd pony-stable
-git checkout 0054b429a54818d187100ed40f5525ec7931b31b
-make
-sudo make install
+echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list
+sudo apt-get update
+sudo apt-get -V install pony-stable
 ```
 
 ## Install Compression Development Libraries
@@ -172,6 +110,7 @@ cd ~/
 wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
 tar zxvf liblz4-1.7.5.tar.gz
 cd lz4-1.7.5
+make
 sudo make install
 ```
 
@@ -189,7 +128,7 @@ Installing Docker will result in it running on your machine. After you reboot yo
 
 All of the Docker commands throughout the rest of this manual assume that you have permission to run Docker commands as a non-root user. Follow the [Manage Docker as a non-root user](https://docs.docker.com/engine/installation/linux/linux-postinstall/#manage-docker-as-a-non-root-user) instructions to set that up. If you don't want to allow a non-root user to run Docker commands, you'll need to run `sudo docker` anywhere you see `docker` for a command.
 
-## Install the Metrics UI
+## Download the Metrics UI
 
 ```bash
 sudo docker pull wallaroolabs/wallaroo-metrics-ui:0.1
@@ -197,7 +136,7 @@ sudo docker pull wallaroolabs/wallaroo-metrics-ui:0.1
 
 ## Set up Environment for the Wallaroo Tutorial
 
-Create a directory called `~/wallaroo-tutorial` and navigate there by running
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running
 
 ```bash
 cd ~/
@@ -210,10 +149,10 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.1.2
+git checkout 0.2.0
 ```
 
-## Installing Machida
+## Compiling Machida
 
 Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
 
@@ -222,7 +161,7 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 make
 ```
 
-## Install Giles Sender
+## Compiling Giles Sender
 
 Giles Sender is used to supply data to Wallaroo applications over TCP.
 
@@ -231,7 +170,7 @@ cd ~/wallaroo-tutorial/wallaroo/giles/sender
 make
 ```
 
-## Install Giles Receiver
+## Compiling Giles Receiver
 
 Giles Receiver receives data from Wallaroo over TCP.
 
@@ -241,7 +180,7 @@ cd ~/wallaroo-tutorial/wallaroo/giles/receiver
 make
 ```
 
-## Install Cluster Shutdown tool
+## Compiling Cluster Shutdown tool
 
 The Cluster Shutdown tool is used to tell the cluster to shut down cleanly.
 

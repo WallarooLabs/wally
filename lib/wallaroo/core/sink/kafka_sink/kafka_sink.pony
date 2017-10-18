@@ -75,7 +75,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     _auth = auth
 
     _topic = try
-               _conf.topics.keys().next()
+               _conf.topics.keys().next()?
              else
                Fail()
                ""
@@ -129,7 +129,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
       (_, (let metric_name, let metrics_id, let send_ts, let worker_ingress_ts,
         let pipeline_time_spent, let tracking_id)) =
-        _pending_delivery_report.remove(delivery_report.opaque)
+        _pending_delivery_report.remove(delivery_report.opaque)?
 
       if delivery_report.status isnt ErrorNone then
         @printf[I32](("Kafka Sink: Error reported in kafka delivery report: "
@@ -262,7 +262,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       @printf[I32]("Rcvd msg at KafkaSink\n".cstring())
     end
     try
-      (let encoded_value, let encoded_key) = _encoder.encode[D](data, _wb)
+      (let encoded_value, let encoded_key) = _encoder.encode[D](data, _wb)?
       my_metrics_id = ifdef "detailed-metrics" then
           var old_ts = my_latest_ts = Time.nanos()
           _metrics_reporter.step_metric(metric_name, "Sink encoding time", 9998,

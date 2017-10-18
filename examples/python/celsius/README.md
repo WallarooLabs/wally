@@ -22,7 +22,7 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 
 ## Running Celsius
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius` directory.
 
@@ -49,7 +49,7 @@ Run `machida` with `--application-module celsius`:
 machida --application-module celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
-  --ponythreads=1
+  --ponythreads=1 --ponynoblock
 ```
 
 ### Shell 3
@@ -59,8 +59,8 @@ Send messages:
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 \
   --file celsius.msg --batch-size 50 --interval 10_000_000 \
-  --messages 1000000 --repeat \
-  --ponythreads=1 --binary --msg-size 8
+  --messages 1000000 --repeat --binary --msg-size 8 --no-write \
+  --ponythreads=1 --ponynoblock 
 ```
 
 ## Reading the Output

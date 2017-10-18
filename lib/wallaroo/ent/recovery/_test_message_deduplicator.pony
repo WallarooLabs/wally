@@ -110,7 +110,7 @@ class _TestSameMessageDifferentFracs2 is UnitTest
     list.push( (MsgId(1), recover [1] end) )
 
     let msg_id = MsgId(1)
-    let frac_ids = recover val [as U32: 1, 2] end
+    let frac_ids = recover val [as U32: 1; 2] end
 
     let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
@@ -125,7 +125,7 @@ class _TestSameMessageDifferentFracs3 is UnitTest
     list.push( (MsgId(1), None ) )
 
     let msg_id = MsgId(1)
-    let frac_ids = recover val [as U32: 1, 2] end
+    let frac_ids = recover val [as U32: 1; 2] end
 
     let is_dup = MessageDeduplicator.is_duplicate(msg_id, frac_ids, list)
 
@@ -183,7 +183,7 @@ class _TestMatchIsLater2 is UnitTest
 
   fun ref apply(h: TestHelper) =>
     let list = DeduplicationList.create()
-    list.push( (MsgId(1), recover [1,5] end) )
+    list.push( (MsgId(1), recover [1; 5] end) )
     list.push( (MsgId(1), recover [10] end) )
 
     let msg_id = MsgId(1)
@@ -199,7 +199,7 @@ class _TestMatchIsLater3 is UnitTest
 
   fun ref apply(h: TestHelper) =>
     let list = DeduplicationList.create()
-    list.push( (MsgId(2), recover [1,5] end) )
+    list.push( (MsgId(2), recover [1; 5] end) )
     list.push( (MsgId(1), recover [10] end) )
 
     let msg_id = MsgId(1)

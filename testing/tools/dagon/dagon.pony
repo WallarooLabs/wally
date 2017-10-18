@@ -183,7 +183,8 @@ actor Main
         end
       end
     else
-      env.err.print("""dagon: usage: [
+      env.err.print("""
+        dagon: usage: [
 --docker=<host:port>
 --docker-tag/-T <docker-tag>
 --docker-network/-N <docker-network>
@@ -194,7 +195,8 @@ actor Main
 --timeout/-t <seconds>
 --filepath/-f <path>
 --phone-home/-h <host:port>
---delay-senders/-D""")
+--delay-senders/-D
+""")
       return
     end
 
@@ -307,6 +309,8 @@ class Notifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ConnectNotify(_env, _p_mgr)
 
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    None
 
 class ConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -357,6 +361,8 @@ class ConnectNotify is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("dagon: server closed")
 
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    None
 
 class Child
   let name: String

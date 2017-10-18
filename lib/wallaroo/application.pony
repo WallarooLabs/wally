@@ -96,7 +96,7 @@ class Application
     sink_count = sink_count + 1
 
   fun state_builder(state_name: String): PartitionBuilder ? =>
-    _state_builders(state_name)
+    _state_builders(state_name)?
 
   fun state_builders(): Map[String, PartitionBuilder] val =>
     let builders = recover trn Map[String, PartitionBuilder] end
@@ -150,7 +150,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun ref add_runner_builder(p: RunnerBuilder) =>
     _runner_builders.push(p)
 
-  fun apply(i: USize): RunnerBuilder ? => _runner_builders(i)
+  fun apply(i: USize): RunnerBuilder ? => _runner_builders(i)?
 
   fun ref update_sink(sink_builder': SinkBuilder) =>
     _sink_builder = sink_builder'

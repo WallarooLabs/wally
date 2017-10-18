@@ -1,6 +1,6 @@
 # Wallaroo Market Spread Single Machine Performance Testing on AWS
 
-If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/WallarooLabs/wallaroo/tree/master/orchestration/terraform) please do so before continuing.
+If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/WallarooLabs/wallaroo/tree/0.1.0-rc2/orchestration/terraform) please do so before continuing.
 
 ## Configuring Cluster:
 

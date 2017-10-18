@@ -4,10 +4,10 @@
 
 Giles components act as external testers for Wallaroo. Giles Sender is used to mimic the behavior of an incoming data source. Giles Sender sends data to Wallaroo in one of four ways:
 
-- With no other commandline options given, it will send string representations of integers, starting with `1` and increasing by `1` with each new message. For example, `./giles/sender -h 127.0.0.1:8081 -m 100` will send messages containing string representations of the numbers `1` through `100`.
-- With a file name given as the `--file/-f` argument it will send each line of the given file as a message. For example, `./giles/sender -h 127.0.0.1:8081 -m 100 -f war-and-peace.txt` will send messages containing each of the first 100 lines of the file `war-and-peace.txt`.
-- With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and every message is 24 bytes, specified with `--msg-size/-g`, it will send every 24 bytes of the given file as a message. For example, `./giles/sender -h 127.0.0.1:8081 -m 100 -f binary-data-file.txt -y -g 24` will send every 24 bytes until it has sent 100 messages
-- With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and variable message lengths specified with `--variable-size/-z`, it will read 4 bytes to get the message size, send that message and repeat. For example, `./giles/sender  127.0.0.1:8081 -m 100 -f binary-data-file.txt -y -z` will initially read a 4 byte header, send that message and repeat until it has sent 100 messages.
+- With no other commandline options given, it will send string representations of integers, starting with `1` and increasing by `1` with each new message. For example, `./giles/sender --host 127.0.0.1:8081 --messages 100` will send messages containing string representations of the numbers `1` through `100`.
+- With a file name given as the `--file/-f` argument it will send each line of the given file as a message. For example, `./giles/sender --host 127.0.0.1:8081 --messages 100 --file war-and-peace.txt` will send messages containing each of the first 100 lines of the file `war-and-peace.txt`.
+- With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and every message is 24 bytes, specified with `--msg-size/-g`, it will send every 24 bytes of the given file as a message. For example, `./giles/sender --host 127.0.0.1:8081 --messages 100 --file binary-data-file.txt --binary --msg-size 24` will send every 24 bytes until it has sent 100 messages
+- With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and variable message lengths specified with `--variable-size/-z`, it will read 4 bytes to get the message size, send that message and repeat. For example, `./giles/sender --host 127.0.0.1:8081 --messages 100 --file binary-data-file.txt --binary --variable-size` will initially read a 4 byte header, send that message and repeat until it has sent 100 messages.
 
 ### Building `giles/sender`
 
@@ -130,14 +130,15 @@ To concatenate the files, in order, use
 
 ```bash
 sender --host 127.0.0.1:7000 --file=file1,file2 --messages=100 --batch-size=1 \
-  --interval=10_000_000 --no-write
+  --interval=10_000_000 --no-write --ponythreads=1 --ponynoblock
 ```
 
 To send the contents of the first file twice, then the contents of the second file once, use
 
 ```bash
 sender --host 127.0.0.1:7000 --file=file1,file1,file2 --messages=100 \
-  --batch-size=1 --interval=10_000_000 --no-write
+  --batch-size=1 --interval=10_000_000 --no-write \
+  --ponythreads=1 --ponynoblock
 ```
 
 Multiple input files are also supported for binary input, but they must all be either fixed length or variable length.
@@ -150,7 +151,7 @@ To send the sequence `'1', '2', '3', ..., '100'`
 Use
 
 ```bash
-sender --host 127.0.0.1:7000 --messages 100
+sender --host 127.0.0.1:7000 --messages 100 --ponythreads=1 --ponynoblock
 ```
 
 ### Send a sequence of numbers, encoded as big-endian U64
@@ -160,7 +161,8 @@ To send the sequence `1,2,3,...,100`
 Use
 
 ```bash
-sender --host 127.0.0.1:7000 --messages 100 --u64
+sender --host 127.0.0.1:7000 --messages 100 --u64 \
+  --ponythreads=1 --ponynoblock
 ```
 
 To send the sequence `101,102,...,200`
@@ -168,7 +170,8 @@ To send the sequence `101,102,...,200`
 Use
 
 ```bash
-sender --host 127.0.0.1:7000 --messages 100 --u64 --start-from 100
+sender --host 127.0.0.1:7000 --messages 100 --u64 --start-from 100 \
+  --ponythreads=1 --ponynoblock
 ```
 
 ## Preparing Data Files for Giles Sender

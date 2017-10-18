@@ -141,14 +141,14 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
   be reconnect_boundary(target_worker_name: String) =>
     try
-      _outgoing_boundaries(target_worker_name).reconnect()
+      _outgoing_boundaries(target_worker_name)?.reconnect()
     else
       Fail()
     end
 
   be remove_route_for(step: Consumer) =>
     try
-      _routes.remove(step)
+      _routes.remove(step)?
     else
       Fail()
     end
@@ -171,6 +171,9 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
   be log_flushed(low_watermark: SeqId) =>
     None
 
+  fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
+    None
+
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
     ifdef debug then
       @printf[I32]("KafkaSource received update_watermark\n".cstring())
@@ -181,7 +184,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
-      _routes(c)
+      _routes(c)?
     else
       None
     end

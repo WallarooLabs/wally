@@ -104,13 +104,13 @@ actor Main
         Application("Sequence Window Printer")
           .new_pipeline[U64 val, String val]("Sequence Window",
             TCPSourceConfig[U64 val].from_options(U64FramedHandler,
-              TCPSourceConfigCLIParser(env.args)(0)))
+              TCPSourceConfigCLIParser(env.args)?(0)?))
           .to[U64]({(): MaybeOneToMany => MaybeOneToMany})
           .to_state_partition[U64 val, U64 val, String val,
             WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
               partition where multi_worker = true)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
-              TCPSinkConfigCLIParser(env.args)(0)))
+              TCPSinkConfigCLIParser(env.args)?(0)?))?
       end
       Startup(env, application, "sequence_window")
     else
@@ -145,7 +145,7 @@ primitive MaybeOneToMany is Computation[U64, U64]
     else
       let mod_magic = input % magic_number
       if mod_magic == 0 then
-        recover val [input, input + 1, input + 2] end
+        recover val [input; input + 1; input + 2] end
       elseif (mod_magic == 1) or (mod_magic == 2) then
         None
       else
@@ -158,11 +158,11 @@ class val WindowStateBuilder
   fun name(): String => "Window State"
 
 class WindowState is State
-  var ring: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4, 0)
+  var ring: Ring[U64] = Ring[U64].from_array(recover [0; 0; 0; 0] end, 4, 0)
 
   fun string(): String =>
     try
-      ring.string(where fill = "0")
+      ring.string(where fill = "0")?
     else
       "Error: failed to convert sequence window into a string."
     end
@@ -175,7 +175,7 @@ class WindowState is State
         // Test validity of updated window
         let values = to_array()
         Fact(TestIncrements(values), "Increments test failed on " +
-          string())
+          string())?
       else
         Fail()
       end
@@ -216,7 +216,7 @@ class WindowStateChange is StateChange[WindowState]
     let ring = state.ring.clone()
     ring.push(_last_value)
     try
-      ring.string(where fill = "0")
+      ring.string(where fill = "0")?
     else
       "Error: failed to convert sequence window into a string."
     end
@@ -225,7 +225,7 @@ class WindowStateChange is StateChange[WindowState]
     WindowStateEncoder(_last_value, out_writer)
 
   fun ref read_log_entry(in_reader: Reader) ? =>
-    _last_value = WindowStateDecoder(in_reader)
+    _last_value = WindowStateDecoder(in_reader)?
 
 class WindowStateChangeBuilder is StateChangeBuilder[WindowState]
   fun apply(id: U64): StateChange[WindowState] =>
@@ -240,7 +240,7 @@ primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
   =>
     let state_change: WindowStateChange ref =
       try
-        sc_repo.lookup_by_name("UpdateWindow") as WindowStateChange
+        sc_repo.lookup_by_name("UpdateWindow")? as WindowStateChange
       else
         WindowStateChange(0)
       end
@@ -256,4 +256,5 @@ primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
     recover val
       let scbs = Array[StateChangeBuilder[WindowState]]
       scbs.push(recover val WindowStateChangeBuilder end)
+      scbs
     end
