@@ -122,6 +122,8 @@ Feel free to click around and get a feel for how the Metrics UI is setup and how
 
 ## Shutdown
 
+### Terminal 5, Cluster Shutdown
+
 You can shut down the cluster with this command once processing has finished:
 
 ```bash

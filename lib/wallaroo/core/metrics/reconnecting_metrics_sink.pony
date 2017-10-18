@@ -163,16 +163,6 @@ actor ReconnectingMetricsSink
       from.cstring())
     _notify_connecting()
 
-  be write(data: ByteSeq) =>
-    """
-    Write a single sequence of bytes.
-    """
-    if not _closed then
-      _in_sent = true
-      write_final(_notify.sent(this, data))
-      _in_sent = false
-    end
-
   be queue(data: ByteSeq) =>
     """
     Queue a single sequence of bytes on linux.
@@ -208,7 +198,7 @@ actor ReconnectingMetricsSink
     Write a sequence of sequences of bytes.
     """
 
-    if not _closed then
+    if not _closed and _connected then
       _in_sent = true
 
       ifdef windows then
