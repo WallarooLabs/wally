@@ -30,7 +30,7 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
     conn.expect(4)
     _header = true
     @printf[I32]("ControlSenderConnectNotifier: connected to %s.\n".cstring(),
-      _worker_name)
+      _worker_name.cstring())
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
