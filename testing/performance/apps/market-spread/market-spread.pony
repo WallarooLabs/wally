@@ -40,10 +40,10 @@ nc -l 127.0.0.1 5001 >> /dev/null
 giles/sender/sender -h 127.0.0.1:7001 -m 350 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 
 5) orders:
-giles/sender/sender -h 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
+giles/sender/sender -h 127.0.0.1:7000 -m 5000000000 -s 300 -i 2_500_000 -f testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 -w --ponynoblock
 
 6) nbbo:
-giles/sender/sender -h 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+giles/sender/sender -h 127.0.0.1:7001 -m 10000000000 -s 300 -i 1_250_000 -f testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w --ponynoblock
 
 R3K or other Symbol Set (700, 1400, 2100)
 
