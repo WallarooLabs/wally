@@ -85,7 +85,7 @@ def _test_restart(command):
                       res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
-        runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
+        runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
         runner_ready_checker.start()
         runner_ready_checker.join()
         if runner_ready_checker.error:

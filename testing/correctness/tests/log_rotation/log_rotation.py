@@ -103,7 +103,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
                       res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
-        runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
+        runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
         runner_ready_checker.start()
         runner_ready_checker.join()
         if runner_ready_checker.error:
@@ -254,7 +254,7 @@ def _test_log_rotation_external_trigger_recovery(command):
                       res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
-        runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
+        runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
         runner_ready_checker.start()
         runner_ready_checker.join()
         if runner_ready_checker.error:
@@ -435,7 +435,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
                       res_dir, workers)
 
         # Wait for first runner (initializer) to report application ready
-        runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
+        runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
         runner_ready_checker.start()
         runner_ready_checker.join()
         if runner_ready_checker.error:
@@ -575,7 +575,7 @@ def _test_log_rotation_file_size_trigger_recovery(command):
                       res_dir, workers, alt_block, alt_func)
 
         # Wait for first runner (initializer) to report application ready
-        runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
+        runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
         runner_ready_checker.start()
         runner_ready_checker.join()
         if runner_ready_checker.error:
