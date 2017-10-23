@@ -7,12 +7,28 @@ They are built and run with a given input and verified against an expected outpu
 ## Test Applications
 
 ### Single Stream Single Sink Application List:
+State Partition -> Parallel Stateless
+State Partition -> Parallel Stateless -> State Partition
 Stateful
+Stateful -> Parallel Stateless
+Stateful -> Parallel Stateless -> Stateful
 Stateful -> Stateless
 Stateful -> Stateless -> Stateful
 Stateless
 Stateless -> Stateful
 Stateless -> Stateful -> Stateless
+Stateless -> Parallel Stateless
+Stateless -> Parallel Stateless -> Stateless
+Parallel Stateless
+Parallel Stateless -> State Partition
+Parallel Stateless -> State Partition -> Parallel Stateless
+Parallel Stateless -> Parallel Stateless
+Parallel Stateless -> Stateless
+Parallel Stateless -> Stateless -> Parallel Stateless
+Parallel Stateless -> Stateful
+Parallel Stateless -> Stateful -> Parallel Stateless
+
+### Failing Single Stream Single Sink Tests
 
 #### Partitioned
 State Partition

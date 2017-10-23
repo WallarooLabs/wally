@@ -41,10 +41,10 @@ actor Main
           .new_pipeline[U64, U64]("Stateful -> Stateless -> Stateful",
             TCPSourceConfig[U64].from_options(U64Decoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_stateful[U64 val, U64Counter](UpdateU64Counter,
+            .to_stateful[U64, U64Counter](UpdateU64Counter,
               U64CounterBuilder, "u64-counter-builder")
             .to[U64]({(): Double => Double})
-            .to_stateful[U64 val, U64Counter](UpdateU64Counter,
+            .to_stateful[U64, U64Counter](UpdateU64Counter,
               U64CounterBuilder, "u64-counter-builder")
             .to_sink(TCPSinkConfig[U64].from_options(
               FramedU64Encoder,

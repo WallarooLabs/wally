@@ -645,10 +645,11 @@ class RunnerReadyChecker(StoppableThread):
     __base_name__ = 'RunnerReadyChecker'
     pattern = re.compile('Application has successfully initialized')
 
-    def __init__(self, runner, timeout=30):
+    def __init__(self, runners, timeout=30):
         super(RunnerReadyChecker, self).__init__()
+        self.runners = runners
         self.name = self.__base_name__
-        self._path = runner.stdout_file.name
+        self._path = self.runners[0].stdout_file.name
         self.timeout = timeout
         self.error = None
 
@@ -667,10 +668,12 @@ class RunnerReadyChecker(StoppableThread):
                         self.stop()
                         break
                 if time.time() - started > self.timeout:
+                    outputs = [(r.name, r.get_output()[0]) for r in self.runners]
+                    outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
                     self.error = TimeoutError(
                         'Application did not report as ready after {} '
-                        'seconds. It had the following output:\n---\n{}'
-                        .format(self.timeout, stdout))
+                        'seconds. It had the following outputs:\n===\n{}'
+                        .format(self.timeout, outputs))
                     self.stop()
                     break
 
@@ -985,7 +988,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 raise runners_err
 
         # Wait until initializer reports ready
-        runner_ready_checker = RunnerReadyChecker(runners[0], ready_timeout)
+        runner_ready_checker = RunnerReadyChecker(runners, ready_timeout)
         runner_ready_checker.start()
         runner_ready_checker.join()
         if runner_ready_checker.error:
@@ -1008,13 +1011,13 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             try:
                 assert(sender.error is None)
             except Exception as err:
-                raise PipelineTestError("Sender exited with an error. "
-                                        "worker output is attached below."
-                                        "\n\n---\n\n%s\n\nSender error:\n---"
-                                        "\n%s"
-                                        % ('\n---\n'.join([r.get_output()[0]
-                                                           for r in runners]),
-                                           sender.error))
+                raise PipelineTestError("Sender exited with the error:\n"
+                                        "\n---START ERROR\n%s\n---END ERROR\n"
+                                        "\nworker output is attached below.\n"
+                                        "\n---START OUTPUT\n%s\n---END OUTPUT"
+                                        % (sender.error,
+                                           '\n---\n'.join([r.get_output()[0]
+                                                           for r in runners])))
         logging.debug('All senders completed sending.')
         # Use sink, metrics, or a timer to determine when to stop the
         # runners and sinks and begin validation
