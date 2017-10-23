@@ -36,7 +36,14 @@ primitive U64Decoder is FramedSourceHandler[U64 val]
       data(5)?, data(6)?, data(7)?)
 
 primitive FramedU64Encoder
-  fun apply(u: U64, wb: Writer): Array[ByteSeq] val =>
+  fun apply(u: U64, wb: Writer = Writer): Array[ByteSeq] val =>
     wb.u32_be(8)
     wb.u64_be(u)
+    wb.done()
+
+primitive FramedCountMaxEncoder
+  fun apply(cm: CountMax val, wb: Writer = Writer): Array[ByteSeq] val =>
+    wb.u32_be(16)
+    wb.u64_be(cm.count.u64())
+    wb.u64_be(cm.max)
     wb.done()

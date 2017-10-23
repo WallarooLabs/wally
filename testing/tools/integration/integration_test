@@ -396,9 +396,8 @@ def CLI():
                       host=args.host,
                       resilience_dir=args.resilience_dir)
     except Exception as err:
-        logging.error("Encountered an error while running the test for %r"
+        logging.exception("Encountered an error while running the test for %r\n===\n"
                       % args.command)
-        logging.exception(err)
         parser.exit(1)
 
     if validation_cmd:

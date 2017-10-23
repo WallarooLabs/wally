@@ -13,6 +13,23 @@ Stateful -> Stateless -> Stateful
 Stateless
 Stateless -> Stateful
 Stateless -> Stateful -> Stateless
+Stateless -> Parallel Stateless
+Stateless -> Parallel Stateless -> Stateless
+Parallel Stateless
+Parallel Stateless -> Parallel Stateless
+Parallel Stateless -> Stateless
+Parallel Stateless -> Stateless -> Parallel Stateless
+Parallel Stateless -> Stateful
+
+Parallel Stateless -> State Partition
+
+### Failing Single Stream Single Sink Tests
+Parallel Stateless -> Stateful -> Parallel Stateless
+Stateful -> Parallel Stateless
+Stateful -> Parallel Stateless -> Stateful
+Parallel Stateless -> State Partition -> Parallel Stateless
+State Partition -> Parallel Stateless
+State Partition -> Parallel Stateless -> State Partition
 
 #### Partitioned
 State Partition

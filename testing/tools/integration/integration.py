@@ -1008,13 +1008,13 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             try:
                 assert(sender.error is None)
             except Exception as err:
-                raise PipelineTestError("Sender exited with an error. "
-                                        "worker output is attached below."
-                                        "\n\n---\n\n%s\n\nSender error:\n---"
-                                        "\n%s"
-                                        % ('\n---\n'.join([r.get_output()[0]
-                                                           for r in runners]),
-                                           sender.error))
+                raise PipelineTestError("Sender exited with the error:\n"
+                                        "\n---START ERROR\n%s\n---END ERROR\n"
+                                        "\nworker output is attached below.\n"
+                                        "\n---START OUTPUT\n%s\n---END OUTPUT"
+                                        % (sender.error,
+                                           '\n---\n'.join([r.get_output()[0]
+                                                           for r in runners])))
         logging.debug('All senders completed sending.')
         # Use sink, metrics, or a timer to determine when to stop the
         # runners and sinks and begin validation
