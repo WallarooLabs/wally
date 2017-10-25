@@ -3,8 +3,8 @@ An umbrella application containing shared utils and different UI components
 
 ## Shared Dependency Installation Guide
 ### Depends on:
-	1. Erlang 18.0 >
-	2. Elixir 1.2.0
+	1. Erlang 18.x
+	2. Elixir 1.2.x
 	3. Node 4.2.2
 		- Node-Sass
 		- Browserify
