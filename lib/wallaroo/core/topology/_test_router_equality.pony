@@ -138,13 +138,23 @@ class iso _TestOmniRouterEquality is UnitTest
     target_boundaries("w2") = boundary2
     target_boundaries("w3") = boundary3
 
+    let base_stateless_partitions =
+      recover trn Map[U128, StatelessPartitionRouter] end
+    base_stateless_partitions(1) = _StatelessPartitionGenerator()
+    base_stateless_partitions(2) = _StatelessPartitionGenerator()
+
+    let target_stateless_partitions =
+      recover trn Map[U128, StatelessPartitionRouter] end
+    target_stateless_partitions(1) = _StatelessPartitionGenerator()
+    target_stateless_partitions(2) = _StatelessPartitionGenerator()
+
     var base_router: OmniRouter = StepIdRouter("w1",
       consume base_data_routes, consume base_step_map,
-      consume base_boundaries)
+      consume base_boundaries, consume base_stateless_partitions)
 
     let target_router: OmniRouter = StepIdRouter("w1",
       consume target_data_routes, consume target_step_map,
-      consume target_boundaries)
+      consume target_boundaries, consume target_stateless_partitions)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
@@ -292,6 +302,11 @@ primitive _RecoveryReplayerGenerator
   fun apply(env: Env, auth: AmbientAuth): RecoveryReplayer =>
     RecoveryReplayer(auth, "", _DataReceiversGenerator(env, auth),
       _RouterRegistryGenerator(env, auth), _Cluster)
+
+primitive _StatelessPartitionGenerator
+  fun apply(): StatelessPartitionRouter =>
+    LocalStatelessPartitionRouter(recover Map[U64, U128] end,
+      recover Map[U64, (Step | ProxyRouter)] end)
 
 actor _Cluster is Cluster
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](

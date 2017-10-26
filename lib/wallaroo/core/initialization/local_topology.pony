@@ -559,6 +559,9 @@ actor LocalTopologyInitializer is LayoutInitializer
         // Keep track of routers to the steps we've built
         let built_routers = Map[U128, Router]
 
+        // Keep track of all stateless partition routers we've built
+        let stateless_partition_routers = Map[U128, StatelessPartitionRouter]
+
         // Keep track of steps we've built that we'll use for the OmniRouter.
         // Unlike data_routes, these will not include state steps, which will
         // never be direct targets for state computation outputs.
@@ -1063,6 +1066,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       consume partition_routes)
 
                   built_routers(next_node.id) = stateless_partition_router
+                  stateless_partition_routers(next_node.id) =
+                    stateless_partition_router
                 else
                   // We need to wait until all local stateless partition steps
                   // are spun up on this worker before we can create the
@@ -1347,8 +1352,15 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.register_boundaries(_outgoing_boundaries,
           _outgoing_boundary_builders)
 
+        let stateless_partition_routers_trn =
+          recover trn Map[U128, StatelessPartitionRouter] end
+        for (id, router) in stateless_partition_routers.pairs() do
+          stateless_partition_routers_trn(id) = router
+        end
+
         let omni_router = StepIdRouter(_worker_name,
-          consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
+          consume built_stateless_steps, t.step_map(), _outgoing_boundaries,
+          consume stateless_partition_routers_trn)
         _router_registry.set_omni_router(omni_router)
 
         // Initialize all our initializables to get backpressure started
@@ -1449,8 +1461,11 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.register_boundaries(_outgoing_boundaries,
           _outgoing_boundary_builders)
 
+        // TODO: We need to inform the joining worker of its stateless
+        // partition routers
         let omni_router = StepIdRouter(_worker_name,
-          consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
+          consume built_stateless_steps, t.step_map(), _outgoing_boundaries,
+          recover Map[U128, StatelessPartitionRouter] end)
         _router_registry.set_omni_router(omni_router)
         _omni_router = omni_router
 
