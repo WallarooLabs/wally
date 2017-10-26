@@ -12,3 +12,4 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Changed
 
+- Changelog Hook Test 2 ([PR #1669](https://github.com/wallaroolabs/wallaroo/pull/1669))
