@@ -90,8 +90,16 @@
     become: yes
   - name: sysctl speed change for raid build
     sysctl:
+      name: dev.raid.speed_limit_max
+      value: 2000000000
+      state: present
+      sysctl_set: yes
+      reload: yes
+    become: yes
+  - name: sysctl speed change for raid build
+    sysctl:
       name: dev.raid.speed_limit_min
-      value: 30720
+      value: 2000000000
       state: present
       sysctl_set: yes
       reload: yes

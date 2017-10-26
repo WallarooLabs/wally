@@ -24,6 +24,10 @@
              dest=/usr/src/
              copy=no
 
+# https://stackoverflow.com/a/44833347/1589726
+- name: Remove UTS_UBUNTU_RELEASE_ABI check in kcompat.h
+  command: sed -i 's/#if UTS_UBUNTU_RELEASE_ABI > 255/#if UTS_UBUNTU_RELEASE_ABI > 99255/' /usr/src/ixgbevf-{{ ixgbevf_version }}/src/kcompat.h
+
 - name: Install dkms.conf
   template: src=dkms.conf
             dest="/usr/src/ixgbevf-{{ ixgbevf_version }}/dkms.conf"
