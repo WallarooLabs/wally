@@ -249,16 +249,19 @@ class val StepIdRouter is OmniRouter
   let _data_routes: Map[U128, Consumer] val
   let _step_map: Map[U128, (ProxyAddress | U128)] val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _stateless_partitions: Map[U128, StatelessPartitionRouter] val
 
   new val create(worker_name: String,
     data_routes: Map[U128, Consumer] val,
     step_map: Map[U128, (ProxyAddress | U128)] val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val)
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    stateless_partitions: Map[U128, StatelessPartitionRouter] val)
   =>
     _worker_name = worker_name
     _data_routes = data_routes
     _step_map = step_map
     _outgoing_boundaries = outgoing_boundaries
+    _stateless_partitions = stateless_partitions
 
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
@@ -295,58 +298,69 @@ class val StepIdRouter is OmniRouter
       end
     else
       // This target_id step exists on another worker
-      try
-        match _step_map(target_id)?
-        | let pa: ProxyAddress =>
-          try
-            // Try as though we have a reference to the right boundary
-            let boundary = _outgoing_boundaries(pa.worker)?
-            let might_be_route = producer.route_to(boundary)
-            match might_be_route
-            | let r: Route =>
-              ifdef "trace" then
-                @printf[I32]("OmniRouter found Route to OutgoingBoundary\n"
-                  .cstring())
-              end
-              let delivery_msg = ForwardMsg[D](pa.step_id,
-                _worker_name, data, metric_name,
-                pa, msg_uid, frac_ids)
+      if _step_map.contains(target_id) then
+        try
+          match _step_map(target_id)?
+          | let pa: ProxyAddress =>
+            try
+              // Try as though we have a reference to the right boundary
+              let boundary = _outgoing_boundaries(pa.worker)?
+              let might_be_route = producer.route_to(boundary)
+              match might_be_route
+              | let r: Route =>
+                ifdef "trace" then
+                  @printf[I32]("OmniRouter found Route to OutgoingBoundary\n"
+                    .cstring())
+                end
+                let delivery_msg = ForwardMsg[D](pa.step_id,
+                  _worker_name, data, metric_name,
+                  pa, msg_uid, frac_ids)
 
-              let keep_sending = r.forward(delivery_msg, pipeline_time_spent,
-                producer, latest_ts, metrics_id,
-                metric_name, worker_ingress_ts)
-              (false, keep_sending, latest_ts)
+                let keep_sending = r.forward(delivery_msg, pipeline_time_spent,
+                  producer, latest_ts, metrics_id,
+                  metric_name, worker_ingress_ts)
+                (false, keep_sending, latest_ts)
+              else
+                // We don't have a route to this boundary
+                ifdef debug then
+                  @printf[I32]("OmniRouter had no Route\n".cstring())
+                end
+                Fail()
+                (true, true, latest_ts)
+              end
             else
-              // We don't have a route to this boundary
+              // We don't have a reference to the right outgoing boundary
               ifdef debug then
-                @printf[I32]("OmniRouter had no Route\n".cstring())
+                @printf[I32](("OmniRouter has no reference to " +
+                  " OutgoingBoundary\n").cstring())
               end
               Fail()
               (true, true, latest_ts)
             end
+          | let sink_id: U128 =>
+            (true, true, latest_ts)
           else
-            // We don't have a reference to the right outgoing boundary
-            ifdef debug then
-              @printf[I32]("OmniRouter has no reference to OutgoingBoundary\n"
-                .cstring())
-            end
             Fail()
             (true, true, latest_ts)
           end
-        | let sink_id: U128 =>
-          (true, true, latest_ts)
         else
           Fail()
           (true, true, latest_ts)
         end
       else
-        // Apparently this target_id does not refer to a valid step id
-        ifdef debug then
-          @printf[I32](("OmniRouter: target id does not refer to valid step " +
-            "id\n").cstring())
+        try
+          _stateless_partitions(target_id)?.route[D](metric_name,
+            pipeline_time_spent, data, producer, msg_uid, frac_ids,
+            latest_ts, metrics_id, worker_ingress_ts)
+        else
+          // Apparently this target_id does not refer to a valid step id
+          ifdef debug then
+            @printf[I32](("OmniRouter: target id does not refer to valid " +
+              " step id\n").cstring())
+          end
+          Fail()
+          (true, true, latest_ts)
         end
-        Fail()
-        (true, true, latest_ts)
       end
     end
 
@@ -359,7 +373,7 @@ class val StepIdRouter is OmniRouter
     end
     new_outgoing_boundaries(w) = boundary
     StepIdRouter(_worker_name, _data_routes, _step_map,
-      consume new_outgoing_boundaries)
+      consume new_outgoing_boundaries, _stateless_partitions)
 
   fun val update_route_to_proxy(id: U128, pa: ProxyAddress): OmniRouter =>
     // TODO: Using persistent maps for our fields would make this more
@@ -375,7 +389,7 @@ class val StepIdRouter is OmniRouter
     new_step_map(id) = pa
 
     StepIdRouter(_worker_name, consume new_data_routes, consume new_step_map,
-      _outgoing_boundaries)
+      _outgoing_boundaries, _stateless_partitions)
 
   fun val update_route_to_step(id: U128, step: Consumer): OmniRouter =>
     // TODO: Using persistent maps for our fields would make this more
@@ -393,7 +407,7 @@ class val StepIdRouter is OmniRouter
     new_step_map(id) = ProxyAddress(_worker_name, id)
 
     StepIdRouter(_worker_name, consume new_data_routes, consume new_step_map,
-      _outgoing_boundaries)
+      _outgoing_boundaries, _stateless_partitions)
 
   fun routes(): Array[Consumer] val =>
     let diff = recover trn Array[Consumer] end
@@ -418,7 +432,9 @@ class val StepIdRouter is OmniRouter
           o._data_routes) and
         MapEquality2[U128, ProxyAddress, U128](_step_map, o._step_map) and
         MapTagEquality[String, OutgoingBoundary](_outgoing_boundaries,
-          o._outgoing_boundaries)
+          o._outgoing_boundaries) and
+        MapEquality[U128, StatelessPartitionRouter](_stateless_partitions,
+          o._stateless_partitions)
     else
       false
     end
