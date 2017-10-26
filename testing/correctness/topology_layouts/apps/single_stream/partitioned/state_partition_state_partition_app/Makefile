@@ -55,12 +55,7 @@ single_stream_partitioned_state_partition_state_partition_app_test:
 	--command './state_partition_state_partition_app' \
 	--sink-expect 100
 
-# Multi-worker tests currently fail:
-# Error initializing local topology
-# This should never happen: failure in lib/wallaroo/initialization/local_topology.pony at line 1236
-# See Issue: 947
-
-#integration-tests-testing-correctness-topology_layouts-apps-single_stream-partitioned-state_partition_state_partition_app: two_worker_single_stream_partitioned_state_partition_state_partition_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-partitioned-state_partition_state_partition_app: two_worker_single_stream_partitioned_state_partition_state_partition_app_test
 
 two_worker_single_stream_partitioned_state_partition_state_partition_app_test:
 	cd $(SINGLE_STREAM_PARTITIONED_STATE_PARTITION_STATE_PARTITION_APP_PATH) && \
@@ -73,7 +68,7 @@ two_worker_single_stream_partitioned_state_partition_state_partition_app_test:
 	--command './state_partition_state_partition_app' \
 	--sink-expect 100
 
-#integration-tests-testing-correctness-topology_layouts-apps-single_stream-partitioned-state_partition_state_partition_app: three_worker_single_stream_partitioned_state_partition_state_partition_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-partitioned-state_partition_state_partition_app: three_worker_single_stream_partitioned_state_partition_state_partition_app_test
 
 three_worker_single_stream_partitioned_state_partition_state_partition_app_test:
 	cd $(SINGLE_STREAM_PARTITIONED_STATE_PARTITION_STATE_PARTITION_APP_PATH) && \

@@ -6,6 +6,8 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Create ProxyRouters to all required steps during initialization
+
 ### Added
 
 ### Changed
