@@ -50,7 +50,7 @@ primitive KafkaSourceConfigFactory
       end
 
     if (kafka_brokers.size() == 0) or (kafka_topic == "") then
-      KafkaSourceConfigError("Error! Either brokers is empty or topics is empty!")
+      return KafkaSourceConfigError("Error! Either brokers is empty or topics is empty!")
     end
 
     recover
