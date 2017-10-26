@@ -116,16 +116,16 @@ variable "instance_volume_size" {
 variable "instance_amis" {
   description = "AMI for all instances."
   default = {
-    sa-east-1 = "ami-78a93c14"
-    us-west-1 = "ami-b20542d2"
-    us-west-2 = "ami-b9ff39d9"
-    us-east-1 = "ami-ddf13fb0"
-    eu-west-1 = "ami-a4d44ed7"
-    ap-southeast-1 = "ami-fc37e59f"
-    ap-southeast-2 = "ami-a387afc0"
-    eu-central-1 = "ami-26e70c49"
-    ap-northeast-1 = "ami-b7d829d6"
-    ap-south-1 = "ami-7e94fe11"
+    sa-east-1 = "ami-1ca7d970"
+    us-west-1 = "ami-1b17257b"
+    us-west-2 = "ami-19e92861"
+    us-east-1 = "ami-bcdc16c6"
+    eu-west-1 = "ami-1b17257b"
+    ap-southeast-1 = "ami-d9dca7ba"
+    ap-southeast-2 = "ami-02ad4060"
+    eu-central-1 = "ami-e613ac89"
+    ap-northeast-1 = "ami-6959870f"
+    ap-south-1 = "ami-50591a3f"
   }
 }
 
