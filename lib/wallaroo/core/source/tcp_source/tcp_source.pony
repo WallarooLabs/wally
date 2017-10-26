@@ -89,9 +89,13 @@ actor TCPSource is Producer
   var _muted: Bool = true
   var _expect_read_buf: Reader = Reader
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
+  let _router_registry: RouterRegistry
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
+
+  fun _final() =>
+    @printf[I32]("FINALIZING SOURCE\n".cstring())
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[Consumer] val, route_builder: RouteBuilder,
@@ -118,6 +122,7 @@ actor TCPSource is Producer
     _max_size = max_size
 
     _layout_initializer = layout_initializer
+    _router_registry = router_registry
 
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
@@ -239,10 +244,6 @@ actor TCPSource is Producer
     """
     - Close the connection gracefully.
     """
-    @printf[I32]("Shutting down TCPSource\n".cstring())
-    for b in _outgoing_boundaries.values() do
-      b.dispose()
-    end
     close()
 
   fun ref route_to(c: Consumer): (Route | None) =>
@@ -324,7 +325,7 @@ actor TCPSource is Producer
       _notify.connecting(this, _connect_count)
     else
       _notify.connect_failed(this)
-      _hard_close()
+      close()
     end
 
   fun ref close() =>
@@ -333,8 +334,17 @@ actor TCPSource is Producer
     source.
     """
 
+    @printf[I32]("Shutting down TCPSource\n".cstring())
     _hard_close()
-
+    _router_registry.unregister_source(this)
+    for b in _outgoing_boundaries.values() do
+      b.dispose()
+    end
+    _outgoing_boundaries.clear()
+    for r in _routes.values() do
+      r.dispose()
+    end
+    _routes.clear()
 
   fun ref _try_shutdown() =>
     """
@@ -359,7 +369,7 @@ actor TCPSource is Producer
     end
 
     if _connected and _shutdown and _shutdown_peer then
-      _hard_close()
+      close()
     else
       if not _unregistered then
         _dispose_routes()
@@ -380,10 +390,9 @@ actor TCPSource is Producer
     _shutdown_peer = true
 
     // Unsubscribe immediately and drop all pending writes.
-    @pony_asio_event_unsubscribe(_event)
     _readable = false
     @pony_asio_event_set_readable[None](_event, false)
-
+    @pony_asio_event_unsubscribe(_event)
 
     @pony_os_socket_close[None](_fd)
     _fd = -1
@@ -475,7 +484,7 @@ actor TCPSource is Producer
     else
       // The socket has been closed from the other side.
       _shutdown_peer = true
-      _hard_close()
+      close()
     end
 
     _reading = false
