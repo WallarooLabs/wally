@@ -1232,6 +1232,21 @@ actor LocalTopologyInitializer is LayoutInitializer
           end
         end
 
+        //////////////
+        // Create ProxyRouters to all non-state steps in the
+        // topology that we haven't yet created routers to
+        for (tid, target) in t.step_map().pairs() do
+          if not built_routers.contains(tid) then
+            match target
+            | let pa: ProxyAddress val =>
+              if pa.worker != _worker_name then
+                built_routers(tid) = ProxyRouter(pa.worker,
+                  _outgoing_boundaries(pa.worker)?, pa, _auth)
+              end
+            end
+          end
+        end
+
         /////
         // Register pre state target routes on corresponding state steps
         for psd in t.pre_state_data().values() do
