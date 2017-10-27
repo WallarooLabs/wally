@@ -141,6 +141,13 @@ demo_to_run ?= dagon-identity## Name of demo dagon command to run
 autoscale ?= on## Build with Autoscale or not
 clustering ?= on## Build with Clustering or not
 resilience ?= off## Build with Resilience or not
+PONYCC ?= ponyc## Path to ponyc executable
+PONYSTABLE ?= stable## Path to pony stable executable
+target_cpu ?= ## Target CPU to generate binary for
+
+ifneq ($(target_cpu),)
+  target_cpu_arg := --cpu $(target_cpu)
+endif
 
 # validation of variable
 ifdef autoscale
@@ -252,15 +259,15 @@ endif
 
 # function call for compiling with ponyc and generating dependency info
 define PONYC
-  $(QUIET)cd $(1) && $(ponyc_docker_args) stable fetch \
+  $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) fetch \
     $(if $(filter $(ponyc_docker_args),docker),$(quote))
-  $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
+  $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) env $(PONYCC) $(ponyc_arch_args) \
     $(debug_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
-    $(PONYCFLAGS) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
+    $(PONYCFLAGS) $(target_cpu_arg) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && echo "$@: $(abspath $(1))/bundle.json" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
-  $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
+  $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) env $(PONYCC) $(ponyc_arch_args) \
     $(debug_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
-    $(PONYCFLAGS) . --pass import --files $(if $(filter \
+    $(PONYCFLAGS) $(target_cpu_arg) . --pass import --files $(if $(filter \
     $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_wallaroo_dir).*.pony" \
     | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \
     >> $(notdir $(abspath $(1:%/=%))).d
