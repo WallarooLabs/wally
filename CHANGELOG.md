@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Fix Sender to properly dispose of files ([PR #1673](https://github.com/wallaroolabs/wallaroo/pull/1673))
 - Create ProxyRouters to all required steps during initialization
 
 ### Added
