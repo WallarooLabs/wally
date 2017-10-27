@@ -657,9 +657,11 @@ class BinaryIntegerDataSource is Iterator[Array[U8] val]
 
 class FileDataSource is Iterator[String]
   let _lines: Iterator[String]
+  let _file: File
 
   new iso create(path: FilePath val) =>
-    _lines = File(path).lines()
+    _file = File.open(path)
+    _lines = _file.lines()
 
   fun ref has_next(): Bool =>
     _lines.has_next()
@@ -670,6 +672,9 @@ class FileDataSource is Iterator[String]
     else
       error
     end
+
+  fun ref dispose() =>
+    _file.dispose()
 
 class MultiFileDataSource is Iterator[String]
   let _paths: Array[FilePath val] val
@@ -694,12 +699,14 @@ class MultiFileDataSource is Iterator[String]
       if f.has_next() then
         true
       else
+        f.dispose()
         _idx = _idx + 1
         try
           _cur_source = FileDataSource(_paths(_idx)?)
           has_next()
         else
           if _should_repeat then
+            f.dispose()
             _idx = 0
             _cur_source =
               try
@@ -754,12 +761,14 @@ class MultiFileBinaryDataSource is Iterator[Array[U8 val] val]
       if f.has_next() then
         true
       else
+        f.dispose()
         _idx = _idx + 1
         try
           _cur_source = BinaryFileDataSource(_paths(_idx)?, _msg_size)
           has_next()
         else
           if _should_repeat then
+            f.dispose()
             _idx = 0
             _cur_source =
               try
@@ -811,12 +820,14 @@ class MultiFileVariableBinaryDataSource is Iterator[Array[U8 val] val]
       if f.has_next() then
         true
       else
+        f.dispose()
         _idx = _idx + 1
         try
           _cur_source = VariableLengthBinaryFileDataSource(_paths(_idx)?)
           has_next()
         else
           if _should_repeat then
+            f.dispose()
             _idx = 0
             _cur_source =
               try
@@ -851,7 +862,7 @@ class BinaryFileDataSource is Iterator[Array[U8] val]
   let _msg_size: USize
 
   new iso create(path: FilePath val, msg_size: USize) =>
-    _file = File(path)
+    _file = File.open(path)
     _msg_size = msg_size
 
   fun ref has_next(): Bool =>
@@ -864,11 +875,14 @@ class BinaryFileDataSource is Iterator[Array[U8] val]
   fun ref next(): Array[U8] val =>
     _file.read(_msg_size)
 
+  fun ref dispose() =>
+    _file.dispose()
+
 class VariableLengthBinaryFileDataSource is Iterator[Array[U8] val]
   let _file: File
 
   new iso create(path: FilePath val) =>
-    _file = File(path)
+    _file = File.open(path)
 
   fun ref has_next(): Bool =>
     if _file.position() < _file.size() then
@@ -888,3 +902,6 @@ class VariableLengthBinaryFileDataSource is Iterator[Array[U8] val]
       end
       recover val Array[U8] end
     end
+
+  fun ref dispose() =>
+    _file.dispose()
