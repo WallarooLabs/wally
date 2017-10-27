@@ -1302,7 +1302,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   built_routers(tid)?
                 else
                   @printf[I32](("Failed to find built router for " +
-                    "target_router\n").cstring())
+                    "target_router to %s\n").cstring(), tid.string().cstring())
                   error
                 end
               match partition_router
