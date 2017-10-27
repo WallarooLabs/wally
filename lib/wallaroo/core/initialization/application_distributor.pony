@@ -500,8 +500,6 @@ actor ApplicationDistributor is Distributor
 
           // Make sure there are still runner_builders left in the pipeline.
           if runner_builder_idx < step_runner_builders.size() then
-            var cur_step_id = _step_id_gen()
-
             // Until we hit the boundary for this worker, keep adding
             // stepinitializers from the pipeline
             while runner_builder_idx < boundary do
@@ -699,6 +697,11 @@ actor ApplicationDistributor is Distributor
                   @printf[I32](("Preparing to spin up " +
                     next_runner_builder.name() + "stateless partition on " +
                     w + "\n").cstring())
+
+                  if w != worker then
+                    local_graphs(w)?.add_node(psd, next_id)
+                  end
+
                   for s_id in worker_to_step_id(w)?.values() do
                     let next_initializer = StepBuilder(application.name(),
                       w, pipeline.name(), next_runner_builder, s_id)
