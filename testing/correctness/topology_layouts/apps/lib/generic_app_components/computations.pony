@@ -39,3 +39,15 @@ primitive OddFilter is Computation[U64, U64]
     end
 
   fun name(): String => "OddFilter"
+
+primitive DivideCountMax is Computation[CountMax, CountMax]
+  fun apply(input: CountMax): CountMax =>
+    CountMax(input.count, (input.max / 2))
+
+  fun name(): String => "DivideCountMax"
+
+primitive DoubleCountMax is Computation[CountMax, CountMax]
+  fun apply(input: CountMax): CountMax =>
+    CountMax(input.count, (input.max * 2))
+
+  fun name(): String => "DoubleCountMax"

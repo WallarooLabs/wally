@@ -65,6 +65,18 @@ primitive PowersOfTwoPartitionFunction2
   fun apply(input: U64): U64 =>
     input.next_pow2()
 
+primitive Mod6PartitionFunction
+  fun apply(input: U64): U64 =>
+    input % 6
+
+primitive Mod3PartitionFunction
+  fun apply(input: U64): U64 =>
+    input % 3
+
+primitive CountMaxMod6PartitionFunction
+  fun apply(input: CountMax): U64 =>
+    input.max % 6
+
 primitive UpdateU64Counter is StateComputation[U64, U64, U64Counter]
   fun name(): String => "Update U64 Counter"
 
@@ -118,3 +130,84 @@ primitive UpdateU64Counter2 is StateComputation[U64, U64, U64Counter]
       scbs.push(recover val U64CounterStateChangeBuilder end)
       scbs
     end
+
+class U64Sum is State
+  var sum: U64 val = 0
+  var count: USize val = 0
+
+  fun ref update(n: U64) =>
+    sum = sum + n
+    count = count + 1
+
+primitive U64SumBuilder
+  fun name(): String => "U64Sum"
+  fun apply(): U64Sum => U64Sum
+
+primitive UpdateU64Sum is StateComputation[U64, U64, U64Sum]
+  fun name(): String => "Update U64Sum"
+
+  fun apply(u: U64 val,
+    sc_repo: StateChangeRepository[U64Sum],
+    state: U64Sum): (U64, DirectStateChange)
+  =>
+    state.update(u)
+
+    (state.sum, DirectStateChange)
+
+  fun state_change_builders():
+    Array[StateChangeBuilder[U64Sum]] val
+  =>
+    recover Array[StateChangeBuilder[U64Sum]] end
+
+class val CountMax
+  let count: USize
+  let max: U64
+
+  new val create(count': USize, max': U64) =>
+    count = count'
+    max = max'
+
+class CountAndMax is State
+  var count: USize = 0
+  var max: U64 = 0
+
+  fun ref apply(u: U64) =>
+    count = count + 1
+    max = max.max(u)
+
+primitive CountAndMaxBuilder
+  fun name(): String => "CountAndMax"
+  fun apply(): CountAndMax => CountAndMax
+
+primitive UpdateCountAndMax is StateComputation[U64, CountMax, CountAndMax]
+  fun name(): String => "Update Count and Max"
+
+  fun apply(u: U64 val,
+    sc_repo: StateChangeRepository[CountAndMax],
+    state: CountAndMax): (CountMax, DirectStateChange)
+  =>
+    state.apply(u)
+
+    (CountMax(state.count, state.max), DirectStateChange)
+
+  fun state_change_builders():
+    Array[StateChangeBuilder[CountAndMax]] val
+  =>
+    recover Array[StateChangeBuilder[CountAndMax]] end
+
+primitive UpdateCountAndMaxFromCountMax is StateComputation[CountMax, CountMax,
+  CountAndMax]
+  fun name(): String => "Update Count and Max from CountMax"
+
+  fun apply(u: CountMax,
+    sc_repo: StateChangeRepository[CountAndMax],
+    state: CountAndMax): (CountMax, DirectStateChange)
+  =>
+    state.apply(u.max)
+
+    (CountMax(state.count, state.max), DirectStateChange)
+
+  fun state_change_builders():
+    Array[StateChangeBuilder[CountAndMax]] val
+  =>
+    recover Array[StateChangeBuilder[CountAndMax]] end
