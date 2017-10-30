@@ -159,31 +159,54 @@ actor ApplicationDistributor is Distributor
 
 
         ///////////
-        // For the current pipeline, the following code transforms the
-        // sequence of runner builders (corresponding to all computations
-        // defined via the API for that pipeline) into a sequence of
-        // runner builders corresponding to steps in the running application.
-        //
-        // If coalescing is on, we try to coalesce all contiguous sequences of
-        // stateless computations into single runner builders (of type
-        // RunnerSequenceBuilder). Each RunnerSequenceBuilder will correspond
-        // to a single step.
-        //
-        // We handle the runner builders for the source first. If coalescing
-        // is on, we take all contiguous runner builders starting from the
-        // first and coalesce them into one RunnerSequenceBuilder. In the
-        // process of doing this, we store them in `source_runner_builders`,
-        // which we will then use to create the RunnerSequenceBuilder.
-        //
-        // We then go through the rest of the runner builders from the
-        // pipeline, coalescing contiguous sequences of runner builders
-        // into single RunnerSequenceBuilders and adding them to
-        // `step_runner_builders`, which will be used to build the
-        // StepInitializers (1-to-1 between members of `step_runner_builders`
-        // and steps in the running application). As we iterate over
-        // contiguous stateless computations, we add them to
-        // `latest_runner_builders`, which will be used to construct the
-        // corresponding RunnerSequenceBuilder.
+        /*
+        For the current pipeline, the following code transforms the
+        sequence of runner builders (corresponding to all computations
+        defined via the API for that pipeline) into a sequence of
+        runner builders corresponding to steps in the running application.
+
+        If coalescing is on, we try to coalesce all contiguous sequences of
+        stateless computations into single runner builders (of type
+        RunnerSequenceBuilder). Each RunnerSequenceBuilder will correspond
+        to a single step.
+
+        We handle the runner builders for the source first. If coalescing
+        is on, we take all contiguous stateless runner builders starting
+        from the first and coalesce them into one RunnerSequenceBuilder.
+        In the process of doing this, we store them in
+        `source_runner_builders`, which we will then use to create the
+        RunnerSequenceBuilder.
+
+        We then go through the rest of the runner builders from the
+        pipeline, coalescing contiguous sequences of stateless runner
+        builders into single RunnerSequenceBuilders and adding them to
+        `step_runner_builders`, which will be used to build the
+        StepInitializers (1-to-1 between members of `step_runner_builders`
+        and steps in the running application). As we iterate over
+        contiguous stateless computations, we add them to
+        `latest_runner_builders`, which will be used to construct the
+        corresponding RunnerSequenceBuilder.
+
+        Keep in mind the following important caveat:
+        We can coalesce the prestate runner builder back onto the
+        previous stateless computation, be we cannot currently do
+        this is if the stateless computation is parallelized.
+        Furthermore, we cannot coalesce anything back onto a prestate
+        runner builder (since that is a partition boundary).
+
+        In what follows note the following 2 points:
+
+        1) `step_runner_builders` is a sequence of runner builders
+        (including some we've coalesced here) that correspond
+        1-to-1 to the actual steps in the topology.
+
+        2) `latest_runner_builders` accumulates runner builders we
+        are in the process of coalescing.  They will eventually be
+        combined into a RunnerSequenceBuilder and placed as one
+        unit into `step_runner_builders`, at which point we empty
+        `latest_runner_builders` so we can use it for the next
+        coalesced sequence.
+        */
         ///////////
 
         //
@@ -242,7 +265,7 @@ actor ApplicationDistributor is Distributor
               // initialization so we can coalesce a pre state runner onto a
               // stateless partition
               if parallel_stateless then
-                latest_runner_builders.push(r_builder)
+                step_runner_builders.push(r_builder)
               end
             else
               source_runner_builders.push(r_builder)
