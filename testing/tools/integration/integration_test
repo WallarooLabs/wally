@@ -379,7 +379,8 @@ def CLI():
 
     # Run the test!
     try:
-        pipeline_test(generator = args.generators,
+        outputs = (pipeline_test(
+                      generator = args.generators,
                       expected = args.expected_val,
                       command = args.command,
                       workers = args.workers,
@@ -394,7 +395,7 @@ def CLI():
                                        False),
                       giles_mode = 'giles' if args.giles_mode else None,
                       host=args.host,
-                      resilience_dir=args.resilience_dir)
+                      resilience_dir=args.resilience_dir))
     except Exception as err:
         logging.exception("Encountered an error while running the test for %r\n===\n"
                       % args.command)
@@ -410,8 +411,12 @@ def CLI():
                 logging.info("Validation command '%s' completed successfully",
                              ' '.join(cmd))
         else:
-            logging.error("Validation command '%s' failed with the output:\n--\n%s",
-                         ' '.join(cmd), out)
+            outputs = [(o[0], o[1][0]) for o in outputs]
+            outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
+            logging.error("Validation command '%s' failed with the output:\n"
+                          "--\n%s\n\nThe application had the following"
+                          " outputs:\n===\n%s",
+                         ' '.join(cmd), out, outputs)
 
         if logging.root.level > logging.ERROR:
             # If failed, and logging level means we didn't log error, include it

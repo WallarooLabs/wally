@@ -1077,7 +1077,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             validation_files = validate_file.split(',')
             for sink, fp in zip(sinks, validation_files):
                 sink.save(fp, giles_mode)
-            return
+            return [(r.name, r.get_output()) for r in runners]
 
         else:  # compare expected to processed
             # Decode captured output from sink
@@ -1144,3 +1144,4 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         for r in runners:
             r.stop()
         clean_up_resilience_path(resilience_dir)
+    return [(r.name, r.get_output()) for r in runners]
