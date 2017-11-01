@@ -25,7 +25,7 @@ The Wallaroo community, while small, is helpful and inviting. We think you'll fi
 
 [mailing list]: https://groups.io/g/wallaroo
 [FAQ]: https://www.wallaroolabs.com/faq
-[IRC]: https://webchat.oftc.net/?channels=wallaroo
+[IRC]: https://webchat.freenode.net/?channels=#wallaroo
 [commercial support]: mailto:hello@wallaroolabs.com
 [issues]: https://github.com/WallarooLabs/wallaroo/issues
 [website community section]: http://www.wallaroolabs.com/community

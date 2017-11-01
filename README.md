@@ -231,7 +231,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [getting help section]: #getting-help
 [getting started section]: #getting-started
 [hello wallaroo post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
-[IRC]: https://webchat.oftc.net/?channels=wallaroo
+[IRC]: https://webchat.freenode.net/?channels=#wallaroo
 [license section]: #license
 [open issues]: https://github.com/WallarooLabs/wallaroo/issues
 [open sourcing wallaroo]: https://blog.wallaroolabs.com/2017/09/open-sourcing-wallaroo/
