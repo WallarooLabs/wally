@@ -14,15 +14,19 @@ Let's dive in and take a look at our application setup:
 
 ```python
 def application_setup(args):
+    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+
     word_partitions = list(string.ascii_lowercase)
     word_partitions.append("!")
 
     ab = wallaroo.ApplicationBuilder("Word Count Application")
-    ab.new_pipeline("Split and Count", Decoder())
+    ab.new_pipeline("Split and Count",
+                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
     ab.to_parallel(Split)
     ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
         WordPartitionFunction(), word_partitions)
-    ab.to_sink(Encoder())
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
     return ab.build()
 ```
 
@@ -30,7 +34,8 @@ By now, hopefully, most of this looks somewhat familiar. We're building on conce
 
 ```python
 ab = wallaroo.ApplicationBuilder("Word Count Application")
-ab.new_pipeline("Split and Count", Decoder())
+ab.new_pipeline("Split and Count",
+                wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
 ```
 
 Upon receiving some textual input, our word count application will route it to a stateless computation called `Split`. `Split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateful computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? The `to` method creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(Split)`, we are placing an instance of the `Split` computation on every worker in our cluster.
@@ -61,15 +66,19 @@ Back to our application setup
 
 ```python
 def application_setup(args):
+    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+
     word_partitions = list(string.ascii_lowercase)
     word_partitions.append("!")
 
     ab = wallaroo.ApplicationBuilder("Word Count Application")
-    ab.new_pipeline("Split and Count", Decoder())
+    ab.new_pipeline("Split and Count",
+                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
     ab.to_parallel(Split)
     ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
         WordPartitionFunction(), word_partitions)
-    ab.to_sink(Encoder())
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
     return ab.build()
 ```
 
@@ -85,6 +94,8 @@ Note we setup up 27 partitions to count our words, one for each letter plus one 
 ```python
 word_partitions = list(string.ascii_lowercase)
 word_partitions.append("!")
+
+...
 
 ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
     WordPartitionFunction(), word_partitions)

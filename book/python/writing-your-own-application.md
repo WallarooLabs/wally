@@ -89,11 +89,11 @@ An application is constructed of pipelines which, in turn, are constructed from 
 
 ```python
 ab = wallaroo.ApplicationBuilder("Reverse Word")
-ab.new_pipeline("reverse", Decoder(),
-    wallaroo.TCPSourceConfig("localhost", "7002"))
+ab.new_pipeline("reverse",
+                wallaroo.TCPSourceConfig("localhost", "7002", Decoder()))
 ```
 
-Since each pipeline must have a source, it must also have a source decoder. So `new_pipeline` takes a name and a `Decoder` instance as its arguments.
+Each pipeline must have a source, and each source must have a decoder, so `new_pipeline` takes a name and a `TCPSourceConfig` instance as its arguments.
 
 Next, we add the computation step:
 
@@ -101,10 +101,10 @@ Next, we add the computation step:
 ab.to(Reverse)
 ```
 
-And finally, we add the sink along with an encoder:
+And finally, we add the sink, using a `TCPSinkConfig`:
 
 ```python
-ab.to_sink(Encoder(), wallaroo.TCPSinkConfig("localhost", "7010"))
+ab.to_sink(wallaroo.TCPSinkConfig("localhost", "7010", Encoder()))
 ```
 
 ### The `application_setup` Entry Point
@@ -117,11 +117,10 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     ab = wallaroo.ApplicationBuilder("Reverse Word")
-    ab.new_pipeline("reverse", Decoder(),
-                    wallaroo.TCPSourceConfig(in_host, in_port))
+    ab.new_pipeline("reverse",
+                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
     ab.to(Reverse)
-    ab.to_sink(Encoder(),
-               wallaroo.TCPSinkConfig(out_host, out_port))
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
     return ab.build()
 ```
 
