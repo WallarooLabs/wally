@@ -233,8 +233,8 @@ class val KeyedStateSubpartition[PIn: Any val,
     @printf[I32](("Spinning up " + partition_count.string() +
       " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
-    LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
-      _partition_function, default_router)
+    LocalPartitionRouter[PIn, Key](worker_name, consume m, _id_map,
+      consume routes, _partition_function, default_router)
 
   fun update_key[K: (Hashable val & Equatable[K] val)](k: K,
     pa: ProxyAddress): StateSubpartition ?

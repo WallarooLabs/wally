@@ -82,11 +82,11 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
       new_proxy_router, boundary2, boundary3)
 
     var base_router: PartitionRouter =
-      LocalPartitionRouter[String, String](consume base_local_map,
+      LocalPartitionRouter[String, String]("w1", consume base_local_map,
         consume base_step_ids, base_partition_routes,
       _PartitionFunctionGenerator(), _DefaultRouterGenerator())
     var target_router: PartitionRouter =
-      LocalPartitionRouter[String, String](consume target_local_map,
+      LocalPartitionRouter[String, String]("w2", consume target_local_map,
         consume target_step_ids, target_partition_routes,
         _PartitionFunctionGenerator(), _DefaultRouterGenerator())
     h.assert_eq[Bool](false, base_router == target_router)
