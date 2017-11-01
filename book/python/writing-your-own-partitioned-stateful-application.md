@@ -89,12 +89,11 @@ def application_setup(args):
 
     letter_partitions = list(string.ascii_lowercase)
     ab = wallaroo.ApplicationBuilder("alphabet")
-    ab.new_pipeline("alphabet", Decoder(),
-                    wallaroo.TCPSourceConfig(in_host, in_port))
+    ab.new_pipeline("alphabet",
+                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
     ab.to_state_partition(AddVotes(), LetterStateBuilder(), "letter state",
                           LetterPartitionFunction(), letter_partitions)
-    ab.to_sink(Encoder(),
-               wallaroo.TCPSinkConfig(out_host, out_port))
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
     return ab.build()
 ```
 
