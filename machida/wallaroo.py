@@ -106,16 +106,6 @@ class ApplicationBuilder(object):
 
 
 class TCPSourceConfig(object):
-    def __init__(self, host, port, encoder):
-        self._host = host
-        self._port = port
-        self._encoder = encoder
-
-    def to_tuple(self):
-        return ("tcp", self._host, self._port, self._encoder)
-
-
-class TCPSinkConfig(object):
     def __init__(self, host, port, decoder):
         self._host = host
         self._port = port
@@ -123,6 +113,16 @@ class TCPSinkConfig(object):
 
     def to_tuple(self):
         return ("tcp", self._host, self._port, self._decoder)
+
+
+class TCPSinkConfig(object):
+    def __init__(self, host, port, encoder):
+        self._host = host
+        self._port = port
+        self._encoder = encoder
+
+    def to_tuple(self):
+        return ("tcp", self._host, self._port, self._encoder)
 
 
 class KafkaSourceConfig(object):
