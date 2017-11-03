@@ -92,7 +92,7 @@ cloned the Wallaroo repo, do so now:
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.2.0
+git checkout 0.2.1
 ```
 
 This will create a subdirectory called `wallaroo`.
