@@ -42,7 +42,7 @@ docker start mui
 1. Start a listener
 
 ```bash
-../../../../giles/receiver/receiver --listen 127.0.0.1:7002 --no-write \
+../../../giles/receiver/receiver --listen 127.0.0.1:7002 --no-write \
   --ponynoblock --ponythreads=1
 ```
 
@@ -57,7 +57,7 @@ docker start mui
 3. Start a sender
 
 ```bash
-../../../../giles/sender/sender --host 127.0.0.1:7010 \
+../../../giles/sender/sender --host 127.0.0.1:7010 \
   --file data_gen/celsius.msg \
   --batch-size 5 --interval 100_000_000 --messages 150 --binary \
   --variable-size --repeat --ponythreads=1 --ponynoblock --no-write
