@@ -35,9 +35,24 @@ actor RouterRegistry
   var _pre_state_data: (Array[PreStateData] val | None) = None
   let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()
+  let _stateless_partition_routers: Map[U128, StatelessPartitionRouter] =
+    _stateless_partition_routers.create()
+
   var _omni_router: (OmniRouter | None) = None
 
   var _application_ready_to_work: Bool = false
+
+  ////////////////
+  // Subscribers
+  // All steps that have a PartitionRouter
+  let _partition_router_steps: SetIs[Step] = _partition_router_steps.create()
+  // All steps that have a StatelessPartitionRouter
+  let _stateless_partition_router_steps: SetIs[Step] =
+    _stateless_partition_router_steps.create()
+  // All steps that have an OmniRouter
+  let _omni_router_steps: SetIs[Step] = _omni_router_steps.create()
+  //
+  ////////////////
 
   let _sources: SetIs[Source] = _sources.create()
   let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
@@ -46,10 +61,6 @@ actor RouterRegistry
   let _control_channel_listeners: SetIs[TCPListener] =
     _control_channel_listeners.create()
   let _data_channels: SetIs[DataChannel] = _data_channels.create()
-  // All steps that have a PartitionRouter
-  let _partition_router_steps: SetIs[Step] = _partition_router_steps.create()
-  // All steps that have an OmniRouter
-  let _omni_router_steps: SetIs[Step] = _omni_router_steps.create()
   // Boundary builders are used by new TCPSources to create their own
   // individual boundaries to other workers (to allow for increased
   // throughput).
@@ -109,6 +120,11 @@ actor RouterRegistry
   be set_partition_router(state_name: String, pr: PartitionRouter) =>
     _partition_routers(state_name) = pr
 
+  be set_stateless_partition_router(partition_id: U128,
+    pr: StatelessPartitionRouter)
+  =>
+    _stateless_partition_routers(partition_id) = pr
+
   be set_omni_router(o: OmniRouter) =>
     _omni_router = o
 
@@ -156,6 +172,12 @@ actor RouterRegistry
 
   be register_partition_router_step(s: Step) =>
     _partition_router_steps.set(s)
+
+    //!!
+    //TODO: Determine in local_topology which steps use these routers
+    // Collect by partition id probably
+  be register_stateless_partition_router_step(s: Step) =>
+    _stateless_partition_router_steps.set(s)
 
   be register_omni_router_step(s: Step) =>
     _omni_router_steps.set(s)
@@ -228,6 +250,25 @@ actor RouterRegistry
         source_listener.update_router(partition_router)
       end
 
+
+  fun _distribute_stateless_partition_router(
+    partition_router: StatelessPartitionRouter)
+  =>
+    None
+    //!!
+    //TODO: where should these be distributed?
+    // OmniRouters and any step that uses a stateless partition router
+
+      // for step in _partition_router_steps.values() do
+      //   step.update_router(partition_router)
+      // end
+      // for source in _sources.values() do
+      //   source.update_router(partition_router)
+      // end
+      // for source_listener in _source_listeners.values() do
+      //   source_listener.update_router(partition_router)
+      // end
+
   be create_partition_routers_from_blueprints(
     partition_blueprints: Map[String, PartitionRouterBlueprint] val)
   =>
@@ -236,21 +277,44 @@ actor RouterRegistry
       obs_trn(w) = ob
     end
     let obs = consume val obs_trn
-    for (w, b) in partition_blueprints.pairs() do
+    for (s, b) in partition_blueprints.pairs() do
       let next_router = b.build_router(_worker_name, obs, _auth)
       _distribute_partition_router(next_router)
-      _partition_routers(w) = next_router
+      _partition_routers(s) = next_router
     end
+
+  be create_stateless_partition_routers_from_blueprints(
+    partition_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
+  =>
+    let obs_trn = recover trn Map[String, OutgoingBoundary] end
+    for (w, ob) in _outgoing_boundaries.pairs() do
+      obs_trn(w) = ob
+    end
+    let obs = consume val obs_trn
+    for (id, b) in partition_blueprints.pairs() do
+      let next_router = b.build_router(_worker_name, obs, _auth)
+      _distribute_stateless_partition_router(next_router)
+      _stateless_partition_routers(id) = next_router
+    end
+
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
     local_topology: LocalTopology)
   =>
-    let blueprints = recover trn Map[String, PartitionRouterBlueprint] end
+    let state_blueprints =
+      recover trn Map[String, PartitionRouterBlueprint] end
     for (w, r) in _partition_routers.pairs() do
-      blueprints(w) = r.blueprint()
+      state_blueprints(w) = r.blueprint()
     end
+
+    let stateless_blueprints =
+      recover trn Map[U128, StatelessPartitionRouterBlueprint] end
+    for (id, r) in _stateless_partition_routers.pairs() do
+      stateless_blueprints(id) = r.blueprint()
+    end
+
     _connections.inform_joining_worker(conn, worker, local_topology,
-      consume blueprints)
+      consume state_blueprints, consume stateless_blueprints)
 
   be inform_cluster_of_join() =>
     _inform_cluster_of_join()

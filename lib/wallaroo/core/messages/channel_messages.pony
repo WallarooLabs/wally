@@ -186,6 +186,8 @@ primitive ChannelMsgEncoder
     data_addrs: Map[String, (String, String)] val,
     worker_names: Array[String] val,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
+    stateless_partition_blueprints:
+      Map[U128, StatelessPartitionRouterBlueprint] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -194,7 +196,7 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
       metric_host, metric_service, control_addrs, data_addrs, worker_names,
-      partition_blueprints),
+      partition_blueprints, stateless_partition_blueprints),
       auth)?
 
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
@@ -563,13 +565,16 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let data_addrs: Map[String, (String, String)] val
   let worker_names: Array[String] val
   let partition_router_blueprints: Map[String, PartitionRouterBlueprint] val
+  let stateless_partition_router_blueprints:
+    Map[U128, StatelessPartitionRouterBlueprint] val
 
   new val create(sender: String, app: String, l_topology: LocalTopology,
     m_host: String, m_service: String,
     c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
     w_names: Array[String] val,
-    p_blueprints: Map[String, PartitionRouterBlueprint] val)
+    p_blueprints: Map[String, PartitionRouterBlueprint] val,
+    stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
   =>
     sender_name = sender
     local_topology = l_topology
@@ -580,6 +585,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
     data_addrs = d_addrs
     worker_names = w_names
     partition_router_blueprints = p_blueprints
+    stateless_partition_router_blueprints = stateless_p_blueprints
 
 // TODO: Don't send host over since we need to determine that on receipt
 class val JoiningWorkerInitializedMsg is ChannelMsg

@@ -533,6 +533,9 @@ actor Startup
       router_registry.create_partition_routers_from_blueprints(
         m.partition_router_blueprints)
 
+      router_registry.create_stateless_partition_routers_from_blueprints(
+        m.stateless_partition_router_blueprints)
+
       // Dispose of temporary listener
       match _joining_listener
       | let tcp_l: TCPListener =>

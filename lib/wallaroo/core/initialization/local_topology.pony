@@ -854,7 +854,13 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // Check if this is a default target.  If so, route it
                 // to the appropriate default state step.
                 let next_step = builder(out_router, _metrics_conn, _event_log,
-                _recovery_replayer, _auth, _outgoing_boundaries)
+                  _recovery_replayer, _auth, _outgoing_boundaries)
+
+                match out_router
+                | let pr: StatelessPartitionRouter =>
+                  _router_registry.register_stateless_partition_router_step(
+                    next_step)
+                end
 
                 data_routes(next_id) = next_step
                 _initializables.set(next_step)
@@ -1061,7 +1067,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   end
 
                   let stateless_partition_router =
-                    LocalStatelessPartitionRouter(
+                    LocalStatelessPartitionRouter(next_node.id, _worker_name,
                       pre_stateless_data.partition_id_to_step_id,
                       consume partition_routes)
 
@@ -1355,6 +1361,10 @@ actor LocalTopologyInitializer is LayoutInitializer
           stateless_partition_routers_trn(id) = router
         end
 
+        for (id, pr) in stateless_partition_routers_trn.pairs() do
+          _router_registry.set_stateless_partition_router(id, pr)
+        end
+
         let omni_router = StepIdRouter(_worker_name,
           consume built_stateless_steps, t.step_map(), _outgoing_boundaries,
           consume stateless_partition_routers_trn)
@@ -1458,8 +1468,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.register_boundaries(_outgoing_boundaries,
           _outgoing_boundary_builders)
 
-        // TODO: We need to inform the joining worker of its stateless
-        // partition routers
         let omni_router = StepIdRouter(_worker_name,
           consume built_stateless_steps, t.step_map(), _outgoing_boundaries,
           recover Map[U128, StatelessPartitionRouter] end)
