@@ -1,7 +1,8 @@
 {
     "plugins": [
         "highlight",
-        "footnote-string-to-number"
+        "footnote-string-to-number",
+        "ga"
     ],
 
     "structure": {
@@ -14,5 +15,11 @@
 
     "variables": {
         "wallaroo_version": "0.2.1"
-  }
+    },
+
+    "pluginsConfig": {
+        "ga": {
+            "token": "UA-59652249-3"
+        }
+    }
 }
