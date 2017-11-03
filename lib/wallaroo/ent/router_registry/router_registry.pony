@@ -16,6 +16,7 @@ use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
+use "wallaroo/core/initialization"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -226,6 +227,30 @@ actor RouterRegistry
       for source_listener in _source_listeners.values() do
         source_listener.update_router(partition_router)
       end
+
+  be create_partition_routers_from_blueprints(
+    partition_blueprints: Map[String, PartitionRouterBlueprint] val)
+  =>
+    let obs_trn = recover trn Map[String, OutgoingBoundary] end
+    for (w, ob) in _outgoing_boundaries.pairs() do
+      obs_trn(w) = ob
+    end
+    let obs = consume val obs_trn
+    for (w, b) in partition_blueprints.pairs() do
+      let next_router = b.build_router(_worker_name, obs, _auth)
+      _distribute_partition_router(next_router)
+      _partition_routers(w) = next_router
+    end
+
+  be inform_joining_worker(conn: TCPConnection, worker: String,
+    local_topology: LocalTopology)
+  =>
+    let blueprints = recover trn Map[String, PartitionRouterBlueprint] end
+    for (w, r) in _partition_routers.pairs() do
+      blueprints(w) = r.blueprint()
+    end
+    _connections.inform_joining_worker(conn, worker, local_topology,
+      consume blueprints)
 
   be inform_cluster_of_join() =>
     _inform_cluster_of_join()

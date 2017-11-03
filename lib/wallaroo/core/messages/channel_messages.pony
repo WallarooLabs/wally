@@ -184,14 +184,17 @@ primitive ChannelMsgEncoder
     l_topology: LocalTopology, metric_host: String,
     metric_service: String, control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
-    worker_names: Array[String] val, auth: AmbientAuth): Array[ByteSeq] val ?
+    worker_names: Array[String] val,
+    partition_blueprints: Map[String, PartitionRouterBlueprint] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     This message is sent as a response to a JoinCluster message. Currently it
     only informs the new worker of metrics-related info
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
-      metric_host, metric_service, control_addrs, data_addrs, worker_names),
+      metric_host, metric_service, control_addrs, data_addrs, worker_names,
+      partition_blueprints),
       auth)?
 
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
@@ -559,12 +562,14 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
   let worker_names: Array[String] val
+  let partition_router_blueprints: Map[String, PartitionRouterBlueprint] val
 
   new val create(sender: String, app: String, l_topology: LocalTopology,
     m_host: String, m_service: String,
     c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
-    w_names: Array[String] val)
+    w_names: Array[String] val,
+    p_blueprints: Map[String, PartitionRouterBlueprint] val)
   =>
     sender_name = sender
     local_topology = l_topology
@@ -574,6 +579,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
     control_addrs = c_addrs
     data_addrs = d_addrs
     worker_names = w_names
+    partition_router_blueprints = p_blueprints
 
 // TODO: Don't send host over since we need to determine that on receipt
 class val JoiningWorkerInitializedMsg is ChannelMsg

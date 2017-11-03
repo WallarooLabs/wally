@@ -545,6 +545,9 @@ actor Startup
         consume data_addrs)
       local_topology_initializer.quick_initialize_data_connections()
 
+      router_registry.create_partition_routers_from_blueprints(
+        m.partition_router_blueprints)
+
       // Dispose of temporary listener
       match _joining_listener
       | let tcp_l: TCPListener =>

@@ -1638,7 +1638,9 @@ actor LocalTopologyInitializer is LayoutInitializer
   be inform_joining_worker(conn: TCPConnection, worker_name: String) =>
     match _topology
     | let t: LocalTopology =>
-      _connections.inform_joining_worker(conn, worker_name, t)
+      _router_registry.inform_joining_worker(conn, worker_name, t)
+      //!!
+      // _connections.inform_joining_worker(conn, worker_name, t)
     else
       Fail()
     end

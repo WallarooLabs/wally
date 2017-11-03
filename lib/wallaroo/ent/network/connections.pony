@@ -584,7 +584,8 @@ actor Connections is Cluster
     end
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
-    local_topology: LocalTopology)
+    local_topology: LocalTopology,
+    partition_blueprints: Map[String, PartitionRouterBlueprint] val)
   =>
     if not _control_addrs.contains(worker) then
       let c_addrs = recover trn Map[String, (String, String)] end
@@ -603,7 +604,7 @@ actor Connections is Cluster
         let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
           _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
           _metrics_service, consume c_addrs, consume d_addrs,
-          local_topology.worker_names, _auth)?
+          local_topology.worker_names, partition_blueprints, _auth)?
         conn.writev(inform_msg)
         @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
           "necessary information.***\n").cstring(), worker.cstring())
