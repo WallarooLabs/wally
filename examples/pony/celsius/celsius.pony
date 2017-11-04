@@ -39,7 +39,7 @@ actor Main
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
             .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))?
+              TCPSinkConfigCLIParser(env.args)?(0)?))
       end
       Startup(env, application, "celsius-conversion")
     else

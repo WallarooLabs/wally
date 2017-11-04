@@ -671,12 +671,12 @@ primitive Machida
       | "to_sink" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_sink(
-          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env)?)?
+          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env)?)
         sink_idx = sink_idx + 1
         latest
       | "done" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.done()?
+        latest = pb.done()
         latest
       end
     end

@@ -100,8 +100,6 @@ primitive OrEq2[A: Equatable[A] #read, B: Equatable[B] #read]
       else
         false
       end
-    else
-      false
     end
 
 primitive OrEq3[A: Equatable[A] #read, B: Equatable[B] #read,
@@ -131,6 +129,4 @@ primitive OrEq3[A: Equatable[A] #read, B: Equatable[B] #read,
       else
         false
       end
-    else
-      false
     end

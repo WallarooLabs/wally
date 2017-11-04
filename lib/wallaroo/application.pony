@@ -286,14 +286,14 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     PipelineBuilder[In, Out, Next](_a, _p)
 
-  fun ref done(): Application ? =>
-    _a.add_pipeline(_p as BasicPipeline)
+  fun ref done(): Application =>
+    _a.add_pipeline(_p)
     _a
 
-  fun ref to_sink(sink_information: SinkConfig[Out]): Application ? =>
+  fun ref to_sink(sink_information: SinkConfig[Out]): Application =>
     let sink_builder = sink_information()
     _a.increment_sink_count()
     _p.update_sink(sink_builder)
     _p.update_sink_id()
-    _a.add_pipeline(_p as BasicPipeline)
+    _a.add_pipeline(_p)
     _a

@@ -120,11 +120,6 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
                 z.push(frac_id.u32())
                 z
               end
-            else
-              // TODO: this can go away when we upgrade to
-              // exhaustive match pony
-              Fail()
-              None
             end
 
             (let f, let s, let ts) =

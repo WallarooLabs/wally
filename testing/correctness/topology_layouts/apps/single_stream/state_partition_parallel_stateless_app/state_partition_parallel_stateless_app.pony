@@ -55,7 +55,7 @@ actor Main
             .to_parallel[CountMax]({(): DoubleCountMax => DoubleCountMax})
             .to_sink(TCPSinkConfig[CountMax].from_options(
               FramedCountMaxEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))?
+              TCPSinkConfigCLIParser(env.args)?(0)?))
       end
       Startup(env, application,
         "single_stream-state_partition_parallel_stateless_app")

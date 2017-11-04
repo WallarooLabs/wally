@@ -129,8 +129,6 @@ actor Connections is Cluster
       _listeners.push(tcp)
     | let dc: DataChannelListener =>
       _data_channel_listeners.push(dc)
-    else
-      Fail()
     end
 
   be register_disposable(d: DisposableActor) =>

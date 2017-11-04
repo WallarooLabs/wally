@@ -47,7 +47,7 @@ actor Main
             .to[F32]({(): Add => Add})
             .to_sink(KafkaSinkConfig[F32](FahrenheitEncoder,
               KafkaSinkConfigCLIParser(env.args, env.out)?,
-              env.root as AmbientAuth))?
+              env.root as AmbientAuth))
       end
       Startup(env, application, "celsius-conversion")
     else

@@ -527,11 +527,6 @@ class ComputationRunner[In: Any val, Out: Any val]
                 z.push(frac_id.u32())
                 z
               end
-            else
-              // TODO: this can go away when we upgrade to
-              // exhaustive match pony
-              Fail()
-              None
             end
 
             (let f, let s, let ts) = _next.run[Out](metric_name,
@@ -550,8 +545,6 @@ class ComputationRunner[In: Any val, Out: Any val]
             this_last_ts = ts
           end
           (this_is_finished, this_keep_sending, this_last_ts)
-        else
-          (true, true, computation_end)
         end
       else
         (true, true, latest_ts)
@@ -626,8 +619,6 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
             StateComputationWrapper[In, Out, S]](
             metric_name, pipeline_time_spent, processor, producer,
             i_msg_uid, frac_ids, latest_ts, metrics_id + 1, worker_ingress_ts)
-        else
-          (true, true, latest_ts)
         end
       else
         @printf[I32]("StateRunner: Input was not a StateProcessor!\n"
@@ -811,8 +802,6 @@ class iso RouterRunner
     | let r: Router =>
       r.route[Out](metric_name, pipeline_time_spent, output, producer,
         i_msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
-    else
-      (true, true, latest_ts)
     end
 
   fun name(): String => "Router runner"

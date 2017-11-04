@@ -46,7 +46,7 @@ actor Main
               U64CounterBuilder, "u64-counter-builder")
           .to_sink(TCPSinkConfig[U64].from_options(
               FramedU64Encoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))?
+              TCPSinkConfigCLIParser(env.args)?(0)?))
       end
       Startup(env, application, "single-stream-stateless")
     else

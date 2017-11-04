@@ -73,7 +73,7 @@ actor Main
                   TCPSourceConfigCLIParser(env.args)?(0)?))
                 .to[U8]({(): Pingify => Pingify})
                 .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
-                  TCPSinkConfigCLIParser(env.args)?(0)?))?
+                  TCPSinkConfigCLIParser(env.args)?(0)?))
           | Pong =>
             Application("Pong App")
               .new_pipeline[U8, U8]("Pong",
@@ -81,7 +81,7 @@ actor Main
                   TCPSourceConfigCLIParser(env.args)?(0)?))
                 .to[U8]({(): Pongify => Pongify})
                 .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
-                  TCPSinkConfigCLIParser(env.args)?(0)?))?
+                  TCPSinkConfigCLIParser(env.args)?(0)?))
           else
             @printf[I32]("Use --ping or --pong to start app.\n".cstring())
             error
