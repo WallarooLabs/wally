@@ -113,7 +113,7 @@ primitive _BaseStateSubpartitionGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
     StateSubpartition
   =>
-    KeyedStateSubpartition[String, String](
+    KeyedStateSubpartition[String, String]("s",
       _BaseKeyedPartitionAddressesGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 
@@ -121,7 +121,7 @@ primitive _TargetStateSubpartitionGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
     StateSubpartition
   =>
-    KeyedStateSubpartition[String, String](
+    KeyedStateSubpartition[String, String]("s",
       _TargetKeyedPartitionAddressesGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 

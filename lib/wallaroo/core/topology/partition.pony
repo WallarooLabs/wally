@@ -163,17 +163,20 @@ trait val StateSubpartition is Equatable[StateSubpartition]
 
 class val KeyedStateSubpartition[PIn: Any val,
   Key: (Hashable val & Equatable[Key] val)] is StateSubpartition
+  let _state_name: String
   let _partition_addresses: KeyedPartitionAddresses[Key] val
   let _id_map: Map[Key, U128] val
   let _partition_function: PartitionFunction[PIn, Key] val
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
 
-  new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
+  new val create(state_name': String,
+    partition_addresses': KeyedPartitionAddresses[Key] val,
     id_map': Map[Key, U128] val, runner_builder': RunnerBuilder,
     partition_function': PartitionFunction[PIn, Key] val,
     pipeline_name': String)
   =>
+    _state_name = state_name'
     _partition_addresses = partition_addresses'
     _id_map = id_map'
     _partition_function = partition_function'
@@ -233,8 +236,8 @@ class val KeyedStateSubpartition[PIn: Any val,
     @printf[I32](("Spinning up " + partition_count.string() +
       " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
-    LocalPartitionRouter[PIn, Key](worker_name, consume m, _id_map,
-      consume routes, _partition_function, default_router)
+    LocalPartitionRouter[PIn, Key](_state_name, worker_name, consume m,
+      _id_map, consume routes, _partition_function, default_router)
 
   fun update_key[K: (Hashable val & Equatable[K] val)](k: K,
     pa: ProxyAddress): StateSubpartition ?
@@ -243,8 +246,8 @@ class val KeyedStateSubpartition[PIn: Any val,
     | let key: Key =>
       match _partition_addresses.update_key[Key](key, pa)?
       | let kpa: KeyedPartitionAddresses[Key] val =>
-        KeyedStateSubpartition[PIn, Key](kpa, _id_map, _runner_builder,
-          _partition_function, _pipeline_name)
+        KeyedStateSubpartition[PIn, Key](_state_name, kpa, _id_map,
+          _runner_builder, _partition_function, _pipeline_name)
       else
         error
       end

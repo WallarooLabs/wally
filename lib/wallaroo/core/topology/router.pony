@@ -625,12 +625,13 @@ class val DataRouter is Equatable[DataRouter]
     end
 
 trait val PartitionRouter is (Router & Equatable[PartitionRouter])
+  fun state_name(): String
   fun local_map(): Map[StepId, Step] val
   fun register_routes(router: Router, route_builder: RouteBuilder)
   fun update_route[K: (Hashable val & Equatable[K] val)](
     raw_k: K, target: (Step | ProxyRouter)): PartitionRouter ?
   fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
-    worker_count: USize, state_name: String, router_registry: RouterRegistry)
+    worker_count: USize, router_registry: RouterRegistry)
   fun size(): USize
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     PartitionRouter
@@ -644,6 +645,7 @@ trait val AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)]
 
 class val LocalPartitionRouter[In: Any val,
   Key: (Hashable val & Equatable[Key] val)] is AugmentablePartitionRouter[Key]
+  let _state_name: String
   let _worker_name: String
   let _local_map: Map[StepId, Step] val
   let _step_ids: Map[Key, StepId] val
@@ -651,13 +653,14 @@ class val LocalPartitionRouter[In: Any val,
   let _partition_function: PartitionFunction[In, Key] val
   let _default_router: (Router | None)
 
-  new val create(worker_name: String,
+  new val create(state_name': String, worker_name: String,
     local_map': Map[StepId, Step] val,
     s_ids: Map[Key, StepId] val,
     partition_routes: Map[Key, (Step | ProxyRouter)] val,
     partition_function: PartitionFunction[In, Key] val,
     default_router: (Router | None) = None)
   =>
+    _state_name = state_name'
     _worker_name = worker_name
     _local_map = local_map'
     _step_ids = s_ids
@@ -668,23 +671,26 @@ class val LocalPartitionRouter[In: Any val,
   fun size(): USize =>
     _partition_routes.size()
 
-  fun migrate_step[K: (Hashable val & Equatable[K] val)](
-    boundary: OutgoingBoundary, state_name: String,  k: K)
-  =>
-    match k
-    | let key: Key =>
-      try
-        match _partition_routes(key)?
-        | let s: Step => s.send_state[Key](boundary, state_name, key)
-        else
-          Fail()
-        end
-      else
-        Fail()
-      end
-    else
-      Fail()
-    end
+  fun state_name(): String =>
+    _state_name
+
+  // fun migrate_step[K: (Hashable val & Equatable[K] val)](
+  //   boundary: OutgoingBoundary, k: K)
+  // =>
+  //   match k
+  //   | let key: Key =>
+  //     try
+  //       match _partition_routes(key)?
+  //       | let s: Step => s.send_state[Key](boundary, _state_name, key)
+  //       else
+  //         Fail()
+  //       end
+  //     else
+  //       Fail()
+  //     end
+  //   else
+  //     Fail()
+  //   end
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
@@ -767,11 +773,11 @@ class val LocalPartitionRouter[In: Any val,
   =>
     match new_d_router
     | let dr: Router =>
-      LocalPartitionRouter[NewIn, Key](_worker_name, _local_map, _step_ids,
-        _partition_routes, new_p_function, dr)
+      LocalPartitionRouter[NewIn, Key](_state_name, _worker_name, _local_map,
+        _step_ids, _partition_routes, new_p_function, dr)
     else
-      LocalPartitionRouter[NewIn, Key](_worker_name, _local_map, _step_ids,
-        _partition_routes, new_p_function, _default_router)
+      LocalPartitionRouter[NewIn, Key](_state_name, _worker_name, _local_map,
+        _step_ids, _partition_routes, new_p_function, _default_router)
     end
 
   fun register_routes(router: Router, route_builder: RouteBuilder) =>
@@ -827,9 +833,9 @@ class val LocalPartitionRouter[In: Any val,
             new_partition_routes(k) = t
           end
         end
-        LocalPartitionRouter[In, Key](_worker_name, consume new_local_map,
-          _step_ids, consume new_partition_routes, _partition_function,
-          _default_router)
+        LocalPartitionRouter[In, Key](_state_name, _worker_name,
+          consume new_local_map, _step_ids, consume new_partition_routes,
+          _partition_function, _default_router)
       | let proxy_router: ProxyRouter =>
         for (id, s) in _local_map.pairs() do
           if id != target_id then new_local_map(id) = s end
@@ -841,9 +847,9 @@ class val LocalPartitionRouter[In: Any val,
             new_partition_routes(k) = t
           end
         end
-        LocalPartitionRouter[In, Key](_worker_name, consume new_local_map,
-          _step_ids, consume new_partition_routes, _partition_function,
-          _default_router)
+        LocalPartitionRouter[In, Key](_state_name, _worker_name,
+          consume new_local_map, _step_ids, consume new_partition_routes,
+          _partition_function, _default_router)
       else
         error
       end
@@ -863,11 +869,12 @@ class val LocalPartitionRouter[In: Any val,
         new_partition_routes(k) = target
       end
     end
-    LocalPartitionRouter[In, Key](_worker_name, _local_map, _step_ids,
-      consume new_partition_routes, _partition_function, _default_router)
+    LocalPartitionRouter[In, Key](_state_name, _worker_name, _local_map,
+      _step_ids, consume new_partition_routes, _partition_function,
+      _default_router)
 
   fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
-    worker_count: USize, state_name: String, router_registry: RouterRegistry)
+    worker_count: USize, router_registry: RouterRegistry)
   =>
     try
       var left_to_send = PartitionRebalancer.step_count_to_send(size(),
@@ -890,9 +897,9 @@ class val LocalPartitionRouter[In: Any val,
           router_registry.add_to_step_waiting_list(step_id)
         end
         for (key, step_id, step) in steps_to_migrate.values() do
-          step.send_state[Key](boundary, state_name, key)
+          step.send_state[Key](boundary, _state_name, key)
           router_registry.move_stateful_step_to_proxy[Key](step_id,
-            ProxyAddress(target_worker, step_id), key, state_name)
+            ProxyAddress(target_worker, step_id), key, _state_name)
         end
       else
         // There is nothing to send over. Can we immediately resume processing?
@@ -921,7 +928,7 @@ class val LocalPartitionRouter[In: Any val,
       Fail()
     end
 
-    LocalPartitionRouterBlueprint[In, Key](_step_ids,
+    LocalPartitionRouterBlueprint[In, Key](_state_name, _step_ids,
       consume partition_addresses, _partition_function)
 
   fun eq(that: box->PartitionRouter): Bool =>
@@ -970,14 +977,17 @@ trait val PartitionRouterBlueprint
 
 class val LocalPartitionRouterBlueprint[In: Any val,
   Key: (Hashable val & Equatable[Key] val)] is PartitionRouterBlueprint
+  let _state_name: String
   let _step_ids: Map[Key, StepId] val
   let _partition_addresses: Map[Key, ProxyAddress] val
   let _partition_function: PartitionFunction[In, Key] val
 
-  new val create(s_ids: Map[Key, StepId] val,
+  new val create(state_name: String,
+    s_ids: Map[Key, StepId] val,
     partition_addresses: Map[Key, ProxyAddress] val,
     partition_function: PartitionFunction[In, Key] val)
   =>
+    _state_name = state_name
     _step_ids = s_ids
     _partition_addresses = partition_addresses
     _partition_function = partition_function
@@ -998,7 +1008,7 @@ class val LocalPartitionRouterBlueprint[In: Any val,
     end
     // Since default routers are deprecated, this does not
     // support them (passing None in instead).
-    LocalPartitionRouter[In, Key](worker_name,
+    LocalPartitionRouter[In, Key](_state_name, worker_name,
       recover val Map[StepId, Step] end,
       _step_ids, consume partition_routes, _partition_function,
       None)
