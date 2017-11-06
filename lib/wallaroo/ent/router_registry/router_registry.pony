@@ -44,10 +44,12 @@ actor RouterRegistry
 
   ////////////////
   // Subscribers
-  // All steps that have a PartitionRouter
-  let _partition_router_steps: SetIs[Step] = _partition_router_steps.create()
-  // All steps that have a StatelessPartitionRouter
-  let _stateless_partition_router_steps: SetIs[Step] =
+  // All steps that have a PartitionRouter, registered by partition
+  // state name
+  let _partition_router_steps: Map[String, SetIs[Step]] = _partition_router_steps.create()
+  // All steps that have a StatelessPartitionRouter, registered by
+  // partition id
+  let _stateless_partition_router_steps: Map[U128, SetIs[Step]] =
     _stateless_partition_router_steps.create()
   // All steps that have an OmniRouter
   let _omni_router_steps: SetIs[Step] = _omni_router_steps.create()
@@ -170,14 +172,22 @@ actor RouterRegistry
     // TODO: These need to be unregistered if they close
     _data_channels.set(dc)
 
-  be register_partition_router_step(s: Step) =>
-    _partition_router_steps.set(s)
+  be register_partition_router_step(state_name: String, s: Step) =>
+    try
+      _partition_router_steps(state_name)?.set(s)
+    else
+      Fail()
+    end
 
     //!!
     //TODO: Determine in local_topology which steps use these routers
     // Collect by partition id probably
-  be register_stateless_partition_router_step(s: Step) =>
-    _stateless_partition_router_steps.set(s)
+  be register_stateless_partition_router_step(partition_id: U128, s: Step) =>
+    try
+      _stateless_partition_router_steps(partition_id)?.set(s)
+    else
+      Fail()
+    end
 
   be register_omni_router_step(s: Step) =>
     _omni_router_steps.set(s)
@@ -196,8 +206,10 @@ actor RouterRegistry
     let new_boundaries_sendable: Map[String, OutgoingBoundary] val =
       consume new_boundaries
 
-    for step in _partition_router_steps.values() do
-      step.add_boundaries(new_boundaries_sendable)
+    for steps in _partition_router_steps.values() do
+      for step in steps.values() do
+        step.add_boundaries(new_boundaries_sendable)
+      end
     end
     for step in _omni_router_steps.values() do
       step.add_boundaries(new_boundaries_sendable)
@@ -240,15 +252,21 @@ actor RouterRegistry
     _data_receivers.update_data_router(_data_router)
 
   fun _distribute_partition_router(partition_router: PartitionRouter) =>
-      for step in _partition_router_steps.values() do
+    let state_name = partition_router.state_name()
+
+    try
+      for step in _partition_router_steps(state_name)?.values() do
         step.update_router(partition_router)
       end
-      for source in _sources.values() do
-        source.update_router(partition_router)
-      end
-      for source_listener in _source_listeners.values() do
-        source_listener.update_router(partition_router)
-      end
+    else
+      Fail()
+    end
+    for source in _sources.values() do
+      source.update_router(partition_router)
+    end
+    for source_listener in _source_listeners.values() do
+      source_listener.update_router(partition_router)
+    end
 
 
   fun _distribute_stateless_partition_router(
@@ -558,7 +576,7 @@ actor RouterRegistry
       let boundary = _outgoing_boundaries(target_worker)?
       let partition_router = _partition_routers(state_name)?
       partition_router.rebalance_steps(boundary, target_worker,
-        _worker_count(), state_name, this)
+        _worker_count(), this)
     else
       Fail()
     end

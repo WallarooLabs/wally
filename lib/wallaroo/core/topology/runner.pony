@@ -404,7 +404,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
   fun state_subpartition(workers: (String | Array[String] val)):
     StateSubpartition
   =>
-    KeyedStateSubpartition[PIn, Key](partition_addresses(workers),
+    KeyedStateSubpartition[PIn, Key](_state_name, partition_addresses(workers),
       _step_id_map, _state_runner_builder, _partition.function(),
       _pipeline_name)
 

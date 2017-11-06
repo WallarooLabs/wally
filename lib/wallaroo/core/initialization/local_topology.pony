@@ -807,7 +807,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let next_step = builder(partition_router, _metrics_conn,
                   _event_log, _recovery_replayer, _auth, _outgoing_boundaries,
                   state_comp_target_router)
-                _router_registry.register_partition_router_step(next_step)
+                _router_registry.register_partition_router_step(
+                  builder.state_name(), next_step)
 
                 data_routes(next_id) = next_step
                 _initializables.set(next_step)
@@ -859,7 +860,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 match out_router
                 | let pr: StatelessPartitionRouter =>
                   _router_registry.register_stateless_partition_router_step(
-                    next_step)
+                    pr.partition_id(), next_step)
                 end
 
                 data_routes(next_id) = next_step
