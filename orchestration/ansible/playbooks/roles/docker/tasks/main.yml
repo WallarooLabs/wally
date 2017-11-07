@@ -1,7 +1,7 @@
 - set_fact: my_ip={{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['address'] }}
 
 - name: Install docker compose
-  get_url: 
+  get_url:
      url: https://github.com/docker/compose/releases/download/1.7.1/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}
      dest: /usr/local/bin/docker-compose
      mode: 0755
@@ -11,7 +11,7 @@
   replace:
     dest: /lib/systemd/system/docker.service
     regexp: ^ExecStart.*
-    replace: ExecStart=/usr/bin/dockerd --insecure-registry docker.sendence.com:5043 {{ '' if ((userland_proxy is defined) and (userland_proxy == true)) else '--userland-proxy=false' }} --storage-driver=overlay -D -H tcp://{{ my_ip }}:2375 -H fd:// {{ '-H tcp://' + ansible_hostname + ':2375' if ((use_hostname is defined) and (use_hostname == true)) else '' }} --cluster-advertise {{ my_ip }}:2375 --cluster-store consul://{{ my_ip }}:8500
+    replace: ExecStart=/usr/bin/dockerd --insecure-registry docker.sendence.com:5043 {{ '' if ((userland_proxy is defined) and (userland_proxy == true)) else '--userland-proxy=false' }} --storage-driver=overlay -D
 
 - name: Update docker startup dependency for network
   replace:
@@ -45,17 +45,6 @@
 - name: restart docker
   service: name=docker state=restarted
 
-- name: Create consul/swarm docker-compose config
-  template: src={{ 'consul_swarm_compose.yml.follower.j2' if leader_ip is defined else 'consul_swarm_compose.yml.leader.j2'  }} dest=/root/cluster.yml
-
-- name: Stop/kill consul/swarm
-  command: docker-compose -f /root/cluster.yml kill
-
-- name: Remove consul/swarm
-  command: docker-compose -f /root/cluster.yml rm -f
-
-- name: Start consul/swarm
-  command: docker-compose -f /root/cluster.yml up -d
 
 - name: login to private Docker remote registry and force reauthentification
   docker_login:
@@ -67,4 +56,3 @@
 - name: login to private Docker remote registry for user
   command: creates=/home/{{ item }}/.docker cp -rf /root/.docker /home/{{ item }}/
   with_items: '{{ docker_users or [] }}'
-
