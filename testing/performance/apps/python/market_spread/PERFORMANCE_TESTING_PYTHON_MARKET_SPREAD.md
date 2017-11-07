@@ -1,8 +1,8 @@
-# Performance Testing Pony Market Spread Guide
+# Performance Testing Python Market Spread Guide
 
-This is a guide for starting up an AWS cluster and running Wallaroo's Performance Testing using Pony Market Spread for both [single worker](#single-worker-pony-market-spread) and [two worker](#two-worker-pony-market-spread).
+This is a guide for starting up an AWS cluster and running Wallaroo's Performance Testing using Python Market Spread for both [single worker](#single-worker-pony-market-spread) and [two worker](#two-worker-pony-market-spread).
 
-If you have not read the [WALLAROO PERFORMANCE TESTING GUIDE](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md) it is recommended that you do so before continuing.
+If you have not read the [WALLAROO PERFORMANCE TESTING GUIDE](../../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md) it is recommended that you do so before continuing.
 
 ## Cluster Start
 
@@ -62,7 +62,7 @@ wallaroo-follower-1 ip-172-17-0-1.ec2.internal
 ==> Successfully ran ansible connectivity/authentication check for cluster 'perftest' in region 'us-east-1' at provider 'aws'...
 ```
 
-You can SSH into the AWS machines using th following command, where `<IP_ADDRESS>` is replaced by one of the IP addresses provided by the output of the command above.
+You can SSH into the AWS machines using the following command, where `<IP_ADDRESS>` is replaced by one of the IP addresses provided by the output of the command above.
 
 ```bash
 ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
@@ -73,7 +73,6 @@ So if we wanted to ssh into `wallaroo-leader-1`, we'd use the IP `54.172.117.178
 ```bash
 54.172.117.178 | SUCCESS | rc=0 >>
 wallaroo-leader-1 ip-172-17-0-1.ec2.internal
-
 ```
 
 Like so:
@@ -97,11 +96,11 @@ git clone https://github.com/WallarooLabs/wallaroo.git
 
 ssh into `wallaroo-leader-1`.
 
-Build the Market Spread application and Wallaroo tools:
+Build the required Wallaroo tools:
 
 ```bash
 cd ~/wallaroo
-make build-testing-performance-apps-market-spread
+make build-machida
 make build-giles-all
 make build-utils-cluster_shutdown
 ```
@@ -143,7 +142,6 @@ Start the Metrics UI:
 
 ```bash
 docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroolabs/wallaroo-metrics-ui:0.4.0
-
 ```
 
 You can verify the Metrics UI is up by visiting the IP address of `wallaroo-follower-2` with `:4000` appended. So if the IP was `54.172.117.178` you'd visit https://54.172.117.178:4000
@@ -156,7 +154,7 @@ If you need to restart the Metrics UI, run the following command on the machine 
 docker restart mui
 ```
 
-### Running Single Worker Market Spread
+### Running Single Worker Python Market Spread
 
 #### Start Giles Receiver
 
@@ -168,109 +166,61 @@ Start Giles Receiver with the following command:
 sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555
 ```
 
-#### Start the Market Spread Application
+### Start the Python Market Spread Application
 
 SSH into `wallaroo-leader-1`
 
-Start the Market Spread application with the following command:
+Start the Python Market Spread application with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponynoblock --ponythreads=16 --ponypinasio
+cd ~/wallaroo/testing/performance/apps/python/market_spread
 
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponythreads=1 --ponypinasio --ponynoblock
 ```
 
-#### Start Giles Senders
+### Start Giles Senders
 
-These senders send out roughly 1.5 million messages per second per stream, this is the current baseline for maximum performance of Pony Market Spread, depending what you are testing this may need to be adjusted. Please visit the "Wallaroo Data Senders Commands" section of the [WALLAROO PERFORMANCE TESTING GUIDE](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#wallaroo-data-senders-commands) for more information regarding adjusting these values.
+These senders send out roughly 45k messages per second per stream, this is the current baseline for maximum performance of Python Market Spread, depending what you are testing this may need to be adjusted. Please visit the "Wallaroo Data Senders Commands" section of the [WALLAROO PERFORMANCE TESTING GUIDE](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#wallaroo-data-senders-commands) for more information regarding adjusting these values.
 
-SSH into `wallaroo-follower-1`
+SSH into `wallaroo-leader-1`
 
 You can run the following commands individually or in a script, the only sender that must be run to completion before starting any of the others is the Initial NBBO Sender.
 
 ##### Initial NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 350 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 90 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
 ```
 
-##### NBBO Senders
+#### NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 90 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
 ```
+
+#### Orders Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 175 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
 ```
 
-```bash
-sudo cset proc -s user -e numactl -- -C 4,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 5,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 6,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 7,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 8,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
-```
-
-##### Orders Senders
-
-```bash
-sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 11,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 12,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 13,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
-```
-
-#### Market Spread Cluster Shutdown
+### Market Spread Cluster Shutdown
 
 When it's time to shutdown your Market Spread cluster, you'd want to do the following.
 
-SSH into `wallaroo-follower-2`
+SSH into `wallaroo-leader-1`
 
 Run the following command to shutdown the cluster:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio
 ```
-
 
 ## Record Information
 
-You should allow this test to run for roughly 1/2 an hour and record the required information. What should be recorded is documented in the Wallaroo Performance Testing Guide under the [Information to Record](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#information-to-record) section.
+You should allow this test to run for roughly 1/2 an hour and record the required information. What should be recorded is documented in the Wallaroo Performance Testing Guide under the [Information to Record](../../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#information-to-record) section.
 
-## Two Worker Pony Market Spread
+## Running Two Worker Python Market Spread
 
 ### Building Wallaroo and Tooling
 
@@ -280,11 +230,12 @@ ssh into `wallaroo-leader-1` and get a copy of the `wallaroo` repo:
 cd ~/
 git clone https://github.com/WallarooLabs/wallaroo.git
 ```
-Build the Market Spread application and Wallaroo tools:
+
+Build the required Wallaroo tools:
 
 ```bash
 cd ~/wallaroo
-make build-testing-performance-apps-market-spread
+make build-machida
 make build-giles-all
 make build-utils-cluster_shutdown
 ```
@@ -297,8 +248,6 @@ scp -r -o StrictHostKeyChecking=no ~/wallaroo/ ubuntu@wallaroo-follower-2:~/wall
 scp -r -o StrictHostKeyChecking=no ~/wallaroo/ ubuntu@wallaroo-follower-3:~/wallaroo
 ```
 
-If running more than 2 workers, scp the files onto the additional instances as well.
-
 ### Validate Testing Environment
 
 A script is provided to verify that the testing environment is in an optimal state for testing. To run this script, ssh into each instance and run the following:
@@ -329,7 +278,6 @@ Start the Metrics UI:
 
 ```bash
 docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroolabs/wallaroo-metrics-ui:0.4.0
-
 ```
 
 You can verify the Metrics UI is up by visiting the IP address of `wallaroo-follower-2` with `:4000` appended. So if the IP was `54.172.117.178` you'd visit https://54.172.117.178:4000
@@ -342,8 +290,6 @@ If you need to restart the Metrics UI, run the following command on the machine 
 docker restart mui
 ```
 
-### Running Two Worker Market Spread
-
 #### Start Giles Receiver
 
 SSH into `wallaroo-follower-2`
@@ -354,27 +300,31 @@ Start Giles Receiver with the following command:
 sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555
 ```
 
-#### Start the Market Spread Application
+#### Start the Python Market Spread Application
 
 SSH into `wallaroo-leader-1`
 
-Start the Market Spread application's Initializer with the following command:
+Start the Python Market Spread application Initializer with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050  -w 2 --ponynoblock --ponythreads=16 --ponypinasio
+cd ~/wallaroo/testing/performance/apps/python/market_spread
+
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 -w 2 --ponythreads=1 --ponypinasio --ponynoblock
 ```
+
+Start the Python Market Spread application Worker 2 with the following command:
 
 SSH into `wallaroo-follower-3`
 
-Start the Market Spread application's 2nd Worker with the following command:
-
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponythreads=8 --ponypinasio --ponynoblock
+cd ~/wallaroo/testing/performance/apps/python/market_spread
+
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponythreads=1 --ponypinasio --ponynoblock
 ```
 
 #### Start Giles Senders
 
-These senders send out roughly 430k messages per second per stream, this is the current baseline for maximum performance of two worker Pony Market Spread, depending what you are testing this may need to be adjusted. Please visit the "Wallaroo Data Senders Commands" section of the [WALLAROO PERFORMANCE TESTING GUIDE](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#wallaroo-data-senders-commands) for more information regarding adjusting these values.
+These senders send out roughly 22k messages per second per stream, this is the current baseline for maximum performance of Python Market Spread, depending what you are testing this may need to be adjusted. Please visit the "Wallaroo Data Senders Commands" section of the [WALLAROO PERFORMANCE TESTING GUIDE](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#wallaroo-data-senders-commands) for more information regarding adjusting these values.
 
 SSH into `wallaroo-follower-1`
 
@@ -383,31 +333,19 @@ You can run the following commands individually or in a script, the only sender 
 ##### Initial NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 350 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 350 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
 ```
 
-##### NBBO Senders
-
-These senders send out roughly 430k messages per second, adjust according to your needs.
+##### NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
 ```
 
-```bash
-sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 450 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
-```
-
-##### Orders Senders
-
-These senders send out roughly 430k messages per second, adjust according to your needs.
+##### Orders Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
-```
-
-```bash
-sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 100 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
 ```
 
 #### Market Spread Cluster Shutdown
@@ -424,7 +362,7 @@ sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/utils/cluster
 
 ## Record Information
 
-You should allow this test to run for roughly 1/2 an hour and record the required information. What should be recorded is documented in the Wallaroo Performance Testing Guide under the [Information to Record](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#information-to-record) section.
+You should allow this test to run for roughly 1/2 an hour and record the required information. What should be recorded is documented in the Wallaroo Performance Testing Guide under the [Information to Record](../../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#information-to-record) section.
 
 ### Deleting AWS Instances
 
