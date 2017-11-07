@@ -4,9 +4,8 @@
 
 Giles components act as external testers for Wallaroo. Giles Receiver is used to mimic the behavior of an external sink for outgoing data from Wallaroo. Giles Receiver has the option to run in one of two ways:
 
-- With no other commandline options given, it will write incoming binary data to file, preceded by a timestamp of when the message was received. For example, `./giles/receiver --listen 127.0.0.1:5555` will write any data received on port 5555.
-
-- With the `--no-write/-w` flag given as a commandline argument, it will drop all incoming binary data and not write to file. For example, `./giles/receiver --listen 127.0.0.1:5555 --no-write` will receive and drop any data received on port 5555.
+- With no other commandline options given beside the listen address, it will write incoming binary data to a file named `received.txt`, with each message preceded by a timestamp of when the message was received.
+- With the `--no-write/-w` flag given as a commandline argument, it will drop all incoming binary data and not write to file. This option is useful when benchmarking application speed, where the sink could potentially be a bottleneck.
 
 ### Building `giles/receiver`
 
@@ -29,8 +28,8 @@ make
 
 * `--listen/-l` address to listen on for incoming data from Wallaroo. Must be given in the `127.0.0.1:5555` format.
 * `--no-write/-w` flag to drop receive and drop incoming data.
-* `--phone-home/-p` Dagon address. Must be provided in the `127.0.0.1:8082` format. This is only used when `giles/receiver` is run by Dagon.
-* `--name/-n` Name to register itself with to Dagon. This is only used when `giles/receiver` is run by Dagon.
+* `--expect/-e` terminate the receiver after an expected number of messages is received.
+* `--metrics/-m` Compute throughput metrics at the end of a run (requires `--expect`).
 
 ## Examples
 

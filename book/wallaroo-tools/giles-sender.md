@@ -4,10 +4,10 @@
 
 Giles components act as external testers for Wallaroo. Giles Sender is used to mimic the behavior of an incoming data source. Giles Sender sends data to Wallaroo in one of four ways:
 
-- With no other commandline options given, it will send string representations of integers, starting with `1` and increasing by `1` with each new message. For example, `./giles/sender --host 127.0.0.1:8081 --messages 100` will send messages containing string representations of the numbers `1` through `100`.
-- With a file name given as the `--file/-f` argument it will send each line of the given file as a message. For example, `./giles/sender --host 127.0.0.1:8081 --messages 100 --file war-and-peace.txt` will send messages containing each of the first 100 lines of the file `war-and-peace.txt`.
-- With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and every message is 24 bytes, specified with `--msg-size/-g`, it will send every 24 bytes of the given file as a message. For example, `./giles/sender --host 127.0.0.1:8081 --messages 100 --file binary-data-file.txt --binary --msg-size 24` will send every 24 bytes until it has sent 100 messages
-- With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and variable message lengths specified with `--variable-size/-z`, it will read 4 bytes to get the message size, send that message and repeat. For example, `./giles/sender --host 127.0.0.1:8081 --messages 100 --file binary-data-file.txt --binary --variable-size` will initially read a 4 byte header, send that message and repeat until it has sent 100 messages.
+- With no other commandline options given, it will send string representations of integers, starting with `1` and increasing by `1` with each new message.
+- With a file name given as the `--file/-f` argument it will send each line of the given file as a message.
+- With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and a fixed message size, specified with `--msg-size/-g`, it will send every `SIZE` bytes of the given file as a message.
+- With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and variable message size specified with `--variable-size/-z`, it will read the first 4 bytes to get the message size, send that message and repeat the process.
 
 ### Building `giles/sender`
 
