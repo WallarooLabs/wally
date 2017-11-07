@@ -22,11 +22,13 @@ use "files"
 use "itertools"
 use "net"
 use "net/http"
+use "signals"
 use "time"
 use "wallaroo_labs/hub"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 use "wallaroo/core/boundary"
+use "wallaroo/core/common/"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/cluster_manager"
 use "wallaroo/ent/network"
@@ -319,6 +321,8 @@ actor Startup
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
 
+      _setup_shutdown_handler(connections, this, auth)
+
       let data_receivers = DataReceivers(auth, connections,
         _startup_options.worker_name, is_recovering)
 
@@ -467,6 +471,8 @@ actor Startup
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
+
+      _setup_shutdown_handler(connections, this, auth)
 
       let data_receivers = DataReceivers(auth, connections,
         _startup_options.worker_name)
@@ -634,3 +640,30 @@ actor Startup
       "the Wallaroo Community License at https://github.com/WallarooLabs/" +
       "wallaroo/blob/master/LICENSE.md for details, and also please visit " +
       "the page at http://www.wallaroolabs.com/pricing****\n").cstring())
+
+  fun ref _setup_shutdown_handler(c: Connections, r: RecoveryFileCleaner,
+    a: AmbientAuth)
+  =>
+    SignalHandler(WallarooShutdownHandler(c, r, a), Sig.int())
+    SignalHandler(WallarooShutdownHandler(c, r, a), Sig.term())
+
+class WallarooShutdownHandler is SignalNotify
+  """
+  Shutdown gracefully on SIGTERM and SIGINT
+  """
+  let _connections: Connections
+  let _recovery_file_cleaner: RecoveryFileCleaner
+  let _auth: AmbientAuth
+
+  new iso create(c: Connections, r: RecoveryFileCleaner, a: AmbientAuth) =>
+    _connections = c
+    _recovery_file_cleaner = r
+    _auth = a
+
+  fun ref apply(count: U32): Bool =>
+    try
+      let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)?
+      _connections.send_control_to_cluster(clean_shutdown_msg)
+      _recovery_file_cleaner.clean_recovery_files()
+    end
+    false

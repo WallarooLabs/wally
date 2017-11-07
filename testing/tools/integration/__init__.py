@@ -64,8 +64,7 @@ Alternatively, for a CLI style integration tester, you may use the
 """
 
 
-from integration import (clean_up_resilience_path,
-                         ex_validate,
+from integration import (ex_validate,
                          files_generator,
                          get_port_values,
                          is_address_available,
