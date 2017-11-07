@@ -12,6 +12,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Added
 
+- Shutdown cluster cleanly when SIGTERM or SIGINT is received ([PR #1705](https://github.com/wallaroolabs/wallaroo/pull/1705))
 ### Changed
 
 - Changelog Hook Test 2 ([PR #1669](https://github.com/wallaroolabs/wallaroo/pull/1669))
