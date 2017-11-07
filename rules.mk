@@ -116,6 +116,7 @@ DEBUG_SHELL ?= ## Debug shell commands?
 VERBOSE ?= ## Print commands as they're executed?
 docker_image_version ?= $(strip $(docker_image_version_val))## Docker Image Tag to use
 docker_image_repo_host ?= docker.sendence.com:5043## Docker Repository to use
+wallaroo_docker_image_repo ?= wallaroolabs## WallarooLabs Docker Repository
 docker_image_repo ?= $(docker_image_repo_host)/sendence## Docker Repository to use
 arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
@@ -253,7 +254,7 @@ ifneq ($(arch),native)
         -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
         -v $(HOME)/.git-credential-cache:/.git-credential-cache \
         -w $(1) --entrypoint bash \
-        $(docker_image_repo_host)/$(monhub_builder):$(monhub_builder_tag) -c $(quote)
+        $(wallaroo_docker_image_repo)/$(monhub_builder):$(monhub_builder_tag) -c $(quote)
   endif
 endif
 
@@ -289,6 +290,10 @@ define MONHUBR
   $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.get --only prod \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix compile \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) npm uninstall \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) npm install node-sass babelify browserify \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) npm install \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
