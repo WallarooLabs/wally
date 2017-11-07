@@ -632,6 +632,12 @@ class Runner(threading.Thread):
         except:
             pass
 
+    def kill(self):
+        try:
+            self.p.kill()
+        except:
+            pass
+
     def get_output(self):
         self.stdout_file.seek(0)
         self.stderr_file.seek(0)
@@ -744,12 +750,6 @@ def setup_resilience_path(res_dir):
     # if any files are in this directory, remove them
     for f in os.listdir(res_dir):
         os.remove(os.path.join(res_dir, f))
-
-
-def clean_up_resilience_path(res_dir):
-    for f in os.listdir(res_dir):
-        os.remove(os.path.join(res_dir, f))
-    os.rmdir(res_dir)
 
 
 def is_address_available(host, port):
@@ -1143,5 +1143,4 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         # clean up any remaining runner processes
         for r in runners:
             r.stop()
-        clean_up_resilience_path(resilience_dir)
     return [(r.name, r.get_output()) for r in runners]

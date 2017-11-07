@@ -20,7 +20,7 @@ use "signals"
 
 use @Py_Exit[None]()
 
-class iso ShutdownHandler is SignalNotify
+class iso MachidaShutdownHandler is SignalNotify
   fun ref apply(count: U32): Bool =>
     @Py_Exit()
     false

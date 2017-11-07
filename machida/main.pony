@@ -33,7 +33,7 @@ actor Main
     Machida.start_python()
 
     try
-      SignalHandler(ShutdownHandler, Sig.int())
+      SignalHandler(MachidaShutdownHandler, Sig.int())
 
       var module_name: String = ""
 

@@ -14,8 +14,7 @@
 
 
 # import requisite components for integration test
-from integration import (clean_up_resilience_path,
-                         ex_validate,
+from integration import (ex_validate,
                          get_port_values,
                          Metrics,
                          Reader,
@@ -97,8 +96,8 @@ def _test_recovery(command):
         sender.start()
         time.sleep(0.2)
 
-        # stop worker
-        runners[-1].stop()
+        # simulate worker crash by doing a non-graceful shutdown
+        runners[-1].kill()
 
         ## restart worker
         runners.append(runners[-1].respawn())
@@ -164,4 +163,3 @@ def _test_recovery(command):
     finally:
         for r in runners:
             r.stop()
-        clean_up_resilience_path(res_dir)

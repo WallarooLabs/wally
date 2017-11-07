@@ -14,8 +14,7 @@
 
 
 # import requisite components for integration test
-from integration import (clean_up_resilience_path,
-                         ex_validate,
+from integration import (ex_validate,
                          get_port_values,
                          Metrics,
                          Reader,
@@ -195,7 +194,6 @@ def _test_log_rotation_external_trigger_no_recovery(command):
     finally:
         for r in runners:
             r.stop()
-        clean_up_resilience_path(res_dir)
 
 
 def test_log_rotation_external_trigger_recovery_pony():
@@ -286,8 +284,9 @@ def _test_log_rotation_external_trigger_recovery(command):
         if log_rotated_checker.error:
             raise log_rotated_checker.error
 
-        # stop worker
-        runners[-1].stop()
+        # stop worker in a non-graceful fashion so that recovery files
+        # aren't removed
+        runners[-1].kill()
 
         ## restart worker
         runners.append(runners[-1].respawn())
@@ -374,7 +373,6 @@ def _test_log_rotation_external_trigger_recovery(command):
     finally:
         for r in runners:
             r.stop()
-        clean_up_resilience_path(res_dir)
 
 
 def test_log_rotation_file_size_trigger_no_recovery_pony():
@@ -513,7 +511,6 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
     finally:
         for r in runners:
             r.stop()
-        clean_up_resilience_path(res_dir)
 
 
 def test_log_rotation_file_size_trigger_recovery_pony():
@@ -594,8 +591,9 @@ def _test_log_rotation_file_size_trigger_recovery(command):
         if log_rotated_checker.error:
             raise log_rotated_checker.error
 
-        # stop worker
-        runners[-1].stop()
+        # stop the worker in a non-graceful fashion so it doesn't remove
+        # recovery files
+        runners[-1].kill()
 
         ## restart worker
         runners.append(runners[-1].respawn())
@@ -680,4 +678,3 @@ def _test_log_rotation_file_size_trigger_recovery(command):
     finally:
         for r in runners:
             r.stop()
-        clean_up_resilience_path(res_dir)
