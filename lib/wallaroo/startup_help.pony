@@ -24,7 +24,6 @@ primitive StartupHelp
       -------------------------------------------------------------------------
       Wallaroo takes the following parameters:
       -------------------------------------------------------------------------
-        --in/-i [Comma-separated list of input addresses sources listen on]
         --control/-c [Sets address for initializer control channel; sets
           control address to connect to for non-initializers]
         --data/-d [Sets address for initializer data channel]
