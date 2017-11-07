@@ -14,7 +14,7 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 
     libssl-dev \
 # useful tools/utilities
     man \
-    netcat \
+    netcat-openbsd \
     curl \
     wget \
     less \
@@ -60,7 +60,7 @@ COPY rules.mk /wallaroo-src/
 COPY SUMMARY.md /wallaroo-src/
 COPY SUPPORT.md /wallaroo-src/
 COPY utils /wallaroo-src/utils/
-COPY docker-setup.sh /wallaroo-src/
+COPY scripts/docker-setup.sh /wallaroo-src/
 
 RUN mkdir /metrics_ui-src && \
     cp -r /wallaroo-src/monitoring_hub/apps/metrics_reporter_ui/rel/metrics_reporter_ui /metrics_ui-src
