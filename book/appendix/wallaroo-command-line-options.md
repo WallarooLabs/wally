@@ -7,7 +7,6 @@ Every Wallaroo option exposes a set of command-line options that are used to con
 When running a Wallaroo application, we use some of the following command line parameters (a star indicates it is required, a plus that it is required for multi-worker runs):
 
 ```bash
-  --in/-i *[Comma-separated list of input addresses sources listen on]
   --control/-c +[Sets address for initializer control channel; sets
     control address to connect to for non-initializers]
   --data/-d +[Sets address for initializer data channel]
@@ -37,11 +36,9 @@ When running a Wallaroo application, we use some of the following command line p
     world]
 ```
 
-Wallaroo currently supports one input stream per pipeline. We provide comma-separated IP addresses for TCP source listeners via the `--in` parameter. Currently, the order of these addresses corresponds to the order in which pipelines are defined in your application code.
+Wallaroo currently supports one source per pipeline, which is setup by the application code. Each pipeline may have at most one sink, which also setup by the application code.
 
-Wallaroo currently supports one sink per application. If you are using a `TCPSInk`, use the `--out` parameter to specify the address (in a `host:port` format) that this sink will write out to over TCP. For other types of sinks, please refer to the specific sink's documentation.
-
-In order to monitor metrics, we must specify the target address for metrics data via the `--metrics/-m` parameter.
+In order to monitor metrics, the target address for metrics data should be defined via the `--metrics/-m` parameter, using a `host:port` format (e.g. `127.0.0.1:5002`).
 
 ## Machida specific parameters
 
@@ -65,7 +62,7 @@ Remember that multi-worker runs require that you distribute the same binary to a
 
 #### Example Single-Worker Run
 
-In order to run a single worker for a Wallaroo app, we need to specify the input address (`--in`), the target output address for the TCP sink (`--out`), and the metrics target address (`--metrics`). For example, using the Celsius Converter application (after navigating to `examples/pony/celsius` and compiling) we would run:
+In order to run a single worker for a Wallaroo app, we need to provide the input and output addresses for the TCPSource and TCPSink (`--in` and `--out`, which will be handled by the application setup code), and the metrics target address (`--metrics`). For example, using the Celsius Converter application (after navigating to `examples/pony/celsius` and compiling) we would run:
 
 ```bash
 ./celsius --in 127.0.0.1:6000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001
@@ -73,7 +70,7 @@ In order to run a single worker for a Wallaroo app, we need to specify the input
 
 #### Example Multi-Worker Run
 
-Sticking with our Celsius Converter app, here is an example of how you might run it over two workers. Beyond the parameters specified in the last section, we need to specify the control channel address (`--control`), data channel address (`--data`), number of workers (`--worker-count`), and, for the initializer process, the fact that it is the cluster initializer (`--cluster-initializer` flag):
+Sticking with our Celsius Converter app, here is an example of how you might run it over two workers. In addition to the parameters specified in the last section, we need to specify the control channel address (`--control`), data channel address (`--data`), number of workers (`--worker-count`), and, for the initializer process, the fact that it is the cluster initializer (`--cluster-initializer` flag):
 
 *Worker 1*
 
