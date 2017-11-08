@@ -30,14 +30,14 @@ use "wallaroo/core/messages"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 
-interface val Router
+trait val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   fun routes(): Array[Consumer] val
   fun routes_not_in(router: Router): Array[Consumer] val
 
-class val EmptyRouter
+class val EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
@@ -50,7 +50,7 @@ class val EmptyRouter
   fun routes_not_in(router: Router): Array[Consumer] val =>
     recover Array[Consumer] end
 
-class val DirectRouter
+class val DirectRouter is Router
   let _target: Consumer
 
   new val create(target: Consumer) =>
@@ -101,7 +101,7 @@ class val DirectRouter
       false
     end
 
-class val ProxyRouter is Equatable[ProxyRouter]
+class val ProxyRouter is (Router & Equatable[ProxyRouter])
   let _worker_name: String
   let _target: OutgoingBoundary
   let _target_proxy_address: ProxyAddress
@@ -209,6 +209,9 @@ trait val OmniRouter is Equatable[OmniRouter]
   fun val update_route_to_step(id: U128,
     step: Consumer): OmniRouter
 
+  fun val update_stateless_partition_router(id: U128,
+    pr: StatelessPartitionRouter): OmniRouter
+
   fun routes(): Array[Consumer] val
 
   fun routes_not_in(router: OmniRouter): Array[Consumer] val
@@ -235,6 +238,11 @@ class val EmptyOmniRouter is OmniRouter
 
   fun val update_route_to_step(id: U128,
     step: Consumer): OmniRouter
+  =>
+    this
+
+  fun val update_stateless_partition_router(id: U128,
+    pr: StatelessPartitionRouter): OmniRouter
   =>
     this
 
@@ -411,6 +419,20 @@ class val StepIdRouter is OmniRouter
 
     StepIdRouter(_worker_name, consume new_data_routes, consume new_step_map,
       _outgoing_boundaries, _stateless_partitions)
+
+  fun val update_stateless_partition_router(p_id: U128,
+    pr: StatelessPartitionRouter): OmniRouter
+  =>
+    let new_stateless_partitions = recover trn
+      Map[U128, StatelessPartitionRouter] end
+
+    for (k, v) in _stateless_partitions.pairs() do
+      new_stateless_partitions(k) = v
+    end
+    new_stateless_partitions(p_id) = pr
+
+    StepIdRouter(_worker_name, _data_routes, _step_map,
+      _outgoing_boundaries, consume new_stateless_partitions)
 
   fun routes(): Array[Consumer] val =>
     let diff = recover trn Array[Consumer] end

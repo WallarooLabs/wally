@@ -25,6 +25,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
+
 actor RouterRegistry
   let _auth: AmbientAuth
   let _data_receivers: DataReceivers
@@ -46,11 +47,13 @@ actor RouterRegistry
   // Subscribers
   // All steps that have a PartitionRouter, registered by partition
   // state name
-  let _partition_router_steps: Map[String, SetIs[Step]] = _partition_router_steps.create()
+  let _partition_router_subs: Map[String, SetIs[RouterUpdateable]] =
+      _partition_router_subs.create()
   // All steps that have a StatelessPartitionRouter, registered by
   // partition id
-  let _stateless_partition_router_steps: Map[U128, SetIs[Step]] =
-    _stateless_partition_router_steps.create()
+  let _stateless_partition_router_subs:
+    Map[U128, SetIs[RouterUpdateable]] =
+      _stateless_partition_router_subs.create()
   // All steps that have an OmniRouter
   let _omni_router_steps: SetIs[Step] = _omni_router_steps.create()
   //
@@ -172,19 +175,52 @@ actor RouterRegistry
     // TODO: These need to be unregistered if they close
     _data_channels.set(dc)
 
-  be register_partition_router_step(state_name: String, s: Step) =>
+  be register_partition_router_subscriber(state_name: String,
+    sub: RouterUpdateable)
+  =>
     try
-      _partition_router_steps(state_name)?.set(s)
+      if _partition_router_subs.contains(state_name) then
+        _partition_router_subs(state_name)?.set(sub)
+      else
+        _partition_router_subs(state_name) = SetIs[RouterUpdateable]
+        _partition_router_subs(state_name)?.set(sub)
+      end
     else
       Fail()
     end
 
-    //!!
-    //TODO: Determine in local_topology which steps use these routers
-    // Collect by partition id probably
-  be register_stateless_partition_router_step(partition_id: U128, s: Step) =>
+  be unregister_partition_router_subscriber(state_name: String,
+    sub: RouterUpdateable)
+  =>
     try
-      _stateless_partition_router_steps(partition_id)?.set(s)
+      _partition_router_subs(state_name)?.unset(sub)
+    else
+      Fail()
+    end
+
+  //!!
+  //TODO: Determine in local_topology which steps use these routers
+  // Collect by partition id probably
+  be register_stateless_partition_router_subscriber(partition_id: U128,
+    sub: RouterUpdateable)
+  =>
+    try
+      if _stateless_partition_router_subs.contains(partition_id) then
+        _stateless_partition_router_subs(partition_id)?.set(sub)
+      else
+        _stateless_partition_router_subs(partition_id) =
+          SetIs[RouterUpdateable]
+        _stateless_partition_router_subs(partition_id)?.set(sub)
+      end
+    else
+      Fail()
+    end
+
+  be unregister_stateless_partition_router_subscriber(partition_id: U128,
+    sub: RouterUpdateable)
+  =>
+    try
+      _stateless_partition_router_subs(partition_id)?.unset(sub)
     else
       Fail()
     end
@@ -206,9 +242,20 @@ actor RouterRegistry
     let new_boundaries_sendable: Map[String, OutgoingBoundary] val =
       consume new_boundaries
 
-    for steps in _partition_router_steps.values() do
-      for step in steps.values() do
-        step.add_boundaries(new_boundaries_sendable)
+    for producers in _partition_router_subs.values() do
+      for producer in producers.values() do
+        match producer
+        | let s: Step =>
+          s.add_boundaries(new_boundaries_sendable)
+        end
+      end
+    end
+    for producers in _stateless_partition_router_subs.values() do
+      for producer in producers.values() do
+        match producer
+        | let s: Step =>
+          s.add_boundaries(new_boundaries_sendable)
+        end
       end
     end
     for step in _omni_router_steps.values() do
@@ -251,41 +298,48 @@ actor RouterRegistry
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
 
-  fun _distribute_partition_router(partition_router: PartitionRouter) =>
-    let state_name = partition_router.state_name()
-
+  fun _distribute_omni_router() =>
     try
-      for step in _partition_router_steps(state_name)?.values() do
-        step.update_router(partition_router)
+      for step in _omni_router_steps.values() do
+        step.update_omni_router(_omni_router as OmniRouter)
       end
     else
       Fail()
     end
-    for source in _sources.values() do
-      source.update_router(partition_router)
-    end
-    for source_listener in _source_listeners.values() do
-      source_listener.update_router(partition_router)
+
+  fun _distribute_partition_router(partition_router: PartitionRouter) =>
+    let state_name = partition_router.state_name()
+
+    try
+      for sub in _partition_router_subs(state_name)?.values() do
+        sub.update_router(partition_router)
+      end
+    else
+      Fail()
     end
 
-
-  fun _distribute_stateless_partition_router(
+  fun ref _distribute_stateless_partition_router(
     partition_router: StatelessPartitionRouter)
   =>
-    None
-    //!!
-    //TODO: where should these be distributed?
-    // OmniRouters and any step that uses a stateless partition router
+    let partition_id = partition_router.partition_id()
 
-      // for step in _partition_router_steps.values() do
-      //   step.update_router(partition_router)
-      // end
-      // for source in _sources.values() do
-      //   source.update_router(partition_router)
-      // end
-      // for source_listener in _source_listeners.values() do
-      //   source_listener.update_router(partition_router)
-      // end
+    try
+      for sub in
+        _stateless_partition_router_subs(partition_id)?.values()
+      do
+        sub.update_router(partition_router)
+      end
+    else
+      Fail()
+    end
+    match _omni_router
+    | let omni: OmniRouter =>
+      _omni_router = omni.update_stateless_partition_router(partition_id,
+        partition_router)
+    else
+      Fail()
+    end
+    _distribute_omni_router()
 
   be create_partition_routers_from_blueprints(
     partition_blueprints: Map[String, PartitionRouterBlueprint] val)
@@ -657,6 +711,7 @@ actor RouterRegistry
         step.update_omni_router(new_omni_router)
       end
       _omni_router = new_omni_router
+      _distribute_omni_router()
     else
       Fail()
     end
@@ -737,6 +792,7 @@ actor RouterRegistry
         step.update_omni_router(new_omni_router)
       end
       _omni_router = new_omni_router
+      _distribute_omni_router()
     else
       Fail()
     end
