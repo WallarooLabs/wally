@@ -171,6 +171,15 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       _kafka_topic_partition_sources(topic) = Map[I32, KafkaSource[In]]
     end
 
+    match router
+    | let pr: PartitionRouter =>
+      _router_registry.register_partition_router_subscriber(pr.state_name(),
+        this)
+    | let spr: StatelessPartitionRouter =>
+      _router_registry.register_stateless_partition_router_subscriber(
+        spr.partition_id(), this)
+    end
+
     // create kafka client
     _kc = KafkaClient(_tcp_auth, _conf, this)
 
@@ -213,6 +222,13 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
               _router_registry)
             partitions_sources(part_id) = source
             _router_registry.register_source(source)
+            match _router
+            | let pr: PartitionRouter =>
+              _router_registry.register_partition_router_subscriber(pr.state_name(), source)
+            | let spr: StatelessPartitionRouter =>
+              _router_registry.register_stateless_partition_router_subscriber(
+                spr.partition_id(), source)
+            end
           else
             @printf[I32](("Error creating KafkaSource for topic: " + topic
               + " and partition: " + part_id.string() + "!").cstring())
@@ -238,7 +254,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       end
     end
 
-  be update_router(router: PartitionRouter) =>
+  be update_router(router: Router) =>
     _notify.update_router(router)
 
   be remove_route_for(moving_step: Consumer) =>

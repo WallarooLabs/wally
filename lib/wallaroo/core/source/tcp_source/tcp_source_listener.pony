@@ -102,11 +102,21 @@ actor TCPSourceListener is SourceListener
     _init_size = init_size
     _max_size = max_size
     _fd = @pony_asio_event_fd(_event)
+
+    match router
+    | let pr: PartitionRouter =>
+      _router_registry.register_partition_router_subscriber(pr.state_name(),
+        this)
+    | let spr: StatelessPartitionRouter =>
+      _router_registry.register_stateless_partition_router_subscriber(
+        spr.partition_id(), this)
+    end
+
     @printf[I32]((source_builder.name() + " source attempting to listen on "
       + host + ":" + service + "\n").cstring())
     _notify_listening()
 
-  be update_router(router: PartitionRouter) =>
+  be update_router(router: Router) =>
     _source_builder = _source_builder.update_router(router)
 
   be remove_route_for(moving_step: Consumer) =>
@@ -195,6 +205,14 @@ actor TCPSourceListener is SourceListener
       // TODO: We need to figure out how to unregister this when the
       // connection dies
       _router_registry.register_source(source)
+      match _router
+      | let pr: PartitionRouter =>
+        _router_registry.register_partition_router_subscriber(pr.state_name(),
+          source)
+      | let spr: StatelessPartitionRouter =>
+        _router_registry.register_stateless_partition_router_subscriber(
+          spr.partition_id(), source)
+      end
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

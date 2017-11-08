@@ -116,8 +116,16 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
     _mute()
 
-  be update_router(router: PartitionRouter) =>
-    let new_router = router.update_boundaries(_outgoing_boundaries)
+  be update_router(router: Router) =>
+    let new_router =
+      match router
+      | let pr: PartitionRouter =>
+        pr.update_boundaries(_outgoing_boundaries)
+      | let spr: StatelessPartitionRouter =>
+        spr.update_boundaries(_outgoing_boundaries)
+      else
+        router
+      end
     _notify.update_router(new_router)
 
   be add_boundary_builders(
