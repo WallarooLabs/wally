@@ -4,6 +4,7 @@ use w = "wallaroo/core/topology"
 
 use @ComputationName[Pointer[U8] ref](cid: U64)
 use @ComputationCompute[U64](cid: U64, did: U64)
+// TODO: add ComputationBuilderBuild[U64](cbid: U64)
 
 use @ComputationMultiName[Pointer[U8] ref](cid: U64)
 use @ComputationMultiCompute[U64](cid: U64, did: U64, sz: Pointer[U64])
@@ -46,6 +47,8 @@ class Computation is w.Computation[GoData, GoData]
 
   fun _final() =>
     RemoveComponent(_computation_id)
+
+// TODO: add ComputationBuilder
 
 class ComputationMulti is w.Computation[GoData, GoData]
   var _computation_id: U64
