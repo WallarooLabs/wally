@@ -106,31 +106,17 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 make
 ```
 
-## Compiling Giles Sender
+## Compiling Giles Sender, Receiver, and the Cluster Shutdown tool
 
-Giles Sender is used to supply data to Wallaroo applications over TCP.
+Giles Sender is used to supply data to Wallaroo applications over TCP, and Giles Receiver is used as a fast TCP Sink that writes the messages it receives to a file, along with a timestmap. The two together are useful when developing and testing applications that use TCP Sources and a TCP Sink.
 
-```bash
-cd ~/wallaroo-tutorial/wallaroo/giles/sender
-make
-```
+The Cluster Shutdown tool is used to instruct the cluster to shutdown cleanly, clearing away any resilience and recovery files it may have created.
 
-## Compiling Giles Receiver
-
-Giles Receiver receives data from Wallaroo over TCP.
+To compile all three, run
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-make
-```
-
-## Compiling Cluster Shutdown tool
-
-The Cluster Shutdown tool is used to tell the cluster to shut down cleanly.
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
-make
+cd ~/wallaroo-tutorial/wallaroo/
+make build-giles-all build-utils-cluster_shutdown-all
 ```
 
 ## Conclusion
