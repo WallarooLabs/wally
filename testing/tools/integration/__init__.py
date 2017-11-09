@@ -64,12 +64,14 @@ Alternatively, for a CLI style integration tester, you may use the
 """
 
 
-from integration import (ex_validate,
+from integration import (add_runner,
+                         ex_validate,
                          files_generator,
                          get_port_values,
                          is_address_available,
                          iter_generator,
                          Metrics,
+                         MetricsParser,
                          MetricsStopper,
                          Reader,
                          Runner,
