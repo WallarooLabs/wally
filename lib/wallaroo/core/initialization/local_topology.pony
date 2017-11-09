@@ -381,13 +381,21 @@ actor LocalTopologyInitializer is LayoutInitializer
   be create_connections(control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val)
   =>
-    _connections.create_connections(control_addrs, data_addrs, this)
+    _connections.create_connections(control_addrs, data_addrs, this,
+      _router_registry)
 
   be quick_initialize_data_connections() =>
     """
     Called as part of joining worker's initialization
     """
     _connections.quick_initialize_data_connections(this)
+
+  be create_partition_routers_from_blueprints(
+    pr_blueprints: Map[String, PartitionRouterBlueprint] val,
+    spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
+  =>
+    _connections.create_partition_routers_from_blueprints(pr_blueprints,
+      spr_blueprints, _router_registry)
 
   be recover_and_initialize(ws: Array[String] val,
     cluster_initializer: (ClusterInitializer | None) = None)

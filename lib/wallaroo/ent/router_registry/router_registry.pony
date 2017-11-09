@@ -307,10 +307,13 @@ actor RouterRegistry
       Fail()
     end
 
-  fun _distribute_partition_router(partition_router: PartitionRouter) =>
+  fun ref _distribute_partition_router(partition_router: PartitionRouter) =>
     let state_name = partition_router.state_name()
 
     try
+      if not _partition_router_subs.contains(state_name) then
+        _partition_router_subs(state_name) = SetIs[RouterUpdateable]
+      end
       for sub in _partition_router_subs(state_name)?.values() do
         sub.update_router(partition_router)
       end
