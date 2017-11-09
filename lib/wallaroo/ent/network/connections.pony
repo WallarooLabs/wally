@@ -360,25 +360,33 @@ actor Connections is Cluster
     _update_boundaries(layout_initializer, recovering)
 
   fun _update_boundaries(layout_initializer: LayoutInitializer,
-    recovering: Bool = false)
+    recovering: Bool = false, router_registry: (RouterRegistry | None) = None)
   =>
-    let out_bs = recover trn Map[String, OutgoingBoundary] end
+    let out_bs_trn = recover trn Map[String, OutgoingBoundary] end
 
     for (target, boundary) in _data_conns.pairs() do
-      out_bs(target) = boundary
+      out_bs_trn(target) = boundary
     end
 
-    let out_bbs = recover trn Map[String, OutgoingBoundaryBuilder] end
+    let out_bbs_trn = recover trn Map[String, OutgoingBoundaryBuilder] end
 
     for (target, builder) in _data_conn_builders.pairs() do
-      out_bbs(target) = builder
+      out_bbs_trn(target) = builder
     end
 
     @printf[I32](("Preparing to update " + _data_conns.size().string() +
       " boundaries\n").cstring())
 
-    layout_initializer.update_boundaries(consume out_bs,
-      consume out_bbs)
+    let out_bs = consume val out_bs_trn
+    let out_bbs = consume val out_bbs_trn
+
+    layout_initializer.update_boundaries(out_bs, out_bbs)
+
+    match router_registry
+    | let r: RouterRegistry =>
+      r.register_boundaries(out_bs, out_bbs)
+    end
+
     // TODO: This should be somewhere else. It's not clear why updating
     // boundaries should trigger initialization, but this is the point
     // at which initialization is possible for a joining or recovering
@@ -390,7 +398,8 @@ actor Connections is Cluster
   be create_connections(
     control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
-    layout_initializer: LayoutInitializer)
+    layout_initializer: LayoutInitializer,
+    router_registry: (RouterRegistry | None) = None)
   =>
     try
       _save_connections(control_addrs, data_addrs)
@@ -407,7 +416,12 @@ actor Connections is Cluster
         end
       end
 
-      _update_boundaries(layout_initializer)
+      match router_registry
+      | let r: RouterRegistry =>
+        _update_boundaries(layout_initializer where router_registry = r)
+      else
+        _update_boundaries(layout_initializer)
+      end
 
       if not _is_joining then
         let connections_ready_msg = ChannelMsgEncoder.connections_ready(
@@ -465,6 +479,19 @@ actor Connections is Cluster
     for boundary in _data_conns.values() do
       boundary.quick_initialize(li)
     end
+
+  be create_partition_routers_from_blueprints(
+    pr_blueprints: Map[String, PartitionRouterBlueprint] val,
+    spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
+    router_registry: RouterRegistry)
+  =>
+    // We delegate to router registry through here to ensure that we've
+    // already sent the outgoing boundaries to the router registry when
+    // create_connections was called.
+    router_registry.create_partition_routers_from_blueprints(
+      pr_blueprints)
+    router_registry.create_stateless_partition_routers_from_blueprints(
+      spr_blueprints)
 
   be recover_connections(layout_initializer: LayoutInitializer)
   =>
