@@ -261,12 +261,18 @@ actor ApplicationDistributor is Distributor
                 latest_runner_builders = recover Array[RunnerBuilder] end,
                 parallel_stateless)
               step_runner_builders.push(seq_builder)
+
               // TODO: Remove this condition and push once we've fixed
               // initialization so we can coalesce a pre state runner onto a
               // stateless partition
               if parallel_stateless then
                 step_runner_builders.push(r_builder)
               end
+
+              // We're done with this coalesced sequence of runners, so
+              // we set parallel_stateless to false to indicate we are back
+              // to searching for a stateless partition.
+              parallel_stateless = false
             else
               source_runner_builders.push(r_builder)
               handled_source_runners = true
@@ -274,6 +280,7 @@ actor ApplicationDistributor is Distributor
           elseif not pipeline.is_coalesced() then
             if handled_source_runners then
               step_runner_builders.push(r_builder)
+              parallel_stateless = false
             else
               source_runner_builders.push(r_builder)
               handled_source_runners = true
@@ -297,10 +304,6 @@ actor ApplicationDistributor is Distributor
             latest_runner_builders = recover Array[RunnerBuilder] end,
             parallel_stateless)
           step_runner_builders.push(seq_builder)
-          // We're done with this coalesced sequence of runners, so
-          // we set parallel_stateless to false to indicate we are back
-          // to searching for a stateless partition.
-          parallel_stateless = false
         end
 
         // Create Source Initializer and add it to the graph for the
