@@ -2,7 +2,6 @@ package wallarooapi
 
 import (
 	"C"
-	"fmt"
 	"unsafe"
 )
 
@@ -14,7 +13,6 @@ type Decoder interface {
 
 //export DecoderHeaderLength
 func DecoderHeaderLength(decoderId uint64) uint64 {
-	fmt.Println("DHL!")
 	decoder := GetComponent(decoderId).(Decoder)
 	return decoder.HeaderLength()
 }

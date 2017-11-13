@@ -2,7 +2,6 @@ package wallarooapi
 
 import (
 	"C"
-	"fmt"
 	"unsafe"
 )
 
@@ -12,7 +11,6 @@ type Encoder interface {
 
 //export EncoderEncode
 func EncoderEncode(encoderId uint64, dataId uint64, size *uint64) unsafe.Pointer {
-	fmt.Println("EncoderEncode!")
 	encoder := GetComponent(encoderId).(Encoder)
 	data := GetComponent(dataId)
 	res := encoder.Encode(data)

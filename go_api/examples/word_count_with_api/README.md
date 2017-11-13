@@ -28,7 +28,7 @@ Start the cluster initializer.
 ```bash
 ./word_count_with_api --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
+  --name worker1 --external 127.0.0.1:5050 --cluster-initializer \
   --ponynoblock --cluster-initializer
 ```
 
@@ -37,13 +37,22 @@ Start the cluster initializer.
 Start the second worker.
 
 ```bash
-./word_count_with_api --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --name worker-name --external 127.0.0.1:5050 --name w1 -j 127.0.0.1:6000 \
-  --ponynoblock
+./word_count_with_api --application-module word_count --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:6000 --name worker2 --ponythreads=1 -j 127.0.0.1:6000
 ```
 
 ### Shell 4
+
+Start the second worker.
+
+```bash
+./word_count_with_api --application-module word_count --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:6000 --name worker2 --ponythreads=1 -j 127.0.0.1:6000
+```
+
+### Shell 5
 
 Send some messages.
 

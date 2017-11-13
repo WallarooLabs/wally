@@ -7,8 +7,7 @@ use wct = "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>
-    let s = ApplicationSetup()
-    env.out.print(s)
+    let application_json_string = ApplicationSetup()
 
     try
       // let letter_partition = wct.Partition[GoData, U64](
@@ -28,8 +27,9 @@ actor Main
       //       .to_sink(TCPSinkConfig[GoData].from_options(GoEncoder(5),
       //         TCPSinkConfigCLIParser(env.args)?(0)?))?
       //  end
+
       let application = recover val
-        BuildApplication.from_json(JSONBlock())?
+        BuildApplication.from_json(application_json_string)?
       end
 
       Startup(env, application, "word-count")

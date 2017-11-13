@@ -11,7 +11,6 @@ class val GoDecoder is FramedSourceHandler[GoData]
     _decoder_id = decoder_id
 
   fun header_length(): USize =>
-    @printf[I32]("header_length!\n".cstring())
     @DecoderHeaderLength(_decoder_id).usize()
 
   fun payload_length(data: Array[U8] iso): USize =>

@@ -57,7 +57,6 @@ class ComputationMulti is w.Computation[GoData, GoData]
     _computation_id = computation_id
 
   fun name(): String =>
-    @printf[I32]("name with computation_id: %d\n".cstring(), _computation_id)
     recover val
       let sp = @ComputationMultiName(_computation_id)
       let n = String.from_cstring(sp)
@@ -66,7 +65,6 @@ class ComputationMulti is w.Computation[GoData, GoData]
     end
 
   fun apply(data: GoData): (Array[GoData] val | None) =>
-    @printf[I32]("compute with computation_id: %d\n".cstring(), _computation_id)
     var size: U64 = 0
 
     let res = @ComputationMultiCompute(_computation_id, data.id(), addressof size)
@@ -86,19 +84,15 @@ class ComputationMulti is w.Computation[GoData, GoData]
     end
 
   fun _serialise_space(): USize =>
-    @printf[I32]("serialize space with computation_id: %d\n".cstring(), _computation_id)
     ComponentSerializeGetSpace(_computation_id)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @printf[I32]("serialize with computation_id: %d\n".cstring(), _computation_id)
     ComponentSerialize(_computation_id, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _computation_id = ComponentDeserialize(bytes)
-    @printf[I32]("deserialized with computation_id: %d\n".cstring(), _computation_id)
 
   fun _final() =>
-    @printf[I32]("finalized with computation_id: %d\n".cstring(), _computation_id)
     RemoveComponent(_computation_id)
 
 class val ComputationMultiBuilder

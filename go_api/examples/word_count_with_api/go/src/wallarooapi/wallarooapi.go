@@ -47,4 +47,5 @@ func AddComponent(component interface{}) uint64 {
 //export RemoveComponent
 func RemoveComponent(id uint64) {
 	componentDict.remove(id)
+	RemoveSerialized(id)
 }
