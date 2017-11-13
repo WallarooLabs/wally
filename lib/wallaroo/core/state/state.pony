@@ -42,3 +42,5 @@ trait ref State
     else
       error
     end
+
+class EmptyState is State

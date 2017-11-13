@@ -29,6 +29,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink"
+use "wallaroo/core/state"
 
 trait val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -649,7 +650,7 @@ class val DataRouter is Equatable[DataRouter]
 trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun state_name(): String
   fun local_map(): Map[StepId, Step] val
-  fun register_routes(router: Router, route_builder: RouteBuilder)
+  fun register_routes(router: Router, route_builder': RouteBuilder)
   fun update_route[K: (Hashable val & Equatable[K] val)](
     raw_k: K, target: (Step | ProxyRouter)): PartitionRouter ?
   fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
@@ -658,6 +659,7 @@ trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     PartitionRouter
   fun blueprint(): PartitionRouterBlueprint
+  fun route_builder(): RouteBuilder
 
 trait val AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)]
   is PartitionRouter
@@ -666,7 +668,8 @@ trait val AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)]
     new_default_router: (Router | None) = None): PartitionRouter
 
 class val LocalPartitionRouter[In: Any val,
-  Key: (Hashable val & Equatable[Key] val)] is AugmentablePartitionRouter[Key]
+  Key: (Hashable val & Equatable[Key] val), S: State ref]
+  is AugmentablePartitionRouter[Key]
   let _state_name: String
   let _worker_name: String
   let _local_map: Map[StepId, Step] val
@@ -695,6 +698,9 @@ class val LocalPartitionRouter[In: Any val,
 
   fun state_name(): String =>
     _state_name
+
+  fun route_builder(): RouteBuilder =>
+    TypedRouteBuilder[StateProcessor[S]]
 
   // fun migrate_step[K: (Hashable val & Equatable[K] val)](
   //   boundary: OutgoingBoundary, k: K)
@@ -795,18 +801,19 @@ class val LocalPartitionRouter[In: Any val,
   =>
     match new_d_router
     | let dr: Router =>
-      LocalPartitionRouter[NewIn, Key](_state_name, _worker_name, _local_map,
-        _step_ids, _partition_routes, new_p_function, dr)
+      LocalPartitionRouter[NewIn, Key, S](_state_name, _worker_name,
+        _local_map, _step_ids, _partition_routes, new_p_function, dr)
     else
-      LocalPartitionRouter[NewIn, Key](_state_name, _worker_name, _local_map,
-        _step_ids, _partition_routes, new_p_function, _default_router)
+      LocalPartitionRouter[NewIn, Key, S](_state_name, _worker_name,
+        _local_map, _step_ids, _partition_routes, new_p_function,
+        _default_router)
     end
 
-  fun register_routes(router: Router, route_builder: RouteBuilder) =>
+  fun register_routes(router: Router, route_builder': RouteBuilder) =>
     for r in _partition_routes.values() do
       match r
       | let step: Step =>
-        step.register_routes(router, route_builder)
+        step.register_routes(router, route_builder')
       end
     end
 
@@ -855,7 +862,7 @@ class val LocalPartitionRouter[In: Any val,
             new_partition_routes(k) = t
           end
         end
-        LocalPartitionRouter[In, Key](_state_name, _worker_name,
+        LocalPartitionRouter[In, Key, S](_state_name, _worker_name,
           consume new_local_map, _step_ids, consume new_partition_routes,
           _partition_function, _default_router)
       | let proxy_router: ProxyRouter =>
@@ -869,7 +876,7 @@ class val LocalPartitionRouter[In: Any val,
             new_partition_routes(k) = t
           end
         end
-        LocalPartitionRouter[In, Key](_state_name, _worker_name,
+        LocalPartitionRouter[In, Key, S](_state_name, _worker_name,
           consume new_local_map, _step_ids, consume new_partition_routes,
           _partition_function, _default_router)
       else
@@ -891,7 +898,7 @@ class val LocalPartitionRouter[In: Any val,
         new_partition_routes(k) = target
       end
     end
-    LocalPartitionRouter[In, Key](_state_name, _worker_name, _local_map,
+    LocalPartitionRouter[In, Key, S](_state_name, _worker_name, _local_map,
       _step_ids, consume new_partition_routes, _partition_function,
       _default_router)
 
@@ -950,12 +957,12 @@ class val LocalPartitionRouter[In: Any val,
       Fail()
     end
 
-    LocalPartitionRouterBlueprint[In, Key](_state_name, _step_ids,
+    LocalPartitionRouterBlueprint[In, Key, S](_state_name, _step_ids,
       consume partition_addresses, _partition_function)
 
   fun eq(that: box->PartitionRouter): Bool =>
     match that
-    | let o: box->LocalPartitionRouter[In, Key] =>
+    | let o: box->LocalPartitionRouter[In, Key, S] =>
       MapTagEquality[StepId, Step](_local_map, o._local_map) and
         MapEquality[Key, StepId](_step_ids, o._step_ids) and
         _partition_routes_eq(o._partition_routes) and
@@ -998,7 +1005,8 @@ trait val PartitionRouterBlueprint
     auth: AmbientAuth): PartitionRouter
 
 class val LocalPartitionRouterBlueprint[In: Any val,
-  Key: (Hashable val & Equatable[Key] val)] is PartitionRouterBlueprint
+  Key: (Hashable val & Equatable[Key] val), S: State ref]
+  is PartitionRouterBlueprint
   let _state_name: String
   let _step_ids: Map[Key, StepId] val
   let _partition_addresses: Map[Key, ProxyAddress] val
@@ -1030,7 +1038,7 @@ class val LocalPartitionRouterBlueprint[In: Any val,
     end
     // Since default routers are deprecated, this does not
     // support them (passing None in instead).
-    LocalPartitionRouter[In, Key](_state_name, worker_name,
+    LocalPartitionRouter[In, Key, S](_state_name, worker_name,
       recover val Map[StepId, Step] end,
       _step_ids, consume partition_routes, _partition_function,
       None)
@@ -1038,7 +1046,7 @@ class val LocalPartitionRouterBlueprint[In: Any val,
 trait val StatelessPartitionRouter is (Router &
   Equatable[StatelessPartitionRouter])
   fun partition_id(): U128
-  fun register_routes(router: Router, route_builder: RouteBuilder)
+  fun register_routes(router: Router, route_builder': RouteBuilder)
   fun update_route(partition_id': U64, target: (Step | ProxyRouter)):
     StatelessPartitionRouter ?
   fun size(): USize
@@ -1108,11 +1116,11 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       (true, true, latest_ts)
     end
 
-  fun register_routes(router: Router, route_builder: RouteBuilder) =>
+  fun register_routes(router: Router, route_builder': RouteBuilder) =>
     for r in _partition_routes.values() do
       match r
       | let step: Step =>
-        step.register_routes(router, route_builder)
+        step.register_routes(router, route_builder')
       end
     end
 

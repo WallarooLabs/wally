@@ -79,6 +79,7 @@ trait val RunnerBuilder
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
+    @printf[I32]("RunnerBuilder Like!\n".cstring())
     r
 
 class val RunnerSequenceBuilder is RunnerBuilder
@@ -191,6 +192,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
+    @printf[I32]("RunnerSequenceBuilder Like!\n".cstring())
     try
       _runner_builders(_runner_builders.size() - 1)?
         .clone_router_and_set_input_type(r, default_r)
@@ -296,8 +298,10 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
+    @printf[I32]("PreStateRunnerBuilder Like!\n".cstring())
     match r
     | let p: AugmentablePartitionRouter[Key] val =>
+      @printf[I32]("AUGMENTED PreStateRunnerBuilder Like!\n".cstring())
       p.clone_and_set_input_type[PIn](_partition_function, default_r)
     else
       r
@@ -404,9 +408,9 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
   fun state_subpartition(workers: (String | Array[String] val)):
     StateSubpartition
   =>
-    KeyedStateSubpartition[PIn, Key](_state_name, partition_addresses(workers),
-      _step_id_map, _state_runner_builder, _partition.function(),
-      _pipeline_name)
+    KeyedStateSubpartition[PIn, Key, S](_state_name,
+      partition_addresses(workers), _step_id_map, _state_runner_builder,
+      _partition.function(), _pipeline_name)
 
   fun partition_addresses(workers: (String | Array[String] val)):
     KeyedPartitionAddresses[Key] val
@@ -575,6 +579,7 @@ class ComputationRunner[In: Any val, Out: Any val]
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
+    @printf[I32]("!!Real CompLike\n".cstring())
     _next.clone_router_and_set_input_type(r)
 
 class PreStateRunner[In: Any val, Out: Any val, S: State ref]
@@ -646,6 +651,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
+    @printf[I32]("!!Real PreStateLike\n".cstring())
     r
 
 class StateRunner[S: State ref] is (Runner & ReplayableRunner &
@@ -775,6 +781,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
+    @printf[I32]("!!Real StateLike\n".cstring())
     r
 
   fun ref serialize_state(): ByteSeq val =>
@@ -820,4 +827,5 @@ class iso RouterRunner
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
+    @printf[I32]("!!RouterRunner like!\n".cstring())
     r

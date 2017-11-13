@@ -29,6 +29,7 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
+use "wallaroo/core/state"
 
 type WeightedKey[Key: (Hashable val & Equatable[Key])] is
   (Key, USize)
@@ -162,7 +163,7 @@ trait val StateSubpartition is Equatable[StateSubpartition]
   fun runner_builder(): RunnerBuilder
 
 class val KeyedStateSubpartition[PIn: Any val,
-  Key: (Hashable val & Equatable[Key] val)] is StateSubpartition
+  Key: (Hashable val & Equatable[Key] val), S: State ref] is StateSubpartition
   let _state_name: String
   let _partition_addresses: KeyedPartitionAddresses[Key] val
   let _id_map: Map[Key, U128] val
@@ -194,7 +195,7 @@ class val KeyedStateSubpartition[PIn: Any val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer],
     default_router: (Router | None) = None):
-    LocalPartitionRouter[PIn, Key] val
+    LocalPartitionRouter[PIn, Key, S] val
   =>
     let routes = recover trn Map[Key, (Step | ProxyRouter)] end
 
@@ -236,7 +237,7 @@ class val KeyedStateSubpartition[PIn: Any val,
     @printf[I32](("Spinning up " + partition_count.string() +
       " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
-    LocalPartitionRouter[PIn, Key](_state_name, worker_name, consume m,
+    LocalPartitionRouter[PIn, Key, S](_state_name, worker_name, consume m,
       _id_map, consume routes, _partition_function, default_router)
 
   fun update_key[K: (Hashable val & Equatable[K] val)](k: K,
@@ -246,7 +247,7 @@ class val KeyedStateSubpartition[PIn: Any val,
     | let key: Key =>
       match _partition_addresses.update_key[Key](key, pa)?
       | let kpa: KeyedPartitionAddresses[Key] val =>
-        KeyedStateSubpartition[PIn, Key](_state_name, kpa, _id_map,
+        KeyedStateSubpartition[PIn, Key, S](_state_name, kpa, _id_map,
           _runner_builder, _partition_function, _pipeline_name)
       else
         error
@@ -257,7 +258,7 @@ class val KeyedStateSubpartition[PIn: Any val,
 
   fun eq(that: box->StateSubpartition): Bool =>
     match that
-    | let kss: box->KeyedStateSubpartition[PIn, Key] =>
+    | let kss: box->KeyedStateSubpartition[PIn, Key, S] =>
       // ASSUMPTION: Add RunnerBuilder equality check assumes that
       // runner builder would not change over time, which currently
       // is true.
