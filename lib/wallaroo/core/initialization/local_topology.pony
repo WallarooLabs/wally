@@ -235,6 +235,14 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
   let _initializables: SetIs[Initializable] = _initializables.create()
 
+  // Partition router blueprints
+  var _partition_router_blueprints:
+    Map[String, PartitionRouterBlueprint] val =
+      recover Map[String, PartitionRouterBlueprint] end
+  var _stateless_partition_router_blueprints:
+    Map[U128, StatelessPartitionRouterBlueprint] val =
+      recover Map[U128, StatelessPartitionRouterBlueprint] end
+
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once EventLog signals we're ready
   let sl_builders: Array[SourceListenerBuilder] =
@@ -390,12 +398,12 @@ actor LocalTopologyInitializer is LayoutInitializer
     """
     _connections.quick_initialize_data_connections(this)
 
-  be create_partition_routers_from_blueprints(
+  be set_partition_router_blueprints(
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
   =>
-    _connections.create_partition_routers_from_blueprints(pr_blueprints,
-      spr_blueprints, _router_registry)
+    _partition_router_blueprints = pr_blueprints
+    _stateless_partition_router_blueprints = spr_blueprints
 
   be recover_and_initialize(ws: Array[String] val,
     cluster_initializer: (ClusterInitializer | None) = None)
@@ -1484,13 +1492,9 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.set_omni_router(omni_router)
         _omni_router = omni_router
 
-        for (state_name, subpartition) in t.state_builders().pairs() do
-          let partition_router = subpartition.build(_application.name(),
-            _worker_name, _metrics_conn, _auth, _event_log, _recovery_replayer,
-            _outgoing_boundaries, _initializables,
-            recover Map[U128, Consumer] end where default_router = None)
-          _router_registry.set_partition_router(state_name, partition_router)
-        end
+        _connections.create_partition_routers_from_blueprints(
+          _partition_router_blueprints,
+          _stateless_partition_router_blueprints, _router_registry)
 
         _save_local_topology()
         _save_worker_names()
@@ -1538,8 +1542,11 @@ actor LocalTopologyInitializer is LayoutInitializer
           auth = _auth), consume reporter, msg.step_id(),
           runner_builder.route_builder(), _event_log, _recovery_replayer,
           _outgoing_boundaries)
+        @printf[I32]("!!About to receive_state\n".cstring())
         step.receive_state(msg.state())
+        @printf[I32]("!!About to update_router_registry\n".cstring())
         msg.update_router_registry(_router_registry, step)
+        @printf[I32]("!!Done here\n".cstring())
       else
         Fail()
       end
@@ -1654,8 +1661,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       _router_registry.inform_joining_worker(conn, worker_name, t)
-      //!!
-      // _connections.inform_joining_worker(conn, worker_name, t)
     else
       Fail()
     end

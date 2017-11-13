@@ -21,6 +21,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
+use "wallaroo/core/invariant"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
@@ -178,6 +179,11 @@ actor RouterRegistry
   be register_partition_router_subscriber(state_name: String,
     sub: RouterUpdateable)
   =>
+    _register_partition_router_subscriber(state_name, sub)
+
+  fun ref _register_partition_router_subscriber(state_name: String,
+    sub: RouterUpdateable)
+  =>
     try
       if _partition_router_subs.contains(state_name) then
         _partition_router_subs(state_name)?.set(sub)
@@ -192,6 +198,7 @@ actor RouterRegistry
   be unregister_partition_router_subscriber(state_name: String,
     sub: RouterUpdateable)
   =>
+    Invariant(_partition_router_subs.contains(state_name))
     try
       _partition_router_subs(state_name)?.unset(sub)
     else
@@ -203,6 +210,11 @@ actor RouterRegistry
   // Collect by partition id probably
   be register_stateless_partition_router_subscriber(partition_id: U128,
     sub: RouterUpdateable)
+  =>
+    _register_stateless_partition_router_subscriber(partition_id, sub)
+
+  fun ref _register_stateless_partition_router_subscriber(
+    partition_id: U128, sub: RouterUpdateable)
   =>
     try
       if _stateless_partition_router_subs.contains(partition_id) then
@@ -219,6 +231,7 @@ actor RouterRegistry
   be unregister_stateless_partition_router_subscriber(partition_id: U128,
     sub: RouterUpdateable)
   =>
+    Invariant(_stateless_partition_router_subs.contains(partition_id))
     try
       _stateless_partition_router_subs(partition_id)?.unset(sub)
     else
@@ -226,6 +239,9 @@ actor RouterRegistry
     end
 
   be register_omni_router_step(s: Step) =>
+    _register_omni_router_step(s)
+
+  fun ref _register_omni_router_step(s: Step) =>
     _omni_router_steps.set(s)
 
   be register_boundaries(bs: Map[String, OutgoingBoundary] val,
@@ -327,6 +343,10 @@ actor RouterRegistry
     let partition_id = partition_router.partition_id()
 
     try
+      if not _stateless_partition_router_subs.contains(partition_id) then
+        _stateless_partition_router_subs(partition_id) =
+          SetIs[RouterUpdateable]
+      end
       for sub in
         _stateless_partition_router_subs(partition_id)?.values()
       do
@@ -742,12 +762,22 @@ actor RouterRegistry
     try
       match target
       | let step: Step =>
+        _data_router = _data_router.add_route(id, step)
+        _distribute_data_router()
+
+        _register_partition_router_subscriber(state_name, step)
+        _register_omni_router_step(step)
+        //!!
         match _omni_router
         | let omni_router: OmniRouter =>
-          step.update_omni_router(omni_router)
+          _omni_router = omni_router.update_route_to_step(id, step)
+          // _distribute_omni_router()
+          // step.update_omni_router(omni_router)
         else
           Fail()
         end
+        _distribute_omni_router()
+        @printf[I32]("!!Update ROUTE\n".cstring())
         let partition_router =
           _partition_routers(state_name)?.update_route[K](key, step)?
         _distribute_partition_router(partition_router)
@@ -758,9 +788,16 @@ actor RouterRegistry
             if psd.state_name() == state_name then
               match psd.target_id()
               | let tid: U128 =>
-                let target_router = DirectRouter(_data_router.step_for_id(tid)?)
-                step.register_routes(target_router,
-                  psd.forward_route_builder())
+                @printf[I32]("!!target ROUTER\n".cstring())
+                //!! Should this always be run?
+                try
+                  let target_router =
+                    DirectRouter(_data_router.step_for_id(tid)?)
+                  step.register_routes(target_router,
+                    psd.forward_route_builder())
+                // else
+                  // Fail()
+                end
               end
             end
           end
@@ -774,7 +811,7 @@ actor RouterRegistry
     else
       Fail()
     end
-    _move_proxy_to_step(id, target, source_worker)
+    // _move_proxy_to_step(id, target, source_worker)
     _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name,
       recover [source_worker] end)
 
@@ -790,11 +827,7 @@ actor RouterRegistry
 
     match _omni_router
     | let o: OmniRouter =>
-      let new_omni_router = o.update_route_to_step(id, target)
-      for step in _omni_router_steps.values() do
-        step.update_omni_router(new_omni_router)
-      end
-      _omni_router = new_omni_router
+      _omni_router = o.update_route_to_step(id, target)
       _distribute_omni_router()
     else
       Fail()
