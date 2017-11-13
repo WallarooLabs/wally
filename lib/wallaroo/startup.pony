@@ -544,8 +544,9 @@ actor Startup
       local_topology_initializer.create_connections(consume control_addrs,
         consume data_addrs)
       local_topology_initializer.quick_initialize_data_connections()
-      local_topology_initializer.create_partition_routers_from_blueprints(
-        m.partition_router_blueprints, m.stateless_partition_router_blueprints)
+      local_topology_initializer.set_partition_router_blueprints(
+        m.partition_router_blueprints,
+        m.stateless_partition_router_blueprints)
 
       // Dispose of temporary listener
       match _joining_listener

@@ -191,6 +191,7 @@ actor Step is (Producer & Consumer)
     _update_router(router)
 
   fun ref _update_router(router: Router) =>
+    @printf[I32]("!!Updating routes\n".cstring())
     try
       let old_router = _router
       _router = router
@@ -200,11 +201,14 @@ actor Step is (Producer & Consumer)
       end
       for consumer in _router.routes().values() do
         if not _routes.contains(consumer) then
+          @printf[I32]("!!Route building\n".cstring())
           let new_route = _route_builder(this, consumer, _metrics_reporter)
+          @printf[I32]("!!Done 1 Route building\n".cstring())
           _acker_x.add_route(new_route)
           _routes(consumer) = new_route
         end
       end
+      @printf[I32]("!!Done all route building on this step\n".cstring())
     else
       Fail()
     end
