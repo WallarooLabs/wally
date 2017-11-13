@@ -92,8 +92,10 @@ actor Step is (Producer & Consumer)
     end
     _event_log.register_producer(this, id)
 
+    @printf[I32]("!!About to clone router\n".cstring())
     let initial_router = _runner.clone_router_and_set_input_type(router)
     _update_router(initial_router)
+    @printf[I32]("!!Updated router in create()!!\n".cstring())
 
   //
   // Application startup lifecycle event
@@ -199,6 +201,7 @@ actor Step is (Producer & Consumer)
         let outdated_route = _routes(outdated_consumer)?
         _acker_x.remove_route(outdated_route)
       end
+      @printf[I32]("!! There are %s consumers\n".cstring(), _router.routes().size().string().cstring())
       for consumer in _router.routes().values() do
         if not _routes.contains(consumer) then
           @printf[I32]("!!Route building\n".cstring())

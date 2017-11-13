@@ -22,6 +22,7 @@ use "wallaroo_labs/dag"
 use "wallaroo/core/common"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/core/state"
 
 actor Main is TestList
   new make() =>
@@ -113,7 +114,7 @@ primitive _BaseStateSubpartitionGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
     StateSubpartition
   =>
-    KeyedStateSubpartition[String, String]("s",
+    KeyedStateSubpartition[String, String, EmptyState]("s",
       _BaseKeyedPartitionAddressesGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 
@@ -121,7 +122,7 @@ primitive _TargetStateSubpartitionGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
     StateSubpartition
   =>
-    KeyedStateSubpartition[String, String]("s",
+    KeyedStateSubpartition[String, String, EmptyState]("s",
       _TargetKeyedPartitionAddressesGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 

@@ -331,6 +331,7 @@ actor RouterRegistry
         _partition_router_subs(state_name) = SetIs[RouterUpdateable]
       end
       for sub in _partition_router_subs(state_name)?.values() do
+        @printf[I32]("!!Update from dist part\n".cstring())
         sub.update_router(partition_router)
       end
     else
@@ -350,6 +351,7 @@ actor RouterRegistry
       for sub in
         _stateless_partition_router_subs(partition_id)?.values()
       do
+        @printf[I32]("!!Update from dist stateless part\n".cstring())
         sub.update_router(partition_router)
       end
     else
