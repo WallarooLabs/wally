@@ -6,6 +6,50 @@ You will need a working [Wallaroo Python API](/book/python/intro.md).
 
 ## Running Word Count
 
+Open 5 shells and go to the `demos/python_word_count` directory. In each one, run `source environment`.
+
+### Shell 1
+
+Run the receiver.
+
+```bash
+./demo_receiver
+```
+
+### Shell 2
+
+Run worker 1.
+
+```bash
+./worker1
+```
+
+### Shell 3
+
+Run the sender
+
+```bash
+./demo_sender
+```
+
+### Shell 4
+
+Run worker 2.
+
+```bash
+./worker2
+```
+
+### Shell 5
+
+Run worker 3.
+
+```bash
+./worker3
+```
+
+## Running Word Count (full)
+
 In a shell, set up a listener:
 
 ```bash
@@ -42,7 +86,7 @@ Worker 2:
 machida --application-module word_count --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --name worker2 --ponythreads=1 -j 127.0.0.1:6000
-``` 
+```
 
 Worker 3:
 
