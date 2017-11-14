@@ -268,8 +268,8 @@ class val EmptyOmniRouter is OmniRouter
 
 class val StepIdRouter is OmniRouter
   let _worker_name: String
-  let _data_routes: Map[U128, Consumer] val
-  let _step_map: Map[U128, (ProxyAddress | U128)] val
+  let _data_routes: Map[StepId, Consumer] val
+  let _step_map: Map[StepId, (ProxyAddress | StepId)] val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _stateless_partitions: Map[U128, StatelessPartitionRouter] val
 
@@ -359,7 +359,7 @@ class val StepIdRouter is OmniRouter
               Fail()
               (true, true, latest_ts)
             end
-          | let sink_id: U128 =>
+          | let sink_id: StepId =>
             (true, true, latest_ts)
           else
             Fail()
@@ -400,8 +400,8 @@ class val StepIdRouter is OmniRouter
   fun val update_route_to_proxy(id: U128, pa: ProxyAddress): OmniRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
-    let new_data_routes = recover trn Map[U128, Consumer] end
-    let new_step_map = recover trn Map[U128, (ProxyAddress | U128)] end
+    let new_data_routes = recover trn Map[StepId, Consumer] end
+    let new_step_map = recover trn Map[StepId, (ProxyAddress | StepId)] end
     for (k, v) in _data_routes.pairs() do
       if k != id then new_data_routes(k) = v end
     end
@@ -413,11 +413,11 @@ class val StepIdRouter is OmniRouter
     StepIdRouter(_worker_name, consume new_data_routes, consume new_step_map,
       _outgoing_boundaries, _stateless_partitions)
 
-  fun val update_route_to_step(id: U128, step: Consumer): OmniRouter =>
+  fun val update_route_to_step(id: StepId, step: Consumer): OmniRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
-    let new_data_routes = recover trn Map[U128, Consumer] end
-    let new_step_map = recover trn Map[U128, (ProxyAddress | U128)] end
+    let new_data_routes = recover trn Map[StepId, Consumer] end
+    let new_step_map = recover trn Map[StepId, (ProxyAddress | StepId)] end
     for (k, v) in _data_routes.pairs() do
       if k != id then new_data_routes(k) = v end
     end
@@ -464,12 +464,12 @@ class val StepIdRouter is OmniRouter
     _outgoing_boundaries
 
   fun blueprint(): OmniRouterBlueprint =>
-    let new_step_map = recover trn Map[U128, ProxyAddress] end
+    let new_step_map = recover trn Map[StepId, ProxyAddress] end
     for (k, v) in _step_map.pairs() do
       match v
       | let pa: ProxyAddress =>
         new_step_map(k) = pa
-      | let step_id: U128 =>
+      | let step_id: StepId =>
         let proxy_address = ProxyAddress(_worker_name, step_id)
         new_step_map(k) = proxy_address
       end
@@ -480,9 +480,9 @@ class val StepIdRouter is OmniRouter
     match that
     | let o: box->StepIdRouter =>
       (_worker_name == o._worker_name) and
-        MapTagEquality[U128, Consumer](_data_routes,
+        MapTagEquality[StepId, Consumer](_data_routes,
           o._data_routes) and
-        MapEquality2[U128, ProxyAddress, U128](_step_map, o._step_map) and
+        MapEquality2[StepId, ProxyAddress, StepId](_step_map, o._step_map) and
         MapTagEquality[String, OutgoingBoundary](_outgoing_boundaries,
           o._outgoing_boundaries) and
         MapEquality[U128, StatelessPartitionRouter](_stateless_partitions,
@@ -493,29 +493,42 @@ class val StepIdRouter is OmniRouter
 
 trait val OmniRouterBlueprint
   fun build_router(worker_name: String,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val): OmniRouter
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    local_sinks: Map[StepId, Consumer] val): OmniRouter
 
 class val EmptyOmniRouterBlueprint is OmniRouterBlueprint
   fun build_router(worker_name: String,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val): OmniRouter
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    local_sinks: Map[StepId, Consumer] val): OmniRouter
   =>
     EmptyOmniRouter
 
 class val StepIdRouterBlueprint is OmniRouterBlueprint
-  let _step_map: Map[U128, ProxyAddress] val
+  let _step_map: Map[StepId, ProxyAddress] val
 
-  new val create(step_map: Map[U128, ProxyAddress] val) =>
+  new val create(step_map: Map[StepId, ProxyAddress] val) =>
     _step_map = step_map
 
   fun build_router(worker_name: String,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val): OmniRouter
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    local_sinks: Map[StepId, Consumer] val): OmniRouter
   =>
-    let new_step_map = recover trn Map[U128, (ProxyAddress | U128)] end
+    let data_routes = recover trn Map[StepId, Consumer] end
+    let new_step_map = recover trn Map[StepId, (ProxyAddress | StepId)] end
     for (k, v) in _step_map.pairs() do
-      new_step_map(k) = v
+      if local_sinks.contains(k) then
+        try
+          data_routes(k) = local_sinks(k)?
+        else
+          Fail()
+        end
+        new_step_map(k) = k
+      else
+        new_step_map(k) = v
+      end
     end
 
-    StepIdRouter(worker_name, recover Map[U128, Consumer] end,
+    StepIdRouter(worker_name, consume data_routes,
       consume new_step_map, outgoing_boundaries,
       recover Map[U128, StatelessPartitionRouter] end)
 

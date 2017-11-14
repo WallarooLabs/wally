@@ -1427,9 +1427,10 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n"
       .cstring())
     try
-      let built_routers = Map[U128, Router]
-      let data_routes = recover trn Map[U128, Consumer] end
-      let built_stateless_steps = recover trn Map[U128, Consumer] end
+      let built_routers = Map[StepId, Router]
+      let local_sinks = recover trn Map[StepId, Consumer] end
+      let data_routes = recover trn Map[StepId, Consumer] end
+      let built_stateless_steps = recover trn Map[StepId, Consumer] end
 
       match _topology
       | let t: LocalTopology =>
@@ -1472,6 +1473,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                     error
                   end
                 else
+                  local_sinks(next_id) = sink
                   DirectRouter(sink)
                 end
 
@@ -1495,7 +1497,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         _connections.create_partition_routers_from_blueprints(
           _partition_router_blueprints,
           _stateless_partition_router_blueprints, _omni_router_blueprint,
-          _router_registry)
+          consume local_sinks, _router_registry)
 
         _save_local_topology()
         _save_worker_names()

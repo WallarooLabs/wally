@@ -483,7 +483,7 @@ actor Connections is Cluster
   be create_partition_routers_from_blueprints(
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    omr_blueprint: OmniRouterBlueprint,
+    omr_blueprint: OmniRouterBlueprint, local_sinks: Map[StepId, Consumer] val,
     router_registry: RouterRegistry)
   =>
     // We delegate to router registry through here to ensure that we've
@@ -491,7 +491,8 @@ actor Connections is Cluster
     // create_connections was called.
 
     // We must create the omni_router first
-    router_registry.create_omni_router_from_blueprint(omr_blueprint)
+    router_registry.create_omni_router_from_blueprint(omr_blueprint,
+      local_sinks)
     router_registry.create_partition_routers_from_blueprints(
       pr_blueprints)
     router_registry.create_stateless_partition_routers_from_blueprints(

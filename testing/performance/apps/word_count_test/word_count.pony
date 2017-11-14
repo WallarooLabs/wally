@@ -158,12 +158,8 @@ primitive AddCount is StateComputation[(String | RunningTotal), RunningTotal, Wo
 
     let word =
       match w
-      | let s: String =>
-        @printf[I32]("!!GOT STR\n".cstring())
-        s
-      | let r: RunningTotal =>
-        @printf[I32]("!!GOT RUN\n".cstring())
-        r.word
+      | let s: String => s
+      | let r: RunningTotal => r.word
       else
         "!"
       end
