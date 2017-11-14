@@ -14,7 +14,7 @@
     },
 
     "variables": {
-        "wallaroo_version": "0.2.1"
+        "wallaroo_version": "0.2.2"
     },
 
     "pluginsConfig": {
