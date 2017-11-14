@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 #ifdef __APPLE__
+    #include <AvailabilityMacros.h>
     #if MAC_OS_X_VERSION_MAX_ALLOWED < 101300
         #include <Python/Python.h>
     #else
