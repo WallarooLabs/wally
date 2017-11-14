@@ -205,9 +205,6 @@ actor RouterRegistry
       Fail()
     end
 
-  //!!
-  //TODO: Determine in local_topology which steps use these routers
-  // Collect by partition id probably
   be register_stateless_partition_router_subscriber(partition_id: U128,
     sub: RouterUpdateable)
   =>
@@ -331,7 +328,6 @@ actor RouterRegistry
         _partition_router_subs(state_name) = SetIs[RouterUpdateable]
       end
       for sub in _partition_router_subs(state_name)?.values() do
-        @printf[I32]("!!Update from dist part\n".cstring())
         sub.update_router(partition_router)
       end
     else
@@ -351,7 +347,6 @@ actor RouterRegistry
       for sub in
         _stateless_partition_router_subs(partition_id)?.values()
       do
-        @printf[I32]("!!Update from dist stateless part\n".cstring())
         sub.update_router(partition_router)
       end
     else
@@ -394,6 +389,16 @@ actor RouterRegistry
       _stateless_partition_routers(id) = next_router
     end
 
+  be create_omni_router_from_blueprint(
+    omni_router_blueprint: OmniRouterBlueprint)
+  =>
+    let obs_trn = recover trn Map[String, OutgoingBoundary] end
+    for (w, ob) in _outgoing_boundaries.pairs() do
+      obs_trn(w) = ob
+    end
+    let obs = consume val obs_trn
+    _omni_router = omni_router_blueprint.build_router(_worker_name,
+      obs)
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
     local_topology: LocalTopology)
@@ -410,8 +415,18 @@ actor RouterRegistry
       stateless_blueprints(id) = r.blueprint()
     end
 
+    let omni_router_blueprint =
+      match _omni_router
+      | let omr: OmniRouter =>
+        omr.blueprint()
+      else
+        Fail()
+        EmptyOmniRouterBlueprint
+      end
+
     _connections.inform_joining_worker(conn, worker, local_topology,
-      consume state_blueprints, consume stateless_blueprints)
+      consume state_blueprints, consume stateless_blueprints,
+      omni_router_blueprint)
 
   be inform_cluster_of_join() =>
     _inform_cluster_of_join()
@@ -766,20 +781,8 @@ actor RouterRegistry
       | let step: Step =>
         _data_router = _data_router.add_route(id, step)
         _distribute_data_router()
-
-        _register_partition_router_subscriber(state_name, step)
         _register_omni_router_step(step)
-        //!!
-        match _omni_router
-        | let omni_router: OmniRouter =>
-          _omni_router = omni_router.update_route_to_step(id, step)
-          // _distribute_omni_router()
-          // step.update_omni_router(omni_router)
-        else
-          Fail()
-        end
-        _distribute_omni_router()
-        @printf[I32]("!!Update ROUTE\n".cstring())
+         _distribute_omni_router()
         let partition_router =
           _partition_routers(state_name)?.update_route[K](key, step)?
         _distribute_partition_router(partition_router)
@@ -790,15 +793,11 @@ actor RouterRegistry
             if psd.state_name() == state_name then
               match psd.target_id()
               | let tid: U128 =>
-                @printf[I32]("!!target ROUTER\n".cstring())
-                //!! Should this always be run?
                 try
                   let target_router =
                     DirectRouter(_data_router.step_for_id(tid)?)
                   step.register_routes(target_router,
                     psd.forward_route_builder())
-                // else
-                  // Fail()
                 end
               end
             end

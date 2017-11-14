@@ -579,7 +579,6 @@ class ComputationRunner[In: Any val, Out: Any val]
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
-    @printf[I32]("!!Real CompLike\n".cstring())
     _next.clone_router_and_set_input_type(r)
 
 class PreStateRunner[In: Any val, Out: Any val, S: State ref]
@@ -651,7 +650,6 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
-    @printf[I32]("!!Real PreStateLike\n".cstring())
     r
 
 class StateRunner[S: State ref] is (Runner & ReplayableRunner &
@@ -781,7 +779,6 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
-    @printf[I32]("!!Real StateLike\n".cstring())
     r
 
   fun ref serialize_state(): ByteSeq val =>
@@ -827,5 +824,4 @@ class iso RouterRunner
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
-    @printf[I32]("!!RouterRunner like!\n".cstring())
     r

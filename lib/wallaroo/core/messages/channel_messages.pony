@@ -188,6 +188,7 @@ primitive ChannelMsgEncoder
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
+    omni_router_blueprint: OmniRouterBlueprint,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -196,8 +197,8 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
       metric_host, metric_service, control_addrs, data_addrs, worker_names,
-      partition_blueprints, stateless_partition_blueprints),
-      auth)?
+      partition_blueprints, stateless_partition_blueprints,
+      omni_router_blueprint), auth)?
 
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
     d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
@@ -567,6 +568,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let partition_router_blueprints: Map[String, PartitionRouterBlueprint] val
   let stateless_partition_router_blueprints:
     Map[U128, StatelessPartitionRouterBlueprint] val
+  let omni_router_blueprint: OmniRouterBlueprint
 
   new val create(sender: String, app: String, l_topology: LocalTopology,
     m_host: String, m_service: String,
@@ -574,7 +576,8 @@ class val InformJoiningWorkerMsg is ChannelMsg
     d_addrs: Map[String, (String, String)] val,
     w_names: Array[String] val,
     p_blueprints: Map[String, PartitionRouterBlueprint] val,
-    stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
+    stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
+    omr_blueprint: OmniRouterBlueprint)
   =>
     sender_name = sender
     local_topology = l_topology
@@ -586,6 +589,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
     worker_names = w_names
     partition_router_blueprints = p_blueprints
     stateless_partition_router_blueprints = stateless_p_blueprints
+    omni_router_blueprint = omr_blueprint
 
 // TODO: Don't send host over since we need to determine that on receipt
 class val JoiningWorkerInitializedMsg is ChannelMsg
