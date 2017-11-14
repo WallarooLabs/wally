@@ -242,6 +242,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _stateless_partition_router_blueprints:
     Map[U128, StatelessPartitionRouterBlueprint] val =
       recover Map[U128, StatelessPartitionRouterBlueprint] end
+  var _omni_router_blueprint: OmniRouterBlueprint = EmptyOmniRouterBlueprint
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once EventLog signals we're ready
@@ -400,10 +401,12 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   be set_partition_router_blueprints(
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
-    spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
+    spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
+    omr_blueprint: OmniRouterBlueprint)
   =>
     _partition_router_blueprints = pr_blueprints
     _stateless_partition_router_blueprints = spr_blueprints
+    _omni_router_blueprint = omr_blueprint
 
   be recover_and_initialize(ws: Array[String] val,
     cluster_initializer: (ClusterInitializer | None) = None)
@@ -1486,15 +1489,10 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.register_boundaries(_outgoing_boundaries,
           _outgoing_boundary_builders)
 
-        let omni_router = StepIdRouter(_worker_name,
-          consume built_stateless_steps, t.step_map(), _outgoing_boundaries,
-          recover Map[U128, StatelessPartitionRouter] end)
-        _router_registry.set_omni_router(omni_router)
-        _omni_router = omni_router
-
         _connections.create_partition_routers_from_blueprints(
           _partition_router_blueprints,
-          _stateless_partition_router_blueprints, _router_registry)
+          _stateless_partition_router_blueprints, _omni_router_blueprint,
+          _router_registry)
 
         _save_local_topology()
         _save_worker_names()
@@ -1542,11 +1540,8 @@ actor LocalTopologyInitializer is LayoutInitializer
           auth = _auth), consume reporter, msg.step_id(),
           runner_builder.route_builder(), _event_log, _recovery_replayer,
           _outgoing_boundaries)
-        @printf[I32]("!!About to receive_state\n".cstring())
         step.receive_state(msg.state())
-        @printf[I32]("!!About to update_router_registry\n".cstring())
         msg.update_router_registry(_router_registry, step)
-        @printf[I32]("!!Done here\n".cstring())
       else
         Fail()
       end

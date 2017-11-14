@@ -92,10 +92,8 @@ actor Step is (Producer & Consumer)
     end
     _event_log.register_producer(this, id)
 
-    @printf[I32]("!!About to clone router\n".cstring())
     let initial_router = _runner.clone_router_and_set_input_type(router)
     _update_router(initial_router)
-    @printf[I32]("!!Updated router in create()!!\n".cstring())
 
   //
   // Application startup lifecycle event
@@ -193,7 +191,6 @@ actor Step is (Producer & Consumer)
     _update_router(router)
 
   fun ref _update_router(router: Router) =>
-    @printf[I32]("!!Updating routes\n".cstring())
     try
       let old_router = _router
       _router = router
@@ -201,17 +198,13 @@ actor Step is (Producer & Consumer)
         let outdated_route = _routes(outdated_consumer)?
         _acker_x.remove_route(outdated_route)
       end
-      @printf[I32]("!! There are %s consumers\n".cstring(), _router.routes().size().string().cstring())
       for consumer in _router.routes().values() do
         if not _routes.contains(consumer) then
-          @printf[I32]("!!Route building\n".cstring())
           let new_route = _route_builder(this, consumer, _metrics_reporter)
-          @printf[I32]("!!Done 1 Route building\n".cstring())
           _acker_x.add_route(new_route)
           _routes(consumer) = new_route
         end
       end
-      @printf[I32]("!!Done all route building on this step\n".cstring())
     else
       Fail()
     end
@@ -225,11 +218,15 @@ actor Step is (Producer & Consumer)
         let outdated_route = _routes(outdated_consumer)?
         _acker_x.remove_route(outdated_route)
       end
+      _add_boundaries(omni_router.boundaries())
     else
       Fail()
     end
 
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
+    _add_boundaries(boundaries)
+
+  fun ref _add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
     for (state_name, boundary) in boundaries.pairs() do
       if not _outgoing_boundaries.contains(state_name) then
         _outgoing_boundaries(state_name) = boundary

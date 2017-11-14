@@ -462,11 +462,15 @@ actor Connections is Cluster
   be create_partition_routers_from_blueprints(
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
+    omr_blueprint: OmniRouterBlueprint,
     router_registry: RouterRegistry)
   =>
     // We delegate to router registry through here to ensure that we've
     // already sent the outgoing boundaries to the router registry when
     // create_connections was called.
+
+    // We must create the omni_router first
+    router_registry.create_omni_router_from_blueprint(omr_blueprint)
     router_registry.create_partition_routers_from_blueprints(
       pr_blueprints)
     router_registry.create_stateless_partition_routers_from_blueprints(
@@ -593,7 +597,8 @@ actor Connections is Cluster
     local_topology: LocalTopology,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
-      Map[U128, StatelessPartitionRouterBlueprint] val)
+      Map[U128, StatelessPartitionRouterBlueprint] val,
+    omr_blueprint: OmniRouterBlueprint)
   =>
     if not _control_addrs.contains(worker) then
       let c_addrs = recover trn Map[String, (String, String)] end
@@ -613,7 +618,7 @@ actor Connections is Cluster
           _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
           _metrics_service, consume c_addrs, consume d_addrs,
           local_topology.worker_names, partition_blueprints,
-          stateless_partition_blueprints, _auth)?
+          stateless_partition_blueprints, omr_blueprint, _auth)?
         conn.writev(inform_msg)
         @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
           "necessary information.***\n").cstring(), worker.cstring())
