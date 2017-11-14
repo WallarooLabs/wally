@@ -390,7 +390,8 @@ actor RouterRegistry
     end
 
   be create_omni_router_from_blueprint(
-    omni_router_blueprint: OmniRouterBlueprint)
+    omni_router_blueprint: OmniRouterBlueprint,
+    local_sinks: Map[StepId, Consumer] val)
   =>
     let obs_trn = recover trn Map[String, OutgoingBoundary] end
     for (w, ob) in _outgoing_boundaries.pairs() do
@@ -398,7 +399,7 @@ actor RouterRegistry
     end
     let obs = consume val obs_trn
     _omni_router = omni_router_blueprint.build_router(_worker_name,
-      obs)
+      obs, local_sinks)
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
     local_topology: LocalTopology)
