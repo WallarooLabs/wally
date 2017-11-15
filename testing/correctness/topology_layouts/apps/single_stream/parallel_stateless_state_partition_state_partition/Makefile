@@ -35,48 +35,48 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
 
-SINGLE_STREAM_PARALLEL_STATELESS_STATE_PARTITION_PARALLEL_STATELESS_APP_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+SINGLE_STREAM_PARALLEL_STATELESS_STATE_PARTITION_STATE_PARTITION_APP_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
 
-integration-tests-testing-correctness-topology_layouts-apps-single_stream-parallel_stateless_state_partition_parallel_stateless_app: single_stream_parallel_stateless_state_partition_parallel_stateless_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-parallel_stateless_state_partition_state_partition_app: single_stream_parallel_stateless_state_partition_state_partition_app_test
 
-single_stream_parallel_stateless_state_partition_parallel_stateless_app_test:
-	cd $(SINGLE_STREAM_PARALLEL_STATELESS_STATE_PARTITION_PARALLEL_STATELESS_APP_PATH) && \
+single_stream_parallel_stateless_state_partition_state_partition_app_test:
+	cd $(SINGLE_STREAM_PARALLEL_STATELESS_STATE_PARTITION_STATE_PARTITION_APP_PATH) && \
 	integration_test \
 	--sequence-sender '(0,100]' \
 	--validation-cmd 'python validate.py --n 100 --output' \
 	--output 'received.txt' \
 	--log-level error \
-	--command './parallel_stateless_state_partition_parallel_stateless_app' \
+	--command './parallel_stateless_state_partition_state_partition_app' \
 	--sink-expect 100
 
-integration-tests-testing-correctness-topology_layouts-apps-single_stream-parallel_stateless_state_partition_parallel_stateless_app: two_worker_single_stream_parallel_stateless_state_partition_parallel_stateless_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-parallel_stateless_state_partition_state_partition_app: two_worker_single_stream_parallel_stateless_state_partition_state_partition_app_test
 
-two_worker_single_stream_parallel_stateless_state_partition_parallel_stateless_app_test:
-	cd $(SINGLE_STREAM_PARALLEL_STATELESS_STATE_PARTITION_PARALLEL_STATELESS_APP_PATH) && \
+two_worker_single_stream_parallel_stateless_state_partition_state_partition_app_test:
+	cd $(SINGLE_STREAM_PARALLEL_STATELESS_STATE_PARTITION_STATE_PARTITION_APP_PATH) && \
 	integration_test \
 	--sequence-sender '(0,100]' \
 	--workers 2 \
 	--validation-cmd 'python validate.py --n 100 --output' \
 	--output 'received.txt' \
 	--log-level error \
-	--command './parallel_stateless_state_partition_parallel_stateless_app' \
+	--command './parallel_stateless_state_partition_state_partition_app' \
 	--sink-expect 100
 
-integration-tests-testing-correctness-topology_layouts-apps-single_stream-parallel_stateless_state_partition_parallel_stateless_app: three_worker_single_stream_parallel_stateless_state_partition_parallel_stateless_app_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-parallel_stateless_state_partition_state_partition_app: three_worker_single_stream_parallel_stateless_state_partition_state_partition_app_test
 
-three_worker_single_stream_parallel_stateless_state_partition_parallel_stateless_app_test:
-	cd $(SINGLE_STREAM_PARALLEL_STATELESS_STATE_PARTITION_PARALLEL_STATELESS_APP_PATH) && \
+three_worker_single_stream_parallel_stateless_state_partition_state_partition_app_test:
+	cd $(SINGLE_STREAM_PARALLEL_STATELESS_STATE_PARTITION_STATE_PARTITION_APP_PATH) && \
 	integration_test \
 	--sequence-sender '(0,100]' \
 	--workers 3 \
 	--validation-cmd 'python validate.py --n 100 --output' \
 	--output 'received.txt' \
 	--log-level error \
-	--command './parallel_stateless_state_partition_parallel_stateless_app' \
+	--command './parallel_stateless_state_partition_state_partition_app' \
 	--sink-expect 100
 
 # end of prevent rules from being evaluated/included multiple times
