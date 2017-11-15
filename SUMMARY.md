@@ -13,11 +13,15 @@
 * [Clustered Wallaroo](book/core-concepts/clustering.md)
 
 ## Developing with Wallaroo
-
-* [Setting up Your Environment](book/getting-started/setup.md)
-  * [MacOS Installation](book/getting-started/macos-setup.md)
-  * [Ubuntu Installation](book/getting-started/linux-setup.md)
-* [Run a Wallaroo Application](book/getting-started/run-a-wallaroo-application.md)
+* [Choosing an Installation Option](book/getting-started/choosing-an-installation-option.md)
+* Installing with Docker
+  * [Setting Up Your Environment](book/getting-started/docker-setup.md)
+  * [Run a Wallaroo Application in Docker](book/getting-started/run-a-wallaroo-application-docker.md)
+* Installing From Source
+  * [Setting up Your Environment](book/getting-started/setup.md)
+    * [MacOS Installation](book/getting-started/macos-setup.md)
+    * [Ubuntu Installation](book/getting-started/linux-setup.md)
+  * [Run a Wallaroo Application](book/getting-started/run-a-wallaroo-application.md)
 * [Conclusion](book/getting-started/conclusion.md)
 
 <!--
@@ -69,6 +73,7 @@
 * [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
 * [Decoding Giles Receiver Output](book/appendix/decoding-giles-receiver-output.md)
 * [Wallaroo and Long-Running Data Processing and Other Workflows](book/appendix/wallaroo-and-long-running-data-processing-and-other-workflows.md)
+* [Tips for using Wallaroo in Docker](book/appendix/wallaroo-in-docker-tips.md)
 
 ## Legal
 * [Terms and Conditions](book/legal/terms.md)

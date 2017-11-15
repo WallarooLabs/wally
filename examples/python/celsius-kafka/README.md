@@ -21,7 +21,9 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 
 ## Running Celsius Kafka
 
-In order to run the application you will need Machida and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions. Alternatively, they could be run in Docker, please see the [Docker](/book/getting-started/docker-setup.md) setup instructions and our [Run an Application in Docker](/book/getting-started/run-a-wallaroo-application-docker.md) guide if you haven't already done so.
+
+Note: If running in Docker, the relative paths are not necessary for binaries as they are all bound to the PATH within the container. You will not need to set the `PATH` variable and `PYTHONPATH` already includes the current working directory. The kafkfa cluster and kafkacat should be run from your host and not within the Docker container.
 
 You will also need access to a Kafka cluster. This example assumes that there is a Kafka broker listening on port `9092` on `127.0.0.1`.
 
@@ -61,6 +63,8 @@ docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
   zookeeper:2181 --create --partitions 4 --topic test-out --replication-factor \
   1 # to create a test-out topic; change arguments as desired
 ```
+
+Note: The `./cluster up 1` command outputs `Host IP used for Kafka Brokers is <YOUR_HOST_IP>`. You will need to use this IP address for the `kafka_source_brokers` and `kafka_sink_brokers` arguments when starting `machida` within Docker in order to communicate with the cluster running on your host machine.
 
 #### Set up a listener to monitor the Kafka topic to which you would the application to publish results. We usually use `kafkacat`.
 
@@ -102,7 +106,7 @@ machida --application-module celsius \
   --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:12500 --data 127.0.0.1:12501 \
   --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1 \
-  --ponynoblock 
+  --ponynoblock
 ```
 
 `kafka_sink_max_message_size` controls maximum size of message sent to kafka in a single produce request. Kafka will return errors if this is bigger than server is configured to accept.

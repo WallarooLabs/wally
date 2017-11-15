@@ -1,6 +1,6 @@
 # Setting Up Your MacOS Environment for Wallaroo
 
-These instructions have been tested on OSX El Capitan and MacOS Sierra.
+These instructions have been tested on OSX El Capitan and MacOS Sierra. If you are on Sierra or High Sierra, we recommend installing via [Docker](/book/getting-started/docker-setup.md) due to a Kernel panic caused by a few of the Wallaroo applications, this is currently under investigation.
 
 There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
