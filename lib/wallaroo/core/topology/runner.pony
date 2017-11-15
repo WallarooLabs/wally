@@ -79,7 +79,6 @@ trait val RunnerBuilder
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
-    @printf[I32]("RunnerBuilder Like!\n".cstring())
     r
 
 class val RunnerSequenceBuilder is RunnerBuilder
@@ -192,7 +191,6 @@ class val RunnerSequenceBuilder is RunnerBuilder
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
-    @printf[I32]("RunnerSequenceBuilder Like!\n".cstring())
     try
       _runner_builders(_runner_builders.size() - 1)?
         .clone_router_and_set_input_type(r, default_r)
@@ -298,10 +296,8 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun clone_router_and_set_input_type(r: Router,
     default_r: (Router | None) = None): Router
   =>
-    @printf[I32]("PreStateRunnerBuilder Like!\n".cstring())
     match r
     | let p: AugmentablePartitionRouter[Key] val =>
-      @printf[I32]("AUGMENTED PreStateRunnerBuilder Like!\n".cstring())
       p.clone_and_set_input_type[PIn](_partition_function, default_r)
     else
       r
