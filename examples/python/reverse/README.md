@@ -28,7 +28,9 @@ The `Decoders`'s `decode(...)` method creates a string from the value represente
 
 ## Running Reverse
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions. Alternatively, they could be run in Docker, please see the [Docker](/book/getting-started/docker-setup.md) setup instructions and our [Run an Application in Docker](/book/getting-started/run-a-wallaroo-application-docker.md) guide if you haven't already done so.
+
+Note: If running in Docker, the relative paths are not necessary for binaries as they are all bound to the PATH within the container. You will not need to set the `PATH` variable and `PYTHONPATH` already includes the current working directory.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/reverse` directory.
 
@@ -55,7 +57,7 @@ Run `machida` with `--application-module reverse`:
 machida --application-module reverse --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
-  --ponythreads=1 --ponynoblock 
+  --ponythreads=1 --ponynoblock
 ```
 
 ### Shell 3
