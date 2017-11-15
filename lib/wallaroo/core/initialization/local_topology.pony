@@ -399,6 +399,9 @@ actor LocalTopologyInitializer is LayoutInitializer
     """
     _connections.quick_initialize_data_connections(this)
 
+  be set_omni_router(omr: OmniRouter) =>
+    _omni_router = omr
+
   be set_partition_router_blueprints(
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
@@ -1394,7 +1397,6 @@ actor LocalTopologyInitializer is LayoutInitializer
           consume stateless_partition_routers_trn)
         _router_registry.set_omni_router(omni_router)
 
-        // Initialize all our initializables to get backpressure started
         _omni_router = omni_router
         for i in _initializables.values() do
           i.application_begin_reporting(this)
@@ -1449,6 +1451,9 @@ actor LocalTopologyInitializer is LayoutInitializer
               let sink = egress_builder(_worker_name,
                 consume sink_reporter, _env, _auth, _outgoing_boundaries)?
 
+
+              _initializables.set(sink)
+
               match sink
               | let d: DisposableActor =>
                 _connections.register_disposable(d)
@@ -1456,10 +1461,6 @@ actor LocalTopologyInitializer is LayoutInitializer
                 @printf[I32](("All sinks and boundaries should be " +
                   "disposable!\n").cstring())
                 Fail()
-              end
-
-              if not _initializables.contains(sink) then
-                _initializables.set(sink)
               end
 
               let sink_router =
@@ -1497,15 +1498,12 @@ actor LocalTopologyInitializer is LayoutInitializer
         _connections.create_partition_routers_from_blueprints(
           _partition_router_blueprints,
           _stateless_partition_router_blueprints, _omni_router_blueprint,
-          consume local_sinks, _router_registry)
+          consume local_sinks, _router_registry, this)
 
         _save_local_topology()
         _save_worker_names()
 
-        // Call this on router registry instead of Connections directly
-        // to make sure that other messages on registry queues are
-        // processed first
-        _router_registry.inform_cluster_of_join()
+        _topology_initialized = true
 
         @printf[I32](("\n|^|^|^|Finished Initializing Joining Worker Local " +
           "Topology|^|^|^|\n").cstring())
@@ -1525,7 +1523,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       match _topology
       | let t: LocalTopology =>
         _topology = t.update_proxy_address_for_state_key[Key](state_name,
-        key, pa)?
+          key, pa)?
         // TODO: We should find a way to batch changes before writing out.
         _save_local_topology()
       end
@@ -1552,6 +1550,25 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
     else
       Fail()
+    end
+
+  be initialize_join_initializables() =>
+    _initialize_join_initializables()
+
+  fun ref _initialize_join_initializables() =>
+    // For now we need to keep boundaries out of the initialization
+    // lifecycle stages during join. This is because during a join, all
+    // data channels are muted, so we are not able to connect
+    // over boundaries. This means the boundaries can not
+    // report as initialized until the join is complete, but
+    // the join can't complete until we say we're initialized.
+    for i in _initializables.values() do
+      match i
+      | let ob: OutgoingBoundary =>
+        _initializables.unset(ob)
+      else
+        i.application_begin_reporting(this)
+      end
     end
 
   be report_created(initializable: Initializable) =>
@@ -1611,6 +1628,12 @@ actor LocalTopologyInitializer is LayoutInitializer
           _event_log.start_pipeline_logging(this)
         end
         _router_registry.application_ready_to_work()
+        if _is_joining then
+          // Call this on router registry instead of Connections directly
+          // to make sure that other messages on registry queues are
+          // processed first
+          _router_registry.inform_cluster_of_join()
+        end
       end
     else
       @printf[I32](("The same Initializable reported being ready to work " +
