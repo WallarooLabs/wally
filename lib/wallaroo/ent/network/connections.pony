@@ -463,7 +463,7 @@ actor Connections is Cluster
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
     omr_blueprint: OmniRouterBlueprint, local_sinks: Map[StepId, Consumer] val,
-    router_registry: RouterRegistry)
+    router_registry: RouterRegistry, lti: LocalTopologyInitializer)
   =>
     // We delegate to router registry through here to ensure that we've
     // already sent the outgoing boundaries to the router registry when
@@ -471,7 +471,7 @@ actor Connections is Cluster
 
     // We must create the omni_router first
     router_registry.create_omni_router_from_blueprint(omr_blueprint,
-      local_sinks)
+      local_sinks, lti)
     router_registry.create_partition_routers_from_blueprints(
       pr_blueprints)
     router_registry.create_stateless_partition_routers_from_blueprints(
