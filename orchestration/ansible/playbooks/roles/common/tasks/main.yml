@@ -88,7 +88,7 @@
 
 - name: Get ptpd deb for armhf
   get_url:
-     url: https://s3.amazonaws.com/sendence-dev/installers/ptpd/ptpd_2.3.2-master-1_armhf.deb
+     url: https://github.com/WallarooLabs/ptpd/releases/download/ptpd_2.3.2-master/ptpd_2.3.2-master-1_armhf.deb
      dest: /tmp/ptpd_2.3.2-master-1_armhf.deb
      mode: 0755
   register: get_url_result
@@ -103,7 +103,7 @@
 
 - name: Get ptpd deb for x86_64
   get_url:
-     url: https://s3.amazonaws.com/sendence-dev/installers/ptpd/ptpd_2.3.2-master-1_amd64.deb
+     url: https://github.com/WallarooLabs/ptpd/releases/download/ptpd_2.3.2-master/ptpd_2.3.2-master-1_amd64.deb
      dest: /tmp/ptpd_2.3.2-master-1_amd64.deb
      mode: 0755
   register: get_url_result
@@ -124,13 +124,13 @@
 
 - name: add llvm apt repo
   apt_repository:
-    repo: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.8 main'
+    repo: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
     state: present
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
 - name: add llvm src apt repo
   apt_repository:
-    repo: 'deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.8 main'
+    repo: 'deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main'
     state: present
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
@@ -148,84 +148,57 @@
    - libssl-dev
    - libxml2-dev
    - zlib1g-dev
+   - llvm-3.9
+   - libpcre2-dev
+   - libsnappy-dev
+   - liblz4-dev
+   - python-dev
    - software-properties-common
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: Download pcre2
-  get_url:
-    url: "http://downloads.sourceforge.net/project/pcre/pcre2/10.21/pcre2-10.21.tar.bz2"
-    dest: "/tmp/pcre2-src.tbz2"
-  register: get_url_result
-  until: get_url_result | succeeded
-  retries: 5
-  delay: 5
+- name: download ponyc
+  git:
+    repo: https://github.com/ponylang/ponyc
+    dest: /src/ponyc
+    clone: yes
+    force: yes
+    version: master
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: Expand pcre2 archive
-  unarchive:
-    src: "/tmp/pcre2-src.tbz2"
-    dest: "/tmp"
-    creates: "/tmp/pcre2-10.21/README"
-    copy: no
+- name: checkout to latest ponyc release
+  shell: git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+  args:
+    chdir: /src/ponyc
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: configure pcre2
-  command: >
-    ./configure prefix=/usr
-    chdir=/tmp/pcre2-10.21
-    creates=/tmp/pcre2-10.21/libtool
+- name: compile and install latest ponyc release
+  command: sudo make config=release install
+  args:
+    chdir: /src/ponyc
+    creates: /src/ponyc/build
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: build pcre2
-  command: >
-    make
-    chdir=/tmp/pcre2-10.21
-    creates=/tmp/pcre2-10.21/pcre2test
+- name: download pony-stable
+  git:
+    repo: https://github.com/ponylang/pony-stable
+    dest: /src/pony-stable
+    clone: yes
+    force: yes
+    version: master
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: install pcre2
-  command: >
-    make install
-    chdir=/tmp/pcre2-10.21
-    creates=/usr/bin/pcre2test
+- name: checkout to latest pony-stable release
+  shell: git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+  args:
+    chdir: /src/pony-stable
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
-- name: List ponyc custom C libs from S3
-  s3:
-    mode=list
-    bucket=sendence-dev
-    prefix=ponyc_external_dependencies/
-  delegate_to: 127.0.0.1
-  become: no
-  register: s3_bucket_items
-
-- name: Filter list of ponyc custom C libs (amd64)
-  set_fact:
-    custom_libs: "{{ s3_bucket_items.s3_keys | select('search', '/amd64') | list }}"
-  when: (ansible_architecture == "x86_64")
-
-- name: Filter list of ponyc custom C libs (armhf)
-  set_fact:
-    custom_libs: "{{ s3_bucket_items.s3_keys | select('search', '/armhf') | list }}"
-  when: ('arm' == '{{ ansible_architecture[0:3] }}')
-
-- name: download ponyc custom C libs from S3
-  get_url:
-     url: https://s3.amazonaws.com/sendence-dev/{{ item }}
-     dest: /tmp/{{ item | basename }}
-     mode: 0755
-  with_items: custom_libs
-  register: get_url_result
-  until: get_url_result | succeeded
-  retries: 5
-  delay: 5
-
-- name: unarchive ponyc custom C libs
-  unarchive:
-    src=/tmp/{{ item | basename }}
-    dest=/usr/
-    copy=no
-  with_items: custom_libs
+- name: compile and install latest pony-stable release
+  shell: make && sudo make config=release install
+  args:
+    chdir: /src/pony-stable
+    creates: /src/pony-stable/bin
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
 - name: create cpu shield
   script: create_cpu_shield.sh {{ system_cpus if system_cpus is defined else "" }} > /create_cpu_shield.out
