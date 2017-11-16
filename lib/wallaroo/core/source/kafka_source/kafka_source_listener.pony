@@ -96,8 +96,8 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _conf = conf
     _tcp_auth = tcp_auth
 
-  fun apply(): SourceListener =>
-    KafkaSourceListener[In](_source_builder, _router, _router_registry,
+  fun apply(env: Env): SourceListener =>
+    KafkaSourceListener[In](env, _source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
       _default_target, _default_in_route_builder, _target_router, _conf,
@@ -120,6 +120,7 @@ class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
 
 
 actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
+  let _env: Env
   let _notify: KafkaSourceListenerNotify[In]
   let _router: Router
   let _router_registry: RouterRegistry
@@ -137,7 +138,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _kafka_topic_partition_sources: Map[String, Map[I32, KafkaSource[In]]] =
     _kafka_topic_partition_sources.create()
 
-  new create(source_builder: SourceBuilder, router: Router,
+  new create(env: Env, source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -148,6 +149,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     target_router: Router = EmptyRouter,
     conf: KafkaConfig val, tcp_auth: TCPConnectionAuth)
   =>
+    _env = env
     _notify = KafkaSourceListenerNotify[In](source_builder, event_log, auth,
       target_router)
     _router = router
@@ -203,7 +205,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
           partitions_changed = true
 
           try
-            let source = KafkaSource[In](this, _notify.build_source()?,
+            let source = KafkaSource[In](this, _notify.build_source(_env)?,
               _router.routes(), _route_builder, _outgoing_boundary_builders,
               _layout_initializer, _default_target,
               _default_in_route_builder,

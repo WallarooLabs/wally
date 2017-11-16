@@ -68,8 +68,8 @@ class val TCPSourceListenerBuilder
     _service = service
     _metrics_reporter = consume metrics_reporter
 
-  fun apply(): SourceListener =>
-    TCPSourceListener(_source_builder, _router, _router_registry,
+  fun apply(env: Env): SourceListener =>
+    TCPSourceListener(env, _source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
       _default_target, _default_in_route_builder, _target_router, _host,

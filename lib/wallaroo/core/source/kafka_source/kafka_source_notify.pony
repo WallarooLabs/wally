@@ -28,17 +28,19 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
 primitive KafkaSourceNotifyBuilder[In: Any val]
-  fun apply(pipeline_name: String, auth: AmbientAuth,
+  fun apply(pipeline_name: String, env: Env, auth: AmbientAuth,
     handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router, pre_state_target_id: (U128 | None) = None):
     SourceNotify iso^
   =>
-    KafkaSourceNotify[In](pipeline_name, auth, handler, runner_builder, router,
-      consume metrics_reporter, event_log, target_router, pre_state_target_id)
+    KafkaSourceNotify[In](pipeline_name, env, auth, handler, runner_builder,
+      router, consume metrics_reporter, event_log, target_router,
+      pre_state_target_id)
 
 class KafkaSourceNotify[In: Any val]
+  let _env: Env
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
   let _pipeline_name: String
   let _source_name: String
@@ -48,7 +50,7 @@ class KafkaSourceNotify[In: Any val]
   let _omni_router: OmniRouter = EmptyOmniRouter
   let _metrics_reporter: MetricsReporter
 
-  new iso create(pipeline_name: String, auth: AmbientAuth,
+  new iso create(pipeline_name: String, env: Env, auth: AmbientAuth,
     handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
@@ -56,6 +58,7 @@ class KafkaSourceNotify[In: Any val]
   =>
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
+    _env = env
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
       target_router, pre_state_target_id)

@@ -77,6 +77,7 @@ actor TCPSink is Consumer
   - Optional in sink deduplication (this woud involve storing what we sent and
     was acknowleged.)
   """
+  let _env: Env
   // Steplike
   let _encoder: TCPEncoderWrapper
   let _wb: Writer = Writer
@@ -125,7 +126,7 @@ actor TCPSink is Consumer
 
   let _terminus_route: TerminusRoute = TerminusRoute
 
-  new create(encoder_wrapper: TCPEncoderWrapper,
+  new create(env: Env, encoder_wrapper: TCPEncoderWrapper,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
@@ -135,6 +136,7 @@ actor TCPSink is Consumer
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
+    _env = env
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].>undefined(init_size) end

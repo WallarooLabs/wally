@@ -974,8 +974,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // egress_builder finds it from _outgoing_boundaries
                 let sink =
                   try
-                    egress_builder(_worker_name,
-                      consume sink_reporter, _auth, _outgoing_boundaries)?
+                    egress_builder(_worker_name, consume sink_reporter, _env,
+                      _auth, _outgoing_boundaries)?
                   else
                     @printf[I32]("Failed to build sink from egress_builder\n"
                       .cstring())
@@ -1415,7 +1415,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               // Create a sink or OutgoingBoundary. If the latter,
               // egress_builder finds it from _outgoing_boundaries
               let sink = egress_builder(_worker_name,
-                consume sink_reporter, _auth, _outgoing_boundaries)?
+                consume sink_reporter, _env, _auth, _outgoing_boundaries)?
 
               match sink
               | let d: DisposableActor =>
@@ -1630,7 +1630,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         "topology was initialized!\n").cstring())
     else
       for builder in sl_builders.values() do
-        let sl = builder()
+        let sl = builder(_env)
         _router_registry.register_source_listener(sl)
       end
     end

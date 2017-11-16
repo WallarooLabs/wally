@@ -104,9 +104,9 @@ class val TCPSinkBuilder
     _service = service
     _initial_msgs = initial_msgs
 
-  fun apply(reporter: MetricsReporter iso): Sink =>
+  fun apply(reporter: MetricsReporter iso, env: Env): Sink =>
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
 
-    TCPSink(_encoder_wrapper, consume reporter, _host, _service,
+    TCPSink(env, _encoder_wrapper, consume reporter, _host, _service,
       _initial_msgs)

@@ -27,8 +27,8 @@ use "wallaroo/core/topology"
 
 trait val SourceBuilder
   fun name(): String
-  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router):
-    SourceNotify iso^
+  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router,
+    env: Env): SourceNotify iso^
   fun val update_router(router: Router): SourceBuilder
 
 class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBuilder
@@ -65,11 +65,12 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
 
   fun name(): String => _name
 
-  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router):
-    SourceNotify iso^
+  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router,
+    env: Env): SourceNotify iso^
   =>
-    _source_notify_builder(_name, auth, _handler, _runner_builder, _router,
-      _metrics_reporter.clone(), event_log, target_router, _pre_state_target_id)
+    _source_notify_builder(_name, env, auth, _handler, _runner_builder,
+      _router, _metrics_reporter.clone(), event_log, target_router,
+      _pre_state_target_id)
 
   fun val update_router(router: Router): SourceBuilder =>
     BasicSourceBuilder[In, SH](_app_name, _worker_name, _name, _runner_builder,

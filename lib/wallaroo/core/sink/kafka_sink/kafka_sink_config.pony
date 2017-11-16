@@ -204,7 +204,7 @@ class val KafkaSinkBuilder
     _conf = conf
     _auth = auth
 
-  fun apply(reporter: MetricsReporter iso): Sink =>
+  fun apply(reporter: MetricsReporter iso, env: Env): Sink =>
     @printf[I32]("Creating Kafka Sink\n".cstring())
 
-    KafkaSink(_encoder_wrapper, consume reporter, _conf, _auth)
+    KafkaSink(_encoder_wrapper, consume reporter, _conf, env, _auth)
