@@ -32,18 +32,19 @@ use "wallaroo/core/topology"
 
 
 primitive TCPFramedSourceNotifyBuilder[In: Any val]
-  fun apply(pipeline_name: String, auth: AmbientAuth,
+  fun apply(pipeline_name: String, env: Env, auth: AmbientAuth,
     handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router, pre_state_target_id: (U128 | None) = None):
     SourceNotify iso^
   =>
-    TCPFramedSourceNotify[In](pipeline_name, auth, handler, runner_builder,
-      router, consume metrics_reporter, event_log, target_router,
-      pre_state_target_id)
+    TCPFramedSourceNotify[In](pipeline_name, env, auth, handler,
+      runner_builder, router, consume metrics_reporter, event_log,
+      target_router, pre_state_target_id)
 
 class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
+  let _env: Env
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
   var _header: Bool = true
   let _pipeline_name: String
@@ -55,7 +56,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
-  new iso create(pipeline_name: String, auth: AmbientAuth,
+  new iso create(pipeline_name: String, env: Env, auth: AmbientAuth,
     handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
@@ -63,6 +64,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   =>
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
+    _env = env
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
       target_router, pre_state_target_id)

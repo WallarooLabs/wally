@@ -46,6 +46,7 @@ actor TCPSourceListener is SourceListener
   # TCPSourceListener
   """
 
+  let _env: Env
   let _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
@@ -66,7 +67,7 @@ actor TCPSourceListener is SourceListener
   let _auth: AmbientAuth
   let _target_router: Router
 
-  new create(source_builder: SourceBuilder, router: Router,
+  new create(env: Env, source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -81,6 +82,7 @@ actor TCPSourceListener is SourceListener
     """
     Listens for both IPv4 and IPv6 connections.
     """
+    _env = env
     _router = router
     _router_registry = router_registry
     _route_builder = route_builder
@@ -213,7 +215,7 @@ actor TCPSourceListener is SourceListener
 
   fun ref _notify_connected(): TCPSourceNotify iso^ ? =>
     try
-      _source_builder(_event_log, _auth, _target_router)
+      _source_builder(_event_log, _auth, _target_router, _env)
         as TCPSourceNotify iso^
     else
       @printf[I32](

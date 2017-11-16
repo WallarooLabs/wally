@@ -27,4 +27,4 @@ interface val SinkConfig[Out: Any val]
   fun apply(): SinkBuilder
 
 interface val SinkBuilder
-  fun apply(reporter: MetricsReporter iso): Sink
+  fun apply(reporter: MetricsReporter iso, env: Env): Sink
