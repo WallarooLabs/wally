@@ -14,18 +14,8 @@ import (
 
 //export ApplicationSetup
 func ApplicationSetup() *C.char {
-	// ab := wa.MakeApplicationBuilder()
-
 	wa.Serialize = Serialize
 	wa.Deserialize = Deserialize
-
-	// wa.AddComponent(&Decoder{})          // 1
-	// wa.AddComponent(&SplitBuilder{})      // 2
-	// wa.AddComponent(&WordTotalsBuilder{}) // 3
-	// wa.AddComponent(&CountWord{})        // 4
-	// wa.AddComponent(&Encoder{})          // 5
-	// wa.AddComponent(&WordPartitionFunction{}) //6
-	// wa.AddComponent(LetterPartition())   // 7
 
 	application := app.MakeApplication("Word Count Application")
 	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig("127.0.0.1", "7010", &Decoder{})).
@@ -36,7 +26,6 @@ func ApplicationSetup() *C.char {
 	json := application.ToJson()
 	fmt.Println(json)
 
-	// return C.CString(ab.ToJson())
 	return C.CString(json)
 }
 
@@ -226,7 +215,6 @@ func Serialize(c interface{}) []byte {
 }
 
 func Deserialize(buff []byte) interface{} {
-	fmt.Print(buff)
 	componentType := binary.BigEndian.Uint32(buff[:4])
 	payload := buff[4:]
 
