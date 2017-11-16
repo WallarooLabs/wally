@@ -459,7 +459,7 @@ actor Connections is Cluster
       boundary.quick_initialize(li)
     end
 
-  be create_partition_routers_from_blueprints(
+  be create_routers_from_blueprints(
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
     omr_blueprint: OmniRouterBlueprint, local_sinks: Map[StepId, Consumer] val,

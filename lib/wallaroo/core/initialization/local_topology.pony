@@ -1448,7 +1448,6 @@ actor LocalTopologyInitializer is LayoutInitializer
               let sink = egress_builder(_worker_name,
                 consume sink_reporter, _env, _auth, _outgoing_boundaries)?
 
-
               _initializables.set(sink)
 
               match sink
@@ -1492,7 +1491,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.register_boundaries(_outgoing_boundaries,
           _outgoing_boundary_builders)
 
-        _connections.create_partition_routers_from_blueprints(
+        _connections.create_routers_from_blueprints(
           _partition_router_blueprints,
           _stateless_partition_router_blueprints, _omni_router_blueprint,
           consume local_sinks, _router_registry, this)
@@ -1559,13 +1558,20 @@ actor LocalTopologyInitializer is LayoutInitializer
     // over boundaries. This means the boundaries can not
     // report as initialized until the join is complete, but
     // the join can't complete until we say we're initialized.
+    let boundaries = Array[Initializable]
     for i in _initializables.values() do
       match i
       | let ob: OutgoingBoundary =>
-        _initializables.unset(ob)
+        boundaries.push(ob)
       else
         i.application_begin_reporting(this)
       end
+    end
+    for b in boundaries.values() do
+      _initializables.unset(b)
+    end
+    if _initializables.size() == 0 then
+      _complete_initialization_lifecycle()
     end
 
   be report_created(initializable: Initializable) =>
@@ -1614,28 +1620,31 @@ actor LocalTopologyInitializer is LayoutInitializer
     if not _ready_to_work.contains(initializable) then
       _ready_to_work.set(initializable)
       if _ready_to_work.size() == _initializables.size() then
-        if _recovering then
-          match _topology
-          | let t: LocalTopology =>
-            _recovery.start_recovery(this, t.worker_names)
-          else
-            Fail()
-          end
-        else
-          _event_log.start_pipeline_logging(this)
-        end
-        _router_registry.application_ready_to_work()
-        if _is_joining then
-          // Call this on router registry instead of Connections directly
-          // to make sure that other messages on registry queues are
-          // processed first
-          _router_registry.inform_cluster_of_join()
-        end
+        _complete_initialization_lifecycle()
       end
     else
       @printf[I32](("The same Initializable reported being ready to work " +
         "twice\n").cstring())
       Fail()
+    end
+
+  fun _complete_initialization_lifecycle() =>
+    if _recovering then
+      match _topology
+      | let t: LocalTopology =>
+        _recovery.start_recovery(this, t.worker_names)
+      else
+        Fail()
+      end
+    else
+      _event_log.start_pipeline_logging(this)
+    end
+    _router_registry.application_ready_to_work()
+    if _is_joining then
+      // Call this on router registry instead of Connections directly
+      // to make sure that other messages on registry queues are
+      // processed first
+      _router_registry.inform_cluster_of_join()
     end
 
   be report_event_log_ready_to_work() =>
