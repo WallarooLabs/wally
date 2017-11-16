@@ -9,28 +9,35 @@ import (
 	"reflect"
 	"strings"
 	wa "wallarooapi"
+	app "wallarooapi/application"
 )
 
 //export ApplicationSetup
 func ApplicationSetup() *C.char {
-	ab := wa.MakeApplicationBuilder()
+	// ab := wa.MakeApplicationBuilder()
 
 	wa.Serialize = Serialize
 	wa.Deserialize = Deserialize
 
-	wa.AddComponent(&Decoder{})          // 1
-	wa.AddComponent(&SplitBuilder{})      // 2
-	wa.AddComponent(&WordTotalsBuilder{}) // 3
-	wa.AddComponent(&CountWord{})        // 4
-	wa.AddComponent(&Encoder{})          // 5
-	wa.AddComponent(&WordPartitionFunction{}) //6
-	wa.AddComponent(LetterPartition())   // 7
+	// wa.AddComponent(&Decoder{})          // 1
+	// wa.AddComponent(&SplitBuilder{})      // 2
+	// wa.AddComponent(&WordTotalsBuilder{}) // 3
+	// wa.AddComponent(&CountWord{})        // 4
+	// wa.AddComponent(&Encoder{})          // 5
+	// wa.AddComponent(&WordPartitionFunction{}) //6
+	// wa.AddComponent(LetterPartition())   // 7
 
-	// application := app.MakeApplication("word count")
-	// application.NewPipeline("count those words")
-	// fmt.Println(application.ToJson())
+	application := app.MakeApplication("Word Count Application")
+	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig("127.0.0.1", "7010", &Decoder{})).
+		ToMulti(&SplitBuilder{}).
+		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition(), true).
+		ToSink(app.MakeTCPSinkConfig("127.0.0.1", "7002", &Encoder{}))
 
-	return C.CString(ab.ToJson())
+	json := application.ToJson()
+	fmt.Println(json)
+
+	// return C.CString(ab.ToJson())
+	return C.CString(json)
 }
 
 func LetterPartition() []uint64 {
@@ -50,7 +57,7 @@ type WordPartitionFunction struct {}
 func (wpf *WordPartitionFunction) Partition (data interface{}) uint64 {
 	word := data.(*string)
 	firstLetter := (*word)[0]
-	if (firstLetter >= 'a') || (firstLetter <= 'z') {
+	if (firstLetter >= 'a') && (firstLetter <= 'z') {
 		return uint64(firstLetter)
 	}
 	return uint64('!')

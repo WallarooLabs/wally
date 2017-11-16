@@ -1,37 +1,54 @@
 package repr
 
-import "encoding/json"
-
-func MakeApplication(name string) *application {
-	return &application{"Application", name, make([]pipeline, 0)}
+func MakeApplication(name string) *Application {
+	return &Application{"Application", name, make([]*Pipeline, 0)}
 }
 
-type application struct {
+type Application struct {
 	Class string
 	Name string
-	Pipelines []pipeline
+	Pipelines []*Pipeline
 }
 
-func (app *application) NewPipeline(name string, sourceConfig interface{}) {
-	app.Pipelines = append(app.Pipelines, sourceConfig, makePipeline(name))
+func (app *Application) AddPipeline(pipeline *Pipeline) {
+	app.Pipelines = append(app.Pipelines, pipeline)
 }
 
-func makePipeline(name string) pipeline {
-	return pipeline{"Pipeline", name}
+func MakePipeline(name string) *Pipeline {
+	return &Pipeline{"Pipeline", name, make([]*Partition, 0), make([]*Component, 0), make([]interface{}, 0), nil}
 }
 
-type pipeline struct {
+type Pipeline struct {
 	Class string
 	Name string
-	SourceConfig interface{}
+	Partitions []*Partition
+	Components []*Component
+	Connections []interface{}
+ 	Source *TCPSourceConfig
 }
 
-func makeTCPConfig(host string, port string) tcpConfig {
-	return tcpConfig{"TCPConfig", host, port}
+func (p *Pipeline) AddPartition(partition *Partition) {
+	p.Partitions = append(p.Partitions, partition)
 }
 
-type tcpConfig struct {
-	Class string
-	Host string
-	Port string
+func (p *Pipeline) AddComponent(c *Component) {
+	p.Components = append(p.Components, c)
 }
+
+func (p *Pipeline) AddTCPSourceConfig(tsc *TCPSourceConfig) {
+	p.Source = tsc
+}
+
+func (p *Pipeline) AddConnection(connection interface{}) {
+	p.Connections = append(p.Connections, connection)
+}
+
+// func makeTCPConfig(host string, port string) *tcpConfig {
+// 	return &tcpConfig{"TCPConfig", host, port}
+// }
+
+// type tcpConfig struct {
+// 	Class string
+// 	Host string
+// 	Port string
+// }

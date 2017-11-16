@@ -8,20 +8,30 @@ type Computation interface {
 }
 
 //export ComputationName
-func ComputationName(computation_id uint64) *C.char {
-	computation := GetComponent(computation_id).(Computation)
+func ComputationName(computationId uint64) *C.char {
+	computation := GetComponent(computationId).(Computation)
 	return C.CString(computation.Name())
 }
 
 //export ComputationCompute
-func ComputationCompute(computation_id uint64, data_id uint64) uint64 {
-	computation := GetComponent(computation_id).(Computation)
-	data := GetComponent(data_id).(interface{})
+func ComputationCompute(computationId uint64, dataId uint64) uint64 {
+	computation := GetComponent(computationId).(Computation)
+	data := GetComponent(dataId).(interface{})
 	res := computation.Compute(data)
 	if res == nil {
 		return 0
 	}
 	return AddComponent(res)
+}
+
+type ComputationBuilder interface {
+	Build() interface{}
+}
+
+//export ComputationBuilderBuild
+func ComputationBuilderBuild(computationBuilderId uint64) uint64 {
+	computationBuilder := GetComponent(computationBuilderId).(ComputationBuilder)
+	return AddComponent(computationBuilder.Build())
 }
 
 type ComputationMulti interface {
@@ -30,28 +40,28 @@ type ComputationMulti interface {
 }
 
 //export ComputationMultiName
-func ComputationMultiName(computation_id uint64) *C.char {
-	computation := GetComponent(computation_id).(ComputationMulti)
+func ComputationMultiName(computationId uint64) *C.char {
+	computation := GetComponent(computationId).(ComputationMulti)
 	return C.CString(computation.Name())
 }
 
 //export ComputationMultiCompute
-func ComputationMultiCompute(computation_id uint64, data_id uint64, size *uint64) uint64 {
-	computation := GetComponent(computation_id).(ComputationMulti)
-	data := GetComponent(data_id).(interface{})
+func ComputationMultiCompute(computationId uint64, dataId uint64, size *uint64) uint64 {
+	computation := GetComponent(computationId).(ComputationMulti)
+	data := GetComponent(dataId).(interface{})
 	res := computation.Compute(data)
 	if res == nil {
 		return 0
 	}
 
 	*size = uint64(len(res))
-	res_holder := make([]uint64, len(res))
+	resHolder := make([]uint64, len(res))
 
 	for i, r := range res {
-		res_holder[i] = AddComponent(r)
+		resHolder[i] = AddComponent(r)
 	}
 
-	return AddComponent(res_holder)
+	return AddComponent(resHolder)
 }
 
 //export GetMultiResultItem
@@ -65,6 +75,6 @@ type ComputationMultiBuilder interface {
 
 //export ComputationMultiBuilderBuild
 func ComputationMultiBuilderBuild(computationBuilderId uint64) uint64 {
-	computation_builder := GetComponent(computationBuilderId).(ComputationMultiBuilder)
-	return AddComponent(computation_builder.Build())
+	computationBuilder := GetComponent(computationBuilderId).(ComputationMultiBuilder)
+	return AddComponent(computationBuilder.Build())
 }

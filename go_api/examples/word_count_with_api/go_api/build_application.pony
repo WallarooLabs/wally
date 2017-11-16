@@ -203,7 +203,7 @@ primitive _Partition
     match clz
     | "PartitionU64" =>
       w.Partition[GoData, U64](
-        PartitionFunctionU64(6), PartitionListU64(7))
+        PartitionFunctionU64(pfid), PartitionListU64(plid))
     else
       error
     end

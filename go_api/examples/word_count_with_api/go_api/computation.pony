@@ -4,7 +4,7 @@ use w = "wallaroo/core/topology"
 
 use @ComputationName[Pointer[U8] ref](cid: U64)
 use @ComputationCompute[U64](cid: U64, did: U64)
-// TODO: add ComputationBuilderBuild[U64](cbid: U64)
+use @ComputationBuilderBuild[U64](cbid: U64)
 
 use @ComputationMultiName[Pointer[U8] ref](cid: U64)
 use @ComputationMultiCompute[U64](cid: U64, did: U64, sz: Pointer[U64])
@@ -48,7 +48,26 @@ class Computation is w.Computation[GoData, GoData]
   fun _final() =>
     RemoveComponent(_computation_id)
 
-// TODO: add ComputationBuilder
+class val ComputationBuilder
+  var _computation_builder_id: U64
+
+  new val create(computation_builder_id: U64) =>
+    _computation_builder_id = computation_builder_id
+
+  fun apply(): Computation iso^ =>
+    recover Computation(@ComputationBuilderBuild(_computation_builder_id)) end
+
+  fun _serialise_space(): USize =>
+    ComponentSerializeGetSpace(_computation_builder_id)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    ComponentSerialize(_computation_builder_id, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _computation_builder_id = ComponentDeserialize(bytes)
+
+  fun _final() =>
+    RemoveComponent(_computation_builder_id)
 
 class ComputationMulti is w.Computation[GoData, GoData]
   var _computation_id: U64
