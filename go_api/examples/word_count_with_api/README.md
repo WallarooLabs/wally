@@ -7,6 +7,7 @@ want to seem more details you should look at them.
 ## Build
 
 ```bash
+export GOPATH="$(realpath .)/go:$(realpath ../../go)"
 go build -buildmode=c-archive -o lib/libwallaroo.a word_count
 stable env ponyc --debug -D autoscale
 ```
@@ -16,6 +17,10 @@ stable env ponyc --debug -D autoscale
 ### Shell 1
 
 Run a listener.
+
+```bash
+./demo_receiver
+```
 
 ```bash
 development/wallaroo/giles/receiver/receiver --ponythreads=1 --listen 127.0.0.1:7002
