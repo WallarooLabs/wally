@@ -1099,7 +1099,11 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             for stopper in stoppers:
                 stopper.join()
                 if stopper.error:
+                    print '\nSinkStopper Error. Runner output below.\n'
                     for r in runners:
+                        print '==='
+                        print 'Runner: ', r.name
+                        print '---'
                         print r.get_output()[0]
                     raise stopper.error
 
