@@ -28,9 +28,3 @@ Re: log of output to files, Merrick doesn't call `flush` until exiting
 so its possible that what you see in the log is out of date as all contents
 might not have been flushed yet.
 
-
-## Working with Dagon
-
-If you are coordinating Merrick with Dagon, then Dagon will handle passing the
-correct command line arguments. See Dagon README for instructions.
-

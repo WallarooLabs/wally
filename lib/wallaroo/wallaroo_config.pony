@@ -35,7 +35,6 @@ class StartupOptions
   var my_d_addr: Array[String] = [""; "0"]
   var my_d_host: String = ""
   var my_d_service: String = "0"
-  var p_arg: (Array[String] | None) = None
   var x_arg: (Array[String] | None) = None
   var worker_count: (USize | None) = None
   var is_initializer: Bool = false
@@ -83,7 +82,6 @@ primitive WallarooConfig
       .add("data", "d", StringArgument)
       .add("my-control", "x", StringArgument)
       .add("my-data", "y", StringArgument)
-      .add("phone-home", "p", StringArgument)
       .add("external", "e", StringArgument)
       .add("file", "f", StringArgument)
       // worker count includes the initial "leader" since there is no
@@ -143,8 +141,6 @@ primitive WallarooConfig
         so.my_d_addr = arg.split(":")
         so.my_d_host = so.my_d_addr(0)?
         so.my_d_service = so.my_d_addr(1)?
-      | ("phone-home", let arg: String) =>
-        so.p_arg = arg.split(":")
       | ("external", let arg: String) =>
         so.x_arg = arg.split(":")
       | ("worker-count", let arg: I64) =>

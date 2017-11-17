@@ -47,7 +47,6 @@ actor Connections is Cluster
   let _data_conn_builders: Map[String, OutgoingBoundaryBuilder] =
     _data_conn_builders.create()
   let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
-  var _phone_home: (TCPConnection | None) = None
   let _metrics_conn: MetricsSink
   let _metrics_host: String
   let _metrics_service: String
@@ -66,7 +65,7 @@ actor Connections is Cluster
 
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
-    d_host: String, d_service: String, ph_host: String, ph_service: String,
+    d_host: String, d_service: String,
     external_host: String, external_service: String,
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
@@ -94,18 +93,6 @@ actor Connections is Cluster
       _my_data_addr = (d_host, d_service)
     else
       create_control_connection("initializer", c_host, c_service)
-    end
-
-    if (ph_host != "") or (ph_service != "") then
-      let phone_home = TCPConnection(_auth,
-        HomeConnectNotify(_worker_name, this), ph_host, ph_service)
-      _phone_home = phone_home
-      if is_initializer then
-        let ready_msg = ExternalMsgEncoder.ready(_worker_name)
-        phone_home.writev(ready_msg)
-      end
-      @printf[I32]("Set up phone home connection on %s:%s\n".cstring(),
-        ph_host.cstring(), ph_service.cstring())
     end
 
     if (external_host != "") or (external_service != "") then
@@ -325,14 +312,6 @@ actor Connections is Cluster
       end
     else
       Fail()
-    end
-
-  be send_phone_home(msg: Array[ByteSeq] val) =>
-    match _phone_home
-    | let tcp: TCPConnection =>
-      tcp.writev(msg)
-    else
-      @printf[I32]("There is no phone home connection to send on!\n".cstring())
     end
 
   be create_boundary_to_new_worker(target: String, boundary_id: U128,
@@ -686,12 +665,6 @@ actor Connections is Cluster
 
     for (key, conn) in _control_conns.pairs() do
       conn.dispose()
-    end
-
-    match _phone_home
-    | let phc: TCPConnection =>
-      phc.writev(ExternalMsgEncoder.done_shutdown(_worker_name))
-      phc.dispose()
     end
 
     for d in _disposables.values() do

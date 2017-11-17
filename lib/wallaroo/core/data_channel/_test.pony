@@ -79,7 +79,6 @@ class _TestDataChannel is DataChannelListenNotify
         "127.0.0.1", "0",
         "127.0.0.1", "0",
         "", "",
-        "", "",
         _NullMetricsSink, "127.0.0.1", "0",
         true, "/tmp/foo_connections.txt", false
         where event_log = event_log)

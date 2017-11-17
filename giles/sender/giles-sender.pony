@@ -29,7 +29,6 @@ use "time"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/messages"
 use "wallaroo_labs/options"
-use "wallaroo_labs/tcp"
 use "wallaroo_labs/time"
 
 // documentation
@@ -55,8 +54,6 @@ actor Main
     else
       var h_arg: (Array[String] | None) = None
       var m_arg: (USize | None) = None
-      var p_arg: (Array[String] | None) = None
-      var n_arg: (String | None) = None
       var f_arg: (String | None) = None
       var g_arg: (USize | None) = None
       var z_arg: (Bool | None) = None
@@ -66,8 +63,6 @@ actor Main
 
         options
           .add("host", "h", StringArgument)
-          .add("phone-home", "p", StringArgument)
-          .add("name", "n", StringArgument)
           .add("messages", "m", I64Argument)
           .add("file", "f", StringArgument)
           .add("batch-size", "s", I64Argument)
@@ -87,12 +82,8 @@ actor Main
             h_arg = arg.split(":")
           | ("messages", let arg: I64) =>
             m_arg = arg.usize()
-          | ("name", let arg: String) =>
-            n_arg = arg
           | ("file", let arg: String) =>
             f_arg = arg
-          | ("phone-home", let arg: String) =>
-            p_arg = arg.split(":")
           | ("batch-size", let arg: I64) =>
             batch_size = arg.usize()
           | ("interval", let arg: I64) =>
@@ -133,24 +124,6 @@ actor Main
           required_args_are_present = false
         end
 
-        if p_arg isnt None then
-          if (p_arg as Array[String]).size() != 2 then
-            @printf[I32](
-              "'--dagon' argument should be in format: '127.0.0.1:8080\n"
-              .cstring())
-            required_args_are_present = false
-          end
-        end
-
-        if (p_arg isnt None) or (n_arg isnt None) then
-          if (p_arg is None) or (n_arg is None) then
-            @printf[I32](
-              "'--dagon' must be used in conjunction with '--name'\n"
-              .cstring())
-            required_args_are_present = false
-          end
-        end
-
         if (g_arg isnt None) and variable_size then
           @printf[I32](
             "--msg-size and --variable-size can't be used together\n"
@@ -186,7 +159,7 @@ actor Main
           let to_host_addr = h_arg as Array[String]
 
           let store = Store(env.root as AmbientAuth)
-          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)?
+          let coordinator = Coordinator(env, store)?
 
           let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
           let to_host_socket = TCPConnection(tcp_auth,
@@ -263,73 +236,9 @@ class ToHostNotify is TCPConnectionNotify
   fun ref unthrottled(sock: TCPConnection ref) =>
     _coordinator.pause_sending(false)
 
-class ToDagonNotify is TCPConnectionNotify
-  let _coordinator: WithDagonCoordinator
-  let _framer: Framer = Framer
-  let _stderr: StdStream
-
-  new iso create(coordinator: WithDagonCoordinator, stderr: StdStream) =>
-    _coordinator = coordinator
-    _stderr = stderr
-
-  fun ref connect_failed(sock: TCPConnection ref) =>
-    _coordinator.to_dagon_socket(sock, Failed)
-
-  fun ref connected(sock: TCPConnection ref) =>
-    if sock.local_address() != sock.remote_address() then
-      sock.set_nodelay(true)
-    end
-    _coordinator.to_dagon_socket(sock, Ready)
-
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
-    n: USize):
-  Bool =>
-    for chunked in _framer.chunk(consume data).values() do
-      try
-        let decoded = ExternalMsgDecoder(consume chunked)?
-        match decoded
-        | let m: ExternalStartMsg =>
-            _coordinator.go()
-        else
-          @printf[I32]("Unexpected message from Dagon\n".cstring())
-        end
-      else
-        @printf[I32]("Unable to decode message from Dagon\n".cstring())
-      end
-    end
-    true
-
 //
 // COORDINATE OUR STARTUP
 //
-
-primitive CoordinatorFactory
-  fun apply(env: Env,
-    store: Store,
-    node_id: (String | None),
-    to_dagon_addr: (Array[String] | None)): Coordinator ?
-  =>
-    if (node_id isnt None) and (to_dagon_addr isnt None) then
-      let n = node_id as String
-      let ph = to_dagon_addr as Array[String]
-      let coordinator = WithDagonCoordinator(env, store, n)
-
-      let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
-      let to_dagon_socket = TCPConnection(tcp_auth,
-        ToDagonNotify(coordinator, env.err),
-        ph(0)?,
-        ph(1)?)
-
-      coordinator
-    else
-      WithoutDagonCoordinator(env, store)
-    end
-
-interface tag Coordinator
-  be finished()
-  be sending_actor(sa: SendingActor)
-  be to_host_socket(sock: TCPConnection, state: WorkerState)
-  be pause_sending(v: Bool)
 
 primitive Waiting
 primitive Ready
@@ -337,7 +246,7 @@ primitive Failed
 
 type WorkerState is (Waiting | Ready | Failed)
 
-actor WithoutDagonCoordinator
+actor Coordinator
   let _env: Env
   var _to_host_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
   var _sending_actor: (SendingActor | None) = None
@@ -379,75 +288,6 @@ actor WithoutDagonCoordinator
         let y = _sending_actor as SendingActor
         y.go()
       end
-    end
-
-actor WithDagonCoordinator
-  let _env: Env
-  var _to_host_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
-  var _to_dagon_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
-  var _sending_actor: (SendingActor | None) = None
-  let _store: Store
-  let _node_id: String
-
-  new create(env: Env, store: Store, node_id: String) =>
-    _env = env
-    _store = store
-    _node_id = node_id
-
-  be go() =>
-    try
-      let y = _sending_actor as SendingActor
-      y.go()
-    end
-
-  be to_host_socket(sock: TCPConnection, state: WorkerState) =>
-    _to_host_socket = (sock, state)
-    if state is Failed then
-      @printf[I32]("Unable to open host socket\n".cstring())
-      sock.dispose()
-    elseif state is Ready then
-      _go_if_ready()
-    end
-
-  be to_dagon_socket(sock: TCPConnection, state: WorkerState) =>
-    _to_dagon_socket = (sock, state)
-    if state is Failed then
-      @printf[I32]("Unable to open dagon socket\n".cstring())
-      sock.dispose()
-    elseif state is Ready then
-      _go_if_ready()
-    end
-
-  be sending_actor(sa: SendingActor) =>
-    _sending_actor = sa
-
-  be finished() =>
-    try
-      let x = _to_dagon_socket._1 as TCPConnection
-      x.writev(ExternalMsgEncoder.done_shutdown(_node_id as String))
-      x.dispose()
-    end
-    try
-      let x = _to_host_socket._1 as TCPConnection
-      x.dispose()
-    end
-    _store.dispose()
-
-  be pause_sending(v: Bool) =>
-    try
-      let sa = _sending_actor as SendingActor
-      sa.pause(v)
-    end
-
-  fun _go_if_ready() =>
-    if (_to_dagon_socket._2 is Ready) and (_to_host_socket._2 is Ready) then
-      _send_ready()
-    end
-
-  fun _send_ready() =>
-    try
-      let x = _to_dagon_socket._1 as TCPConnection
-      x.writev(ExternalMsgEncoder.ready(_node_id as String))
     end
 
 //
