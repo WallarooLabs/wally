@@ -25,8 +25,6 @@
 
 # Configure and deploy leader servers.
 - hosts: wallaroo-leaders
-  vars_files:
-    - 'docker_creds.yml'
   vars:
     ethernet_interface: enp0s8
     ptpd_role: master
@@ -42,8 +40,6 @@
 
 # Configure and deploy follower servers.
 - hosts: wallaroo-followers
-  vars_files:
-    - 'docker_creds.yml'
   vars:
     ethernet_interface: enp0s8
     ptpd_role: slave

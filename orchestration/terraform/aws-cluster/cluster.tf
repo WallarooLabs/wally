@@ -2,9 +2,9 @@
 data "terraform_remote_state" "vpc" {
   backend = "s3"
   "config" {
-    "bucket" = "sendence-dev"
+    "bucket" = "${var.terraform_state_aws_bucket}"
     "key" = "terraform-state/vpc/${var.aws_region}-terraform.tfstate"
-    "region" = "us-east-1"
+    "region" = "${var.terraform_state_aws_region}"
   }
 
 }
