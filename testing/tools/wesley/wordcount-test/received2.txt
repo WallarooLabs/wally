@@ -1,8 +1,0 @@
-1, one,1
-1, two,2
-1, three,3
-1, four,4
-1, five,5
-1, six,6
-1, seven,7
-1, eight,8
