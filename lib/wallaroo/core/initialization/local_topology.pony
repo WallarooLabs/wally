@@ -1343,9 +1343,6 @@ actor LocalTopologyInitializer is LayoutInitializer
 
           if not recovering then
             _connections.send_control("initializer", topology_ready_msg)
-
-            let ready_msg = ExternalMsgEncoder.ready(_worker_name)
-            _connections.send_phone_home(ready_msg)
           end
         end
 

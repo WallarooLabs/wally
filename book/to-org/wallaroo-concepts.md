@@ -11,7 +11,6 @@
 **Integration Test Suite**
 Wallaroo provides a purpose-built integration testing framework to ensue the platform and applications are functioning correctly. The test suite is made up of the following components:
 
-* **Dagon** Orchestration tools - Starts and stops cluster and other services
 * **Giles** Test data source and data capture
 * **Wesley** Test validation
 * **Spike** Introduces damage into data and data flow

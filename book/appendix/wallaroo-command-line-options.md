@@ -12,7 +12,6 @@ When running a Wallaroo application, we use some of the following command line p
   --data/-d +[Sets address for initializer data channel]
   --my-control [Optionally sets address for my data channel]
   --my-data [Optionally sets address for my data channel]
-  --phone-home/-p [Sets address for phone home connection]
   --external/-e [Sets address for external message channel]
   --worker-count/-w +[Sets cluster initialier's total number of workers,
     including cluster initializer itself]

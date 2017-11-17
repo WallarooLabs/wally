@@ -47,8 +47,6 @@ actor Startup
   let _application: Application val
   let _app_name: String
 
-  var _ph_host: String = ""
-  var _ph_service: String = ""
   var _external_host: String = ""
   var _external_service: String = ""
   var _is_multi_worker: Bool = true
@@ -105,19 +103,6 @@ actor Startup
     try
       let auth = _env.root as AmbientAuth
       _startup_options = WallarooConfig.wallaroo_args(_env.args)?
-
-      (_ph_host, _ph_service) =
-        match _startup_options.p_arg
-        | let addr: Array[String] =>
-          try
-            (addr(0)?, addr(1)?)
-          else
-            Fail()
-            ("", "")
-          end
-        else
-          ("", "")
-        end
 
       (_external_host, _external_service) =
         match _startup_options.x_arg
@@ -314,7 +299,7 @@ actor Startup
         _startup_options.worker_name, auth,
         _startup_options.c_host, _startup_options.c_service,
         _startup_options.d_host, _startup_options.d_service,
-        _ph_host, _ph_service, _external_host, _external_service,
+        _external_host, _external_service,
         metrics_conn, m_addr(0)?, m_addr(1)?, _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
         _startup_options.spike_config, event_log,
@@ -463,7 +448,7 @@ actor Startup
 
       let connections = Connections(_application.name(),
         _startup_options.worker_name,
-        auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
+        auth, c_host, c_service, d_host, d_service,
         _external_host, _external_service,
         metrics_conn, m.metrics_host, m.metrics_service,
         _startup_options.is_initializer,

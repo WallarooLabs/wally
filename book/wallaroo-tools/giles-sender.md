@@ -40,8 +40,6 @@ make
 * `--variable-size/-z` a flag to pass if using binary format and the binary messages have varying lengths. Cannot be used with `--msg-size/-g`.
 * `--msg-size/-g` the size of the binary message in bytes. Cannot be used with `--variable-size/-z`.
 * `--no-write/-w` flag to stop the `sender` from writing the messages sent to file.
-* `--phone-home/-p` Dagon address. Must be provided in the `127.0.0.1:8082` format. Only used when run by Dagon.
-* `--name/-n` Name to register itself with to Dagon. Only used when run by Dagon.
 
 ## Examples
 

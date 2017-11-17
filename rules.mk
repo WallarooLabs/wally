@@ -129,16 +129,11 @@ ifeq ($(docker_host),)
   docker_host := unix:///var/run/docker.sock
 endif
 docker_host_arg := --host=$(docker_host)# docker host argument
-dagon_docker_host ?= ## Dagon docker host arg (defaults to docker_host value)
-dagon_in_docker ?= false## Run Dagon in a docker container
-dagon_docker_repo ?= $(docker_image_repo)/dagon## Dagon docker repository url
-dagon_notifier_docker_repo ?= $(docker_image_repo)/dagon-dagon-notifier## Dagon docker repository url
 monhub_builder ?= monitoring-hub-builder
 monhub_builder_tag ?= latest
 unix_timestamp := $(shell date +%s) # unix timestamp for docker network name
 demo_cluster_name ?= ## Name of demo cluster
 demo_cluster_spot_pricing ?= true## Whether to use spot pricing or not for demo cluster
-demo_to_run ?= dagon-identity## Name of demo dagon command to run
 autoscale ?= on## Build with Autoscale or not
 clustering ?= on## Build with Clustering or not
 resilience ?= off## Build with Resilience or not
@@ -178,11 +173,6 @@ ifeq ($(resilience),on)
 endif
 
 # validation of variable
-ifdef dagon_in_docker
-  $(eval $(call check-values,dagon_in_docker,false true))
-endif
-
-# validation of variable
 ifdef demo_cluster_spot_pricing
   $(eval $(call check-values,demo_cluster_spot_pricing,false true))
 endif
@@ -190,10 +180,6 @@ endif
 # validation of variable
 ifdef debug
   $(eval $(call check-values,debug,false true))
-endif
-
-ifeq ($(dagon_docker_host),)
-  dagon_docker_host := $(docker_host)
 endif
 
 ifeq ($(shell uname -s),Linux)
@@ -305,80 +291,6 @@ define MONHUBR
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix release \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
-endef
-
-# rule to add a new dagon target
-define RUN_DAGON
-$(if $(filter $5,false true),,\
-    $(error Unknown 'include in CI' option "$5"))
-dagon-test: $(if $(filter $5,true),$1,)
-dagon-docker-test: $(if $(filter $5,true),$(subst dagon-,dagon-docker-,$1),)
-$(call RUN_DAGON_TARGET,$1,$2,$3,$4)
-endef
-
-# rule to add a new dagon spike target
-define RUN_DAGON_SPIKE
-$(if $(filter $5,false true),,\
-    $(error Unknown 'include in CI' option "$5"))
-dagon-spike-test: $(if $(filter $5,true),$1,)
-dagon-docker-spike-test: $(if $(filter $5,true),$(subst dagon-,dagon-docker-,$1),)
-$(call RUN_DAGON_TARGET,$1,$2,$3,$4)
-endef
-
-# rule to add a new dagon target
-define RUN_DAGON_TARGET
-$(if $(findstring dagon,$(word 1, $(subst -, ,$1))),,$(error Dagon tests must \
-begin with 'dagon-'! Current test name '$(strip $1)' is invalid!))
-.PHONY: $1 $(subst dagon-,dagon-docker-,$1)
-$(subst dagon-,dagon-docker-,$1): dagon_use_docker=--docker=$$(if $$(custom_dagon_host),$$(custom_dagon_host),$(dagon_docker_host)) \
---docker-tag=$(docker_image_version) --docker-arch=$(if $(filter $(arch),native),amd64,$(arch))
-$(subst dagon-,dagon-docker-,$1): dagon_config_file=$$(if $$(custom_dagon_config),$$(custom_dagon_config),$2)
-$(subst dagon-,dagon-docker-,$1): dagon_timeout=$$(if $$(custom_dagon_timeout),$$(custom_dagon_timeout),$3)
-$(subst dagon-,dagon-docker-,$1): dagon_phone_home=$$(if $$(custom_dagon_phone_home),$$(custom_dagon_phone_home),$$(if $$(filter $$(dagon_in_docker),true),dagon-$(strip $(unix_timestamp)),$(host_ip)):8080)
-$(subst dagon-,dagon-docker-,$1): dagon_cmd=$$(if $$(filter $$(dagon_in_docker),true),\
-docker --host=$$(if $$(custom_dagon_host),$$(custom_dagon_host),$(dagon_docker_host)) \
-run -v $(abs_wallaroo_dir):$(abs_wallaroo_dir) -w $(abs_wallaroo_dir) \
--v /bin:/bin:ro -v /lib:/lib:ro -v /lib64:/lib64:ro -v /usr:/usr:ro -v /tmp:/tmp -w /tmp \
--it --name dagon-$(unix_timestamp) -h dagon-$(unix_timestamp) \
---net wallaroo-$(unix_timestamp) $(dagon_docker_repo).$(if $(filter $(arch),native),amd64,$(arch)):$(docker_image_version), \
-cd $(abs_wallaroo_dir) && $(abs_wallaroo_dir:%/=%)/dagon/dagon)
-$(subst dagon-,dagon-docker-,$1):
-	$$(call run-dagon)
-	$$(if $$(filter $$(dont_validate),true),,$4)
-$1: dagon_config_file=$$(if $$(custom_dagon_config),$$(custom_dagon_config),$2)
-$1: dagon_timeout=$$(if $$(custom_dagon_timeout),$$(custom_dagon_timeout),$3)
-$1: dagon_phone_home=$$(if $$(custom_dagon_phone_home),$$(custom_dagon_phone_home),127.0.0.1:8080)
-$1: dagon_cmd=$$(if $$(filter $$(dagon_in_docker),true),\
-docker --host=$$(if $$(custom_dagon_host),$$(custom_dagon_host),$(dagon_docker_host)) \
-run -v $(abs_wallaroo_dir):$(abs_wallaroo_dir) -w $(abs_wallaroo_dir) \
--v /bin:/bin:ro -v /lib:/lib:ro -v /lib64:/lib64:ro -v /usr:/usr:ro -v /tmp:/tmp -w /tmp \
--it --name dagon-$(unix_timestamp) -h dagon-$(unix_timestamp) \
---net wallaroo-$(unix_timestamp) $(dagon_docker_repo).$(if $(filter $(arch),native),amd64,$(arch)):$(docker_image_version), \
-cd $(abs_wallaroo_dir) && $(abs_wallaroo_dir:%/=%)/dagon/dagon)
-$1:
-	$$(call run-dagon)
-	$$(if $$(filter $$(dont_validate),true),,$4)
-endef
-
-# function call for running dagon
-define run-dagon
-  $(if $(dagon_use_docker),$(QUIET)docker --host=$(if $(custom_dagon_host),$(custom_dagon_host),$(dagon_docker_host)) \
-network create wallaroo-$(unix_timestamp),)
-  $(QUIET)$(dagon_cmd) --timeout=$(dagon_timeout) -f $(dagon_config_file) \
-          -h $(dagon_phone_home) $(dagon_use_docker) --docker-network=wallaroo-$(unix_timestamp) $(dagon_extra_args)
-endef
-
-# function call for running dagon-notifier
-define run-dagon-notifier
-  $(QUIET)$(if $(filter $(dagon_in_docker),true),\
-docker --host=$(if $(custom_dagon_host),$(custom_dagon_host),$(dagon_docker_host)) \
-run --privileged -v $(abs_wallaroo_dir):$(abs_wallaroo_dir) -w $(abs_wallaroo_dir) \
--v /bin:/bin:ro -v /lib:/lib:ro -v /lib64:/lib64:ro -v /usr:/usr:ro -v /tmp:/tmp -w /tmp \
--it --name dagon-notifier-$(unix_timestamp) -h dagon-notifier-$(unix_timestamp) \
---net $(if $(custom_dagon_network),$(custom_dagon_network),wallaroo-$(unix_timestamp)) \
-$(dagon_notifier_docker_repo).$(if $(filter $(arch),native),amd64,$(arch)):$(docker_image_version),\
-cd $(abs_wallaroo_dir) && $(abs_wallaroo_dir:%/=%)/dagon/dagon-notifier/dagon-notifier) \
---dagon-addr=$(dagon_phone_home) --msg-type StartGilesSenders
 endef
 
 # rule to generate includes for makefiles in subdirs of first argument
@@ -545,7 +457,7 @@ endef
 ROOT_TARGET_SUFFIX := $(if $(filter $(abs_wallaroo_dir),$(abspath $(ROOT_PATH))),wallarooroot-all,$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $(ROOT_PATH))))-all)
 
 # phony targets
-.PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony dagon-spike-test dagon-test list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help build-docker-pony push-docker-pony build-docker-monhub push-docker-monhub dagon-docker-test dagon-docker-spike-test
+.PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help build-docker-pony push-docker-pony build-docker-monhub push-docker-monhub
 
 # default targets
 .DEFAULT_GOAL := build
@@ -567,66 +479,6 @@ push-docker-monhub: push-docker-monhub-all ## Push docker containers for all mon
 build-docker: build-docker-$(ROOT_TARGET_SUFFIX) ## Build all docker images
 push-docker: push-docker-$(ROOT_TARGET_SUFFIX) ## Push all docker images
 
-start-demo: setup-demo ## Signal senders to start sending data for a demo
-	$(call run-dagon-notifier)
-
-setup-demo: temp_dagon_host=$(if $(demo_cluster_name),$(shell aws ec2 describe-instances \
-              --filters Name=tag:Name,Values=$(demo_cluster_name):wallaroo-leader-1 --query \
-              'Reservations[*].Instances[*].PublicIpAddress' --output text),127.0.0.1)
-setup-demo: custom_dagon_phone_home=$(if $(demo_cluster_name),$(shell ps aux | \
-              grep -o 'name.*dagon' | awk '{print $$2}'),$(temp_dagon_host)):8080
-setup-demo: custom_dagon_host=$(temp_dagon_host):2375
-setup-demo: custom_dagon_network=$(shell ps aux | grep -o 'net.*dagon' | awk '{print $$2}')
-setup-demo: dont_validate=true
-setup-demo: dagon_extra_args=-D --docker-path /usr/bin/docker
-setup-demo: dagon_in_docker=$(if $(demo_cluster_name),true,false)
-setup-demo:
-	$(if $(demo_cluster_name),$(QUIET)echo "running demo on $(temp_dagon_host)",\
-$(QUIET)echo "running demo locally")
-	$(eval custom_dagon_phone_home=$(custom_dagon_phone_home))
-	$(eval dagon_phone_home=$(custom_dagon_phone_home))
-	$(eval custom_dagon_host=$(custom_dagon_host))
-	$(eval custom_dagon_network=$(custom_dagon_network))
-	$(eval dont_validate=$(dont_validate))
-	$(eval dagon_extra_args=$(dagon_extra_args))
-	$(eval dagon_in_docker=$(dagon_in_docker))
-	$(if $(demo_cluster_name), $(QUIET)cd orchestration/terraform && \
-          make sync-wallaroo cluster_name=$(demo_cluster_name),)
-
-run-demo: setup-demo $(if $(demo_cluster_name),dagon-docker-,dagon-)$(subst dagon-,,$(subst dagon-docker-,,$(demo_to_run)))## Run demo locally or on a cluster with senders waiting to send
-
-create-demo: $(if $(demo_cluster_name),create-demo-cluster check-demo-cluster final-check-demo-cluster) run-demo ## Create/start a demo with senders waiting to send
-	$(QUIET)echo "done running demo"
-
-demo-cluster-options = num_followers=0 force_instance=c4.4xlarge spot_bid_factor=100 \
-          # ansible_system_cpus=0,8 ansible_isolcpus=true
-
-check-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):wallaroo-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
-check-demo-cluster: # Check a cluster for running the demo
-	$(if $(demo_host),,$(QUIET)cd orchestration/terraform && make configure cluster_name=$(demo_cluster_name) \
-          $(demo-cluster-options) \
-          no_spot=$(if $(filter $(demo_cluster_spot_pricing),false),true,false))
-
-final-check-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):wallaroo-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
-final-check-demo-cluster: # Final check a cluster for running the demo
-	$(if $(demo_host),,$(error unable to look up demo host! destroy and try again.))
-
-create-demo-cluster: demo_host=$(shell aws ec2 describe-instances --filters Name=tag:Name,Values=$(demo_cluster_name):wallaroo-leader-1 --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
-create-demo-cluster: demo_cluster_command=$(if $(demo_host),configure,cluster)
-create-demo-cluster: ## Create a cluster for running the demo
-	$(if $(demo_cluster_name),,$(error Must supply demo_cluster_name when creating demo cluster!))
-	$(QUIET)cd orchestration/terraform && make $(demo_cluster_command) cluster_name=$(demo_cluster_name) \
-          $(demo-cluster-options) \
-          no_spot=$(if $(filter $(demo_cluster_spot_pricing),false),true,false)
-
-destroy-demo: $(if $(demo_cluster_name),destroy-demo-cluster,) ## Destroy/stop a demo
-
-destroy-demo-cluster: ## Create a cluster for running the demo
-	$(if $(demo_cluster_name),,$(error Must supply demo_cluster_name when destroying demo cluster!))
-	$(QUIET)cd orchestration/terraform && make destroy cluster_name=$(demo_cluster_name) \
-          $(demo-cluster-options) \
-          no_spot=$(if $(filter $(demo_cluster_spot_pricing),false),true,false)
-
 # rule to print info about make variables, works only with make 3.81 and above
 # to use invoke make with a target of print-VARNAME, e.g.,
 # make print-CCFLAGS
@@ -636,14 +488,6 @@ print-%:
 	$(QUIET)echo '  flavor = $(flavor $*)'
 	$(QUIET)echo '   value = $(value  $*)'
 
-
-dagon-test: ## Run dagon tests
-
-dagon-docker-test: ## Run dagon tests (using docker)
-
-dagon-spike-test: ## Run dagon spike tests
-
-dagon-docker-spike-test: ## Run dagon spike tests (using docker)
 
 # rule to confirm we are building for a real docker architecture we support
 docker-arch-check:
@@ -699,10 +543,6 @@ help: ## this help message
 	$(QUIET)grep -h -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
           'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-40s\033[0m %s\n", \
           $$1, $$2}'
-	$(QUIET)grep -h -E '^#[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
-          'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-40s\033[0m %s\n", \
-          substr($$1,2), $$2; str=$$1; sub(/#dagon-/,"dagon-docker-",str); printf \
-          "\033[36m%-40s\033[0m %s (using docker)\n", str, $$2}'
 
 endif # RULES_MK
 

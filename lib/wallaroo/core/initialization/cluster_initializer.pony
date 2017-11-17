@@ -153,10 +153,6 @@ actor ClusterInitializer
           _expected)
         _distributor.topology_ready()
 
-        let topology_ready_msg =
-          ExternalMsgEncoder.topology_ready(_initializer_name)
-        _connections.send_phone_home(topology_ready_msg)
-
         _topology_ready = true
       end
     else

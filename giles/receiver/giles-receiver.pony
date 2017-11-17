@@ -190,16 +190,6 @@ class Notify is TCPConnectionNotify
 // COORDINATE OUR STARTUP
 //
 
-primitive CoordinatorFactory
-  fun apply(env: Env,
-    store: Store,
-    node_id: (String | None),
-    to_dagon_addr: (Array[String] | None),
-    expected: (USize | None),
-    use_metrics: Bool): Coordinator
-  =>
-    Coordinator(env, store, expected, use_metrics)
-
 primitive Waiting
 primitive Ready
 primitive Failed
