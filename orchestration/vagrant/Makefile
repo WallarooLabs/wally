@@ -1,4 +1,3 @@
-ansible_vault_password ?= ~/.ansible_vault_pass.txt## Ansible Vault password file
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= 1## Number of leader nodes
 num_followers ?= 2## Number of follower nodes
@@ -42,7 +41,7 @@ destroy: ## Run vagrant destroy step to destroy a cluster
 
 configure: ## Configure nodes using ansible
 	@echo "\033[32m==> Running ansible playbook...\033[0m"
-	$(num_leaders_arg) $(num_followers_arg) ansible-playbook --vault-password-file $(ansible_vault_password)\
+	$(num_leaders_arg) $(num_followers_arg) ansible-playbook \
           $(ansible_parallelism_arg) -i ../ansible/vagrant.py \
           --ssh-common-args="-o StrictHostKeyChecking=no" \
           --extra-vars "cluster_name=$(cluster_name) \

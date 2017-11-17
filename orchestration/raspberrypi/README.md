@@ -108,7 +108,7 @@ make configure-rpi private_key=<PATH_TO_PRIVATE_KEY>
 
 #### Using ansible directly
 
-`ansible-playbook --ask-vault-pass -i hosts --ssh-extra-args="-o StrictHostKeyChecking=no -i <PATH/TO/PRIVATE/KEY>" -u root playbooks/hypriot.yml`
+`ansible-playbook -i hosts --ssh-extra-args="-o StrictHostKeyChecking=no -i <PATH/TO/PRIVATE/KEY>" -u root playbooks/hypriot.yml`
 
 NOTE: `<PATH/TO/PRIVATE/KEY>` must be an absolute path or else ansible doesn't
 work properly on OSX.

@@ -9,15 +9,6 @@ The following are the currently supported targets:
 * AWS
 * Hypriot on RPi
 
-## Vault
-
-The Ansible playbooks all use Ansible Vault to encrypt sensitive information.
-At the moment the only sensitive information we have is the login/password for
-the private Sendence docker repository. Because of this, all the Ansible
-playbook examples prompt for a password on execution. This can (and likely will)
-be changed so the password can be read from a file instead so as to not require
-user input.
-
 ## Vagrant
 
 Please look at the documentation in the 

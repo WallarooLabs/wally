@@ -105,8 +105,6 @@
 
 # Configure and deploy leader servers.
 - hosts: wallaroo-leaders
-  vars_files:
-    - 'docker_creds.yml'
   vars:
     ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: master
@@ -121,8 +119,6 @@
 
 # Configure and deploy follower servers.
 - hosts: wallaroo-followers
-  vars_files:
-    - 'docker_creds.yml'
   vars:
     ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: slave

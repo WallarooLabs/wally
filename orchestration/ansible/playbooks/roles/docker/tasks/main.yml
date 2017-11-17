@@ -7,12 +7,6 @@
      mode: 0755
   when: ('arm' != '{{ ansible_architecture[0:3] }}')
 
-- name: Update docker config
-  replace:
-    dest: /lib/systemd/system/docker.service
-    regexp: ^ExecStart.*
-    replace: ExecStart=/usr/bin/dockerd --insecure-registry docker.sendence.com:5043 {{ '' if ((userland_proxy is defined) and (userland_proxy == true)) else '--userland-proxy=false' }} --storage-driver=overlay -D
-
 - name: Update docker startup dependency for network
   replace:
     dest: /lib/systemd/system/docker.service
@@ -45,14 +39,3 @@
 - name: restart docker
   service: name=docker state=restarted
 
-
-- name: login to private Docker remote registry and force reauthentification
-  docker_login:
-    registry: docker.sendence.com:5043
-    username: "{{ docker_user }}"
-    password: "{{ docker_password }}"
-    reauth: yes
-
-- name: login to private Docker remote registry for user
-  command: creates=/home/{{ item }}/.docker cp -rf /root/.docker /home/{{ item }}/
-  with_items: '{{ docker_users or [] }}'

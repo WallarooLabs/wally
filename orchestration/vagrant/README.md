@@ -31,7 +31,7 @@ Test ansible communication with the leader nodes only:
 
 There is an ansible playbook for configuring the nodes. It can be run using the following command:
 
-`ansible-playbook --ask-vault-pass -i ../ansible/vagrant.py --ssh-common-args="-o StrictHostKeyChecking=no" ../ansible/playbooks/vagrant.yml`
+`ansible-playbook -i ../ansible/vagrant.py --ssh-common-args="-o StrictHostKeyChecking=no" ../ansible/playbooks/vagrant.yml`
 
 ## Makefile
 

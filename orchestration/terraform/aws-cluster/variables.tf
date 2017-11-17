@@ -18,6 +18,16 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
+variable "terraform_state_aws_region" {
+  description = "AWS region for terraform state."
+  default = "us-east-1"
+}
+
+variable "terraform_state_aws_bucket" {
+  description = "AWS bucket for terraform state."
+  default = "sendence-dev"
+}
+
 variable "aws_subnet_id" {
   description = "AWS subnet_id to launch servers."
   default = ""

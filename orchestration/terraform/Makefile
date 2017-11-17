@@ -6,8 +6,10 @@ region ?= us-east-1## Region to launch cluster in. For Packet: ewr1==New York, s
 availability_zone ?= ## Availability Zone to launch cluster in.
 cluster_pem ?= ~/.ssh/ec2/$(region).pem## PEM file to use for ssh keys for cluster.
 terraform_args ?= ## Terraform arguments.
+terraform_locking_aws_region ?= us-east-1## AWS Region for storing terraform state
+terraform_state_aws_region ?= us-east-1## AWS Region for storing terraform state
+terraform_state_aws_bucket ?= sendence-dev## AWS Bucket for storing terraform state
 use_placement_group ?= false## Whether to use placement group or not
-ansible_vault_password ?= ~/.ansible_vault_pass.txt## Ansible Vault password file
 terraform_packet_vars ?= ~/.terraform_packet_vars## Terraform variables for Packet
 use_automagic_instances ?= true## Find appropriate instances to use (spot included); Will automagically use placement groups if applicable
 mem_required ?= 0.5## Minimum amount of memory in GB per instance (for use_automagic_instances=true)
@@ -356,12 +358,10 @@ sync-wallaroo: check-cluster-name ## Rsync wallaroo repo to nodes
 
 
 configure: check-cluster-name ## Configure nodes using ansible
-	$(if $(wildcard $(ansible_vault_password)),,$(error Ansible Vault \
-          password file ($(ansible_vault_password)) is missing!))
 	@echo "\033[36m==> Running ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
-	PACKET_NET_API_KEY=$(packet_api_key) ansible-playbook $(ansible_parallelism_arg) --vault-password-file \
-          $(ansible_vault_password) --timeout=30 -i \
+	PACKET_NET_API_KEY=$(packet_api_key) ansible-playbook $(ansible_parallelism_arg) \
+          --timeout=30 -i \
           ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           cluster_project_name=$(cluster_project_name) \
@@ -500,19 +500,19 @@ destroy-vpc: check-cluster-name init-vpc-terraform # destroy VPC in region
 acquire-cluster-lock: check-cluster-name ## Acquire cluster lock in order to safely run terraform commands on shared remote state in S3
 	@echo "\033[36m==> Acquiring cluster lock...\033[0m"
 	aws configure set preview.sdb true
-	aws sdb create-domain --region us-east-1 --domain-name terraform_locking
+	aws sdb create-domain --region $(terraform_locking_aws_region) --domain-name terraform_locking
         # create lock item if needed
-	-aws sdb put-attributes --region us-east-1 --domain-name \
+	-aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=$(cluster_name)-lock,Value=free,Replace=true \
           --expected Name=$(cluster_name)-lock,Exists=false
         # get a free lock
-	-aws sdb put-attributes --region us-east-1 --domain-name \
+	-aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=$(cluster_name)-lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=$(cluster_name)-lock,Value=free
         # next command is for when a previous make target failed without releasing a lock
-	aws sdb put-attributes --region us-east-1 --domain-name \
+	aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=$(cluster_name)-lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=$(cluster_name)-lock,Value=`id -u -n`-`hostname`
@@ -521,19 +521,19 @@ acquire-cluster-lock: check-cluster-name ## Acquire cluster lock in order to saf
 acquire-vpc-lock: check-cluster-name ## Acquire vpc lock in order to safely run terraform commands on shared remote state in S3
 	@echo "\033[36m==> Acquiring vpc lock...\033[0m"
 	aws configure set preview.sdb true
-	aws sdb create-domain --region us-east-1 --domain-name terraform_locking
+	aws sdb create-domain --region $(terraform_locking_aws_region) --domain-name terraform_locking
         # create lock item if needed
-	-aws sdb put-attributes --region us-east-1 --domain-name \
+	-aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=vpc-lock,Value=free,Replace=true \
           --expected Name=vpc-lock,Exists=false
         # get a free lock
-	-aws sdb put-attributes --region us-east-1 --domain-name \
+	-aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=vpc-lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=vpc-lock,Value=free
         # next command is for when a previous make target failed without releasing a lock
-	aws sdb put-attributes --region us-east-1 --domain-name \
+	aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=vpc-lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=vpc-lock,Value=`id -u -n`-`hostname`
@@ -549,8 +549,8 @@ init-vpc-terraform: check-cluster-name ## Initialize/reset local terraform state
 	cd $(provider)-vpc && rm -f .terraform/terraform.tfstate
 	cd $(provider)-vpc && rm -f .terraform/terraform.tfstate.backup
 	cd $(provider)-vpc && terraform remote config -backend=s3 \
-          -backend-config="bucket=sendence-dev" \
-          -backend-config="region=us-east-1" \
+          -backend-config="bucket=$(terraform_state_aws_bucket)" \
+          -backend-config="region=$(terraform_state_aws_region)" \
           -backend-config="key=terraform-state/vpc/$(region)-terraform.tfstate"
 	@echo "\033[36m==> Terraform state successfully initialized for VPC in \
 region '$(region)' at provider '$(provider)'!\033[0m"
@@ -574,15 +574,15 @@ init-terraform: ## Initialize/reset local terraform state based on what is in S3
 	cd $(provider)-cluster && rm -f .terraform/terraform.tfstate
 	cd $(provider)-cluster && rm -f .terraform/terraform.tfstate.backup
 	cd $(provider)-cluster && terraform remote config -backend=s3 \
-          -backend-config="bucket=sendence-dev" \
-          -backend-config="region=us-east-1" \
+          -backend-config="bucket=$(terraform_state_aws_bucket)" \
+          -backend-config="region=$(terraform_state_aws_region)" \
           -backend-config="key=terraform-state/cluster/$(provider)-$(region)-$(cluster_name)-terraform.tfstate"
 	@echo "\033[36m==> Terraform state successfully initialized for cluster\
  '$(cluster_name)' in region '$(region)' at provider '$(provider)'!\033[0m"
 
 release-cluster-lock: check-cluster-name ## Release cluster lock after safely running terraform commands on shared remote state in S3
 	@echo "\033[36m==> Releasing cluster lock...\033[0m"
-	aws sdb put-attributes --region us-east-1 --domain-name \
+	aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=$(cluster_name)-lock,Value=free,Replace=true \
           --expected Name=$(cluster_name)-lock,Value=`id -u -n`-`hostname`
@@ -590,20 +590,20 @@ release-cluster-lock: check-cluster-name ## Release cluster lock after safely ru
 
 force-release-cluster-lock: check-cluster-name ## Force release cluster lock (NOTE: ONLY USE IN EMERGENCY ELSE IT COULD CORRUPT TERRAFORM CACHE!!!!)
 	@echo "\033[36m==> Forcing release of cluster lock...\033[0m"
-	aws sdb put-attributes --region us-east-1 --domain-name \
+	aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=$(cluster_name)-lock,Value=free,Replace=true
 	@echo "\033[36m==> Cluster lock successfully released!\033[0m"
 
 force-delete-cluster-state: check-cluster-name ## Force delete cluster state (NOTE: ONLY USE IN EMERGENCY AS IT DELETES TERRAFORM CACHE!!!!)
 	@echo "\033[36m==> Forcing delete of terraform cluster state...\033[0m"
-	aws s3 rm s3://sendence-dev/terraform-state/cluster/$(provider)-$(region)-$(cluster_name)-terraform.tfstate
+	aws s3 rm s3://$(terraform_state_aws_bucket)/terraform-state/cluster/$(provider)-$(region)-$(cluster_name)-terraform.tfstate
 	@echo "\033[36m==> Cluster terraform state successfully deleted!\033[0m"
 	@echo "\033[36m==> NOTE: PLEASE MAKE SURE TO MANUALLY DELETE ANY LINGERING RESOURCES!!!\033[0m"
 
 release-vpc-lock: check-cluster-name ## Release vpc lock after safely running terraform commands on shared remote state in S3
 	@echo "\033[36m==> Releasing vpc lock...\033[0m"
-	aws sdb put-attributes --region us-east-1 --domain-name \
+	aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=vpc-lock,Value=free,Replace=true \
           --expected Name=vpc-lock,Value=`id -u -n`-`hostname`
@@ -611,7 +611,7 @@ release-vpc-lock: check-cluster-name ## Release vpc lock after safely running te
 
 force-release-vpc-lock: check-cluster-name ## Force release vpc lock (NOTE: ONLY USE IN EMERGENCY ELSE IT COULD CORRUPT TERRAFORM CACHE!!!!)
 	@echo "\033[36m==> Forcing release of vpc lock...\033[0m"
-	aws sdb put-attributes --region us-east-1 --domain-name \
+	aws sdb put-attributes --region $(terraform_locking_aws_region) --domain-name \
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=vpc-lock,Value=free,Replace=true
 	@echo "\033[36m==> VPC lock successfully released!\033[0m"

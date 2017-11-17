@@ -115,9 +115,8 @@ $(eval \
 DEBUG_SHELL ?= ## Debug shell commands?
 VERBOSE ?= ## Print commands as they're executed?
 docker_image_version ?= $(strip $(docker_image_version_val))## Docker Image Tag to use
-docker_image_repo_host ?= docker.sendence.com:5043## Docker Repository to use
-wallaroo_docker_image_repo ?= wallaroolabs## WallarooLabs Docker Repository
-docker_image_repo ?= $(docker_image_repo_host)/sendence## Docker Repository to use
+docker_image_repo_host ?= ## Docker Repository to use
+docker_image_repo ?= $(docker_image_repo_host)wallaroolabs## Docker Repository to use
 arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
 ponyc_tag ?= wallaroolabs-$(strip $(latest_ponyc_tag))-release## tag for ponyc docker to use
@@ -240,21 +239,21 @@ ifneq ($(arch),native)
     quote = '
     ponyc_docker_args = docker run --rm -i $(docker_user_arg) -v \
         $(abs_wallaroo_dir):$(abs_wallaroo_dir) $(docker_cpu_arg) \
-        -v $(HOME)/.gitconfig:/.gitconfig \
-        -v $(HOME)/.gitconfig:/root/.gitconfig \
-        -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
-        -v $(HOME)/.git-credential-cache:/.git-credential-cache \
+        $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+        $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+        $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+        $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
         -w $(1) --entrypoint bash \
         $(ponyc_runner):$(ponyc_tag) -c $(quote)
 
     monhub_docker_args = docker run --rm -i -v \
         $(abs_wallaroo_dir):$(abs_wallaroo_dir) $(docker_cpu_arg) \
-        -v $(HOME)/.gitconfig:/.gitconfig \
-        -v $(HOME)/.gitconfig:/root/.gitconfig \
-        -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
-        -v $(HOME)/.git-credential-cache:/.git-credential-cache \
+        $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+        $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+        $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+        $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
         -w $(1) --entrypoint bash \
-        $(wallaroo_docker_image_repo)/$(monhub_builder):$(monhub_builder_tag) -c $(quote)
+        $(docker_image_repo)/$(monhub_builder):$(monhub_builder_tag) -c $(quote)
   endif
 endif
 

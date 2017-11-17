@@ -71,8 +71,6 @@ Accounts needed:
 
 Configuration needed:
 
-* Create `~/.ansible_vault_pass.txt` with password for Ansible Vault (same password
-  as for Docker registry; ask Dipin if needed)
 * Create AWS config using `aws configure` command
 * Set up shared ssh keys in `~/.ssh/ec2/` (ask Dipin or someone else for where to get the
   key files)
@@ -102,13 +100,6 @@ The `Makefile` enforces the following:
 * Run terraform plan/apply/destroy command
 * Release lock from simpledb if it is held by the current user (throw error
   otherwise)
-
-NOTE: The `Makefile` uses a password file for Ansible Vault when configuring
-the cluster. The default password file is `~/.ansible_vault_pass.txt` and 
-the command will fail if the file doesn't exist. The command will also fail
-if the file contents are not the correct Vault password. If you need to know
-the Vault password in order to create the password file, please ask Dipin 
-or Sean or Markus.
 
 NOTE: The `Makefile` does *not* currently ensure that the lock is released if
 there is an error running any commands after acquiring the lock.

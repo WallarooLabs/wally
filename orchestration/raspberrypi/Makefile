@@ -1,4 +1,3 @@
-ansible_vault_password ?= ~/.ansible_vault_pass.txt## Ansible Vault password file
 hosts_file ?= hosts## Hosts inventory file for ansible
 private_key ?= ## Private key to use
 node_hostname ?= ## Hostname to flash
@@ -52,10 +51,8 @@ configure-rpi: ## Configure nodes using ansible
           file ($(hosts_file)) is missing!))
 	$(if $(wildcard $(private_key)),,$(error SSH private key \
           file ($(private_key)) is missing!))
-	$(if $(wildcard $(ansible_vault_password)),,$(error Ansible Vault \
-          password file ($(ansible_vault_password)) is missing!))
 	@echo "\033[36m==> Running ansible playbook for RPi cluster...\033[0m"
-	ansible-playbook --vault-password-file $(ansible_vault_password) -i\
+	ansible-playbook -i\
           hosts --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(private_key)" -u root ../ansible/playbooks/hypriot.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for RPi \
