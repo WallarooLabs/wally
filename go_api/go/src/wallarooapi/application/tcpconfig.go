@@ -16,12 +16,16 @@ func MakeTCPSourceConfig(host string, port string, decoder wa.Decoder) *TCPSourc
 	return &TCPSourceConfig{host, port, decoder, 0}
 }
 
-func (tsc *TCPSourceConfig) AddDecoder() uint64 {
+func (tsc *TCPSourceConfig) MakeDecoder() repr.ComponentRepresentable {
+	return makeFramedDecoder(tsc.addDecoder())
+}
+
+func (tsc *TCPSourceConfig) addDecoder() uint64 {
 	tsc.decoderId = wa.AddComponent(tsc.decoder)
 	return tsc.decoderId
 }
 
-func (tsc *TCPSourceConfig) Repr() *repr.TCPSourceConfig {
+func (tsc *TCPSourceConfig) SourceConfigRepr() interface{} {
 	return repr.MakeTCPSourceConfig(tsc.host, tsc.port, tsc.decoderId)
 }
 
@@ -36,11 +40,15 @@ func MakeTCPSinkConfig(host string, port string, encoder wa.Encoder) *TCPSinkCon
 	return &TCPSinkConfig{host, port, encoder, 0}
 }
 
-func (tsc *TCPSinkConfig) AddEncoder() uint64 {
+func (tsc *TCPSinkConfig) MakeEncoder() repr.ComponentRepresentable {
+	return makeEncoder(tsc.addEncoder())
+}
+
+func (tsc *TCPSinkConfig) addEncoder() uint64 {
 	tsc.encoderId = wa.AddComponent(tsc.encoder)
 	return tsc.encoderId
 }
 
-func (tsc *TCPSinkConfig) Repr() *repr.TCPSinkConfig {
+func (tsc *TCPSinkConfig) SinkConfigRepr() interface{} {
 	return repr.MakeTCPSinkConfig(tsc.host, tsc.port, tsc.encoderId)
 }

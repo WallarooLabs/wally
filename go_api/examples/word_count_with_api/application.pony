@@ -29,7 +29,7 @@ actor Main
       //  end
 
       let application = recover val
-        BuildApplication.from_json(application_json_string)?
+        BuildApplication.from_json(application_json_string, env)?
       end
 
       Startup(env, application, "word-count")

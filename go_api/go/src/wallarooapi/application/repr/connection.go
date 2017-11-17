@@ -30,13 +30,13 @@ type ToStatePartition struct {
 	MultiWorker bool
 }
 
-func MakeToSink(stepId uint64, fromStepId uint64, tcpSinkConfig *TCPSinkConfig) *ToSink {
-	return &ToSink{"ToSink", stepId, fromStepId, tcpSinkConfig}
+func MakeToSink(stepId uint64, fromStepId uint64, sinkConfig interface{}) *ToSink {
+	return &ToSink{"ToSink", stepId, fromStepId, sinkConfig}
 }
 
 type ToSink struct {
 	Class string
 	StepId uint64
 	FromStepId uint64
-	Sink *TCPSinkConfig
+	Sink interface{}
 }

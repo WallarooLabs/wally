@@ -24,7 +24,7 @@ type Pipeline struct {
 	Partitions []*Partition
 	Components []*Component
 	Connections []interface{}
- 	Source *TCPSourceConfig
+ 	Source interface{}
 }
 
 func (p *Pipeline) AddPartition(partition *Partition) {
@@ -35,8 +35,8 @@ func (p *Pipeline) AddComponent(c *Component) {
 	p.Components = append(p.Components, c)
 }
 
-func (p *Pipeline) AddTCPSourceConfig(tsc *TCPSourceConfig) {
-	p.Source = tsc
+func (p *Pipeline) AddSourceConfig(sc interface{}) {
+	p.Source = sc
 }
 
 func (p *Pipeline) AddConnection(connection interface{}) {

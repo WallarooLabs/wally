@@ -26,6 +26,10 @@ func MakePartitionFunction(id uint64) *Component {
 }
 
 func MakeDecoder(id uint64) *Component {
+	return &Component{"SourceHandler", id}
+}
+
+func MakeFramedDecoder(id uint64) *Component {
 	return &Component{"TCPFramedSourceHandler", id}
 }
 

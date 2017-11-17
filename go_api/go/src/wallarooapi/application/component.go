@@ -62,6 +62,18 @@ func (sb *stateBuilder) Repr() *repr.Component {
 // 	return repr.MakePartition(p.id)
 // }
 
+func makeFramedDecoder(id uint64) *framedDecoder {
+	return &framedDecoder{id}
+}
+
+type framedDecoder struct {
+	id uint64
+}
+
+func (d *framedDecoder) Repr() *repr.Component {
+	return repr.MakeFramedDecoder(d.id)
+}
+
 func makeDecoder(id uint64) *decoder {
 	return &decoder{id}
 }

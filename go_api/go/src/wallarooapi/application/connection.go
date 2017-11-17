@@ -38,15 +38,15 @@ func (tsp *ToStatePartition) Repr() interface{} {
 	return repr.MakeToStatePartition(tsp.stepId, tsp.fromStepId, tsp.stateComputationId, tsp.stateBuilderId, tsp.stateName, tsp.partitionId, tsp.multiWorker)
 }
 
-func makeToSink(stepId uint64, fromStepId uint64, tcpSinkConfig *TCPSinkConfig) *ToSink {
-	return &ToSink{&Step{stepId, fromStepId}, tcpSinkConfig}
+func makeToSink(stepId uint64, fromStepId uint64, sinkConfig SinkConfig) *ToSink {
+	return &ToSink{&Step{stepId, fromStepId}, sinkConfig}
 }
 
 type ToSink struct {
 	*Step
-	tcpSinkConfig *TCPSinkConfig
+	SinkConfig SinkConfig
 }
 
 func (ts *ToSink) Repr() interface{} {
-	return repr.MakeToSink(ts.stepId, ts.fromStepId, ts.tcpSinkConfig.Repr())
+	return repr.MakeToSink(ts.stepId, ts.fromStepId, ts.SinkConfig.SinkConfigRepr())
 }
