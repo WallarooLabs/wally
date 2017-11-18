@@ -120,7 +120,7 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 
 ## License
 
-Wallaroo is an open source project. All of the source code is available to you. Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. However, not all of the Wallaroo source code is a[Apache 2[apache 2 license] licensed. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. Source files in this repository have a header indicating which license they are under. 
+Wallaroo is an open source project. All of the source code is available to you. Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. However, not all of the Wallaroo source code is [Apache 2][apache 2 license] licensed. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. Source files in this repository have a header indicating which license they are under. 
 
 The core stream processing engine and state management facilities are all licensed under the the [Apache version 2][apache 2 license]. Autoscaling, exactly-once message processing and resiliency features are licensed under the [Wallaroo Community License Agreement][wallaroo community license].
 
