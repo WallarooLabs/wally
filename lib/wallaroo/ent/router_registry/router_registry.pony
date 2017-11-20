@@ -17,14 +17,14 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/core/initialization"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/network"
-use "wallaroo/ent/recovery"
-use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
+use "wallaroo_labs/mort"
 
 
 actor RouterRegistry
@@ -563,6 +563,33 @@ actor RouterRegistry
       _migrate_partition_steps(state_name, target_worker)
     end
 
+  be begin_migration_of_all() =>
+    """
+    Begin partition migration of *all* local stateful partition steps,
+    as part of a shrink-to-fit migration.
+    """
+    if _partition_routers.size() == 0 then
+      //no steps have been migrated
+      @printf[I32](("Resuming message processing immediately. No partitions " +
+        "to migrate.\n").cstring())
+      _resume_the_world()
+    end
+
+    let target_workers: Array[(String, OutgoingBoundary)] =
+      match _omni_router
+      | let omr: OmniRouter =>
+        omr.get_outgoing_boundaries_sorted()
+      | None =>
+        recover Array[(String, OutgoingBoundary)] end
+      end
+    Invariant(target_workers.size() == _outgoing_boundaries.size())
+
+    @printf[I32]("Migrating all partitions to %d remaining workers\n".cstring(),
+      target_workers.size())
+    for state_name in _partition_routers.keys() do
+      _migrate_all_partition_steps(state_name, target_workers)
+    end
+
   be step_migration_complete(step_id: StepId) =>
     """
     Step with provided step id has been created on another worker.
@@ -674,11 +701,26 @@ actor RouterRegistry
         state_name.cstring(), target_worker.cstring())
       let boundary = _outgoing_boundaries(target_worker)?
       let partition_router = _partition_routers(state_name)?
-      partition_router.rebalance_steps(boundary, target_worker,
-        _worker_count(), this)
+      partition_router.rebalance_steps_grow(boundary, target_worker,
+        _worker_count(), state_name, this)
     else
       Fail()
     end
+
+  fun _migrate_all_partition_steps(state_name: String,
+    target_workers: Array[(String, OutgoingBoundary)])
+  =>
+    """
+    Called to initiate migrating all partition steps the set of remaining
+    workers.
+    """
+    try
+      @printf[I32]("Migrating steps for %s partition to %d workers\n".cstring(),
+        state_name.cstring(), target_workers.size())
+      let partition_router = _partition_routers(state_name)?
+      partition_router.rebalance_steps_shrink(target_workers, state_name, this)
+    end
+
 
   be add_to_step_waiting_list(step_id: StepId) =>
     _step_waiting_list.set(step_id)

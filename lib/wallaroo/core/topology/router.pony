@@ -214,6 +214,7 @@ trait val OmniRouter is Equatable[OmniRouter]
     pr: StatelessPartitionRouter): OmniRouter
 
   fun routes(): Array[Consumer] val
+  fun get_outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)]
 
   fun routes_not_in(router: OmniRouter): Array[Consumer] val
 
@@ -253,6 +254,8 @@ class val EmptyOmniRouter is OmniRouter
 
   fun routes(): Array[Consumer] val =>
     recover Array[Consumer] end
+  fun get_outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)] =>
+    recover Array[(String, OutgoingBoundary)] end
 
   fun routes_not_in(router: OmniRouter): Array[Consumer] val =>
     recover Array[Consumer] end
@@ -449,6 +452,24 @@ class val StepIdRouter is OmniRouter
     let diff = recover trn Array[Consumer] end
     for r in _data_routes.values() do
       diff.push(r)
+    end
+    consume diff
+
+  fun get_outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)] =>
+    let keys = Array[String]
+    for k in _outgoing_boundaries.keys() do
+      keys.push(k)
+    end
+
+    let sorted_keys = Sort[Array[String], String](keys)
+
+    let diff = recover trn Array[(String, OutgoingBoundary)] end
+    for sorted_key in sorted_keys.values() do
+      try
+        diff.push((sorted_key, _outgoing_boundaries(sorted_key)?))
+      else
+        Fail()
+      end
     end
     consume diff
 
@@ -720,8 +741,10 @@ trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun register_routes(router: Router, route_builder': RouteBuilder)
   fun update_route[K: (Hashable val & Equatable[K] val)](
     raw_k: K, target: (Step | ProxyRouter)): PartitionRouter ?
-  fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
-    worker_count: USize, router_registry: RouterRegistry)
+  fun rebalance_steps_grow(boundary: OutgoingBoundary, target_worker: String,
+    worker_count: USize, state_name': String, router_registry: RouterRegistry)
+  fun rebalance_steps_shrink(target_workers: Array[(String, OutgoingBoundary)],
+    state_name': String, router_registry: RouterRegistry)
   fun size(): USize
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     PartitionRouter
@@ -969,43 +992,102 @@ class val LocalPartitionRouter[In: Any val,
       _step_ids, consume new_partition_routes, _partition_function,
       _default_router)
 
-  fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
-    worker_count: USize, router_registry: RouterRegistry)
+  fun rebalance_steps_grow(boundary: OutgoingBoundary, target_worker: String,
+    worker_count: USize, state_name': String, router_registry: RouterRegistry)
   =>
+   let steps_to_migrate = rebalance_pure_grow(_local_map,
+    worker_count, _partition_routes, target_worker, boundary)
+
+   rebalance_steps_common(state_name', router_registry, steps_to_migrate, 1)
+
+  fun rebalance_pure_grow(local_map': Map[U128, Step] val,
+    worker_count: USize, partition_routes: Map[Key, (Step | ProxyRouter)] val,
+     target_worker: String, boundary: OutgoingBoundary):
+    Array[(String, OutgoingBoundary, Key, U128, Step)]
+  =>
+    let steps_to_migrate = Array[(String, OutgoingBoundary, Key, U128, Step)]
+
     try
       var left_to_send = PartitionRebalancer.step_count_to_send(size(),
-        _local_map.size(), worker_count - 1)
+        local_map'.size(), worker_count - 1)
       if left_to_send > 0 then
-        let steps_to_migrate = Array[(Key, StepId, Step)]
-        for (key, target) in _partition_routes.pairs() do
+        for (key, target) in partition_routes.pairs() do
           if left_to_send == 0 then break end
           match target
           | let s: Step =>
             let step_id = _step_ids(key)?
-            steps_to_migrate.push((key, step_id, s))
+            steps_to_migrate.push((target_worker, boundary, key, step_id, s))
             left_to_send = left_to_send - 1
           end
         end
         if left_to_send > 0 then Fail() end
-        @printf[I32]("^^Migrating %lu steps to %s\n".cstring(),
-          steps_to_migrate.size(), target_worker.cstring())
-        for (_, step_id, _) in steps_to_migrate.values() do
-          router_registry.add_to_step_waiting_list(step_id)
-        end
-        for (key, step_id, step) in steps_to_migrate.values() do
-          step.send_state[Key](boundary, _state_name, key)
-          router_registry.move_stateful_step_to_proxy[Key](step_id,
-            ProxyAddress(target_worker, step_id), key, _state_name)
-        end
       else
-        // There is nothing to send over. Can we immediately resume processing?
-        router_registry.try_to_resume_processing_immediately()
+        // There is nothing to send over.
+        None
       end
       ifdef debug then
         Invariant(left_to_send == 0)
       end
     else
       Fail()
+    end
+    steps_to_migrate
+
+  fun rebalance_steps_shrink(target_workers: Array[(String, OutgoingBoundary)],
+    state_name': String, router_registry: RouterRegistry)
+  =>
+    let steps_to_migrate = rebalance_pure_shrink(_partition_routes,
+      target_workers, state_name', router_registry)
+
+    rebalance_steps_common(state_name', router_registry, steps_to_migrate, 1)
+
+  fun rebalance_pure_shrink(
+    partition_routes: Map[Key, (Step | ProxyRouter)] val,
+    target_workers: Array[(String, OutgoingBoundary)],
+    state_name': String, router_registry: RouterRegistry):
+    Array[(String, OutgoingBoundary, Key, U128, Step)]
+  =>
+    let steps_to_migrate = Array[(String, OutgoingBoundary, Key, U128, Step)]
+    var i: USize = 0
+
+    for (key, target) in _partition_routes.pairs() do
+      match target
+      | let s: Step =>
+        try
+          let step_id = _step_ids(key)?
+          (let target_worker: String, let boundary: OutgoingBoundary) =
+            target_workers(i.mod(target_workers.size()))?
+          steps_to_migrate.push((target_worker, boundary, key, step_id, s))
+          i = i + 1
+        else
+          Fail()
+        end
+      end
+    end
+    steps_to_migrate
+
+  fun rebalance_steps_common(state_name': String,
+    router_registry: RouterRegistry,
+    steps_to_migrate: Array[(String, OutgoingBoundary, Key, U128, Step)],
+    num_boundaries: USize)
+  =>
+    if (steps_to_migrate.size() == 0) then
+      // There is nothing to send over. Can we immediately resume processing?
+      router_registry.try_to_resume_processing_immediately()
+      return
+    end
+    @printf[I32]("^^Migrating %lu steps to %d workers\n".cstring(),
+      steps_to_migrate.size(), num_boundaries)
+    for (target_worker, boundary, key, step_id, step)
+      in steps_to_migrate.values()
+    do
+      router_registry.add_to_step_waiting_list(step_id)
+      step.send_state[Key](boundary, state_name', key)
+      router_registry.move_stateful_step_to_proxy[Key](step_id,
+        ProxyAddress(target_worker, step_id), key, state_name')
+      @printf[I32](
+        "^^Migrating step %lx to outgoing boundary %s/%lx\n".cstring(),
+        step, target_worker.cstring(), boundary)
     end
 
   fun blueprint(): PartitionRouterBlueprint =>
