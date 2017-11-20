@@ -1036,10 +1036,10 @@ actor LocalTopologyInitializer is LayoutInitializer
                       error
                     end
                   else
+                    built_stateless_steps(next_id) = sink
                     DirectRouter(sink)
                   end
 
-                built_stateless_steps(next_id) = sink
                 data_routes(next_id) = sink
                 built_routers(next_id) = sink_router
               end
@@ -1474,12 +1474,12 @@ actor LocalTopologyInitializer is LayoutInitializer
                   end
                 else
                   local_sinks(next_id) = sink
+                  built_stateless_steps(next_id) = sink
                   DirectRouter(sink)
                 end
 
               data_routes(next_id) = sink
               built_routers(next_id) = sink_router
-              built_stateless_steps(next_id) = sink
             end
           else
             @printf[I32](("Joining worker only currently supports sinks for " +
