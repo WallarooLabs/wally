@@ -24,6 +24,12 @@ primitive Double is Computation[U64, U64]
 
   fun name(): String => "Double"
 
+primitive Triple is Computation[U64, U64]
+  fun apply(input: U64): U64 =>
+    input * 3
+
+  fun name(): String => "Triple"
+
 primitive Divide is Computation[U64, U64]
   fun apply(input: U64): U64 =>
     input / 2
