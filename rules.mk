@@ -205,7 +205,7 @@ endif
 
 # validation of variable
 ifdef arch
-  $(eval $(call check-values,arch,amd64 armhf native))
+  $(eval $(call check-values,arch,amd64 native))
 endif
 
 # validation of variable
