@@ -59,9 +59,8 @@ for v in range(1, args.n+1):
 
 expected = [(counts[i], maxes[i]) for i in range(0,3)]
 
-
 try:
-    assert(expected == processed3)
+    assert(set(expected) == set(processed3))
     assert(args.n == len(received))
 except Exception as e:
     print 'expected final output to be:\n', expected

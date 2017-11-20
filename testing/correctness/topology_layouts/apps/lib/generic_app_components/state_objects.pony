@@ -73,6 +73,10 @@ primitive Mod3PartitionFunction
   fun apply(input: U64): U64 =>
     input % 3
 
+primitive Mod6CountMaxPartitionFunction
+  fun apply(cm: CountMax): U64 =>
+    cm.max.u64() % 6
+
 primitive CountMaxMod6PartitionFunction
   fun apply(input: CountMax): U64 =>
     input.max % 6
@@ -199,11 +203,11 @@ primitive UpdateCountAndMaxFromCountMax is StateComputation[CountMax, CountMax,
   CountAndMax]
   fun name(): String => "Update Count and Max from CountMax"
 
-  fun apply(u: CountMax,
+  fun apply(cm: CountMax,
     sc_repo: StateChangeRepository[CountAndMax],
     state: CountAndMax): (CountMax, DirectStateChange)
   =>
-    state.apply(u.max)
+    state.apply(cm.max)
 
     (CountMax(state.count, state.max), DirectStateChange)
 
