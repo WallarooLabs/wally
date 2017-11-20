@@ -60,7 +60,7 @@ COPY rules.mk /wallaroo-src/
 COPY SUMMARY.md /wallaroo-src/
 COPY SUPPORT.md /wallaroo-src/
 COPY utils /wallaroo-src/utils/
-COPY scripts/docker-setup.sh /wallaroo-src/
+COPY docker/docker-setup.sh /wallaroo-src/
 
 RUN mkdir /metrics_ui-src && \
     cp -r /wallaroo-src/monitoring_hub/apps/metrics_reporter_ui/rel/metrics_reporter_ui /metrics_ui-src
