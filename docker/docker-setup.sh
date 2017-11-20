@@ -2,7 +2,7 @@
 
 cd /src/wallaroo
 if [ ! -f Dockerfile ]; then
-  echo "====== Copying Wallaoo Source Code to Working Directory (/src/wallaroo) ======"
+  echo "====== Copying Wallaroo Source Code to Working Directory (/src/wallaroo) ======"
   cp -r /wallaroo-src/* /src/wallaroo
 fi
 if [ -d /src/python-virtualenv ]; then
