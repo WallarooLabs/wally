@@ -48,8 +48,8 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
-use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
+use @pony_asio_event_set_readable[None](event: AsioEventID, readable: Bool)
 
 actor TCPSource is Producer
   """
@@ -110,8 +110,13 @@ actor TCPSource is Producer
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    _event = @pony_asio_event_create(this, fd,
-      AsioEvent.read_write_oneshot(), 0, true)
+    ifdef linux then
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write_oneshot(), 0, true)
+    else
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write(), 0, true)
+    end
     _connected = true
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
@@ -382,7 +387,9 @@ actor TCPSource is Producer
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
     _readable = false
-    @pony_asio_event_set_readable[None](_event, false)
+    ifdef linux then
+      @pony_asio_event_set_readable(_event, false)
+    end
 
 
     @pony_os_socket_close[None](_fd)
@@ -433,9 +440,13 @@ actor TCPSource is Producer
           // Would block, try again later.
           // this is safe because asio thread isn't currently subscribed
           // for a read event so will not be writing to the readable flag
-          @pony_asio_event_set_readable[None](_event, false)
-          _readable = false
-          @pony_asio_event_resubscribe_read(_event)
+          ifdef linux then
+            @pony_asio_event_set_readable(_event, false)
+            _readable = false
+            @pony_asio_event_resubscribe_read(_event)
+          else
+            _readable = false
+          end
           _reading = false
           return
         | _next_size =>

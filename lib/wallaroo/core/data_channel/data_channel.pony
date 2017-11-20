@@ -41,6 +41,8 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
+use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
+use @pony_asio_event_set_readable[None](event: AsioEventID, readable: Bool)
 
 type DataChannelAuth is (AmbientAuth | NetAuth | TCPAuth | TCPConnectAuth)
 
@@ -135,10 +137,17 @@ actor DataChannel
     _notify = consume notify
     _connect_count = 0
     _fd = fd
-    _event = @pony_asio_event_create(this, fd,
-      AsioEvent.read_write_oneshot(), 0, true)
+    ifdef linux then
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write_oneshot(), 0, true)
+    else
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write(), 0, true)
+    end
     _connected = true
-    @pony_asio_event_set_writeable[None](_event, true)
+    ifdef linux then
+      @pony_asio_event_set_writeable(_event, true)
+    end
     _writeable = true
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
@@ -645,9 +654,13 @@ actor DataChannel
             // Would block, try again later.
             // this is safe because asio thread isn't currently subscribed
             // for a read event so will not be writing to the readable flag
-            @pony_asio_event_set_readable[None](_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
+            ifdef linux then
+              @pony_asio_event_set_readable(_event, false)
+              _readable = false
+              @pony_asio_event_resubscribe_read(_event)
+            else
+              _readable = false
+            end
             return
           | _next_size =>
             // Increase the read buffer size.
@@ -772,8 +785,10 @@ actor DataChannel
       _pending_writev_total = 0
       _readable = false
       _writeable = false
-      @pony_asio_event_set_readable[None](_event, false)
-      @pony_asio_event_set_writeable[None](_event, false)
+      ifdef linux then
+        @pony_asio_event_set_readable(_event, false)
+        @pony_asio_event_set_writeable(_event, false)
+      end
     end
 
     // On windows, this will also cancel all outstanding IOCP operations.
@@ -791,8 +806,10 @@ actor DataChannel
         _writeable = false
         // this is safe because asio thread isn't currently subscribed
         // for a write event so will not be writing to the readable flag
-        @pony_asio_event_set_writeable[None](_event, false)
-        @pony_asio_event_resubscribe_write(_event)
+        ifdef linux then
+          @pony_asio_event_set_writeable(_event, false)
+          @pony_asio_event_resubscribe_write(_event)
+        end
       end
 
       _notify.throttled(this)
