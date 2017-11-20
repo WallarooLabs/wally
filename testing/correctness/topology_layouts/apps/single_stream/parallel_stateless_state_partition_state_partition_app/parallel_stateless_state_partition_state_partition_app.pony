@@ -55,7 +55,7 @@ actor Main
               mod6partition where multi_worker = true)
             .to_state_partition[U64, U64, CountMax, CountAndMax](
               UpdateCountAndMaxFromCountMax, CountAndMaxBuilder,
-              "count-and-max",
+              "count-and-max-2",
               mod6partition where multi_worker = true)
             .to_sink(TCPSinkConfig[CountMax].from_options(
               FramedCountMaxEncoder,
