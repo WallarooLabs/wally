@@ -50,3 +50,15 @@ type ToSink struct {
 func (ts *ToSink) Repr() interface{} {
 	return repr.MakeToSink(ts.stepId, ts.fromStepId, ts.SinkConfig.SinkConfigRepr())
 }
+
+func makeDone(stepId uint64, fromStepId uint64) *Done {
+	return &Done{&Step{stepId, fromStepId}}
+}
+
+type Done struct {
+	*Step
+}
+
+func (d *Done) Repr() interface{} {
+	return repr.MakeDone(d.stepId, d.fromStepId)
+}

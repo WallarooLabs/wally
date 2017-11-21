@@ -4,35 +4,33 @@ use "wallaroo/core/source"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/sink/tcp_sink"
 use wct = "wallaroo/core/topology"
+use "wallaroo_labs/options"
+
+use @WallarooApiSetArgs[None](argv: Pointer[Pointer[U8] tag] tag, argc: U64)
+
+primitive ArgsToCArgs
+  fun apply(args: Array[String] val): Array[Pointer[U8] tag] val =>
+    let c_args = recover trn Array[Pointer[U8] tag] end
+    for a in args.values() do
+      c_args.push(a.cstring())
+    end
+    consume c_args
 
 actor Main
   new create(env: Env) =>
-    let application_json_string = ApplicationSetup()
-
     try
-      // let letter_partition = wct.Partition[GoData, U64](
-      //   PartitionFunctionU64(6), PartitionListU64(7))
+      let options = Options(WallarooConfig.application_args(env.args)?, false)
+      let c_args = ArgsToCArgs(options.remaining())
+      @WallarooApiSetArgs(c_args.cpointer(), c_args.size().u64())
+      let application_json_string = ApplicationSetup()
 
-      // let application = recover val
-      //   Application("word count")
-      //     .new_pipeline[GoData, GoData]("word count",
-      //       TCPSourceConfig[GoData].from_options(GoDecoder(1),
-      //         TCPSourceConfigCLIParser(env.args)?(0)?))
-      //       .to[GoData](ComputationMultiBuilder(2))
+      try
+        (let application, let application_name) = recover val
+          BuildApplication.from_json(application_json_string, env)?
+        end
 
-      //       .to_state_partition[GoData, U64, GoData, GoState](StateComputation(4),
-      //         StateBuilder(3), "word-count", letter_partition
-      //         where multi_worker = true)
-
-      //       .to_sink(TCPSinkConfig[GoData].from_options(GoEncoder(5),
-      //         TCPSinkConfigCLIParser(env.args)?(0)?))?
-      //  end
-
-      let application = recover val
-        BuildApplication.from_json(application_json_string, env)?
+        Startup(env, application, application_name)
+      else
+        @printf[I32]("Couldn't build topology\n".cstring())
       end
-
-      Startup(env, application, "word-count")
-    else
-      @printf[I32]("Couldn't build topology\n".cstring())
     end

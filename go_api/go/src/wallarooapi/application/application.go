@@ -64,3 +64,7 @@ func (pb *pipelineBuilder) ToSink(sinkConfig SinkConfig) *pipelineBuilder {
 	newStepId := pb.pipeline.AddToSink(pb.lastStepId, sinkConfig)
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
+
+func (pb *pipelineBuilder) Done() {
+	pb.pipeline.AddDone(pb.lastStepId)
+}

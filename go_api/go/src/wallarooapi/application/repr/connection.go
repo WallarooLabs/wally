@@ -40,3 +40,13 @@ type ToSink struct {
 	FromStepId uint64
 	Sink interface{}
 }
+
+func MakeDone(stepId uint64, fromStepId uint64) *Done {
+	return &Done{"Done", stepId, fromStepId}
+}
+
+type Done struct {
+	Class string
+	StepId uint64
+	FromStepId uint64
+}

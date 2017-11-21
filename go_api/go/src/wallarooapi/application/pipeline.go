@@ -66,3 +66,8 @@ func (p *pipeline) AddToSink(fromStepId uint64, sinkConfig SinkConfig) uint64 {
 	p.connections = append(p.connections, makeToSink(newStepId, fromStepId, sinkConfig))
 	return newStepId
 }
+
+func (p *pipeline) AddDone(fromStepId uint64) {
+	newStepId := p.newStepId()
+	p.connections = append(p.connections, makeDone(newStepId, fromStepId))
+}

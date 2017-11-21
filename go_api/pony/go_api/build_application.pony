@@ -112,6 +112,23 @@ class val _ToSink is _Connection
   fun connect(pipeline: _PipelineInfo box, steps_map: Map[U64, _StepInfo])? =>
     steps_map(_from_step_id)?.to_sink(_sink_config)?
 
+class val _Done is _Connection
+  let _step_id: U64
+  let _from_step_id: U64
+
+  new val create(step_id': U64, from_step_id': U64) =>
+    _step_id = step_id'
+    _from_step_id = from_step_id'
+
+  fun step_id(): U64 =>
+    _step_id
+
+  fun from_step_id(): U64 =>
+    _from_step_id
+
+  fun connect(pipeline: _PipelineInfo box, steps_map: Map[U64, _StepInfo])? =>
+    steps_map(_from_step_id)?.done()?
+
 primitive _ConnectionFactory
   fun apply(connection_j: JsonEzData, env: Env): _Connection ? =>
     let step_id = connection_j("StepId")?.int()?.u64()
@@ -138,6 +155,8 @@ primitive _ConnectionFactory
       let sink_j = connection_j("Sink")?
       let sink = _SinkConfig.from_json_ez_data(sink_j, env)?
       _ToSink(step_id, from_step_id, sink)
+    | "Done" =>
+      _Done(step_id, from_step_id)
     else
       Debug("Could not create connection")
       error
@@ -165,6 +184,9 @@ class _StepInfo
 
   fun ref to_sink(sink_config: SinkConfig[GoData])? =>
     _pipeline_builder.to_sink(sink_config)?
+
+  fun ref done()? =>
+    _pipeline_builder.done()?
 
 class val _PipelineInfo
   let name: String
@@ -281,7 +303,7 @@ primitive _SinkConfig
     end
 
 primitive BuildApplication
-  fun from_json(json_str: String, env: Env): Application val ? =>
+  fun from_json(json_str: String, env: Env): (Application val, String) ? =>
     try
       let json_doc: JsonDoc = JsonDoc
       json_doc.parse(json_str)?
@@ -337,7 +359,7 @@ primitive BuildApplication
         pipelines.push(_PipelineInfo(name, source, consume components_map,
           consume partitions_map, consume connections))
       end
-      _build_application(application_name, consume pipelines)?
+      (_build_application(application_name, consume pipelines)?, application_name)
     else
       Debug("Error building application")
       error

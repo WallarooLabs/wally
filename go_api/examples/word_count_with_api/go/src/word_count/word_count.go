@@ -14,6 +14,8 @@ import (
 
 //export ApplicationSetup
 func ApplicationSetup() *C.char {
+	fmt.Println("wallarooapi.Args=", wa.Args)
+
 	wa.Serialize = Serialize
 	wa.Deserialize = Deserialize
 
