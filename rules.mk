@@ -262,6 +262,10 @@ endef
 
 # function call for compiling monhub projects
 define MONHUBC
+  $(QUIET)cd $(1) && $(monhub_docker_args) mix local.hex --force \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) mix local.rebar --force \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) mix deps.get \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) mix compile \
@@ -270,6 +274,10 @@ endef
 
 # function call for compiling ui projects for release
 define MONHUBR
+  $(QUIET)cd $(1) && $(monhub_docker_args) mix local.hex --force \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) mix local.rebar --force \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.clean --all \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.get --only prod \
