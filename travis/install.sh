@@ -83,7 +83,7 @@ install_monitoring_hub_dependencies() {
     erlang-ssl=1:18.0 erlang-mnesia=1:18.0 erlang-runtime-tools=1:18.0 \
     erlang-inets=1:18.0
   kiex install 1.2.6
-  kiex use 1.2.6
+  kiex default 1.2.6
   source $HOME/.kiex/elixirs/elixir-1.2.6.env
   mix local.hex --force
   mix local.rebar --force
