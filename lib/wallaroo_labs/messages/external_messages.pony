@@ -16,8 +16,9 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "net"
 use "buffered"
+use "collections"
+use "net"
 
 primitive _Data                                 fun apply(): U16 => 1
 primitive _Ready                                fun apply(): U16 => 2
@@ -32,15 +33,41 @@ primitive _GilesSendersStarted                  fun apply(): U16 => 10
 primitive _Print                                fun apply(): U16 => 11
 primitive _RotateLog                            fun apply(): U16 => 12
 primitive _CleanShutdown                        fun apply(): U16 => 13
+primitive _Shrink                               fun apply(): U16 => 14
 
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
     let s_array = s.array()
-    let size = s_array.size() + 2
-    wb.u32_be(size.u32())
+    let size = s_array.size()
+    wb.u32_be(1 + 2 + 4 + size.u32())
+    wb.u8(1) // _encode serialization type tag
     wb.u16_be(id)
+    wb.u32_be(size.u32())
     wb.write(s_array)
+    wb.done()
+
+  fun _encode_shrink(id: U16, query: Bool, node_names: Array[String],
+    num_nodes: USize, wb: Writer): Array[ByteSeq] val
+  =>
+    var num_bytes: U32 = 0
+
+    for n in node_names.values() do
+      num_bytes = num_bytes + 4 + U32.from[USize](n.size())
+    end
+
+    wb.u32_be(1 + 2 + 1 + 4 + num_bytes + 4)
+    wb.u8(2) // _encode serialization type tag
+    wb.u16_be(id)
+    wb.u8(if query is true then 1 else 0 end)
+    wb.u32_be(node_names.size().u32())
+    for n in node_names.values() do
+      let n_array = n.array()
+      let size = n_array.size()
+      wb.u32_be(size.u32())
+      wb.write(n_array)
+    end
+    wb.u32_be(num_nodes.u32())
     wb.done()
 
   fun data(d: Stringable val, wb: Writer = Writer):
@@ -103,6 +130,24 @@ primitive ExternalMsgEncoder
   =>
     _encode(_CleanShutdown(), msg, wb)
 
+  fun shrink(query: Bool, node_names: Array[String] = [],
+    num_nodes: USize = 0, wb: Writer = Writer): Array[ByteSeq] val ?
+  =>
+    if (query is true) then
+      return _encode_shrink(_Shrink(), true, [], 0, wb)
+    end
+    if (node_names.size() > 0) and (num_nodes > 0) then
+      error
+    end
+    if (num_nodes < 0) then
+      error
+    end
+    if (node_names.size() == 0) and (num_nodes == 0) then
+      _encode_shrink(_Shrink(), false, node_names, 1, wb)
+    else
+      _encode_shrink(_Shrink(), false, node_names, num_nodes, wb)
+    end
+
 class BufferedExternalMsgEncoder
   let _buffer: Writer
 
@@ -146,7 +191,17 @@ class BufferedExternalMsgEncoder
     _buffer.done()
 
 primitive ExternalMsgDecoder
-  fun apply(data: Array[U8] val): ExternalMsg ? =>
+  fun apply(data: Array[U8] val): ExternalMsg val ? =>
+    """
+    Decode an ExternalMsg that was been encoded by ExternalMsgEncoder.
+
+    NOTE: ExternalMsgEncoder adds a 4 byte header that describes
+          the length of the serialized message.  This decoder function
+          assumes that the caller has stripped off that header.
+          For example, Wallaroo assumes that the Pony TCP actor has
+          already removed the header bytes as part of the
+          ExternalChannelConnectNotifier's operation.
+    """
     match _decode(data)?
     | (_Data(), let s: String) =>
       ExternalDataMsg(s)
@@ -172,19 +227,47 @@ primitive ExternalMsgDecoder
       ExternalRotateLogFilesMsg(s)
     | (_CleanShutdown(), let s: String) =>
       ExternalCleanShutdownMsg(s)
+    | (_Shrink(), let query: Bool,
+      let node_names: Array[String] val, let num_nodes: USize) =>
+      ExternalShrinkMsg(query, node_names, num_nodes)
     else
       error
     end
 
-  fun _decode(data: Array[U8] val): (U16, String) ? =>
+  fun _decode(data: Array[U8] val):
+    ((U16, String) | (U16, Bool, Array[String] val, USize)) ?
+  =>
     let rb = Reader
     rb.append(data)
-    let id = rb.u16_be()?
-    let s_len = data.size() - 2
-    let s = String.from_array(rb.block(s_len)?)
-    (id, s)
+    let type_tag = rb.u8()? // serialization type tag
+
+    match type_tag
+    | 1 =>
+      let id = rb.u16_be()?
+      let s_len: USize = USize.from[U32](rb.u32_be()?)
+      let s = String.from_array(rb.block(s_len)?)
+      (id, s)
+    | 2 =>
+      let id = rb.u16_be()?
+      let query: Bool = if (rb.u8()? == 1) then true else false end
+      let node_names = recover trn Array[String] end
+      let node_names_size = USize.from[U32](rb.u32_be()?)
+
+      // node_names.reserve(node_names_size)
+      for i in Range[USize](0, node_names_size) do
+        let size = USize.from[U32](rb.u32_be()?)
+        let n = String.from_array(rb.block(size)?)
+        node_names.push(n)
+      end
+      let num_nodes = USize.from[U32](rb.u32_be()?)
+
+      (id, query, consume node_names, num_nodes)
+    else
+      error
+    end
 
 trait val ExternalMsg
+  fun the_string() => String
 
 class val ExternalDataMsg is ExternalMsg
   let data: String
@@ -239,8 +322,21 @@ class val ExternalRotateLogFilesMsg is ExternalMsg
   new val create(n: String) =>
     node_name = n
 
+  fun the_string() => node_name
+
 class val ExternalCleanShutdownMsg is ExternalMsg
   let msg: String
 
   new val create(m: String) =>
     msg = m
+
+class val ExternalShrinkMsg is ExternalMsg
+  let query: Bool
+  let node_names: Array[String] val
+  let num_nodes: USize
+
+  new val create(query': Bool,
+    node_names': Array[String] val, num_nodes': USize) =>
+    query = query'
+    node_names = node_names'
+    num_nodes = num_nodes'

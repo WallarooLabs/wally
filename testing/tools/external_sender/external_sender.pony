@@ -52,7 +52,16 @@ actor Main
               -----------------------------------------------------------------------------------
               --external/-e [Specifies address to send message to]
               --type/-t [Specifies message type]
+                  clean-shutdown | rotate-log | shrink | print
               --message/-m [Specifies message contents to send]
+                  rotate-log
+                      Node name to rotate log files
+                  clean-shutdown | print
+                      Text to embed in the message
+                  shrink
+                      Specify names of nodes or number of nodes.
+                      If 1st char is a digit, specify number of of nodes;
+                      else specify comma-separated list of node names.
               -----------------------------------------------------------------------------------
               """.cstring())
             return
@@ -66,6 +75,11 @@ actor Main
           ExternalMsgEncoder.clean_shutdown(message)
         | "rotate-log" =>
           ExternalMsgEncoder.rotate_log(message)
+        | "shrink" =>
+          (let query: Bool,
+            let node_names: Array[String], let num_nodes: USize) =
+            parse_shrink_cmd_line(message)?
+          ExternalMsgEncoder.shrink(query, node_names, num_nodes)?
         else // default to print
           ExternalMsgEncoder.print_message(message)
         end
@@ -75,6 +89,17 @@ actor Main
     else
       @printf[I32]("Error sending.\n".cstring())
     end
+
+    fun parse_shrink_cmd_line(s: String): (Bool, Array[String], USize) ? =>
+      let first: U8 = s(0)?
+
+      if (first == '?') then
+        return (true, [], 0)
+      elseif (first >= U8('0')) and (first <= U8('9')) then
+        return (false, [], s.usize()?)
+      else
+        return (false, s.split(","), 0)
+      end
 
 class ExternalSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth

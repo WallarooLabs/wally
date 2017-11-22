@@ -16,6 +16,8 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "buffered"
+use "collections"
 use "ponytest"
 
 actor Main is TestList
@@ -27,6 +29,8 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     test(_TestFallorMsgEncoder)
     test(_TestFallorTimestampRaw)
+    test(_TestGeneralExtEncDecSimple)
+    test(_TestGeneralExtEncDecShrink)
 
 class iso _TestFallorMsgEncoder is UnitTest
   fun name(): String => "messages/_TestFallorMsgEncoder"
@@ -81,3 +85,179 @@ class iso _TestFallorTimestampRaw is UnitTest
     h.assert_eq[USize](tup.size(), 2)
     h.assert_eq[String](tup(0)?, at.string())
     h.assert_eq[String](tup(1)?, text)
+
+interface _EncoderFn0
+  fun ref apply(wb: Writer): Array[ByteSeq] val
+
+interface _EncoderFn1
+  fun ref apply(str: String, wb: Writer): Array[ByteSeq] val
+
+interface _ExtractFn
+  fun val apply(em: ExternalMsg): (String | None)
+
+primitive Help
+  fun val flatten(e1: Array[ByteSeq] val): Array[U8] val =>
+    // Decoder expects a single stream of bytes, so we need to join
+    // the byteseqs into a single Array[U8]
+    let e1': Array[U8] trn = recover Array[U8] end
+    for seq in e1.values() do
+      e1'.append(seq)
+    end
+  consume e1'
+
+  fun general(h: TestHelper, enc: (_EncoderFn0 | _EncoderFn1),
+    extr: _ExtractFn val) ?
+  =>
+    let str1: String val = "a string"
+    let wb1: Writer ref = Writer
+
+    let e1: Array[ByteSeq] val =
+      match enc
+      | let e: _EncoderFn0 =>
+        e(wb1)
+      | let e: _EncoderFn1 =>
+        e(str1, wb1)
+      end
+
+    // encode & decode are not symmetric -- we need to chop off
+    // the first 4 bytes before we can decode.
+    let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
+    let extracted: (String | None) =
+      (extr)(ExternalMsgDecoder(e1')?)
+    match extracted
+    | None =>
+      // Lambda extractor already matched correct type, nothing more to do"
+      None
+    | let ex: String =>
+      h.assert_eq[String](str1, ex)
+    end
+
+class iso _TestGeneralExtEncDecSimple is UnitTest
+  fun name(): String => "General Encode/decode for simple external messages"
+
+  fun apply(h: TestHelper) ? =>
+    Help.general(h, ExternalMsgEncoder~data(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalDataMsg => x.data
+        else "bad data" end
+      })?
+    Help.general(h, ExternalMsgEncoder~ready(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalReadyMsg => x.node_name
+        else "bad read" end
+      })?
+    Help.general(h, ExternalMsgEncoder~topology_ready(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalTopologyReadyMsg => x.node_name
+        else "bad topology_ready" end
+      })?
+    Help.general(h, ExternalMsgEncoder~start(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalStartMsg => None
+        else "bad start" end
+      })?
+    Help.general(h, ExternalMsgEncoder~shutdown(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalShutdownMsg => x.node_name
+        else "bad shutdown" end
+      })?
+    Help.general(h, ExternalMsgEncoder~done(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalDoneMsg => x.node_name
+        else "bad done" end
+      })?
+    Help.general(h, ExternalMsgEncoder~start_giles_senders(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalStartGilesSendersMsg => None
+        else "bad start_giles_senders" end
+      })?
+    Help.general(h, ExternalMsgEncoder~senders_started(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalGilesSendersStartedMsg => None
+        else "bad senders_started" end
+      })?
+    Help.general(h, ExternalMsgEncoder~print_message(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalPrintMsg => x.message
+        else "bad print_message" end
+      })?
+    Help.general(h, ExternalMsgEncoder~rotate_log(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalRotateLogFilesMsg => x.node_name
+        else "bad rotate_log" end
+      })?
+    Help.general(h, ExternalMsgEncoder~clean_shutdown(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalCleanShutdownMsg => x.msg
+        else "bad clean_shutdown" end
+      })?
+
+class iso _TestGeneralExtEncDecShrink is UnitTest
+  fun name(): String => "General Encode/decode for Shrink external messages"
+
+  fun apply(h: TestHelper) ? =>
+    """
+    Test round-trip serialization of ExternalShrinkMsg.
+
+    Note an "ah-hah" requirement: if both the node_names array
+    empty and also num_nodes is zero, then by default we should
+    observe node_names empty and num_nodes equal to *one*.
+    """
+    let node_names: Array[String] = [""; "a"; "lovely b"; ""; "node c"]
+
+    // Use Range so that num_nodes array size 0 is tested.
+    for i in Range[USize](0, node_names.size()) do
+      let e1: Array[ByteSeq] val =
+        ExternalMsgEncoder.shrink(false, node_names.slice(0, i), 0)?
+      // encode & decode are not symmetric -- we need to chop off
+      // the first 4 bytes before we can decode.
+      let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
+
+      match ExternalMsgDecoder(e1')?
+      | let extracted: ExternalShrinkMsg =>
+        h.assert_eq[Bool](false, extracted.query)
+        h.assert_eq[USize](i, extracted.node_names.size())
+        for j in extracted.node_names.keys() do
+          h.assert_eq[String](node_names(j)?, extracted.node_names(j)?)
+        end
+        if (i == 0) then
+          h.assert_eq[USize](1, extracted.num_nodes) // ah-hah
+        else
+          h.assert_eq[USize](0, extracted.num_nodes)
+        end
+      else
+        h.assert_eq[String]("error", "case 1")
+      end
+    end
+
+    // Use Range so that num_nodes = 0 is included
+    for i in Range[USize](0, 4) do
+      let e1: Array[ByteSeq] val = ExternalMsgEncoder.shrink(false, [], i)?
+      let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
+
+      match ExternalMsgDecoder(e1')?
+      | let extracted: ExternalShrinkMsg =>
+        h.assert_eq[Bool](false, extracted.query)
+        h.assert_eq[USize](0, extracted.node_names.size())
+        if (i == 0) then
+          h.assert_eq[USize](1, extracted.num_nodes) // ah-hah
+        else
+          h.assert_eq[USize](i, extracted.num_nodes)
+        end
+      else
+        h.assert_eq[String]("error", "case 2")
+      end
+    end
+
+    // Let's now try a round trip for a query
+    let e2: Array[ByteSeq] val = ExternalMsgEncoder.shrink(true, [], 0)?
+    let e2': Array[U8] val = recover Help.flatten(e2).slice(4) end
+
+    match ExternalMsgDecoder(e2')?
+    | let extracted: ExternalShrinkMsg =>
+      h.assert_eq[Bool](true, extracted.query)
+      h.assert_eq[USize](0, extracted.node_names.size())
+      h.assert_eq[USize](0, extracted.num_nodes)
+    else
+      h.assert_eq[String]("error", "case query")
+    end

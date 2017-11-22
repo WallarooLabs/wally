@@ -10,6 +10,7 @@ the License. You may obtain a copy of the License at
 
 */
 
+use "buffered"
 use "net"
 use "collections"
 use "time"
@@ -122,6 +123,15 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
             _recovery_file_cleaner.clean_recovery_files()
           else
             Fail()
+          end
+        | let m: ExternalShrinkMsg =>
+          @printf[I32]("TODO: query %s node_names size %d num_nodes %d\n".cstring(),
+            m.query.string().cstring(), m.node_names.size(), m.num_nodes)
+          if m.query is true then
+            let wb = recover ref Writer end
+            let available: Array[String] = ["todo-flopsy"; "mopsy"; "cottontail"]
+            let todo_reply = ExternalMsgEncoder.shrink(false, available, available.size(), wb)?
+            conn.writev(todo_reply)
           end
         else
           @printf[I32](("Incoming External Message type not handled by " +
