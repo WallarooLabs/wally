@@ -62,14 +62,6 @@ install_kafka_compression_libraries() {
 
 install_monitoring_hub_dependencies() {
   echo "Installing monitoring hub dependencies"
-  #echo "Installing kerl"
-  #pushd /tmp
-  #wget https://raw.githubusercontent.com/kerl/kerl/master/kerl
-  #chmod a+x kerl
-  #/tmp/kerl build 18.3 18.3
-  #/tmp/kerl install 18.3 /tmp/erlang
-  #. /tmp/erlang/activate
-  #export PATH="/tmp/erlang/bin:$PATH"
   echo "deb https://packages.erlang-solutions.com/ubuntu trusty contrib" | sudo tee -a /etc/apt/sources.list
   pushd /tmp
   wget https://packages.erlang-solutions.com/ubuntu/erlang_solutions.asc
@@ -82,11 +74,9 @@ install_monitoring_hub_dependencies() {
     erlang-syntax-tools=1:18.0 erlang-asn1=1:18.0 erlang-public-key=1:18.0 \
     erlang-ssl=1:18.0 erlang-mnesia=1:18.0 erlang-runtime-tools=1:18.0 \
     erlang-inets=1:18.0
+  echo "Install keix and setup Elixir version"
   kiex install 1.2.6
   kiex default 1.2.6
-  source $HOME/.kiex/elixirs/elixir-1.2.6.env
-  mix local.hex --force
-  mix local.rebar --force
 }
 
 install_python_dependencies() {
