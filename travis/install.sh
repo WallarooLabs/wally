@@ -37,7 +37,7 @@ install_cpuset() {
 }
 
 install_ponyc() {
-  echo "** Installing ponyc"
+  echo "** Installing ponyc from ${INSTALL_PONYC_FROM}"
 
   case "$INSTALL_PONYC_FROM" in
     "bintray")
@@ -49,11 +49,10 @@ install_ponyc() {
     ;;
 
     "source")
-      echo "Installing ponyc from source"
       echo "Installing ponyc dependencies"
       install_llvm
       install_pcre
-      echo "Grabbing ponyc"
+      echo "Installing ponyc from source"
       pushd /tmp
       git clone https://github.com/ponylang/ponyc.git
       pushd ponyc
@@ -131,9 +130,13 @@ install_python_dependencies() {
   echo "** Python dependencies installed"
 }
 
+echo "----- Installing dependencies"
+
 install_cpuset
 install_ponyc
 install_pony_stable
 install_kafka_compression_libraries
 install_monitoring_hub_dependencies
 install_python_dependencies
+
+echo "----- Dependencies installed"
