@@ -6,10 +6,12 @@ set -o nounset
 install_llvm() {
   echo "** Downloading and installing LLVM ${LLVM_VERSION}"
 
+  pushd /tmp
   wget "http://llvm.org/releases/${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-debian8.tar.xz"
   tar -xvf clang+llvm*
   pushd clang+llvm* && sudo mkdir /tmp/llvm && sudo cp -r ./* /tmp/llvm/
   sudo ln -s "/tmp/llvm/bin/llvm-config" "/usr/local/bin/${LLVM_CONFIG}"
+  popd
   popd
 
   echo "** LLVM ${LLVM_VERSION} installed"
@@ -18,9 +20,11 @@ install_llvm() {
 install_pcre() {
   echo "** Downloading and building PCRE2..."
 
+  pushd /tmp
   wget "ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2"
   tar -xjvf pcre2-10.21.tar.bz2
   pushd pcre2-10.21 && ./configure --prefix=/usr && make && sudo make install
+  popd
   popd
 
   echo "** PRCE2 installed"
