@@ -34,11 +34,18 @@ matrix:
       env:
         # bintray or source
         - INSTALL_PONYC_FROM="source"
+        # ponyc version to install
+        # needs to be a version in bintray or
+        # a valid `git checkout` value if from source
         - PONYC_VERSION="0.20.0"
+        # ponyc from source variables
+        # LLVM version used if building ponyc from source
         - LLVM_VERSION="3.9.1"
         - LLVM_CONFIG="llvm-config-3.9"
+        # gcc version to use as linker if building ponyc from source
         - CC1=gcc-5
         - CXX1=g++-5
+        # don't use LTO if building ponyc from source
         - lto=no
 
 before_install:

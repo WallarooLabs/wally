@@ -4,32 +4,41 @@ set -o errexit
 set -o nounset
 
 install_llvm() {
-  echo "Downloading and installing the LLVM specified by envvars..."
+  echo "** Downloading and installing LLVM ${LLVM_VERSION}"
 
   wget "http://llvm.org/releases/${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-debian8.tar.xz"
   tar -xvf clang+llvm*
   pushd clang+llvm* && sudo mkdir /tmp/llvm && sudo cp -r ./* /tmp/llvm/
   sudo ln -s "/tmp/llvm/bin/llvm-config" "/usr/local/bin/${LLVM_CONFIG}"
   popd
+
+  echo "** LLVM ${LLVM_VERSION} installed"
 }
 
 install_pcre() {
-  echo "Downloading and building PCRE2..."
+  echo "** Downloading and building PCRE2..."
 
   wget "ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2"
   tar -xjvf pcre2-10.21.tar.bz2
   pushd pcre2-10.21 && ./configure --prefix=/usr && make && sudo make install
   popd
+
+  echo "** PRCE2 installed"
 }
 
 install_cpuset() {
   # if cpuset isn't installed, we get warning messages that dirty up
   # the travis output logs
+  echo "** Installing cpuset"
+
   sudo apt-get -fy install cpuset
+
+  echo "** cpuset installed"
 }
 
 install_ponyc() {
-  echo "Installing ponyc"
+  echo "** Installing ponyc"
+
   case "$INSTALL_PONYC_FROM" in
     "bintray")
       echo "Installing latest ponyc release from bintray"
@@ -60,18 +69,24 @@ install_ponyc() {
       exit 1
     ;;
   esac
+
+  echo "** ponyc installed"
 }
 
 install_pony_stable() {
-  echo "Installing latest pony-stable release from bintray"
+  echo "** Installing pony-stable"
+
   sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
   echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list
   sudo apt-get update
   sudo apt-get -V install pony-stable
+
+  echo "** pony-stable installed"
 }
 
 install_kafka_compression_libraries() {
-  echo "Installing compression libraries needed for Kafka support"
+  echo "** Installing compression libraries needed for Kafka support"
+
   sudo apt-get install libsnappy-dev
   pushd /tmp
   wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
@@ -80,10 +95,13 @@ install_kafka_compression_libraries() {
   sudo make install
   popd
   popd
+
+  echo "** Compression libraries needed for Kafka support installed"
 }
 
 install_monitoring_hub_dependencies() {
-  echo "Installing monitoring hub dependencies"
+  echo "** Installing monitoring hub dependencies"
+
   echo "deb https://packages.erlang-solutions.com/ubuntu trusty contrib" | sudo tee -a /etc/apt/sources.list
   pushd /tmp
   wget https://packages.erlang-solutions.com/ubuntu/erlang_solutions.asc
@@ -98,14 +116,19 @@ install_monitoring_hub_dependencies() {
   echo "Install keix and setup Elixir version"
   kiex install 1.2.6
   kiex default 1.2.6
+
+  echo "** Monitoring hub dependencies installed"
 }
 
 install_python_dependencies() {
-  echo "Installing python dependencies"
+  echo "** Installing python dependencies"
+
   echo "Installing pytest"
   sudo python2 -m pip install pytest==3.2.2
   echo "Install enum"
   sudo python2 -m pip install --upgrade pip enum34
+
+  echo "** Python dependencies installed"
 }
 
 install_cpuset
