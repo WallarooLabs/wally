@@ -3,7 +3,7 @@
 set -o errexit
 set -o nounset
 
-download_llvm() {
+install_llvm() {
   echo "Downloading and installing the LLVM specified by envvars..."
 
   wget "http://llvm.org/releases/${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-debian8.tar.xz"
@@ -13,7 +13,7 @@ download_llvm() {
   popd
 }
 
-download_pcre() {
+install_pcre() {
   echo "Downloading and building PCRE2..."
 
   wget "ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2"
@@ -30,14 +30,36 @@ install_cpuset() {
 
 install_ponyc() {
   echo "Installing ponyc"
-  if [[ "$INSTALL_PONYC_FROM" == "last-release" ]]
-  then
-    echo "Installing latest ponyc release from bintray"
-    sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "8756 C4F7 65C9 AC3C B6B8  5D62 379C E192 D401 AB61"
-    echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
-    sudo apt-get update
-    sudo apt-get -V install ponyc
-  fi
+  case "$INSTALL_PONYC_FROM" in
+    "bintray")
+      echo "Installing latest ponyc release from bintray"
+      sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "8756 C4F7 65C9 AC3C B6B8  5D62 379C E192 D401 AB61"
+      echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
+      sudo apt-get update
+      sudo apt-get -V install ponyc=$PONYC_VERSION
+    ;;
+
+    "source")
+      echo "Installing ponyc from source"
+      echo "Installing ponyc dependencies"
+      install_llvm
+      install_pcre
+      echo "Grabbing ponyc"
+      pushd /tmp
+      git clone https://github.com/ponylang/ponyc.git
+      pushd ponyc
+      git checkout $PONYC_VERSION
+      make CC=$CC1 CXX=$CXX1
+      sudo make install
+      popd
+      popd
+    ;;
+
+    *)
+      echo "ERROR: unrecognized source to install ponyc from ${INSTALL_PONYC_FROM}"
+      exit 1
+    ;;
+  esac
 }
 
 install_pony_stable() {
@@ -68,7 +90,6 @@ install_monitoring_hub_dependencies() {
   sudo apt-key add erlang_solutions.asc
   popd
   sudo apt-get update
-  #sudo apt-get -fy install erlang=1:18.3
   sudo apt-get -fy install erlang-base=1:18.0 erlang-dev=1:18.0 \
     erlang-parsetools=1:18.0 erlang-eunit=1:18.0 erlang-crypto=1:18.0 \
     erlang-syntax-tools=1:18.0 erlang-asn1=1:18.0 erlang-public-key=1:18.0 \

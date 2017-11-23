@@ -32,7 +32,9 @@ matrix:
           packages:
             - g++-5
       env:
-        - INSTALL_PONYC_FROM="last-release"
+        # bintray or source
+        - INSTALL_PONYC_FROM="source"
+        - PONYC_VERSION="0.20.0"
         - LLVM_VERSION="3.9.1"
         - LLVM_CONFIG="llvm-config-3.9"
         - CC1=gcc-5
