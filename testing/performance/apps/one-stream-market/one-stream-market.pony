@@ -112,7 +112,7 @@ actor Main
                 symbol_data_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[NbboResult val].from_options(NbboResultEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?,
-              initial_report_msgs))?
+              initial_report_msgs))
       end
       Startup(env, application, "market-spread")
     else

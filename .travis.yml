@@ -33,11 +33,11 @@ matrix:
             - g++-5
       env:
         # bintray or source
-        - INSTALL_PONYC_FROM="bintray"
+        - INSTALL_PONYC_FROM="source"
         # ponyc version to install
         # needs to be a version in bintray or
         # a valid `git checkout` value if from source
-        - PONYC_VERSION="0.20.0"
+        - PONYC_VERSION="master"
         # ponyc from source variables
         # LLVM version used if building ponyc from source
         - LLVM_VERSION="3.9.1"

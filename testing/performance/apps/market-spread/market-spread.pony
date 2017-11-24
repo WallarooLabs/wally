@@ -133,7 +133,7 @@ actor Main
               where multi_worker = true)
             //!! TODO: Update to use command line for host/service
             .to_sink(TCPSinkConfig[OrderResult val].from_options(OrderResultEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))?
+              TCPSinkConfigCLIParser(env.args)?(0)?))
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
@@ -141,7 +141,7 @@ actor Main
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
-            .done()?
+            .done()
       end
       Startup(env, application, "market-spread")
     else

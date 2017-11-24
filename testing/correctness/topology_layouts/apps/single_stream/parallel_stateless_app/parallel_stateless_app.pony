@@ -44,7 +44,7 @@ actor Main
             .to_parallel[U64]({(): Double => Double})
             .to_sink(TCPSinkConfig[U64].from_options(
               FramedU64Encoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))?
+              TCPSinkConfigCLIParser(env.args)?(0)?))
       end
       Startup(env, application, "single_stream-parallel_stateless_app")
     else

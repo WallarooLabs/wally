@@ -283,8 +283,6 @@ class FileBackend is Backend
         for frac_id in x.values() do
           _writer.u32_be(frac_id)
         end
-      else
-        Fail()
       end
 
       _writer.u64_be(statechange_id)

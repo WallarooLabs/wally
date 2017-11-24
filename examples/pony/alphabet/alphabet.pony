@@ -46,7 +46,7 @@ actor Main
               letter_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[LetterTotal val].from_options(
               LetterTotalEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))?
+              TCPSinkConfigCLIParser(env.args)?(0)?))
       end
       Startup(env, application, "alphabet-contest")
     else

@@ -51,7 +51,7 @@ actor Main
               AddCount, WordTotalsBuilder, "word-totals",
               word_totals_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[RunningTotal].from_options(
-              RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))?
+              RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
       end
       Startup(env, application, "word-count")
     else

@@ -222,10 +222,6 @@ class val EgressBuilder
       else
         EmptySink
       end
-    else
-      // The match is exhaustive, so this can't happen
-      @printf[I32]("Exhaustive match failed somehow\n".cstring())
-      error
     end
 
 class val PreStateData

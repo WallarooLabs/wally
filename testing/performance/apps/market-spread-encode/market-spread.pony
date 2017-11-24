@@ -137,7 +137,7 @@ actor Main
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
             .to_sink(TCPSinkConfig[Array[ByteSeq] val].from_options(EmptyEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?, initial_report_msgs))?
+              TCPSinkConfigCLIParser(env.args)?(0)?, initial_report_msgs))
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
@@ -145,7 +145,7 @@ actor Main
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
-            .done()?
+            .done()
       end
       Startup(env, application, "market-spread")
     else

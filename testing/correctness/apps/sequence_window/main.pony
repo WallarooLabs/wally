@@ -110,7 +110,7 @@ actor Main
             WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
               partition where multi_worker = true)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))?
+              TCPSinkConfigCLIParser(env.args)?(0)?))
       end
       Startup(env, application, "sequence_window")
     else
