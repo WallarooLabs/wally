@@ -152,8 +152,6 @@ primitive KafkaSinkConfigCLIParser
     | let ksce: KafkaSinkConfigError =>
       @printf[U32]("%s\n".cstring(), ksce.message().cstring())
       error
-    else
-      error
     end
 
   fun _brokers_from_input_string(inputs: String): Array[(String, I32)] val ? =>

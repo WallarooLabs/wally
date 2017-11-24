@@ -967,8 +967,6 @@ primitive _SourceConfig
     | let kce: KafkaSourceConfigError =>
       @printf[U32]("%s\n".cstring(), kce.message().cstring())
       error
-    else
-      error
     end
 
 primitive _SinkConfig
@@ -1047,7 +1045,5 @@ primitive _SinkConfig
       conf
     | let kce: KafkaSinkConfigError =>
       @printf[U32]("%s\n".cstring(), kce.message().cstring())
-      error
-    else
       error
     end

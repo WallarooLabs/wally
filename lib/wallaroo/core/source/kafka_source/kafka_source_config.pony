@@ -133,8 +133,6 @@ primitive KafkaSourceConfigCLIParser
     | let e: KafkaSourceConfigError =>
       @printf[U32]("%s\n".cstring(), e.message().cstring())
       error
-    else
-      error
     end
 
   fun _brokers_from_input_string(inputs: String): Array[(String, I32)] val ? =>
