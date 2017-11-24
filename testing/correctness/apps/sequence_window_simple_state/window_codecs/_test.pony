@@ -40,7 +40,6 @@ class iso _TestWindowEncoder is UnitTest
     let encoded = match byteseqs(1)?
     | let m: String val => m
     | let m: Array[U8] val => String.from_array(m)
-    else ""
     end
     h.assert_eq[String]("[1,2,3,4]", encoded)
 
