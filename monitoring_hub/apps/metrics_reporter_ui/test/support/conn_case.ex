@@ -27,8 +27,7 @@ defmodule MetricsReporterUI.ConnCase do
     end
   end
 
-  setup tags do
-
-    {:ok, conn: Phoenix.ConnTest.conn()}
+  setup do
+    {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

@@ -10,10 +10,10 @@ defmodule MonitoringHubUtils.Serializers.HubProtocol do
   end
 
   def decode(data) do
-    error_msg = decode_error_msg
+    error_msg = decode_error_msg()
     case decode!(data) do
       ^error_msg ->
-        {:error, decode_error_msg}
+        {:error, decode_error_msg()}
       decoded_msg ->
         {:ok, decoded_msg}
     end
@@ -53,7 +53,7 @@ defmodule MonitoringHubUtils.Serializers.HubProtocol do
 
   def decode!(<< 3 :: size(8), event_size :: size(32),
     event :: binary-size(event_size), topic_size :: size(32),
-    topic :: binary-size(topic_size), payload_size :: size(32),
+    topic :: binary-size(topic_size), _payload_size :: size(32),
     payload :: binary>> = _iodata)
   do
     %{
@@ -65,7 +65,7 @@ defmodule MonitoringHubUtils.Serializers.HubProtocol do
   end
 
   def decode!(_unknown_data) do
-    decode_error_msg
+    decode_error_msg()
   end
 
   # 4-header : 1-side-U8 : 4-client_id-U32 : 6-order_id-String :
@@ -103,7 +103,7 @@ defmodule MonitoringHubUtils.Serializers.HubProtocol do
   # (8)-period-U64 : 8-period_ends_at_timestamp-U64
 
   defp payload_decode(<< _header :: size(32), name_size :: size(32),
-    name :: binary-size(name_size), category_size :: size(32),
+    name :: binary-size(name_size), _category_size :: size(32),
     "computation", worker_name_size :: size(32),
     worker_name :: binary-size(worker_name_size),
     pipeline_name_size :: size(32), pipeline_name :: binary-size(pipeline_name_size),
@@ -161,14 +161,13 @@ defmodule MonitoringHubUtils.Serializers.HubProtocol do
         bin_61, bin_62, bin_63, bin_64],
       "min" => min_val,
       "max" => max_val,
-      "period" => period,
       "period" => round(period / 1000000000),
       "timestamp" => round(timestamp / 1000000000)
     }
   end
 
   defp payload_decode(<< _header :: size(32), name_size :: size(32),
-    name :: binary-size(name_size), category_size :: size(32),
+    _name :: binary-size(name_size), _category_size :: size(32),
     "start-to-end", worker_name_size :: size(32),
     worker_name :: binary-size(worker_name_size),
     pipeline_name_size :: size(32), pipeline_name :: binary-size(pipeline_name_size),
@@ -226,14 +225,13 @@ defmodule MonitoringHubUtils.Serializers.HubProtocol do
         bin_61, bin_62, bin_63, bin_64],
       "min" => min_val,
       "max" => max_val,
-      "period" => period,
       "period" => round(period / 1000000000),
       "timestamp" => round(timestamp / 1000000000)
     }
   end
 
   defp payload_decode(<< _header :: size(32), name_size :: size(32),
-    name :: binary-size(name_size), category_size :: size(32),
+    _name :: binary-size(name_size), _category_size :: size(32),
     "node-ingress-egress", worker_name_size :: size(32),
     worker_name :: binary-size(worker_name_size),
     pipeline_name_size :: size(32), pipeline_name :: binary-size(pipeline_name_size),
@@ -291,7 +289,6 @@ defmodule MonitoringHubUtils.Serializers.HubProtocol do
         bin_61, bin_62, bin_63, bin_64],
       "min" => min_val,
       "max" => max_val,
-      "period" => period,
       "period" => round(period / 1000000000),
       "timestamp" => round(timestamp / 1000000000)
     }
@@ -356,7 +353,6 @@ defmodule MonitoringHubUtils.Serializers.HubProtocol do
         bin_61, bin_62, bin_63, bin_64],
       "min" => min_val,
       "max" => max_val,
-      "period" => period,
       "period" => round(period / 1000000000),
       "timestamp" => round(timestamp / 1000000000)
     }

@@ -3,7 +3,7 @@ defmodule MetricsReporterUI.StartEndByWorkerChannel do
   alias MonitoringHubUtils.MessageLog
 
   def join("start-to-end-by-worker:" <> _metric_name, _message, socket) do
-    send(self, :after_join)
+    send(self(), :after_join)
     {:ok, socket}
   end
 

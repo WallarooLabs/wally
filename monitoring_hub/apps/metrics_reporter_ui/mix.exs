@@ -4,7 +4,7 @@ defmodule MetricsReporterUI.Mixfile do
   def project do
     [app: :metrics_reporter_ui,
      version: "0.0.1",
-     build_path: "../../_build",
+     build_path: "_build",
      config_path: "../../config/config.exs",
      deps_path: "../../deps",
      lockfile: "../../mix.lock",
@@ -13,7 +13,7 @@ defmodule MetricsReporterUI.Mixfile do
      compilers: [:phoenix, :gettext] ++ Mix.compilers,
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
-     deps: deps]
+     deps: deps()]
   end
 
   # Configuration for the OTP application.
@@ -33,13 +33,13 @@ defmodule MetricsReporterUI.Mixfile do
   #
   # Type `mix help deps` for examples and options.
   defp deps do
-    [{:phoenix, "~> 1.1.2"},
-     {:phoenix_html, "~> 2.3"},
-     {:phoenix_live_reload, "~> 1.0", only: :dev},
-     {:gettext, "~> 0.9"},
+    [{:phoenix, "~> 1.3.0"},
+     {:phoenix_html, "~> 2.10.5"},
+     {:phoenix_live_reload, "~> 1.1.3", only: :dev},
+     {:gettext, "~> 0.14.0"},
      {:cowboy, "~> 1.0"},
-     {:exrm, "~> 1.0.8"},
-     {:phoenix_tcp, git: "https://github.com/WallarooLabs/phoenix_tcp.git", branch: "master"},
+     {:distillery, "~> 1.5.2"},
+     {:phoenix_tcp, git: "https://github.com/WallarooLabs/phoenix_tcp.git", branch: "update-deps"},
      {:monitoring_hub_utils, in_umbrella: true},
      {:metrics_reporter, in_umbrella: true}]
   end

@@ -42,6 +42,9 @@ env:
     - CXX: g++-5
     # don't use LTO if building ponyc from source
     - lto: no
+    # erlang and elixir versions to install
+    - OTP_VERSION: "1:20.1-1"
+    - ELIXIR_VERSION: "1.5.2-1"
 
 install:
   - bash travis/install.sh
