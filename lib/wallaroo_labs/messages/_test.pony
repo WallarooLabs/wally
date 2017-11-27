@@ -16,6 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "buffered"
 use "ponytest"
 
 actor Main is TestList
@@ -27,6 +28,7 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     test(_TestFallorMsgEncoder)
     test(_TestFallorTimestampRaw)
+    test(_TestGeneralExtEncDec)
 
 class iso _TestFallorMsgEncoder is UnitTest
   fun name(): String => "messages/_TestFallorMsgEncoder"
@@ -81,3 +83,107 @@ class iso _TestFallorTimestampRaw is UnitTest
     h.assert_eq[USize](tup.size(), 2)
     h.assert_eq[String](tup(0)?, at.string())
     h.assert_eq[String](tup(1)?, text)
+
+interface _EncoderFn0
+  fun ref apply(wb: Writer): Array[ByteSeq] val
+
+interface _EncoderFn1
+  fun ref apply(str: String, wb: Writer): Array[ByteSeq] val
+
+interface _ExtractFn
+  fun val apply(em: ExternalMsg): (String | None)
+
+primitive Help
+  fun val flatten(e1: Array[ByteSeq] val): Array[U8] val =>
+    // Decoder expects a single stream of bytes, so we need to join
+    // the byteseqs into a single Array[U8]
+    let e1': Array[U8] trn = recover Array[U8] end
+    for seq in e1.values() do
+      e1'.append(seq)
+    end
+   consume e1'
+
+  fun general(h: TestHelper, enc: (_EncoderFn0 | _EncoderFn1),
+    extr: _ExtractFn val) ?
+  =>
+    let str1: String val = "a string"
+    let wb1: Writer ref = Writer
+
+    let e1: Array[ByteSeq] val =
+      match enc
+      | let e: _EncoderFn0 =>
+        e(wb1)
+      | let e: _EncoderFn1 =>
+        e(str1, wb1)
+      end
+    let e1': Array[U8] val = Help.flatten(e1)
+
+    let extracted: (String | None) =
+      (extr)(ExternalMsgDecoder(e1')?)
+    match extracted
+    | None =>
+      // Lambda extractor already matched correct type, nothing more to do"
+      None
+    | let ex: String =>
+      h.assert_eq[String](str1, ex)
+    end
+
+class iso _TestGeneralExtEncDec is UnitTest
+  fun name(): String => "General Encode/decode for external messages"
+
+  fun apply(h: TestHelper) ? =>
+    Help.general(h, ExternalMsgEncoder~data(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalDataMsg => x.data
+        else "bad data" end
+      })?
+    Help.general(h, ExternalMsgEncoder~ready(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalReadyMsg => x.node_name
+        else "bad read" end
+      })?
+    Help.general(h, ExternalMsgEncoder~topology_ready(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalTopologyReadyMsg => x.node_name
+        else "bad topology_ready" end
+      })?
+    Help.general(h, ExternalMsgEncoder~start(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalStartMsg => None
+        else "bad start" end
+      })?
+    Help.general(h, ExternalMsgEncoder~shutdown(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalShutdownMsg => x.node_name
+        else "bad shutdown" end
+      })?
+    Help.general(h, ExternalMsgEncoder~done(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalDoneMsg => x.node_name
+        else "bad done" end
+      })?
+    Help.general(h, ExternalMsgEncoder~start_giles_senders(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalStartGilesSendersMsg => None
+        else "bad start_giles_senders" end
+      })?
+    Help.general(h, ExternalMsgEncoder~senders_started(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalGilesSendersStartedMsg => None
+        else "bad senders_started" end
+      })?
+    Help.general(h, ExternalMsgEncoder~print_message(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalPrintMsg => x.message
+        else "bad print_message" end
+      })?
+    Help.general(h, ExternalMsgEncoder~rotate_log(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalRotateLogFilesMsg => x.node_name
+        else "bad rotate_log" end
+      })?
+    Help.general(h, ExternalMsgEncoder~clean_shutdown(),
+      {(em: ExternalMsg) =>
+        match em | let x: ExternalCleanShutdownMsg => x.msg
+        else "bad clean_shutdown" end
+      })?
