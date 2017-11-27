@@ -3,7 +3,7 @@ defmodule MetricsReporterUI.PipelineChannel do
   alias MonitoringHubUtils.MessageLog
 
   def join("pipeline:" <> _metric_name, _message, socket) do
-    send(self, :after_join)
+    send(self(), :after_join)
     {:ok, socket}
   end
 

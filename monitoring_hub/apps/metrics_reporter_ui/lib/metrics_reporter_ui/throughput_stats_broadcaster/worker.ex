@@ -14,7 +14,7 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
   def init(args) do
     [log_name: log_name, interval_key: interval_key, pipeline_key: pipeline_key, app_name: app_name, category: category, stats_interval: stats_interval] = args
     msg_log_name = message_log_name(app_name, category, pipeline_key, interval_key)
-    send(self, :get_and_broadcast_latest_throughput_stat_msgs)
+    send(self(), :get_and_broadcast_latest_throughput_stat_msgs)
     {:ok, %{
       log_name: log_name, interval_key: interval_key, category: category, app_name: app_name,
       msg_log_name: msg_log_name, pipeline_key: pipeline_key, stats_interval: stats_interval
@@ -31,12 +31,12 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
     case get_throughput_msgs(log_name, start_time) do
       [] ->
         :ok
-      [partial_throughput_msg] ->
+      [_partial_throughput_msg] ->
         :ok
-      [first_throughput_msg, second_throughput_msg] ->
+      [_first_throughput_msg, _second_throughput_msg] ->
         :ok
       throughput_msgs ->
-        %{"time" => timestamp} = last_throughput_msg = List.last(throughput_msgs)
+        %{"time" => timestamp} = List.last(throughput_msgs)
         updated_throughput_msgs = if Integer.is_odd(timestamp) do
           List.delete_at(throughput_msgs, -1)
         else
@@ -47,14 +47,14 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
         {:ok, ^throughput_stats_msg} = store_throughput_stats_msg(msg_log_name, throughput_stats_msg)
         broadcast_throughput_stats_msg(category, pipeline_key, interval_key, throughput_stats_msg)
     end
-    send(self, :get_and_broadcast_latest_throughput_stat_msgs)
+    send(self(), :get_and_broadcast_latest_throughput_stat_msgs)
     {:noreply, state}
   end
 
   defp get_throughput_msgs(log_name, start_time) do
     :ok = MessageLog.Supervisor.lookup_or_create log_name
     throughput_msgs = MessageLog.get_logs(log_name, [start_time: start_time])
-    throughput_msgs_without_partial = List.delete_at(throughput_msgs, -1)
+    _throughput_msgs_without_partial = List.delete_at(throughput_msgs, -1)
   end
 
   defp create_throughput_stats_msg(throughput_stats, pipeline_key, time_now) do

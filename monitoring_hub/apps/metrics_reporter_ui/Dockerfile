@@ -12,7 +12,7 @@ RUN apt-get install -y openssl
 
 RUN mkdir /apps && mkdir /apps/metrics_reporter_ui
 
-COPY /rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz ./rel/metrics_reporter_ui.tar.gz
+COPY /_build/prod/rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz ./rel/metrics_reporter_ui.tar.gz
 
 RUN tar xfv /rel/metrics_reporter_ui.tar.gz -C /apps/metrics_reporter_ui
 

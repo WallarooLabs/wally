@@ -21,7 +21,7 @@ defmodule MetricsReporterUI.MetricsSocket do
   transport :longpoll, Phoenix.Transports.LongPoll
   transport :tcp, PhoenixTCP.Transports.TCP,
     timeout: :infinity,
-    serializer: MonitoringHubUtils.Serializers.TCPSerializer,
+    serializer: [{MonitoringHubUtils.Serializers.TCPSerializer, "~> 1.0.0"}],
     tcp_server: MonitoringHubUtils.TCPServer
 
   # Socket params are passed from the client and can

@@ -114,14 +114,12 @@ install_monitoring_hub_dependencies() {
   sudo apt-key add erlang_solutions.asc
   popd
   sudo apt-get update
-  sudo apt-get -fy install erlang-base=1:18.0 erlang-dev=1:18.0 \
-    erlang-parsetools=1:18.0 erlang-eunit=1:18.0 erlang-crypto=1:18.0 \
-    erlang-syntax-tools=1:18.0 erlang-asn1=1:18.0 erlang-public-key=1:18.0 \
-    erlang-ssl=1:18.0 erlang-mnesia=1:18.0 erlang-runtime-tools=1:18.0 \
-    erlang-inets=1:18.0
-  echo "Install keix and setup Elixir version"
-  kiex install 1.2.6
-  kiex default 1.2.6
+  sudo apt-get -fy install erlang-base=$OTP_VERSION erlang-dev=$OTP_VERSION \
+    erlang-parsetools=$OTP_VERSION erlang-eunit=$OTP_VERSION erlang-crypto=$OTP_VERSION \
+    erlang-syntax-tools=$OTP_VERSION erlang-asn1=$OTP_VERSION erlang-public-key=$OTP_VERSION \
+    erlang-ssl=$OTP_VERSION erlang-mnesia=$OTP_VERSION erlang-runtime-tools=$OTP_VERSION \
+    erlang-inets=$OTP_VERSION elixir=$ELIXIR_VERSION
+  yes YES | kiex implode
 
   echo "** Monitoring hub dependencies installed"
 }

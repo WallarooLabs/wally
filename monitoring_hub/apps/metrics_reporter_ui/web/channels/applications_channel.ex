@@ -3,7 +3,7 @@ defmodule MetricsReporterUI.ApplicationsChannel do
   alias MonitoringHubUtils.Stores.AppConfigStore
 
   def join("applications", _message, socket) do
-    send(self, :after_join)
+    send(self(), :after_join)
     {:ok, socket}
   end
 

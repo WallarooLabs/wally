@@ -131,7 +131,7 @@ ifeq ($(docker_host),)
 endif
 docker_host_arg := --host=$(docker_host)# docker host argument
 monhub_builder ?= monitoring-hub-builder
-monhub_builder_tag ?= latest
+monhub_builder_tag ?= 2.0
 unix_timestamp := $(shell date +%s) # unix timestamp for docker network name
 demo_cluster_name ?= ## Name of demo cluster
 demo_cluster_spot_pricing ?= true## Whether to use spot pricing or not for demo cluster
@@ -284,7 +284,7 @@ define MONHUBR
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) mix local.rebar --force \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
-  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.clean --all \
+  $(QUIET)cd $(1) && $(monhub_docker_args) if [ -d "_build" ]; then MIX_ENV=prod mix deps.clean --build --all; fi \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.get --only prod \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
@@ -298,7 +298,7 @@ define MONHUBR
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) npm run build:production \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
-  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix phoenix.digest \
+  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix phx.digest \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix release.clean \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
@@ -369,9 +369,9 @@ endef
 
 # rule to generate targets for building actual monhub executable including dependencies to relevant files so incremental builds work properly
 define monhub-release-goal
-$(abspath $(1:%/=%))/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%))): $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
+$(abspath $(1:%/=%))/_build/prod/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%))): $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
 	$$(call MONHUBR,$(abspath $(1:%/=%)))
-release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): monhub-arch-check $(abspath $(1:%/=%))/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
+release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): monhub-arch-check $(abspath $(1:%/=%))/_build/prod/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
 release-monhub-all: release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 .PHONY: release-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
@@ -408,9 +408,8 @@ define monhub-clean-goal
 clean-monhub-all: clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))):
-	$(QUIET)rm -rf $(abspath $1)/rel
 	$(QUIET)rm -rf $(abspath $1)/node_modules
-	$(QUIET)rm -rf $(abspath $1)/../../_build
+	$(QUIET)rm -rf $(abspath $1)/_build
 .PHONY: clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 

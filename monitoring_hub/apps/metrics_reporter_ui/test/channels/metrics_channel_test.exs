@@ -7,7 +7,7 @@ defmodule MetricsReporterUI.MetricsChannelTest do
   setup do
     {:ok, _, socket} = socket()
       |> subscribe_and_join(MetricsChannel, "metrics:test")
-    timestamp = generate_timestamp
+    timestamp = generate_timestamp()
     start_timestamp = timestamp
     end_timestamp = timestamp + 1
 

@@ -8,9 +8,9 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Supervisor do
     Supervisor.start_link(__MODULE__, [], name: @name)
   end
 
-  def start_worker([log_name: _log_name, interval_key: interval_key,
+  def start_worker([log_name: _log_name, interval_key: _interval_key,
     pipeline_key: _pipeline_key, app_name: _app_name, category: _category, stats_interval: _stats_interval] = args) do
-    Supervisor.start_child(@name, [args])    
+    Supervisor.start_child(@name, [args])
   end
 
   def find_or_start_worker([log_name: log_name, interval_key: interval_key,
@@ -20,7 +20,7 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Supervisor do
         start_worker(args)
       pid ->
         {:ok, pid}
-    end  
+    end
   end
 
   def init([]) do

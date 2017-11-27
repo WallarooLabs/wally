@@ -3,7 +3,7 @@ defmodule MetricsReporterUI.NodeIngressEgressByPipelineChannel do
 	alias MonitoringHubUtils.MessageLog
 
 	def join("node-ingress-egress-by-pipeline:" <> _metric_name, _message, socket) do
-		send(self, :after_join)
+		send(self(), :after_join)
     {:ok, socket}
 	end
 

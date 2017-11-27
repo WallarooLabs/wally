@@ -9,7 +9,7 @@ defmodule MetricsReporterUI.AppConfigBroadcaster do
 
   def init([app_name: app_name]) do
     {:ok, app_config} = AppConfigStore.get_or_create_app_config(app_name)
-    send(self, :watch_app_config)
+    send(self(), :watch_app_config)
     {:ok, %{app_name: app_name, app_config: app_config}}
   end
 
@@ -19,7 +19,7 @@ defmodule MetricsReporterUI.AppConfigBroadcaster do
     if (app_config != updated_app_config) do
       MetricsReporterUI.Endpoint.broadcast! "app-config:" <> app_name, "app-config", updated_app_config
     end
-    send(self, :watch_app_config)
+    send(self(), :watch_app_config)
     {:noreply, put_in(state, [:app_config], updated_app_config)}
   end
 

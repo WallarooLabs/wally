@@ -200,7 +200,7 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 
   defp do_add_metrics_channel_to_app_config(app_config,  "node-ingress-egress-by-pipeline" = category, channel) do
     update_in(app_config, ["metrics", category], fn workers_map ->
-      [pipeline_name, worker_name] = String.split(channel, "*")
+      [_pipeline_name, worker_name] = String.split(channel, "*")
       Map.update(workers_map, worker_name, [channel], fn channel_list ->
         channel_list ++ [channel]
           |> Enum.sort
@@ -217,16 +217,7 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
     end)
   end
 
-  defp add_event_to_metrics_map(metrics, category, event) do
-    Map.get_and_update(metrics, category, fn(events_list) ->
-        updated_events_list = events_list ++ [event]
-          |> Enum.uniq
-          |> Enum.sort
-        {events_list, updated_events_list}
-      end)
-  end
-
-  defp do_add_pipeline_computation_to_app_config(app_config, pipeline_name, computation_name, channel) do
+  defp do_add_pipeline_computation_to_app_config(app_config, pipeline_name, _computation_name, channel) do
     update_in(app_config, ["metrics", "pipeline-computations"], fn pipeline_map ->
       Map.update(pipeline_map, pipeline_name, [channel], fn channel_list ->
         channel_list ++ [channel]

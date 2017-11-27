@@ -1,5 +1,5 @@
 import Dispatcher from "../../dispatcher/Dispatcher"
-import {Socket} from "phoenix-js"
+import {Socket} from "phoenix"
 import PhoenixChannels from "../../stream-data/channels/PhoenixChannels"
 import ChannelDispatchConnector from "../../stream-data/ChannelDispatchConnector"
 
