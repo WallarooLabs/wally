@@ -8,10 +8,10 @@ defmodule MonitoringHubUtils.Mixfile do
      config_path: "../../config/config.exs",
      deps_path: "../../deps",
      lockfile: "../../mix.lock",
-     elixir: "~> 1.2",
+     elixir: "~> 1.5",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
-     deps: deps]
+     deps: deps()]
   end
 
   # Configuration for the OTP application
@@ -35,7 +35,8 @@ defmodule MonitoringHubUtils.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:gproc, "~> 0.5.0"},
-     {:phoenix, "~> 1.1.2"}]
+    [{:gproc, "~> 0.6.1"},
+     {:phoenix, "~> 1.3.0"},
+     {:cowboy, "~> 1.0"}]
   end
 end

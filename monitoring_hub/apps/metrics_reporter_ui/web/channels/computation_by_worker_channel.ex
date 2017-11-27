@@ -3,7 +3,7 @@ defmodule MetricsReporterUI.ComputationByWorkerChannel do
   alias MonitoringHubUtils.MessageLog
 
   def join("computation-by-worker:" <> _computation_name, _message, socket) do
-    send(self, :after_join)
+    send(self(), :after_join)
     {:ok, socket}
   end
 

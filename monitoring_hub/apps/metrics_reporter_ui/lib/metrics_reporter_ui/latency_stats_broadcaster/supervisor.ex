@@ -8,22 +8,22 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Supervisor do
     Supervisor.start_link(__MODULE__, [], name: @name)
   end
 
-  def start_worker([log_name: log_name, interval_key: interval_key, 
-    pipeline_key: pipeline_key, aggregate_interval: aggregate_interval,
-    app_name: app_name, category: category] = args) do
+  def start_worker([log_name: _log_name, interval_key: _interval_key,
+    pipeline_key: _pipeline_key, aggregate_interval: _aggregate_interval,
+    app_name: _app_name, category: _category] = args) do
     Supervisor.start_child(@name, [args])
   end
 
-  def find_or_start_worker([log_name: log_name, interval_key: interval_key, 
-    pipeline_key: pipeline_key, aggregate_interval: aggregate_interval,
-    app_name: app_name, category: category] = args) do
+  def find_or_start_worker([log_name: log_name, interval_key: interval_key,
+    pipeline_key: _pipeline_key, aggregate_interval: _aggregate_interval,
+    app_name: _app_name, category: _category] = args) do
     case :gproc.where({:n, :l, {:lba_worker, message_log_name(log_name, interval_key)}}) do
       :undefined ->
         start_worker(args)
       pid ->
         {:ok, pid}
     end
-  end 
+  end
 
   def init([]) do
     children = [

@@ -1,2 +1,0 @@
-defmodule MarketSpreadReports do
-end

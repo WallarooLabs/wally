@@ -3,7 +3,7 @@ defmodule MetricsReporterUI.StepChannel do
   alias MonitoringHubUtils.MessageLog
 
   def join("step:" <> _step_name, _message, socket) do
-    send(self, :after_join)
+    send(self(), :after_join)
     {:ok, socket}
   end
 

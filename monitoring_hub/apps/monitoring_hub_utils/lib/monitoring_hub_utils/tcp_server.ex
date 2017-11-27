@@ -2,7 +2,7 @@ defmodule MonitoringHubUtils.TCPServer do
 	use GenServer
   require Logger
 
-  @behavious :ranch_protocol
+  @behaviour :ranch_protocol
 
   def start_link(ref, tcp_socket, tcp_transport, opts \\ []) do
     :proc_lib.start_link(__MODULE__, :init, [ref, tcp_socket, tcp_transport, opts])
@@ -108,20 +108,10 @@ defmodule MonitoringHubUtils.TCPServer do
   end
 
   defp handle_reply(%{timeout: timeout, tcp_transport: transport, tcp_socket: socket} = state,
-      {:reply, {_encoding, encoded_payload}, new_config}) do
+      {:reply, {_encoding, _encoded_payload}, new_config}) do
     :ok = transport.setopts(socket, [active: :once])
     new_state = Map.put(state, :transport_config, new_config)
     {:noreply, new_state, timeout}
-  end
-
-  defp connected_json do
-    Poison.encode!(
-      %{"payload" => %{"status" => "ok",
-        "response" => "connected"},
-      "topic" => "",
-      "event" => "",
-      "ref" => nil}
-    )
   end
 
 end

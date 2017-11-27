@@ -18,7 +18,7 @@ config :metrics_reporter_ui, MetricsReporterUI.Endpoint,
         protocol_options: [serializer: MonitoringHubUtils.Serializers.HubProtocol]],
   check_origin: false,
   # url: [host: "example.com", port: 80],
-  cache_static_manifest: "priv/static/manifest.json",
+  cache_static_manifest: "priv/static/cache_manifest.json",
   server: true,
   root: "."
 

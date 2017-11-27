@@ -28,8 +28,8 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     else
       ["0", "10", "19", "20", "21", "22", "23", "24", "25", "26", "27", "30", "64"]
     end
-    all_bins = get_all_bins
-    send(self, :calculate_and_publish_latency_percentage_bins_msgs)
+    all_bins = get_all_bins()
+    send(self(), :calculate_and_publish_latency_percentage_bins_msgs)
     {:ok, %{
       log_name: log_name, interval_key: interval_key, aggregate_interval: aggregate_interval, bins: bins, all_bins: all_bins,
       category: category, pipeline_key: pipeline_key, msg_log_name: msg_log_name, stats_msg_log_name: stats_msg_log_name}}
@@ -59,7 +59,7 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
         {:ok, ^latency_bins_percentile_stats_msg} = store_latest_latency_bins_percentile_stats_msg(stats_msg_log_name, latency_bins_percentile_stats_msg)
         broadcast_latest_latency_bins_percentile_stats_msg(category, pipeline_key, interval_key, latency_bins_percentile_stats_msg)
     end
-    send(self, :calculate_and_publish_latency_percentage_bins_msgs)
+    send(self(), :calculate_and_publish_latency_percentage_bins_msgs)
     {:noreply, state}
   end
 

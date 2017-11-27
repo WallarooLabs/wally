@@ -41,9 +41,9 @@ defmodule MetricsReporter.LatencyStatsCalculator do
   def calculate_latency_percentile_bin_stats(cumalative_latency_percentage_bins_msg) do
     sorted_bin_keys = Map.keys(cumalative_latency_percentage_bins_msg)
       |> Enum.sort(&(String.to_integer(&1)< String.to_integer(&2)))
-    latency_percent_bin_stats = get_percentiles
+    _latency_percent_bin_stats = get_percentiles()
       |> Enum.reduce(%{}, fn percentile, percentile_map ->
-        bin = Enum.reduce_while(sorted_bin_keys, 0, fn bin, acc ->
+        bin = Enum.reduce_while(sorted_bin_keys, 0, fn bin, _acc ->
           percentage_at_bin = cumalative_latency_percentage_bins_msg[bin]
           if String.to_float(percentile) > percentage_at_bin do
             {:cont, Enum.max_by(sorted_bin_keys, fn bin ->
@@ -66,11 +66,11 @@ defmodule MetricsReporter.LatencyStatsCalculator do
       sorted_keys = Map.keys(aggregated_latency_bins_data)
         |> Enum.sort(&(String.to_integer(&1) < String.to_integer(&2)))
 
-      {_, aggregated_map} = 
+      {_, aggregated_map} =
         expected_latency_bins
           |> Enum.sort(&(String.to_integer(&1) < String.to_integer(&2)))
           |>  Enum.reduce({sorted_keys, %{}}, fn(bin, {keys_list, acc_map}) ->
-                {acc_count, updated_keys_list} =         
+                {acc_count, updated_keys_list} =
                   Enum.reduce_while(keys_list, {0, keys_list}, fn (key, {acc, remaining_keys}) ->
                     if String.to_integer(key) <= String.to_integer(bin) do
                       {:cont, {acc + Map.get(aggregated_latency_bins_data, key), List.delete(remaining_keys, key)}}
@@ -82,7 +82,7 @@ defmodule MetricsReporter.LatencyStatsCalculator do
               end)
 
       map = get_empty_latency_percentage_bins_data(expected_latency_bins)
-        |> Map.merge(aggregated_map, fn _k, v1, v2 ->
+        |> Map.merge(aggregated_map, fn _k, _v1, v2 ->
           calculate_percentile(v2, total_count)
         end)
       map
@@ -115,18 +115,4 @@ defmodule MetricsReporter.LatencyStatsCalculator do
     end
   end
 
-  defp replace_key(map, from, to) do
-   with %{^from => value} <- map do
-     map |> Map.delete(from) |> Map.put(to, value)
-   end 
-  end
-
-  defp fix_latency_bins_keys(latency_bins_data) do
-    latency_bins = latency_bins_data["latency_bins"]
-    fixed_latency_bins = latency_bins
-      |> replace_key("1e-05", "0.00001")
-      |> replace_key("1e-06", "0.000001")
-      |> replace_key("overflow", "100.0")
-    Map.put(latency_bins_data, "latency_bins", fixed_latency_bins)
-  end
 end

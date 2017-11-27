@@ -120,13 +120,12 @@ defmodule MonitoringHubUtils.MessageLog do
 
   defp do_get_logs(tid, [start_time: start_time]) do
     messages = []
-    next_key =
+    {next_key, messages} =
       case :ets.lookup(tid, start_time) do
       [{_msg_timestamp, message}] ->
-        messages = List.insert_at(messages, -1, message)
-        :ets.next(tid, start_time)
+        {:ets.next(tid, start_time), List.insert_at(messages, -1, message)}
       [] ->
-        :ets.next(tid, start_time)
+        {:ets.next(tid, start_time), messages}
     end
 
     get_logs_from_table(tid, [key: next_key, end_key: :"$end_of_table"], messages)
@@ -134,13 +133,12 @@ defmodule MonitoringHubUtils.MessageLog do
 
   defp do_get_logs(tid, [start_time: start_time, end_time: end_time]) do
     messages = []
-    next_key =
+    {next_key, messages} =
       case :ets.lookup(tid, start_time) do
         [{_msg_timestamp, message}] ->
-          messages = List.insert_at(messages, -1, message)
-          :ets.next(tid, start_time)
+          {:ets.next(tid, start_time), List.insert_at(messages, -1, message)}
         [] ->
-          :ets.next(tid, start_time)
+          {:ets.next(tid, start_time), messages}
       end
     get_logs_from_table(tid, [key: next_key, end_key: end_time], messages)
   end
@@ -169,7 +167,7 @@ defmodule MonitoringHubUtils.MessageLog do
     timestamp = throughput_message["time"]
       case :ets.lookup(tid, timestamp) do
         [{^timestamp, old_throughput_message}] ->
-          updated_throughput_message = 
+          updated_throughput_message =
             update_throughput_message(old_throughput_message, throughput_message)
           true = :ets.insert(tid, {timestamp, updated_throughput_message})
           {:ok, updated_throughput_message}
@@ -180,16 +178,12 @@ defmodule MonitoringHubUtils.MessageLog do
   end
 
   defp do_log_period_throughput_message(tid, throughput_message) do
-    %{"period" => period, "time" => end_timestamp, 
+    %{"period" => period, "time" => end_timestamp,
       "total_throughput" => total_throughput, "pipeline_key" => pipeline_key} = throughput_message
     start_timestamp = end_timestamp - period
     per_sec_throughput = round(total_throughput / period)
     # IO.inspect "logging for ts: #{end_timestamp}, period: #{period}, tt: #{total_throughput}, pst: #{per_sec_throughput}, pipeline_key: #{pipeline_key}"
     do_log_sec_throughput_message(tid, start_timestamp, end_timestamp, per_sec_throughput, pipeline_key)
-  end
-
-  defp do_log_sec_throughput_message(tid, start_timestamp, current_timestamp, total_throughput, pipeline_key)
-  when start_timestamp == current_timestamp do
   end
 
   defp do_log_sec_throughput_message(tid, start_timestamp, current_timestamp, total_throughput, pipeline_key) do
@@ -229,7 +223,7 @@ defmodule MonitoringHubUtils.MessageLog do
   end
 
   defp update_latency_bins_message(old_latency_bins_message, latency_bins_message) do
-    Map.update!(old_latency_bins_message, "latency_bins", fn (latency_bins) -> 
+    Map.update!(old_latency_bins_message, "latency_bins", fn (latency_bins) ->
       Map.merge(latency_bins, latency_bins_message["latency_bins"], fn _k, v1, v2 ->
         v1 + v2
       end)
