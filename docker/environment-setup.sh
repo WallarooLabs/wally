@@ -1,13 +1,14 @@
 #!/bin/sh
 
-cd /src/wallaroo
-if [ ! -f Dockerfile ]; then
+WALLAROO_DIR="/src/wallaroo"
+cd $WALLAROO_DIR
+if [ ! "$(ls -A $WALLAROO_DIR)" ]; then
   echo "====== Copying Wallaroo Source Code to Working Directory (/src/wallaroo) ======"
   cp -r /wallaroo-src/* /src/wallaroo
 fi
 if [ -d /src/python-virtualenv ]; then
   cd /src/python-virtualenv
-  if [ ! -f pip-selfcheck.json ]; then
+  if [ ! -f bin/activate ]; then
     echo "====== Setting up Persistent Python Virtual Environment ======"
     virtualenv .
     echo "====== Done Setting up Persistent Python Virtual Environment ======"
@@ -18,5 +19,5 @@ if [ -d /src/python-virtualenv ]; then
   . bin/activate
 fi
 cd /src
-exec bash
-
+(cat ~/.bashrc; echo "PS1=\"$PS1\"") > /.prompt
+exec bash --rcfile /.prompt

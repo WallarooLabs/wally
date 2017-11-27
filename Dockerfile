@@ -60,7 +60,7 @@ COPY rules.mk /wallaroo-src/
 COPY SUMMARY.md /wallaroo-src/
 COPY SUPPORT.md /wallaroo-src/
 COPY utils /wallaroo-src/utils/
-COPY docker/docker-setup.sh /wallaroo-src/
+COPY docker/environment-setup.sh /wallaroo-src/
 
 RUN mkdir /metrics_ui-src && \
     cp -r /wallaroo-src/monitoring_hub/apps/metrics_reporter_ui/rel/metrics_reporter_ui /metrics_ui-src
@@ -76,7 +76,7 @@ RUN make clean && \
     cp giles/receiver/receiver /wallaroo-bin/receiver && \
     cp machida/build/machida /wallaroo-bin/machida && \
     cp utils/cluster_shutdown/cluster_shutdown /wallaroo-bin/cluster_shutdown && \
-    cp docker-setup.sh /wallaroo-bin && \
+    cp environment-setup.sh /wallaroo-bin && \
     make clean
 
 
@@ -87,4 +87,4 @@ ENV PYTHONPATH /src/wallaroo/machida:$PYTHONPATH
 
 WORKDIR /src
 
-ENTRYPOINT ["docker-setup.sh"]
+ENTRYPOINT ["environment-setup.sh"]
