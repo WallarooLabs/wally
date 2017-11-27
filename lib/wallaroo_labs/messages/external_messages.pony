@@ -37,9 +37,9 @@ primitive _CleanShutdown                        fun apply(): U16 => 13
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
     let s_array = s.array()
-    let size = s_array.size() + 2
-    wb.u32_be(size.u32())
+    let size = s_array.size()
     wb.u16_be(id)
+    wb.u32_be(size.u32())
     wb.write(s_array)
     wb.done()
 
@@ -180,7 +180,7 @@ primitive ExternalMsgDecoder
     let rb = Reader
     rb.append(data)
     let id = rb.u16_be()?
-    let s_len = data.size() - 2
+    let s_len: USize = USize.from[U32](rb.u32_be()?)
     let s = String.from_array(rb.block(s_len)?)
     (id, s)
 
