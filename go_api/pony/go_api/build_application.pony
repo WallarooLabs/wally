@@ -110,7 +110,7 @@ class val _ToSink is _Connection
     _from_step_id
 
   fun connect(pipeline: _PipelineInfo box, steps_map: Map[U64, _StepInfo])? =>
-    steps_map(_from_step_id)?.to_sink(_sink_config)?
+    steps_map(_from_step_id)?.to_sink(_sink_config)
 
 class val _Done is _Connection
   let _step_id: U64
@@ -127,7 +127,7 @@ class val _Done is _Connection
     _from_step_id
 
   fun connect(pipeline: _PipelineInfo box, steps_map: Map[U64, _StepInfo])? =>
-    steps_map(_from_step_id)?.done()?
+    steps_map(_from_step_id)?.done()
 
 primitive _ConnectionFactory
   fun apply(connection_j: JsonEzData, env: Env): _Connection ? =>
@@ -182,11 +182,11 @@ class _StepInfo
     _pipeline_builder.to_state_partition[GoData, U64, GoData, GoState](
       computation, state_builder, name, partition, multi_worker)
 
-  fun ref to_sink(sink_config: SinkConfig[GoData])? =>
-    _pipeline_builder.to_sink(sink_config)?
+  fun ref to_sink(sink_config: SinkConfig[GoData]) =>
+    _pipeline_builder.to_sink(sink_config)
 
-  fun ref done()? =>
-    _pipeline_builder.done()?
+  fun ref done() =>
+    _pipeline_builder.done()
 
 class val _PipelineInfo
   let name: String
