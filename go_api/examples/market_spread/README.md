@@ -7,6 +7,7 @@ This is the Market Spread application in Go.
 ```bash
 export GOPATH="$(realpath .)/go:$(realpath ../../go)"
 go build -buildmode=c-archive -o lib/libwallaroo.a market_spread
+stable fetch
 stable env ponyc --debug -D autoscale
 ```
 
@@ -25,7 +26,7 @@ Run a listener.
 Start the worker.
 
 ```bash
-./market_spread --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+./market_spread --in 127.0.0.1:7010,127.0.0.1:7011 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker1 --external 127.0.0.1:5050 --cluster-initializer \
   --ponynoblock
