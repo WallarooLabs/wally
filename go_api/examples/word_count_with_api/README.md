@@ -9,6 +9,7 @@ want to seem more details you should look at them.
 ```bash
 export GOPATH="$(realpath .)/go:$(realpath ../../go)"
 go build -buildmode=c-archive -o lib/libwallaroo.a word_count
+stable fetch
 stable env ponyc --debug -D autoscale
 ```
 
