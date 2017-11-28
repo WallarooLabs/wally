@@ -21,7 +21,7 @@ class Computation is w.Computation[GoData, GoData]
   fun name(): String =>
     recover val
       let sp = @ComputationName(_computation_id)
-      let n = String.from_cstring(sp)
+      let n = String.copy_cstring(sp)
       @free(sp)
       n
     end
@@ -78,7 +78,7 @@ class ComputationMulti is w.Computation[GoData, GoData]
   fun name(): String =>
     recover val
       let sp = @ComputationMultiName(_computation_id)
-      let n = String.from_cstring(sp)
+      let n = String.copy_cstring(sp)
       @free(sp)
       n
     end

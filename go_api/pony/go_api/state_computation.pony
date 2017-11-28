@@ -22,7 +22,7 @@ class val StateComputation is w.StateComputation[GoData, GoData, GoState]
   fun name(): String =>
     recover val
       let sp = @StateComputationName(_computation_id)
-      let n = String.from_cstring(sp)
+      let n = String.copy_cstring(sp)
       @free(sp)
       n
     end
@@ -72,7 +72,7 @@ class val StateComputationMulti is w.StateComputation[GoData, GoData, GoState]
   fun name(): String =>
     recover val
       let sp = @StateComputationMultiName(_computation_id)
-      let n = String.from_cstring(sp)
+      let n = String.copy_cstring(sp)
       @free(sp)
       n
     end
@@ -131,7 +131,7 @@ class val StateBuilder
   fun name(): String =>
     recover val
       let sp = @StateBuilderName(_state_builder_id)
-      let n = String.from_cstring(sp)
+      let n = String.copy_cstring(sp)
       @free(sp)
       n
     end
