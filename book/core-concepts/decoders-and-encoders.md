@@ -109,7 +109,7 @@ class Decoder(object):
 
 But this time, we are doing something slightly more complicated in our payload. Our payload is two items, a string representing a letter and some votes for that letter. We'll unpack those using `struct` and create a domain specific object `Votes` to return.
 
-```
+```python
 class Decoder(object):
     def decode(self, bs):
         (letter, vote_count) = struct.unpack(">sI", bs)
@@ -133,7 +133,7 @@ This is just about the simplest encoder you could have. It's from the [Reverse W
 
 Here's a more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet):
 
-```
+```python
 class Votes(object):
     def __init__(self, letter, votes):
         self.letter = letter
