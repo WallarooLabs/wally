@@ -79,6 +79,8 @@ actor RouterRegistry
   // Partition Migration
   //////
   var _stop_the_world_in_process: Bool = false
+  var _joining_worker_count: USize = 0
+  let _initialized_joining_workers: SetIs[String] = SetIs[String]
   // Steps migrated out and waiting for acknowledgement
   let _step_waiting_list: SetIs[U128] = _step_waiting_list.create()
   // Workers in running cluster that have been stopped for migration
@@ -512,29 +514,52 @@ actor RouterRegistry
   //////////////
   // NEW WORKER PARTITION MIGRATION
   //////////////
-  be migrate_onto_new_worker(new_worker: String) =>
+  be update_joining_worker_count(count: USize) =>
+    _joining_worker_count = count
+
+  be joining_worker_initialized(worker: String) =>
+    if _joining_worker_count == 0 then
+      ifdef debug then
+        @printf[I32]("Joining worker reported as initialized,
+          but we're not waiting for it (perhaps we're joining too\n".cstring())
+      end
+      return
+    end
+    _initialized_joining_workers.set(worker)
+    if _initialized_joining_workers.size() == _joining_worker_count then
+      let new_workers = recover trn Array[String] end
+      for w in _initialized_joining_workers.values() do
+        new_workers.push(w)
+      end
+      migrate_onto_new_workers(consume new_workers)
+      _joining_worker_count = 0
+    end
+
+  fun ref migrate_onto_new_workers(new_workers: Array[String] val) =>
     """
     Called when a new worker joins the cluster and we are ready to start
     the partition migration process. We first trigger a pause to allow
     in-flight messages to finish processing.
     """
     _stop_the_world_in_process = true
-    _stop_the_world(new_worker)
+    _stop_the_world(new_workers)
     let timers = Timers
-    let timer = Timer(PauseBeforeMigrationNotify(this, new_worker),
+    let timer = Timer(PauseBeforeMigrationNotify(this, new_workers),
       _stop_the_world_pause)
     timers(consume timer)
 
-  fun ref _stop_the_world(new_worker: String) =>
+  fun ref _stop_the_world(new_workers: Array[String] val) =>
     """
     We currently stop all message processing before migrating partitions and
     updating routers/routes.
     """
     @printf[I32]("~~~Stopping message processing for state migration.~~~\n"
       .cstring())
-    _migration_target_ack_list.set(new_worker)
+    for w in new_workers.values() do
+      _migration_target_ack_list.set(w)
+    end
     _mute_request(_worker_name)
-    _connections.stop_the_world(recover [new_worker] end)
+    _connections.stop_the_world(new_workers)
 
   be resume_the_world() =>
     _resume_the_world()
@@ -547,7 +572,7 @@ actor RouterRegistry
     _stop_the_world_in_process = false
     @printf[I32]("~~~Resuming message processing.~~~\n".cstring())
 
-  be begin_migration(target_worker: String) =>
+  be begin_migration(target_workers: Array[String] val) =>
     """
     Begin partition migration
     """
@@ -557,10 +582,11 @@ actor RouterRegistry
         "to migrate.\n").cstring())
       _resume_the_world()
     end
-    @printf[I32]("Migrating partitions to %s\n".cstring(),
-      target_worker.cstring())
+    for w in target_workers.values() do
+      @printf[I32]("Migrating partitions to %s\n".cstring(), w.cstring())
+    end
     for state_name in _partition_routers.keys() do
-      _migrate_partition_steps(state_name, target_worker)
+      _migrate_partition_steps(state_name, target_workers)
     end
 
   be begin_migration_of_all() =>
@@ -575,12 +601,12 @@ actor RouterRegistry
       _resume_the_world()
     end
 
-    let target_workers: Array[(String, OutgoingBoundary)] =
+    let target_workers: Array[(String, OutgoingBoundary)] val =
       match _omni_router
       | let omr: OmniRouter =>
         omr.get_outgoing_boundaries_sorted()
       | None =>
-        recover Array[(String, OutgoingBoundary)] end
+        recover val Array[(String, OutgoingBoundary)] end
       end
     Invariant(target_workers.size() == _outgoing_boundaries.size())
 
@@ -691,24 +717,32 @@ actor RouterRegistry
     """
     _connections.ack_migration_batch_complete(sender_name)
 
-  fun _migrate_partition_steps(state_name: String, target_worker: String) =>
+  fun _migrate_partition_steps(state_name: String,
+    target_workers: Array[String] val)
+  =>
     """
     Called to initiate migrating partition steps to a target worker in order
     to rebalance.
     """
     try
-      @printf[I32]("Migrating steps for %s partition to %s\n".cstring(),
-        state_name.cstring(), target_worker.cstring())
-      let boundary = _outgoing_boundaries(target_worker)?
+      for w in target_workers.values() do
+        @printf[I32]("Migrating steps for %s partition to %s\n".cstring(),
+          state_name.cstring(), w.cstring())
+      end
+      let tws = recover trn Array[(String, OutgoingBoundary)] end
+      for w in target_workers.values() do
+        let boundary = _outgoing_boundaries(w)?
+        tws.push((w, boundary))
+      end
       let partition_router = _partition_routers(state_name)?
-      partition_router.rebalance_steps_grow(boundary, target_worker,
-        _worker_count(), state_name, this)
+      partition_router.rebalance_steps_grow(consume tws, _worker_count(),
+        state_name, this)
     else
       Fail()
     end
 
   fun _migrate_all_partition_steps(state_name: String,
-    target_workers: Array[(String, OutgoingBoundary)])
+    target_workers: Array[(String, OutgoingBoundary)] val)
   =>
     """
     Called to initiate migrating all partition steps the set of remaining
@@ -883,14 +917,15 @@ actor RouterRegistry
 
 class PauseBeforeMigrationNotify is TimerNotify
   let _registry: RouterRegistry
-  let _target_worker: String
+  let _target_workers: Array[String] val
 
-  new iso create(registry: RouterRegistry, target_worker: String) =>
+  new iso create(registry: RouterRegistry, target_workers: Array[String] val)
+  =>
     _registry = registry
-    _target_worker = target_worker
+    _target_workers = target_workers
 
   fun ref apply(timer: Timer, count: U64): Bool =>
-    _registry.begin_migration(_target_worker)
+    _registry.begin_migration(_target_workers)
     false
 
 class PauseBeforeLogRotationNotify is TimerNotify

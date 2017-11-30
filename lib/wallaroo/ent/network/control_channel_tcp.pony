@@ -268,6 +268,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
             lti.inform_joining_worker(conn, m.worker_name)
+            _router_registry.update_joining_worker_count(m.worker_count)
           else
             Fail()
           end
@@ -291,7 +292,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           (let joining_host, _) = conn.remote_address().name()?
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
-            lti.add_new_worker(m.worker_name, joining_host, m.control_addr,
+            lti.add_joining_worker(m.worker_name, joining_host, m.control_addr,
               m.data_addr)
           else
             Fail()
@@ -344,20 +345,27 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 class JoiningControlSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _worker_name: String
+  let _worker_count: USize
   let _startup: Startup
   var _header: Bool = true
 
   new iso create(auth: AmbientAuth, worker_name: String,
-    startup: Startup)
+    worker_count: (USize | None), startup: Startup)
   =>
     _auth = auth
     _worker_name = worker_name
+    _worker_count =
+      match worker_count
+      | let u: USize => u
+      else
+        1
+      end
     _startup = startup
 
   fun ref connected(conn: TCPConnection ref) =>
     try
       let cluster_join_msg =
-        ChannelMsgEncoder.join_cluster(_worker_name, _auth)?
+        ChannelMsgEncoder.join_cluster(_worker_name, _worker_count, _auth)?
       conn.writev(cluster_join_msg)
     else
       Fail()
