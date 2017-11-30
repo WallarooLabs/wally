@@ -285,7 +285,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   be update_topology(t: LocalTopology) =>
     _topology = t
 
-  be add_new_worker(w: String, joining_host: String,
+  be add_joining_worker(w: String, joining_host: String,
     control_addr: (String, String), data_addr: (String, String))
   =>
     _add_worker_name(w)
@@ -293,20 +293,17 @@ actor LocalTopologyInitializer is LayoutInitializer
     _connections.create_data_connection_to_joining_worker(w, joining_host,
       data_addr._2, this)
     let new_boundary_id = _step_id_gen()
-    _connections.create_boundary_to_new_worker(w, new_boundary_id, this)
+    _connections.create_boundary_to_joining_worker(w, new_boundary_id, this)
     @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
       w.cstring())
 
-  be add_boundary_to_new_worker(w: String, boundary: OutgoingBoundary,
+  be add_boundary_to_joining_worker(w: String, boundary: OutgoingBoundary,
     builder: OutgoingBoundaryBuilder)
   =>
     _add_boundary(w, boundary, builder)
     _router_registry.register_boundaries(_outgoing_boundaries,
       _outgoing_boundary_builders)
-    // TODO: This is currently the hook to say "new worker has joined, let's
-    // start migrating state steps to it." This seems like a surprising place
-    // for this to happen though.
-    _router_registry.migrate_onto_new_worker(w)
+    _router_registry.joining_worker_initialized(w)
 
   fun ref _add_worker_name(w: String) =>
     match _topology

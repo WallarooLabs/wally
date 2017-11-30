@@ -312,7 +312,7 @@ actor Connections is Cluster
       Fail()
     end
 
-  be create_boundary_to_new_worker(target: String, boundary_id: U128,
+  be create_boundary_to_joining_worker(target: String, boundary_id: U128,
     local_topology_initializer: LocalTopologyInitializer)
   =>
     try
@@ -324,8 +324,8 @@ actor Connections is Cluster
       let boundary = builder.build_and_initialize(boundary_id,
         local_topology_initializer)
       _register_disposable(boundary)
-      local_topology_initializer.add_boundary_to_new_worker(target, boundary,
-        builder)
+      local_topology_initializer.add_boundary_to_joining_worker(target,
+        boundary, builder)
     else
       @printf[I32]("Can't find data address for worker\n".cstring())
       Fail()
