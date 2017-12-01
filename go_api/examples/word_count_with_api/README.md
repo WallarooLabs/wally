@@ -10,7 +10,7 @@ want to seem more details you should look at them.
 export GOPATH="$(realpath .)/go:$(realpath ../../go)"
 go build -buildmode=c-archive -o lib/libwallaroo.a word_count
 stable fetch
-stable env ponyc --debug -D autoscale
+stable env ponyc -D autoscale
 ```
 
 ## Run
@@ -23,19 +23,12 @@ Run a listener.
 ./demo_receiver
 ```
 
-```bash
-development/wallaroo/giles/receiver/receiver --ponythreads=1 --listen 127.0.0.1:7002
-```
-
 ### Shell 2
 
 Start the cluster initializer.
 
 ```bash
-./word_count_with_api --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --name worker1 --external 127.0.0.1:5050 --cluster-initializer \
-  --ponynoblock --cluster-initializer
+./worker1
 ```
 
 ### Shell 3
@@ -43,9 +36,7 @@ Start the cluster initializer.
 Start the second worker.
 
 ```bash
-./word_count_with_api --application-module word_count --in 127.0.0.1:7010 \
-  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:6000 --name worker2 --ponythreads=1 -j 127.0.0.1:6000
+./worker2
 ```
 
 ### Shell 4
@@ -53,9 +44,7 @@ Start the second worker.
 Start the second worker.
 
 ```bash
-./word_count_with_api --application-module word_count --in 127.0.0.1:7010 \
-  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:6000 --name worker2 --ponythreads=1 -j 127.0.0.1:6000
+./worker3
 ```
 
 ### Shell 5
@@ -63,5 +52,5 @@ Start the second worker.
 Send some messages.
 
 ```bash
-echo -n '\x00\x00\x00\x33a b c d e f g h i j k l m n o p q r s t u v w x y z' | nc 127.0.0.1 7010
+./demo_sender
 ```
