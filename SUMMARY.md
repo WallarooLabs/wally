@@ -50,7 +50,6 @@
 
 ### Wallaroo Python API
 * [Python API Introduction](book/python/intro.md)
-* [Wallaroo and Virtualenv](book/python/virtualenv.md)
 * [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
 * [Writing Your Own Application](book/python/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
@@ -63,6 +62,7 @@
 * [Debugging](book/python/debugging.md)
 
 ## Appendix
+* [Wallaroo and Virtualenv](book/appendix/virtualenv.md)
 * [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
