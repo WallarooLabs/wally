@@ -102,7 +102,7 @@ actor Connections is Cluster
           ExternalChannelListenNotifier(_worker_name, _auth, this, rfc)
         let external_listener = TCPListener(_auth,
           consume external_channel_notifier, external_host, external_service)
-        _listeners.push(external_listener)
+        _register_listener(external_listener)
       else
         @printf[I32]("Need RecoveryFileCleaner to create external channel\n"
           .cstring())
@@ -124,11 +124,16 @@ actor Connections is Cluster
     None
 
   be register_listener(listener: (TCPListener | DataChannelListener)) =>
+    _register_listener(listener)
+
+  fun ref _register_listener(listener: (TCPListener | DataChannelListener)) =>
     match listener
     | let tcp: TCPListener =>
       _listeners.push(tcp)
+      _register_disposable(tcp)
     | let dc: DataChannelListener =>
       _data_channel_listeners.push(dc)
+      _register_disposable(dc)
     end
 
   be register_disposable(d: DisposableActor) =>
@@ -150,14 +155,16 @@ actor Connections is Cluster
 
         @printf[I32]("Restarting a listener ...\n\n".cstring())
 
-        _listeners.push(TCPListener(auth, consume notifier, consume host',
-          consume port'))
+        let listener = TCPListener(auth, consume notifier, consume host',
+            consume port')
+         _register_listener(listener)
       else
         @printf[I32](("could not recover host and port from file (replace " +
           " with Fail())\n").cstring())
       end
     else
-      _listeners.push(TCPListener(auth, consume notifier, host, port))
+      let listener = TCPListener(auth, consume notifier, host, port)
+      _register_listener(listener)
     end
 
   be make_and_register_recoverable_data_channel_listener(auth: TCPListenerAuth,
@@ -176,7 +183,7 @@ actor Connections is Cluster
           .cstring(), host'.cstring(), port'.cstring())
         let dch_listener = DataChannelListener(auth, consume notifier,
           router_registry, consume host', consume port')
-        _data_channel_listeners.push(dch_listener)
+        _register_listener(dch_listener)
       else
         @printf[I32](("could not recover host and port from file (replace " +
           "with Fail())\n").cstring())
@@ -184,7 +191,7 @@ actor Connections is Cluster
     else
       let dch_listener = DataChannelListener(auth, consume notifier,
         router_registry, host, port)
-      _data_channel_listeners.push(dch_listener)
+      _register_listener(dch_listener)
     end
 
   be create_initializer_data_channel_listener(
@@ -204,7 +211,7 @@ actor Connections is Cluster
     // buffer size
     let dch_listener = DataChannelListener(_auth, consume data_notifier,
       router_registry, _init_d_host, _init_d_service, 0, 1_048_576, 1_048_576)
-    register_listener(dch_listener)
+    _register_listener(dch_listener)
 
     cluster_initializer.identify_data_address("initializer", _init_d_host,
       _init_d_service)
@@ -535,6 +542,7 @@ actor Connections is Cluster
   =>
     _control_addrs(target_name) = (host, service)
     let tcp_conn_wrapper = ControlConnection
+    _register_disposable(tcp_conn_wrapper)
     let control_notifier: TCPConnectionNotify iso =
       ControlSenderConnectNotifier(_auth, target_name, tcp_conn_wrapper)
     let control_conn: TCPConnection =
@@ -580,6 +588,7 @@ actor Connections is Cluster
     let outgoing_boundary =
       boundary_builder.build_and_initialize(_step_id_gen(), li)
     _data_conn_builders(target_name) = boundary_builder
+    _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
 
   be update_boundary_ids(boundary_ids: Map[String, U128] val) =>
@@ -599,6 +608,7 @@ actor Connections is Cluster
       Map[U128, StatelessPartitionRouterBlueprint] val,
     omr_blueprint: OmniRouterBlueprint)
   =>
+    _register_disposable(conn)
     if not _control_addrs.contains(worker) then
       let c_addrs = recover trn Map[String, (String, String)] end
       for (w, addr) in _control_addrs.pairs() do

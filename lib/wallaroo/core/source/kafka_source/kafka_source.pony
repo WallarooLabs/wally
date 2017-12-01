@@ -46,6 +46,8 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
   var _muted: Bool = true
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
+  let _router_registry: RouterRegistry
+
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
@@ -73,6 +75,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     _notify = consume notify
 
     _layout_initializer = layout_initializer
+    _router_registry = router_registry
 
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
@@ -141,6 +144,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
         let boundary = builder.build_and_initialize(_step_id_gen(),
           _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
+        _router_registry.register_disposable(boundary)
         _routes(boundary) =
           _route_builder(this, boundary, _metrics_reporter)
       end
