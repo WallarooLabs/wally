@@ -16,6 +16,8 @@ Machida runs Wallaroo Python applications using an embedded CPython interpreter.
 
 Wallaroo programs that use the Python API can use any packages that would be used with a normal Python program, including your own packages and third party packages. In order to use them, they must be installed on every machine in the Wallaroo cluster and must be accessible via the `PYTHONPATH`.
 
+We recommend using [virtualenv](https://virtualenv.pypa.io/en/stable/) with Wallaroo. See [Wallaroo and Virtualenv](https://virtualenv.pypa.io/en/stable/) for set up and usage instructions.
+
 ## Next Steps
 
 To set up your environment for writing and running Wallaroo Python application, refer to [Running a Wallaroo Python Application](running-a-wallaroo-python-application.md).
