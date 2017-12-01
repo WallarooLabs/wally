@@ -23,6 +23,8 @@ The recommended way to create your topology structure is by using the [Applicati
 * [State](#state)
 * [StateBuilder](#statebuilder)
 * [StateComputation](#statecomputation)
+* [TCPSourceConfig](#tcpsourceconfig)
+* [TCPSinkConfig](#tcpsinkconfig)
 
 ### Application Setup
 
