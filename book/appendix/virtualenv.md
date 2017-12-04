@@ -2,7 +2,7 @@
 
 We recommend using [virtualenv](https://virtualenv.pypa.io/en/stable/) to handle your application's dependencies.
 
-While not required to run Wallaroo applications, virtualenv will ensure that your application and development environment are isolated from the rest of your Python installation(s) on your computer. In addition, virtualenv will ensure that machida uses the correct version of Python if you have multiple versions installed on your computer.
+While not required to run Wallaroo applications, virtualenv will ensure that your application and development environment are isolated from the rest of your Python installation(s) on your computer. In addition, virtualenv will ensure that Machida uses the correct version of Python if you have multiple versions installed on your computer.
 
 ## Installing Virtualenv
 
