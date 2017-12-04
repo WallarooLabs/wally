@@ -16,9 +16,7 @@ To create a virtualenv for your application, run the following command
 virtualenv --python=python2 ENV
 ```
 
-This will create a directory named `ENV` and set up all of the scripts and dependencies required to run an isolated python virtual environment.
-
-OS X users should not omit the `--python` argument to `virtualenv` in order to work around a known problem with Python 2.7.
+This will create a directory named `ENV` and set up all of the scripts and dependencies required to run an isolated Python2 virtual environment, located in `ENV`.
 
 ## Cleaning up a Virtualenv
 
