@@ -152,8 +152,10 @@ primitive ChannelMsgEncoder
   =>
     _encode(AckDataConnectMsg(last_id_seen), auth)?
 
-  fun start_normal_data_sending(auth: AmbientAuth): Array[ByteSeq] val ? =>
-    _encode(StartNormalDataSendingMsg, auth)?
+  fun start_normal_data_sending(last_id_seen: SeqId, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(StartNormalDataSendingMsg(last_id_seen), auth)?
 
   fun replay_complete(sender_name: String, boundary_id: U128,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -334,7 +336,11 @@ class val AckDataConnectMsg is ChannelMsg
   new val create(last_id_seen': SeqId) =>
     last_id_seen = last_id_seen'
 
-primitive StartNormalDataSendingMsg is ChannelMsg
+class val StartNormalDataSendingMsg is ChannelMsg
+  let last_id_seen: SeqId
+
+  new val create(last_id_seen': SeqId) =>
+    last_id_seen = last_id_seen'
 
 class val RequestBoundaryCountMsg is ChannelMsg
   let sender_name: String
