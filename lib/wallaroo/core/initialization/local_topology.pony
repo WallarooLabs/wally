@@ -1093,7 +1093,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                   let stateless_partition_router =
                     LocalStatelessPartitionRouter(next_node.id, _worker_name,
                       pre_stateless_data.partition_id_to_step_id,
-                      consume partition_routes)
+                      consume partition_routes,
+                      pre_stateless_data.steps_per_worker)
 
                   built_routers(next_node.id) = stateless_partition_router
                   stateless_partition_routers(next_node.id) =
