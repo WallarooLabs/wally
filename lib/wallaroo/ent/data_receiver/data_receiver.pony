@@ -91,7 +91,8 @@ actor DataReceiver is Producer
 
   fun _inform_boundary_to_send_normal_messages() =>
     try
-      let start_msg = ChannelMsgEncoder.start_normal_data_sending(_auth)?
+      let start_msg = ChannelMsgEncoder.start_normal_data_sending(
+        _last_id_seen, _auth)?
       _write_on_conn(start_msg)
     else
       Fail()
@@ -284,7 +285,6 @@ class _DataReceiverAcceptingMessagesPhase is _DataReceiverProcessingPhase
     _data_receiver = dr
 
   fun data_connect() =>
-    _data_receiver._ack_data_connect()
     _data_receiver._inform_boundary_to_send_normal_messages()
 
 trait _TimerInit
