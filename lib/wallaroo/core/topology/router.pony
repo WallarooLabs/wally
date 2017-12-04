@@ -1181,6 +1181,8 @@ trait val StatelessPartitionRouter is (Router &
   fun size(): USize
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     StatelessPartitionRouter
+  fun calculate_shrink(remaining_workers: Array[String] val):
+    StatelessPartitionRouter
   fun blueprint(): StatelessPartitionRouterBlueprint
 
 class val LocalStatelessPartitionRouter is StatelessPartitionRouter
@@ -1190,15 +1192,18 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
   let _step_ids: Map[U64, StepId] val
   // Maps stateless partition id to step or proxy router
   let _partition_routes: Map[U64, (Step | ProxyRouter)] val
+  let _steps_per_worker: USize
   let _partition_size: USize
 
   new val create(p_id: U128, worker_name: String, s_ids: Map[U64, StepId] val,
-    partition_routes: Map[U64, (Step | ProxyRouter)] val)
+    partition_routes: Map[U64, (Step | ProxyRouter)] val,
+    steps_per_worker: USize)
   =>
     _partition_id = p_id
     _worker_name = worker_name
     _step_ids = s_ids
     _partition_routes = partition_routes
+    _steps_per_worker = steps_per_worker
     _partition_size = _partition_routes.size()
 
   fun size(): USize =>
@@ -1296,7 +1301,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
         end
       end
       LocalStatelessPartitionRouter(_partition_id, _worker_name, _step_ids,
-        consume new_partition_routes)
+        consume new_partition_routes, _steps_per_worker)
     | let proxy_router: ProxyRouter =>
       for (p_id, t) in _partition_routes.pairs() do
         if p_id == partition_id' then
@@ -1306,7 +1311,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
         end
       end
       LocalStatelessPartitionRouter(_partition_id, _worker_name, _step_ids,
-        consume new_partition_routes)
+        consume new_partition_routes, _steps_per_worker)
     end
 
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
@@ -1322,7 +1327,45 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       end
     end
     LocalStatelessPartitionRouter(_partition_id, _worker_name, _step_ids,
-      consume new_partition_routes)
+      consume new_partition_routes, _steps_per_worker)
+
+  fun calculate_shrink(remaining_workers: Array[String] val):
+    StatelessPartitionRouter
+  =>
+    let new_partition_count = remaining_workers.size() * _steps_per_worker
+    let reduced_partition_routes =
+      recover trn Map[U64, (Step | ProxyRouter)] end
+    for (p_id, s) in _partition_routes.pairs() do
+      match s
+      | let step: Step =>
+        reduced_partition_routes(p_id) = step
+      | let pr: ProxyRouter =>
+        if remaining_workers.contains(pr.proxy_address().worker) then
+          reduced_partition_routes(p_id) = pr
+        end
+      end
+    end
+    let partition_count = reduced_partition_routes.size()
+    let unsorted_old_p_ids = Array[U64]
+    for id in reduced_partition_routes.keys() do
+      unsorted_old_p_ids.push(id)
+    end
+    let old_p_ids = Sort[Array[U64], U64](unsorted_old_p_ids)
+    let new_step_ids = recover trn Map[U64, StepId] end
+    let new_partition_routes = recover trn Map[U64, (Step | ProxyRouter)] end
+    for i in Range[U64](0, old_p_ids.size().u64()) do
+      try
+        let old_p_id = old_p_ids(i.usize())?
+        new_step_ids(i) = _step_ids(old_p_id)?
+        new_partition_routes(i) = reduced_partition_routes(old_p_id)?
+      else
+        Fail()
+      end
+    end
+
+    LocalStatelessPartitionRouter(_partition_id, _worker_name,
+      consume new_step_ids, consume new_partition_routes,
+      _steps_per_worker)
 
   fun blueprint(): StatelessPartitionRouterBlueprint =>
    let partition_addresses = recover trn Map[U64, ProxyAddress] end
@@ -1341,7 +1384,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     end
 
     LocalStatelessPartitionRouterBlueprint(_partition_id, _step_ids,
-      consume partition_addresses)
+      consume partition_addresses, _steps_per_worker)
 
   fun eq(that: box->StatelessPartitionRouter): Bool =>
     match that
@@ -1386,13 +1429,16 @@ class val LocalStatelessPartitionRouterBlueprint
   let _partition_id: U128
   let _step_ids: Map[U64, StepId] val
   let _partition_addresses: Map[U64, ProxyAddress] val
+  let _steps_per_worker: USize
 
   new val create(p_id: U128, s_ids: Map[U64, StepId] val,
-    partition_addresses: Map[U64, ProxyAddress] val)
+    partition_addresses: Map[U64, ProxyAddress] val,
+    steps_per_worker: USize)
   =>
     _partition_id = p_id
     _step_ids = s_ids
     _partition_addresses = partition_addresses
+    _steps_per_worker = steps_per_worker
 
   fun build_router(worker_name: String,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
@@ -1409,4 +1455,4 @@ class val LocalStatelessPartitionRouterBlueprint
       Fail()
     end
     LocalStatelessPartitionRouter(_partition_id, worker_name, _step_ids,
-      consume partition_routes)
+      consume partition_routes, _steps_per_worker)

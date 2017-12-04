@@ -644,54 +644,14 @@ actor ApplicationDistributor is Distributor
               //////////////////////////////////////
               // PARALLELIZED STATELESS COMPUTATIONS
               elseif next_runner_builder.is_stateless_parallel() then
-                // First we calculate the size of the partition and determine
-                // where the steps in the partition go in the cluster. We are
-                // populating three maps. Two of them, partition_id_to_worker
-                // and partition_id_to_step_id, will be used to create a
-                // StatelessPartitionRouter during local topology
-                // initialization. The third, worker_to_step_id, will be used
-                // here to determine which step ids we will put in which
-                // local graphs.
-                let pony_thread_count = @ponyint_sched_cores[I32]().usize()
-                let partition_count = worker_count * pony_thread_count
-                let partition_id_to_worker_trn =
-                  recover trn Map[U64, String] end
-                let partition_id_to_step_id_trn =
-                  recover trn Map[U64, U128] end
-                let worker_to_step_id_trn =
-                  recover trn Map[String, Array[U128] trn] end
-                for w in all_workers.values() do
-                  worker_to_step_id_trn(w) = recover Array[U128] end
-                end
-                for id in Range[U64](0, partition_count.u64()) do
-                  let step_id = _step_id_gen()
-                  partition_id_to_step_id_trn(id) = step_id
-                  let w = all_workers(id.usize() % worker_count)?
-                  partition_id_to_worker_trn(id) = w
-                  worker_to_step_id_trn(w)?.push(step_id)
-                end
-                let partition_id_to_worker: Map[U64, String] val =
-                  consume partition_id_to_worker_trn
-                let partition_id_to_step_id: Map[U64, U128] val =
-                  consume partition_id_to_step_id_trn
-                let worker_to_step_id_collector =
-                  recover trn Map[String, Array[U128] val] end
-                for (k, v) in worker_to_step_id_trn.pairs() do
-                  match worker_to_step_id_trn(k) = recover Array[U128] end
-                  | let arr: Array[U128] trn =>
-                    worker_to_step_id_collector(k) = consume arr
-                  end
-                end
-                let worker_to_step_id: Map[String, Array[U128] val] val =
-                  consume worker_to_step_id_collector
-
                 // Create a node in the graph for this worker
                 // containing the blueprint for creating the stateless
                 // partition router.
                 let next_id = next_runner_builder.id()
-                let psd = PreStatelessData(pipeline.name(), next_id,
-                  partition_id_to_worker,
-                  partition_id_to_step_id, worker_to_step_id)
+                let pony_thread_count = @ponyint_sched_cores[I32]().usize()
+                let psd = StatelessPartition.pre_stateless_data(
+                  pipeline.name(), next_id, all_workers, pony_thread_count)?
+
                 local_graphs(worker)?.add_node(psd, next_id)
                 local_graphs = _add_edges_to_graph(
                   last_initializer, local_graphs = recover Map[String,
@@ -728,7 +688,7 @@ actor ApplicationDistributor is Distributor
                     local_graphs(w)?.add_node(psd, next_id)
                   end
 
-                  for s_id in worker_to_step_id(w)?.values() do
+                  for s_id in psd.worker_to_step_id(w)?.values() do
                     let next_initializer = StepBuilder(application.name(),
                       w, pipeline.name(), next_runner_builder, s_id)
                     step_map(s_id) = ProxyAddress(w, s_id)
