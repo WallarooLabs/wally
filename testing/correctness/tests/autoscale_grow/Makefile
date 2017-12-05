@@ -34,9 +34,11 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 AUTOSCALE_GROW_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
+CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH):$(TESTING_ALPHABET_PATH)
+CUSTOM_PYTHONPATH += $(TESTING_ALPHABET_PYTHON_PATH)
 
 build-testing-correctness-tests-autoscale_grow: build-testing-correctness-apps-sequence_window
+build-testing-correctness-tests-autoscale_grow: build-testing-correctness-apps-alphabet
 build-testing-correctness-tests-autoscale_grow: build-machida
 integration-tests-testing-correctness-tests-autoscale_grow: build-testing-correctness-tests-autoscale_grow
 integration-tests-testing-correctness-tests-autoscale_grow: autoscale_grow_tests
