@@ -172,14 +172,14 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayMsg(delivery_bytes), auth)?
 
-  fun join_cluster(worker_name: String, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+  fun join_cluster(worker_name: String, worker_count: USize,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     This message is sent from a worker requesting to join a running cluster to
     any existing worker in the cluster.
     """
-    _encode(JoinClusterMsg(worker_name), auth)?
+    _encode(JoinClusterMsg(worker_name, worker_count), auth)?
 
   // TODO: Update this once new workers become first class citizens
   fun inform_joining_worker(worker_name: String, metric_app_name: String,
@@ -554,9 +554,11 @@ class val JoinClusterMsg is ChannelMsg
   any existing worker in the cluster.
   """
   let worker_name: String
+  let worker_count: USize
 
-  new val create(w: String) =>
+  new val create(w: String, wc: USize) =>
     worker_name = w
+    worker_count = wc
 
 class val InformJoiningWorkerMsg is ChannelMsg
   """

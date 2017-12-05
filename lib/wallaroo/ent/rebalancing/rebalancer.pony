@@ -10,22 +10,27 @@ the License. You may obtain a copy of the License at
 
 */
 
+use "collections"
+
 primitive PartitionRebalancer
-  fun step_count_to_send(total_steps: USize, worker_portion: USize,
-    current_workers_count: USize): USize
+  fun step_counts_to_send(total_steps: USize, worker_portion: USize,
+    current_workers_count: USize, joining_worker_count: USize):
+    (USize, Array[USize] val)
   =>
     """
     Calculate how many steps a worker should send based on the total steps
     in the partition, the portion of those steps on the sending worker,
-    and the current count of workers.
+    the current count of workers, and the number of joining workers.
 
     The aim of this algorithm is to have a roughly equal number of steps on
-    each worker.
+    each worker.  Returns the total amount to send and a list of how many
+    to send to each worker.
     """
     // Ideal # of steps per worker before sending
     let ideal_pre: F64 = total_steps.f64() / current_workers_count.f64()
     // Ideal # of steps per worker after sending
-    let ideal_post: F64 = total_steps.f64() / (current_workers_count + 1).f64()
+    let ideal_post: F64 =
+      total_steps.f64() / (current_workers_count + joining_worker_count).f64()
     // How far this worker is off from the ideal before sending
     let off_by = worker_portion.f64() - ideal_pre
 
@@ -43,9 +48,24 @@ primitive PartitionRebalancer
         worker_portion - ideal_post.round().usize()
       end
 
+    let counts_to_send = recover trn Array[USize] end
     // Never send your last step.
     if (worker_portion - try_to_send) > 0 then
-      try_to_send
+      let common_amount = try_to_send / joining_worker_count
+      var leftover = try_to_send - (common_amount * joining_worker_count)
+      for i in Range(0, joining_worker_count) do
+        counts_to_send.push(
+          if leftover > 0 then
+            leftover = leftover - 1
+            common_amount + 1
+          else
+            common_amount
+          end
+        )
+      end
     else
-      0
+      for i in Range(0, joining_worker_count) do
+        counts_to_send.push(0)
+      end
     end
+    (try_to_send, consume counts_to_send)
