@@ -234,6 +234,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _initialized: SetIs[Initializable] = _initialized.create()
   var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
   let _initializables: SetIs[Initializable] = _initializables.create()
+  var _initialization_lifecycle_complete: Bool = false
 
   // Partition router blueprints
   var _partition_router_blueprints:
@@ -1617,7 +1618,9 @@ actor LocalTopologyInitializer is LayoutInitializer
   be report_ready_to_work(initializable: Initializable) =>
     if not _ready_to_work.contains(initializable) then
       _ready_to_work.set(initializable)
-      if _ready_to_work.size() == _initializables.size() then
+      if (not _initialization_lifecycle_complete) and
+        (_ready_to_work.size() == _initializables.size())
+      then
         _complete_initialization_lifecycle()
       end
     else
@@ -1626,7 +1629,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  fun _complete_initialization_lifecycle() =>
+  fun ref _complete_initialization_lifecycle() =>
     if _recovering then
       match _topology
       | let t: LocalTopology =>
@@ -1644,6 +1647,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       // processed first
       _router_registry.inform_cluster_of_join()
     end
+    _initialization_lifecycle_complete = true
 
   be report_event_log_ready_to_work() =>
     // This should only get called after all initializables have reported

@@ -98,6 +98,7 @@ actor OutgoingBoundary is Consumer
   // Lifecycle
   var _initializer: (LayoutInitializer | None) = None
   var _reported_initialized: Bool = false
+  var _reported_ready_to_work: Bool = false
 
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
@@ -212,8 +213,6 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
-    initializer.report_ready_to_work(this)
-
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
@@ -224,6 +223,7 @@ actor OutgoingBoundary is Consumer
     try
       _initializer = initializer
       _reported_initialized = true
+      _reported_ready_to_work = true
       _connect_count = @pony_os_connect_tcp[U32](this,
         _host.cstring(), _service.cstring(),
         _from.cstring())
@@ -380,6 +380,15 @@ actor OutgoingBoundary is Consumer
     _replay_from(last_id_seen)
 
   fun ref start_normal_sending() =>
+    if not _reported_ready_to_work then
+      match _initializer
+      | let li: LayoutInitializer =>
+        li.report_ready_to_work(this)
+        _reported_ready_to_work = true
+      else
+        Fail()
+      end
+    end
     _connection_initialized = true
     _replaying = false
     _maybe_mute_or_unmute_upstreams()
