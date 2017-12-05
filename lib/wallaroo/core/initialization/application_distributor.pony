@@ -19,8 +19,6 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "files"
 use "net"
-use "wallaroo_labs/dag"
-use "wallaroo_labs/messages"
 use "wallaroo"
 use "wallaroo/core/common"
 use "wallaroo/ent/recovery"
@@ -29,6 +27,9 @@ use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/dag"
+use "wallaroo_labs/messages"
+use "wallaroo_labs/thread_count"
 
 actor ApplicationDistributor is Distributor
   let _auth: AmbientAuth
@@ -648,7 +649,7 @@ actor ApplicationDistributor is Distributor
                 // containing the blueprint for creating the stateless
                 // partition router.
                 let next_id = next_runner_builder.id()
-                let pony_thread_count = @ponyint_sched_cores[I32]().usize()
+                let pony_thread_count = ThreadCount()
                 let psd = StatelessPartition.pre_stateless_data(
                   pipeline.name(), next_id, all_workers, pony_thread_count)?
 

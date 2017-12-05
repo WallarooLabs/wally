@@ -1332,7 +1332,23 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
   fun calculate_shrink(remaining_workers: Array[String] val):
     StatelessPartitionRouter
   =>
+    // We need to remove any non-remaining workers from our partition
+    // routes and then reassign partition ids accordingly. Partition ids
+    // range sequentially from 0 to the partition count - 1.  They are
+    // assigned to StepIds in the partition. When we remove non-remaining
+    // workers, we are also removing all StepIds for partition steps that
+    // existed on those workers. This means the partition count is reduced
+    // and we create holes in the remaining valid partition ids. For example,
+    // if we're removing worker 3 and worker 3 had a step corresponding to
+    // partition ids 2 and 5 in a sequence from 0 to 5, then we are left
+    // with partition id sequence [0, 1, 3, 4]. Since we route messages by
+    // modding message seq ids over partition count, this gap means we'd
+    // lose messages. We need to reassign the partition ids from 0 to
+    // the new partition count - 1.
     let new_partition_count = remaining_workers.size() * _steps_per_worker
+
+    // Filter out non-remaining workers, creating a map of only the
+    // remaining partition routes.
     let reduced_partition_routes =
       recover trn Map[U64, (Step | ProxyRouter)] end
     for (p_id, s) in _partition_routes.pairs() do
@@ -1346,11 +1362,16 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       end
     end
     let partition_count = reduced_partition_routes.size()
+
+    // Collect and sort the remaining old partition ids.
     let unsorted_old_p_ids = Array[U64]
     for id in reduced_partition_routes.keys() do
       unsorted_old_p_ids.push(id)
     end
     let old_p_ids = Sort[Array[U64], U64](unsorted_old_p_ids)
+
+    // Reassign StepIds and (Step | ProxyRouter) values to the new partition
+    // ids by placing them in new maps.
     let new_step_ids = recover trn Map[U64, StepId] end
     let new_partition_routes = recover trn Map[U64, (Step | ProxyRouter)] end
     for i in Range[U64](0, old_p_ids.size().u64()) do
