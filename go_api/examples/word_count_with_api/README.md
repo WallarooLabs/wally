@@ -6,10 +6,19 @@ seem more details you should look at them.
 
 ## Build
 
-Make sure that you've built Giles sender and receiver. They are
-required for the `demo_sender` and `demo_receiver` scripts.
+You'll need to have the GNU `realpath` utility installed. If you are on MacOS, install GNU coreutils:
 
-Then build the application.
+```bash
+brew install coreutils
+```
+
+On debian based systems you should be able to:
+
+```bash
+sudo apt-get install realpath
+```
+
+To build the word count binary:
 
 ```bash
 export GOPATH="$(realpath .)/go:$(realpath ../../go)"
@@ -17,6 +26,9 @@ go build -buildmode=c-archive -o lib/libwallaroo.a word_count
 stable fetch
 stable env ponyc -D autoscale
 ```
+
+Make sure that you've built Giles sender and receiver. They are
+required for the `demo_sender` and `demo_receiver` scripts.
 
 ## Run
 
@@ -38,10 +50,10 @@ Start the cluster initializer.
 
 ### Shell 3
 
-Start the second worker.
+Send some messages.
 
 ```bash
-./worker2
+./demo_sender
 ```
 
 ### Shell 4
@@ -49,13 +61,13 @@ Start the second worker.
 Start the second worker.
 
 ```bash
-./worker3
+./worker2
 ```
 
 ### Shell 5
 
-Send some messages.
+Start the second worker.
 
 ```bash
-./demo_sender
+./worker3
 ```
