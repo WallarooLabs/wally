@@ -35,6 +35,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 RECOVERY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
+CUSTOM_PYTHONPATH += $(SEQUENCE_WINDOW_PYTHON_PATH)
 
 build-testing-correctness-tests-recovery: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests-recovery: build-testing-tools-external_sender

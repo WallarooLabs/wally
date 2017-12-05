@@ -17,6 +17,7 @@
 from integration import (add_runner,
                          ex_validate,
                          get_port_values,
+                         iter_generator,
                          Metrics,
                          MetricsParser,
                          Reader,
@@ -24,46 +25,80 @@ from integration import (add_runner,
                          RunnerChecker,
                          RunnerReadyChecker,
                          Sender,
-                         sequence_generator,
                          setup_resilience_path,
                          Sink,
                          SinkAwaitValue,
                          start_runners,
                          TimeoutError)
-import os
+
+from collections import Counter
+from itertools import cycle
+from string import lowercase
+from struct import pack, unpack
 import re
-import struct
 import time
 
 
-def test_autoscale_grow_pony():
-    command = 'sequence_window'
-    _test_autoscale_grow(command)
+fmt = '>LsQ'
+def decode(bs):
+    return unpack(fmt, bs)[1:3]
 
 
-def test_autoscale_grow_machida():
-    command = 'machida --application-module sequence_window'
-    _test_autoscale_grow(command)
+def pre_process(decoded):
+    totals = {}
+    for c, v in decoded:
+        totals[c] = v
+    return totals
 
 
-def _test_autoscale_grow(command):
+def process(data):
+    decoded = []
+    for d in data:
+        decoded.append(decode(d))
+    return pre_process(decoded)
+
+
+def validate(raw_data, expected):
+    data = process(raw_data)
+    assert(data == expected)
+
+
+def test_autoscale_grow_pony_by_1():
+    command = 'alphabet'
+    _test_autoscale_grow(command, worker_count=2)
+
+
+def test_autoscale_grow_machida_by_1():
+    command = 'machida --application-module alphabet'
+    _test_autoscale_grow(command, worker_count=2)
+
+
+def test_autoscale_grow_pony_by_4():
+    command = 'alphabet'
+    _test_autoscale_grow(command, worker_count=5)
+
+
+def test_autoscale_grow_machida_by_4():
+    command = 'machida --application-module alphabet'
+    _test_autoscale_grow(command, worker_count=5)
+
+
+def _test_autoscale_grow(command, worker_count=1):
     host = '127.0.0.1'
     sources = 1
     workers = 1
+    joiners = worker_count - workers
     res_dir = '/tmp/res-data'
     expect = 2000
-    last_value_0 = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
-    last_value_1 = '[{}]'.format(','.join((str(expect-1-v) for v in range(6,-2,-2))))
 
-    await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
-                    struct.pack('>I', len(last_value_1)) + last_value_1)
-
-    patterns_i = [re.escape(r'***Worker worker1 attempting to join the '
-                            r'cluster. Sent necessary information.***'),
-                  re.escape(r'Migrating partitions to worker1'),
-                  re.escape(r'--All new workers have acked migration '
-                            r'batch complete'),
-                  re.escape(r'~~~Resuming message processing.~~~')]
+    patterns_i = ([re.escape(r'***Worker worker{} attempting to join the '
+                             r'cluster. Sent necessary information.***'
+                             .format(i)) for i in range(1, joiners + 1)]
+                  +
+                  [re.escape(r'Migrating partitions to worker1'),
+                   re.escape(r'--All new workers have acked migration '
+                             r'batch complete'),
+                   re.escape(r'~~~Resuming message processing.~~~')])
     patterns_w = [re.escape(r'***Successfully joined cluster!***'),
                   re.escape(r'~~~Resuming message processing.~~~')]
 
@@ -74,8 +109,19 @@ def _test_autoscale_grow(command):
         # Create sink, metrics, reader, sender
         sink = Sink(host)
         metrics = Metrics(host)
-        reader1 = Reader(sequence_generator(expect-1000))
-        reader2 = Reader(sequence_generator(expect, 1000))
+
+        char_gen = cycle(lowercase)
+        char_1000 = [next(char_gen) for i in range(1000)]
+        char_2000 = [next(char_gen) for i in range(1000)]
+        expected = Counter(char_1000 + char_2000)
+
+        reader1 = Reader(iter_generator(char_1000,
+                                        lambda s: pack('>sI', s, 1)))
+        reader2 = Reader(iter_generator(char_2000,
+                                        lambda s: pack('>sI', s, 1)))
+
+        await_values = [pack('>IsQ', 9, c, v) for c, v in
+                        expected.items()]
 
         # Start sink and metrics, and get their connection info
         sink.start()
@@ -102,7 +148,7 @@ def _test_autoscale_grow(command):
         if runner_ready_checker.error:
             raise runner_ready_checker.error
 
-        # start sender1 (0,1000]
+        # start sender1
         sender1 = Sender(host, input_ports[0], reader1, batch_size=10,
                         interval=0.05)
         sender1.start()
@@ -113,30 +159,37 @@ def _test_autoscale_grow(command):
             raise sender1.error
         if sender1.is_alive():
             sender1.stop()
-            raise TimeoutError('Sender did not complete in the expected '
+            raise TimeoutError('Sender1 did not complete in the expected '
                                'period')
 
         # create a new worker and have it join
-        add_runner(runners, command, host, inputs, outputs, metrics_port,
-                   control_port, external_port, data_port, res_dir, workers)
+        for i in range(joiners):
+            add_runner(runners, command, host, inputs, outputs, metrics_port,
+                       control_port, external_port, data_port, res_dir,
+                       joiners)
 
         # Wait for runner to complete a log rotation
-        join_checker_i = RunnerChecker(runners[0], patterns_i, timeout=30)
-        join_checker_w = RunnerChecker(runners[1], patterns_w, timeout=30)
-        join_checker_i.start()
-        join_checker_w.start()
-        join_checker_i.join()
-        if join_checker_i.error:
-            print('worker output:')
-            print(runners[1].get_output()[0])
-            raise join_checker_i.error
-        join_checker_w.join()
-        if join_checker_w.error:
-            print('initalizer output:')
-            print(runners[0].get_output()[0])
-            raise join_checker_w.error
+        join_checkers = []
+        join_checkers.append(RunnerChecker(runners[0], patterns_i, timeout=30))
+        for runner in runners[1:]:
+            join_checkers.append(RunnerChecker(runner, patterns_w, timeout=30))
+        for jc in join_checkers:
+            jc.start()
+        for jc in join_checkers:
+            jc.join()
+            if jc.error:
+                print('RunnerChecker error for Join check on {}'
+                      .format(jc.runner_name))
 
-        # Start sender2 (1000, 2000]
+                outputs = [(r.name, r.get_output()[0]) for r in runners]
+                outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
+                raise TimeoutError(
+                    'Worker {} join timed out in {} '
+                    'seconds. The cluster had the following outputs:\n===\n{}'
+                    .format(jc.runner_name, jc.timeout, outputs))
+
+
+        # Start sender2
         sender2 = Sender(host, input_ports[0], reader2, batch_size=10,
                          interval=0.05)
         sender2.start()
@@ -147,7 +200,7 @@ def _test_autoscale_grow(command):
             raise sender2.error
         if sender2.is_alive():
             sender2.stop()
-            raise TimeoutError('Sender did not complete in the expected '
+            raise TimeoutError('Sender2 did not complete in the expected '
                                'period')
 
         # Use Sink value to determine when to stop runners and sink
@@ -163,7 +216,6 @@ def _test_autoscale_grow(command):
 
         # Stop sink
         sink.stop()
-        print 'sink.data size: ', len(sink.data)
 
         # Stop metrics
         metrics.stop()
@@ -173,40 +225,40 @@ def _test_autoscale_grow(command):
         mp = MetricsParser()
         mp.load_string_list(metrics.data)
         mp.parse()
-        # Now confirm that there are computations in worker1's metrics
-        app_key = mp.data.keys()[0]  # 'metrics:Sequence Window Printer'
-        worker_metrics = [v for v in mp.data[app_key].get('worker1', [])
-                          if v[0] =='metrics']
+        # Now confirm that there are computations in each worker's metrics
+        app_key = mp.data.keys()[0]  # 'metrics:Alphabet Poplarity Contest'
+        worker_metrics = {w: [v for v in mp.data[app_key].get(w, [])
+                                   if v[0] =='metrics']
+                          for w in ['worker{}'.format(i) for i in
+                                    range(1, joiners + 1)]}
         # Verify there is at least one entry for a computation with a nonzero
         # total value
-        print('worker_metrics', worker_metrics)
-        filtered = filter(lambda v: (v[1]['metric_category'] == 'computation'
-                                     and
-                                     v[1]['total'] > 0),
-                          worker_metrics)
-        print('filtered', filtered)
-        assert(len(filtered) > 0)
-
-        # Use validator to validate the data in at-least-once mode
-        # save sink data to a file
-        out_file = os.path.join(res_dir, 'received.txt')
-        sink.save(out_file, mode='giles')
+        for w, m in worker_metrics.items():
+            filtered = filter(lambda v: ((v[1]['metric_category'] ==
+                                          'computation')
+                                         and
+                                         v[1]['total'] > 0),
+                              m)
+            print('filtered', filtered)
+            try:
+                assert(len(filtered) > 0)
+            except AssertionError:
+                outputs = [(r.name, r.get_output()[0]) for r in runners]
+                outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
+                raise AssertionError('{} did not process any data! '
+                                     'Worker outputs are included below:'
+                                     '\n===\n{}'.format(w, outputs))
 
 
         # Validate captured output
-        cmd_validate = ('validator -i {out_file} -e {expect} -a'
-                        .format(out_file = out_file,
-                                expect = expect))
-        success, stdout, retcode, cmd = ex_validate(cmd_validate)
         try:
-            assert(success)
+            validate(sink.data, expected)
         except AssertionError:
-            print runners[-1].get_output()[0]
-            print '---'
-            print runners[-2].get_output()[0]
-            print '---'
-            raise AssertionError('Validation failed with the following '
-                                 'error:\n{}'.format(stdout))
+            outputs = [(r.name, r.get_output()[0]) for r in runners]
+            outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
+            raise AssertionError('Validation failed on expected output. '
+                                 'Worker outputs are included below:'
+                                 '\n===\n{}'.format(outputs))
 
     finally:
         for r in runners:
