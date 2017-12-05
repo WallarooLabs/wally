@@ -18,12 +18,19 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "wallaroo/core/boundary"
+use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/core/messages"
 
 trait tag LayoutInitializer
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
     recovering: Bool)
+
+  be report_created(initializable: Initializable)
+
+  be report_initialized(initializable: Initializable)
+
+  be report_ready_to_work(initializable: Initializable)
 
   be receive_immigrant_step(msg: StepMigrationMsg)
 
