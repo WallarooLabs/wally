@@ -6,6 +6,20 @@ want to seem more details you should look at them.
 
 ## Build
 
+You'll need to have the GNU `realpath` utility installed. If you are on MacOS, install GNU coreutils:
+
+```bash
+brew install coreutils
+```
+
+On debian based systems you should be able to:
+
+```bash
+sudo apt-get install realpath
+```
+
+To build the word count binary:
+
 ```bash
 export GOPATH="$(realpath .)/go:$(realpath ../../go)"
 go build -buildmode=c-archive -o lib/libwallaroo.a word_count
@@ -33,10 +47,10 @@ Start the cluster initializer.
 
 ### Shell 3
 
-Start the second worker.
+Send some messages.
 
 ```bash
-./worker2
+./demo_sender
 ```
 
 ### Shell 4
@@ -44,13 +58,15 @@ Start the second worker.
 Start the second worker.
 
 ```bash
-./worker3
+./worker2
 ```
 
 ### Shell 5
 
-Send some messages.
+Start the second worker.
 
 ```bash
-./demo_sender
+./worker3
 ```
+
+
