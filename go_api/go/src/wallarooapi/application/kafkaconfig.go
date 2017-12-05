@@ -47,7 +47,7 @@ func (ksc *KafkaSourceConfig) MakeDecoder() repr.ComponentRepresentable {
 }
 
 func (ksc *KafkaSourceConfig) addDecoder() uint64 {
-	ksc.decoderId = wa.AddComponent(ksc.decoder)
+	ksc.decoderId = wa.AddComponent(ksc.decoder, wa.DecoderTypeId)
 	return ksc.decoderId
 }
 
@@ -75,6 +75,6 @@ func (ksc *KafkaSinkConfig) MakeEncoder() repr.ComponentRepresentable {
 }
 
 func (ksc *KafkaSinkConfig) addEncoder() uint64 {
-	ksc.encoderId = wa.AddComponent(ksc.encoder)
+	ksc.encoderId = wa.AddComponent(ksc.encoder, wa.EncoderTypeId)
 	return ksc.encoderId
 }

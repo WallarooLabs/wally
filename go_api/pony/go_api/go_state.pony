@@ -12,13 +12,13 @@ class GoState is State
     _state_id
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_state_id)
+    ComponentSerializeGetSpace(_state_id, ComponentType.state())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_state_id, bytes)
+    ComponentSerialize(_state_id, bytes, ComponentType.state())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _state_id = ComponentDeserialize(bytes)
+    _state_id = ComponentDeserialize(bytes, ComponentType.state())
 
   fun _final() =>
-    RemoveComponent(_state_id)
+    RemoveComponent(_state_id, ComponentType.state())

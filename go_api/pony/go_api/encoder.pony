@@ -23,16 +23,16 @@ class val GoEncoder
     wb.done()
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_encoder_id)
+    ComponentSerializeGetSpace(_encoder_id, ComponentType.encoder())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_encoder_id, bytes)
+    ComponentSerialize(_encoder_id, bytes, ComponentType.encoder())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _encoder_id = ComponentDeserialize(bytes)
+    _encoder_id = ComponentDeserialize(bytes, ComponentType.encoder())
 
   fun _final() =>
-    RemoveComponent(_encoder_id)
+    RemoveComponent(_encoder_id, ComponentType.encoder())
 
 class val GoKafkaEncoder
   var _encoder_id: U64
@@ -91,13 +91,13 @@ class val GoKafkaEncoder
     // (consume value, None)
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_encoder_id)
+    ComponentSerializeGetSpace(_encoder_id, ComponentType.encoder())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_encoder_id, bytes)
+    ComponentSerialize(_encoder_id, bytes, ComponentType.encoder())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _encoder_id = ComponentDeserialize(bytes)
+    _encoder_id = ComponentDeserialize(bytes, ComponentType.encoder())
 
   fun _final() =>
-    RemoveComponent(_encoder_id)
+    RemoveComponent(_encoder_id, ComponentType.encoder())

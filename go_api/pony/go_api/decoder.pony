@@ -21,16 +21,16 @@ class val GoFramedSourceHandler is FramedSourceHandler[GoData]
     GoData(@DecoderDecode(_decoder_id, data.cpointer(), data.size().u64()))
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_decoder_id)
+    ComponentSerializeGetSpace(_decoder_id, ComponentType.decoder())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_decoder_id, bytes)
+    ComponentSerialize(_decoder_id, bytes, ComponentType.decoder())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _decoder_id = ComponentDeserialize(bytes)
+    _decoder_id = ComponentDeserialize(bytes, ComponentType.decoder())
 
   fun _final() =>
-    RemoveComponent(_decoder_id)
+    RemoveComponent(_decoder_id, ComponentType.decoder())
 
 class val GoSourceHandler is SourceHandler[GoData]
   var _decoder_id: U64
@@ -42,13 +42,13 @@ class val GoSourceHandler is SourceHandler[GoData]
     GoData(@DecoderDecode(_decoder_id, data.cpointer(), data.size().u64()))
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_decoder_id)
+    ComponentSerializeGetSpace(_decoder_id, ComponentType.decoder())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_decoder_id, bytes)
+    ComponentSerialize(_decoder_id, bytes, ComponentType.decoder())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _decoder_id = ComponentDeserialize(bytes)
+    _decoder_id = ComponentDeserialize(bytes, ComponentType.decoder())
 
   fun _final() =>
-    RemoveComponent(_decoder_id)
+    RemoveComponent(_decoder_id, ComponentType.decoder())

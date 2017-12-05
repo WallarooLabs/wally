@@ -36,7 +36,7 @@ class val _ToComputation is _Connection
     _from_step_id
 
   fun connect(pipeline: _PipelineInfo box, steps_map: Map[U64, _StepInfo]) ? =>
-    match pipeline.components_map(_computation_builder_id)?
+    match pipeline.computation_builders_map(_computation_builder_id)?
     | "ComputationMultiBuilder" =>
       steps_map(_step_id) =
         _StepInfo(steps_map(_from_step_id)?.to(
@@ -76,7 +76,7 @@ class val _ToStatePartition is _Connection
     _from_step_id
 
   fun connect(pipeline: _PipelineInfo box, steps_map: Map[U64, _StepInfo]) ? =>
-    match pipeline.components_map(_state_computation_id)?
+    match pipeline.state_computations_map(_state_computation_id)?
     | "StateComputation" =>
       steps_map(_step_id) =
         _StepInfo(steps_map(_from_step_id)?.to_state_partition(
@@ -191,19 +191,22 @@ class _StepInfo
 class val _PipelineInfo
   let name: String
   let source_config: SourceConfig[GoData] val
-  let components_map: Map[U64, String] val
+  let computation_builders_map: Map[U64, String] val
+  let state_computations_map: Map[U64, String] val
   let partitions_map: Map[U64, w.Partition[GoData, U64]] val
   let connections: Array[_Connection] val
 
   new val create(name': String,
     source_config': SourceConfig[GoData] val,
-    components_map': Map[U64, String] val,
+    computation_builders_map': Map[U64, String] val,
+    state_computations_map': Map[U64, String] val,
     partitions_map': Map[U64, w.Partition[GoData, U64]] val,
     connections': Array[_Connection] val)
   =>
     name = name'
     source_config = source_config'
-    components_map = components_map'
+    computation_builders_map = computation_builders_map'
+    state_computations_map = state_computations_map'
     partitions_map = partitions_map'
     connections = connections'
 
@@ -323,12 +326,18 @@ primitive BuildApplication
         let components = pipeline("Components")?
         let components_array = components.array()?
 
-        let components_map = recover trn Map[U64, String] end
+        let computation_builders_map = recover trn Map[U64, String] end
+        let state_computations_map = recover trn Map[U64, String] end
 
         for component_json in components_array.values() do
           let clz = component_json("Class")?.string()?
           let cid = component_json("ComponentId")?.int()?.u64()
-          components_map(cid) = clz
+          match clz
+          | "ComputationBuilder" => computation_builders_map(cid) = clz
+          | "ComputationMultiBuilder" => computation_builders_map(cid) = clz
+          | "StateComputation" => state_computations_map(cid) = clz
+          | "StateComputationMulti" => state_computations_map(cid) = clz
+          end
         end
         Debug("Read components")
 
@@ -356,7 +365,8 @@ primitive BuildApplication
 
         Debug("Read connections")
 
-        pipelines.push(_PipelineInfo(name, source, consume components_map,
+        pipelines.push(_PipelineInfo(name, source,
+          consume computation_builders_map, consume state_computations_map,
           consume partitions_map, consume connections))
       end
       (_build_application(application_name, consume pipelines)?, application_name)

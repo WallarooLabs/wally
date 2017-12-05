@@ -21,7 +21,7 @@ func (tsc *TCPSourceConfig) MakeDecoder() repr.ComponentRepresentable {
 }
 
 func (tsc *TCPSourceConfig) addDecoder() uint64 {
-	tsc.decoderId = wa.AddComponent(tsc.decoder)
+	tsc.decoderId = wa.AddComponent(tsc.decoder, wa.DecoderTypeId)
 	return tsc.decoderId
 }
 
@@ -45,7 +45,7 @@ func (tsc *TCPSinkConfig) MakeEncoder() repr.ComponentRepresentable {
 }
 
 func (tsc *TCPSinkConfig) addEncoder() uint64 {
-	tsc.encoderId = wa.AddComponent(tsc.encoder)
+	tsc.encoderId = wa.AddComponent(tsc.encoder, wa.EncoderTypeId)
 	return tsc.encoderId
 }
 
