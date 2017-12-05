@@ -1,8 +1,8 @@
 # Word Count in Go
 
-This is an experimental Word Count application that uses a skeletal Go
-API for Wallaroo. It works like the other word count examples, if you
-want to seem more details you should look at them.
+This is an experimental Word Count application that uses the Wallaroo
+Go API. It works like the other word count examples, if you want to
+seem more details you should look at them.
 
 ## Build
 
@@ -26,6 +26,9 @@ go build -buildmode=c-archive -o lib/libwallaroo.a word_count
 stable fetch
 stable env ponyc -D autoscale
 ```
+
+Make sure that you've built Giles sender and receiver. They are
+required for the `demo_sender` and `demo_receiver` scripts.
 
 ## Run
 
@@ -68,5 +71,3 @@ Start the second worker.
 ```bash
 ./worker3
 ```
-
-
