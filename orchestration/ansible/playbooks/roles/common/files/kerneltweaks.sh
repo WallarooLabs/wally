@@ -100,6 +100,17 @@ do
   fi
 done
 
+for drive_path in /dev/nvme*n1
+do
+  drive=`basename ${drive_path}`
+  if [ -b "${drive_path}" ]; then
+    echo 2 > /sys/block/${drive}/queue/rq_affinity
+    echo 256 > /sys/block/${drive}/queue/read_ahead_kb
+    echo 0 > /sys/block/${drive}/queue/add_random
+    echo 0 > /sys/block/${drive}/queue/rotational
+  fi
+done
+
 # apply changes
 sysctl -p # apply changed settings
 

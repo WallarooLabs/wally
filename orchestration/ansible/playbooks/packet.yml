@@ -95,7 +95,7 @@
         components: "{{ disks_list }}"
         filesystem_type: "{{ raid_fs if raid_fs is defined else 'ext4' }}"
         mount_point: "/data"
-        mount_options: "noatime,noexec,nodiratime"
+        mount_options: "noatime,nodiratime,discard"
         dump: 0
         passno: 0
   roles:

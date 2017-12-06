@@ -2,8 +2,11 @@
 - hosts: tag_Project_{{ cluster_project_name | replace('-', '_') }}:&tag_ClusterName_{{ cluster_name | replace('-', '_') }}:&{{ aws_region }}
   gather_facts: False
   tasks:
+  - name: update apt
+    raw: which python || apt-get update
+    become: yes
   - name: install python for full ansible support
-    raw: apt-get install -y python
+    raw: which python || apt-get install -y python
     become: yes
   - name: gather facts
     action: setup
@@ -21,8 +24,10 @@
     command: update-grub
     become: yes
     when: (gfile|changed)
-
-
+  - name: Gather network driver type
+    shell: ethtool -i {{ ansible_default_ipv4.interface }} | grep -i "^driver:" | grep -Po "([^ ]*)$"
+    register: network_driver_name
+    ignore_errors: yes
 
 # create dynamic groups
 - hosts: tag_Project_{{ cluster_project_name | replace('-', '_') }}:&tag_Role_follower:&tag_ClusterName_{{ cluster_name | replace('-', '_') }}:&{{ aws_region }}
@@ -50,7 +55,7 @@
     ixgbevf_version: 2.16.4
     ixgbevf_tar_sha1_hash: 110fa89c30b029e946ed73105c471cf03f1767be
   roles:
-  - { role: atlassian.ixgbevf, become: yes }
+  - { role: atlassian.ixgbevf, become: yes, when: network_driver_name.stdout != "ena" }
   tasks:
   - name: "Add follower hostnames to hosts file"
     lineinfile:
@@ -120,8 +125,10 @@
         level: "{{ raid_level if raid_level is defined else '0' }}"
         components: "{{ disks_list }}"
         filesystem_type: "{{ raid_fs if raid_fs is defined else 'ext4' }}"
+        # tell mkfs not to use `disard/TRIM` on blocks because aws pre-discards all blocks
+        mkfs_options: "{{ '' if raid_fs is defined and raid_fs != 'ext4' else '-E nodiscard' }}"
         mount_point: "/data"
-        mount_options: "noatime,noexec,nodiratime"
+        mount_options: "noatime,nodiratime,discard"
         dump: 0
         passno: 0
   roles:
