@@ -202,10 +202,15 @@ primitive WallarooConfig
         FatalUserError("Cluster initializer needs its data channel address " +
           "to be specified via --data.")
       end
+    elseif so.is_joining then
+      match so.worker_count
+      | None =>
+        so.worker_count = 1
+      end
     else
       match so.worker_count
       | let wc: USize =>
-        FatalUserError("Only supply --worker-count to cluster initializer.")
+        FatalUserError("Only supply --worker-count to cluster initializer or to joining worker.")
       end
       if so.d_host != "" then
         FatalUserError("Only supply --data to cluster initializer.")

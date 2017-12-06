@@ -154,7 +154,7 @@ class TCPReceiver(StoppableThread):
     """
     __base_name__ = 'TCPReceiver'
 
-    def __init__(self, host, port=0, max_connections=10, mode='framed',
+    def __init__(self, host, port=0, max_connections=100, mode='framed',
                  header_fmt='>I'):
         """
         Listen on a (host, port) pair for up to max_connections connections.
@@ -803,13 +803,16 @@ BASE_COMMAND = r'''{command} \
     {{join_block}} \
     --ponythreads=1 \
     --ponypinasio \
-    --ponynoblock
-    '''
-INITIALIZER_CMD = r'''--worker-count {workers} \
+    --ponynoblock'''
+INITIALIZER_CMD = r'''{worker_count} \
     --data {host}:{data_port} \
     --external {host}:{external_port} \
     --cluster-initializer'''
-JOIN_CMD = r'''--join {host}:{control_port}'''
+JOIN_CMD = r'''--join {host}:{control_port} \
+    {worker_count}'''
+WORKER_COUNT_CMD = r'''--worker-count {worker_count}'''
+
+
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
                   control_port, external_port, data_port, res_dir, workers,
                   alt_block=None, alt_func=None):
@@ -828,7 +831,7 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
     cmd = cmd_stub.format(
         name = 'initializer',
         initializer_block = INITIALIZER_CMD.format(
-            workers = workers,
+            worker_count = WORKER_COUNT_CMD.format(worker_count = workers),
             data_port = data_port,
             external_port = external_port,
             host = host),
@@ -893,7 +896,10 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
                           initializer_block = '',
                           join_block = JOIN_CMD.format(
                                 host = host,
-                                control_port = control_port))
+                                control_port = control_port,
+                                worker_count = (WORKER_COUNT_CMD.format(
+                                    worker_count = workers) if workers else
+                                    '')))
     if alt_func and alt_func(x):
         cmd = '''{} \
             {}'''.format(cmd, alt_block)
@@ -909,7 +915,7 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
     try:
         assert(runner.is_alive())
     except Exception as err:
-        stdout, stderr = r.get_output()
+        stdout, stderr = runner.get_output()
         raise PipelineTestError(
                 "Runner %d of %d has exited with an error: "
                 "\n---\n%s\n---\n%s" % (x+1, len(runners), stdout,

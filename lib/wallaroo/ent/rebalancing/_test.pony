@@ -34,40 +34,40 @@ class iso _TestRebalancerStepsFromOne is UnitTest
     let total_steps_count_1: USize = 10
     let current_workers_count_1: USize = 2
     let expected_step_count_to_send_1: USize = 2
-    let step_count_to_send_1: USize = PartitionRebalancer.step_count_to_send(
-       total_steps_count_1, my_steps_count_1, current_workers_count_1)
+    (let step_count_to_send_1, _) = PartitionRebalancer.step_counts_to_send(
+       total_steps_count_1, my_steps_count_1, current_workers_count_1, 1)
     h.assert_eq[USize](expected_step_count_to_send_1, step_count_to_send_1)
 
     let my_steps_count_2: USize = 4
     let total_steps_count_2: USize = 8
     let current_workers_count_2: USize = 2
     let expected_step_count_to_send_2: USize = 1
-    let step_count_to_send_2: USize = PartitionRebalancer.step_count_to_send(
-       total_steps_count_2, my_steps_count_2, current_workers_count_2)
+    (let step_count_to_send_2, _) = PartitionRebalancer.step_counts_to_send(
+       total_steps_count_2, my_steps_count_2, current_workers_count_2, 1)
     h.assert_eq[USize](expected_step_count_to_send_2, step_count_to_send_2)
 
     let my_steps_count_3: USize = 3
     let total_steps_count_3: USize = 6
     let current_workers_count_3: USize = 2
     let expected_step_count_to_send_3: USize = 1
-    let step_count_to_send_3: USize = PartitionRebalancer.step_count_to_send(
-       total_steps_count_3, my_steps_count_3, current_workers_count_3)
+    (let step_count_to_send_3, _) = PartitionRebalancer.step_counts_to_send(
+       total_steps_count_3, my_steps_count_3, current_workers_count_3, 1)
     h.assert_eq[USize](expected_step_count_to_send_3, step_count_to_send_3)
 
     let my_steps_count_4: USize = 2
     let total_steps_count_4: USize = 4
     let current_workers_count_4: USize = 2
     let expected_step_count_to_send_4: USize = 1
-    let step_count_to_send_4: USize = PartitionRebalancer.step_count_to_send(
-       total_steps_count_4, my_steps_count_4, current_workers_count_4)
+    (let step_count_to_send_4, _) = PartitionRebalancer.step_counts_to_send(
+       total_steps_count_4, my_steps_count_4, current_workers_count_4, 1)
     h.assert_eq[USize](expected_step_count_to_send_4, step_count_to_send_4)
 
     let my_steps_count_5: USize = 1
     let total_steps_count_5: USize = 2
     let current_workers_count_5: USize = 2
     let expected_step_count_to_send_5: USize = 0
-    let step_count_to_send_5: USize = PartitionRebalancer.step_count_to_send(
-       total_steps_count_5, my_steps_count_5, current_workers_count_5)
+    (let step_count_to_send_5, _) = PartitionRebalancer.step_counts_to_send(
+       total_steps_count_5, my_steps_count_5, current_workers_count_5, 1)
     h.assert_eq[USize](expected_step_count_to_send_5, step_count_to_send_5)
 
 class iso _TestRebalancerStepsFrom3Workers is UnitTest
@@ -102,7 +102,7 @@ class iso _TestRebalancerStepsForNewWorker is UnitTest
     // The tolerance is how far we allow a worker's step count to be off from
     // the ideal (where the ideal is the total partition size divided by the
     // number of workers).
-    let tolerance: F64 = 2.0
+    let tolerance: F64 = 2.2
     h.assert_eq[Bool](true, _WorkerIterations(5, tolerance))
     h.assert_eq[Bool](true, _WorkerIterations(11, tolerance))
     h.assert_eq[Bool](true, _WorkerIterations(12, tolerance))
@@ -137,12 +137,12 @@ primitive _From3Workers
     var w2_count: USize = base_share
     var w3_count: USize = base_share
 
-    let w1_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w1_count, current_workers_count)
-    let w2_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w2_count, current_workers_count)
-    let w3_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w3_count, current_workers_count)
+    (let w1_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w1_count, current_workers_count, 1)
+    (let w2_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w2_count, current_workers_count, 1)
+    (let w3_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w3_count, current_workers_count, 1)
     let w4_count: USize = w1_to_send + w2_to_send + w3_to_send
     let w4_ideal: F64 =
       partition_size.f64() / (current_workers_count + 1).f64()
@@ -155,8 +155,8 @@ primitive _WorkerIterations
     var current_workers_count: USize = 1
     var w1_count: USize = partition_size
 
-    var w1_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w1_count, current_workers_count)
+    (var w1_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w1_count, current_workers_count, 1)
     var w2_count: USize = w1_to_send
     let w2_ideal: F64 =
       partition_size.f64() / (current_workers_count + 1).f64()
@@ -170,10 +170,10 @@ primitive _WorkerIterations
     // Add worker 3 and reallocate steps
     current_workers_count = 2
 
-    w1_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w1_count, current_workers_count)
-    var w2_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w2_count, current_workers_count)
+    (w1_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w1_count, current_workers_count, 1)
+    (var w2_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w2_count, current_workers_count, 1)
 
     var w3_count: USize = w1_to_send + w2_to_send
     let w3_ideal: F64 =
@@ -189,12 +189,12 @@ primitive _WorkerIterations
     // Add worker 4 and reallocate steps
     current_workers_count = 3
 
-    w1_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w1_count, current_workers_count)
-    w2_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w2_count, current_workers_count)
-    var w3_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w3_count, current_workers_count)
+    (w1_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w1_count, current_workers_count, 1)
+    (w2_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w2_count, current_workers_count, 1)
+    (var w3_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w3_count, current_workers_count, 1)
     var w4_count: USize = w1_to_send + w2_to_send + w3_to_send
     let w4_ideal: F64 =
       partition_size.f64() / (current_workers_count + 1).f64()
@@ -210,14 +210,14 @@ primitive _WorkerIterations
     // Add worker 5 and reallocate steps
     current_workers_count = 4
 
-    w1_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w1_count, current_workers_count)
-    w2_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w2_count, current_workers_count)
-    w3_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w3_count, current_workers_count)
-    var w4_to_send = PartitionRebalancer.step_count_to_send(partition_size,
-      w4_count, current_workers_count)
+    (w1_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w1_count, current_workers_count, 1)
+    (w2_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w2_count, current_workers_count, 1)
+    (w3_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w3_count, current_workers_count, 1)
+    (var w4_to_send, _) = PartitionRebalancer.step_counts_to_send(
+      partition_size, w4_count, current_workers_count, 1)
 
     var w5_count: USize = w1_to_send + w2_to_send + w3_to_send + w4_to_send
 

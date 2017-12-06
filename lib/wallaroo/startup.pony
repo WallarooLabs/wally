@@ -159,7 +159,7 @@ actor Startup
         let j_addr = _startup_options.j_arg as Array[String]
         let control_notifier: TCPConnectionNotify iso =
           JoiningControlSenderConnectNotifier(auth,
-            _startup_options.worker_name, this)
+            _startup_options.worker_name, _startup_options.worker_count, this)
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0)?, j_addr(1)?)
         _disposables.set(control_conn)
