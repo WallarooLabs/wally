@@ -237,17 +237,18 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
   fun ref is_muted(): Bool =>
     _muted
 
-  be receive_kafka_message(msg: KafkaMessage val,
+  be receive_kafka_message(value: Array[U8] iso, key: (Array[U8] val | None),
+    msg_metadata: KafkaMessageMetadata val,
     network_received_timestamp: U64)
   =>
-    if (msg.get_topic() != _topic)
-      or (msg.get_partition_id() != _partition_id) then
-      @printf[I32](("Msg topic: " + msg.get_topic() + " != _topic: " + _topic
-        + " or Msg partition: " + msg.get_partition_id().string() + " != "
+    if (msg_metadata.get_topic() != _topic)
+      or (msg_metadata.get_partition_id() != _partition_id) then
+      @printf[I32](("Msg topic: " + msg_metadata.get_topic() + " != _topic: " + _topic
+        + " or Msg partition: " + msg_metadata.get_partition_id().string() + " != "
         + " _partition_id: " + _partition_id.string() + "!").cstring())
       Fail()
     end
-    _notify.received(this, msg, network_received_timestamp)
+    _notify.received(this, consume value, key, msg_metadata, network_received_timestamp)
 
   be dispose() =>
     @printf[I32]("Shutting down KafkaSource\n".cstring())

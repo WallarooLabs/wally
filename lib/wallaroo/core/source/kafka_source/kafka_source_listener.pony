@@ -31,10 +31,10 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
 class val KafkaSourceListenerBuilderBuilder[In: Any val]
-  let _ksco: KafkaSourceConfigOptions val
+  let _ksco: KafkaConfigOptions val
   let _auth: TCPConnectionAuth
 
-  new val create(ksco: KafkaSourceConfigOptions val, auth: TCPConnectionAuth) =>
+  new val create(ksco: KafkaConfigOptions val, auth: TCPConnectionAuth) =>
     _ksco = ksco
     _auth = auth
 
@@ -67,7 +67,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
   let _default_target: (Step | None)
   let _target_router: Router
   let _metrics_reporter: MetricsReporter
-  let _ksco: KafkaSourceConfigOptions val
+  let _ksco: KafkaConfigOptions val
   let _tcp_auth: TCPConnectionAuth
 
   new val create(source_builder: SourceBuilder, router: Router,
@@ -79,7 +79,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder | None) = None,
     target_router: Router = EmptyRouter,
-    ksco: KafkaSourceConfigOptions val, tcp_auth: TCPConnectionAuth)
+    ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth)
   =>
     _source_builder = source_builder
     _router = router
@@ -111,9 +111,10 @@ class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
     _consumers = consumers
 
   fun ref apply(consumers: Array[KafkaConsumer tag] val,
-    msg: KafkaMessage val): (KafkaConsumer tag | None)
+    key: (Array[U8] box | None), msg_metadata: KafkaMessageMetadata val):
+    (KafkaConsumer tag | None)
   =>
-    try _consumers(msg.get_partition_id())? end
+    try _consumers(msg_metadata.get_partition_id())? end
 
   fun clone(): KafkaConsumerMessageHandler iso^ =>
     recover iso MapPartitionConsumerMessageHandler(_consumers) end
@@ -130,7 +131,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _layout_initializer: LayoutInitializer
   let _default_target: (Step | None)
   let _metrics_reporter: MetricsReporter
-  let _ksco: KafkaSourceConfigOptions val
+  let _ksco: KafkaConfigOptions val
   let _tcp_auth: TCPConnectionAuth
   let _kc: (KafkaClient tag | None)
   let _kafka_topic_partition_sources: Map[String, Map[I32, KafkaSource[In]]] =
@@ -145,7 +146,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder | None) = None,
     target_router: Router = EmptyRouter,
-    ksco: KafkaSourceConfigOptions val, tcp_auth: TCPConnectionAuth)
+    ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth)
   =>
     _env = env
     _notify = KafkaSourceListenerNotify[In](source_builder, event_log, auth,
@@ -173,14 +174,14 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
 
 
     // create kafka config
-    _kc = match KafkaSourceConfigFactory(_ksco, _env.out)
+    _kc = match KafkaConfigFactory(_ksco, _env.out)
     | let kc: KafkaConfig val =>
       for topic in kc.consumer_topics.values() do
         _kafka_topic_partition_sources(topic) = Map[I32, KafkaSource[In]]
       end
       // create kafka client
       KafkaClient(_tcp_auth, kc, this)
-    | let ksce: KafkaSourceConfigError =>
+    | let ksce: KafkaConfigError =>
       @printf[U32]("%s\n".cstring(), ksce.message().cstring())
       Fail()
       None

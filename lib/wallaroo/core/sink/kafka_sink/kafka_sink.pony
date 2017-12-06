@@ -81,7 +81,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
                ""
              end
 
-  fun ref update_producer_mapping(mapping: KafkaProducerMapping):
+  fun ref create_producer_mapping(mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
   =>
     _kafka_producer_mapping = mapping

@@ -25,8 +25,8 @@ use "wallaroo/core/topology"
 
 actor Main
   new create(env: Env) =>
-    let ksource_clip = KafkaSourceConfigCLIParser(env.out, "src")
-    let ksink_clip = KafkaSinkConfigCLIParser(env.out, "snk")
+    let ksource_clip = KafkaSourceConfigCLIParser(env.out)
+    let ksink_clip = KafkaSinkConfigCLIParser(env.out)
 
     try
       if (env.args(1)? == "--help") or (env.args(1)? == "-h") then
@@ -44,12 +44,12 @@ actor Main
       let application = recover val
         Application("Celsius Conversion App")
           .new_pipeline[F32, F32]("Celsius Conversion",
-            KafkaSourceConfig[F32](ksource_clip.parse(env.args)?,
+            KafkaSourceConfig[F32](ksource_clip.parse_options(env.args)?,
             env.root as AmbientAuth, CelsiusKafkaDecoder))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
             .to_sink(KafkaSinkConfig[F32](FahrenheitEncoder,
-              ksink_clip.parse(env.args)?,
+              ksink_clip.parse_options(env.args)?,
               env.root as AmbientAuth))
       end
       Startup(env, application, "celsius-conversion")
