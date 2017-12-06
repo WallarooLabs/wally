@@ -20,5 +20,6 @@ All notable changes to Wallaroo will be documented in this file.
 - Shutdown cluster cleanly when SIGTERM or SIGINT is received ([PR #1705](https://github.com/wallaroolabs/wallaroo/pull/1705))
 ### Changed
 
+- Don't report a cluster as ready to work until node connection protocol has completed ([PR #1771](https://github.com/wallaroolabs/wallaroo/pull/1771))
 - Add Env as argument to source/sink builders ([PR #1734](https://github.com/wallaroolabs/wallaroo/pull/1734))
 - Changelog Hook Test 2 ([PR #1669](https://github.com/wallaroolabs/wallaroo/pull/1669))
