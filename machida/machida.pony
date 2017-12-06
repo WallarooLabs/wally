@@ -928,12 +928,12 @@ primitive _SourceConfig
         PySourceHandler(d)
       end
 
-      KafkaSourceConfig[PyData val](ksco, (env.root as TCPConnectionAuth), decoder)
+      KafkaSourceConfig[PyData val](consume ksco, (env.root as TCPConnectionAuth), decoder)
     else
       error
     end
 
-  fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaSourceConfigOptions val =>
+  fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaConfigOptions iso^ =>
     let topic = recover val
       String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
     end
@@ -961,7 +961,7 @@ primitive _SourceConfig
       String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 3)))
     end
 
-    KafkaSourceConfigOptions(topic, brokers, log_level)
+    KafkaConfigOptions("Wallaroo Kafka Source", KafkaConsumeOnly, topic, brokers, log_level)
 
 primitive _SinkConfig
   fun from_tuple(sink_config_tuple: Pointer[U8] val, env: Env):
@@ -997,12 +997,12 @@ primitive _SinkConfig
         PyKafkaEncoder(encoderp)
       end
 
-      KafkaSinkConfig[PyData val](encoder, ksco, (env.root as TCPConnectionAuth))
+      KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
     else
       error
     end
 
-  fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaSinkConfigOptions val =>
+  fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaConfigOptions iso^ =>
     let topic = recover val
       String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
     end
@@ -1034,4 +1034,4 @@ primitive _SinkConfig
 
     let max_message_size = @PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 5)).i32()
 
-    KafkaSinkConfigOptions(topic, brokers, log_level, max_produce_buffer_ms, max_message_size)
+    KafkaConfigOptions("Wallaroo Kafka Sink", KafkaProduceOnly, topic, brokers, log_level, max_produce_buffer_ms, max_message_size)
