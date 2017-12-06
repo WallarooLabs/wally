@@ -37,6 +37,7 @@
   - name: software raid - filesystem creation
     filesystem:
       fstype: "{{ item.filesystem_type }}"
+      opts: "{{ item.mkfs_options }}"
       dev: "{{ item.device }}"
     with_items: software_raid_devices
     when: software_raid_devices is defined and item.mount_point is defined
