@@ -50,15 +50,18 @@ integration-tests-testing-correctness-apps-sequence_window_simple_state: sequenc
 
 sequence_window_simple_state_test:
 	cd $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH) && \
-	integration_test --sequence-sender '(0,1000]' \
+	integration_test --sequence-sender '(0,10000]' \
 	  --log-level error \
 		--command './sequence_window_simple_state' \
-		--validation-cmd 'validator -e 1000 -a -i' \
+		--validation-cmd 'validator -e 10000 -a -i' \
 		--output 'received.txt' \
 		--giles-mode \
 		--workers 2 \
 		--batch-size 10 \
-		--sink-expect 1000
+		--sink-await '[9994,9996,9998,10000]' \
+		--sink-await '[9993,9995,9997,9999]' \
+		--spike 0 0.001 200 1
+
 
 clean-testing-correctness-apps-sequence_window_simple_state: sequence_window_simple_state_clean
 

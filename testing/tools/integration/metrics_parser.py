@@ -2,12 +2,12 @@ from io import BytesIO, BufferedReader
 from struct import unpack
 
 
-## Message Types
+# Message Types
 #   1: Connect
 #   2: Join
 #   3: Metrics
 
-## Format types
+# Format types
 #   U8: B
 #   U16: H
 #   U32: I
@@ -17,8 +17,10 @@ from struct import unpack
 
 MSG_TYPES = {1: 'connect', 2: 'join', 3: 'metrics'}
 
+
 def _s(n):
     return '{}s'.format(n)
+
 
 class MetricsParser(object):
     def __init__(self):

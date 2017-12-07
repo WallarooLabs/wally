@@ -193,13 +193,13 @@ class TCPReceiver(StoppableThread):
                 (clientsocket, address) = self.sock.accept()
                 cl = SingleSocketReceiver(clientsocket, self.data, self.mode,
                                           self.header_fmt,
-                                          name = '{}-{}'.format(
+                                          name='{}-{}'.format(
                                               self.__base_name__,
                                               len(self.clients)))
                 logging.info("{}:{} accepting connection from ({}, {}) on "
                              "port {}."
                              .format(self.__base_name__, self.name, self.host,
-                              self.port, address[1]))
+                                     self.port, address[1]))
                 self.clients.append(cl)
                 cl.start()
         except Exception as err:
@@ -389,6 +389,7 @@ class SinkAwaitValue(StoppableThread):
         self.sink.stop()
         super(SinkAwaitValue, self).stop()
 
+
 class Sender(StoppableThread):
     """
     Send length framed data to a destination (host, port).
@@ -544,7 +545,7 @@ def newline_file_generator(filepath, header_fmt='>I'):
     Generate length-encoded strings from a newline-delimited file.
     """
     with open(filepath, 'rb') as f:
-        f.seek(0,2)
+        f.seek(0, 2)
         fin = f.tell()
         f.seek(0)
         while f.tell() < fin:
@@ -676,8 +677,10 @@ class RunnerReadyChecker(StoppableThread):
                         self.stop()
                         break
                 if time.time() - started > self.timeout:
-                    outputs = [(r.name, r.get_output()[0]) for r in self.runners]
-                    outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
+                    outputs = [(r.name, r.get_output()[0]) for r in
+                               self.runners]
+                    outputs = '\n===\n'.join(('\n---\n'.join(t) for t in
+                                              outputs))
                     self.error = TimeoutError(
                         'Application did not report as ready after {} '
                         'seconds. It had the following outputs:\n===\n{}'
@@ -788,7 +791,7 @@ def get_port_values(host, sources):
     while len(free_ports) < 3:
         if is_address_available(host, port):
             free_ports.append(port)
-        port +=1
+        port += 1
     return source_ports, free_ports[0], free_ports[1], free_ports[2]
 
 
@@ -801,6 +804,8 @@ BASE_COMMAND = r'''{command} \
     --name {{name}} \
     {{initializer_block}} \
     {{join_block}} \
+    {{spike_block}} \
+    {{alt_block}} \
     --ponythreads=1 \
     --ponypinasio \
     --ponynoblock
@@ -810,42 +815,67 @@ INITIALIZER_CMD = r'''--worker-count {workers} \
     --external {host}:{external_port} \
     --cluster-initializer'''
 JOIN_CMD = r'''--join {host}:{control_port}'''
+SPIKE_CMD = r'''--spike-drop \
+    {prob} \
+    {margin} \
+    {seed}'''
+SPIKE_SEED = r'''--spike-seed {seed}'''
+SPIKE_PROB = r'''--spike-prob {prob}'''
+SPIKE_MARGIN = r'''--spike-margin {margin}'''
+
+
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
                   control_port, external_port, data_port, res_dir, workers,
-                  alt_block=None, alt_func=None):
-    cmd_stub = BASE_COMMAND.format(command = command,
-                                   host = host,
-                                   inputs = inputs,
-                                   outputs = outputs,
-                                   metrics_port = metrics_port,
-                                   control_port = control_port,
-                                   res_dir = res_dir)
+                  alt_block=None, alt_func=lambda x: False, spikes={}):
+    cmd_stub = BASE_COMMAND.format(command=command,
+                                   host=host,
+                                   inputs=inputs,
+                                   outputs=outputs,
+                                   metrics_port=metrics_port,
+                                   control_port=control_port,
+                                   res_dir=res_dir)
 
     # for each worker, assign `name` and `cluster-initializer` values
     if workers < 1:
         raise PipelineTestError("workers must be 1 or more")
     x = 0
+    if x in spikes:
+        logging.info("Enabling spike for initializer")
+        sc = spikes[x]
+        spike_block = SPIKE_CMD.format(
+            prob=SPIKE_PROB.format(prob=sc.probability),
+            margin=SPIKE_MARGIN.format(margin=sc.margin),
+            seed=SPIKE_SEED.format(seed=sc.seed) if sc.seed else '')
+    else:
+        spike_block = ''
     cmd = cmd_stub.format(
-        name = 'initializer',
-        initializer_block = INITIALIZER_CMD.format(
-            workers = workers,
-            data_port = data_port,
-            external_port = external_port,
-            host = host),
-        join_block = '')
-    if alt_func and alt_func(x):
-        cmd = '''{} \
-            {}'''.format(cmd, alt_block)
-    runners.append(Runner(cmd_string = cmd, name = 'initializer'))
+        name='initializer',
+        initializer_block=INITIALIZER_CMD.format(
+            workers=workers,
+            data_port=data_port,
+            external_port=external_port,
+            host=host),
+        join_block='',
+        alt_block=alt_block if alt_func(x) else '',
+        spike_block=spike_block)
+    runners.append(Runner(cmd_string=cmd, name='initializer'))
     for x in range(1, workers):
-        cmd = cmd_stub.format(name = 'worker{}'.format(x),
-                              initializer_block = '',
-                              join_block = '')
-        if alt_func and alt_func(x):
-            cmd = '''{} \
-                {}'''.format(cmd, alt_block)
-        runners.append(Runner(cmd_string = cmd,
-                              name = 'worker{}'.format(x)))
+        if x in spikes:
+            logging.info("Enabling spike for worker{}".format(x))
+            sc = spikes[x]
+            spike_block = SPIKE_CMD.format(
+                prob=SPIKE_PROB.format(prob=sc.probability),
+                margin=SPIKE_MARGIN.format(margin=sc.margin),
+                seed=SPIKE_SEED.format(seed=sc.seed) if sc.seed else '')
+        else:
+            spike_block = ''
+        cmd = cmd_stub.format(name='worker{}'.format(x),
+                              initializer_block='',
+                              join_block='',
+                              alt_block=alt_block if alt_func(x) else '',
+                              spike_block=spike_block)
+        runners.append(Runner(cmd_string=cmd,
+                              name='worker{}'.format(x)))
 
     # start the workers, 50ms apart
     for idx, r in enumerate(runners):
@@ -871,14 +901,14 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
 
 def add_runner(runners, command, host, inputs, outputs, metrics_port,
                control_port, external_port, data_port, res_dir, workers,
-               alt_block=None, alt_func=None):
-    cmd_stub = BASE_COMMAND.format(command = command,
-                                   host = host,
-                                   inputs = inputs,
-                                   outputs = outputs,
-                                   metrics_port = metrics_port,
-                                   control_port = control_port,
-                                   res_dir = res_dir)
+               alt_block=None, alt_func=lambda x: False, spikes={}):
+    cmd_stub = BASE_COMMAND.format(command=command,
+                                   host=host,
+                                   inputs=inputs,
+                                   outputs=outputs,
+                                   metrics_port=metrics_port,
+                                   control_port=control_port,
+                                   res_dir=res_dir)
 
     # Test that the new worker *can* join
     if len(runners) < 1:
@@ -889,16 +919,24 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
                                 "join!")
 
     x = len(runners)
-    cmd = cmd_stub.format(name = 'worker{}'.format(x),
-                          initializer_block = '',
-                          join_block = JOIN_CMD.format(
-                                host = host,
-                                control_port = control_port))
-    if alt_func and alt_func(x):
-        cmd = '''{} \
-            {}'''.format(cmd, alt_block)
-    runner = Runner(cmd_string = cmd,
-                   name = 'worker{}'.format(x))
+    if x in spikes:
+        logging.info("Enabling spike for joining worker{}".format(x))
+        sc = spikes[x]
+        spike_block= SPIKE_CMD.format(
+            prob=SPIKE_PROB.format(sc.probability),
+            margin=SPIKE_MARGIN.format(sc.margin),
+            seed=SPIKE_SEED.format(sc.seed) if sc.seed else '')
+    else:
+        spike_block = ''
+    cmd = cmd_stub.format(name='worker{}'.format(x),
+                          initializer_block='',
+                          join_block=JOIN_CMD.format(
+                                host=host,
+                                control_port=control_port),
+                          alt_block=alt_block if alt_func(x) else '',
+                          spike_block=spike_block)
+    runner = Runner(cmd_string=cmd,
+                    name='worker{}'.format(x))
     runners.append(runner)
 
     # start the new worker
@@ -922,14 +960,17 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
                 "\n---\n%s" % (x+1, len(runners), r.error))
 
 
-DEFAULT_SINK_EXPECT_TIMEOUT = 30
+DEFAULT_SINK_STOP_TIMEOUT = 30
+
+
 def pipeline_test(generator, expected, command, workers=1, sources=1,
                   mode='framed', sinks=1, decoder=None, pre_processor=None,
-                  batch_size=1, sink_expect=None, sink_expect_timeout=None,
-                  delay=None,
+                  batch_size=1, sink_expect=None, sink_stop_timeout=None,
+                  sink_await=None, delay=None,
                   validate_file=None, giles_mode=False,
                   host='127.0.0.1', listen_attempts=1,
-                  ready_timeout=30, resilience_dir='/tmp/res-dir'):
+                  ready_timeout=30, resilience_dir='/tmp/res-dir',
+                  spikes={}):
     """
     Run a pipeline test without having to instrument everything
     yourself. This only works for 1-source, 1-sink topologies.
@@ -941,8 +982,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         sequentially, and the index is 0-based against the input addresses.
         the values in this set should be either strings or stringable. If they
         are custom data structures, they should already be encoded as strings.
-    - `expectd`: the expect output set, to be compared against the received output.
-        The data should be directly comparable to the decoded output.
+    - `expectd`: the expect output set, to be compared against the received
+        output. The data should be directly comparable to the decoded output.
     - `command`: the command to run each worker. Make sure to leave out the
         Wallaroo parameters: `--in`, `--out`, `--metrics`, `--data`,
         `--control`, `--external`, `--workers`, `--name`,
@@ -960,33 +1001,39 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         Default: None, assume output data is directly comparable.
     - `batch_size`: the batch size to use in the sender. Default: 1
     - `sink_expect`: the number of messages to expect at the sink. This allows
-       directly relying on received output for timing control. Default: None
-       Should be a list of `len(sinks)`.
-    - `sink_expect_timeout`: the timeout in seconds to use when awaiting an
-      expected number of messages at the sink. Raise an error if timeout
-      elapses. Default: 30
-      Can be a number or a list of numbers of `len(sinks)`.
+        directly relying on received output for timing control. Default: None
+        Should be a list of `len(sinks)`.
+    - `sink_await`: a list of (binary) strings to await for at the sink.
+        Once all of the await values have been seen at the sink, the test may
+        be stopped.
+    - `sink_stop_timeout`: the timeout in seconds to use when awaiting an
+        expected number of messages at the sink. Raise an error if timeout
+        elapses. Default: 30
+        Can be a number or a list of numbers of `len(sinks)`.
     - `delay`: If None, and `sink_expect` is also None, the pipeline test
-      will wait until metrics messages have a 0 throughput or have stopped
-      arriving. If set to a number > 0, the minimum delay in seconds to
-      wait after data sending has completed before checking the sink's
-      data. Default: None.
+        will wait until metrics messages have a 0 throughput or have stopped
+        arriving. If set to a number > 0, the minimum delay in seconds to
+        wait after data sending has completed before checking the sink's
+        data. Default: None.
     - `validate_file`: save sink data to a file to be validated by an external
-      process.
+        process.
     - `giles_mode`: if True, include a 64-bit timestamp between the length
-      header and the payload when saving sink data to file. This is a backward
-      compatibility mode for validators that expected giles-receiver format.
+        header and the payload when saving sink data to file. This is a
+        backward compatibility mode for validators that expected
+        giles-receiver format.
     - `host`: the network host address to use in workers, senders, and
-      receivers. Default '127.0.0.1'
+        receivers. Default '127.0.0.1'
     - `listen_attempts`: attempt to start an applicatin listening on ports
-      that are provided by the system. After `listen_attempts` fail, raise
-      an appropriate error. For tests that experience TCP_WAIT related
-      errors, this value should be set higher than 1.
-      Default 1.
+        that are provided by the system. After `listen_attempts` fail, raise
+        an appropriate error. For tests that experience TCP_WAIT related
+        errors, this value should be set higher than 1.
+        Default 1.
     - `ready_timeout`: number of seconds before an error is raised if the
-      application does not report as ready. Default 30
+        application does not report as ready. Default 30
     - `resilience_dir`: The directory where resilience file are kept. This
-      path will be cleaned up before and after each run.
+        path will be cleaned up before and after each run.
+    - `spikes`: A dict of 3-tuples with the worker index as its key, and
+        the spike parameters (probability, margin, seed) as its value.
 
     `expected` and the processed sink(s) data should be directly equatable.
     The test fails if they fail an equality assertion.
@@ -1006,7 +1053,10 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         num_sinks = sinks
         if sink_expect is not None:
             if not isinstance(sink_expect, (list, tuple)):
-                sink_expect = [sink_expect for x in range(len(num_sinks))]
+                sink_expect = [sink_expect for x in range(num_sinks)]
+        elif sink_await is not None:
+            if len(sink_await) != num_sinks:
+                sink_await = [sink_await[:] for x in range(num_sinks)]
         outputs = []
         sinks = []
         for x in range(num_sinks):
@@ -1036,7 +1086,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                    input_ports])
                 start_runners(runners, command, host, inputs, outputs,
                               metrics_port, control_port, external_port,
-                              data_port, resilience_dir, workers)
+                              data_port, resilience_dir, workers,
+                              spikes=spikes)
                 break
             except PipelineTestError as err:
                 # terminate runners, prepare to retry
@@ -1086,14 +1137,36 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         # Use sink, metrics, or a timer to determine when to stop the
         # runners and sinks and begin validation
         if sink_expect:
-            if sink_expect_timeout is None:
-                sink_expect_timeout = DEFAULT_SINK_EXPECT_TIMEOUT
+            if sink_stop_timeout is None:
+                sink_stop_timeout = DEFAULT_SINK_STOP_TIMEOUT
             logging.debug('Waiting for {} messages at the sinks with a timeout'
                           ' of {} seconds'.format(sink_expect,
-                                                  sink_expect_timeout))
+                                                  sink_stop_timeout))
             stoppers = []
             for sink, sink_expect_val in zip(sinks, sink_expect):
-                stopper = SinkExpect(sink, sink_expect_val, sink_expect_timeout)
+                stopper = SinkExpect(sink, sink_expect_val, sink_stop_timeout)
+                stopper.start()
+                stoppers.append(stopper)
+            for stopper in stoppers:
+                stopper.join()
+                if stopper.error:
+                    print '\nSinkStopper Error. Runner output below.\n'
+                    for r in runners:
+                        print '==='
+                        print 'Runner: ', r.name
+                        print '---'
+                        print r.get_output()[0]
+                    raise stopper.error
+        elif sink_await:
+            if sink_stop_timeout is None:
+                sink_stop_timeout = DEFAULT_SINK_STOP_TIMEOUT
+            logging.debug('Awaiting {} values at the sinks with a timeout of '
+                          '{} seconds'.format(sum(map(len, sink_await)),
+                                              sink_stop_timeout))
+            stoppers = []
+            for sink, sink_await_vals in zip(sinks, sink_await):
+                stopper = SinkAwaitValue(sink, sink_await_vals,
+                                         sink_stop_timeout)
                 stopper.start()
                 stoppers.append(stopper)
             for stopper in stoppers:
@@ -1164,7 +1237,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 processed = pre_processor(decoded)
             else:
                 processed = decoded
-
 
             # Validate captured output against expected output
             if isinstance(expected, basestring):

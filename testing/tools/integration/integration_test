@@ -1,10 +1,12 @@
 #!/usr/bin/env python2
 
 import argparse
+from collections import namedtuple
 import logging
 import os
 import random
 import re
+import struct
 
 # set up basic logging
 logging.root.name = 'integration'
@@ -206,6 +208,74 @@ class CSVStringAction(argparse.Action):
         setattr(namespace, self.dest, values.split(','))
 
 
+SpikeConfig = namedtuple('SpikeConfig', ['probability', 'margin', 'seed'])
+
+
+class SpikeAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        """
+        Parameters (values): (index, probability, margin, seed)
+        defaults: index = 0, probability = 0.001, margin = 100, seed = None
+        """
+        if len(values) == 1:
+            index = int(values[0])  # Parse index
+            prob = 0.001
+            margin = 100
+            seed = None
+        elif len(values) == 2:
+            index = int(values[0])  # Parse index
+            prob = float(values[1]) # Parse probability
+            margin = 100
+            seed = None
+        elif len(values) == 3:
+            index = int(values[0])  # Parse index
+            prob = float(values[1]) # Parse probability
+            margin = int(values[2]) # Parse margin
+            seed = None
+        elif len(values) == 4:
+            index = int(values[0])  # Parse index
+            prob = float(values[1]) # Parse probability
+            margin = int(values[2]) # Parse margin
+            seed = int(values[3])   # Parse seed
+        else:
+            msg = ('Argument "{f}" requires 1, 2, 3 or 4 arguments specifying '
+                   'index [, probability [, margin [, seed]]].'
+                   .format(f=self.dest))
+            raise argparse.ArgumentTypeError(msg)
+
+        try:
+            dest = getattr(namespace, self.dest)
+            if not dest:
+                dest= {}
+                setattr(namespace, self.dest, dest)
+        except AttributeError:
+            dest = {}
+            setattr(namespace, self.dest, dest)
+        dest[index] = SpikeConfig(prob, margin, seed)
+
+
+class SinkAwaitAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        """
+        Parameters (values): [value, header]
+        Encode header with struct.pack using len(value)
+        """
+        if len(values) == 1:
+            values.append('>I')
+        elif len(values) != 2:
+            msg = ('Argumet "{f}" requires 1 or 2 arguments specifying '
+                   'value [header]'.format(f=self.dest))
+            raise argparse.ArgumentTypeError(msg)
+        dest = getattr(namespace, self.dest)
+        if not dest:
+            dest = []
+            setattr(namespace, self.dest, dest)
+        if values[1]:
+            dest.append(struct.pack(values[1], len(values[0])) + values[0])
+        else:
+            dest.append(values[0])
+
+
 LOG_LEVELS = {'none': 0,
               'debug': 10,
               'info': 20,
@@ -276,10 +346,14 @@ def CLI():
                       metavar=('item1,item2,...', 'source_index', 'header_format'),
                       help="Send values from a comma delimited string")
 
+    # Network parameters
     net1 = parser.add_argument_group('Network')
     net1.add_argument('--host', help=("The host address to use in "
                                            "networked components."),
                            default='127.0.0.1')
+    net1.add_argument('--spike', nargs='+', action=SpikeAction,
+                      metavar=('index', 'probability', 'margin', 'seed'),
+                      help=("Spike the connection on the specified worker"))
 
     # Expected data foir validation
     exp_group = parser.add_mutually_exclusive_group()
@@ -334,7 +408,11 @@ def CLI():
     expect = stopper.add_argument_group('Sink Expect')
     expect.add_argument('--sink-expect', type=int, action='append',
                         help=("How many messages to expect at each sink."))
-    expect.add_argument('--sink-expect-timeout', type=float,
+    stopper.add_argument('--sink-await', nargs='+', action=SinkAwaitAction,
+                         metavar=('value', 'header'),
+                         help=("Stop after receiving all await values in the"
+                               "sink"))
+    expect.add_argument('--sink-stop-timeout', type=float,
                         help=("Timeout in seconds before raising a "
                               "TimeoutError"))
     stopper.add_argument('--delay', type=float, default=None,
@@ -389,13 +467,15 @@ def CLI():
                       mode = args.sink_mode,
                       batch_size = args.batch_size,
                       sink_expect = args.sink_expect,
-                      sink_expect_timeout = args.sink_expect_timeout,
+                      sink_stop_timeout = args.sink_stop_timeout,
+                      sink_await = args.sink_await,
                       delay = args.delay,
                       validate_file = (args.output if args.validation_cmd else
                                        False),
                       giles_mode = 'giles' if args.giles_mode else None,
                       host=args.host,
-                      resilience_dir=args.resilience_dir))
+                      resilience_dir=args.resilience_dir,
+                      spikes=args.spike))
     except Exception as err:
         logging.exception("Encountered an error while running the test for %r\n===\n"
                       % args.command)
@@ -413,10 +493,11 @@ def CLI():
         else:
             outputs = [(o[0], o[1][0]) for o in outputs]
             outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
+            logging.error("Application outputs:\n===\n{}\n===\n"
+                          .format(outputs))
             logging.error("Validation command '%s' failed with the output:\n"
-                          "--\n%s\n\nThe application had the following"
-                          " outputs:\n===\n%s",
-                         ' '.join(cmd), out, outputs)
+                          "--\n%s\nThe application output is shown above.\n",
+                          ' '.join(cmd), out)
 
         if logging.root.level > logging.ERROR:
             # If failed, and logging level means we didn't log error, include it
