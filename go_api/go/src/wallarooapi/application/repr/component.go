@@ -9,12 +9,20 @@ type Component struct {
 	ComponentId uint64
 }
 
+func MakeComputationBuilder(id uint64) *Component {
+	return &Component{"ComputationBuilder", id}
+}
+
 func MakeComputationMultiBuilder(id uint64) *Component {
 	return &Component{"ComputationMultiBuilder", id}
 }
 
 func MakeStateComputation(id uint64) *Component {
 	return &Component{"StateComputation", id}
+}
+
+func MakeStateComputationMulti(id uint64) *Component {
+	return &Component{"StateComputationMulti", id}
 }
 
 func MakeStateBuilder(id uint64) *Component {

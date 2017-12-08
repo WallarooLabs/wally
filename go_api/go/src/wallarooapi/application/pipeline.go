@@ -43,6 +43,13 @@ func (p *pipeline) AddSourceConfig(sourceConfig SourceConfig) {
 	p.components = append(p.components, sourceConfig.MakeDecoder())
 }
 
+func (p *pipeline) AddToComputation(fromStepId uint64, id uint64) uint64 {
+	p.components = append(p.components, makeComputationBuilder(id))
+	newStepId := p.newStepId()
+	p.connections = append(p.connections, makeTo(newStepId, fromStepId, id))
+	return newStepId
+}
+
 func (p *pipeline) AddToComputationMulti(fromStepId uint64, id uint64) uint64 {
 	p.components = append(p.components, makeComputationMultiBuilder(id))
 	newStepId := p.newStepId()
@@ -52,6 +59,16 @@ func (p *pipeline) AddToComputationMulti(fromStepId uint64, id uint64) uint64 {
 
 func (p *pipeline) AddToStatePartition(fromStepId uint64, computationId uint64, stateBuilderId uint64, stateName string, partitionFunctionId uint64, partitionListId uint64, multiWorker bool) uint64 {
 	p.components = append(p.components, makeStateComputation(computationId))
+	p.components = append(p.components, makeStateBuilder(stateBuilderId))
+	partitionId := uint64(len(p.partitions))
+	p.partitions = append(p.partitions, MakePartition(partitionFunctionId, partitionListId))
+	newStepId := p.newStepId()
+	p.connections = append(p.connections, makeToStatePartition(newStepId, fromStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId, multiWorker))
+	return newStepId
+}
+
+func (p *pipeline) AddToStatePartitionMulti(fromStepId uint64, computationId uint64, stateBuilderId uint64, stateName string, partitionFunctionId uint64, partitionListId uint64, multiWorker bool) uint64 {
+	p.components = append(p.components, makeStateComputationMulti(computationId))
 	p.components = append(p.components, makeStateBuilder(stateBuilderId))
 	partitionId := uint64(len(p.partitions))
 	p.partitions = append(p.partitions, MakePartition(partitionFunctionId, partitionListId))

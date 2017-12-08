@@ -45,6 +45,12 @@ type pipelineBuilder struct {
 	pipeline *pipeline
 }
 
+func (pb *pipelineBuilder) To(computationBuilder wa.ComputationBuilder) *pipelineBuilder {
+	id := wa.AddComponent(computationBuilder)
+	newStepId := pb.pipeline.AddToComputation(pb.lastStepId, id)
+	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
+}
+
 func (pb *pipelineBuilder) ToMulti(computationBuilder wa.ComputationMultiBuilder) *pipelineBuilder {
 	id := wa.AddComponent(computationBuilder)
 	newStepId := pb.pipeline.AddToComputationMulti(pb.lastStepId, id)
@@ -57,6 +63,15 @@ func (pb *pipelineBuilder) ToStatePartition(stateComputation wa.StateComputation
 	partitionFunctionId := wa.AddComponent(partitionFunction)
 	partitionId := wa.AddComponent(partitions)
 	newStepId := pb.pipeline.AddToStatePartition(pb.lastStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId, multiWorker)
+	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
+}
+
+func (pb *pipelineBuilder) ToStatePartitionMulti(stateComputation wa.StateComputationMulti, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64, multiWorker bool) *pipelineBuilder {
+	computationId := wa.AddComponent(stateComputation)
+	stateBuilderId := wa.AddComponent(stateBuilder)
+	partitionFunctionId := wa.AddComponent(partitionFunction)
+	partitionId := wa.AddComponent(partitions)
+	newStepId := pb.pipeline.AddToStatePartitionMulti(pb.lastStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId, multiWorker)
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 

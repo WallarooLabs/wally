@@ -2,6 +2,18 @@ package application
 
 import "wallarooapi/application/repr"
 
+func makeComputationBuilder(id uint64) *computationBuilder {
+	return &computationBuilder{id}
+}
+
+type computationBuilder struct {
+	id uint64
+}
+
+func (cmb *computationBuilder) Repr() *repr.Component {
+	return repr.MakeComputationBuilder(cmb.id)
+}
+
 func makeComputationMultiBuilder(id uint64) *computationMultiBuilder {
 	return &computationMultiBuilder{id}
 }
@@ -24,6 +36,18 @@ type stateComputation struct {
 
 func (sc *stateComputation) Repr() *repr.Component {
 	return repr.MakeStateComputation(sc.id)
+}
+
+func makeStateComputationMulti(id uint64) *stateComputationMulti {
+	return &stateComputationMulti{id}
+}
+
+type stateComputationMulti struct {
+	id uint64
+}
+
+func (sc *stateComputationMulti) Repr() *repr.Component {
+	return repr.MakeStateComputationMulti(sc.id)
 }
 
 func makeStateBuilder(id uint64) *stateBuilder {

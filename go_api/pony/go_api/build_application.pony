@@ -42,8 +42,9 @@ class val _ToComputation is _Connection
         _StepInfo(steps_map(_from_step_id)?.to(
           ComputationMultiBuilder(_computation_builder_id)))
     | "ComputationBuilder" =>
-      // TODO: add computation builder
-      error
+      steps_map(_step_id) =
+        _StepInfo(steps_map(_from_step_id)?.to(
+          ComputationBuilder(_computation_builder_id)))
     else
       error
     end
@@ -85,8 +86,12 @@ class val _ToStatePartition is _Connection
           _state_name, pipeline.partitions_map(_partition_id)?,
           _multi_worker))
     | "StateComputationMulti" =>
-      // TODO: add computation builder
-      error
+      steps_map(_step_id) =
+        _StepInfo(steps_map(_from_step_id)?.to_state_partition(
+          StateComputationMulti(_state_computation_id),
+          StateBuilder(_state_builder_id),
+          _state_name, pipeline.partitions_map(_partition_id)?,
+          _multi_worker))
     else
       error
     end
@@ -168,13 +173,13 @@ class _StepInfo
   new create(pipeline_builder: PipelineBuilder[GoData, GoData, GoData]) =>
     _pipeline_builder = pipeline_builder
 
-  fun ref to(computation_builder: ComputationMultiBuilder):
+  fun ref to(computation_builder: (ComputationBuilder | ComputationMultiBuilder)):
     PipelineBuilder[GoData, GoData, GoData]
   =>
     _pipeline_builder.to[GoData](computation_builder)
 
   fun ref to_state_partition(
-    computation: w.StateComputation[GoData, GoData, GoState] val,
+    computation: (StateComputation | StateComputationMulti),
     state_builder: StateBuilder, name: String, partition: w.Partition[GoData, U64],
     multi_worker: Bool):
     PipelineBuilder[GoData, GoData, GoData]
