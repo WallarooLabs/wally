@@ -22,7 +22,7 @@ func (r *Reverse) Name() string {
 }
 
 func (r *Reverse) Compute(data interface{}) interface{} {
-  input := data.(string)
+  input := *(data.(*string))
 
   // string reversal taken from
   // https://groups.google.com/forum/#!topic/golang-nuts/oPuBaYJ17t4
@@ -76,8 +76,9 @@ func (d *Decoder) PayloadLength(b []byte) uint64 {
   return uint64(binary.BigEndian.Uint32(b[0:4]))
 }
 
-func (d* Decoder) Decode(b []byte) interface {} {
-  return string(b[:])
+func (d* Decoder) Decode(b []byte) interface{} {
+  x := string(b[:])
+  return &x
 }
 ```
 
