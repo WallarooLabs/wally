@@ -26,6 +26,15 @@ The outputs of the application are strings followed by newlines. Here's an examp
 
 The `Decoders`'s `decode(...)` method creates a string from the value represented by the payload. The string is then sent to the `Reverse` computation where it is reversed. The reversed string is then sent to `Encode`'s `encode(...)` method, where a newline is appended to the string.
 
+## Building Reverse
+
+```
+export GOPATH="$(realpath .)/go:$(realpath ../../../go_api/go)"
+go build -buildmode=c-archive -o lib/libwallaroo.a reverse
+stable fetch
+stable env ponyc
+```
+
 ## Running Reverse
 
 In order to run the application you will need Giles Sender and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
@@ -43,7 +52,7 @@ nc -l 127.0.0.1 7002
 ### Shell 2
 
 ```bash
- --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+ ./reverse --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
   --ponythreads=1 --ponynoblock 
