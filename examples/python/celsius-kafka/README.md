@@ -21,11 +21,11 @@ The `Decoder`'s `decode(...)` method creates a float from the value represented 
 
 ## Running Celsius Kafka
 
-In order to run the application you will need Machida and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions. Alternatively, they could be run in Docker, please see the [Docker](/book/getting-started/docker-setup.md) setup instructions and our [Run an Application in Docker](/book/getting-started/run-a-wallaroo-application-docker.md) guide if you haven't already done so.
-
-Note: If running in Docker, the relative paths are not necessary for binaries as they are all bound to the PATH within the container. You will not need to set the `PATH` variable and `PYTHONPATH` already includes the current working directory. The kafkfa cluster and kafkacat should be run from your host and not within the Docker container.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](/book/getting-started/choosing-an-installation-option.md) instructions to choose one of these options if you have not already done so.
 
 You will also need access to a Kafka cluster. This example assumes that there is a Kafka broker listening on port `9092` on `127.0.0.1`.
+
+Note: If running in Docker, the kafkfa cluster and kafkacat should be run from your host and not within the Docker container.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius-kafka` directory.
 
@@ -44,7 +44,7 @@ sudo curl -L https://github.com/docker/compose/releases/download/1.15.0/docker-c
 sudo chmod +x /usr/local/bin/docker-compose
 ```
 
-OSX: Docker compose is already included as part of Docker for Mac.
+MacOS: Docker compose is already included as part of Docker for Mac.
 
 
 NOTE: You might need to run with sudo depending on how you set up Docker.
@@ -90,11 +90,14 @@ kafkacat -C -b 127.0.0.1:9092 -t test-out > celsius.out
 
 ### Shell 2
 
-Set `PYTHONPATH` to refer to the current directory (where `celsius.py` is) and the `machida` directory (where `wallaroo.py` is). Set `PATH` to refer to the directory that contains the `machida` executable. Assuming you installed Machida according to the tutorial instructions you would do:
+
+Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `celsius.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
 Run `machida` with `--application-module celsius`:
@@ -143,10 +146,17 @@ with open('celsius.out', 'rb') as f:
 
 ## Shutdown
 
-To shut down the cluster, you will need to use the `cluster_shutdown` tool.
+Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+```
+You can shut down the Wallaroo cluster with this command:
+
+```bash
+cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down the kafkacat producer by pressing Ctrl-d from its shell.
