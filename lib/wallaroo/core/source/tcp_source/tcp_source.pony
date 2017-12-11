@@ -90,6 +90,8 @@ actor TCPSource is Producer
   var _expect_read_buf: Reader = Reader
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
+  let _router_registry: RouterRegistry
+
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
@@ -118,6 +120,7 @@ actor TCPSource is Producer
     _max_size = max_size
 
     _layout_initializer = layout_initializer
+    _router_registry = router_registry
 
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
@@ -193,6 +196,7 @@ actor TCPSource is Producer
       if not _outgoing_boundaries.contains(target_worker_name) then
         let boundary = builder.build_and_initialize(_step_id_gen(),
           _layout_initializer)
+        _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
         _routes(boundary) =
           _route_builder(this, boundary, _metrics_reporter)

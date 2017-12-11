@@ -27,6 +27,7 @@ actor ControlConnection
     _control_sender.writev(data)
 
   be dispose() =>
+    @printf[I32]("Shutting down ControlConnection\n".cstring())
     _control_sender.dispose()
 
 trait _TCPConnectionControlSender

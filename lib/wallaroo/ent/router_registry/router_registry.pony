@@ -111,9 +111,13 @@ actor RouterRegistry
     _data_receivers = data_receivers
     _connections = c
     _stop_the_world_pause = stop_the_world_pause
+    _connections.register_disposable(this)
 
   fun _worker_count(): USize =>
     _outgoing_boundaries.size() + 1
+
+  be dispose() =>
+    None
 
   be application_ready_to_work() =>
     _application_ready_to_work = true
