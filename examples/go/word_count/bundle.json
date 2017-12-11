@@ -10,7 +10,7 @@
     },
     {
       "type": "local",
-      "local-path": "../../pony"
+      "local-path": "../../../go_api/pony"
     },
     {
       "type": "github",
