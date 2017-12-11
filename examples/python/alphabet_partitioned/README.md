@@ -34,28 +34,35 @@ The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter be
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions. Alternatively, they could be run in Docker, please see the [Docker](/book/getting-started/docker-setup.md) setup instructions and our [Run an Application in Docker](/book/getting-started/run-a-wallaroo-application-docker.md) guide if you haven't already done so.
-
-Note: If running in Docker, the relative paths are not necessary for binaries as they are all bound to the PATH within the container. You will not need to set the `PATH` variable and `PYTHONPATH` already includes the current working directory.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](/book/getting-started/choosing-an-installation-option.md) instructions to choose one of these options if you have not already done so.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
 ### Shell 1
 
+Set `PATH` to refer to the directory that contains the `receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
+
+```bash
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+```
 Run Giles Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
-../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
+receiver --ponythreads=1 --ponynoblock \
   --listen 127.0.0.1:7002 --no-write
 ```
 
 ### Shell 2
 
-Set `PYTHONPATH` to refer to the current directory (where `alphabet.py` is) and the `machida` directory (where `wallaroo.py` is). Set `PATH` to refer to the directory that contains the `machida` executable. Assuming you installed Machida according to the tutorial instructions you would do:
+Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `alphabet_partitioned.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Machida according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
 Run `machida` with `--application-module alphabet_partitioned` as an initializer:
@@ -69,11 +76,13 @@ machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
 
 ### Shell 3
 
-Set `PYTHONPATH` as you did in the previous shell:
+Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `alphabet_partitioned.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Machida according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
 Run `machida` with `--application-module alphabet_partitioned` as a worker:
@@ -86,10 +95,18 @@ machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
 
 ### Shell 4
 
+Set `PATH` to refer to the directory that contains the `sender`  executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
+
+```bash
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+```
+
 Send messages:
 
 ```bash
-../../../giles/sender/sender --host 127.0.0.1:7010 \
+sender --host 127.0.0.1:7010 \
   --file votes.msg --batch-size 50 --interval 10_000_000 \
   --messages 1000000 --binary --msg-size 9 --repeat --ponythreads=1 \
   --ponynoblock --no-write
@@ -97,10 +114,18 @@ Send messages:
 
 ## Shutdown
 
+Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
+
+```bash
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+```
+
 You can shut down the cluster with this command once processing has finished:
 
 ```bash
-../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:6002
+cluster_shutdown 127.0.0.1:6002
 ```
 
 You can shut down Giles Sender and Giles Receiver by pressing `Ctrl-c` from their respective shells.
