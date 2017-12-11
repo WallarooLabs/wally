@@ -5,6 +5,7 @@ import (
 	"C"
 	"encoding/binary"
 	"encoding/gob"
+	"flag"
 	"fmt"
 	"reflect"
 	"strings"
@@ -14,21 +15,41 @@ import (
 
 //export ApplicationSetup
 func ApplicationSetup() *C.char {
-	fmt.Println("wallarooapi.Args=", wa.Args)
+	fs := flag.NewFlagSet("wallaroo", flag.ExitOnError)
+	inHostsPortsArg := fs.String("in", "", "input host:port list")
+	outHostsPortsArg := fs.String("out", "", "output host:port list")
+
+	fs.Parse(wa.Args[1:])
+
+	inHostsPorts := hostsPortsToList(*inHostsPortsArg)
+
+	inHost := inHostsPorts[0][0]
+	inPort := inHostsPorts[0][1]
+
+	outHostsPorts := hostsPortsToList(*outHostsPortsArg)
+	outHost := outHostsPorts[0][0]
+	outPort := outHostsPorts[0][1]
 
 	wa.Serialize = Serialize
 	wa.Deserialize = Deserialize
 
 	application := app.MakeApplication("Word Count Application")
-	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig("127.0.0.1", "7010", &Decoder{})).
+	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
 		ToMulti(&SplitBuilder{}).
 		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition(), true).
-		ToSink(app.MakeTCPSinkConfig("127.0.0.1", "7002", &Encoder{}))
+		ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
 	json := application.ToJson()
-	fmt.Println(json)
 
 	return C.CString(json)
+}
+
+func hostsPortsToList(hostsPorts string) [][]string {
+	hostsPortsList := make([][]string, 0)
+	for _, hp := range strings.Split(hostsPorts, ",") {
+		hostsPortsList = append(hostsPortsList, strings.Split(hp, ":"))
+	}
+	return hostsPortsList
 }
 
 func LetterPartition() []uint64 {
@@ -65,7 +86,8 @@ func (decoder *Decoder) PayloadLength(b []byte) uint64 {
 }
 
 func (decoder *Decoder) Decode(b []byte) interface{} {
-	return string(b[:])
+	s := string(b[:])
+	return &s
 }
 
 type Split struct {}
@@ -76,11 +98,11 @@ func (s *Split) Name() string {
 
 func (s *Split) Compute(data interface{}) []interface{} {
 	punctuation := " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
-	lines := data.(string)
+	lines := data.(*string)
 
 	words := make([]interface{}, 0)
 
-	for _, line := range strings.Split(lines, "\n") {
+	for _, line := range strings.Split(*lines, "\n") {
 		clean_line := strings.Trim(strings.ToLower(line), punctuation)
 		for _, word := range strings.Split(clean_line, " ") {
 			clean_word := strings.Trim(word, punctuation)
@@ -184,7 +206,6 @@ func Serialize(c interface{}) []byte {
 		binary.BigEndian.PutUint32(buff, 6)
 		var b bytes.Buffer
 		enc := gob.NewEncoder(&b)
-		enc.Encode(6)
 		enc.Encode(c)
 		return append(buff, b.Bytes()...)
 	case *WordTotals:
