@@ -68,7 +68,6 @@
 * [Running a Wallaroo Python Application](book/go/running-a-wallaroo-go-application.md)
 * [Writing Your Own Application](book/go/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/go/writing-your-own-stateful-application.md)
-* [Writing Your Own Partitioned Stateful Application](book/go/writing-your-own-partitioned-stateful-application.md).
 * [Word Count](book/go/word-count.md)
 * [Interworker Serialization and Resilience](book/go/interworker-serialization-and-resilience.md)
 * [Wallaroo Python API](book/go/api.md)
