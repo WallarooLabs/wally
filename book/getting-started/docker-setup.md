@@ -21,7 +21,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Get the official Wallaroo image from [Bintray](https://bintray.com/wallaroo-labs/wallaroolabs/first-install%3Awallaroo):
 
 ```bash
-docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/dev/wallaroo:7b1f3550
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/dev/wallaroo:e089428
 ```
 
 ## What's Included in the Wallaroo Docker image
