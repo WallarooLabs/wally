@@ -131,7 +131,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Download the Metrics UI
 
 ```bash
-sudo docker pull wallaroolabs/wallaroo-metrics-ui:0.1
+sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.0
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
