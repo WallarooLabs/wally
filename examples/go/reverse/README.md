@@ -28,6 +28,20 @@ The `Decoder`'s `Decode(...)` method creates a string from the value represented
 
 ## Building Reverse
 
+You'll need to have the GNU `realpath` utility installed. If you are on MacOS, install GNU coreutils:
+
+```bash
+brew install coreutils
+```
+
+On debian based systems you should be able to:
+
+```bash
+sudo apt-get install realpath
+```
+
+To build the reverse binary:
+
 ```
 export GOPATH="$(realpath .)/go:$(realpath ../../../go_api/go)"
 go build -buildmode=c-archive -o lib/libwallaroo.a reverse
