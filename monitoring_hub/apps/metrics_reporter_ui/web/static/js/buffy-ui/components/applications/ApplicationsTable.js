@@ -1,6 +1,7 @@
 import React from "react"
-import { Table } from "react-bootstrap"
+import { Table, Alert } from "react-bootstrap"
 import ApplicationsTableRow from "./ApplicationsTableRow"
+import VersionAlert from "./VersionAlert"
 
 export default class ApplicationsTable extends React.Component {
 	render() {
@@ -10,6 +11,8 @@ export default class ApplicationsTable extends React.Component {
 			return <ApplicationsTableRow appName={appName} key={appName} />;
 		});
 		return (
+			<div>
+			<VersionAlert />
 			<Table className="applications">
 				<thead>
 					<tr>
@@ -20,6 +23,7 @@ export default class ApplicationsTable extends React.Component {
 					{rows}
 				</tbody>
 			</Table>
+			</div>
 		)
 	}
 }
