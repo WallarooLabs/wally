@@ -99,4 +99,4 @@ class Encoder(object):
         votes = data.votes
         print "letter is " + str(letter)
         print "votes is " + str(votes)
-        return struct.pack(">LsQ", 9, data.letter, data.votes)
+        return struct.pack(">IsQ", 9, data.letter, data.votes)
