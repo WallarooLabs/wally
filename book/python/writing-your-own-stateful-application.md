@@ -82,7 +82,7 @@ class LetterStateBuilder(object):
 ```
 
 ### Encoder
-The encoder is going to receive a `Votes` instance and encode into a string with the letter, followed by the vote count as a big-endian 32-bit unsigned integer:
+The encoder is going to receive a `Votes` instance and encode into a string with the letter, followed by the vote count as a big-endian 64-bit unsigned integer:
 
 ```python
 class Encoder(object):
