@@ -69,6 +69,7 @@
 * [Writing Your Own Stateful Application](book/go/writing-your-own-stateful-application.md)
 * [Word Count](book/go/word-count.md)
 * [Interworker Serialization and Resilience](book/go/interworker-serialization-and-resilience.md)
+* [Start A Go Project](book/go/start-a-project.md)
 * [Wallaroo Python API](book/go/api.md)
 
 ## Appendix
