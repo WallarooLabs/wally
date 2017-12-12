@@ -104,9 +104,12 @@ footer img {
 }
 
 footer span {
-    color: white;
-    vertical-align: bottom;
+    vertical-align: -webkit-baseline-middle;
     margin: 0px 10px;
+}
+
+footer a:hover, a:visited, a:link, a:active {
+    text-decoration: none;
 }
 
 footer div.container, nav div.container {
