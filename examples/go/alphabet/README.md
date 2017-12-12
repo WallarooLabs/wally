@@ -38,7 +38,7 @@ The `Decoder`'s `Decode(...)` method creates a `Votes` object with the letter be
 export GOPATH="$(realpath .)/go:$(realpath ../../../go_api/go)"
 go build -buildmode=c-archive -o lib/libwallaroo.a alphabet
 stable fetch
-stable env ponyc
+stable env ponyc -D clustering
 ```
 
 ## Running Alphabet
