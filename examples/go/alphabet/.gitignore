@@ -1,4 +1,4 @@
-alphabet
-lib
-sent.txt
-.deps
+/alphabet
+/lib
+/sent.txt
+/.deps

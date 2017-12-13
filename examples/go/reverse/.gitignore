@@ -1,4 +1,4 @@
-reverse
-lib
-sent.txt
-.deps
+/reverse
+/lib
+/sent.txt
+/.deps
