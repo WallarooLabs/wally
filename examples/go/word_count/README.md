@@ -24,31 +24,11 @@ The `Decoder`'s `Decode(...)` method turns the input message into a string. That
 
 ## Building Word Count
 
-You'll need to have the GNU `realpath` utility installed. If you are on MacOS, install GNU coreutils:
-
-```bash
-brew install coreutils
-```
-
-On debian based systems you should be able to:
-
-```bash
-sudo apt-get install realpath
-```
-
-To build the word count binary:
-
-```bash
-export GOPATH="$(realpath .)/go:$(realpath ../../../go_api/go)"
-go build -buildmode=c-archive -o lib/libwallaroo.a word_count
-stable fetch
-stable env ponyc -D autoscale
-```
-
-Make sure that you've built Giles sender and receiver. They are
-required for the `demo_sender` and `demo_receiver` scripts.
+In the word_count directory, run `make`.
 
 ## Running Word Count
+
+In order to run the application you will need Giles Sender and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
 
 ### Shell 1
 

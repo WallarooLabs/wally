@@ -39,22 +39,6 @@ git checkout 314db6ae1a8960a1eab3c5a20f74e3ce4c67f222
 
 Installation instructions for Linux and MacOS are available on the [Pony stable GitHub repo](https://github.com/ponylang/pony-stable).
 
-### Install `realpath`
-
-The `realpath` utility is used when setting the GOPATH in various examples. If it's not already installed on your machine, go ahead and install it.
-
-If you are on MacOS, install GNU coreutils:
-
-```bash
-brew install coreutils
-```
-
-On debian based systems you should be able to:
-
-```bash
-sudo apt-get install realpath
-```
-
 ### Build Wallaroo support utilities
 
 The various examples you will be asked to run as part of our teaching examples.
