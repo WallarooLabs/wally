@@ -162,6 +162,10 @@ The company behind Wallaroo.
 
 Wallaroo documentation.
 
+- [Wallaroo Labs' Blog][blog]
+
+Wallaroo Labs blog.
+
 - QCon NY 2016: [How did I get here? Building Confidence in a Distributed Stream Processor][qcon16 how did i get here]
 - CodeMesh 2016:[How did I get here? Building Confidence in a Distributed Stream Processor][codemesh16 how did i get here]
 
@@ -217,6 +221,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [additional links]: #additional-links
 [apache 2 license]: https://www.apache.org/licenses/LICENSE-2.0
 [autoscaling website]: http://www.wallaroolabs.com/technology/autoscaling
+[blog]: https://blog.wallaroolabs.com
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
 [community website]: http://www.wallaroolabs.com/community
 [contact us email]: mailto:hello@wallaroolabs.com
