@@ -123,7 +123,7 @@ ponyc_tag ?= wallaroolabs-$(strip $(latest_ponyc_tag))-release## tag for ponyc d
 ponyc_runner ?= wallaroolabs/ponyc## ponyc docker image to use
 debug ?= false## Use ponyc debug option (-d)
 debug_arg :=# Final argument string for debug option
-spike ?= false ## use ponycflags -D spike
+spike ?= false## Enable compile-time network fault injection
 spike_arg :=# Final argument string for spike option
 docker_host ?= $(DOCKER_HOST)## docker host to build/run containers on
 ifeq ($(docker_host),)
