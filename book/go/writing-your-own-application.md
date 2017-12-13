@@ -165,3 +165,5 @@ The complete example is available [here](https://github.com/WallarooLabs/wallaro
 ## Next Steps
 
 To learn how to write a stateful application, continue to [Writing Your Own Stateful Application](writing-your-own-stateful-application.md).
+
+Our Reverse application contains serialization and deserialization code that we didn't cover; to learn more, skip ahead to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).

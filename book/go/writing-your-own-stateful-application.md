@@ -211,4 +211,4 @@ The complete alphabet example is available [here](https://github.com/WallarooLab
 
 To see how everything we've learned so far comes together, check out our [Word Count walkthrough](word-count.md)
 
-To learn how to make your application resilient and able to work across multiple workers, skip ahead to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).
+Our Alphabet application contains serialization and deserialization code that we didn't cover; to learn more, skip ahead to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).
