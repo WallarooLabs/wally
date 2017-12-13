@@ -70,7 +70,7 @@
 * [Word Count](book/go/word-count.md)
 * [Interworker Serialization and Resilience](book/go/interworker-serialization-and-resilience.md)
 * [Start A Go Project](book/go/start-a-project.md)
-* [Wallaroo Python API](book/go/api.md)
+* [Wallaroo Go API](book/go/api.md)
 
 ## Appendix
 * [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)
