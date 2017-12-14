@@ -80,6 +80,19 @@ primitive ChannelMsgEncoder
     """
     _encode(StepMigrationCompleteMsg(step_id), auth)?
 
+  fun begin_leaving_migration(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(BeginLeavingMigrationMsg(remaining_workers, leaving_workers),
+      auth)?
+
+  fun prepare_shrink(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(PrepareShrinkMsg(remaining_workers, leaving_workers), auth)?
+
   fun mute_request(originating_worker: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(MuteRequestMsg(originating_worker), auth)?
 
@@ -206,6 +219,11 @@ primitive ChannelMsgEncoder
     d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)?
+
+  fun leaving_worker_done_migrating(worker_name: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(LeavingWorkerDoneMigratingMsg(worker_name), auth)?
 
   fun request_boundary_count(sender: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -412,19 +430,42 @@ class val AckMigrationBatchCompleteMsg is ChannelMsg
 
 class val MuteRequestMsg is ChannelMsg
   let originating_worker: String
+
   new val create(worker: String) =>
     originating_worker = worker
 
 class val UnmuteRequestMsg is ChannelMsg
   let originating_worker: String
+
   new val create(worker: String) =>
     originating_worker = worker
 
 class val StepMigrationCompleteMsg is ChannelMsg
   let step_id: StepId
+
   new val create(step_id': U128)
   =>
     step_id = step_id'
+
+class val BeginLeavingMigrationMsg is ChannelMsg
+  let remaining_workers: Array[String] val
+  let leaving_workers: Array[String] val
+
+  new val create(remaining_workers': Array[String] val,
+    leaving_workers': Array[String] val)
+  =>
+    remaining_workers = remaining_workers'
+    leaving_workers = leaving_workers'
+
+class val PrepareShrinkMsg is ChannelMsg
+  let remaining_workers: Array[String] val
+  let leaving_workers: Array[String] val
+
+  new val create(remaining_workers': Array[String] val,
+    leaving_workers': Array[String] val)
+  =>
+    remaining_workers = remaining_workers'
+    leaving_workers = leaving_workers'
 
 class val AckWatermarkMsg is ChannelMsg
   let sender_name: String
@@ -611,6 +652,13 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
     worker_name = name
     control_addr = c_addr
     data_addr = d_addr
+
+class val LeavingWorkerDoneMigratingMsg is ChannelMsg
+  let worker_name: String
+
+  new val create(name: String)
+  =>
+    worker_name = name
 
 trait val AnnounceNewStatefulStepMsg is ChannelMsg
   fun update_registry(r: RouterRegistry)

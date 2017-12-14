@@ -43,3 +43,10 @@ primitive ArrayHelpers[V]
       if pred(v) then return true end
     end
     false
+
+  fun sorted[A: Comparable[A] val](arr: Array[A] val): Array[A] =>
+    let unsorted = Array[A]
+    for a in arr.values() do
+      unsorted.push(a)
+    end
+    Sort[Array[A], A](unsorted)

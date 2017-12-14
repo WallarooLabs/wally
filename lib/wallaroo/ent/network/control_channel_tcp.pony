@@ -301,12 +301,26 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
+      | let m: LeavingWorkerDoneMigratingMsg =>
+        _router_registry.disconnect_from_leaving_worker(m.worker_name)
       | let m: AckMigrationBatchCompleteMsg =>
         ifdef "trace" then
           @printf[I32](("Received AckMigrationBatchCompleteMsg on Control " +
             "Channel\n").cstring())
         end
         _router_registry.process_migrating_target_ack(m.sender_name)
+      | let m: BeginLeavingMigrationMsg =>
+        ifdef "trace" then
+          @printf[I32](("Received BeginLeavingMigrationMsg on Control " +
+            "Channel\n").cstring())
+        end
+        _router_registry.prepare_shrink(m.remaining_workers, m.leaving_workers)
+      | let m: PrepareShrinkMsg =>
+        ifdef "trace" then
+          @printf[I32](("Received PrepareShrinkMsg on Control " +
+            "Channel\n").cstring())
+        end
+        _router_registry.prepare_shrink(m.remaining_workers, m.leaving_workers)
       | let m: MuteRequestMsg =>
         @printf[I32]("Control Ch: Received Mute Request from %s\n".cstring(),
           m.originating_worker.cstring())
