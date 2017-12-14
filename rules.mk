@@ -123,6 +123,8 @@ ponyc_tag ?= wallaroolabs-$(strip $(latest_ponyc_tag))-release## tag for ponyc d
 ponyc_runner ?= wallaroolabs/ponyc## ponyc docker image to use
 debug ?= false## Use ponyc debug option (-d)
 debug_arg :=# Final argument string for debug option
+spike ?= false## Enable compile-time network fault injection
+spike_arg :=# Final argument string for spike option
 docker_host ?= $(DOCKER_HOST)## docker host to build/run containers on
 ifeq ($(docker_host),)
   docker_host := unix:///var/run/docker.sock
@@ -203,6 +205,10 @@ ifeq ($(debug),true)
   debug_arg := --debug
 endif
 
+ifeq ($(spike), true)
+	spike_arg := -D spike
+endif
+
 # validation of variable
 ifdef arch
   $(eval $(call check-values,arch,amd64 native))
@@ -248,11 +254,11 @@ define PONYC
   $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) fetch \
     $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) env $(PONYCC) $(ponyc_arch_args) \
-    $(debug_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
+    $(debug_arg) $(spike_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
     $(PONYCFLAGS) $(target_cpu_arg) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && echo "$@: $(abspath $(1))/bundle.json" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
   $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) env $(PONYCC) $(ponyc_arch_args) \
-    $(debug_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
+    $(debug_arg) $(spike_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
     $(PONYCFLAGS) $(target_cpu_arg) . --pass import --files $(if $(filter \
     $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_wallaroo_dir).*.pony" \
     | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \

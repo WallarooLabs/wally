@@ -27,8 +27,8 @@ It has:
     - files_generator: a file source supporting both newlines and framed modes
     - sequence_generator: a framed source encoded U64 sequence generator
         (binary)
-    - iter_generator: a generic framed source encoded generator that operates on
-        iterators. It takes an optional `to_string` lambda for converting
+    - iter_generator: a generic framed source encoded generator that operates
+        on iterators. It takes an optional `to_string` lambda for converting
         iterator items to strings.
     - files_generator: a generic
     - Runner: Runs a single Wallaroo worker with command line parameters.
