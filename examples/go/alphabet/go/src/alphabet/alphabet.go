@@ -19,7 +19,7 @@ import (
   "C"
   "encoding/binary"
   "encoding/gob"
-  "flags"
+  "flag"
   "fmt"
   "reflect"
   wa "wallarooapi"
