@@ -36,7 +36,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 ALPHABET_GO_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 GO_PONY_LIB := $(wallaroo_path)/go_api/go
-export GOPATH=$(ALPHABET_GO_PATH)/go:$(GO_PONY_LIB)
+ALPHABET_GOPATH=$(ALPHABET_GO_PATH)/go:$(GO_PONY_LIB)
 
 # standard rules generation makefile
 include $(rules_mk_path)
@@ -45,7 +45,7 @@ build-examples-go-alphabet: alphabet_go_clean alphabet_go_build
 clean-examples-go-alphabet: alphabet_go_clean
 
 alphabet_go_build:
-	$(QUIET)go build -buildmode=c-archive -o $(ALPHABET_GO_PATH)lib/libwallaroo.a alphabet
+	$(QUIET)GOPATH=$(ALPHABET_GOPATH) && go build -buildmode=c-archive -o $(ALPHABET_GO_PATH)lib/libwallaroo.a alphabet
 	$(QUIET)stable fetch
 	$(QUIET)stable env ponyc
 
