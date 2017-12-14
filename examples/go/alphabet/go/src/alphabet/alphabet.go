@@ -22,6 +22,7 @@ import (
   "flag"
   "fmt"
   "reflect"
+  "strings"
   wa "wallarooapi"
   app "wallarooapi/application"
 )
@@ -251,4 +252,13 @@ func Deserialize(buff []byte) interface{} {
 
   return nil
 }
+
+func hostsPortsToList(hostsPorts string) [][]string {
+  hostsPortsList := make([][]string, 0)
+  for _, hp := range strings.Split(hostsPorts, ",") {
+    hostsPortsList = append(hostsPortsList, strings.Split(hp, ":"))
+  }
+  return hostsPortsList
+}
+
 func main() {}
