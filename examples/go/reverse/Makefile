@@ -36,7 +36,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 REVERSE_GO_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 GO_PONY_LIB := $(wallaroo_path)/go_api/go
-REVERSE_GOPATH=$(REVERSE_GO_PATH)/go:$(GO_PONY_LIB)
+REVERSE_GOPATH := $(REVERSE_GO_PATH)/go:$(GO_PONY_LIB)
 
 # standard rules generation makefile
 include $(rules_mk_path)
@@ -45,7 +45,7 @@ build-examples-go-reverse: reverse_go_clean reverse_go_build
 clean-examples-go-reverse: reverse_go_clean
 
 reverse_go_build:
-	$(QUIET)GOPATH=$(REVERSE_GOPATH) && go build -buildmode=c-archive -o $(REVERSE_GO_PATH)lib/libwallaroo.a reverse
+	$(QUIET)export GOPATH=$(REVERSE_GOPATH) && go build -buildmode=c-archive -o $(REVERSE_GO_PATH)lib/libwallaroo.a reverse
 	$(QUIET)stable fetch
 	$(QUIET)stable env ponyc
 

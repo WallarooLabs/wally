@@ -36,7 +36,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 WORD_COUNT_GO_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 GO_PONY_LIB := $(wallaroo_path)/go_api/go
-WORD_COUNT_GOPATH=$(WORD_COUNT_GO_PATH)/go:$(GO_PONY_LIB)
+WORD_COUNT_GOPATH := $(WORD_COUNT_GO_PATH)/go:$(GO_PONY_LIB)
 
 # standard rules generation makefile
 include $(rules_mk_path)
@@ -45,7 +45,7 @@ build-examples-go-word_count: word_count_go_clean word_count_go_build
 clean-examples-go-word_count: word_count_go_clean
 
 word_count_go_build:
-	$(QUIET)GOPATH=$(WORD_COUNT_GOPATH) && go build -buildmode=c-archive -o $(WORD_COUNT_GO_PATH)lib/libwallaroo.a word_count
+	$(QUIET)export GOPATH=$(WORD_COUNT_GOPATH) && go build -buildmode=c-archive -o $(WORD_COUNT_GO_PATH)lib/libwallaroo.a word_count
 	$(QUIET)stable fetch
 	$(QUIET)stable env ponyc
 
