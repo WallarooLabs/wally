@@ -52,16 +52,16 @@ class val StateComputation is w.StateComputation[GoData, GoData, GoState]
     recover val Array[StateChangeBuilder[GoState] val] end
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_computation_id)
+    ComponentSerializeGetSpace(_computation_id, ComponentType.state_computation())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_computation_id, bytes)
+    ComponentSerialize(_computation_id, bytes, ComponentType.state_computation())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _computation_id = ComponentDeserialize(bytes)
+    _computation_id = ComponentDeserialize(bytes, ComponentType.state_computation())
 
   fun _final() =>
-    RemoveComponent(_computation_id)
+    RemoveComponent(_computation_id, ComponentType.state_computation())
 
 class val StateComputationMulti is w.StateComputation[GoData, GoData, GoState]
   var _computation_id: U64
@@ -102,7 +102,7 @@ class val StateComputationMulti is w.StateComputation[GoData, GoData, GoState]
         for i in Range(0, size.usize()) do
           results.push(GoData(@GetMultiResultItem(res, i.u64())))
         end
-        @RemoveComponent(res)
+        RemoveComponent(res, ComponentType.data())
         (consume results, state_changed_indicator)
       end
     end
@@ -111,16 +111,16 @@ class val StateComputationMulti is w.StateComputation[GoData, GoData, GoState]
     recover val Array[StateChangeBuilder[GoState] val] end
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_computation_id)
+    ComponentSerializeGetSpace(_computation_id, ComponentType.state_computation())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_computation_id, bytes)
+    ComponentSerialize(_computation_id, bytes, ComponentType.state_computation())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _computation_id = ComponentDeserialize(bytes)
+    _computation_id = ComponentDeserialize(bytes, ComponentType.state_computation())
 
   fun _final() =>
-    RemoveComponent(_computation_id)
+    RemoveComponent(_computation_id, ComponentType.state_computation())
 
 class val StateBuilder
   var _state_builder_id: U64
@@ -140,13 +140,13 @@ class val StateBuilder
     GoState(@StateBuilderBuild(_state_builder_id))
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_state_builder_id)
+    ComponentSerializeGetSpace(_state_builder_id, ComponentType.state_builder())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_state_builder_id, bytes)
+    ComponentSerialize(_state_builder_id, bytes, ComponentType.state_builder())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _state_builder_id = ComponentDeserialize(bytes)
+    _state_builder_id = ComponentDeserialize(bytes, ComponentType.state_builder())
 
   fun _final() =>
-    RemoveComponent(_state_builder_id)
+    RemoveComponent(_state_builder_id, ComponentType.state_builder())

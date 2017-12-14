@@ -9,15 +9,15 @@ type StateComputation interface {
 
 //export StateComputationName
 func StateComputationName(computationId uint64) *C.char {
-	computation := GetComponent(computationId).(StateComputation)
+	computation := GetComponent(computationId, StateComputationTypeId).(StateComputation)
 	return C.CString(computation.Name())
 }
 
 //export StateComputationCompute
 func StateComputationCompute(computationId uint64, dataId uint64, stateId uint64, stateChanged *uint64) uint64 {
-	computation := GetComponent(computationId).(StateComputation)
-	data := GetComponent(dataId).(interface{})
-	state := GetComponent(stateId).(interface{})
+	computation := GetComponent(computationId, StateComputationTypeId).(StateComputation)
+	data := GetComponent(dataId, DataTypeId).(interface{})
+	state := GetComponent(stateId, StateTypeId).(interface{})
 	res, sc := computation.Compute(data, state)
 	if sc {
 		*stateChanged = 1
@@ -27,7 +27,7 @@ func StateComputationCompute(computationId uint64, dataId uint64, stateId uint64
 	if res == nil {
 		return 0
 	}
-	return AddComponent(res)
+	return AddComponent(res, DataTypeId)
 }
 
 type StateComputationMulti interface {
@@ -37,15 +37,15 @@ type StateComputationMulti interface {
 
 //export StateComputationMultiName
 func StateComputationMultiName(computationId uint64) *C.char {
-	computation := GetComponent(computationId).(StateComputationMulti)
+	computation := GetComponent(computationId, StateComputationTypeId).(StateComputationMulti)
 	return C.CString(computation.Name())
 }
 
 //export StateComputationMultiCompute
 func StateComputationMultiCompute(computationId uint64, dataId uint64, stateId uint64, stateChanged *uint64, size *uint64) uint64 {
-	computation := GetComponent(computationId).(StateComputationMulti)
-	data := GetComponent(dataId).(interface{})
-	state := GetComponent(stateId).(interface{})
+	computation := GetComponent(computationId, StateComputationTypeId).(StateComputationMulti)
+	data := GetComponent(dataId, DataTypeId).(interface{})
+	state := GetComponent(stateId, DataTypeId).(interface{})
 	res, sc := computation.Compute(data, state)
 	if sc {
 		*stateChanged = 1
@@ -60,10 +60,10 @@ func StateComputationMultiCompute(computationId uint64, dataId uint64, stateId u
 	resHolder := make([]uint64, len(res))
 
 	for i, r := range res {
-		resHolder[i] = AddComponent(r)
+		resHolder[i] = AddComponent(r, DataTypeId)
 	}
 
-	return AddComponent(resHolder)
+	return AddComponent(resHolder, DataTypeId)
 }
 
 type StateBuilder interface {
@@ -73,13 +73,13 @@ type StateBuilder interface {
 
 //export StateBuilderName
 func StateBuilderName(stateBuilderId uint64) *C.char {
-	stateBuilder := GetComponent(stateBuilderId).(StateBuilder)
+	stateBuilder := GetComponent(stateBuilderId, StateBuilderTypeId).(StateBuilder)
 	return C.CString(stateBuilder.Name())
 }
 
 //export StateBuilderBuild
 func StateBuilderBuild(stateBuilderId uint64) uint64 {
-	stateBuilder := GetComponent(stateBuilderId).(StateBuilder)
+	stateBuilder := GetComponent(stateBuilderId, StateBuilderTypeId).(StateBuilder)
 	state := stateBuilder.Build()
-	return AddComponent(state)
+	return AddComponent(state, StateTypeId)
 }

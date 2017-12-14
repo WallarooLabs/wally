@@ -46,31 +46,31 @@ type pipelineBuilder struct {
 }
 
 func (pb *pipelineBuilder) To(computationBuilder wa.ComputationBuilder) *pipelineBuilder {
-	id := wa.AddComponent(computationBuilder)
+	id := wa.AddComponent(computationBuilder, wa.ComputationBuilderTypeId)
 	newStepId := pb.pipeline.AddToComputation(pb.lastStepId, id)
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 
 func (pb *pipelineBuilder) ToMulti(computationBuilder wa.ComputationMultiBuilder) *pipelineBuilder {
-	id := wa.AddComponent(computationBuilder)
+	id := wa.AddComponent(computationBuilder, wa.ComputationBuilderTypeId)
 	newStepId := pb.pipeline.AddToComputationMulti(pb.lastStepId, id)
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 
 func (pb *pipelineBuilder) ToStatePartition(stateComputation wa.StateComputation, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64, multiWorker bool) *pipelineBuilder {
-	computationId := wa.AddComponent(stateComputation)
-	stateBuilderId := wa.AddComponent(stateBuilder)
-	partitionFunctionId := wa.AddComponent(partitionFunction)
-	partitionId := wa.AddComponent(partitions)
+	computationId := wa.AddComponent(stateComputation, wa.StateComputationTypeId)
+	stateBuilderId := wa.AddComponent(stateBuilder, wa.StateBuilderTypeId)
+	partitionFunctionId := wa.AddComponent(partitionFunction, wa.PartitionFunctionTypeId)
+	partitionId := wa.AddComponent(partitions, wa.PartitionListTypeId)
 	newStepId := pb.pipeline.AddToStatePartition(pb.lastStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId, multiWorker)
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 
 func (pb *pipelineBuilder) ToStatePartitionMulti(stateComputation wa.StateComputationMulti, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64, multiWorker bool) *pipelineBuilder {
-	computationId := wa.AddComponent(stateComputation)
-	stateBuilderId := wa.AddComponent(stateBuilder)
-	partitionFunctionId := wa.AddComponent(partitionFunction)
-	partitionId := wa.AddComponent(partitions)
+	computationId := wa.AddComponent(stateComputation, wa.StateComputationTypeId)
+	stateBuilderId := wa.AddComponent(stateBuilder, wa.StateBuilderTypeId)
+	partitionFunctionId := wa.AddComponent(partitionFunction, wa.PartitionFunctionTypeId)
+	partitionId := wa.AddComponent(partitions, wa.PartitionListTypeId)
 	newStepId := pb.pipeline.AddToStatePartitionMulti(pb.lastStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId, multiWorker)
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }

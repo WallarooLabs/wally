@@ -8,13 +8,13 @@ class val GoData
     _data_id
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_data_id)
+    ComponentSerializeGetSpace(_data_id, ComponentType.data())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_data_id, bytes)
+    ComponentSerialize(_data_id, bytes, ComponentType.data())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _data_id = ComponentDeserialize(bytes)
+    _data_id = ComponentDeserialize(bytes, ComponentType.data())
 
   fun _final() =>
-    RemoveComponent(_data_id)
+    RemoveComponent(_data_id, ComponentType.data())

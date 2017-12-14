@@ -14,16 +14,16 @@ class val PartitionFunctionU64
     @PartitionFunctionU64Partition(_partition_function_id, data.id())
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_partition_function_id)
+    ComponentSerializeGetSpace(_partition_function_id, ComponentType.partition_function())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_partition_function_id, bytes)
+    ComponentSerialize(_partition_function_id, bytes, ComponentType.partition_function())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _partition_function_id = ComponentDeserialize(bytes)
+    _partition_function_id = ComponentDeserialize(bytes, ComponentType.partition_function())
 
   fun _final() =>
-    RemoveComponent(_partition_function_id)
+    RemoveComponent(_partition_function_id, ComponentType.partition_function())
 
 primitive PartitionListU64
   fun apply(plid: U64): Array[U64] val =>

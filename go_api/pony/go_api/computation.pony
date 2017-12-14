@@ -37,16 +37,16 @@ class Computation is w.Computation[GoData, GoData]
     end
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_computation_id)
+    ComponentSerializeGetSpace(_computation_id, ComponentType.computation())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_computation_id, bytes)
+    ComponentSerialize(_computation_id, bytes, ComponentType.computation())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _computation_id = ComponentDeserialize(bytes)
+    _computation_id = ComponentDeserialize(bytes, ComponentType.computation())
 
   fun _final() =>
-    RemoveComponent(_computation_id)
+    RemoveComponent(_computation_id, ComponentType.computation())
 
 class val ComputationBuilder
   var _computation_builder_id: U64
@@ -58,16 +58,16 @@ class val ComputationBuilder
     recover Computation(@ComputationBuilderBuild(_computation_builder_id)) end
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_computation_builder_id)
+    ComponentSerializeGetSpace(_computation_builder_id, ComponentType.computation_builder())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_computation_builder_id, bytes)
+    ComponentSerialize(_computation_builder_id, bytes, ComponentType.computation_builder())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _computation_builder_id = ComponentDeserialize(bytes)
+    _computation_builder_id = ComponentDeserialize(bytes, ComponentType.computation_builder())
 
   fun _final() =>
-    RemoveComponent(_computation_builder_id)
+    RemoveComponent(_computation_builder_id, ComponentType.computation_builder())
 
 class ComputationMulti is w.Computation[GoData, GoData]
   var _computation_id: U64
@@ -97,22 +97,22 @@ class ComputationMulti is w.Computation[GoData, GoData]
         for i in Range(0, size.usize()) do
           results.push(GoData(@GetMultiResultItem(res, i.u64())))
         end
-        @RemoveComponent(res)
+        RemoveComponent(res, ComponentType.data())
         consume results
       end
     end
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_computation_id)
+    ComponentSerializeGetSpace(_computation_id, ComponentType.computation())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_computation_id, bytes)
+    ComponentSerialize(_computation_id, bytes, ComponentType.computation())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _computation_id = ComponentDeserialize(bytes)
+    _computation_id = ComponentDeserialize(bytes, ComponentType.computation())
 
   fun _final() =>
-    RemoveComponent(_computation_id)
+    RemoveComponent(_computation_id, ComponentType.computation())
 
 class val ComputationMultiBuilder
   var _computation_builder_id: U64
@@ -124,13 +124,13 @@ class val ComputationMultiBuilder
     recover ComputationMulti(@ComputationMultiBuilderBuild(_computation_builder_id)) end
 
   fun _serialise_space(): USize =>
-    ComponentSerializeGetSpace(_computation_builder_id)
+    ComponentSerializeGetSpace(_computation_builder_id, ComponentType.computation_builder())
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    ComponentSerialize(_computation_builder_id, bytes)
+    ComponentSerialize(_computation_builder_id, bytes, ComponentType.computation_builder())
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _computation_builder_id = ComponentDeserialize(bytes)
+    _computation_builder_id = ComponentDeserialize(bytes, ComponentType.computation_builder())
 
   fun _final() =>
-    RemoveComponent(_computation_builder_id)
+    RemoveComponent(_computation_builder_id, ComponentType.computation_builder())
