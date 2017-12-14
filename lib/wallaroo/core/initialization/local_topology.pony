@@ -156,6 +156,17 @@ class val LocalTopology
       this
     end
 
+  fun val remove_worker_names(ws: Array[String] val): LocalTopology =>
+    let new_worker_names = recover trn Array[String] end
+    for w in worker_names.values() do
+      if not ws.contains(w) then
+        new_worker_names.push(w)
+      end
+    end
+    LocalTopology(_app_name, _worker_name, _graph, _step_map,
+      _state_builders, _pre_state_data, _proxy_ids, default_target,
+      default_state_name, default_target_id, consume new_worker_names)
+
   fun val for_new_worker(new_worker: String): LocalTopology ? =>
     let w_names =
       if not worker_names.contains(new_worker) then
@@ -298,6 +309,10 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
       w.cstring())
 
+  be initiate_shrink(leaving_workers: Array[String] val) =>
+    let remaining_workers = _remove_worker_names(leaving_workers)
+    _router_registry.initiate_shrink(remaining_workers, leaving_workers)
+
   be add_boundary_to_joining_worker(w: String, boundary: OutgoingBoundary,
     builder: OutgoingBoundaryBuilder)
   =>
@@ -314,6 +329,18 @@ actor LocalTopologyInitializer is LayoutInitializer
       _save_worker_names()
     else
       Fail()
+    end
+
+  fun ref _remove_worker_names(ws: Array[String] val): Array[String] val =>
+    match _topology
+    | let t: LocalTopology =>
+      t.remove_worker_names(ws)
+      _save_local_topology()
+      _save_worker_names()
+      t.worker_names
+    else
+      Fail()
+      recover val Array[String] end
     end
 
   fun ref _add_boundary(target_worker: String, boundary: OutgoingBoundary,

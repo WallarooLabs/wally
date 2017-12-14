@@ -266,6 +266,19 @@ actor Connections is Cluster
       _send_data(worker, data)
     end
 
+  be disconnect_from(worker: String) =>
+    try
+      // _data_conns(worker).dispose()
+      (_, let d) = _data_conns.remove(worker)?
+      d.dispose()
+      // _control_conns(worker).dispose()
+      (_, let c) = _control_conns.remove(worker)?
+      c.dispose()
+    else
+      @printf[I32]("Couldn't find worker %s for disconnection\n".cstring(),
+        worker.cstring())
+    end
+
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: U128, key: K, state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
