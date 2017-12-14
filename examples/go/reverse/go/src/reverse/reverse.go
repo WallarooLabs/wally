@@ -19,6 +19,7 @@ import (
   "C"
   "encoding/binary"
   "encoding/gob"
+  "flag"
   "fmt"
   "reflect"
   wa "wallarooapi"
@@ -27,13 +28,28 @@ import (
 
 //export ApplicationSetup
 func ApplicationSetup() *C.char {
+  fs := flag.NewFlagSet("wallaroo", flag.ExitOnError)
+  inHostsPortsArg := fs.String("in", "", "input host:port list")
+  outHostsPortsArg := fs.String("out", "", "output host:port list")
+
+  fs.Parse(wa.Args[1:])
+
+  inHostsPorts := hostsPortsToList(*inHostsPortsArg)
+
+  inHost := inHostsPorts[0][0]
+  inPort := inHostsPorts[0][1]
+
+  outHostsPorts := hostsPortsToList(*outHostsPortsArg)
+  outHost := outHostsPorts[0][0]
+  outPort := outHostsPorts[0][1]
+
   wa.Serialize = Serialize
   wa.Deserialize = Deserialize
 
   application := app.MakeApplication("Reverse Word")
-  application.NewPipeline("Reverse", app.MakeTCPSourceConfig("127.0.0.1", "7010", &Decoder{})).
+  application.NewPipeline("Reverse", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
     To(&ReverseBuilder{}).
-    ToSink(app.MakeTCPSinkConfig("127.0.0.1", "7002", &Encoder{}))
+    ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
   return C.CString(application.ToJson())
 }

@@ -114,7 +114,7 @@ An application is constructed of pipelines which, in turn, are constructed from 
 
 ```go
 application := app.MakeApplication("Reverse Word")
-application.NewPipeline("Reverse", app.MakeTCPSourceConfig("127.0.0.1", "7010", &Decoder{})).
+application.NewPipeline("Reverse", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
 ```
 
 Each pipeline must have a source, and each source must have a decoder, so `NewPipeline` takes a name and a `TCPSourceConfig` instance as its arguments.
@@ -128,7 +128,7 @@ To(&ReverseBuilder{}).
 And finally, we add the sink, using a `TCPSinkConfig`:
 
 ```python
-ToSink(app.MakeTCPSinkConfig("127.0.0.1", "7002", &Encoder{}))
+ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 ```
 
 ### The `ApplicationSetup` Entry Point
