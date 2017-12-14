@@ -8,9 +8,6 @@ install_llvm() {
 
   pushd /tmp
   wget "http://llvm.org/releases/${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-debian8.tar.xz"
-  python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
-  echo "PRINTING O_NONBLOCK flag"
-  echo `python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); print(flags&os.O_NONBLOCK);'`
   tar -xvf clang+llvm*
   pushd clang+llvm* && sudo mkdir /tmp/llvm && sudo cp -r ./* /tmp/llvm/
   sudo ln -s "/tmp/llvm/bin/llvm-config" "/usr/local/bin/${LLVM_CONFIG}"
@@ -140,8 +137,17 @@ install_python_dependencies() {
   echo "** Python dependencies installed"
 }
 
+turn_off_o_noblock() {
+  echo "PRINTING O_NONBLOCK flag"
+  echo `python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); print(flags&os.O_NONBLOCK);'`
+  python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
+  echo "PRINTING O_NONBLOCK flag"
+  echo `python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); print(flags&os.O_NONBLOCK);'`
+}
+
 echo "----- Installing dependencies"
 
+turn_off_o_noblock
 install_cpuset
 install_ponyc
 install_pony_stable
