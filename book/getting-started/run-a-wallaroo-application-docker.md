@@ -24,7 +24,7 @@ docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-src:/src/wallaroo \
 -v /tmp/wallaroo-docker/python-virtualenv:/src/python-virtualenv \
 --name wally \
-wallaroo-labs-docker-wallaroolabs.bintray.io/dev/wallaroo:7b1f3550
+wallaroo-labs-docker-wallaroolabs.bintray.io/dev/wallaroo:c01f09c
 ```
 
 ### Breaking down the Docker command
@@ -135,8 +135,9 @@ We will be sending in 25,000,000 messages using a pre-generated data file. The d
 You will now be able to start the `sender` with the following command:
 
 ```bash
-sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
-  --repeat --no-write --msg-size 8 --ponythreads=1 --ponynoblock \
+sender --host 127.0.0.1:7000 --messages 25000000 --binary \
+--batch-size 50 --interval 10_000_000 --repeat --no-write \
+--msg-size 8 --ponythreads=1 --ponynoblock \
   --file /src/wallaroo/examples/python/celsius/celsius.msg
 ```
 

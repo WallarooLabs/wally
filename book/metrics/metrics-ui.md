@@ -21,14 +21,14 @@ NOTE: You might need to run with sudo depending on how you set up Docker.
 Once you have Docker setup, you can grab the Metrics UI image by running:
 
 ```
-docker pull wallaroolabs/wallaroo-metrics-ui:0.1
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.0
 ```
 
 To start the Metrics UI you will run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  wallaroolabs/wallaroo-metrics-ui:0.1
+  wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.0
 ```
 
 If you are running locally, open [http://localhost:4000](http://localhost:4000)
