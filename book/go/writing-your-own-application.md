@@ -127,24 +127,39 @@ To(&ReverseBuilder{}).
 
 And finally, we add the sink, using a `TCPSinkConfig`:
 
-```python
+```go
 ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 ```
 
 ### The `ApplicationSetup` Entry Point
 
-After Wallaroo has loaded the application's python file, it will try to execute its `ApplicationSetup()` function. This function is where the application builder steps from above are going to run.
+After Wallaroo starts, it will try to execute its `ApplicationSetup()` function. This function is where the application builder steps from above are going to run.
 
-```python
+```go
 //export ApplicationSetup
 func ApplicationSetup() *C.char {
+  fs := flag.NewFlagSet("wallaroo", flag.ExitOnError)
+  inHostsPortsArg := fs.String("in", "", "input host:port list")
+  outHostsPortsArg := fs.String("out", "", "output host:port list")
+
+  fs.Parse(wa.Args[1:])
+
+  inHostsPorts := hostsPortsToList(*inHostsPortsArg)
+
+  inHost := inHostsPorts[0][0]
+  inPort := inHostsPorts[0][1]
+
+  outHostsPorts := hostsPortsToList(*outHostsPortsArg)
+  outHost := outHostsPorts[0][0]
+  outPort := outHostsPorts[0][1]
+
   wa.Serialize = Serialize
   wa.Deserialize = Deserialize
 
   application := app.MakeApplication("Reverse Word")
-  application.NewPipeline("Reverse", app.MakeTCPSourceConfig("127.0.0.1", "7010", &Decoder{})).
+  application.NewPipeline("Reverse", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
     To(&ReverseBuilder{}).
-    ToSink(app.MakeTCPSinkConfig("127.0.0.1", "7002", &Encoder{}))
+    ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
   return C.CString(application.ToJson())
 }
