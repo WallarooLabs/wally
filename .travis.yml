@@ -56,3 +56,8 @@ install:
 
 script:
   - bash travis/script.sh
+
+deploy:
+  skip_cleanup: true
+  provider: script
+  script: travis/docker_release.sh
