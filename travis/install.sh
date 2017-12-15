@@ -137,8 +137,14 @@ install_python_dependencies() {
   echo "** Python dependencies installed"
 }
 
+turn_off_o_nonblock() {
+  echo "Turning off O_NONBLOCK"
+  python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
+}
+
 echo "----- Installing dependencies"
 
+turn_off_o_nonblock
 install_cpuset
 install_ponyc
 install_pony_stable
