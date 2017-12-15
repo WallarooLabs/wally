@@ -4,14 +4,14 @@ In this section, we're going to run an example Wallaroo application in Docker. B
 
 There's a couple Wallaroo support applications that you'll be interacting with for the first time:
 
-- Our Metrics UI that allows you to monitor the performance and health of your applications.
-- Giles receiver is designed to capture TCP output from Wallaroo applications.
-- Giles sender is used to send test data into Wallaroo applications over TCP.
-- Machida, our program for running Wallaroo Python applications.
+* Our Metrics UI that allows you to monitor the performance and health of your applications.
+* Giles receiver is designed to capture TCP output from Wallaroo applications.
+* Giles sender is used to send test data into Wallaroo applications over TCP.
+* Machida, our program for running Wallaroo Python applications.
 
 You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
 
-The Metrics UI process will be run in the background. The other three processes (receiver, sender, and Wallaroo) will run in the foreground. We recommend that you run each process in a separate terminal.
+The Metrics UI process will be run in the background. The other three processes \(receiver, sender, and Wallaroo\) will run in the foreground. We recommend that you run each process in a separate terminal.
 
 NOTE: If you haven't set up Docker to run without root, you will need to use `sudo` with your Docker commands.
 
@@ -24,26 +24,26 @@ docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-src:/src/wallaroo \
 -v /tmp/wallaroo-docker/python-virtualenv:/src/python-virtualenv \
 --name wally \
-wallaroo-labs-docker-wallaroolabs.bintray.io/dev/wallaroo:7b1f3550
+wallaroo-labs-docker-wallaroolabs.bintray.io/dev/wallaroo:f6acc5f
 ```
 
 ### Breaking down the Docker command
 
-- `docker run`: The Docker command to start a new container.
+* `docker run`: The Docker command to start a new container.
 
-- `--rm`: Automatically clean up the container and remove the file system on exit.
+* `--rm`: Automatically clean up the container and remove the file system on exit.
 
-- `-it`: Allows us to work with interactive processes by allocating a tty for the container.
+* `-it`: Allows us to work with interactive processes by allocating a tty for the container.
 
-- `--privileged`: Gives the container access to the hosts' devices. This allows certain system calls to be used by Wallaroo, specifically `mbind` and `set_mempolicy`. This setting is optional, but by excluding it there will be a performance degradation in Wallaroo's processing capabilities.
+* `--privileged`: Gives the container access to the hosts' devices. This allows certain system calls to be used by Wallaroo, specifically `mbind` and `set_mempolicy`. This setting is optional, but by excluding it there will be a performance degradation in Wallaroo's processing capabilities.
 
-- `-p 4000:4000`: Maps the default port for HTTP requests for the Metrics UI from the container to the host. This makes it possible to call up the Metrics UI from a browser on the host.
+* `-p 4000:4000`: Maps the default port for HTTP requests for the Metrics UI from the container to the host. This makes it possible to call up the Metrics UI from a browser on the host.
 
-- `-v /tmp/wallaroo-docker/wallaroo-src:/src/wallaroo`: Mounts a host directory as a data volume within the container. The first time you run this, you must use an empty directory in order for the Docker image to copy the Wallaroo source code to your host. This allows you to open and modify the Wallaroo source code with the editor of your choice on your host. The Wallaroo source code will persist on your machine after the container is stopped or deleted. This setting is optional, but without it you would need to use an editor within the container to view or modify the Wallaroo source code.
+* `-v /tmp/wallaroo-docker/wallaroo-src:/src/wallaroo`: Mounts a host directory as a data volume within the container. The first time you run this, you must use an empty directory in order for the Docker image to copy the Wallaroo source code to your host. This allows you to open and modify the Wallaroo source code with the editor of your choice on your host. The Wallaroo source code will persist on your machine after the container is stopped or deleted. This setting is optional, but without it you would need to use an editor within the container to view or modify the Wallaroo source code.
 
-- `-v /tmp/wallaroo-docker/python-virtualenv:/src/python-virtualenv`: Mounts a host directory as a data volume within the container. The first time this is run for the provided directory, this command will setup a persistent Python virtual environment using [virtualenv](https://virtualenv.pypa.io/en/stable/) for the container on your host. Thus, if you need to install any python modules using `pip` or `easy_install` they will persist after the container is stopped or deleted. This setting is optional, but without it, you will not have a persistent `virtualenv` for the container.
+* `-v /tmp/wallaroo-docker/python-virtualenv:/src/python-virtualenv`: Mounts a host directory as a data volume within the container. The first time this is run for the provided directory, this command will setup a persistent Python virtual environment using [virtualenv](https://virtualenv.pypa.io/en/stable/) for the container on your host. Thus, if you need to install any python modules using `pip` or `easy_install` they will persist after the container is stopped or deleted. This setting is optional, but without it, you will not have a persistent `virtualenv` for the container.
 
-- `--name wally`: The name for the container. This setting is optional but makes it easier to reference the container in later commands.
+* `--name wally`: The name for the container. This setting is optional but makes it easier to reference the container in later commands.
 
 ## Terminal 2, Start the Metrics UI
 
@@ -154,9 +154,9 @@ If your landing page resembles the one above, the "Celsius to Fahrenheit" applic
 
 Now, let's have a look at some metrics. By clicking on the "Celsius to Fahrenheit" link, you'll be taken to the "Application Dashboard" page. On this page you should see metric stats for the following:
 
-- a single pipeline: `Celsius Conversion`
-- a single worker: `Initializer`
-- three computations: `Add32`, `Decode Time in TCP Source`, `Multiply by 1.8`
+* a single pipeline: `Celsius Conversion`
+* a single worker: `Initializer`
+* three computations: `Add32`, `Decode Time in TCP Source`, `Multiply by 1.8`
 
 ![Application Dashboard Page](/book/metrics/images/application-dashboard-page.png)
 
@@ -203,3 +203,4 @@ docker stop wally
 This command will also terminate any active sessions you may have left open to the docker container.
 
 For tips on editing existing Wallaroo example code or installing Python modules within Docker, have a look at our [Tips for using Wallaroo in Docker](/book/appendix/wallaroo-in-docker-tips.md) section.
+
