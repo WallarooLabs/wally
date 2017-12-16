@@ -19,13 +19,10 @@ As with the Reverse Word example, we will list the components required:
 The computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and return some data that tells Wallaroo what to do next.
 
 ```python
-class AddVotes(object):
-    def name(self):
-        return "add votes"
-
-    def compute(self, data, state):
-        state.update(data)
-        return (state.get_votes(data.letter), True)
+@wallaroo.state_computation(name='add votes')
+def add_votes(self, data, state):
+    state.update(data)
+    return (state.get_votes(data.letter), True)
 ```
 
 Let's dig into that tuple that we are returning:
@@ -73,25 +70,14 @@ class AllVotes(object):
 This map is the `state` object that `AddVotes.compute` above takes.
 An important thing to note here is that `get_votes` returns a _new_ `Votes` instance. This is important, as this is the value that is returned eventually passed to `Encoder.encode`, and if we passed a reference to a mutable object here, there is no guarantee that `Encoder.encode` will execute before another update to this object.
 
-Lastly, a stateful application's pipeline is going to need a `StateBuilder`, so let's create one:
-
-```python
-class LetterStateBuilder(object):
-    def name(self):
-        return "Letter State Builder"
-
-    def build(self):
-        return AllVotes()
-```
-
 ### Encoder
 The encoder is going to receive a `Votes` instance and encode into a string with the letter, followed by the vote count as a big-endian 64-bit unsigned integer:
 
 ```python
-class Encoder(object):
-    def encode(self, data):
-        # data is a Votes
-        return struct.pack(">IsQ", 9, data.letter, data.votes)
+@wallaroo.encoder
+def encode(self, data):
+    # data is a Votes
+    return struct.pack(">IsQ", 9, data.letter, data.votes)
 ```
 
 ### Decoder
@@ -99,16 +85,10 @@ class Encoder(object):
 The decoder, like the one in Reverse Word, is going to use a `header_length` of 4 bytes to denote a big-endian 32-bit unsigned integer. Then, for the data, it is expecting a single character followed by a big-endian 32-bit unsigned integer. Here we use the `struct` module to unpack these integers from the bytes string.
 
 ```python
-class Decoder(object):
-    def header_length(self):
-        return 4
-
-    def payload_length(self, bs):
-        return struct.unpack(">I", bs)[0]
-
-    def decode(self, bs):
-        (letter, vote_count) = struct.unpack(">sI", bs)
-        return Votes(letter, vote_count)
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def decode(self, bs):
+    (letter, vote_count) = struct.unpack(">sI", bs)
+    return Votes(letter, vote_count)
 ```
 
 ### Application Setup
@@ -122,25 +102,25 @@ def application_setup(args):
 
     ab = wallaroo.ApplicationBuilder("alphabet")
     ab.new_pipeline("alphabet",
-                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
-    ab.to_stateful(AddVotes(), LetterStateBuilder(), "letter state")
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
+                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+    ab.to_stateful(add_votes, AllVotes, "letter state")
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()
 ```
 
 The only difference between this setup and the stateless Reverse Word's one is that while in Reverse Word we used:
 
 ```python
-ab.to(Reverse)
+ab.to(reverse)
 ```
 
 here we use:
 
 ```python
-ab.to_stateful(AddVotes(), LetterStateBuilder(), "letter state")
+ab.to_stateful(add_votes, AllVotes, "letter state")
 ```
 
-That is, while the stateless computation constructor `to` took only a computation class as its argument, the stateful computation constructor `to_stateful` takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state.
+That is, while the stateless computation constructor `to` took only a computation class as its argument, the stateful computation constructor `to_stateful` takes a computation _function_, as well as a state _class_, along with the name of that state.
 
 ### Miscellaneous
 

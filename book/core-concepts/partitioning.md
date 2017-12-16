@@ -37,13 +37,13 @@ func (s *Stocks) Set(symbol string, price float64) {
 If a message came into the system with a new stock price, the computation would take that message, get the symbol and the price, and use them to update the state.
 
 {% codetabs name="Python", type="py" -%}
-class UpdateStock(object):
-    def compute(self, stock, state):
-        symbol = stock.symbol
-        price = stock.price
+@wallaroo.state_computation("update stock")
+def update_stock(stock, state):
+    symbol = stock.symbol
+    price = stock.price
 
-        state.set(symbol, price)
-        return (None, True)
+    state.set(symbol, price)
+    return (None, True)
 {%- language name="Go", type="go" -%}
 type UpdateStock struct {}
 
@@ -85,12 +85,12 @@ type Stock struct {
 Since the computation only has one stock in its state now, there is no need to do a dictionary look up. Instead, the computation can update the particular Stock's state right away.
 
 {% codetabs name="Python", type="py" -%}
-class UpdateStock(object):
-    def compute(self, stock, state):
-        state.symbol = stock.symbol
-        state.price = stock.price
+@wallaroo.state_computation(name="update stock")
+def update_stock(stock, state):
+    state.symbol = stock.symbol
+    state.price = stock.price
 
-        return (None, True)
+    return (None, True)
 {%- language name="Go", type="go" -%}
 type UpdateStock struct {}
 
@@ -113,9 +113,9 @@ Currently, the partition keys for a particular partition need to be defined alon
 The partition function takes in message data and returns a partition key. In the example, the message symbol would be extracted from the message data and returned as the key.
 
 {% codetabs name="Python", type="py" -%}
-class SymbolPartitionFunction(object):
-    def partition(self, data):
-        return data.symbol
+@wallaroo.partition
+def partition(data):
+    return data.symbol
 {%- language name="Go", type="go" -%}
 func symbolToKey(symbol string) uint64 {
     return uint64(binary.BigEndian.Uint32([]byte(fmt.Sprintf("%4s", symbol))))

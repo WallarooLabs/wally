@@ -27,10 +27,6 @@ SIDETYPE_BUY = 1
 SIDETYPE_SELL = 2
 
 
-def test_python():
-    return "hello python"
-
-
 def str_to_partition(stringable):
     ret = 0
     for x in range(0, len(stringable)):
@@ -56,19 +52,19 @@ def application_setup(args):
     ab = wallaroo.ApplicationBuilder("market-spread")
     ab.new_pipeline(
             "Orders",
-            wallaroo.TCPSourceConfig(order_host, order_port, OrderDecoder())
+            wallaroo.TCPSourceConfig(order_host, order_port, order_decoder)
         ).to_state_partition_u64(
-            CheckOrder(), SymbolDataBuilder(), "symbol-data",
-            SymbolPartitionFunction(), symbol_partitions
-       ).to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
-                                        OrderResultEncoder())
-       ).new_pipeline(
+            check_order, SymbolData, "symbol-data",
+            symbol_partition_function, symbol_partitions
+        ).to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
+                                        order_result_encoder)
+        ).new_pipeline(
             "Market Data",
             wallaroo.TCPSourceConfig(nbbo_host, nbbo_port,
-                                     MarketDataDecoder())
+                                     market_data_decoder)
         ).to_state_partition_u64(
-            UpdateMarketData(), SymbolDataBuilder(), "symbol-data",
-            SymbolPartitionFunction(), symbol_partitions
+            update_market_data, SymbolData, "symbol-data",
+            symbol_partition_function, symbol_partitions
         ).done()
     return ab.build()
 
@@ -86,36 +82,23 @@ class MarketSpreadError(Exception):
 
 
 class SymbolData(object):
-    def __init__(self, last_bid, last_offer, should_reject_trades):
+    def __init__(self, last_bid=0.0, last_offer=0.0, should_reject_trades=True):
         self.last_bid = last_bid
         self.last_offer = last_offer
         self.should_reject_trades = should_reject_trades
 
 
-class SymbolDataBuilder(object):
-    def name(self):
-        return "Symbol Data Builder"
-
-    def build(self):
-        return SymbolData(0.0, 0.0, True)
+@wallaroo.partition
+def symbol_partition_function(data):
+    return str_to_partition(data.symbol)
 
 
-class SymbolPartitionFunction(object):
-    def partition(self, data):
-        return str_to_partition(data.symbol)
-
-
-class CheckOrder(object):
-    def name(self):
-        return "Check Order"
-
-    def compute(self, data, state):
-        if state.should_reject_trades:
-            ts = int(time.time() * 100000)
-            return (OrderResult(data, state.last_bid,
-                                state.last_offer, ts),
-                    False)
-        return (None, False)
+@wallaroo.state_computation(name="Check Order")
+def check_order(data, state):
+    if state.should_reject_trades:
+        ts = int(time.time() * 100000)
+        return (OrderResult(data, state.last_bid, state.last_offer, ts), False)
+    return (None, False)
 
 
 class Order(object):
@@ -130,38 +113,32 @@ class Order(object):
         self.transact_time = transact_time
 
 
-class OrderDecoder(object):
-    def header_length(self):
-        return 4
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def order_decoder(bs):
+    """
+    0 -  1b - FixType (U8)
+    1 -  1b - side (U8)
+    2 -  4b - account (U32)
+    6 -  6b - order id (String)
+    12 -  4b - symbol (String)
+    16 -  8b - order qty (F64)
+    24 -  8b - price (F64)
+    32 - 21b - transact_time (String)
+    """
+    order_type = struct.unpack(">B", bs[0:1])[0]
+    if order_type != FIXTYPE_ORDER:
+        raise MarketSpreadError("Wrong Fix message type. Did you connect "
+                                "the senders the wrong way around?")
+    side = struct.unpack(">B", bs[1:2])[0]
+    account = struct.unpack(">I", bs[2:6])[0]
+    order_id = struct.unpack("6s", bs[6:12])[0]
+    symbol = struct.unpack("4s", bs[12:16])[0]
+    qty = struct.unpack(">d", bs[16:24])[0]
+    price = struct.unpack(">d", bs[24:32])[0]
+    transact_time = struct.unpack("21s", bs[32:53])[0]
 
-    def payload_length(self, bs):
-        return struct.unpack(">I", bs)[0]
-
-    def decode(self, bs):
-        """
-        0 -  1b - FixType (U8)
-        1 -  1b - side (U8)
-        2 -  4b - account (U32)
-        6 -  6b - order id (String)
-        12 -  4b - symbol (String)
-        16 -  8b - order qty (F64)
-        24 -  8b - price (F64)
-        32 - 21b - transact_time (String)
-        """
-        order_type = struct.unpack(">B", bs[0:1])[0]
-        if order_type != FIXTYPE_ORDER:
-            raise MarketSpreadError("Wrong Fix message type. Did you connect "
-                                    "the senders the wrong way around?")
-        side = struct.unpack(">B", bs[1:2])[0]
-        account = struct.unpack(">I", bs[2:6])[0]
-        order_id = struct.unpack("6s", bs[6:12])[0]
-        symbol = struct.unpack("4s", bs[12:16])[0]
-        qty = struct.unpack(">d", bs[16:24])[0]
-        price = struct.unpack(">d", bs[24:32])[0]
-        transact_time = struct.unpack("21s", bs[32:53])[0]
-
-        return Order(side, account, order_id, symbol, qty, price,
-                     transact_time)
+    return Order(side, account, order_id, symbol, qty, price,
+                 transact_time)
 
 
 class OrderResult(object):
@@ -172,20 +149,20 @@ class OrderResult(object):
         self.timestamp = timestamp
 
 
-class OrderResultEncoder(object):
-    def encode(self, data):
-        p = struct.pack(">HI6s4sddddQ",
-                        data.order.side,
-                        data.order.account,
-                        data.order.order_id,
-                        data.order.symbol,
-                        data.order.qty,
-                        data.order.price,
-                        data.bid,
-                        data.offer,
-                        data.timestamp)
-        out = struct.pack('>I{}s'.format(len(p)), len(p), p)
-        return out
+@wallaroo.encoder
+def order_result_encoder(data):
+    p = struct.pack(">HI6s4sddddQ",
+                    data.order.side,
+                    data.order.account,
+                    data.order.order_id,
+                    data.order.symbol,
+                    data.order.qty,
+                    data.order.price,
+                    data.bid,
+                    data.offer,
+                    data.timestamp)
+    out = struct.pack('>I{}s'.format(len(p)), len(p), p)
+    return out
 
 
 class MarketDataMessage(object):
@@ -197,44 +174,35 @@ class MarketDataMessage(object):
         self.mid = (bid + offer) / 2.0
 
 
-class MarketDataDecoder(object):
-    def header_length(self):
-        return 4
-
-    def payload_length(self, bs):
-        return struct.unpack(">I", bs)[0]
-
-    def decode(self, bs):
-        """
-        0 -  1b - FixType (U8)
-        1 -  4b - symbol (String)
-        5 -  21b - transact_time (String)
-        26 - 8b - bid_px (F64)
-        34 - 8b - offer_px (F64)
-        """
-        order_type = struct.unpack(">B", bs[0:1])[0]
-        if order_type != FIXTYPE_MARKET_DATA:
-            raise MarketSpreadError("Wrong Fix message type. Did you connect "
-                                    "the senders the wrong way around?")
-        symbol = struct.unpack(">4s", bs[1:5])[0]
-        transact_time = struct.unpack(">21s", bs[5:26])[0]
-        bid = struct.unpack(">d", bs[26:34])[0]
-        offer = struct.unpack(">d", bs[34:42])[0]
-        return MarketDataMessage(symbol, transact_time, bid, offer)
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def market_data_decoder(bs):
+    """
+    0 -  1b - FixType (U8)
+    1 -  4b - symbol (String)
+    5 -  21b - transact_time (String)
+    26 - 8b - bid_px (F64)
+    34 - 8b - offer_px (F64)
+    """
+    order_type = struct.unpack(">B", bs[0:1])[0]
+    if order_type != FIXTYPE_MARKET_DATA:
+        raise MarketSpreadError("Wrong Fix message type. Did you connect "
+                                "the senders the wrong way around?")
+    symbol = struct.unpack(">4s", bs[1:5])[0]
+    transact_time = struct.unpack(">21s", bs[5:26])[0]
+    bid = struct.unpack(">d", bs[26:34])[0]
+    offer = struct.unpack(">d", bs[34:42])[0]
+    return MarketDataMessage(symbol, transact_time, bid, offer)
 
 
-class UpdateMarketData(object):
-    def name(self):
-        return "Update Market Data"
+@wallaroo.state_computation(name="Update Market Data")
+def update_market_data(data, state):
+    offer_bid_difference = data.offer - data.bid
 
-    def compute(self, data, state):
-        offer_bid_difference = data.offer - data.bid
+    should_reject_trades = ((offer_bid_difference >= 0.05) or
+                            ((offer_bid_difference / data.mid) >= 0.05))
 
-        should_reject_trades = ((offer_bid_difference >= 0.05) or
-                                ((offer_bid_difference / data.mid) >= 0.05))
+    state.last_bid = data.bid
+    state.last_offer = data.offer
+    state.should_reject_trades = should_reject_trades
 
-        state.last_bid = data.bid
-        state.last_offer = data.offer
-        state.should_reject_trades = should_reject_trades
-
-        return (None, True)
+    return (None, True)

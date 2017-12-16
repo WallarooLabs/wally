@@ -14,8 +14,9 @@
 
 
 import argparse
-import inspect
+from functools import wraps
 import pickle
+import struct
 
 
 def serialize(o):
@@ -40,56 +41,30 @@ class ApplicationBuilder(object):
         return self
 
     def to(self, computation):
-        if not inspect.isclass(computation):
-            raise WallarooParameterError("Expecting a Computation class. Got "
-                                         "an instance instead.")
         self._actions.append(("to", computation))
         return self
 
     def to_parallel(self, computation):
-        if not inspect.isclass(computation):
-            raise WallarooParameterError("Expecting a Computation class. Got "
-                                         "an instance instead.")
         self._actions.append(("to_parallel", computation))
         return self
 
-    def to_stateful(self, computation, state_builder, state_name):
-        if inspect.isclass(computation):
-            raise WallarooParameterError("Expecting a Computation Builder "
-                                         "instance. Got a class instead.")
-        if inspect.isclass(state_builder):
-            raise WallarooParameterError("Expecting a State Builder "
-                                         "instance. Got a class instead.")
-        self._actions.append(("to_stateful", computation, state_builder,
+    def to_stateful(self, computation, state_class, state_name):
+        self._actions.append(("to_stateful", computation,
+                              StateBuilder(state_name, state_class),
                               state_name))
         return self
 
-    def to_state_partition_u64(self, computation, state_builder, state_name,
+    def to_state_partition_u64(self, computation, state_class, state_name,
                                partition_function, partition_keys):
-        if inspect.isclass(computation):
-            raise WallarooParameterError("Expecting a Computation Builder "
-                                         "instance. Got a class instead.")
-        if inspect.isclass(state_builder):
-            raise WallarooParameterError("Expecting a State Builder "
-                                         "instance. Got a class instead.")
         self._actions.append(("to_state_partition_u64", computation,
-                              state_builder, state_name, partition_function,
-                              partition_keys))
+                              StateBuilder(state_name, state_class),
+                              state_name, partition_function, partition_keys))
         return self
 
-    def to_state_partition(self, computation, state_builder, state_name,
+    def to_state_partition(self, computation, state_class, state_name,
                            partition_function, partition_keys):
-        if inspect.isclass(computation):
-            raise WallarooParameterError("Expecting a Computation Builder "
-                                         "instance. Got a class instead.")
-        if inspect.isclass(state_builder):
-            raise WallarooParameterError("Expecting a State Builder "
-                                         "instance. Got a class instead.")
-        if not isinstance(partition_keys, list):
-            raise WallarooParameterError("Expecting a partition_keys list. "
-                                         "Got a {} instead.".format(
-                                             type(partition_keys)))
-        self._actions.append(("to_state_partition", computation, state_builder,
+        self._actions.append(("to_state_partition", computation,
+                              StateBuilder(state_name, state_class),
                               state_name, partition_function, partition_keys))
         return self
 
@@ -103,6 +78,110 @@ class ApplicationBuilder(object):
 
     def build(self):
         return self._actions
+
+
+def computation(name):
+    def wrapped(computation_function):
+        @wraps(computation_function)
+        class C:
+            def name(self):
+                return name
+            def compute(self, data):
+                return computation_function(data)
+            def __call__(self, *args):
+                return self
+        return C()
+    return wrapped
+
+
+def state_computation(name):
+    def wrapped(computation_function):
+        @wraps(computation_function)
+        class C:
+            def name(self):
+                return name
+            def compute(self, data, state):
+                return computation_function(data, state)
+            def __call__(self, *args):
+                return self
+        return C()
+    return wrapped
+
+
+def computation_multi(name):
+    def wrapped(computation_function):
+        @wraps(computation_function)
+        class C:
+            def name(self):
+                return name
+            def compute_multi(self, data):
+                return computation_function(data)
+            def __call__(self, *args):
+                return self
+        return C()
+    return wrapped
+
+
+def state_computation_multi(name):
+    def wrapped(computation_function):
+        @wraps(computation_function)
+        class C:
+            def name(self):
+                return name
+            def compute_multi(self, data, state):
+                return computation_function(data, state)
+            def __call__(self, *args):
+                return self
+        return C()
+    return wrapped
+
+
+class StateBuilder(object):
+    def __init__(self, name, state_cls):
+        self.name = name
+        self.state_cls = state_cls
+
+    def ____wallaroo_build____(self):
+        return self.state_cls()
+
+    def name(self):
+        return self.name
+
+
+def partition(fn):
+    @wraps(fn)
+    class C:
+        def partition(self, data):
+            return fn(data)
+        def __call__(self, *args):
+            return self
+    return C()
+
+
+def decoder(header_length, length_fmt):
+    def wrapped(decoder_function):
+        @wraps(decoder_function)
+        class C:
+            def header_length(self):
+                return header_length
+            def payload_length(self, bs):
+                return struct.unpack(length_fmt, bs)[0]
+            def decode(self, bs):
+                return decoder_function(bs)
+            def __call__(self, *args):
+                return self
+        return C()
+    return wrapped
+
+
+def encoder(encoder_function):
+    @wraps(encoder_function)
+    class C:
+        def encode(self, data):
+            return encoder_function(data)
+        def __call__(self, *args):
+            return self
+    return C()
 
 
 class TCPSourceConfig(object):

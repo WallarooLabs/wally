@@ -19,16 +19,8 @@ from random import choice, randrange, randint, random
 from string import lowercase
 from struct import pack
 
-FIXTYPE_ORDER = 1
-FIXTYPE_MARKET_DATA = 2
-
-SIDETYPE_BUY = 1
-SIDETYPE_SELL = 2
-
 from market_spread import (FIXTYPE_MARKET_DATA,
                            FIXTYPE_ORDER,
-                           OrderResult,
-                           OrderResultEncoder,
                            SIDETYPE_BUY,
                            SIDETYPE_SELL)
 

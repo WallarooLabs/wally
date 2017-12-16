@@ -22,11 +22,11 @@ def application_setup(args):
 
     ab = wallaroo.ApplicationBuilder("Word Count Application")
     ab.new_pipeline("Split and Count",
-                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
-    ab.to_parallel(Split)
-    ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
-        WordPartitionFunction(), word_partitions)
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
+                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+    ab.to_parallel(split)
+    ab.to_state_partition(count_word, WordTotals, "word totals",
+        partition, word_partitions)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()
 ```
 
@@ -35,10 +35,10 @@ By now, hopefully, most of this looks somewhat familiar. We're building on conce
 ```python
 ab = wallaroo.ApplicationBuilder("Word Count Application")
 ab.new_pipeline("Split and Count",
-                wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
+                wallaroo.TCPSourceConfig(in_host, in_port, decoder))
 ```
 
-Upon receiving some textual input, our word count application will route it to a stateless computation called `Split`. `Split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateful computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? The `to` method creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(Split)`, we are placing an instance of the `Split` computation on every worker in our cluster.
+Upon receiving some textual input, our word count application will route it to a stateless computation called `split`. `split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateful computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? The `to` method creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(split)`, we are placing the `split` computation on every worker in our cluster.
 
 ### `A to` vs `to_parallel` digression
 
@@ -74,19 +74,19 @@ def application_setup(args):
 
     ab = wallaroo.ApplicationBuilder("Word Count Application")
     ab.new_pipeline("Split and Count",
-                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
-    ab.to_parallel(Split)
-    ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
-        WordPartitionFunction(), word_partitions)
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
+                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+    ab.to_parallel(split)
+    ab.to_state_partition(count_word, WordTotals, "word totals",
+        partition, word_partitions)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()
 ```
 
 Beyond `to_parallel`, there's nothing new in our word count application. After we split our text chunks into words, they get routed to a state partition where they are counted.
 
 ```python
-ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
-    WordPartitionFunction(), word_partitions)
+    ab.to_state_partition(count_word, WordTotals, "word totals",
+        partition, word_partitions)
 ```
 
 Note we setup up 27 partitions to count our words, one for each letter plus one called "!" which will handle any "word" that doesn't start with a letter:
@@ -97,8 +97,8 @@ word_partitions.append("!")
 
 ...
 
-ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
-    WordPartitionFunction(), word_partitions)
+ab.to_state_partition(count_word, WordTotals, "word totals",
+    partition, word_partitions)
 ```
 
 ### Splitting words
@@ -106,55 +106,50 @@ ab.to_state_partition(CountWord(), WordTotalsBuilder(), "word totals",
 Our word splitting is mostly uninteresting, except for one huge difference, our previous examples had one output for each input. When splitting text into words, we take one input and produce multiple outputs. Let's see how that is done.
 
 ```python
-class Split(object):
-    def name(self):
-        return "split into words"
+@wallaroo.computation_multi(name="split into words")
+def split(data):
+    punctuation = " !\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
 
-    def compute_multi(self, data):
-        punctuation = " !\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
+    words = []
 
-        words = []
+    for line in data.split("\n"):
+        clean_line = line.lower().strip(punctuation)
+        for word in clean_line.split(' '):
+            clean_word = word.strip(punctuation)
+            words.append(clean_word)
 
-        for line in data.split("\n"):
-            clean_line = line.lower().strip(punctuation)
-            for word in clean_line.split(' '):
-                clean_word = word.strip(punctuation)
-                words.append(clean_word)
-
-        return words
+    return words
 ```  
 
-Did you catch what is going on? Previously, we've seen our stateless computations have a `compute` method. `Split` doesn't have a `compute` method. It has a `compute_multi` method. Why both `compute` and `compute_multi`? The answer lies in Python's type system.
+Did you catch what is going on? Previously, we've seen our stateless computations wrapped by the `computation` decorator. Why do we have both `computation` and `computation_multi`? The answer lies in Python's type system.
 
-### `compute` vs `compute_multi`
+### `computation` vs `computation_multi`
 
 Wallaroo's Python API allows a programmer to indicate that the output of a computation is meant to be treated as a single output by using the `compute` method. This allows us, for example, to split some text into words and have that list of words treated as a single item by Wallaroo. In our word splitting case, that isn't what we want. We want each word to be handled individually. `compute_multi` lets us tell Wallaroo that each of these words is a new message and should be handled individually.
 
-By using `compute_multi`, each word will be handled individually. This allows us to then route each one based on its first letter for counting. If you look below, you can see that our word partitioning function is expecting words, not a list, which makes sense.
+By using `computation_multi`, each word will be handled individually. This allows us to then route each one based on its first letter for counting. If you look below, you can see that our word partitioning function is expecting words, not a list, which makes sense.
 
 ```python
-class WordPartitionFunction(object):
-    def partition(self, data):
-        if data[0] >= 'a' or data[0] <= 'z':
-          return data[0]
-        else:
-          return "!"
+@wallaroo.partition
+def partition(data):
+    if data[0] >= 'a' or data[0] <= 'z':
+        return data[0]
+    else:
+        return "!"
 ```
 
 ### Our counting guts
 
-The next three classes are the core of our word counting application. By this point, our messages has been split into individual words and run through our `WordPartitionFunction` and will arrive at a state computation based on the first letter of the word.
+The next three classes are the core of our word counting application. By this point, our messages has been split into individual words and run through our `partition` function and will arrive at a state computation based on the first letter of the word.
 
-Let's take a look at we have. `CountWord` is a `StateComputation`. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
+Let's take a look at we have. `CountWord` is a State Computation. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
 
 ```python
-class CountWord():
-    def name(self):
-        return "Count Word"
+@wallaroo.state_computation(name="Count Word")
+def count_word(word, word_totals):
+    word_totals.update(word)
+    return (word_totals.get_count(word), True)
 
-    def compute(self, word, word_totals):
-        word_totals.update(word)
-        return (word_totals.get_count(word), True)
 
 class WordCount(object):
     def __init__(self, word, count):
@@ -184,9 +179,9 @@ class WordTotals(object):
 By this point, our word has almost made it to the end of the pipeline. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word and its count, and we format it into a single line of text that our receiver can record.
 
 ```python
-class Encoder(object):
-    def encode(self, data):
-        return data.word + " => " + str(data.count) + "\n"
+@wallaroo.encoder
+def encoder(data):
+    return data.word + " => " + str(data.count) + "\n"
 ```
 
 ### Running `word_count.py`

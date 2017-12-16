@@ -24,41 +24,28 @@ def application_setup(args):
 
     ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit")
     ab.new_pipeline("Celsius Conversion",
-                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
-    ab.to(Multiply)
-    ab.to(Add)
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
+                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+    ab.to(multiply)
+    ab.to(add)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()
 
 
-class Decoder(object):
-    def header_length(self):
-        return 4
-
-    def payload_length(self, bs):
-        return struct.unpack(">I", bs)[0]
-
-    def decode(self, bs):
-        return struct.unpack('>f', bs)[0]
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def decoder(bs):
+    return struct.unpack('>f', bs)[0]
 
 
-class Multiply(object):
-    def name(self):
-        return "multiply by 1.8"
-
-    def compute(self, data):
-        return data * 1.8
+@wallaroo.computation(name="multiply by 1.8")
+def multiply(data):
+    return data * 1.8
 
 
-class Add(object):
-    def name(self):
-        return "add 32"
-
-    def compute(self, data):
-        return data + 32
+@wallaroo.computation(name="add 32")
+def add(data):
+    return data + 32
 
 
-class Encoder(object):
-    def encode(self, data):
-        # data is a float
-        return struct.pack('>If', 4, data)
+@wallaroo.encoder
+def encoder(data):
+    return struct.pack('>If', 4, data)

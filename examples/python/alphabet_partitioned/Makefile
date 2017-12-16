@@ -45,6 +45,7 @@ integration-tests-examples-python-alphabet_partitioned: build-examples-python-al
 
 integration-tests-examples-python-alphabet_partitioned: alphabet_partitioned_py_test
 
+
 alphabet_partitioned_py_test:
 	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
 	python _test/gen.py && \
@@ -54,7 +55,28 @@ alphabet_partitioned_py_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command 'machida --application-module alphabet_partitioned' \
-		--sink-expect 1000
+		--sink-expect 1000 \
+		--workers 1
+	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida --application-module alphabet_partitioned' \
+		--sink-expect 1000 \
+		--workers 2
+	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida --application-module alphabet_partitioned' \
+		--sink-expect 1000 \
+		--workers 3
 
 clean-examples-python-alphabet-partitioned: alphabet_partitioned_py_clean
 
