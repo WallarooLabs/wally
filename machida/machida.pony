@@ -307,27 +307,13 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
     Machida.dec_ref(_source_decoder)
 
 class PyComputationBuilder
-  var _computation_class: Pointer[U8] val
+  var _computation: PyComputation val
 
-  new create(computation_class: Pointer[U8] val) =>
-    _computation_class = computation_class
+  new create(computation: Pointer[U8] val) =>
+    _computation = recover val PyComputation(computation) end
 
-  fun apply(): PyComputation iso^ =>
-    recover
-      PyComputation(@instantiate_python_class(_computation_class))
-    end
-
-  fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_computation_class)
-
-  fun _serialise(bytes: Pointer[U8] tag) =>
-    Machida.user_serialization(_computation_class, bytes)
-
-  fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _computation_class = recover Machida.user_deserialization(bytes) end
-
-  fun _final() =>
-    Machida.dec_ref(_computation_class)
+  fun apply(): PyComputation val =>
+    _computation
 
 class PyComputation is Computation[PyData val, PyData val]
   var _computation: Pointer[U8] val
@@ -576,15 +562,15 @@ primitive Machida
           source_config)
         source_idx = source_idx + 1
       | "to" =>
-        let computation_class = @PyTuple_GetItem(item, 1)
-        Machida.inc_ref(computation_class)
-        let builder = recover val PyComputationBuilder(computation_class) end
+        let computation = @PyTuple_GetItem(item, 1)
+        Machida.inc_ref(computation)
+        let builder = recover val PyComputationBuilder(computation) end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to[PyData val](builder)
       | "to_parallel" =>
-        let computation_class = @PyTuple_GetItem(item, 1)
-        Machida.inc_ref(computation_class)
-        let builder = recover val PyComputationBuilder(computation_class) end
+        let computation = @PyTuple_GetItem(item, 1)
+        Machida.inc_ref(computation)
+        let builder = recover val PyComputationBuilder(computation) end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_parallel[PyData val](builder)
       | "to_stateful" =>
@@ -842,20 +828,20 @@ primitive Machida
   fun user_serialization_get_size(o: Pointer[U8] tag): USize =>
     let r = @user_serialization_get_size(o)
     if (print_errors()) then
-      @printf[U32]("Serialization failed".cstring())
+      @printf[U32]("Serialization failed\n".cstring())
     end
     r
 
   fun user_serialization(o: Pointer[U8] tag, bs: Pointer[U8] tag) =>
     @user_serialization(o, bs)
     if (print_errors()) then
-      @printf[U32]("Serialization failed".cstring())
+      @printf[U32]("Serialization failed\n".cstring())
     end
 
   fun user_deserialization(bs: Pointer[U8] tag): Pointer[U8] val =>
     let r = @user_deserialization(bs)
     if (print_errors()) then
-      @printf[U32]("Deserialization failed".cstring())
+      @printf[U32]("Deserialization failed\n".cstring())
     end
     r
 
