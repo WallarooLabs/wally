@@ -60,4 +60,7 @@ script:
 deploy:
   skip_cleanup: true
   provider: script
-  script: travis/docker_release.sh
+  script: /bin/bash travis/docker_release.sh
+  on:
+    all_branches: true
+    condition: '$TRAVIS_BRANCH == "release" || $TRAVIS_BRANCH == *"release-"*'
