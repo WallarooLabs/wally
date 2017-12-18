@@ -2,7 +2,7 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [unreleased] - unreleased
+## [0.3.0] - 2017-12-18
 
 ### Fixed
 
@@ -19,8 +19,8 @@ All notable changes to Wallaroo will be documented in this file.
 - Add stateless partition shrink recalculation ([PR #1767](https://github.com/wallaroolabs/wallaroo/pull/1767))
 - Add full support for partition routing to newly joined worker ([PR #1730](https://github.com/wallaroolabs/wallaroo/pull/1730))
 - Shutdown cluster cleanly when SIGTERM or SIGINT is received ([PR #1705](https://github.com/wallaroolabs/wallaroo/pull/1705))
+
 ### Changed
 
 - Don't report a cluster as ready to work until node connection protocol has completed ([PR #1771](https://github.com/wallaroolabs/wallaroo/pull/1771))
 - Add Env as argument to source/sink builders ([PR #1734](https://github.com/wallaroolabs/wallaroo/pull/1734))
-- Changelog Hook Test 2 ([PR #1669](https://github.com/wallaroolabs/wallaroo/pull/1669))

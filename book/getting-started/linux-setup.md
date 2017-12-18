@@ -72,7 +72,7 @@ Now you need to install Pony compiler `ponyc`. Run:
 ```bash
 echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
 sudo apt-get update
-sudo apt-get -V install ponyc
+sudo apt-get -V install ponyc=0.21.0-4301.acd811b
 ```
 
 ## Installing pony-stable
@@ -131,7 +131,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Download the Metrics UI
 
 ```bash
-sudo docker pull wallaroolabs/wallaroo-metrics-ui:0.1
+sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.0
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -149,7 +149,7 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.2.2
+git checkout 0.3.0
 ```
 
 ## Compiling Machida

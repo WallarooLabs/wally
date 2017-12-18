@@ -61,6 +61,12 @@ COPY SUMMARY.md /wallaroo-src/
 COPY SUPPORT.md /wallaroo-src/
 COPY utils /wallaroo-src/utils/
 COPY docker/environment-setup.sh /wallaroo-src/
+COPY testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg \
+    /wallaroo-src/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg
+COPY testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg \
+    /wallaroo-src/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg
+COPY testing/data/market_spread/orders/350-symbols_orders-fixish.msg \
+    /wallaroo-src/testing/data/market_spread/orders/350-symbols_orders-fixish.msg
 
 WORKDIR /wallaroo-src
 
