@@ -132,14 +132,19 @@ def _test_autoscale_grow(command, worker_count=1):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, external_port, data_port = (
-            get_port_values(host, sources))
+        num_ports = sources + 3 + (2 * (workers - 1))
+        ports = get_port_values(num=num_ports, host=host)
+        (input_ports, (control_port, data_port, external_port),
+         worker_ports) = (ports[:sources],
+                          ports[sources:sources+3],
+                          zip(ports[-(2*(workers-1)):][::2],
+                              ports[-(2*(workers-1)):][1::2]))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
                       metrics_port, control_port, external_port, data_port,
-                      res_dir, workers)
+                      res_dir, workers, worker_ports)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
@@ -163,10 +168,13 @@ def _test_autoscale_grow(command, worker_count=1):
                                'period')
 
         # create a new worker and have it join
+        new_ports = get_port_values(num=(joiners * 2), host=host,
+                                    base_port=55000)
+        joiner_ports = zip(new_ports[::2], new_ports[1::2])
         for i in range(joiners):
             add_runner(runners, command, host, inputs, outputs, metrics_port,
                        control_port, external_port, data_port, res_dir,
-                       joiners)
+                       joiners, *joiner_ports[i])
 
         # Wait for runner to complete a log rotation
         join_checkers = []

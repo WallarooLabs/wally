@@ -779,20 +779,20 @@ class PipelineTestError(Exception):
     pass
 
 
-def get_port_values(host, sources):
-    port = 50000
-    source_ports = []
-    free_ports = []
-    target = sources
-    while len(source_ports) < sources:
-        if is_address_available(host, port):
-            source_ports.append(port)
-        port += 1
-    while len(free_ports) < 3:
-        if is_address_available(host, port):
-            free_ports.append(port)
-        port += 1
-    return source_ports, free_ports[0], free_ports[1], free_ports[2]
+def get_port_values(num=1, host='127.0.0.1', base_port=50000):
+    """
+    Get the requested number (default: 1) of free ports for a given host
+    (defult: '127.0.0.1'), starting from base_port (default: 50000).
+    """
+
+    ports = []
+
+    # Select source listener ports
+    while len(ports) < num:
+        if is_address_available(host, base_port):
+            ports.append(base_port)
+        base_port += 1
+    return ports
 
 
 BASE_COMMAND = r'''{command} \
@@ -803,6 +803,7 @@ BASE_COMMAND = r'''{command} \
     --resilience-dir {res_dir} \
     --name {{name}} \
     {{initializer_block}} \
+    {{worker_block}} \
     {{join_block}} \
     {{spike_block}} \
     {{alt_block}} \
@@ -813,6 +814,8 @@ INITIALIZER_CMD = r'''{worker_count} \
     --data {host}:{data_port} \
     --external {host}:{external_port} \
     --cluster-initializer'''
+WORKER_CMD = r'''--my-control {host}:{control_port} \
+    --my-data {host}:{data_port}'''
 JOIN_CMD = r'''--join {host}:{control_port} \
     {worker_count}'''
 WORKER_COUNT_CMD = r'''--worker-count {worker_count}'''
@@ -827,7 +830,8 @@ SPIKE_MARGIN = r'''--spike-margin {margin}'''
 
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
                   control_port, external_port, data_port, res_dir, workers,
-                  alt_block=None, alt_func=lambda x: False, spikes={}):
+                  worker_ports=[], alt_block=None, alt_func=lambda x: False,
+                  spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    host=host,
                                    inputs=inputs,
@@ -856,6 +860,7 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
             data_port=data_port,
             external_port=external_port,
             host=host),
+        worker_block='',
         join_block='',
         alt_block=alt_block if alt_func(x) else '',
         spike_block=spike_block)
@@ -872,6 +877,10 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
             spike_block = ''
         cmd = cmd_stub.format(name='worker{}'.format(x),
                               initializer_block='',
+                              worker_block=WORKER_CMD.format(
+                                  host=host,
+                                  control_port=worker_ports[x-1][0],
+                                  data_port=worker_ports[x-1][1]),
                               join_block='',
                               alt_block=alt_block if alt_func(x) else '',
                               spike_block=spike_block)
@@ -902,6 +911,7 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
 
 def add_runner(runners, command, host, inputs, outputs, metrics_port,
                control_port, external_port, data_port, res_dir, workers,
+               my_control_port, my_data_port,
                alt_block=None, alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    host=host,
@@ -929,13 +939,18 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
             seed=SPIKE_SEED.format(sc.seed) if sc.seed else '')
     else:
         spike_block = ''
+
     cmd = cmd_stub.format(name='worker{}'.format(x),
                           initializer_block='',
+                          worker_block=WORKER_CMD.format(
+                              host=host,
+                              control_port=my_control_port,
+                              data_port=my_data_port),
                           join_block=JOIN_CMD.format(
-                                host=host,
-                                control_port=control_port,
-                                worker_count=(WORKER_COUNT_CMD.format(
-                                    worker_count=workers) if workers else '')),
+                              host=host,
+                              control_port=control_port,
+                              worker_count=(WORKER_COUNT_CMD.format(
+                                  worker_count=workers) if workers else '')),
                           alt_block=alt_block if alt_func(x) else '',
                           spike_block=spike_block)
     runner = Runner(cmd_string=cmd,
@@ -1083,14 +1098,24 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             logging.debug("Attempt #%d to start workers with random listen"
                           " ports..." % attempt)
             try:
-                input_ports, control_port, external_port, data_port = (
-                    get_port_values(host, sources))
+                # Number of ports:
+                #             sources
+                #           + 3 for initializer [control, data, external]
+                #           + 2 * (workers - 1) [(my_control, my_data) for
+                #                                each remaining worker]
+                num_ports = sources + 3 + (2 * (workers - 1))
+                ports = get_port_values(num=num_ports, host=host)
+                (input_ports, (control_port, data_port, external_port),
+                 worker_ports) = (ports[:sources],
+                                  ports[sources:sources+3],
+                                  zip(ports[-(2*(workers-1)):][::2],
+                                      ports[-(2*(workers-1)):][1::2]))
                 inputs = ','.join(['{}:{}'.format(host, p) for p in
                                    input_ports])
                 start_runners(runners, command, host, inputs, outputs,
                               metrics_port, control_port, external_port,
                               data_port, resilience_dir, workers,
-                              spikes=spikes)
+                              worker_ports, spikes=spikes)
                 break
             except PipelineTestError as err:
                 # terminate runners, prepare to retry
