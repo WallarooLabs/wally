@@ -128,6 +128,9 @@ actor ApplicationDistributor is Distributor
       // Keep track of proxy ids per worker
       let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
 
+      // Keep track of workers that cannot be removed during shrink to fit
+      let non_shrinkable = recover trn SetIs[String] end
+
 
       @printf[I32](("Found " + application.pipelines.size().string() +
         " pipelines in application\n").cstring())
@@ -753,6 +756,10 @@ actor ApplicationDistributor is Distributor
                 steps(next_id) = worker
               end
 
+              // Since we've assigned at least one runner builder to this
+              // worker, it can't be shrunk under our current requirements.
+              non_shrinkable.set(worker)
+
               runner_builder_idx = runner_builder_idx + 1
             end
             // We've reached the end of this worker's runner builders for this
@@ -998,6 +1005,8 @@ actor ApplicationDistributor is Distributor
         end
       end
 
+      let non_shrinkable_to_send = consume val non_shrinkable
+
       // For each worker, generate a LocalTopology from its LocalGraph
       for (w, g) in local_graphs.pairs() do
         let p_ids = recover trn Map[String, U128] end
@@ -1020,7 +1029,7 @@ actor ApplicationDistributor is Distributor
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
               consume p_ids, default_target, application.default_state_name,
               application.default_target_id,
-              all_workers)
+              all_workers, non_shrinkable_to_send)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

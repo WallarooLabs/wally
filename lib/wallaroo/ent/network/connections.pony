@@ -66,7 +66,6 @@ actor Connections is Cluster
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
     d_host: String, d_service: String,
-    external_host: String, external_service: String,
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
     is_joining: Bool, spike_config: (SpikeConfig | None) = None,
@@ -93,22 +92,6 @@ actor Connections is Cluster
       _my_data_addr = (d_host, d_service)
     else
       create_control_connection("initializer", c_host, c_service)
-    end
-
-    if (external_host != "") or (external_service != "") then
-      match recovery_file_cleaner
-      | let rfc: RecoveryFileCleaner =>
-        let external_channel_notifier =
-          ExternalChannelListenNotifier(_worker_name, _auth, this, rfc)
-        let external_listener = TCPListener(_auth,
-          consume external_channel_notifier, external_host, external_service)
-        _register_listener(external_listener)
-      else
-        @printf[I32]("Need RecoveryFileCleaner to create external channel\n"
-          .cstring())
-      end
-      @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
-        external_host.cstring(), external_service.cstring())
     end
 
     _register_disposable(_metrics_conn)

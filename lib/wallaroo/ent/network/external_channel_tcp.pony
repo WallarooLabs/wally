@@ -30,14 +30,17 @@ class ExternalChannelListenNotifier is TCPListenNotify
   var _service: String = ""
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
+  let _local_topology_initializer: LocalTopologyInitializer
 
   new iso create(name: String, auth: AmbientAuth, connections: Connections,
-    recovery_file_cleaner: RecoveryFileCleaner)
+    recovery_file_cleaner: RecoveryFileCleaner,
+    local_topology_initializer: LocalTopologyInitializer)
   =>
     _auth = auth
     _worker_name = name
     _connections = connections
     _recovery_file_cleaner = recovery_file_cleaner
+    _local_topology_initializer = local_topology_initializer
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -59,22 +62,25 @@ class ExternalChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ExternalChannelConnectNotifier(_worker_name, _auth, _connections,
-      _recovery_file_cleaner)
+      _recovery_file_cleaner, _local_topology_initializer)
 
 class ExternalChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _worker_name: String
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
+  let _local_topology_initializer: LocalTopologyInitializer
   var _header: Bool = true
 
   new iso create(name: String, auth: AmbientAuth, connections: Connections,
-    recovery_file_cleaner: RecoveryFileCleaner)
+    recovery_file_cleaner: RecoveryFileCleaner,
+    local_topology_initializer: LocalTopologyInitializer)
   =>
     _auth = auth
     _worker_name = name
     _connections = connections
     _recovery_file_cleaner = recovery_file_cleaner
+    _local_topology_initializer = local_topology_initializer
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -128,10 +134,14 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("TODO: query %s node_names size %d num_nodes %d\n".cstring(),
             m.query.string().cstring(), m.node_names.size(), m.num_nodes)
           if m.query is true then
-            let wb = recover ref Writer end
-            let available: Array[String] = ["todo-flopsy"; "mopsy"; "cottontail"]
-            let todo_reply = ExternalMsgEncoder.shrink(false, available, available.size(), wb)?
-            conn.writev(todo_reply)
+            _local_topology_initializer.shrinkable_query(conn)
+          else
+            _local_topology_initializer.initiate_shrink(m.node_names,
+              m.num_nodes)
+            // let wb = recover ref Writer end
+            // let available: Array[String] = ["todo-flopsy"; "mopsy"; "cottontail"]
+            // let todo_reply = ExternalMsgEncoder.shrink(false, available, available.size(), wb)?
+            // conn.writev(todo_reply)
           end
         else
           @printf[I32](("Incoming External Message type not handled by " +
