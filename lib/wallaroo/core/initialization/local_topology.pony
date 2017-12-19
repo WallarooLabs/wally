@@ -37,6 +37,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/dag"
 use "wallaroo_labs/equality"
 use "wallaroo_labs/messages"
@@ -163,7 +164,7 @@ class val LocalTopology
   fun val remove_worker_names(ws: Array[String] val): LocalTopology =>
     let new_worker_names = recover trn Array[String] end
     for w in worker_names.values() do
-      if not ws.contains(w) then
+      if not ArrayHelpers[String].contains[String](ws, w) then
         new_worker_names.push(w)
       end
     end
@@ -316,14 +317,14 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   be initiate_shrink(target_workers: Array[String] val, shrink_count: USize) =>
     if target_workers.size() > 0 then
-      if are_valid_shrink_candidates(target_workers) then
+      if _are_valid_shrink_candidates(target_workers) then
         let remaining_workers = _remove_worker_names(target_workers)
         _router_registry.initiate_shrink(remaining_workers, target_workers)
       else
         @printf[I32]("**Invalid shrink targets!**\n".cstring())
       end
     elseif shrink_count > 0 then
-      let candidates = get_shrink_candidates(shrink_count)
+      let candidates = _get_shrink_candidates(shrink_count)
       if candidates.size() < shrink_count then
         @printf[I32]("**Only %s candidates are eligible for removal\n"
           .cstring(), candidates.size().string().cstring())
@@ -331,17 +332,21 @@ actor LocalTopologyInitializer is LayoutInitializer
         @printf[I32]("**%s candidates are eligible for removal\n"
           .cstring(), candidates.size().string().cstring())
       end
-      let remaining_workers = _remove_worker_names(candidates)
-      _router_registry.initiate_shrink(remaining_workers, candidates)
+      if candidates.size() > 0 then
+        let remaining_workers = _remove_worker_names(candidates)
+        _router_registry.initiate_shrink(remaining_workers, candidates)
+      else
+        @printf[I32]("**Cannot shrink 0 workers!**\n".cstring())
+      end
     else
       @printf[I32]("**Cannot shrink 0 workers!**\n".cstring())
     end
 
-  fun are_valid_shrink_candidates(candidates: Array[String] val): Bool =>
+  fun _are_valid_shrink_candidates(candidates: Array[String] val): Bool =>
     match _topology
     | let t: LocalTopology =>
       for c in candidates.values() do
-        if t.non_shrinkable.contains(c) then
+        if SetHelpers[String].contains[String](t.non_shrinkable, c) then
           return false
         end
       end
@@ -351,13 +356,13 @@ actor LocalTopologyInitializer is LayoutInitializer
       false
     end
 
-  fun get_shrink_candidates(count: USize): Array[String] val =>
+  fun _get_shrink_candidates(count: USize): Array[String] val =>
     let candidates = recover trn Array[String] end
     match _topology
     | let t: LocalTopology =>
       for w in t.worker_names.values() do
         if candidates.size() < count then
-          if not t.non_shrinkable.contains(w) then
+          if not SetHelpers[String].contains[String](t.non_shrinkable, w) then
             candidates.push(w)
           end
         end
@@ -388,10 +393,11 @@ actor LocalTopologyInitializer is LayoutInitializer
   fun ref _remove_worker_names(ws: Array[String] val): Array[String] val =>
     match _topology
     | let t: LocalTopology =>
-      t.remove_worker_names(ws)
+      let new_topology = t.remove_worker_names(ws)
+      _topology = new_topology
       _save_local_topology()
       _save_worker_names()
-      t.worker_names
+      new_topology.worker_names
     else
       Fail()
       recover val Array[String] end
@@ -1637,13 +1643,9 @@ actor LocalTopologyInitializer is LayoutInitializer
           available.push(w)
         end
       end
-      try
-        let query_reply = ExternalMsgEncoder.shrink(false, available,
-          available.size())?
-        conn.writev(query_reply)
-      else
-        Fail()
-      end
+      let query_reply = ExternalMsgEncoder.shrink(false, available,
+        available.size())
+      conn.writev(query_reply)
     else
       Fail()
     end

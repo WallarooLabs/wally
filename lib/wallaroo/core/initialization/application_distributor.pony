@@ -402,6 +402,8 @@ actor ApplicationDistributor is Distributor
           pipeline.source_listener_builder_builder(),
           source_pre_state_target_id)
 
+        non_shrinkable.set(initializer_name)
+
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() +
           " on source on initializer\n").cstring())
 
