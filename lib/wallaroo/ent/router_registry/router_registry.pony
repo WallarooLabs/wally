@@ -94,7 +94,7 @@ actor RouterRegistry
     _migration_target_ack_list.create()
 
   // For keeping track of leaving workers during an autoscale shrink
-  let _leaving_workers: SetIs[String] = _leaving_workers.create()
+  let _leaving_workers: _StringSet = _leaving_workers.create()
   // Used as a proxy for RouterRegistry when muting and unmuting sources
   // and data channel.
   // TODO: Probably change mute()/unmute() interface so we don't need this
@@ -634,6 +634,7 @@ actor RouterRegistry
     if (_step_waiting_list.size() == 0) then
       if _leaving_in_process then
         _send_leaving_worker_done_migrating()
+        _connections.shutdown()
       else
         _send_migration_batch_complete()
       end
@@ -804,6 +805,15 @@ actor RouterRegistry
     This should only be called on the worker contacted via an external
     message to initiate a shrink.
     """
+    @printf[I32]("~~~Initiating shrink~~~\n".cstring())
+    @printf[I32]("-- Remaining workers: \n".cstring())
+    for w in remaining_workers.values() do
+      @printf[I32]("-- -- %s\n".cstring(), w.cstring())
+    end
+    @printf[I32]("-- Leaving workers: \n".cstring())
+    for w in leaving_workers.values() do
+      @printf[I32]("-- -- %s\n".cstring(), w.cstring())
+    end
     _stop_the_world_in_process = true
     _stop_the_world_for_shrink()
     let timers = Timers

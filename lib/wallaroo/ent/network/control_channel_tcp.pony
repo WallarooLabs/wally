@@ -314,7 +314,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32](("Received BeginLeavingMigrationMsg on Control " +
             "Channel\n").cstring())
         end
-        _router_registry.prepare_shrink(m.remaining_workers, m.leaving_workers)
+        _router_registry.begin_leaving_migration(m.remaining_workers,
+          m.leaving_workers)
       | let m: PrepareShrinkMsg =>
         ifdef "trace" then
           @printf[I32](("Received PrepareShrinkMsg on Control " +

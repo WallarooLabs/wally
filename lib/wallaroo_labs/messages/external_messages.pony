@@ -130,23 +130,13 @@ primitive ExternalMsgEncoder
   =>
     _encode(_CleanShutdown(), msg, wb)
 
-  fun shrink(query: Bool, node_names: Array[String] = [],
-    num_nodes: USize = 0, wb: Writer = Writer): Array[ByteSeq] val ?
+  fun shrink(query: Bool, node_names: Array[String] = Array[String],
+    num_nodes: USize = 0, wb: Writer = Writer): Array[ByteSeq] val
   =>
     if (query is true) then
-      return _encode_shrink(_Shrink(), true, [], 0, wb)
+      return _encode_shrink(_Shrink(), true, Array[String], 0, wb)
     end
-    if (node_names.size() > 0) and (num_nodes > 0) then
-      error
-    end
-    if (num_nodes < 0) then
-      error
-    end
-    if (node_names.size() == 0) and (num_nodes == 0) then
-      _encode_shrink(_Shrink(), false, node_names, 1, wb)
-    else
-      _encode_shrink(_Shrink(), false, node_names, num_nodes, wb)
-    end
+    _encode_shrink(_Shrink(), false, node_names, num_nodes, wb)
 
 class BufferedExternalMsgEncoder
   let _buffer: Writer
@@ -334,9 +324,19 @@ class val ExternalShrinkMsg is ExternalMsg
   let query: Bool
   let node_names: Array[String] val
   let num_nodes: USize
+  var _header: Bool = true
 
   new val create(query': Bool,
     node_names': Array[String] val, num_nodes': USize) =>
     query = query'
     node_names = node_names'
     num_nodes = num_nodes'
+
+  fun string(): String =>
+    var nodes = "|"
+    for n in node_names.values() do
+      nodes = nodes + " " + n + " |"
+    end
+    "Query: " + query.string() + " Node count: " + num_nodes.string() +
+      "Nodes: " + nodes
+

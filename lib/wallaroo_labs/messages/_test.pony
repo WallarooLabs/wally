@@ -208,7 +208,7 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
     // Use Range so that num_nodes array size 0 is tested.
     for i in Range[USize](0, node_names.size()) do
       let e1: Array[ByteSeq] val =
-        ExternalMsgEncoder.shrink(false, node_names.slice(0, i), 0)?
+        ExternalMsgEncoder.shrink(false, node_names.slice(0, i), 0)
       // encode & decode are not symmetric -- we need to chop off
       // the first 4 bytes before we can decode.
       let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
@@ -232,7 +232,7 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
 
     // Use Range so that num_nodes = 0 is included
     for i in Range[USize](0, 4) do
-      let e1: Array[ByteSeq] val = ExternalMsgEncoder.shrink(false, [], i)?
+      let e1: Array[ByteSeq] val = ExternalMsgEncoder.shrink(false, [], i)
       let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
 
       match ExternalMsgDecoder(e1')?
@@ -250,7 +250,7 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
     end
 
     // Let's now try a round trip for a query
-    let e2: Array[ByteSeq] val = ExternalMsgEncoder.shrink(true, [], 0)?
+    let e2: Array[ByteSeq] val = ExternalMsgEncoder.shrink(true, [], 0)
     let e2': Array[U8] val = recover Help.flatten(e2).slice(4) end
 
     match ExternalMsgDecoder(e2')?
