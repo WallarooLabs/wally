@@ -1,4 +1,5 @@
-# Wallaroo
+![Wallaroo Logo](wallaroo-logo.png)
+---
 
 Wallaroo is a fast, elastic data processing engine that rapidly takes you from prototype to production by eliminating infrastructure complexity.
 
