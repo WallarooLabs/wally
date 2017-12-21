@@ -111,6 +111,8 @@ sender --host 127.0.0.1:7011 --file \
   --ponythreads=1 --ponynoblock --msg-size 46 --no-write
 ```
 
+This will run for a few seconds and then terminate.
+
 ### Shell 4
 
 Set `PATH` to refer to the directory that contains the `sender`  executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
@@ -129,6 +131,8 @@ sender --host 127.0.0.1:7011 --file \
   --batch-size 20 --interval 100_000_000 --messages 1000000 --binary \
   --repeat --ponythreads=1 --ponynoblock --msg-size 46 --no-write
 ```
+
+This will run until all 1,000,000 messages are processed, can be stopped by `ctrl-c`.
 
 Once you've started sending Market messages, go to the next section to start sending order messages.
 
@@ -150,6 +154,8 @@ sender --host 127.0.0.1:7010 --file \
   --batch-size 20 --interval 100_000_000 --messages 1000000 --binary \
   --repeat --ponythreads=1 --ponynoblock --msg-size 57 --no-write
 ```
+
+This will run until all 1,000,000 messages are processed, can be stopped by `ctrl-c`.
 
 ## Shutdown
 
