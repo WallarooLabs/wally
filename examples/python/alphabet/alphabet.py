@@ -40,6 +40,9 @@ def deserialize(bs):
 
 
 class LetterStateBuilder(object):
+    def name(self):
+        return "Letter State Builder"
+
     def build(self):
         return AllVotes()
 

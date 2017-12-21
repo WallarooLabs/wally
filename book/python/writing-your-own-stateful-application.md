@@ -77,6 +77,9 @@ Lastly, a stateful application's pipeline is going to need a `StateBuilder`, so 
 
 ```python
 class LetterStateBuilder(object):
+    def name(self):
+        return "Letter State Builder"
+
     def build(self):
         return AllVotes()
 ```

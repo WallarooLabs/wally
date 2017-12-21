@@ -358,6 +358,10 @@ AlphabetCounts(objects):
 
 A StateBuilder is used by Wallaroo to create an initial state object for a [StateComputation](#statecomputation).
 
+##### `name()`
+
+Return the name of the StateBuilder as a string.
+
 ##### `build()`
 
 Return a new [State](#state) instance.
@@ -368,6 +372,9 @@ Return a AlphabetCounts object initialized with a count of zero for each letter 
 
 ```python
 class StateBuilder(object):
+    def name(self):
+        return "Alphabet Counts State Builder"
+
     def build(self):
         return AlphabetCounts([(c, 0) for c in string.ascii_lowercase])
 ```
