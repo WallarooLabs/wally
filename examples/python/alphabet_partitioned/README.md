@@ -72,7 +72,7 @@ Run `machida` with `--application-module alphabet_partitioned` as an initializer
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --worker-count 2 --cluster-initializer \
-  --external 127.0.0.1:6002 --ponythreads=1 --ponynoblock
+  --external 127.0.0.1:5050 --ponythreads=1 --ponynoblock
 ```
 
 ### Shell 3
@@ -126,7 +126,7 @@ export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo
 You can shut down the cluster with this command once processing has finished:
 
 ```bash
-cluster_shutdown 127.0.0.1:6002
+cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down Giles Sender and Giles Receiver by pressing `Ctrl-c` from their respective shells.
