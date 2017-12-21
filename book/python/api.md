@@ -28,7 +28,7 @@ The recommended way to create your topology structure is by using the [Applicati
 
 ### Application Setup
 
-After Machida loaded a Wallaroo Python application module, it executes its entry point function: `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. Therefore, any Wallaroo Python application must provide this function.
+After Machida has loaded a Wallaroo Python application module, it executes its entry point function: `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. Therefore, any Wallaroo Python application must provide this function.
 
 The `wallaroo` module provides an [ApplicationBuilder](#wallarooapplicationbuilder) that facilitates the creation of this data structure. When `ApplicationBuilder` is used, a topology can be built using its methods, and then its structure can be return by calling `ApplicationBuilder.build()`.
 
