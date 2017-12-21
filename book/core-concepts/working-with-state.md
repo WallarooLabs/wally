@@ -13,17 +13,14 @@ class WordAndCount(object):
         self.count = count
 ```
 
-State computations allow you to read and write data to state objects. State computations have 3 inputs and 2 outputs. 
+State computations allow you to read and write data to state objects. State computations have 2 inputs and 2 outputs. 
 
 * State computation input:
   - The message to be processed
   - The state object we are operating on
-  - A state change repository
 * State computation output:
   - An optional output message
-  - An optional state change
-
-For the duration of this document, we're going to ignore the "state change repository" input and "optional state change" output as they are used by Wallaroo's resilience feature and you don't need to understand them to grasp the basics of how Wallaroo's state computations work. Remember when we said that state objects provide "safe, serialized access to data in a highly parallelized environment"? Let's take a look at what that means. 
+  - A boolean to indicate if we made any updates to the state object we operated on
 
 ## Thread Safety
 
