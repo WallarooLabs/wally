@@ -9,7 +9,6 @@
 * [State](book/core-concepts/state.md)
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Partitioning](book/core-concepts/partitioning.md)
-* [Clustered Wallaroo](book/core-concepts/clustering.md)
 
 ## Developing with Wallaroo
 * [Choosing an Installation Option](book/getting-started/choosing-an-installation-option.md)
@@ -65,6 +64,7 @@
 * [Debugging](book/python/debugging.md)
 
 ## Appendix
+* [Clustered Wallaroo](book/appendix/clustering.md)
 * [Wallaroo and Virtualenv](book/appendix/virtualenv.md)
 * [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)
 * [TCP Decoders and Encoders](book/appendix/tcp-decoders-and-encoders.md)
