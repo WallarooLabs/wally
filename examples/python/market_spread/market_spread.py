@@ -93,6 +93,9 @@ class SymbolData(object):
 
 
 class SymbolDataBuilder(object):
+    def name(self):
+        return "Symbol Data Builder"
+
     def build(self):
         return SymbolData(0.0, 0.0, True)
 
