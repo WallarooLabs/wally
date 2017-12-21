@@ -9,7 +9,6 @@
 * [State](book/core-concepts/state.md)
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Partitioning](book/core-concepts/partitioning.md)
-* [Decoders and Encoders](book/core-concepts/decoders-and-encoders.md)
 * [Clustered Wallaroo](book/core-concepts/clustering.md)
 
 ## Developing with Wallaroo
@@ -68,6 +67,7 @@
 ## Appendix
 * [Wallaroo and Virtualenv](book/appendix/virtualenv.md)
 * [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)
+* [TCP Decoders and Encoders](book/appendix/tcp-decoders-and-encoders.md)
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
 * [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)

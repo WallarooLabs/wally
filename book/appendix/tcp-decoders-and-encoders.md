@@ -1,34 +1,34 @@
-# Decoders and Encoders
+# TCP Decoders and Encoders
 
-Earlier, we spoke of [sources and sinks](core-concepts.md) and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s. Our examples will focus on TCP sources and sinks, but the same principles apply to any other type of source or sink.
+Earlier, we spoke of [sources and sinks](/core-concepts/core-concepts.md) and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s. 
 
 ## Reviewing our terms
 
 ### Source
 
-: Input point for data from external systems into an application.
+Input point for data from external systems into an application.
 
 ### Sink
 
-: Output point from an application to external systems.
+Output point from an application to external systems.
 
 ### Decoder
 
-: Code that transforms a stream of bytes from an external system
+Code that transforms a stream of bytes from an external system
 into a series of application input types.
 
 ### Encoder
 
-: Code that transforms an application output type into bytes for
+Code that transforms an application output type into bytes for
 sending to an external system.
 
 ## Framed Message Protocols
 
-A Wallaroo source accepts a stream of bytes from an external source and turns that stream of bytes into a stream of application specific messages. As an application programmer, you provide a `Decoder` to tell Wallaroo how to turn that stream of bytes into messages.
+A Wallaroo TCP Source accepts a stream of bytes from an external source and turns that stream of bytes into a stream of application specific messages. As an application programmer, you provide a `Decoder` to tell Wallaroo how to turn that stream of bytes into messages.
 
 An incoming stream of bytes can represent many things: each byte could be an 8-bit unsigned integer, or every 4-byte block may be a 32-bit integer. Or the stream may be an ASCII sequence (each byte is a char), or a Unicode sequence (in which case characters aren't equally-wide!).
 
-Decoders are unique to the type of source. Currently, we support TCP and Kafka sources. `TCPSource`s use a [framed message protocol](https://www.codeproject.com/Articles/37496/TCP-IP-Protocol-Design-Message-Framing). A framed message protocol boils down to:
+Decoders are unique to the type of source. `TCPSource`s use a [framed message protocol](https://www.codeproject.com/Articles/37496/TCP-IP-Protocol-Design-Message-Framing). A framed message protocol boils down to:
 
 - We have a fixed size header that tells us how long a message is
 - We have a variable length message payload 
@@ -51,7 +51,7 @@ Let's make that a bit more concrete. Let's say we are sending in two messages; e
 
 - 4-byte header whose value is `5`
 - 5-byte payload containing the binary representation of the ASCII string "first"
-- 4-byte header whose value is 9`
+- 4-byte header whose value is `9`
 - 9 byte payload containing the binary representation of the ASCII string "not first"
 
 ## Creating a Decoder
