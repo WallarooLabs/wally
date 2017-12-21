@@ -140,7 +140,7 @@ A `Computation` class must provide the `name` and `compute` methods.
 
 ##### `name()`
 
-Return the name of the computaiton as a string.
+Return the name of the computation as a string.
 
 ##### `compute(data)`
 
