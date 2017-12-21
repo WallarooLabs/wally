@@ -2,7 +2,8 @@
     "plugins": [
         "highlight",
         "footnote-string-to-number",
-        "ga"
+        "ga",
+        "codetabs"
     ],
 
     "structure": {

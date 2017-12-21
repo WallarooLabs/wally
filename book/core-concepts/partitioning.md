@@ -4,7 +4,7 @@ If all of the application state exists in one state object then only one computa
 
 For example, in an application that keeps track of stock prices, the application state might be a dictionary where the stock symbol is used to look up the price of the stock.
 
-```python
+{% codetabs name="Python", type="py" -%}
 class Stock(object):
     def __init__(self, symbol, price):
         self.symbol = symbol
@@ -18,11 +18,25 @@ class Stocks(object):
     def set(self, symbol, price):
         stock = self.stocks[symbol]
         stock.price = price
-```
+{%- language name="Go", type="go" -%}
+type Stock struct {
+  Symbol string
+  Price float64
+}
+
+type Stocks struct {
+  Stocks map[string]Stock
+}
+
+func (s *Stocks) Set(symbol string, price float64) {
+  stock := s[symbol]
+  stock.Price = price
+}
+{%- endcodetabs %}
 
 If a message came into the system with a new stock price, the computation would take that message, get the symbol and the price, and use them to update the state.
 
-```python
+{% codetabs name="Python", type="py" -%}
 class UpdateStock(object):
     def compute(self, stock, state):
         symbol = stock.symbol
@@ -30,7 +44,18 @@ class UpdateStock(object):
 
         state.set(symbol, price)
         return (None, True)
-```
+{%- language name="Go", type="go" -%}
+type UpdateStock struct {}
+
+func (us *UpdateStock) Compute(data interface{}, state interface{}) (interface{}, bool) {
+    stock := data.(*Stock)
+    stocks := state.(*Stocks)
+
+    stocks.Set(stock.Symbol, stock.Price)
+    return nil, true
+}
+{%- endcodetabs %}
+
 
 However, only one computation may access the state at a time, so in this cases messages are handled one at a time.
 
@@ -45,35 +70,62 @@ To do this, a _partition function_ is used to determine which _state part_ a par
 
 In order to take advantage of state partitioning, state objects need to be broken down. In the stock example there is already a class that represents an individual stock, so it can be used as the partitioned state.
 
-```python
+{% codetabs name="Python", type="py" -%}
 class Stock(object):
     def __init__(self, symbol, price):
         self.symbol = symbol
         self.price = price
-```
+{%- language name="Go", type="go" -%}
+type Stock struct {
+  Symbol string
+  Price float64
+}
+{%- endcodetabs %}
 
 Since the computation only has one stock in its state now, there is no need to do a dictionary look up. Instead, the computation can update the particular Stock's state right away.
 
-```python
+{% codetabs name="Python", type="py" -%}
 class UpdateStock(object):
     def compute(self, stock, state):
         state.symbol = stock.symbol
         state.price = stock.price
 
         return (None, True)
-```
+{%- language name="Go", type="go" -%}
+type UpdateStock struct {}
+
+func (us *UpdateStock) Compute(data interface{}, state interface{}) (interface{}, bool) {
+    stock := data.(*Stock)
+    state := state.(*Stock)
+
+    state.Symbol = stock.Symbol
+    state.Price = stock.Price
+
+    return nil, true
+{%- endcodetabs %}
 
 ### Partition Key
 
-Currently, the partition keys for a particular partition need to be defined along with the application. The specific details of keys vary between the different language APIs, but they are typically an object of some type that can support comparison and hashing. In the stock example, the partition key would be the symbol name (a string). All of the expected stock symbols are passed to the application setup code.
-
+Currently, the partition keys for a particular partition need to be defined along with the application. The specific details of keys vary between the different language APIs, but they are typically an object of some type that can support comparison and hashing. In the stock example, the partition key would be based on the symbol name (a string). All of the expected stock symbols are passed to the application setup code.
 
 ### Partition Function
 
 The partition function takes in message data and returns a partition key. In the example, the message symbol would be extracted from the message data and returned as the key.
 
-```python
+{% codetabs name="Python", type="py" -%}
 class SymbolPartitionFunction(object):
     def partition(self, data):
         return data.symbol
-```
+{%- language name="Go", type="go" -%}
+func symbolToKey(symbol string) uint64 {
+    return uint64(binary.BigEndian.Uint32([]byte(fmt.Sprintf("%4s", symbol))))
+}
+
+type SymbolPartitionFunction struct {
+}
+
+func (spf *SymbolPartitionFunction) Partition(data interface{}) uint64 {
+    symbol := data.(SymbolMessage).GetSymbol()
+    return symbolToKey(symbol)
+}
+{%- endcodetabs %}
