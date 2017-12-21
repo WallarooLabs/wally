@@ -132,7 +132,7 @@ sender --host 127.0.0.1:7011 --file \
   --repeat --ponythreads=1 --ponynoblock --msg-size 46 --no-write
 ```
 
-This will run until all 1,000,000 messages are processed, can be stopped by `ctrl-c`.
+This will run until all 1,000,000 messages are processed; it can be stopped by `ctrl-c`.
 
 Once you've started sending Market messages, go to the next section to start sending order messages.
 
@@ -155,7 +155,7 @@ sender --host 127.0.0.1:7010 --file \
   --repeat --ponythreads=1 --ponynoblock --msg-size 57 --no-write
 ```
 
-This will run until all 1,000,000 messages are processed, can be stopped by `ctrl-c`.
+This will run until all 1,000,000 messages are processed; it can be stopped by `ctrl-c`.
 
 ## Shutdown
 
