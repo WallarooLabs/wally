@@ -57,10 +57,7 @@ install:
 script:
   - bash travis/script.sh
 
-deploy:
-  skip_cleanup: true
-  provider: script
-  script: /bin/bash travis/docker_release.sh
-  on:
-    all_branches: true
-    condition: '$TRAVIS_BRANCH == "release" || $TRAVIS_BRANCH == *"release-"*'
+jobs:
+  include:
+    - stage: deploy
+      script: bash travis/docker_release.sh
