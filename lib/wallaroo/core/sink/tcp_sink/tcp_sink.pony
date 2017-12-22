@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "backpressure"
 use "buffered"
 use "collections"
 use "net"
@@ -149,7 +150,6 @@ actor TCPSink is Consumer
     _service = service
     _from = from
     _connect_count = 0
-    _mute_upstreams()
 
   //
   // Application Lifecycle events
@@ -162,7 +162,6 @@ actor TCPSink is Consumer
   be application_created(initializer: LocalTopologyInitializer,
     omni_router: OmniRouter)
   =>
-    _mute_upstreams()
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
@@ -795,6 +794,10 @@ actor TCPSink is Consumer
 
   fun ref _apply_backpressure() =>
     if not _throttled then
+      ifdef debug then
+        @printf[I32]("BACKPRESSURE tcp_sink: apply by %s:%s\n".cstring(),
+          _host.cstring(), _service.cstring())
+      end
       _throttled = true
       _writeable = false
       // this is safe because asio thread isn't currently subscribed
@@ -807,33 +810,38 @@ actor TCPSink is Consumer
 
   fun ref _release_backpressure() =>
     if _throttled then
+      ifdef debug then
+        @printf[I32]("BACKPRESSURE tcp_sink: release by %s:%s\n".cstring(),
+          _host.cstring(), _service.cstring())
+      end
       _throttled = false
       _notify.unthrottled(this)
       _maybe_mute_or_unmute_upstreams()
     end
 
   fun ref _maybe_mute_or_unmute_upstreams() =>
-    if _mute_outstanding then
-      if _can_send() then
-        _unmute_upstreams()
+    match _env.root
+    | None =>
+      Fail()
+    | let auth: AmbientAuth =>
+      if _mute_outstanding then
+        if _can_send() then
+          ifdef debug then
+            @printf[I32]("BACKPRESSURE tcp_sink: Backpressure.release by %s:%s\n".cstring(),
+              _host.cstring(), _service.cstring())
+          end
+          Backpressure.release(auth)
+        end
+      else
+        if not _can_send() then
+          ifdef debug then
+            @printf[I32]("BACKPRESSURE tcp_sink: Backpressure.apply by %s:%s\n".cstring(),
+              _host.cstring(), _service.cstring())
+          end
+          Backpressure.apply(auth)
+        end
       end
-    else
-      if not _can_send() then
-        _mute_upstreams()
-      end
     end
-
-  fun ref _mute_upstreams() =>
-    for u in _upstreams.values() do
-      u.mute(this)
-    end
-    _mute_outstanding = true
-
-  fun ref _unmute_upstreams() =>
-    for u in _upstreams.values() do
-      u.unmute(this)
-    end
-    _mute_outstanding = false
 
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable

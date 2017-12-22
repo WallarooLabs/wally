@@ -72,13 +72,6 @@ class TypedRoute[In: Any val] is Route
     end
     match data
     | let input: In =>
-      ifdef debug then
-        match _step
-        | let source: TCPSource ref =>
-          Invariant(not source.is_muted())
-        end
-      end
-
       _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
         msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
       true

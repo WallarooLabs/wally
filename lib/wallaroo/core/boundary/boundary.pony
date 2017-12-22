@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "backpressure"
 use "buffered"
 use "collections"
 use "net"
@@ -921,15 +922,19 @@ actor OutgoingBoundary is Consumer
     end
 
   fun ref _mute_upstreams() =>
-    for u in _upstreams.values() do
-      u.mute(this)
+    ifdef debug then
+      @printf[I32]("BACKPRESSURE boundary: Backpressure.apply by %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
     end
+    Backpressure.apply(_auth)
     _mute_outstanding = true
 
   fun ref _unmute_upstreams() =>
-    for u in _upstreams.values() do
-      u.unmute(this)
+    ifdef debug then
+      @printf[I32]("BACKPRESSURE tcp_sink: Backpressure.release by %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
     end
+    Backpressure.release(_auth)
     _mute_outstanding = false
 
   fun _can_send(): Bool =>

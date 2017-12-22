@@ -79,6 +79,7 @@ primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
     if state.letter == " " then state.letter = votes.letter end
     state.count = state.count + votes.count
 
+    @printf[I32]("AddVotes: letter %s (%d) count %d\n".cstring(), state.letter.clone().cstring(), state.letter.size(), state.count)
     (LetterTotal(state.letter, state.count), DirectStateChange)
 
   fun state_change_builders():
@@ -97,10 +98,13 @@ primitive VotesDecoder is FramedSourceHandler[Votes val]
     // Assumption: 1 byte for letter
     let letter = String.from_array(data.trim(0, 1))
     let count = Bytes.to_u32(data(1)?, data(2)?, data(3)?, data(4)?)
+    // @printf[I32]("DECODE: letter %s (%d) count %d\n".cstring(), letter.cstring(), letter.size(), count)
+    @printf[I32]("DECODE: letter %s (%d) count %d\n".cstring(), letter.clone().cstring(), letter.size(), count)
     Votes(letter, count.u64())
 
 primitive LetterPartitionFunction
   fun apply(votes: Votes val): String =>
+    @printf[I32]("PARTITION: letter %s (%d)\n".cstring(), votes.letter.clone().cstring())
     votes.letter
 
 class Votes
@@ -121,6 +125,8 @@ class LetterTotal
 
 primitive LetterTotalEncoder
   fun apply(t: LetterTotal val, wb: Writer = Writer): Array[ByteSeq] val =>
+    // @printf[I32]("ENCODE: letter %s (%d) count %d\n".cstring(), t.letter.cstring(), t.letter.size(), t.count)
+    @printf[I32]("ENCODE: letter %s (%d) count %d\n".cstring(), t.letter.clone().cstring(), t.letter.size(), t.count)
     wb.u32_be(9)
     wb.write(t.letter) // Assumption: letter is 1 byte
     wb.u64_be(t.count)

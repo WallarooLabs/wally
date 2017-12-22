@@ -88,8 +88,6 @@ actor ReconnectingMetricsSink
   var _read_len: USize = 0
   var _expect: USize = 0
 
-  var _muted: Bool = false
-
   var _reconnect_pause: U64
   var _application_name: String
   var _worker_name: String
@@ -243,17 +241,13 @@ actor ReconnectingMetricsSink
 
   be mute() =>
     """
-    Temporarily suspend reading off this TCPConnection until such time as
-    `unmute` is called.
+    NOOP.
     """
-    _muted = true
 
   be unmute() =>
     """
-    Start reading off this TCPConnection again after having been muted.
+    NOOP.
     """
-    _muted = false
-    _pending_reads()
 
   be set_notify(notify: MetricsSinkNotify iso) =>
     """
@@ -597,7 +591,7 @@ actor ReconnectingMetricsSink
 
       _read_len = _read_len + len.usize()
 
-      if (not _muted) and (_read_len >= _expect) then
+      if (_read_len >= _expect) then
         let data = _read_buf = recover Array[U8] end
         data.truncate(_read_len)
         _read_len = 0
@@ -637,7 +631,7 @@ actor ReconnectingMetricsSink
 
   fun ref _pending_reads() =>
     """
-    Unless this connection is currently muted, read while data is available,
+    Read while data is available,
     guessing the next packet length as we go. If we read 4 kb of data, send
     ourself a resume message and stop reading, to avoid starving other actors.
     """
@@ -646,10 +640,6 @@ actor ReconnectingMetricsSink
       var received_called: USize = 0
 
       while _readable and not _shutdown_peer do
-        if _muted then
-          return
-        end
-
         // Read as much data as possible.
         let len = @pony_os_recv[USize](
           _event,
@@ -718,20 +708,11 @@ actor ReconnectingMetricsSink
 
   fun ref close() =>
     """
-    Attempt to perform a graceful shutdown. Don't accept new writes. If the
-    connection isn't muted then we won't finish closing until we get a zero
-    length read.  If the connection is muted, perform a hard close and
-    shut down immediately.
+    Attempt to perform a graceful shutdown. Don't accept new writes.
+    We won't finish closing until we get a zero
+    length read.
     """
-    ifdef windows then
-      _close()
-    else
-      if _muted then
-        _hard_close()
-      else
-       _close()
-     end
-    end
+     _close()
 
   fun ref _close() =>
     _closed = true

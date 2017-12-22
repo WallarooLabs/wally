@@ -76,12 +76,6 @@ class BoundaryRoute is Route
     latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64): Bool
   =>
-    ifdef debug then
-      match _step
-      | let source: TCPSource ref =>
-        Invariant(not source.is_muted())
-      end
-    end
     ifdef "trace" then
       @printf[I32]("Rcvd msg at BoundaryRoute (%s)\n".cstring(),
         _step_type.cstring())

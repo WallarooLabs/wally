@@ -89,7 +89,7 @@ def _test_autoscale_grow(command, worker_count=1):
     workers = 1
     joiners = worker_count - workers
     res_dir = '/tmp/res-data'
-    expect = 2000
+    expect = 2002
 
     patterns_i = ([re.escape(r'***Worker worker{} attempting to join the '
                              r'cluster. Sent necessary information.***'
@@ -112,7 +112,7 @@ def _test_autoscale_grow(command, worker_count=1):
 
         char_gen = cycle(lowercase)
         char_1000 = [next(char_gen) for i in range(1000)]
-        char_2000 = [next(char_gen) for i in range(1000)]
+        char_2000 = [next(char_gen) for i in range(1002)]
         expected = Counter(char_1000 + char_2000)
 
         reader1 = Reader(iter_generator(char_1000,
@@ -122,6 +122,7 @@ def _test_autoscale_grow(command, worker_count=1):
 
         await_values = [pack('>IsQ', 9, c, v) for c, v in
                         expected.items()]
+        #### await_values.append('SLF yo fail the test')
 
         # Start sink and metrics, and get their connection info
         sink.start()
@@ -153,9 +154,9 @@ def _test_autoscale_grow(command, worker_count=1):
         if runner_ready_checker.error:
             raise runner_ready_checker.error
 
-        # start sender1
-        sender1 = Sender(host, input_ports[0], reader1, batch_size=10,
-                        interval=0.05)
+        # start sender1, must run at least 2 seconds for metrics check to succeed
+        sender1 = Sender(host, input_ports[0], reader1, batch_size=100,
+                        interval=0.25)
         sender1.start()
 
         # wait until sender1 completes (~5 seconds)
@@ -197,9 +198,9 @@ def _test_autoscale_grow(command, worker_count=1):
                     .format(jc.runner_name, jc.timeout, outputs))
 
 
-        # Start sender2
-        sender2 = Sender(host, input_ports[0], reader2, batch_size=10,
-                         interval=0.05)
+        # Start sender2, must run at least 2 seconds for metrics check to succeed
+        sender2 = Sender(host, input_ports[0], reader2, batch_size=100,
+                         interval=0.25)
         sender2.start()
 
         # wait until sender2 completes (~5 seconds)
@@ -216,6 +217,10 @@ def _test_autoscale_grow(command, worker_count=1):
         stopper.start()
         stopper.join()
         if stopper.error:
+            for r in runners:
+                print r.name
+                print r.get_output()[0]
+                print '---'
             raise stopper.error
 
         # stop application workers

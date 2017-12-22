@@ -250,18 +250,6 @@ actor DataReceiver is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  be mute(c: Consumer) =>
-    match _latest_conn
-    | let conn: DataChannel =>
-      conn.mute(c)
-    end
-
-  be unmute(c: Consumer) =>
-    match _latest_conn
-    | let conn: DataChannel =>
-      conn.unmute(c)
-    end
-
 
 trait _DataReceiverProcessingPhase
   fun data_connect() =>

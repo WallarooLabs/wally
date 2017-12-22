@@ -219,11 +219,11 @@ class Ring[A: Any val]
     for x in Range[USize](0, _size - _buf.size()) do
       a.push(fill)
     end
-    let s: Array[U8] iso = recover Array[U8] end
+    let s: String iso = recover iso String end
     s.append("[")
     s.append(delim.join((consume a).reverse().values()))
     s.append("]")
-    String.from_array(consume s)
+    s
 
 class RingKeys[A: Any val, B: Ring[A] #read] is Iterator[USize]
   let _ring: B

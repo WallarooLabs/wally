@@ -403,14 +403,10 @@ actor Step is (Producer & Consumer)
     _upstreams.unset(producer)
 
   be mute(c: Consumer) =>
-    for u in _upstreams.values() do
-      u.mute(c)
-    end
+    None
 
   be unmute(c: Consumer) =>
-    for u in _upstreams.values() do
-      u.unmute(c)
-    end
+    None
 
   ///////////////
   // GROW-TO-FIT
