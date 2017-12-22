@@ -306,7 +306,7 @@ The `KafkaSourceDecoder` is responsible for converting bytes into an object that
 
 To do this, a `KafkaSourceDecoder` class must implement the following method:
 
-##### `decode(self, bs)`
+##### `decode(data)`
 
 Return Python object of the type the next step in the pipeline expects.
 
@@ -318,10 +318,10 @@ A complete KafkaSourceDecoder example that decodes messages with a 32-bit unsign
 
 ```python
 class Decoder(object):
-    def decode(self, bs):
-        if len(bs) < 4:
+    def decode(self, data):
+        if len(data) < 4:
           return 0.0
-        return struct.unpack('>I', bs[:4])[0]
+        return struct.unpack('>I', data[:4])[0]
 ```
 
 ### State
@@ -338,8 +338,6 @@ An AlphabetCounts keeps a count for how many times each letter in the English al
 
 ```python
 import copy
-
-...
 
 AlphabetCounts(objects):
     def __init__(self, initial_counts):
