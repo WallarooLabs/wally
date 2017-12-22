@@ -596,7 +596,6 @@ class Reader(object):
         self.overflow = out.raw.read()
         return r
 
-
 class Runner(threading.Thread):
     """
     Run a shell application with command line arguments and save its stdout
@@ -691,12 +690,18 @@ class Runner(threading.Thread):
             pass
 
     def get_output(self):
-        self.stdout_file.seek(0)
-        self.stderr_file.seek(0)
-        return (self.stdout_file.read(), self.stderr_file.read())
+        self.stdout_file.flush()
+        self.stderr_file.flush()
+        stdout_fh = open(self.stdout_file.name, 'rb')
+        stderr_fh = open(self.stderr_file.name, 'rb')
+        try:
+            return (stdout_fh.read(), stdout_fh.read())
+        finally:
+            stdout_fh.close()
+            stderr_fh.close()
 
     def respawn(self):
-        return Runner(self.cmd_string, self.name)
+        return Runner(self.cmd_string, self.name, self.tcp_listen_ports)
 
 
 class RunnerReadyChecker(StoppableThread):
@@ -788,7 +793,7 @@ class PipelineTestError(Exception):
 def get_port_values(num=1, host='127.0.0.1', base_port=20000):
     """
     Get the requested number (default: 1) of free ports for a given host
-    (defult: '127.0.0.1'), starting from base_port (default: 50000).
+    (default: '127.0.0.1'), starting from base_port (default: 20000).
     """
 
     ports = []
@@ -1135,6 +1140,12 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 # terminate runners, prepare to retry
                 for r in runners:
                     r.stop()
+                print '\nError: %s. Runner output below.\n' % err
+                for r in runners:
+                    print '==='
+                    print 'Runner: ', r.name
+                    print '---'
+                    print r.get_output()[0]
                 raise err
                 runners = []
                 runners_err = err
@@ -1252,8 +1263,10 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 topo_type = int(topo_type)
             assert(workers == topo_type)
         except Exception as err:
-            print 'runner output'
+            print 'runner output: stdout'
             print stdout
+            print 'runner output: stderr'
+            print stderr
             raise err
 
         if validate_file:
