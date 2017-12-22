@@ -300,17 +300,17 @@ class Encoder(object):
         return (word, letter_key)
 ```
 
-### KafakSourceDecoder
+### KafkaSourceDecoder
 
-The `TCPSourceDecoder` is responsible for converting bytes into an object that the rest of the application can process.
+The `KafkaSourceDecoder` is responsible for converting bytes into an object that the rest of the application can process.
 
 To do this, a `KafkaSourceDecoder` class must implement the following method:
 
-##### `decode(bs)`
+##### `decode(self, bs)`
 
 Return Python object of the type the next step in the pipeline expects.
 
-`bs` is a `bytes` of the length returned by [payload_length](#payload-length(bs)), and it is up to the developer to translate that into a Python object.
+`data` is a `bytes` object representing the incoming Kafka message, and it is up to the developer to translate that into a Python object.
 
 #### Example KafkaSourceDecoder
 
@@ -319,7 +319,9 @@ A complete KafkaSourceDecoder example that decodes messages with a 32-bit unsign
 ```python
 class Decoder(object):
     def decode(self, bs):
-        return struct.unpack('>1sL', bs)
+        if len(bs) < 4:
+          return 0.0
+        return struct.unpack('>I', bs[:4])[0]
 ```
 
 ### State
