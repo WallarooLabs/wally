@@ -147,7 +147,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             raise stopper.error
 
@@ -174,17 +174,17 @@ def _test_log_rotation_external_trigger_no_recovery(command):
             assert(success)
         except AssertionError:
             print runners[0].name
-            print runners[0].get_output()[0]
+            print runners[0].get_output()
             print '---'
             print runners[1].name
-            print runners[1].get_output()[0]
+            print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate all workers underwent log rotation
         for r in runners[1:]:
-            stdout, stderr = r.get_output()
+            stdout = r.get_output()
             try:
                 assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
                        is not None)
@@ -318,7 +318,7 @@ def _test_log_rotation_external_trigger_recovery(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             raise stopper.error
 
@@ -345,17 +345,17 @@ def _test_log_rotation_external_trigger_recovery(command):
             assert(success)
         except AssertionError:
             print runners[0].name
-            print runners[0].get_output()[0]
+            print runners[0].get_output()
             print '---'
             print runners[1].name
-            print runners[1].get_output()[0]
+            print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate all workers underwent log rotation
         r = runners[1]
-        stdout, stderr = r.get_output()
+        stdout = r.get_output()
         try:
             assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
                    is not None)
@@ -369,17 +369,16 @@ def _test_log_rotation_external_trigger_recovery(command):
                                  % (1, r.name, log_rotated_pattern, stdout))
         # Validate worker actually underwent recovery
         pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."
-        stdout, stderr = runners[-1].get_output()
+        stdout = runners[-1].get_output()
         try:
             assert(re.search(pattern, stdout) is not None)
         except AssertionError:
             raise AssertionError('Worker %d.%r does not appear to have '
                                  'performed recovery as expected. Worker '
                                  'output is '
-                                 'included below.\nSTDOUT\n---\n%s\n---\n'
-                                 'STDERR\n---\n%s'
+                                 'included below.\nSTDOUT\n---\n%s'
                                  % (len(runners)-1, runners[-1].name,
-                                    stdout, stderr))
+                                    stdout))
     finally:
         for r in runners:
             r.stop()
@@ -477,7 +476,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             raise stopper.error
 
@@ -502,16 +501,16 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         try:
             assert(success)
         except AssertionError:
-            print runners[0].get_output()[0]
+            print runners[0].get_output()
             print '---'
-            print runners[1].get_output()[0]
+            print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate all workers underwent log rotation
         for r in runners:
-            stdout, stderr = r.get_output()
+            stdout = r.get_output()
             try:
                 assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
                        is not None)
@@ -635,7 +634,7 @@ def _test_log_rotation_file_size_trigger_recovery(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             raise stopper.error
 
@@ -661,17 +660,17 @@ def _test_log_rotation_file_size_trigger_recovery(command):
             assert(success)
         except AssertionError:
             print runners[-1].name
-            print runners[-1].get_output()[0]
+            print runners[-1].get_output()
             print '---'
             print runners[-2].name
-            print runners[-2].get_output()[0]
+            print runners[-2].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate worker underwent log rotation, but not initializer
         i, r = 1, runners[1]
-        stdout, stderr = r.get_output()
+        stdout = r.get_output()
         try:
             assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
                    is not None)
@@ -687,14 +686,14 @@ def _test_log_rotation_file_size_trigger_recovery(command):
 
         # Validate worker actually underwent recovery
         pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."
-        stdout, stderr = runners[-1].get_output()
+        stdout = runners[-1].get_output()
         try:
             assert(re.search(pattern, stdout) is not None)
         except AssertionError:
             raise AssertionError('Worker does not appear to have performed '
                                  'recovery as expected. Worker output is '
-                                 'included below.\nSTDOUT\n---\n%s\n---\n'
-                                 'STDERR\n---\n%s' % (stdout, stderr))
+                                 'included below.\nSTDOUT\n---\n%s'
+                                 % stdout)
     finally:
         for r in runners:
             r.stop()

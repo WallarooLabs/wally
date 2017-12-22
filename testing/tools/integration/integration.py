@@ -600,10 +600,10 @@ class Reader(object):
 class Runner(threading.Thread):
     """
     Run a shell application with command line arguments and save its stdout
-    and stderr to in-memory buffers.
+    and stderr to a temporoary file.
 
-    `get_output` may be used to get a tuple of BufferedReader for STDOUT and
-    STDERR respectively, after the runner has been stopped via `stop()`.
+    `get_output` may be used to get the entire output text up to the present,
+    as well as after the runner has been stopped via `stop()`.
     """
     def __init__(self, cmd_string, name):
         super(Runner, self).__init__()
@@ -611,8 +611,7 @@ class Runner(threading.Thread):
         self.cmd_string = cmd_string
         self.cmd_args = shlex.split(cmd_string)
         self.error = None
-        self.stderr_file = tempfile.NamedTemporaryFile()
-        self.stdout_file = tempfile.NamedTemporaryFile()
+        self.file = tempfile.NamedTemporaryFile()
         self.p = None
         self.name = name
 
@@ -621,8 +620,8 @@ class Runner(threading.Thread):
             logging.info("{}: Running:\n{}".format(self.name,
                                                    self.cmd_string))
             self.p = subprocess.Popen(args=self.cmd_args,
-                                      stdout=self.stdout_file,
-                                      stderr=self.stdout_file)
+                                      stdout=self.file,
+                                      stderr=subprocess.STDOUT)
             self.p.wait()
         except Exception as err:
             self.error = err
@@ -642,9 +641,9 @@ class Runner(threading.Thread):
             pass
 
     def get_output(self):
-        self.stdout_file.seek(0)
-        self.stderr_file.seek(0)
-        return (self.stdout_file.read(), self.stderr_file.read())
+        self.file.flush()
+        with open(self.file.name, 'rb') as ro:
+            return ro.read()
 
     def respawn(self):
         return Runner(self.cmd_string, self.name)
@@ -658,7 +657,7 @@ class RunnerReadyChecker(StoppableThread):
         super(RunnerReadyChecker, self).__init__()
         self.runners = runners
         self.name = self.__base_name__
-        self._path = self.runners[0].stdout_file.name
+        self._path = self.runners[0].file.name
         self.timeout = timeout
         self.error = None
 
@@ -677,7 +676,7 @@ class RunnerReadyChecker(StoppableThread):
                         self.stop()
                         break
                 if time.time() - started > self.timeout:
-                    outputs = [(r.name, r.get_output()[0]) for r in
+                    outputs = [(r.name, r.get_output()) for r in
                                self.runners]
                     outputs = '\n===\n'.join(('\n---\n'.join(t) for t in
                                               outputs))
@@ -696,7 +695,7 @@ class RunnerChecker(StoppableThread):
         super(RunnerChecker, self).__init__()
         self.name = self.__base_name__
         self.runner_name = runner.name
-        self._path = runner.stdout_file.name
+        self._path = runner.file.name
         self.timeout = timeout
         self.error = None
         if isinstance(patterns, (list, tuple)):
@@ -896,11 +895,10 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
         try:
             assert(r.is_alive())
         except Exception as err:
-            stdout, stderr = r.get_output()
+            stdout = r.get_output()
             raise PipelineTestError(
                     "Runner %d of %d has exited with an error: "
-                    "\n---\n%s\n---\n%s" % (idx+1, len(runners), stdout,
-                                            stderr))
+                    "\n---\n%s" % (idx+1, len(runners), stdout))
         try:
             assert(r.error is None)
         except Exception as err:
@@ -965,11 +963,10 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
     try:
         assert(runner.is_alive())
     except Exception as err:
-        stdout, stderr = runner.get_output()
+        stdout = runner.get_output()
         raise PipelineTestError(
                 "Runner %d of %d has exited with an error: "
-                "\n---\n%s\n---\n%s" % (x+1, len(runners), stdout,
-                                        stderr))
+                "\n---\n%s" % (x+1, len(runners), stdout))
     try:
         assert(runner.error is None)
     except Exception as err:
@@ -1159,7 +1156,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                         "\nworker output is attached below.\n"
                                         "\n---START OUTPUT\n%s\n---END OUTPUT"
                                         % (sender.error,
-                                           '\n---\n'.join([r.get_output()[0]
+                                           '\n---\n'.join([r.get_output()
                                                            for r in runners])))
         logging.debug('All senders completed sending.')
         # Use sink, metrics, or a timer to determine when to stop the
@@ -1183,7 +1180,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                         print '==='
                         print 'Runner: ', r.name
                         print '---'
-                        print r.get_output()[0]
+                        print r.get_output()
                     raise stopper.error
         elif sink_await:
             if sink_stop_timeout is None:
@@ -1205,7 +1202,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                         print '==='
                         print 'Runner: ', r.name
                         print '---'
-                        print r.get_output()[0]
+                        print r.get_output()
                     raise stopper.error
 
         elif delay:
@@ -1227,7 +1224,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         logging.debug('Begin validation phase...')
         # Use initializer's outputs to validate topology is set up correctly
         check_initializer = re.compile(r'([\w\d]+) worker topology')
-        stdout, stderr = runners[0].get_output()
+        stdout = runners[0].get_output()
         try:
             m = check_initializer.search(stdout)
             assert(m is not None)

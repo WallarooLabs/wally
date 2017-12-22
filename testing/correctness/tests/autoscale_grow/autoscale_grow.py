@@ -189,7 +189,7 @@ def _test_autoscale_grow(command, worker_count=1):
                 print('RunnerChecker error for Join check on {}'
                       .format(jc.runner_name))
 
-                outputs = [(r.name, r.get_output()[0]) for r in runners]
+                outputs = [(r.name, r.get_output()) for r in runners]
                 outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
                 raise TimeoutError(
                     'Worker {} join timed out in {} '
@@ -251,7 +251,7 @@ def _test_autoscale_grow(command, worker_count=1):
             try:
                 assert(len(filtered) > 0)
             except AssertionError:
-                outputs = [(r.name, r.get_output()[0]) for r in runners]
+                outputs = [(r.name, r.get_output()) for r in runners]
                 outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
                 raise AssertionError('{} did not process any data! '
                                      'Worker outputs are included below:'
@@ -262,7 +262,7 @@ def _test_autoscale_grow(command, worker_count=1):
         try:
             validate(sink.data, expected)
         except AssertionError:
-            outputs = [(r.name, r.get_output()[0]) for r in runners]
+            outputs = [(r.name, r.get_output()) for r in runners]
             outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
             raise AssertionError('Validation failed on expected output. '
                                  'Worker outputs are included below:'

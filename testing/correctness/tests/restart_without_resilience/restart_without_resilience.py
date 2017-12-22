@@ -125,7 +125,7 @@ def _test_restart(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             print 'sink data'
             print sink.data
@@ -141,14 +141,14 @@ def _test_restart(command):
 
         # Validate worker actually underwent recovery
         pattern_restarting = "Restarting a listener ..."
-        stdout, stderr = runners[-1].get_output()
+        stdout = runners[-1].get_output()
         try:
             assert(re.search(pattern_restarting, stdout) is not None)
         except AssertionError:
             raise AssertionError('Worker does not appear to have reconnected '
                                  'as expected. Worker output is '
-                                 'included below.\nSTDOUT\n---\n%s\n---\n'
-                                 'STDERR\n---\n%s' % (stdout, stderr))
+                                 'included below.\nSTDOUT\n---\n%s'
+                                 % stdout)
     finally:
         for r in runners:
             r.stop()

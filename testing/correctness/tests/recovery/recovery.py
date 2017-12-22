@@ -147,23 +147,23 @@ def _test_recovery(command):
         try:
             assert(success)
         except AssertionError:
-            print runners[-1].get_output()[0]
+            print runners[-1].get_output()
             print '---'
-            print runners[-2].get_output()[0]
+            print runners[-2].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate worker actually underwent recovery
         pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."
-        stdout, stderr = runners[-1].get_output()
+        stdout = runners[-1].get_output()
         try:
             assert(re.search(pattern, stdout) is not None)
         except AssertionError:
             raise AssertionError('Worker does not appear to have performed '
                                  'recovery as expected. Worker output is '
-                                 'included below.\nSTDOUT\n---\n%s\n---\n'
-                                 'STDERR\n---\n%s' % (stdout, stderr))
+                                 'included below.\nSTDOUT\n---\n%s'
+                                 % stdout)
 
     finally:
         for r in runners:

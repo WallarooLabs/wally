@@ -491,7 +491,7 @@ def CLI():
                 logging.info("Validation command '%s' completed successfully",
                              ' '.join(cmd))
         else:
-            outputs = [(o[0], o[1][0]) for o in outputs]
+            outputs = [(o[0], o[1]) for o in outputs]
             outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
             logging.error("Application outputs:\n===\n{}\n===\n"
                           .format(outputs))
