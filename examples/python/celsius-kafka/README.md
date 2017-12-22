@@ -25,7 +25,7 @@ In order to run the application you will need Machida, Giles Sender, and the Clu
 
 You will also need access to a Kafka cluster. This example assumes that there is a Kafka broker listening on port `9092` on `127.0.0.1`.
 
-Note: If running in Docker, the kafkfa cluster and kafkacat should be run from your host and not within the Docker container.
+**NOTE:** If running in Docker, the kafkfa cluster and kafkacat should be run from your host and not within the Docker container.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius-kafka` directory.
 
@@ -47,7 +47,7 @@ sudo chmod +x /usr/local/bin/docker-compose
 MacOS: Docker compose is already included as part of Docker for Mac.
 
 
-NOTE: You might need to run with sudo depending on how you set up Docker.
+**NOTE:** You might need to run with sudo depending on how you set up Docker.
 
 Clone local-kafka-cluster project and run it:
 
@@ -64,7 +64,7 @@ docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
   1 # to create a test-out topic; change arguments as desired
 ```
 
-Note: The `./cluster up 1` command outputs `Host IP used for Kafka Brokers is <YOUR_HOST_IP>`. You will need to use this IP address for the `kafka_source_brokers` and `kafka_sink_brokers` arguments when starting `machida` within Docker in order to communicate with the cluster running on your host machine.
+**Note:** The `./cluster up 1` command outputs `Host IP used for Kafka Brokers is <YOUR_HOST_IP>`. You will need to use this IP address for the `kafka_source_brokers` and `kafka_sink_brokers` arguments when starting `machida` within Docker in order to communicate with the cluster running on your host machine.
 
 #### Set up a listener to monitor the Kafka topic to which you would the application to publish results. We usually use `kafkacat`.
 
@@ -87,6 +87,8 @@ To run `kafkacat` to listen to the `test-out` topic:
 ```bash
 kafkacat -C -b 127.0.0.1:9092 -t test-out > celsius.out
 ```
+
+**NOTE:** If you are running `kafkacat` from within the Docker container, you will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 1.
 
 ### Shell 2
 

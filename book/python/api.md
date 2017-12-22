@@ -300,17 +300,17 @@ class Encoder(object):
         return (word, letter_key)
 ```
 
-### KafakSourceDecoder
+### KafkaSourceDecoder
 
-The `TCPSourceDecoder` is responsible for converting bytes into an object that the rest of the application can process.
+The `KafkaSourceDecoder` is responsible for converting bytes into an object that the rest of the application can process.
 
 To do this, a `KafkaSourceDecoder` class must implement the following method:
 
-##### `decode(bs)`
+##### `decode(data)`
 
 Return Python object of the type the next step in the pipeline expects.
 
-`bs` is a `bytes` of the length returned by [payload_length](#payload-length(bs)), and it is up to the developer to translate that into a Python object.
+`data` is a `bytes` object representing the incoming Kafka message, and it is up to the developer to translate that into a Python object.
 
 #### Example KafkaSourceDecoder
 
@@ -318,8 +318,10 @@ A complete KafkaSourceDecoder example that decodes messages with a 32-bit unsign
 
 ```python
 class Decoder(object):
-    def decode(self, bs):
-        return struct.unpack('>1sL', bs)
+    def decode(self, data):
+        if len(data) < 4:
+          return 0.0
+        return struct.unpack('>I', data[:4])[0]
 ```
 
 ### State
@@ -328,8 +330,6 @@ State is an object that is passed to the [StateCompution's](#statecomputation) `
 
 A common issue that arises with asynchronous execution, is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
 
-e.g. if the state is a list of immutable objects, consider returning a shallow copy of it via `list(my_list)`.
-
 In either case, it is up to the developer to provide a side-effect safe value for the Computation to return!
 
 #### Example State
@@ -337,6 +337,8 @@ In either case, it is up to the developer to provide a side-effect safe value fo
 An AlphabetCounts keeps a count for how many times each letter in the English alphabet has been seen
 
 ```python
+import copy
+
 AlphabetCounts(objects):
     def __init__(self, initial_counts):
         self.data = dict(initial_counts)
@@ -346,8 +348,8 @@ AlphabetCounts(objects):
         return self.data[c]
 
     def get_counts(self):
-        # Return a shallow copy of the data dict
-        return dict(self.data)
+        # Return a deep copy of the data dict
+        return copy.deepcopy(self.data)
 
     def get_count(self, c):
         # int is safe to return as is!
@@ -357,6 +359,10 @@ AlphabetCounts(objects):
 ### StateBuilder
 
 A StateBuilder is used by Wallaroo to create an initial state object for a [StateComputation](#statecomputation).
+
+##### `name()`
+
+Return the name of the StateBuilder as a string.
 
 ##### `build()`
 
@@ -368,6 +374,9 @@ Return a AlphabetCounts object initialized with a count of zero for each letter 
 
 ```python
 class StateBuilder(object):
+    def name(self):
+        return "Alphabet Counts State Builder"
+
     def build(self):
         return AlphabetCounts([(c, 0) for c in string.ascii_lowercase])
 ```

@@ -8,6 +8,14 @@ There are a few applications/tools which are required to be installed before you
 
 In order to compile the Wallaroo example applications, your system will need to have approximately 6 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
 
+## Update apt-get
+
+Ensures you'll have the latest available packages:
+
+```bash
+sudo apt-get update
+```
+
 ## Installing git
 
 If you do not already have Git installed, install it:
@@ -131,7 +139,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Download the Metrics UI
 
 ```bash
-sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.0
+sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.1
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -149,7 +157,7 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.3.0
+git checkout 0.3.1
 ```
 
 ## Compiling Machida

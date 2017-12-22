@@ -83,6 +83,9 @@ class WordCount(object):
 
 
 class WordTotalsBuilder(object):
+    def name(self):
+        return "Word Totals Builder"
+
     def build(self):
         return WordTotals()
 
