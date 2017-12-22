@@ -328,8 +328,6 @@ State is an object that is passed to the [StateCompution's](#statecomputation) `
 
 A common issue that arises with asynchronous execution, is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
 
-e.g. if the state is a list of immutable objects, consider returning a shallow copy of it via `list(my_list)`.
-
 In either case, it is up to the developer to provide a side-effect safe value for the Computation to return!
 
 #### Example State
@@ -337,6 +335,10 @@ In either case, it is up to the developer to provide a side-effect safe value fo
 An AlphabetCounts keeps a count for how many times each letter in the English alphabet has been seen
 
 ```python
+import copy
+
+...
+
 AlphabetCounts(objects):
     def __init__(self, initial_counts):
         self.data = dict(initial_counts)
@@ -346,8 +348,8 @@ AlphabetCounts(objects):
         return self.data[c]
 
     def get_counts(self):
-        # Return a shallow copy of the data dict
-        return dict(self.data)
+        # Return a deep copy of the data dict
+        return copy.deepcopy(self.data)
 
     def get_count(self, c):
         # int is safe to return as is!
