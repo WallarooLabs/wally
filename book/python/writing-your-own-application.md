@@ -90,7 +90,7 @@ An application is constructed of pipelines which, in turn, are constructed from 
 ```python
 ab = wallaroo.ApplicationBuilder("Reverse Word")
 ab.new_pipeline("reverse",
-                wallaroo.TCPSourceConfig("localhost", "7002", Decoder()))
+                wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
 ```
 
 Each pipeline must have a source, and each source must have a decoder, so `new_pipeline` takes a name and a `TCPSourceConfig` instance as its arguments.
