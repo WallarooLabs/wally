@@ -605,7 +605,8 @@ class Runner(threading.Thread):
     `get_output` may be used to get a tuple of BufferedReader for STDOUT and
     STDERR respectively, after the runner has been stopped via `stop()`.
     """
-    def __init__(self, cmd_string, name):
+
+    def __init__(self, cmd_string, name, tcp_listen_ports=[], tcp_listen_timeout=None):
         super(Runner, self).__init__()
         self.daemon = True
         self.cmd_string = cmd_string
@@ -613,21 +614,69 @@ class Runner(threading.Thread):
         self.error = None
         self.stderr_file = tempfile.NamedTemporaryFile()
         self.stdout_file = tempfile.NamedTemporaryFile()
+        logging.info("stderr_file = %s stdout_file = %s" % (self.stderr_file.name, self.stdout_file.name))
         self.p = None
         self.name = name
+        self.tcp_listen_ports = tcp_listen_ports
+        self.tcp_listen_timeout = tcp_listen_timeout
+        logging.info('DBG: runner %s cmd %s' % (self.name, self.cmd_string))
 
-    def run(self):
+    def run(self, tcp_listen_timeout=5):
         try:
             logging.info("{}: Running:\n{}".format(self.name,
                                                    self.cmd_string))
             self.p = subprocess.Popen(args=self.cmd_args,
                                       stdout=self.stdout_file,
                                       stderr=self.stdout_file)
+            if self.tcp_listen_timeout != None:
+                tcp_listen_timeout = self.tcp_listen_timeout
             self.p.wait()
         except Exception as err:
             self.error = err
             logging.warn("{}: Stopped running!".format(self.name))
             raise err
+
+    def poll_tcp_port(self, host, port, deadline):
+        sock = None
+        try:
+            while True:
+                timeout = min(deadline - time.time(), 0.25)
+                if timeout < 0:
+                    # If we really raise an error here, then we will interrupt
+                    # the start of this Runner, and the rest of the harness
+                    # won't be able to harvest the output from the Runner
+                    # process.  So, we'll print our error here and return
+                    # something not dangerous.
+                    print 'poll: Timeout connecting to %s:%d' % (host, port)
+                    return False
+                try:
+                    sock = socket.create_connection((host, port), timeout)
+                    return True
+                except socket.timeout:
+                    time.sleep(0.05)
+                except socket.error as err:
+                    if isinstance(err, str):
+                        raise PipelineTestError('Unknown socket error to %s:%d : %s' %
+                                                    (host, port, err))
+                    else:
+                        (errno_n, errno_str) = err
+                        ## OS X:
+                        ## 61=ECONNREFUSED, 22=EINVAL, 35=EAGAIN, 4=EINTR
+                        ## Linux:
+                        ## 111=ECONNREFUSED, 22=EINVAL, 11=EAGAIN, 4=EINTR
+                        if errno_n == 61 or errno_n == 22 or errno_n == 35 or \
+                           errno_n == 4 or errno_n == 111:
+                            time.sleep(0.05)
+                        else:
+                            raise PipelineTestError('Unknown socket error to %s:%d : %d %s' %
+                                                    (host, port, errno_n, errno_str))
+        finally:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+                sock.close()
+            except:
+                None
+
 
     def stop(self):
         try:
@@ -688,58 +737,6 @@ class RunnerReadyChecker(StoppableThread):
                     self.stop()
                     break
 
-
-class RunnerChecker(StoppableThread):
-    __base_name__ = 'RunnerChecker'
-
-    def __init__(self, runner, patterns, timeout=30):
-        super(RunnerChecker, self).__init__()
-        self.name = self.__base_name__
-        self.runner_name = runner.name
-        self._path = runner.stdout_file.name
-        self.timeout = timeout
-        self.error = None
-        if isinstance(patterns, (list, tuple)):
-            self.patterns = patterns
-        else:
-            self.patterns = [pattern]
-        self.compiled = [re.compile(p) for p in patterns]
-
-    def run(self):
-        with open(self._path, 'rb') as r:
-            last_match = 0
-            started = time.time()
-            while not self.stopped():
-                r.seek(last_match)
-                stdout = r.read()
-                if not stdout:
-                    time.sleep(0.1)
-                    continue
-                else:
-                    match = self.compiled[0].search(stdout)
-                    if match:
-                        logging.debug('Pattern %r found in runner STDOUT.'
-                                      % match.re.pattern)
-                        self.compiled.pop(0)
-                        last_match = 0
-                        if self.compiled:
-                            continue
-                        self.stop()
-                        break
-                if time.time() - started > self.timeout:
-                    r.seek(0)
-                    stdout = r.read()
-                    self.error = TimeoutError(
-                        'Runner {!r} did not have patterns {!r}'
-                        ' after {} '
-                        'seconds. It had the following output:\n---\n{}'
-                        .format(self.runner_name,
-                                [rx.pattern for rx in self.compiled],
-                                self.timeout, stdout))
-                    self.stop()
-                    break
-
-
 def ex_validate(cmd):
     """
     Run a shell command, wait for it to exit.
@@ -761,25 +758,34 @@ def setup_resilience_path(res_dir):
     for f in os.listdir(res_dir):
         os.remove(os.path.join(res_dir, f))
 
+class PortsTracker(Exception):
+    def __init__(self):
+        self.used_ports = {}
+        try:
+            p = subprocess.Popen(args=['sh', '-c',
+                'netstat -na | egrep "^tcp" | awk "{print \$4}" | ' +
+                'sed "s/.*[:.]//"'],
+                stdout=subprocess.PIPE)
+            while True:
+                (in_str, out_ignored) = p.communicate()
+                for port in string.split(in_str, '\n'):
+                    self.used_ports[int(port)] = True
+        except:
+            None
+        logging.info('DBG: used_ports = %s' % self.used_ports)
 
-def is_address_available(host, port):
-    """
-    Test whether a (host, port) pair is free
-    """
-    try:
-        s = socket.socket()
-        s.bind((host, port))
-        s.close()
-        return True
-    except:
-        return False
+    def is_address_available(self, port):
+        """
+        Test whether a (host, port) pair is free
+        """
+        return not self.used_ports.get(port, False)
 
 
 class PipelineTestError(Exception):
     pass
 
 
-def get_port_values(num=1, host='127.0.0.1', base_port=50000):
+def get_port_values(num=1, host='127.0.0.1', base_port=20000):
     """
     Get the requested number (default: 1) of free ports for a given host
     (defult: '127.0.0.1'), starting from base_port (default: 50000).
@@ -788,8 +794,9 @@ def get_port_values(num=1, host='127.0.0.1', base_port=50000):
     ports = []
 
     # Select source listener ports
+    tracker = PortsTracker()
     while len(ports) < num:
-        if is_address_available(host, base_port):
+        if tracker.is_address_available(base_port):
             ports.append(base_port)
         base_port += 1
     return ports
@@ -864,7 +871,8 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
         join_block='',
         alt_block=alt_block if alt_func(x) else '',
         spike_block=spike_block)
-    runners.append(Runner(cmd_string=cmd, name='initializer'))
+    runners.append(Runner(cmd_string=cmd, name='initializer',
+                          tcp_listen_ports=[external_port]))
     for x in range(1, workers):
         if x in spikes:
             logging.info("Enabling spike for worker{}".format(x))
@@ -885,12 +893,18 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
                               alt_block=alt_block if alt_func(x) else '',
                               spike_block=spike_block)
         runners.append(Runner(cmd_string=cmd,
-                              name='worker{}'.format(x)))
+                              name='worker{}'.format(x),
+                              tcp_listen_ports=[worker_ports[x-1][0]]))
 
-    # start the workers, 50ms apart
+    # start the workers
     for idx, r in enumerate(runners):
+        deadline = time.time() + 8.0
         r.start()
-        time.sleep(0.05)
+        for port in r.tcp_listen_ports:
+            port_status = r.poll_tcp_port('localhost', port, deadline)
+            if not port_status:
+                raise PipelineTestError('poll for localhost:%d failed' % port)
+        logging.info('DBG: runner start poll done for %s: %s' % (r.name, r.tcp_listen_ports))
 
         # check the runners haven't exited with any errors
         try:
@@ -954,12 +968,12 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
                           alt_block=alt_block if alt_func(x) else '',
                           spike_block=spike_block)
     runner = Runner(cmd_string=cmd,
-                    name='worker{}'.format(x))
+                    name='worker{}'.format(x),
+                    tcp_listen_ports=[my_control_port, my_data_port])
     runners.append(runner)
 
     # start the new worker
     runner.start()
-    time.sleep(0.05)
 
     # check the runner hasn't exited with any errors
     try:
