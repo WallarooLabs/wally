@@ -600,10 +600,10 @@ class Reader(object):
 class Runner(threading.Thread):
     """
     Run a shell application with command line arguments and save its stdout
-    and stderr to in-memory buffers.
+    and stderr to a temporoary file.
 
-    `get_output` may be used to get a tuple of BufferedReader for STDOUT and
-    STDERR respectively, after the runner has been stopped via `stop()`.
+    `get_output` may be used to get the entire output text up to the present,
+    as well as after the runner has been stopped via `stop()`.
     """
     def __init__(self, cmd_string, name):
         super(Runner, self).__init__()
@@ -611,8 +611,7 @@ class Runner(threading.Thread):
         self.cmd_string = cmd_string
         self.cmd_args = shlex.split(cmd_string)
         self.error = None
-        self.stderr_file = tempfile.NamedTemporaryFile()
-        self.stdout_file = tempfile.NamedTemporaryFile()
+        self.file = tempfile.NamedTemporaryFile()
         self.p = None
         self.name = name
 
@@ -621,8 +620,8 @@ class Runner(threading.Thread):
             logging.info("{}: Running:\n{}".format(self.name,
                                                    self.cmd_string))
             self.p = subprocess.Popen(args=self.cmd_args,
-                                      stdout=self.stdout_file,
-                                      stderr=self.stdout_file)
+                                      stdout=self.file,
+                                      stderr=subprocess.STDOUT)
             self.p.wait()
         except Exception as err:
             self.error = err
@@ -642,9 +641,9 @@ class Runner(threading.Thread):
             pass
 
     def get_output(self):
-        self.stdout_file.seek(0)
-        self.stderr_file.seek(0)
-        return (self.stdout_file.read(), self.stderr_file.read())
+        self.file.flush()
+        with open(self.file.name, 'rb') as ro:
+            return ro.read()
 
     def respawn(self):
         return Runner(self.cmd_string, self.name)
@@ -658,7 +657,7 @@ class RunnerReadyChecker(StoppableThread):
         super(RunnerReadyChecker, self).__init__()
         self.runners = runners
         self.name = self.__base_name__
-        self._path = self.runners[0].stdout_file.name
+        self._path = self.runners[0].file.name
         self.timeout = timeout
         self.error = None
 
@@ -677,7 +676,7 @@ class RunnerReadyChecker(StoppableThread):
                         self.stop()
                         break
                 if time.time() - started > self.timeout:
-                    outputs = [(r.name, r.get_output()[0]) for r in
+                    outputs = [(r.name, r.get_output()) for r in
                                self.runners]
                     outputs = '\n===\n'.join(('\n---\n'.join(t) for t in
                                               outputs))
@@ -696,7 +695,7 @@ class RunnerChecker(StoppableThread):
         super(RunnerChecker, self).__init__()
         self.name = self.__base_name__
         self.runner_name = runner.name
-        self._path = runner.stdout_file.name
+        self._path = runner.file.name
         self.timeout = timeout
         self.error = None
         if isinstance(patterns, (list, tuple)):
@@ -779,20 +778,20 @@ class PipelineTestError(Exception):
     pass
 
 
-def get_port_values(host, sources):
-    port = 50000
-    source_ports = []
-    free_ports = []
-    target = sources
-    while len(source_ports) < sources:
-        if is_address_available(host, port):
-            source_ports.append(port)
-        port += 1
-    while len(free_ports) < 3:
-        if is_address_available(host, port):
-            free_ports.append(port)
-        port += 1
-    return source_ports, free_ports[0], free_ports[1], free_ports[2]
+def get_port_values(num=1, host='127.0.0.1', base_port=20000):
+    """
+    Get the requested number (default: 1) of free ports for a given host
+    (default: '127.0.0.1'), starting from base_port (default: 20000).
+    """
+
+    ports = []
+
+    # Select source listener ports
+    while len(ports) < num:
+        if is_address_available(host, base_port):
+            ports.append(base_port)
+        base_port += 1
+    return ports
 
 
 BASE_COMMAND = r'''{command} \
@@ -803,6 +802,7 @@ BASE_COMMAND = r'''{command} \
     --resilience-dir {res_dir} \
     --name {{name}} \
     {{initializer_block}} \
+    {{worker_block}} \
     {{join_block}} \
     {{spike_block}} \
     {{alt_block}} \
@@ -813,6 +813,8 @@ INITIALIZER_CMD = r'''{worker_count} \
     --data {host}:{data_port} \
     --external {host}:{external_port} \
     --cluster-initializer'''
+WORKER_CMD = r'''--my-control {host}:{control_port} \
+    --my-data {host}:{data_port}'''
 JOIN_CMD = r'''--join {host}:{control_port} \
     {worker_count}'''
 WORKER_COUNT_CMD = r'''--worker-count {worker_count}'''
@@ -827,7 +829,8 @@ SPIKE_MARGIN = r'''--spike-margin {margin}'''
 
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
                   control_port, external_port, data_port, res_dir, workers,
-                  alt_block=None, alt_func=lambda x: False, spikes={}):
+                  worker_ports=[], alt_block=None, alt_func=lambda x: False,
+                  spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    host=host,
                                    inputs=inputs,
@@ -856,6 +859,7 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
             data_port=data_port,
             external_port=external_port,
             host=host),
+        worker_block='',
         join_block='',
         alt_block=alt_block if alt_func(x) else '',
         spike_block=spike_block)
@@ -872,6 +876,10 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
             spike_block = ''
         cmd = cmd_stub.format(name='worker{}'.format(x),
                               initializer_block='',
+                              worker_block=WORKER_CMD.format(
+                                  host=host,
+                                  control_port=worker_ports[x-1][0],
+                                  data_port=worker_ports[x-1][1]),
                               join_block='',
                               alt_block=alt_block if alt_func(x) else '',
                               spike_block=spike_block)
@@ -887,11 +895,10 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
         try:
             assert(r.is_alive())
         except Exception as err:
-            stdout, stderr = r.get_output()
+            stdout = r.get_output()
             raise PipelineTestError(
                     "Runner %d of %d has exited with an error: "
-                    "\n---\n%s\n---\n%s" % (idx+1, len(runners), stdout,
-                                            stderr))
+                    "\n---\n%s" % (idx+1, len(runners), stdout))
         try:
             assert(r.error is None)
         except Exception as err:
@@ -902,6 +909,7 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
 
 def add_runner(runners, command, host, inputs, outputs, metrics_port,
                control_port, external_port, data_port, res_dir, workers,
+               my_control_port, my_data_port,
                alt_block=None, alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    host=host,
@@ -929,13 +937,18 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
             seed=SPIKE_SEED.format(sc.seed) if sc.seed else '')
     else:
         spike_block = ''
+
     cmd = cmd_stub.format(name='worker{}'.format(x),
                           initializer_block='',
+                          worker_block=WORKER_CMD.format(
+                              host=host,
+                              control_port=my_control_port,
+                              data_port=my_data_port),
                           join_block=JOIN_CMD.format(
-                                host=host,
-                                control_port=control_port,
-                                worker_count=(WORKER_COUNT_CMD.format(
-                                    worker_count=workers) if workers else '')),
+                              host=host,
+                              control_port=control_port,
+                              worker_count=(WORKER_COUNT_CMD.format(
+                                  worker_count=workers) if workers else '')),
                           alt_block=alt_block if alt_func(x) else '',
                           spike_block=spike_block)
     runner = Runner(cmd_string=cmd,
@@ -950,11 +963,10 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
     try:
         assert(runner.is_alive())
     except Exception as err:
-        stdout, stderr = runner.get_output()
+        stdout = runner.get_output()
         raise PipelineTestError(
                 "Runner %d of %d has exited with an error: "
-                "\n---\n%s\n---\n%s" % (x+1, len(runners), stdout,
-                                        stderr))
+                "\n---\n%s" % (x+1, len(runners), stdout))
     try:
         assert(runner.error is None)
     except Exception as err:
@@ -1083,14 +1095,24 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             logging.debug("Attempt #%d to start workers with random listen"
                           " ports..." % attempt)
             try:
-                input_ports, control_port, external_port, data_port = (
-                    get_port_values(host, sources))
+                # Number of ports:
+                #             sources
+                #           + 3 for initializer [control, data, external]
+                #           + 2 * (workers - 1) [(my_control, my_data) for
+                #                                each remaining worker]
+                num_ports = sources + 3 + (2 * (workers - 1))
+                ports = get_port_values(num=num_ports, host=host)
+                (input_ports, (control_port, data_port, external_port),
+                 worker_ports) = (ports[:sources],
+                                  ports[sources:sources+3],
+                                  zip(ports[-(2*(workers-1)):][::2],
+                                      ports[-(2*(workers-1)):][1::2]))
                 inputs = ','.join(['{}:{}'.format(host, p) for p in
                                    input_ports])
                 start_runners(runners, command, host, inputs, outputs,
                               metrics_port, control_port, external_port,
                               data_port, resilience_dir, workers,
-                              spikes=spikes)
+                              worker_ports, spikes=spikes)
                 break
             except PipelineTestError as err:
                 # terminate runners, prepare to retry
@@ -1134,7 +1156,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                         "\nworker output is attached below.\n"
                                         "\n---START OUTPUT\n%s\n---END OUTPUT"
                                         % (sender.error,
-                                           '\n---\n'.join([r.get_output()[0]
+                                           '\n---\n'.join([r.get_output()
                                                            for r in runners])))
         logging.debug('All senders completed sending.')
         # Use sink, metrics, or a timer to determine when to stop the
@@ -1158,7 +1180,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                         print '==='
                         print 'Runner: ', r.name
                         print '---'
-                        print r.get_output()[0]
+                        print r.get_output()
                     raise stopper.error
         elif sink_await:
             if sink_stop_timeout is None:
@@ -1180,7 +1202,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                         print '==='
                         print 'Runner: ', r.name
                         print '---'
-                        print r.get_output()[0]
+                        print r.get_output()
                     raise stopper.error
 
         elif delay:
@@ -1202,7 +1224,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         logging.debug('Begin validation phase...')
         # Use initializer's outputs to validate topology is set up correctly
         check_initializer = re.compile(r'([\w\d]+) worker topology')
-        stdout, stderr = runners[0].get_output()
+        stdout = runners[0].get_output()
         try:
             m = check_initializer.search(stdout)
             assert(m is not None)

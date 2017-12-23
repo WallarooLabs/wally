@@ -74,14 +74,19 @@ def _test_restart(command):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, external_port, data_port = (
-            get_port_values(host, sources))
+        num_ports = sources + 3 + (2 * (workers - 1))
+        ports = get_port_values(num=num_ports, host=host)
+        (input_ports, (control_port, data_port, external_port),
+         worker_ports) = (ports[:sources],
+                          ports[sources:sources+3],
+                          zip(ports[-(2*(workers-1)):][::2],
+                              ports[-(2*(workers-1)):][1::2]))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
                       metrics_port, control_port, external_port, data_port,
-                      res_dir, workers)
+                      res_dir, workers, worker_ports)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
@@ -120,7 +125,7 @@ def _test_restart(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             print 'sink data'
             print sink.data
@@ -136,14 +141,14 @@ def _test_restart(command):
 
         # Validate worker actually underwent recovery
         pattern_restarting = "Restarting a listener ..."
-        stdout, stderr = runners[-1].get_output()
+        stdout = runners[-1].get_output()
         try:
             assert(re.search(pattern_restarting, stdout) is not None)
         except AssertionError:
             raise AssertionError('Worker does not appear to have reconnected '
                                  'as expected. Worker output is '
-                                 'included below.\nSTDOUT\n---\n%s\n---\n'
-                                 'STDERR\n---\n%s' % (stdout, stderr))
+                                 'included below.\nSTDOUT\n---\n%s'
+                                 % stdout)
     finally:
         for r in runners:
             r.stop()
