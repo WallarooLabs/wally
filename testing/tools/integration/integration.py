@@ -781,7 +781,7 @@ class PipelineTestError(Exception):
 def get_port_values(num=1, host='127.0.0.1', base_port=20000):
     """
     Get the requested number (default: 1) of free ports for a given host
-    (defult: '127.0.0.1'), starting from base_port (default: 50000).
+    (default: '127.0.0.1'), starting from base_port (default: 20000).
     """
 
     ports = []

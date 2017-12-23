@@ -169,7 +169,7 @@ def _test_autoscale_grow(command, worker_count=1):
 
         # create a new worker and have it join
         new_ports = get_port_values(num=(joiners * 2), host=host,
-                                    base_port=55000)
+                                    base_port=25000)
         joiner_ports = zip(new_ports[::2], new_ports[1::2])
         for i in range(joiners):
             add_runner(runners, command, host, inputs, outputs, metrics_port,
