@@ -68,10 +68,10 @@
 ### Setting up Your Environment
 
 * [Setting up Your Environment](book/go/getting-started/setup.md)
-  * [MacOS Installation](book/getting-started/macos-setup.md)
-  * [Ubuntu Installation](book/getting-started/linux-setup.md)
-* [Run a Wallaroo Go Application](book/getting-started/run-a-wallaroo-go-application.md)
-* [Conclusion](book/getting-started/conclusion.md)
+  * [MacOS Installation](book/go/getting-started/macos-setup.md)
+  * [Ubuntu Installation](book/go/getting-started/linux-setup.md)
+* [Run a Wallaroo Go Application](book/go/getting-started/run-a-wallaroo-go-application.md)
+* [Conclusion](book/go/getting-started/conclusion.md)
 
 ### Wallaroo Go API
 * [Go API Introduction](book/go/api/intro.md)
