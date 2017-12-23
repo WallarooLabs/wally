@@ -50,6 +50,7 @@
    * [UserFunctions](book/cpp/api/user-functions.md)
 -->
 
+## Wallaroo with Python
 ### Wallaroo Python API
 * [Python API Introduction](book/python/intro.md)
 * [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
@@ -62,6 +63,24 @@
 
 ### Debugging Python Wallaroo Applications
 * [Debugging](book/python/debugging.md)
+
+## Wallaroo with Go
+### Setting up Your Environment
+
+* [Setting up Your Environment](book/go/getting-started/setup.md)
+  * [MacOS Installation](book/getting-started/macos-setup.md)
+  * [Ubuntu Installation](book/getting-started/linux-setup.md)
+* [Run a Wallaroo Go Application](book/getting-started/run-a-wallaroo-go-application.md)
+* [Conclusion](book/getting-started/conclusion.md)
+
+### Wallaroo Go API
+* [Go API Introduction](book/go/api/intro.md)
+* [Writing Your Own Application](book/go/api/writing-your-own-application.md)
+* [Writing Your Own Stateful Application](book/go/api/writing-your-own-stateful-application.md)
+* [Word Count](book/go/word-count.md)
+* [Interworker Serialization and Resilience](book/go/api/interworker-serialization-and-resilience.md)
+* [Start A Go Project](book/go/api/start-a-project.md)
+* [Wallaroo Go API](book/go/api/api.md)
 
 ## Appendix
 * [Clustered Wallaroo](book/appendix/clustering.md)

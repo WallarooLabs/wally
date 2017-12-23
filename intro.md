@@ -9,7 +9,7 @@ Welcome to the developer's guide for Wallaroo. This document is available in a v
 
 You can open issues and submit pull requests against [our GitHub repo](https://github.com/wallaroolabs/wallaroo).
 
-This document is has been written to take an application developer from zero knowledge about Wallaroo to being able to develop streaming Wallaroo applications in a local development environment in Python. (For other languages such as GoLang and C++, and for long-running data jobs such as large-scale analysis or model training, please contact us. Support and documentation are coming soon.)
+This document is has been written to take an application developer from zero knowledge about Wallaroo to being able to develop streaming Wallaroo applications in a local development environment using Go or Python. (For other languages such as C++, and for long-running data jobs such as large-scale analysis or model training, please contact us. Support and documentation are coming soon.)
 
 Please contact us at [hello@wallaroolabs.com](mailto:hello@wallaroolabs.com) about how we can help you with your particular data processing applications.
 
@@ -17,7 +17,7 @@ Please contact us at [hello@wallaroolabs.com](mailto:hello@wallaroolabs.com) abo
 
 We designed this document for programmers that want to jump right in and get started using Wallaroo.  Starting with installing all of the necessary components required for Wallaroo and launching an example application in a local development environment.
 
-Although not required, you will get the most out of this tutorial if you have previous experience with Python.  Additionally, experience with stream processing and distributed computing systems and concepts would be helpful.
+Although not required, you will get the most out of this tutorial if you have previous experience with Go and/or Python.  Additionally, experience with stream processing and distributed computing systems and concepts would be helpful.
 
 ## Supported development environments
 
@@ -37,7 +37,7 @@ Once you have finished the "Developing with Wallaroo" section, you can then jump
 
 ### Core Concepts
 
-Covers the concepts you'll need to understand in order to build a Wallaroo application. Example code is presented using our Python API.
+Covers the concepts you'll need to understand in order to build a Wallaroo application. 
 
 ### Developing with Wallaroo
 
@@ -48,6 +48,10 @@ By the time you are done with this, you will have touched many of the tools you'
 ### Wallaroo Python API
 
 How to develop Wallaroo applications using Python.
+
+### Wallaroo Go API
+
+How to develop Wallaroo applications using Go.
 
 ### Code Examples
 
