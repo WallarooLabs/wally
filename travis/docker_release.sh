@@ -14,7 +14,7 @@ then
 		version=$(< VERSION)
 		wallaroo_docker_image_repo=release
 		docker_image_tag=$version
-	elif [[ "$TRAVIS_BRANCH" == *"release-"* && "$TRAVIS_PULL_REQUEST" == "false" ]]
+	elif [[ "$TRAVIS_BRANCH" == *"release-"* && "$TRAVIS_PULL_REQUEST" == "true" ]]
 	then
 		## Sets repo to dev for Wallaroo Docker image
 		wallaroo_docker_image_repo=dev
