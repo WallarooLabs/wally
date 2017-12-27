@@ -56,3 +56,4 @@ jobs:
       script: bash travis/script.sh
     - stage: deploy
       script: bash travis/docker_release.sh
+      if: (branch = release OR branch =~ ^release-(\d).(\d).(\d)$) AND type IN (push)
