@@ -70,28 +70,21 @@ docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
 
 `kafkacat` can be installed via:
 
-Ubuntu:
-
 ```bash
-sudo apt-get install kafkacat
+docker pull ryane/kafkacat
 ```
 
-MacOS:
+##### Run `kafkacat` from Docker
+
+To run `kafkacat` to listen to the `test-out` topic via Docker:
+
+**NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 1.
 
 ```bash
-brew install kafkacat
+docker run --rm -it ryane/kafkacat -C -b 127.0.0.1:9092 -t test-out > celsius.out
 ```
-
-To run `kafkacat` to listen to the `test-out` topic:
-
-```bash
-kafkacat -C -b 127.0.0.1:9092 -t test-out > celsius.out
-```
-
-**NOTE:** If you are running `kafkacat` from within the Docker container, you will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 1.
 
 ### Shell 2
-
 
 Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `celsius.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -124,8 +117,10 @@ Send data into Kafka. Again, we use `kafakcat`.
 
 Run the following and then type at least 4 characters on each line and hit enter to send in data (only first 4 characters are used/interpreted as a float; the application will throw an error and possibly segfault if less than 4 characters are sent in):
 
+**NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 1.
+
 ```bash
-kafkacat -P -b 127.0.0.1:9092 -t test-in
+docker run --rm -it ryane/kafkacat -P -b 127.0.0.1:9092 -t test-in
 ```
 
 Note: You can use `ctrl-d` to exit `kafkacat`

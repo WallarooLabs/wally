@@ -24,7 +24,7 @@ docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-src:/src/wallaroo \
 -v /tmp/wallaroo-docker/python-virtualenv:/src/python-virtualenv \
 --name wally \
-wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.3.1
+wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.3.2
 ```
 
 ### Breaking down the Docker command
@@ -50,10 +50,10 @@ wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.3.1
 Enter the Wallaroo Docker container:
 
 ```bash
-docker exec -it wally environment-setup.sh
+docker exec -it wally env-setup
 ```
 
-This command will start a new Bash shell within the container, which will run the `environment-setup.sh` script to ensure our persistent Python `virtualenv` is set up.
+This command will start a new Bash shell within the container, which will run the `env-setup` script to ensure our persistent Python `virtualenv` is set up.
 
 To start the Metrics UI run:
 
@@ -86,7 +86,7 @@ metrics_reporter_ui start
 Enter the Wallaroo Docker container:
 
 ```bash
-docker exec -it wally environment-setup.sh
+docker exec -it wally env-setup
 ```
 
 We'll use Giles Receiver to listen for data from our Wallaroo application.
@@ -102,7 +102,7 @@ You should see the line `Listening for data` that indicates that Giles receiver 
 Enter the Wallaroo Docker container:
 
 ```bash
-docker exec -it wally environment-setup.sh
+docker exec -it wally env-setup
 ```
 
 First, we'll need to get to the python Celsius example directory with the following command:
@@ -127,7 +127,7 @@ This tells the "Celsius to Fahrenheit" application that it should listen on port
 Enter the Wallaroo Docker container:
 
 ```bash
-docker exec -it wally environment-setup.sh
+docker exec -it wally env-setup
 ```
 
 We will be sending in 25,000,000 messages using a pre-generated data file. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
@@ -176,7 +176,7 @@ Feel free to click around and get a feel for how the Metrics UI is setup and how
 Enter the Wallaroo Docker container:
 
 ```bash
-docker exec -it wally environment-setup.sh
+docker exec -it wally env-setup
 ```
 
 You can shut down the cluster with this command once processing has finished:

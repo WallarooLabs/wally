@@ -60,7 +60,7 @@ COPY rules.mk /wallaroo-src/
 COPY SUMMARY.md /wallaroo-src/
 COPY SUPPORT.md /wallaroo-src/
 COPY utils /wallaroo-src/utils/
-COPY docker/environment-setup.sh /wallaroo-src/
+COPY docker/env-setup /wallaroo-src/
 COPY testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg \
     /wallaroo-src/testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg
 COPY testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg \
@@ -82,7 +82,7 @@ RUN make clean && \
     cp giles/receiver/receiver /wallaroo-bin/receiver && \
     cp machida/build/machida /wallaroo-bin/machida && \
     cp utils/cluster_shutdown/cluster_shutdown /wallaroo-bin/cluster_shutdown && \
-    cp environment-setup.sh /wallaroo-bin && \
+    cp env-setup /wallaroo-bin && \
     make clean
 
 VOLUME /src/wallaroo
@@ -92,4 +92,4 @@ ENV PYTHONPATH /src/wallaroo/machida:$PYTHONPATH
 
 WORKDIR /src
 
-ENTRYPOINT ["environment-setup.sh"]
+ENTRYPOINT ["env-setup"]
