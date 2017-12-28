@@ -119,6 +119,14 @@ cd ~/wallaroo-tutorial/wallaroo/
 make build-giles-all build-utils-cluster_shutdown-all
 ```
 
+## Register 
+
+Register today and receive a Wallaroo T-shirt and a one-hour phone consultation with Sean, our V.P. of Engineering, to discuss your streaming data questions. Not sure if you have a streaming data problem? Not sure how to go about architecting a streaming data system? Looking to improve an existing system? Not sure how Wallaroo can help? Sean has extensive experience and is happy to help you work through your questions.
+
+Please register here: [https://www.wallaroolabs.com/register](https://www.wallaroolabs.com/register).
+
+Your email address will only be used to facilitate the above. 
+
 ## Conclusion
 
 Awesome! All set. Time to try running your first application.
