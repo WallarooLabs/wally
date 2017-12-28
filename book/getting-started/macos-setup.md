@@ -73,7 +73,7 @@ Installing Docker will result in it running on your machine. After you reboot yo
 ## Download the Metrics UI
 
 ```bash
-docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.1
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.2
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -92,7 +92,7 @@ cloned the Wallaroo repo, do so now:
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.3.1
+git checkout 0.3.2
 ```
 
 This will create a subdirectory called `wallaroo`.
@@ -119,13 +119,13 @@ cd ~/wallaroo-tutorial/wallaroo/
 make build-giles-all build-utils-cluster_shutdown-all
 ```
 
-## Register 
+## Register
 
 Register today and receive a Wallaroo T-shirt and a one-hour phone consultation with Sean, our V.P. of Engineering, to discuss your streaming data questions. Not sure if you have a streaming data problem? Not sure how to go about architecting a streaming data system? Looking to improve an existing system? Not sure how Wallaroo can help? Sean has extensive experience and is happy to help you work through your questions.
 
 Please register here: [https://www.wallaroolabs.com/register](https://www.wallaroolabs.com/register).
 
-Your email address will only be used to facilitate the above. 
+Your email address will only be used to facilitate the above.
 
 ## Conclusion
 
