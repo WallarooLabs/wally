@@ -619,6 +619,7 @@ actor Startup
     end
 
   be dispose() =>
+    @printf[I32]("Shutting down Startup...\n".cstring())
     for d in _join_disposables.values() do
       d.dispose()
     end

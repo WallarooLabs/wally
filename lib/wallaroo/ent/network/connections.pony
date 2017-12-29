@@ -231,10 +231,8 @@ actor Connections is Cluster
 
   be disconnect_from(worker: String) =>
     try
-      // _data_conns(worker).dispose()
       (_, let d) = _data_conns.remove(worker)?
       d.dispose()
-      // _control_conns(worker).dispose()
       (_, let c) = _control_conns.remove(worker)?
       c.dispose()
     else

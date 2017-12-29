@@ -142,10 +142,6 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
           else
             _local_topology_initializer.initiate_shrink(m.node_names,
               m.num_nodes)
-            // let wb = recover ref Writer end
-            // let available: Array[String] = ["todo-flopsy"; "mopsy"; "cottontail"]
-            // let todo_reply = ExternalMsgEncoder.shrink(false, available, available.size(), wb)?
-            // conn.writev(todo_reply)
           end
         else
           @printf[I32](("Incoming External Message type not handled by " +
