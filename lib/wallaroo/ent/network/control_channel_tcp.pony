@@ -94,21 +94,24 @@ class ControlChannelListenNotifier is TCPListenNotify
       @printf[I32]((_name + " control: listening on " + _host + ":" + _service
         + "\n").cstring())
     else
-      @printf[I32]((_name + " control : couldn't get local address\n")
+      @printf[I32]((_name + " control: couldn't get local address\n")
         .cstring())
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    @printf[I32]((_name + " control : unable to listen on (%s:%s)\n").cstring(),
+    @printf[I32]((_name + " control: unable to listen on (%s:%s)\n").cstring(),
       _host.cstring(), _service.cstring())
     listen.close()
 
-  fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
+  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
       _router_registry, _d_host, _d_service, _event_log,
       _recovery_file_cleaner)
+
+  fun ref closed(listen: TCPListener ref) =>
+    @printf[I32]((_name + " control: listener closed\n").cstring())
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
@@ -146,6 +149,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _recovery_file_cleaner = recovery_file_cleaner
 
   fun ref accepted(conn: TCPConnection ref) =>
+    _connections.register_disposable(conn)
     conn.expect(4)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
@@ -355,7 +359,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     @printf[I32]((_name + ": connection failed!\n").cstring())
 
   fun ref closed(conn: TCPConnection ref) =>
-    @printf[I32](("ControlChannelConnectNotifier :" + _name +
+    @printf[I32](("ControlChannelConnectNotifier:" + _name +
       ": server closed\n").cstring())
 
 class JoiningControlSenderConnectNotifier is TCPConnectionNotify
@@ -428,4 +432,8 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     @printf[I32]("JoiningControlSenderConnectNotifier: connection failed!\n"
+      .cstring())
+
+  fun ref closed(conn: TCPConnection ref) =>
+    @printf[I32]("JoiningControlSenderConnectNotifier: server closed\n"
       .cstring())

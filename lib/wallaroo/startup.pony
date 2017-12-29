@@ -69,7 +69,7 @@ actor Startup
 
   var _connections: (Connections | None) = None
 
-  let _disposables: SetIs[DisposableActor] = _disposables.create()
+  let _join_disposables: SetIs[DisposableActor] = _join_disposables.create()
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -162,14 +162,14 @@ actor Startup
             _startup_options.worker_name, _startup_options.worker_count, this)
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0)?, j_addr(1)?)
-        _disposables.set(control_conn)
+        _join_disposables.set(control_conn)
         @printf[I32]("Attempting to join cluster...\n".cstring())
         // This only exists to keep joining worker alive while it waits for
         // cluster information.
         // TODO: Eliminate the need for this.
         let joining_listener = TCPListener(auth, JoiningListenNotifier)
         _joining_listener = joining_listener
-        _disposables.set(joining_listener)
+        _join_disposables.set(joining_listener)
       else
         initialize()
       end
@@ -304,6 +304,7 @@ actor Startup
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
+      connections.register_disposable(this)
 
       _setup_shutdown_handler(connections, this, auth)
 
@@ -337,7 +338,7 @@ actor Startup
             connections, this, local_topology_initializer)
         let external_listener = TCPListener(auth,
           consume external_channel_notifier, _external_host, _external_service)
-        connections.register_listener(external_listener)
+        connections.register_disposable(external_listener)
         @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
           _external_host.cstring(), _external_service.cstring())
       end
@@ -465,6 +466,7 @@ actor Startup
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
+      connections.register_disposable(this)
 
       _setup_shutdown_handler(connections, this, auth)
 
@@ -499,7 +501,7 @@ actor Startup
             connections, this, local_topology_initializer)
         let external_listener = TCPListener(auth,
           consume external_channel_notifier, _external_host, _external_service)
-        connections.register_listener(external_listener)
+        connections.register_disposable(external_listener)
         @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
           _external_host.cstring(), _external_service.cstring())
       end
@@ -617,7 +619,7 @@ actor Startup
     end
 
   be dispose() =>
-    for d in _disposables.values() do
+    for d in _join_disposables.values() do
       d.dispose()
     end
 
