@@ -52,9 +52,6 @@ actor Connections is Cluster
   let _metrics_service: String
   let _init_d_host: String
   let _init_d_service: String
-  let _listeners: Array[TCPListener] = _listeners.create()
-  let _data_channel_listeners: Array[DataChannelListener] =
-    _data_channel_listeners.create()
   let _disposables: SetIs[DisposableActor] = _disposables.create()
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _connection_addresses_file: String
@@ -102,23 +99,6 @@ actor Connections is Cluster
   be register_my_data_addr(host: String, service: String) =>
     _my_data_addr = (host, service)
 
-  be register_source_listener(listener: TCPSourceListener) =>
-    // TODO: Handle source listeners for shutdown
-    None
-
-  be register_listener(listener: (TCPListener | DataChannelListener)) =>
-    _register_listener(listener)
-
-  fun ref _register_listener(listener: (TCPListener | DataChannelListener)) =>
-    match listener
-    | let tcp: TCPListener =>
-      _listeners.push(tcp)
-      _register_disposable(tcp)
-    | let dc: DataChannelListener =>
-      _data_channel_listeners.push(dc)
-      _register_disposable(dc)
-    end
-
   be register_disposable(d: DisposableActor) =>
     _register_disposable(d)
 
@@ -140,14 +120,14 @@ actor Connections is Cluster
 
         let listener = TCPListener(auth, consume notifier, consume host',
             consume port')
-         _register_listener(listener)
+         _register_disposable(listener)
       else
         @printf[I32](("could not recover host and port from file (replace " +
           " with Fail())\n").cstring())
       end
     else
       let listener = TCPListener(auth, consume notifier, host, port)
-      _register_listener(listener)
+      _register_disposable(listener)
     end
 
   be make_and_register_recoverable_data_channel_listener(auth: TCPListenerAuth,
@@ -166,7 +146,7 @@ actor Connections is Cluster
           .cstring(), host'.cstring(), port'.cstring())
         let dch_listener = DataChannelListener(auth, consume notifier,
           router_registry, consume host', consume port')
-        _register_listener(dch_listener)
+        _register_disposable(dch_listener)
       else
         @printf[I32](("could not recover host and port from file (replace " +
           "with Fail())\n").cstring())
@@ -174,7 +154,7 @@ actor Connections is Cluster
     else
       let dch_listener = DataChannelListener(auth, consume notifier,
         router_registry, host, port)
-      _register_listener(dch_listener)
+      _register_disposable(dch_listener)
     end
 
   be create_initializer_data_channel_listener(
@@ -194,7 +174,7 @@ actor Connections is Cluster
     // buffer size
     let dch_listener = DataChannelListener(_auth, consume data_notifier,
       router_registry, _init_d_host, _init_d_service, 0, 1_048_576, 1_048_576)
-    _register_listener(dch_listener)
+    _register_disposable(dch_listener)
 
     cluster_initializer.identify_data_address("initializer", _init_d_host,
       _init_d_service)
@@ -696,14 +676,6 @@ actor Connections is Cluster
     _shutdown()
 
   fun ref _shutdown() =>
-    for listener in _listeners.values() do
-      listener.dispose()
-    end
-
-    for data_channel_listener in _data_channel_listeners.values() do
-      data_channel_listener.dispose()
-    end
-
     for (key, conn) in _control_conns.pairs() do
       conn.dispose()
     end

@@ -30,3 +30,6 @@ class OutNotify is TCPConnectionNotify
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     @printf[I32](("%s: connection failed!\n").cstring(), _name.cstring())
+
+  fun ref closed(conn: TCPConnection ref) =>
+    @printf[I32](("%s: connection closed!\n").cstring(), _name.cstring())

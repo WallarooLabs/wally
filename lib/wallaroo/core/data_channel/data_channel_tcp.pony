@@ -114,7 +114,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
       f.sync()
       f.dispose()
     else
-      @printf[I32]((_name + " data : couldn't get local address\n").cstring())
+      @printf[I32]((_name + " data: couldn't get local address\n").cstring())
       listen.close()
     end
 
@@ -124,7 +124,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     else
       listen.requested_address()
     end
-    @printf[I32]((_name + " data : unable to listen on (%s:%s)\n").cstring(),
+    @printf[I32]((_name + " data: unable to listen on (%s:%s)\n").cstring(),
       h.cstring(), s.cstring())
     Fail()
 
@@ -294,7 +294,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     @printf[I32]("incoming connected on data channel\n".cstring())
 
   fun ref closed(conn: DataChannel ref) =>
-    @printf[I32]("DataChannelConnectNotifier : server closed\n".cstring())
+    @printf[I32]("DataChannelConnectNotifier: server closed\n".cstring())
     //TODO: Initiate reconnect to downstream node here. We need to
     //      create a new connection in OutgoingBoundary
 
