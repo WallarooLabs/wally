@@ -134,9 +134,12 @@ primitive ExternalMsgEncoder
     num_nodes: USize = 0, wb: Writer = Writer): Array[ByteSeq] val
   =>
     if (query is true) then
-      return _encode_shrink(_Shrink(), true, Array[String], 0, wb)
+      _encode_shrink(_Shrink(), true, Array[String], 0, wb)
+    elseif (node_names.size() == 0) and (num_nodes == 0) then
+      _encode_shrink(_Shrink(), false, node_names, 1, wb)
+    else
+      _encode_shrink(_Shrink(), false, node_names, num_nodes, wb)
     end
-    _encode_shrink(_Shrink(), false, node_names, num_nodes, wb)
 
 class BufferedExternalMsgEncoder
   let _buffer: Writer
