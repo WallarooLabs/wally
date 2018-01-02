@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Fix shrink autoscale query reply ([PR #1862](https://github.com/wallaroolabs/wallaroo/pull/1862))
 ### Added
 
 ### Changed
