@@ -135,8 +135,6 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         | let m: ExternalShrinkMsg =>
-          @printf[I32]("TODO: query %s node_names size %d num_nodes %d\n".cstring(),
-            m.query.string().cstring(), m.node_names.size(), m.num_nodes)
           if m.query is true then
             _local_topology_initializer.shrinkable_query(conn)
           else
