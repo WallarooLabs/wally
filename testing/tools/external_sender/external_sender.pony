@@ -118,14 +118,13 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
     _msg = msg
     _stay_alive = stay_alive
 
-  fun ref accepted(conn: TCPConnection ref) =>
-    conn.expect(4)
-
   fun ref connected(conn: TCPConnection ref) =>
     @printf[I32]("Connected...\n".cstring())
     conn.writev(_msg)
     @printf[I32]("Sent message!\n".cstring())
-    if not _stay_alive then
+    if _stay_alive then
+      conn.expect(4)
+    else
       conn.dispose()
     end
 
@@ -136,14 +135,12 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
       try
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?)
           .usize()
-        @printf[I32]("!! Got header: %s\n".cstring(), expect.string().cstring())
         conn.expect(expect)
         _header = false
       else
         @printf[I32]("Error reading header\n".cstring())
       end
     else
-      @printf[I32]("!! Got body\n".cstring())
       try
         match ExternalMsgDecoder(consume data)?
         | let m: ExternalShrinkMsg =>

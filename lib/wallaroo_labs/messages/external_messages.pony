@@ -336,10 +336,15 @@ class val ExternalShrinkMsg is ExternalMsg
     num_nodes = num_nodes'
 
   fun string(): String =>
-    var nodes = "|"
+    let nodes = Array[String]
     for n in node_names.values() do
-      nodes = nodes + " " + n + " |"
+      nodes.push(n)
     end
-    "Query: " + query.string() + " Node count: " + num_nodes.string() +
-      "Nodes: " + nodes
+    var nodes_string = "|"
+    for n in nodes.values() do
+      nodes_string = nodes_string + "," + n
+    end
+    nodes_string = nodes_string + "|"
+    "Query: " + query.string() + ", Node count: " + num_nodes.string() +
+      ", Nodes: " + nodes_string
 
