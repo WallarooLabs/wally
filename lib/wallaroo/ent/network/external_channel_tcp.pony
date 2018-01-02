@@ -88,6 +88,7 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
+    _connections.register_disposable(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
