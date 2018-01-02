@@ -68,7 +68,7 @@ func (tv *RunningVoteTotal) GetVotes() *LetterAndVotes {
 
 Lastly, a stateful application's pipeline is going to need a `StateBuilder`, so let's create one:
 
-```python
+```go
 type RunningVotesTotalBuilder struct {}
 
 func (rvtb *RunningVotesTotalBuilder) Name() string {

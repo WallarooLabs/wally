@@ -127,7 +127,7 @@ func main() {}
 
 The `GOPATH` must refer to the workspaces that contain both your application code and the Go API code. If you created a `WALLAROO_HOME` variable earlier, you can use it to set your `GOPATH` by running this command in your project directory:
 
-```go
+```bash
 export GOPATH=${WALLAROO_HOME}/go_api/go:$(pwd)/go
 ```
 
