@@ -51,7 +51,7 @@ You'll notice that the type of argument to `Compute` is `interface {}`. Your dat
 
 ### Sink Encoder
 
-Next, we are going to define how the output gets constructed for the sink. It is important to remember that Wallaroo sends its output over the network, so data going through the sink needs to be of type `[]byte`.
+Next, we are going to define how the output gets constructed for the sink. It is important to remember that when using a TCP sink, Wallaroo sends its output over the network, so data going through the sink needs to be of type `[]byte`.
 
 ```go
 type Encoder struct {}
@@ -82,7 +82,7 @@ func (d* Decoder) Decode(b []byte) interface{} {
 }
 ```
 
-This one is different. Wallaroo handles _streams of bytes_, and in order to do that efficiently, it uses a method called message framing. This means that Wallaroo requires input data to follow a special structure, as well as for the application to provide the mechanism with which to decode this data.
+This one is different. When using a TCP source, Wallaroo handles _streams of bytes_, and in order to do that efficiently, it uses a method called message framing. This means that Wallaroo requires input data to follow a special structure, as well as for the application to provide the mechanism with which to decode this data.
 
 To read more about this, please refer to the [Creating A Decoder](/book/core-concepts/decoders-and-encoders.md#creating-a-decoder) section.
 

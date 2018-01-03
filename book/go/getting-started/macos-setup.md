@@ -24,7 +24,7 @@ Homebrew is used for easy installation of certain packages needed by Pony.
 
 Instructions for installing Homebrew can be found [on their website](http://brew.sh/).  This book assumes that you use the default installation directory, `/usr/local`.  If you choose an alternate installation directory, please configure your shell's `PATH` environment variable as needed.
 
-**NOTE:** For users of the MacPorts package manager, we strongly recommend *not* using MacPorts.  It is extremely difficult to install correctly the compiler toolchain required by Wallaroo using only MacPorts.
+**NOTE:** For users of the MacPorts package manager, we strongly recommend *not* using MacPorts.  It is extremely difficult to correctly install the compiler toolchain required by Wallaroo using only MacPorts.
 
 ## Installing git
 

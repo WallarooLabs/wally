@@ -4,11 +4,11 @@ In this section, we're going to run an example Wallaroo Go application. By the t
 
 There's a couple Wallaroo support applications that you'll be interacting with for the first time:
 
-- Our Metrics UI that allows you to monitor the performance and health of your applications.
-- Giles receiver is designed to capture TCP output from Wallaroo applications.
+- Our Metrics UI allows you to monitor the performance and health of your applications.
+- Data Receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
 
-You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
+You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data Receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
 
 The Metrics UI process will be run in the background via Docker.  The other three processes (receiver, sender, and Wallaroo) will run in the foreground.  We recommend that you run each process in a separate terminal.
 
@@ -131,7 +131,7 @@ cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
 ./cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down Giles Sender and Giles Receiver by pressing Ctrl-c from their respective shells.
+You can shut down Giles Sender and Data Receiver by pressing Ctrl-c from their respective shells.
 
 You can shut down the Metrics UI with the following command:
 

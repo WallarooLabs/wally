@@ -4,7 +4,7 @@ There are a few things that need to be done in order to start a Wallaroo Go proj
 
 ## Create an Application Directory
 
-The application should live in it's own directory. You can create the directory anywhere.
+The application should live in its own directory. You can create the directory anywhere.
 
 ## Copy the `application.pony` File to the Application Directory
 

@@ -1,6 +1,6 @@
 # Writing Your Own Wallaroo Go Stateful Application
 
-In this section, we will go over how to write a stateful application with the Wallaroo Go API. If you haven't reviewed the simple stateless application example yet, you may find it [here](writing-your-own-application.md).
+In this section, we will go over how to write a stateful application with the Wallaroo Go API. If you haven't reviewed the simple stateless application example yet, you can find it [here](writing-your-own-application.md).
 
 ## A Stateful Application - Alphabet
 
@@ -35,15 +35,15 @@ func (av *AddVotes) Compute(data interface{}, state interface{}) (interface{}, b
 }
 ```
 
-Let's dig into that our reutrn values
+Let's dig into that our return values
 
 ```go
 return rvt.GetVotes(), true
 ```
 
-The first element, `rvt.GetVotes()` is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element. `true` is a to let Wallaroo know if we should store an update for our state. By returning true, we are instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing so, why wouldn't we always return `true`? There are two answers:
+The first element, `rvt.GetVotes()`, is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element, `true`, is a to let Wallaroo know if we should store an update for our state. By returning `true`, we are instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing, so why wouldn't we always return `true`? There are two answers:
 
-1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
+1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
 
 ### State and StateBuilder
@@ -82,7 +82,7 @@ func (rvtb *RunningVotesTotalBuilder) Build() interface{} {
 
 ### Encoder
 
-By this point, we've almost made it to the end of the line. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the letter, its vote count and format it into a single line of text that our receiver can record.
+By this point, we've almost made it to the end of the line. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the letter and its vote count, and format it into a single line of text that our receiver can record.
 
 ```go
 type Encoder struct {}
@@ -165,7 +165,7 @@ here we use:
 ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions(), true).
 ```
 
-That is, while the stateless computation constructor `To` took only a computation class as its argument, the stateful computation constructor `ToStatePartition` takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state. Additionally it takes two arguments for needed to partition our state.
+That is, while the stateless computation constructor `To` took only a computation class as its argument, the stateful computation constructor `ToStatePartition` takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state. Additionally, it takes two arguments for needed to partition our state.
 
 ## Partitioning
 
@@ -177,9 +177,9 @@ Partitioning is a key aspect of how work is distributed in Wallaroo. From the ap
 
 ### Partition
 
-If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is:
+If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is to create a partition key list.
 
-Create a partition key list, we use the `MakeLetterPartitions()` function:
+To create a partition key list, we use the `MakeLetterPartitions()` function:
 
 ```go
 func MakeLetterPartitions() []uint64 {
@@ -193,7 +193,7 @@ func MakeLetterPartitions() []uint64 {
 }
 ```
 
-And then a partitioning function which returns a key from the above list for input data:
+And then we define a partitioning function which returns a key from the above list for input data:
 
 ```go
 type LetterPartitionFunction struct {}

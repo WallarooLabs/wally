@@ -4,7 +4,7 @@ The Wallaro Go API allows developers to create Wallaroo applications in Go.
 
 ## Overview
 
-In order to create a Wallaroo application in Python, developers need to create classes that provide the required interfaces for each step in their pipline, and then connect them together in a topology structure that is returned by the entry-point function `ApplicationSetup`.
+In order to create a Wallaroo application in Go, developers need to create classes that provide the required interfaces for each step in their pipline, and then connect them together in a topology structure that is returned by the entry-point function `ApplicationSetup`.
 
 ### Application Setup
 
@@ -44,11 +44,11 @@ The `application` class in `wallarooapi.application` is used to create an applic
 
 ##### constructor `MakeApplication(name string) *application`
 
-Create a new application the the name `name`.
+Create a new application with the name `name`.
 
 ##### `NewPipeline(name string, source_config SourceConfig) *pipelineBuilder`
 
-Create a new pipeline with the anem `name` and a source config object.
+Create a new pipeline with the name `name` and a source config object.
 
 ##### `ToJson()`
 
@@ -68,7 +68,7 @@ Similar to `To`, but the computation can return more than one message.
 
 ##### `ToStatePartition(stateComputation wallarooapi.StateComputation, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64, multiworker bool) *pipelineBuilder`
 
-Add a partitioned state computation that only returns one messsage to the pipeline.
+Add a partitioned state computation that only returns one message to the pipeline.
 
 `stateBuilder` builds the state.
 
@@ -129,7 +129,7 @@ A stateless computation is a function that takes an input message, returns an ou
 
 #### `wallarooapi.ComputationMulti` Methods
 
-Use `data` to perform a computation and return a new outputs. `data` is the object the previous step in the pipeline returned.
+Use `data` to perform a computation and return a new output. `data` is the object the previous step in the pipeline returned.
 
 ##### `Name() string`
 
@@ -163,7 +163,7 @@ func (d *Double) Compute(data interface{}) []interface{} {
 
 Data is the object that is passed to a computation's `Compute` method. It is a plain Go object and can be as simple or as complex as you would like it to be.
 
-It is important to ensure that data returned is always immutable or unique to avoid any unexpected behavior due to the asynchronous exectution nature of Wallaroo.
+It is important to ensure that data returned is always immutable or unique to avoid any unexpected behavior due to the asynchronous execution nature of Wallaroo.
 
 ### Key
 
@@ -336,9 +336,9 @@ func (d *Decoder) Decode(b []byte) interface{} {
 
 State is an object that is passed to the StateCompution's `Compute` method. It is a plain Go object and can be as simple or as complex as you would like it to be.
 
-A common issue that arises with asynchronous execution, is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a Computation StateComputation that is based on data from the state object should use a copy of that data rather than a reference to something in the state object itself.
+A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a StateComputation that is based on data from the state object should use a copy of that data rather than a reference to something in the state object itself.
 
-It is up to the developer to provide a side-effect safe value for the Computation to return!
+It is up to the developer to provide a side-effect safe value for the StateComputation to return!
 
 ### Example State
 
@@ -376,7 +376,7 @@ Return a new state instance.
 
 #### Example `StateBuilder`
 
-Return an `RunningVoteTotal` object with the values initialized to defaults.
+Return a `RunningVoteTotal` object with the values initialized to defaults.
 
 ```go
 type RunningVotesTotalBuilder struct {}
@@ -408,11 +408,11 @@ Return the name of the computation as a string.
 
 `data` is anything that was returned by the previous step in the pipeline, and `state` is provided by the `StateBuilder` that was defined for this step in the pipeline definition.
 
-The first return value is a message that we will send on to our next step. It should be a new object. Returning `nil` will stop processing and no messages will be sent to the next step. The second return value instructs Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `true` if you wish to save the state, otherwise return `false`.
+The first return value is a message that we will send on to our next step. It should be a new object. Returning `nil` will stop processing that message and no messages will be sent to the next step. The second return value instructs Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `true` if you wish to save the state, otherwise return `false`.
 
 Why wouldn't we always return `true`? There are two answers:
 
-1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
+1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
 
 #### Example `StateComputation`
@@ -448,7 +448,7 @@ Return the name of the computation as a string.
 
 `data` is anything that was returned by the previous step in the pipeline, and `state` is provided by the `StateBuilder` that was defined for this step in the pipeline definition.
 
-The first return value is a slice of object that we will send on to our next step, where each object is a different message. Returning `nil` will stop processing and no messages will be sent to the next step. The second return value instructs Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `true` if you wish to save the state, otherwise return `false`.
+The first return value is a slice of object that we will send on to our next step, where each object is a different message. Returning `nil` will stop processing that message and no messages will be sent to the next step. The second return value instructs Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `true` if you wish to save the state, otherwise return `false`.
 
 ### wallaroo.application.TCPSourceConfig
 
@@ -496,7 +496,7 @@ ToSink(app.MakeTCPSinkConfig("127.0.0.1", "7002", &Encoder{}))
 
 ### wallaroo.application.KafkaSourceConfig
 
-A `KafkaSourceConfig` object specifies the parameters to use for the Kafak source connection when creating an application. This object is provided as an argument to `NewPipeline`.
+A `KafkaSourceConfig` object specifies the parameters to use for the Kafka source connection when creating an application. This object is provided as an argument to `NewPipeline`.
 
 #### `wallaroo.application.KafkaSourceConfig` Constructor
 

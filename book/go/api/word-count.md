@@ -107,7 +107,7 @@ func LetterPartition() []uint64 {
 
 ## Splitting Words
 
-Our word splitting is mostly uninteresting, except for one huge difference, our previous examples had one output for each input. When splitting text into words, we take one input and produce multiple outputs. Let's see how that is done.
+Our word splitting is mostly uninteresting, except for one huge difference: our previous examples had one output for each input. When splitting text into words, we take one input and produce multiple outputs. Let's see how that is done.
 
 ```go
 type Split struct {}
@@ -151,9 +151,9 @@ func (wpf *WordPartitionFunction) Partition (data interface{}) uint64 {
 
 ### Our Counting Guts
 
-The next three classes are the core of our word counting application. By this point, our messages has been split into individual words and run through our `WordPartitionFunction` and will arrive at a state computation based on the first letter of the word.
+The next three classes are the core of our word counting application. By this point, our messages have been split into individual words and run through our `WordPartitionFunction` and will arrive at a state computation based on the first letter of the word.
 
-Let's take a look at we have. `CountWord` is a `StateComputation`. When it's run, we update our state to reflect the new incoming word. Then, it returns the return value from `wordTotals.GetCount` and `true`. The return value of `GetCount` is an instance of the `WordCount` class containing the word and its current count.
+Let's take a look at what we have. `CountWord` is a `StateComputation`. When it's run, we update our state to reflect the new incoming word. Then, it returns the return value from `wordTotals.GetCount` and `true`. The return value of `GetCount` is an instance of the `WordCount` class containing the word and its current count.
 
 ```go
 type CountWord struct {}
@@ -196,7 +196,7 @@ func (wordTotals *WordTotals) GetCount(word string) *WordCount {
 
 ### Hello World! I'm a `WordCount`.
 
-By this point, our word has almost made it to the end of the line. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word, its count and format it into a single line of text that our receiver can record.
+By this point, our word has almost made it to the end of the line. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word and its count, and format it into a single line of text that our receiver can record.
 
 ```go
 type Encoder struct {}
