@@ -39,6 +39,8 @@
 -->
 
 ## Wallaroo with Python
+* [Wallaroo with Python Introduction](book/python/intro.md)
+
 ### Setting up Your Environment
 * [Choosing an Installation Option](book/getting-started/choosing-an-installation-option.md)
 * Installing with Docker
@@ -52,7 +54,6 @@
 * [Conclusion](book/getting-started/conclusion.md)
 
 ### Wallaroo Python API
-* [Python API Introduction](book/python/intro.md)
 * [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
 * [Writing Your Own Application](book/python/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
