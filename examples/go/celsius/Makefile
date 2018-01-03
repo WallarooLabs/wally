@@ -42,7 +42,7 @@ CELSIUS_GOPATH := $(CELSIUS_GO_PATH)/go:$(GO_PONY_LIB)
 include $(rules_mk_path)
 
 build-examples-go-celsius: celsius_go_build
-test-examples-go-celsius: build-examples-go-celsius
+unit-tests-examples-go-celsius: build-examples-go-celsius
 clean-examples-go-celsius: celsius_go_clean
 
 celsius_go_build: $(CELSIUS_GO_PATH)/celsius

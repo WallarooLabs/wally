@@ -42,7 +42,7 @@ WORD_COUNT_GOPATH := $(WORD_COUNT_GO_PATH)/go:$(GO_PONY_LIB)
 include $(rules_mk_path)
 
 build-examples-go-word_count: word_count_go_build
-test-examples-go-word_count: build-examples-go-word_count
+unit-tests-examples-go-word_count: build-examples-go-word_count
 clean-examples-go-word_count: word_count_go_clean
 
 word_count_go_build: $(WORD_COUNT_GO_PATH)/word_count
