@@ -41,16 +41,21 @@ ALPHABET_GOPATH := $(ALPHABET_GO_PATH)/go:$(GO_PONY_LIB)
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-examples-go-alphabet: alphabet_go_clean alphabet_go_build
+build-examples-go-alphabet: alphabet_go_build
+test-examples-go-alphabet: build-examples-go-alphabet
 clean-examples-go-alphabet: alphabet_go_clean
 
-alphabet_go_build:
-	$(QUIET)export GOPATH=$(ALPHABET_GOPATH) && go build -buildmode=c-archive -o $(ALPHABET_GO_PATH)lib/libwallaroo.a alphabet
-	$(QUIET)stable fetch
-	$(QUIET)stable env ponyc -D clustering
+alphabet_go_build: $(ALPHABET_GO_PATH)/alphabet
 
 alphabet_go_clean:
 	$(QUIET)rm -rf $(ALPHABET_GO_PATH)/lib $(ALPHABET_GO_PATH)/.deps $(ALPHABET_GO_PATH)/alphabet
+
+-include $(ALPHABET_GO_PATH)/alphabet.d
+$(ALPHABET_GO_PATH)/alphabet: $(ALPHABET_GO_PATH)/lib/libwallaroo.a
+	$(call PONYC,$(abspath $(ALPHABET_GO_PATH:%/=%)))
+
+$(ALPHABET_GO_PATH)/lib/libwallaroo.a: $(ALPHABET_GO_PATH)/go/src/alphabet/alphabet.go
+	$(QUIET)export GOPATH=$(ALPHABET_GOPATH) && go build -buildmode=c-archive -o $(ALPHABET_GO_PATH)lib/libwallaroo.a alphabet
 
 # end of prevent rules from being evaluated/included multiple times
 endif
