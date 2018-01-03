@@ -10,18 +10,6 @@
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Partitioning](book/core-concepts/partitioning.md)
 
-## Developing with Wallaroo
-* [Choosing an Installation Option](book/getting-started/choosing-an-installation-option.md)
-* Installing with Docker
-  * [Setting Up Your Environment](book/getting-started/docker-setup.md)
-  * [Run a Wallaroo Application in Docker](book/getting-started/run-a-wallaroo-application-docker.md)
-* Installing From Source
-  * [Setting up Your Environment](book/getting-started/setup.md)
-    * [MacOS Installation](book/getting-started/macos-setup.md)
-    * [Ubuntu Installation](book/getting-started/linux-setup.md)
-  * [Run a Wallaroo Application](book/getting-started/run-a-wallaroo-application.md)
-* [Conclusion](book/getting-started/conclusion.md)
-
 <!--
 ### Wallaroo C++ API
 * [C++ API Introduction](book/cpp/intro.md)
@@ -51,6 +39,18 @@
 -->
 
 ## Wallaroo with Python
+### Setting up Your Environment
+* [Choosing an Installation Option](book/getting-started/choosing-an-installation-option.md)
+* Installing with Docker
+  * [Setting Up Your Environment](book/getting-started/docker-setup.md)
+  * [Run a Wallaroo Application in Docker](book/getting-started/run-a-wallaroo-application-docker.md)
+* Installing From Source
+  * [Setting up Your Environment](book/getting-started/setup.md)
+    * [MacOS Installation](book/getting-started/macos-setup.md)
+    * [Ubuntu Installation](book/getting-started/linux-setup.md)
+  * [Run a Wallaroo Application](book/getting-started/run-a-wallaroo-application.md)
+* [Conclusion](book/getting-started/conclusion.md)
+
 ### Wallaroo Python API
 * [Python API Introduction](book/python/intro.md)
 * [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
@@ -66,7 +66,6 @@
 
 ## Wallaroo with Go
 ### Setting up Your Environment
-
 * [Setting up Your Environment](book/go/getting-started/setup.md)
   * [MacOS Installation](book/go/getting-started/macos-setup.md)
   * [Ubuntu Installation](book/go/getting-started/linux-setup.md)
