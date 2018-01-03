@@ -157,7 +157,7 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.3.2
+git checkout release-0.3.3
 ```
 
 ## Compiling Machida

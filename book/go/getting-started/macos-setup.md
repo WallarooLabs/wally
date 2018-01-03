@@ -71,7 +71,7 @@ Installing Docker will result in it running on your machine. After you reboot yo
 ## Download the Metrics UI
 
 ```bash
-docker pull wallaroolabs/wallaroo-metrics-ui:0.1
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.2
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -90,7 +90,7 @@ cloned the Wallaroo repo, do so now:
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.3.0
+git checkout release-0.3.3
 ```
 
 This will create a subdirectory called `wallaroo`.
