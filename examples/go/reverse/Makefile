@@ -42,7 +42,7 @@ REVERSE_GOPATH := $(REVERSE_GO_PATH)/go:$(GO_PONY_LIB)
 include $(rules_mk_path)
 
 build-examples-go-reverse: reverse_go_build
-test-examples-go-reverse: build-examples-go-reverse
+unit-tests-examples-go-reverse: build-examples-go-reverse
 clean-examples-go-reverse: reverse_go_clean
 
 reverse_go_build: $(REVERSE_GO_PATH)/reverse
