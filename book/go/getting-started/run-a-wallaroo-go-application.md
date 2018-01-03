@@ -61,14 +61,14 @@ Data Receiver will start up and receive data without creating any output. By def
 First, we need to build the application.
 
 ```bash
-cd ~/wallaroo-tutorial/examples/go/celsius
+cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
 make
 ```
 
 Now start up the "Celsius to Fahrenheit" application
 
 ```bash
-cd ~/wallaroo-tutorial/examples/go/celsius
+cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
 ./celsius --in 127.0.0.1:7000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
