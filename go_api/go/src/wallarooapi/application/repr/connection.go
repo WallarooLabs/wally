@@ -15,8 +15,8 @@ type To struct {
 	ComputationBuilderId uint64
 }
 
-func MakeToStatePartition(stepId uint64, fromStepId uint64, stateComputationId uint64, stateBuilderId uint64, stateName string, partitionId uint64, multiWorker bool) interface {} {
-	return &ToStatePartition{"ToStatePartition", stepId, fromStepId, stateComputationId, stateBuilderId, stateName, partitionId, multiWorker}
+func MakeToStatePartition(stepId uint64, fromStepId uint64, stateComputationId uint64, stateBuilderId uint64, stateName string, partitionId uint64) interface {} {
+	return &ToStatePartition{"ToStatePartition", stepId, fromStepId, stateComputationId, stateBuilderId, stateName, partitionId}
 }
 
 type ToStatePartition struct {
@@ -27,7 +27,6 @@ type ToStatePartition struct {
 	StateBuilderId uint64
 	StateName string
 	PartitionId uint64
-	MultiWorker bool
 }
 
 func MakeToSink(stepId uint64, fromStepId uint64, sinkConfig interface{}) *ToSink {
