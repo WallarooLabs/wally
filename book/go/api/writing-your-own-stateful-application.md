@@ -48,7 +48,7 @@ The first element, `rvt.GetVotes()`, is a message that we will send on to our ne
 
 ### State and StateBuilder
 
-We are going to partition by letter. We'll have a separate state object for every letter. 
+We are going to partition by letter. We'll have a separate state object for every letter.
 
 ```go
 type RunningVoteTotal struct {
@@ -97,7 +97,7 @@ func (encoder *Encoder) Encode(data interface{}) []byte {
 
 ### Decoder
 
-The decoder, like the one in Reverse Word, is going to use a `HeaderLength()` of 4 bytes to denote a big-endian 32-bit unsigned integer. Then, for the data, it is expecting a single character followed by a big-endian 32-bit unsigned integer. 
+The decoder, like the one in [Reverse Word](/book/go/api/writing-your-own-application.md#sourcedecoder), is going to use a `HeaderLength()` of 4 bytes to denote a big-endian 32-bit unsigned integer. Then, for the data, it is expecting a single character followed by a big-endian 32-bit unsigned integer.
 
 ```go
 type Decoder struct {}

@@ -45,9 +45,9 @@ func (r *Reverse) Compute(data interface{}) interface{} {
 }
 ```
 
-A Computation has no state, so it only needs to define its name, and how to convert input data into output data. In this case, string reversal is done using some code we got from the `go-lang nuts` forum. 
+A Computation has no state, so it only needs to define its name, and how to convert input data into output data. In this case, string reversal is done using some code we got from the `go-lang nuts` forum.
 
-You'll notice that the type of argument to `Compute` is `interface {}`. Your data types are opaque to Wallaroo and could be of any type. For this reason, you'll see `interface {}` used in a number of places in the Wallaroo Go API. 
+You'll notice that the type of argument to `Compute` is `interface {}`. Your data types are opaque to Wallaroo and could be of any type. For this reason, you'll see `interface {}` used in a number of places in the Wallaroo Go API.
 
 ### Sink Encoder
 
@@ -84,7 +84,7 @@ func (d* Decoder) Decode(b []byte) interface{} {
 
 This one is different. When using a TCP source, Wallaroo handles _streams of bytes_, and in order to do that efficiently, it uses a method called message framing. This means that Wallaroo requires input data to follow a special structure, as well as for the application to provide the mechanism with which to decode this data.
 
-To read more about this, please refer to the [Creating A Decoder](/book/core-concepts/decoders-and-encoders.md#creating-a-decoder) section.
+To read more about this, please refer to the [Creating A Decoder](/book/appendix/tcp-decoders-and-encoders.md#creating-a-decoder) section.
 
 For our application purposes, we will simply define the structure and how it is going to get parsed:
 
@@ -92,7 +92,7 @@ For our application purposes, we will simply define the structure and how it is 
 2. Wallaroo requires three methods to parse this type of message:
   1. `HeaderLength()`, which returns the number of bytes used for the `PAYLOAD_SIZE` in the message. This value tells Wallaroo how many bytes to read from the stream as `HEADER`.
   2. `PayloadLength([]byte)`, which reads `PAYLOAD_SIZE` bytestring of the size returned by `HeaderLength()` and computes the size of `PAYLOAD`. It then returns that size as an integer to Wallaroo, which will then read that many bytes from the stream.
-  3. `Decode([]byte)`, which receives the remainder of the message, `MSG`, and decodes it into a Go object. 
+  3. `Decode([]byte)`, which receives the remainder of the message, `MSG`, and decodes it into a Go object.
 
 In our case:
 
@@ -110,7 +110,7 @@ For this, two things are needed:
 
 #### Application Builder and Pipelines
 
-An application is constructed of pipelines which, in turn, are constructed from a sequence of a source, steps, and optionally a sink. Our reverse application only has one pipeline, so we only need to create one:
+An application is constructed of [pipelines](/book/core-concepts/core-concepts.md#pipeline) which, in turn, are constructed from a sequence of a [source](/book/core-concepts/core-concepts.md#source), one or more [computations](/book/core-concepts/core-concepts.md#computation) and [state computations](/book/core-concepts/core-concepts.md#state-computation), and optionally a [sink](/book/core-concepts/core-concepts.md#sink). Our reverse application only has one pipeline, so we only need to create one:
 
 ```go
 application := app.MakeApplication("Reverse Word")
