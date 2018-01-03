@@ -119,4 +119,4 @@ Your email address will only be used to facilitate the above.
 
 ## Conclusion
 
-Awesome! All set. Time to try running your first application.
+Awesome! All set. Time to try [running your first application](run-a-wallaroo-go-application.md).

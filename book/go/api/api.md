@@ -34,7 +34,7 @@ func ApplicationSetup() *C.char {
 
 #### `wallarooapi.Args`
 
-The Wallaroo framework uses a number of command line arguments. The variable `wallaroo.Args` contains the arguments that were passed to the application that were not used by the Wallaroo framework. It is a `[]string` which can be used by parsers like `flags` to get application-specific command line arguments.
+The Wallaroo framework uses a number of command line arguments. The variable `wallarooapi.Args` contains the arguments that were passed to the application that were not used by the Wallaroo framework. It is a `[]string` which can be used by parsers like `flags` to get application-specific command line arguments.
 
 ### `wallarooapi.application.application`
 
