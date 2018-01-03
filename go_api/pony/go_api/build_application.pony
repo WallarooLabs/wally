@@ -264,13 +264,10 @@ primitive _SourceConfig
       let log_level = source("LogLevel")?.string()?
       let decoder_id = source("DecoderId")?.int()?.u64()
       let brokers_val: Array[(String, I32)] val = consume brokers
-      match recover KafkaSourceConfigFactory(topic, brokers_val, log_level, env.out) end
-      | let kc: KafkaConfig val =>
-        KafkaSourceConfig[GoData](kc, env.root as TCPConnectionAuth,
-          GoSourceHandler(decoder_id))
-      else
-        error
-      end
+      let ksco = KafkaConfigOptions("Wallaroo Kakfa Source", KafkaConsumeOnly,
+        topic, brokers_val, log_level)
+      KafkaSourceConfig[GoData](consume ksco, env.root as TCPConnectionAuth,
+        GoSourceHandler(decoder_id))
     else
       error
     end
@@ -298,14 +295,10 @@ primitive _SinkConfig
       let max_message_size = sink("MaxMessageSize")?.int()?.i32()
       let encoder_id = sink("EncoderId")?.int()?.u64()
       let brokers_val: Array[(String, I32)] val = consume brokers
-      match recover KafkaSinkConfigFactory(topic, brokers_val, log_level,
-        max_produce_buffer_ms, max_message_size ,env.out) end
-      | let kc: KafkaConfig val =>
-        KafkaSinkConfig[GoData](GoKafkaEncoder(encoder_id), kc,
-          env.root as TCPConnectionAuth)
-      else
-        error
-      end
+      let ksco = KafkaConfigOptions("Wallaroo Kakfa Sink", KafkaProduceOnly,
+        topic, brokers_val, log_level, max_produce_buffer_ms, max_message_size)
+      KafkaSinkConfig[GoData](GoKafkaEncoder(encoder_id), consume ksco,
+        env.root as TCPConnectionAuth)
     else
       error
     end
