@@ -20,8 +20,8 @@ func (to *To) Repr() interface{} {
 	return repr.MakeTo(to.stepId, to.fromStepId, to.computationBuilderId)
 }
 
-func makeToStatePartition(stepId uint64, fromStepId uint64, stateComputationId uint64, stateBuilderId uint64, stateName string, partitionFunctionId uint64, partitionId uint64, multiWorker bool) *ToStatePartition {
-	return &ToStatePartition{&Step{stepId, fromStepId}, stateComputationId, stateBuilderId, stateName, partitionFunctionId, partitionId, multiWorker}
+func makeToStatePartition(stepId uint64, fromStepId uint64, stateComputationId uint64, stateBuilderId uint64, stateName string, partitionFunctionId uint64, partitionId uint64) *ToStatePartition {
+	return &ToStatePartition{&Step{stepId, fromStepId}, stateComputationId, stateBuilderId, stateName, partitionFunctionId, partitionId}
 }
 
 type ToStatePartition struct {
@@ -31,11 +31,10 @@ type ToStatePartition struct {
 	stateName string
 	partitionFunctionId uint64
 	partitionId uint64
-	multiWorker bool
 }
 
 func (tsp *ToStatePartition) Repr() interface{} {
-	return repr.MakeToStatePartition(tsp.stepId, tsp.fromStepId, tsp.stateComputationId, tsp.stateBuilderId, tsp.stateName, tsp.partitionId, tsp.multiWorker)
+	return repr.MakeToStatePartition(tsp.stepId, tsp.fromStepId, tsp.stateComputationId, tsp.stateBuilderId, tsp.stateName, tsp.partitionId)
 }
 
 func makeToSink(stepId uint64, fromStepId uint64, sinkConfig SinkConfig) *ToSink {

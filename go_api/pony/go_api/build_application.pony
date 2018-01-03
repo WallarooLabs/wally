@@ -56,11 +56,9 @@ class val _ToStatePartition is _Connection
   let _state_builder_id: U64
   let _state_name: String
   let _partition_id: U64
-  let _multi_worker: Bool
 
   new val create(step_id': U64, from_step_id': U64, state_computation_id: U64,
-    state_builder_id: U64, state_name: String, partition_id: U64,
-    multi_worker: Bool)
+    state_builder_id: U64, state_name: String, partition_id: U64)
   =>
     _step_id = step_id'
     _from_step_id = from_step_id'
@@ -68,7 +66,6 @@ class val _ToStatePartition is _Connection
     _state_builder_id = state_builder_id
     _state_name = state_name
     _partition_id = partition_id
-    _multi_worker = multi_worker
 
   fun step_id(): U64 =>
     _step_id
@@ -83,15 +80,13 @@ class val _ToStatePartition is _Connection
         _StepInfo(steps_map(_from_step_id)?.to_state_partition(
           StateComputation(_state_computation_id),
           StateBuilder(_state_builder_id),
-          _state_name, pipeline.partitions_map(_partition_id)?,
-          _multi_worker))
+          _state_name, pipeline.partitions_map(_partition_id)?))
     | "StateComputationMulti" =>
       steps_map(_step_id) =
         _StepInfo(steps_map(_from_step_id)?.to_state_partition(
           StateComputationMulti(_state_computation_id),
           StateBuilder(_state_builder_id),
-          _state_name, pipeline.partitions_map(_partition_id)?,
-          _multi_worker))
+          _state_name, pipeline.partitions_map(_partition_id)?))
     else
       error
     end
@@ -149,13 +144,8 @@ primitive _ConnectionFactory
       let state_builder_id = connection_j("StateBuilderId")?.int()?.u64()
       let state_name = connection_j("StateName")?.string()?
       let partition_id = connection_j("PartitionId")?.int()?.u64()
-      let multi_worker = try
-        connection_j("MultiWorker")?.bool()?
-      else
-        false
-      end
       _ToStatePartition(step_id, from_step_id, state_computation_id,
-        state_builder_id, state_name, partition_id, multi_worker)
+        state_builder_id, state_name, partition_id)
     | "ToSink" =>
       let sink_j = connection_j("Sink")?
       let sink = _SinkConfig.from_json_ez_data(sink_j, env)?
@@ -180,12 +170,11 @@ class _StepInfo
 
   fun ref to_state_partition(
     computation: (StateComputation | StateComputationMulti),
-    state_builder: StateBuilder, name: String, partition: w.Partition[GoData, U64],
-    multi_worker: Bool):
+    state_builder: StateBuilder, name: String, partition: w.Partition[GoData, U64]):
     PipelineBuilder[GoData, GoData, GoData]
   =>
     _pipeline_builder.to_state_partition[GoData, U64, GoData, GoState](
-      computation, state_builder, name, partition, multi_worker)
+      computation, state_builder, name, partition)
 
   fun ref to_sink(sink_config: SinkConfig[GoData]) =>
     _pipeline_builder.to_sink(sink_config)

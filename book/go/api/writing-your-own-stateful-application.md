@@ -146,7 +146,7 @@ func ApplicationSetup() *C.char {
 
   application := app.MakeApplication("Alphabet")
   application.NewPipeline("Alphabet", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
-    ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions(), true).
+    ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions()).
     ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
   return C.CString(application.ToJson())
@@ -162,7 +162,7 @@ To(&ReverseBuilder{}).
 here we use:
 
 ```go
-ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions(), true).
+ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions()).
 ```
 
 That is, while the stateless computation constructor `To` took only a computation class as its argument, the stateful computation constructor `ToStatePartition` takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state. Additionally, it takes two arguments for needed to partition our state.
@@ -207,7 +207,7 @@ func (lpf *LetterPartitionFunction) Partition(data interface{}) uint64 {
 When we set up our state partition, we pass both functions above as arguments to `ToStatePartition` as we saw earlier:
 
 ```go
-ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions(), true).
+ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions()).
 ```
 
 ## Next Steps

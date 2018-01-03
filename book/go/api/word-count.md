@@ -36,7 +36,7 @@ func ApplicationSetup() *C.char {
 	application := app.MakeApplication("Word Count Application")
 	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
 		ToMulti(&SplitBuilder{}).
-		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition(), true).
+		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition()).
 		ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
 	json := application.ToJson()
@@ -73,7 +73,7 @@ We set up a new application with a single pipeline:
 	application := app.MakeApplication("Word Count Application")
 	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
 		ToMulti(&SplitBuilder{}).
-		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition(), true).
+		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition()).
 		ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 ```
 
@@ -86,7 +86,7 @@ Upon receiving some textual input, our word count application will route it to a
 After we split our text chunks into words, they get routed to a state partition where they are counted:
 
 ```go
-		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition(), true).
+		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition()).
 ```
 
 Note we set up 27 partitions to count our words, one for each letter plus one called "!" which will handle any "word" that doesn't start with a letter:
