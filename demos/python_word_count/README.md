@@ -1,4 +1,4 @@
-# Word Count Autoscale Demo
+# Python Word Count Autoscale Demo
 
 This is an example application that receives strings of text, splits it into individual words and counts the occurrences of each word. Contains commands to allow you to autoscale up to 3 worker cluster, starting from 1.
 
