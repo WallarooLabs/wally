@@ -41,16 +41,21 @@ CELSIUS_GOPATH := $(CELSIUS_GO_PATH)/go:$(GO_PONY_LIB)
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-examples-go-celsius: celsius_go_clean celsius_go_build
+build-examples-go-celsius: celsius_go_build
+test-examples-go-celsius: build-examples-go-celsius
 clean-examples-go-celsius: celsius_go_clean
 
-celsius_go_build:
-	$(QUIET)export GOPATH=$(CELSIUS_GOPATH) && go build -buildmode=c-archive -o $(CELSIUS_GO_PATH)lib/libwallaroo.a celsius
-	$(QUIET)stable fetch
-	$(QUIET)stable env ponyc
+celsius_go_build: $(CELSIUS_GO_PATH)/celsius
 
 celsius_go_clean:
 	$(QUIET)rm -rf $(CELSIUS_GO_PATH)/lib $(CELSIUS_GO_PATH)/.deps $(CELSIUS_GO_PATH)/celsius
+
+-include $(CELSIUS_GO_PATH)/celsius.d
+$(CELSIUS_GO_PATH)/celsius: $(CELSIUS_GO_PATH)/lib/libwallaroo.a
+	$(call PONYC,$(abspath $(CELSIUS_GO_PATH:%/=%)))
+
+$(CELSIUS_GO_PATH)/lib/libwallaroo.a: $(CELSIUS_GO_PATH)/go/src/celsius/celsius.go
+	$(QUIET)export GOPATH=$(CELSIUS_GOPATH) && go build -buildmode=c-archive -o $(CELSIUS_GO_PATH)lib/libwallaroo.a celsius
 
 # end of prevent rules from being evaluated/included multiple times
 endif
