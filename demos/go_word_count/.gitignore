@@ -1,0 +1,3 @@
+*.dSYM
+/go_word_count
+lib

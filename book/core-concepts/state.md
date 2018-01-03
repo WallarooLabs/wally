@@ -22,12 +22,17 @@ So what is a state object? Let's explain via an example. Imagine we are writing 
 
 Wallaroo allows you to define your own state objects that match your domain. For example, our example application might define a state object as:
 
-```python
+{% codetabs name="Python", type="py" -%}
 class Stock(object):
     def __init__(self, symbol, price):
         self.symbol = symbol
         self.price = price
-```
+{%- language name="Go", type="go" -%}
+type Stock struct {
+  Symbol string
+  Price float64
+}
+{%- endcodetabs %}
 
 State objects can be arbitrarily complex. Our example is two fields. If your application required it, you could build a deeply nested series of objects.
 
