@@ -42,7 +42,7 @@ ALPHABET_GOPATH := $(ALPHABET_GO_PATH)/go:$(GO_PONY_LIB)
 include $(rules_mk_path)
 
 build-examples-go-alphabet: alphabet_go_build
-test-examples-go-alphabet: build-examples-go-alphabet
+unit-tests-examples-go-alphabet: build-examples-go-alphabet
 clean-examples-go-alphabet: alphabet_go_clean
 
 alphabet_go_build: $(ALPHABET_GO_PATH)/alphabet
