@@ -4,7 +4,7 @@ In this section, we will go over how to write a stateful application with the Wa
 
 ## A Stateful Application - Alphabet
 
-Our stateful application is going to be a vote counter, called Alphabet. It receives as its input a message containing an alphabet character and a number of votes, which it then increments in its internal state. After each update, it sends the new updated vote count or that character to its output.
+Our stateful application is going to be a vote counter, called Alphabet. It receives as its input a message containing an alphabet character and a number of votes, which it then increments in its internal state. After each update, it sends the new updated vote count of that character to its output.
 
 As with the Reverse Word example, we will list the components required:
 
@@ -13,7 +13,7 @@ As with the Reverse Word example, we will list the components required:
 * Computation for adding votes
 * State objects
 * State change management
-* A list of key that are valid for partitioning our state objects
+* A list of keys that are valid for partitioning our state objects
 * A partitioning function
 
 ### Computation
@@ -204,7 +204,7 @@ func (lpf *LetterPartitionFunction) Partition(data interface{}) uint64 {
 }
 ```
 
-When we set up our state partition, we pass both as arguments to `ToStatePartition` as we saw earlier:
+When we set up our state partition, we pass both functions above as arguments to `ToStatePartition` as we saw earlier:
 
 ```go
 ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions(), true).

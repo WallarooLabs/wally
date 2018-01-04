@@ -34,7 +34,7 @@ brew install git
 
 ### Installing ponyc
 
-Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`.
+Now you need to install the Pony compiler `ponyc`.
 
 ```bash
 brew update
@@ -52,7 +52,7 @@ brew install pony-stable
 
 ## Install Compression Development Libraries
 
-Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
+Wallaroo's Kafka support requires a `libsnappy` and `liblz` to be installed.
 
 ```bash
 brew install snappy lz4
@@ -78,7 +78,7 @@ docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.
 
 ## Set up Environment for the Wallaroo Tutorial
 
-If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
 
 ```bash
 cd ~/

@@ -60,7 +60,7 @@ By now, hopefully, most of this looks somewhat familiar. We're building on conce
 	inPort := inHostsPorts[0][1]
 ```
 
-We point the Wallaro serialization and deserialization functions to our serializer and deserializer:
+We point the Wallaroo serialization and deserialization functions to our serializer and deserializer:
 
 ```go
 	wa.Serialize = Serialize
@@ -134,7 +134,7 @@ func (s *Split) Compute(data interface{}) []interface{} {
 }
 ```
 
-Did you catch what is going on? Previously, we've seen our stateless computations have a `Compute` method that returns an `interface{}`. `Split` returns a `[]interface{}`. Each item in the slice is a new message that is send individually to the next step in the pipeline. This allows us to then route each one based on its first letter for counting. If you look below, you can see that our word partitioning function is expecting words, not a list, which makes sense:
+Did you catch what is going on? Previously, we've seen our stateless computations have a `Compute` method that returns an `interface{}`. `Split` returns a `[]interface{}`. Each item in the slice is a new message that is sent individually to the next step in the pipeline. This allows us to then route each message based on its first letter for counting. If you look below, you can see that our word partitioning function is expecting words, not a list, which makes sense:
 
 ```go
 type WordPartitionFunction struct {}
@@ -196,7 +196,7 @@ func (wordTotals *WordTotals) GetCount(word string) *WordCount {
 
 ### Hello World! I'm a `WordCount`.
 
-By this point, our word has almost made it to the end of the line. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word and its count, and format it into a single line of text that our receiver can record.
+By this point, our word has almost made it to the end of the pipeline. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word and its count, and we format it into a single line of text that our receiver can record.
 
 ```go
 type Encoder struct {}

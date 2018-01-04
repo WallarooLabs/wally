@@ -18,7 +18,7 @@ You will not need to modify this file at all if you follow these instructions fo
 
 `stable` is a tool for managing Pony dependencies and building Pony projects. `stable` reads a file called `bundle.json` to figure out where to find dependencies. This file can be created using `stable add ...` to add the dependencies. You should run these commands in the project directory so that the `bundle.json` file will be created there.
 
-The easiest thing to do would be to create a shell variable that contains the path to where you have cloned the wallaroo repo. For example, if it is your home directory then your shell variable would be set with
+The easiest thing to do would be to create a shell variable that contains the path to where you have cloned the Wallaroo repo. For example, if it is your home directory then your shell variable would be set with:
 
 ```bash
 WALLAROO_HOME=$HOME/wallaroo
@@ -83,7 +83,7 @@ mkdir -p go/src/PROJECT_NAME
 
 ## Create a Wallaroo Go Application
 
-The code for your application should be under the `go/src/PROJECT_NAME` directory that you created. There must be a `main` package with an empty `main()` function, and your program must export a C function called `ApplicationSetup`. You must also set the `wallarooapi.Serialize` and `wallaroo.Deserialize` variables. Here's an outline of what the application file might look like:
+The code for your application should be under the `go/src/PROJECT_NAME` directory that you created. There must be a `main` package with an empty `main()` function, and your program must export a C function called `ApplicationSetup`. You must also set the `wallarooapi.Serialize` and `wallarooapi.Deserialize` variables. Here's an outline of what the application file might look like:
 
 ```go
 package main

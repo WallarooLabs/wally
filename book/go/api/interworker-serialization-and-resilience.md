@@ -24,7 +24,7 @@ Your application must handle all of these type of objects in its serialization a
 * state objects
 * messages that pass between steps in a topology
 
-### An Example
+### An Example Serializing Function
 
 As an example of serialization, let's look at the Reverse
 application. It converts a `byte` slice into a string, reverses
@@ -66,14 +66,12 @@ func Serialize(c interface{}) []byte {
 }
 ```
 
-The switch statement handles all of the types that need to be serialized.
-* partition functions -- not applicable to this program
+The switch statement handles all of the types that need to be serialized.  (Remember, the Reverse application does not use stateful computations.  Cases for partition functions, state computations, and state objects do not appear in this example).
+
 * decoders -- the `Decoder` class
 * encoders -- the `Encoder` class
 * computations -- the `Reverse` class
 * computation builders -- the `ReverseBuilder` class
-* state computations -- not applicable to this program
-* state objects -- not applicable to this program
 * messages that pass between steps in a topology -- the `string` class
 
 You are free to select any encoding mechanism that you would like. In
@@ -83,6 +81,8 @@ the `string` class, you will need to encode that data as well. Go
 provides the `gob` module which can encode and decode objects for you;
 we recommend you use this unless you have a specific need that it does
 not satisfy.
+
+### An Example Deserializing Function
 
 The decoder function performs the opposite operation, taking an
 serialized representation and converting it into the object that is
