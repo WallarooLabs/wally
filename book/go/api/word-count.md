@@ -134,7 +134,7 @@ func (s *Split) Compute(data interface{}) []interface{} {
 }
 ```
 
-Did you catch what is going on? Previously, we've seen our stateless computations have a `Compute` method that returns an `interface{}`. `Split` returns a `[]interface{}`. Each item in the slice is a new message that is send individually to the next step in the pipeline. This allows us to then route each one based on its first letter for counting. If you look below, you can see that our word partitioning function is expecting words, not a list, which makes sense:
+Did you catch what is going on? Previously, we've seen our stateless computations have a `Compute` method that returns an `interface{}`. `Split` returns a `[]interface{}`. Each item in the slice is a new message that is sent individually to the next step in the pipeline. This allows us to then route each one based on its first letter for counting. If you look below, you can see that our word partitioning function is expecting words, not a list, which makes sense:
 
 ```go
 type WordPartitionFunction struct {}
