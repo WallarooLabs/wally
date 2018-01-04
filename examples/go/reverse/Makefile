@@ -48,7 +48,7 @@ clean-examples-go-reverse: reverse_go_clean
 reverse_go_build: $(REVERSE_GO_PATH)/reverse
 
 reverse_go_clean:
-	$(QUIET)rm -rf $(REVERSE_GO_PATH)/lib $(REVERSE_GO_PATH)/.deps $(REVERSE_GO_PATH)/reverse
+	$(QUIET)rm -rf $(REVERSE_GO_PATH)/lib $(REVERSE_GO_PATH)/.deps $(REVERSE_GO_PATH)/reverse $(REVERSE_GO_PATH)/reverse.d
 
 -include $(REVERSE_GO_PATH)/reverse.d
 $(REVERSE_GO_PATH)/reverse: $(REVERSE_GO_PATH)/lib/libwallaroo.a
