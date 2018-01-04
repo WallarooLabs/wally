@@ -48,7 +48,7 @@ clean-examples-go-alphabet: alphabet_go_clean
 alphabet_go_build: $(ALPHABET_GO_PATH)/alphabet
 
 alphabet_go_clean:
-	$(QUIET)rm -rf $(ALPHABET_GO_PATH)/lib $(ALPHABET_GO_PATH)/.deps $(ALPHABET_GO_PATH)/alphabet
+	$(QUIET)rm -rf $(ALPHABET_GO_PATH)/lib $(ALPHABET_GO_PATH)/.deps $(ALPHABET_GO_PATH)/alphabet $(ALPHABET_GO_PATH)/alphabet.d
 
 -include $(ALPHABET_GO_PATH)/alphabet.d
 $(ALPHABET_GO_PATH)/alphabet: $(ALPHABET_GO_PATH)/lib/libwallaroo.a
