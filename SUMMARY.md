@@ -66,6 +66,8 @@
   * [Debugging](book/python/debugging.md)
 
 ## Wallaroo with Go
+* [Go API Introduction](book/go/intro.md)
+
 * Setting up Your Environment
   * [Setting up Your Environment](book/go/getting-started/setup.md)
     * [MacOS Installation](book/go/getting-started/macos-setup.md)
@@ -74,7 +76,6 @@
   * [Conclusion](book/go/getting-started/conclusion.md)
 
 * Wallaroo Go API
-  * [Go API Introduction](book/go/api/intro.md)
   * [Writing Your Own Application](book/go/api/writing-your-own-application.md)
   * [Writing Your Own Stateful Application](book/go/api/  writing-your-own-stateful-application.md)
   * [Word Count](book/go/word-count.md)
