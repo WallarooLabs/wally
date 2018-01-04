@@ -77,7 +77,7 @@
 
 * Wallaroo Go API
   * [Writing Your Own Application](book/go/api/writing-your-own-application.md)
-  * [Writing Your Own Stateful Application](book/go/api/  writing-your-own-stateful-application.md)
+  * [Writing Your Own Stateful Application](book/go/api/writing-your-own-stateful-application.md)
   * [Word Count](book/go/word-count.md)
   * [Interworker Serialization and Resilience](book/go/api/interworker-serialization-and-resilience.md)
   * [Start A Go Project](book/go/api/start-a-project.md)
