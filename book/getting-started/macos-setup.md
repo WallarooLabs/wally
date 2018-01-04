@@ -34,7 +34,7 @@ brew install git
 
 ### Installing ponyc
 
-Now you need to install the Wallaroo Labs fork of the Pony compiler `ponyc`.
+Now you need to install the Pony compiler `ponyc`.
 
 ```bash
 brew update
