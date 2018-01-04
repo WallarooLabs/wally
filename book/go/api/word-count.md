@@ -196,7 +196,7 @@ func (wordTotals *WordTotals) GetCount(word string) *WordCount {
 
 ### Hello World! I'm a `WordCount`.
 
-By this point, our word has almost made it to the end of the line. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word and its count, and format it into a single line of text that our receiver can record.
+By this point, our word has almost made it to the end of the pipeline. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word and its count, and we format it into a single line of text that our receiver can record.
 
 ```go
 type Encoder struct {}
