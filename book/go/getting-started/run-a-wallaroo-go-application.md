@@ -65,7 +65,7 @@ cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
 make
 ```
 
-Now start up the "Celsius to Fahrenheit" application
+Now start up the "Celsius to Fahrenheit" application.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
