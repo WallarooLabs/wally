@@ -35,13 +35,13 @@ func (av *AddVotes) Compute(data interface{}, state interface{}) (interface{}, b
 }
 ```
 
-Let's dig into that our return values
+Let's dig into our return values
 
 ```go
 return rvt.GetVotes(), true
 ```
 
-The first element, `rvt.GetVotes()`, is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element, `true`, is a to let Wallaroo know if we should store an update for our state. By returning `true`, we are instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing, so why wouldn't we always return `true`? There are two answers:
+The first element, `rvt.GetVotes()`, is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element, `true`, is to let Wallaroo know if we should store an update for our state. By returning `true`, we are instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing, so why wouldn't we always return `true`? There are two answers:
 
 1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
@@ -165,11 +165,11 @@ here we use:
 ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions()).
 ```
 
-That is, while the stateless computation constructor `To` took only a computation class as its argument, the stateful computation constructor `ToStatePartition` takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state. Additionally, it takes two arguments for needed to partition our state.
+That is, while the stateless computation constructor `To` took only a computation class as its argument, the stateful computation constructor `ToStatePartition` takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state. Additionally, it takes two arguments needed for partitioning our state.
 
 ## Partitioning
 
-Partitioning is a key aspect of how work is distributed in Wallaroo. From the application's point of view, what is required are:
+Partitioning is a key aspect of how work is distributed in Wallaroo. From the application's point of view, what is required is:
 
 * a list of partition keys
 * a partitioning function
@@ -177,7 +177,7 @@ Partitioning is a key aspect of how work is distributed in Wallaroo. From the ap
 
 ### Partition
 
-If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is to create a partition key list.
+If we were to use partitioning in the alphabet application from the previous section and we wanted to partition by key, then one way we could go about it is to create a partition key list.
 
 To create a partition key list, we use the `MakeLetterPartitions()` function:
 
