@@ -13,7 +13,7 @@ As with the Reverse Word example, we will list the components required:
 * Computation for adding votes
 * State objects
 * State change management
-* A list of key that are valid for partitioning our state objects
+* A list of keys that are valid for partitioning our state objects
 * A partitioning function
 
 ### Computation
