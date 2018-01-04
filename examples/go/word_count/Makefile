@@ -41,16 +41,21 @@ WORD_COUNT_GOPATH := $(WORD_COUNT_GO_PATH)/go:$(GO_PONY_LIB)
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-examples-go-word_count: word_count_go_clean word_count_go_build
+build-examples-go-word_count: word_count_go_build
+unit-tests-examples-go-word_count: build-examples-go-word_count
 clean-examples-go-word_count: word_count_go_clean
 
-word_count_go_build:
-	$(QUIET)export GOPATH=$(WORD_COUNT_GOPATH) && go build -buildmode=c-archive -o $(WORD_COUNT_GO_PATH)lib/libwallaroo.a word_count
-	$(QUIET)stable fetch
-	$(QUIET)stable env ponyc
+word_count_go_build: $(WORD_COUNT_GO_PATH)/word_count
 
 word_count_go_clean:
 	$(QUIET)rm -rf $(WORD_COUNT_GO_PATH)/lib $(WORD_COUNT_GO_PATH)/.deps $(WORD_COUNT_GO_PATH)/word_count
+
+-include $(WORD_COUNT_GO_PATH)/word_count.d
+$(WORD_COUNT_GO_PATH)/word_count: $(WORD_COUNT_GO_PATH)/lib/libwallaroo.a
+	$(call PONYC,$(abspath $(WORD_COUNT_GO_PATH:%/=%)))
+
+$(WORD_COUNT_GO_PATH)/lib/libwallaroo.a: $(WORD_COUNT_GO_PATH)/go/src/word_count/word_count.go
+	$(QUIET)export GOPATH=$(WORD_COUNT_GOPATH) && go build -buildmode=c-archive -o $(WORD_COUNT_GO_PATH)lib/libwallaroo.a word_count
 
 # end of prevent rules from being evaluated/included multiple times
 endif

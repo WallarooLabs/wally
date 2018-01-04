@@ -41,16 +41,21 @@ REVERSE_GOPATH := $(REVERSE_GO_PATH)/go:$(GO_PONY_LIB)
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-examples-go-reverse: reverse_go_clean reverse_go_build
+build-examples-go-reverse: reverse_go_build
+unit-tests-examples-go-reverse: build-examples-go-reverse
 clean-examples-go-reverse: reverse_go_clean
 
-reverse_go_build:
-	$(QUIET)export GOPATH=$(REVERSE_GOPATH) && go build -buildmode=c-archive -o $(REVERSE_GO_PATH)lib/libwallaroo.a reverse
-	$(QUIET)stable fetch
-	$(QUIET)stable env ponyc
+reverse_go_build: $(REVERSE_GO_PATH)/reverse
 
 reverse_go_clean:
 	$(QUIET)rm -rf $(REVERSE_GO_PATH)/lib $(REVERSE_GO_PATH)/.deps $(REVERSE_GO_PATH)/reverse
+
+-include $(REVERSE_GO_PATH)/reverse.d
+$(REVERSE_GO_PATH)/reverse: $(REVERSE_GO_PATH)/lib/libwallaroo.a
+	$(call PONYC,$(abspath $(REVERSE_GO_PATH:%/=%)))
+
+$(REVERSE_GO_PATH)/lib/libwallaroo.a: $(REVERSE_GO_PATH)/go/src/reverse/reverse.go
+	$(QUIET)export GOPATH=$(REVERSE_GOPATH) && go build -buildmode=c-archive -o $(REVERSE_GO_PATH)lib/libwallaroo.a reverse
 
 # end of prevent rules from being evaluated/included multiple times
 endif
