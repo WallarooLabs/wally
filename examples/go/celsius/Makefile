@@ -43,6 +43,8 @@ include $(rules_mk_path)
 
 build-examples-go-celsius: celsius_go_build
 unit-tests-examples-go-celsius: build-examples-go-celsius
+integration-tests-examples-go-celsius: build-examples-go-celsius
+integration-tests-examples-go-celsius: celsius_go_test
 clean-examples-go-celsius: celsius_go_clean
 
 celsius_go_build: $(CELSIUS_GO_PATH)/celsius
@@ -56,6 +58,16 @@ $(CELSIUS_GO_PATH)/celsius: $(CELSIUS_GO_PATH)/lib/libwallaroo.a
 
 $(CELSIUS_GO_PATH)/lib/libwallaroo.a: $(CELSIUS_GO_PATH)/go/src/celsius/celsius.go
 	$(QUIET)export GOPATH=$(CELSIUS_GOPATH) && go build -buildmode=c-archive -o $(CELSIUS_GO_PATH)lib/libwallaroo.a celsius
+
+celsius_go_test:
+	cd $(CELSIUS_GO_PATH) && \
+	integration_test --framed-file-sender \
+	  _test.txt --validation-cmp \
+	  --expected-file _expected.txt \
+		--log-level error \
+		--command './celsius' \
+		--sink-mode newlines \
+		--sink-expect 100
 
 # end of prevent rules from being evaluated/included multiple times
 endif
