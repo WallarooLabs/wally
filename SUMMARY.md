@@ -41,7 +41,7 @@
 ## Wallaroo with Python
 * [Wallaroo with Python Introduction](book/python/intro.md)
 
-### Setting up Your Environment
+* -- Setting up Your Environment
 * [Choosing an Installation Option](book/getting-started/choosing-an-installation-option.md)
 * Installing with Docker
   * [Setting Up Your Environment](book/getting-started/docker-setup.md)
@@ -53,7 +53,7 @@
   * [Run a Wallaroo Application](book/getting-started/run-a-wallaroo-application.md)
 * [Conclusion](book/getting-started/conclusion.md)
 
-### Wallaroo Python API
+* -- Wallaroo Python API
 * [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
 * [Writing Your Own Application](book/python/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
@@ -62,18 +62,18 @@
 * [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)
 * [Wallaroo Python API](book/python/api.md)
 
-### Debugging Python Wallaroo Applications
+* -- Debugging Python Wallaroo Applications
 * [Debugging](book/python/debugging.md)
 
 ## Wallaroo with Go
-### Setting up Your Environment
+* -- Setting up Your Environment
 * [Setting up Your Environment](book/go/getting-started/setup.md)
   * [MacOS Installation](book/go/getting-started/macos-setup.md)
   * [Ubuntu Installation](book/go/getting-started/linux-setup.md)
 * [Run a Wallaroo Go Application](book/go/getting-started/run-a-wallaroo-go-application.md)
 * [Conclusion](book/go/getting-started/conclusion.md)
 
-### Wallaroo Go API
+* -- Wallaroo Go API
 * [Go API Introduction](book/go/api/intro.md)
 * [Writing Your Own Application](book/go/api/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/go/api/writing-your-own-stateful-application.md)
