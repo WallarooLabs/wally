@@ -67,13 +67,13 @@ func Serialize(c interface{}) []byte {
 ```
 
 The switch statement handles all of the types that need to be serialized.
-* partition functions -- not applicable to this program
+* partition functions -- not applicable to the Reverse application
 * decoders -- the `Decoder` class
 * encoders -- the `Encoder` class
 * computations -- the `Reverse` class
 * computation builders -- the `ReverseBuilder` class
-* state computations -- not applicable to this program
-* state objects -- not applicable to this program
+* state computations -- not applicable to the Reverse application
+* state objects -- not applicable to the Reverse application
 * messages that pass between steps in a topology -- the `string` class
 
 You are free to select any encoding mechanism that you would like. In
