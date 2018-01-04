@@ -217,7 +217,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
   fun ref _unmute() =>
     ifdef debug then
-      @printf[I32]("Muting KafkaSource\n".cstring())
+      @printf[I32]("Unmuting KafkaSource\n".cstring())
     end
     _kc.consumer_resume(_topic, _partition_id)
 
