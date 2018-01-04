@@ -83,7 +83,7 @@ mkdir -p go/src/PROJECT_NAME
 
 ## Create a Wallaroo Go Application
 
-The code for your application should be under the `go/src/PROJECT_NAME` directory that you created. There must be a `main` package with an empty `main()` function, and your program must export a C function called `ApplicationSetup`. You must also set the `wallarooapi.Serialize` and `wallaroo.Deserialize` variables. Here's an outline of what the application file might look like:
+The code for your application should be under the `go/src/PROJECT_NAME` directory that you created. There must be a `main` package with an empty `main()` function, and your program must export a C function called `ApplicationSetup`. You must also set the `wallarooapi.Serialize` and `wallarooapi.Deserialize` variables. Here's an outline of what the application file might look like:
 
 ```go
 package main
