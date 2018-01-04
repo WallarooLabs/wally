@@ -48,7 +48,7 @@ clean-examples-go-celsius: celsius_go_clean
 celsius_go_build: $(CELSIUS_GO_PATH)/celsius
 
 celsius_go_clean:
-	$(QUIET)rm -rf $(CELSIUS_GO_PATH)/lib $(CELSIUS_GO_PATH)/.deps $(CELSIUS_GO_PATH)/celsius
+	$(QUIET)rm -rf $(CELSIUS_GO_PATH)/lib $(CELSIUS_GO_PATH)/.deps $(CELSIUS_GO_PATH)/celsius $(CELSIUS_GO_PATH)/celsius.d
 
 -include $(CELSIUS_GO_PATH)/celsius.d
 $(CELSIUS_GO_PATH)/celsius: $(CELSIUS_GO_PATH)/lib/libwallaroo.a
