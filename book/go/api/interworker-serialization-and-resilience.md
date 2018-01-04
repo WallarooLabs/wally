@@ -66,16 +66,13 @@ func Serialize(c interface{}) []byte {
 }
 ```
 
-The switch statement handles all of the types that need to be serialized.
+The switch statement handles all of the types that need to be serialized.  (Remember, the Reverse application does not use stateful computations.  Cases for partition functions, state computations, and state objects do not appear in this example).
+
 * decoders -- the `Decoder` class
 * encoders -- the `Encoder` class
 * computations -- the `Reverse` class
 * computation builders -- the `ReverseBuilder` class
 * messages that pass between steps in a topology -- the `string` class
-* types not shown in the example code above but are required by stateful computations. (The Reverse application does not use stateful computations).
-  * partition functions
-  * state computations
-  * state objects
 
 You are free to select any encoding mechanism that you would like. In
 this example we have used a 32-bit integer to represent the type of
