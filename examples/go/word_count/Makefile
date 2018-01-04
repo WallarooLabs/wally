@@ -48,7 +48,7 @@ clean-examples-go-word_count: word_count_go_clean
 word_count_go_build: $(WORD_COUNT_GO_PATH)/word_count
 
 word_count_go_clean:
-	$(QUIET)rm -rf $(WORD_COUNT_GO_PATH)/lib $(WORD_COUNT_GO_PATH)/.deps $(WORD_COUNT_GO_PATH)/word_count
+	$(QUIET)rm -rf $(WORD_COUNT_GO_PATH)/lib $(WORD_COUNT_GO_PATH)/.deps $(WORD_COUNT_GO_PATH)/word_count $(WORD_COUNT_GO_PATH)/word_count.d
 
 -include $(WORD_COUNT_GO_PATH)/word_count.d
 $(WORD_COUNT_GO_PATH)/word_count: $(WORD_COUNT_GO_PATH)/lib/libwallaroo.a
