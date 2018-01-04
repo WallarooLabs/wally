@@ -52,7 +52,7 @@ brew install pony-stable
 
 ## Install Compression Development Libraries
 
-Wallaroo's Kakfa support requires a `libsnappy` and `liblz` to be installed.
+Wallaroo's Kafka support requires a `libsnappy` and `liblz` to be installed.
 
 ```bash
 brew install snappy lz4
