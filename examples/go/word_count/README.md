@@ -37,7 +37,7 @@ You will need three separate shells to run this application. Open each shell and
 Run `data_receiver` to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
-../../../utils/data_receiver --listen 127.0.0.1:7002
+../../../utils/data_receiver/data_receiver --listen 127.0.0.1:7002
 ```
 
 ### Shell 2
