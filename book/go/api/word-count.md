@@ -60,7 +60,7 @@ By now, hopefully, most of this looks somewhat familiar. We're building on conce
 	inPort := inHostsPorts[0][1]
 ```
 
-We point the Wallaro serialization and deserialization functions to our serializer and deserializer:
+We point the Wallaroo serialization and deserialization functions to our serializer and deserializer:
 
 ```go
 	wa.Serialize = Serialize
