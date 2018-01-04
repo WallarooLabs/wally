@@ -2,7 +2,7 @@
 
 The Wallaroo Go API can be used to write Wallaroo applications using Go. 
 
-In order to write a Wallaroo application in Go, the developer creates a series of functions and types that provide methods expected by Wallaroo (see [Wallaroo Go API Classes](api.md) for more detail on this). Additionally, the developer writes an entry point function that Wallaroo uses to lay out the application. 
+In order to write a Wallaroo application in Go, the developer creates a series of functions and types that provide methods expected by Wallaroo (see [Wallaroo Go API Classes](api.md) for more detail). Additionally, the developer writes an entry point function that Wallaroo uses to lay out the application.
 
 For a basic overview of what Wallaroo does, read [What is Wallaroo](/book/what-is-wallaroo.md) and [Core Concepts](/book/core-concepts/intro.md). These documents will help you understand the system at a high level so that you can see how the pieces of the Go API fit into it.
 
