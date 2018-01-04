@@ -10,7 +10,7 @@ For a basic overview of what Wallaroo does, read [What is Wallaroo](/book/what-i
 
 A Wallaroo Go application is a combination of Go library (technically Cgo, we'll cover that in more detail later) and Wallaroo framework code provided by Wallaroo Labs.
 
-You, the application developer, write your application in Go and then compile it into a Go library that will be linked into a final binary using the Pony compiler.
+You, the application developer, write your application in Go and then compile it into a Go library that will be linked into a final executable file using the Pony compiler.
 
 ## Next Steps
 
