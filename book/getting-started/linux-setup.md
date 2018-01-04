@@ -144,7 +144,7 @@ sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui
 
 ## Set up Environment for the Wallaroo Tutorial
 
-If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
 
 ```bash
 cd ~/
