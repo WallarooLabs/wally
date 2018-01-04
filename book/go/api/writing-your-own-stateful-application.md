@@ -204,7 +204,7 @@ func (lpf *LetterPartitionFunction) Partition(data interface{}) uint64 {
 }
 ```
 
-When we set up our state partition, we pass both as arguments to `ToStatePartition` as we saw earlier:
+When we set up our state partition, we pass both functions above as arguments to `ToStatePartition` as we saw earlier:
 
 ```go
 ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions(), true).
