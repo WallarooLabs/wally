@@ -81,7 +81,7 @@ To run `kafkacat` to listen to the `test-out` topic via Docker:
 **NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 1.
 
 ```bash
-docker run --rm -it ryane/kafkacat -C -b 127.0.0.1:9092 -t test-out > celsius.out
+docker run --rm -it ryane/kafkacat -C -b 127.0.0.1:9092 -t test-out -q > celsius.out
 ```
 
 ### Shell 2
