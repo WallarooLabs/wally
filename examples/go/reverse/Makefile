@@ -43,6 +43,8 @@ include $(rules_mk_path)
 
 build-examples-go-reverse: reverse_go_build
 unit-tests-examples-go-reverse: build-examples-go-reverse
+integration-tests-examples-go-reverse: build-examples-go-reverse
+integration-tests-examples-go-reverse: reverse_go_test
 clean-examples-go-reverse: reverse_go_clean
 
 reverse_go_build: $(REVERSE_GO_PATH)/reverse
@@ -56,6 +58,17 @@ $(REVERSE_GO_PATH)/reverse: $(REVERSE_GO_PATH)/lib/libwallaroo.a
 
 $(REVERSE_GO_PATH)/lib/libwallaroo.a: $(REVERSE_GO_PATH)/go/src/reverse/reverse.go
 	$(QUIET)export GOPATH=$(REVERSE_GOPATH) && go build -buildmode=c-archive -o $(REVERSE_GO_PATH)lib/libwallaroo.a reverse
+
+reverse_go_test:
+	cd $(REVERSE_GO_PATH) && \
+	integration_test --csv-sender '1234,5678,1212,1111' \
+	  --validation-cmp \
+		--sink-mode 'newlines' \
+		--expected-csv '4321,8765,2121,1111' \
+		--log-level error \
+		--command './reverse' \
+		--sink-expect 4
+
 
 # end of prevent rules from being evaluated/included multiple times
 endif
