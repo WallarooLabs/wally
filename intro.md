@@ -37,13 +37,13 @@ Once you have finished the "Developing with Wallaroo" section, you can then jump
 
 ### Core Concepts
 
-Covers the concepts you'll need to understand in order to build a Wallaroo application. 
+Covers the concepts you'll need to understand in order to build a Wallaroo application.
 
 ### Wallaroo with Python
 
-How to develop Wallaroo applications using Python. 
+How to develop Wallaroo applications using Python.
 
-The "Setting Up Your Environment for Wallaroo" describes setting up your development environment and then compiling and running a Wallaroo application. The tools you will install then are useful when developing a Wallaroo application.
+The ["Setting Up Your Environment for Wallaroo"](book/getting-started/setup.md) describes setting up your development environment and then compiling and running a Wallaroo application. The tools you will install then are useful when developing a Wallaroo application.
 
 The Wallaroo Python API section takes you through a number of examples applications to teach you the Wallaroo Go API.
 
@@ -51,7 +51,7 @@ The Wallaroo Python API section takes you through a number of examples applicati
 
 How to develop Wallaroo applications using Go.
 
-The "Setting Up Your Environment for Wallaroo" describes setting up your development environment and then compiling and running a Wallaroo application. The tools you will install then are useful when developing a Wallaroo application.
+The ["Setting Up Your Environment for Wallaroo"](book/go/getting-started/setup.md) describes setting up your development environment and then compiling and running a Wallaroo application. The tools you will install then are useful when developing a Wallaroo application.
 
 The Wallaroo Go API section takes you through a number of examples applications to teach you the Wallaroo Go API.
 
