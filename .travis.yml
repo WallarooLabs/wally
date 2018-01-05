@@ -65,5 +65,5 @@ jobs:
       env:
         - RESILIENCE_INTEGRATION_TESTS=t
     - stage: deploy
-      if: branch =~ ^release$ OR branch =~ ^release-(\d).(\d).(\d)$
+      if: type != pull_request AND ( branch =~ ^release$ OR branch =~ ^release-(\d).(\d).(\d)$ )
       script: /bin/bash travis/docker_release.sh
