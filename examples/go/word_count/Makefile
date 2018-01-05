@@ -43,6 +43,8 @@ include $(rules_mk_path)
 
 build-examples-go-word_count: word_count_go_build
 unit-tests-examples-go-word_count: build-examples-go-word_count
+integration-tests-examples-go-word_count: build-examples-go-word_count
+integration-tests-examples-go-word_count: word_count_go_test
 clean-examples-go-word_count: word_count_go_clean
 
 word_count_go_build: $(WORD_COUNT_GO_PATH)/word_count
@@ -56,6 +58,37 @@ $(WORD_COUNT_GO_PATH)/word_count: $(WORD_COUNT_GO_PATH)/lib/libwallaroo.a
 
 $(WORD_COUNT_GO_PATH)/lib/libwallaroo.a: $(WORD_COUNT_GO_PATH)/go/src/word_count/word_count.go
 	$(QUIET)export GOPATH=$(WORD_COUNT_GOPATH) && go build -buildmode=c-archive -o $(WORD_COUNT_GO_PATH)lib/libwallaroo.a word_count
+
+word_count_go_test:
+	cd $(WORD_COUNT_GO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command './word_count' \
+		--sink-mode newlines \
+		--sink-expect 482
+	cd $(WORD_COUNT_GO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command './word_count' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 2
+	cd $(WORD_COUNT_GO_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command './word_count' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 3
 
 # end of prevent rules from being evaluated/included multiple times
 endif
