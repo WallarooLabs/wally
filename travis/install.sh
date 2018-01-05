@@ -137,6 +137,17 @@ install_python_dependencies() {
   echo "** Python dependencies installed"
 }
 
+install_gitbook_dependencies() {
+  # we need npm
+  sudo apt-get install npm
+  # install gitbook
+  npm install gitbook-cli -g
+  # install any required plugins - this checks book.json for plugin list
+  gitbook install
+  # for uploading generated docs to repo
+  sudo python2 -m pip install ghp-import
+}
+
 echo "----- Installing dependencies"
 
 install_cpuset
@@ -145,5 +156,6 @@ install_pony_stable
 install_kafka_compression_libraries
 install_monitoring_hub_dependencies
 install_python_dependencies
+install_gitbook_dependencies
 
 echo "----- Dependencies installed"
