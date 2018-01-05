@@ -7,5 +7,3 @@ set -o nounset
 make build debug=true
 # Validate that unit tests are passing
 make unit-tests debug=true
-
-
