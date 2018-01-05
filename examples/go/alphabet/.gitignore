@@ -2,3 +2,5 @@
 /lib
 /sent.txt
 /.deps
+_expected.json
+_test.txt
