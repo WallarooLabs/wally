@@ -10,6 +10,9 @@
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Partitioning](book/core-concepts/partitioning.md)
 
+## Wallaroo Language Support
+* [Wallaroo Languages Supported](book/language_support.md)
+
 <!--
 ### Wallaroo C++ API
 * [C++ API Introduction](book/cpp/intro.md)
@@ -38,7 +41,7 @@
    * [UserFunctions](book/cpp/api/user-functions.md)
 -->
 
-## Wallaroo with Python
+### Wallaroo with Python
 * [Wallaroo with Python Introduction](book/python/intro.md)
 
 * [Setting up Your Environment](book/getting-started/setting-up-your-environment.md)
@@ -65,7 +68,7 @@
 * Debugging Python Wallaroo Applications
   * [Debugging](book/python/debugging.md)
 
-## Wallaroo with Go
+### Wallaroo with Go
 * [Go API Introduction](book/go/intro.md)
 
 * [Setting up Your Environment](book/go/getting-started/setting-up-your-environment.md)
