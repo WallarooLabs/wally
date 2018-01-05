@@ -44,4 +44,4 @@ To try running an example, go to [the Reverse example application](https://githu
 
 To learn how to write your own Wallaroo Python application, continue to [Writing Your Own Application](writing-your-own-application.md)
 
-To read about the Machida command line arguments, refer to [Appendix: Wallaroo Command-Line Options](/book/appendix/wallaroo-command-line-options.md).
+To find out more detail on the command line arguments and other aspects of running Wallaroo application, see the [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md) section.

@@ -138,3 +138,7 @@ You can shut down the Metrics UI with the following command:
 ```bash
 docker stop mui
 ```
+
+## More Detail
+
+If you'd like more detail on the command line arguments and other aspects of running Wallaroo application, see the [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md) section.
