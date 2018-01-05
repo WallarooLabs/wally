@@ -215,4 +215,4 @@ The complete example is available [here](https://github.com/WallarooLabs/wallaro
 
 ### Next Steps
 
-For further reading, please refer to the [Wallaroo Go API Classes](api.md).
+Learn more about what as an application programmer need to do for [serialization](interworker-serialization-and-resilience.md) when writing a Wallaroo Go application. 
