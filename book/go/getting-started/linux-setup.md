@@ -10,7 +10,7 @@ In order to compile the Wallaroo example applications, your system will need to 
 
 ## Install Go
 
-You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/dl/).
+You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/doc/install).
 
 ## Update apt-get
 
