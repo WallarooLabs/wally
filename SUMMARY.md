@@ -41,19 +41,19 @@
 ## Wallaroo with Python
 * [Wallaroo with Python Introduction](book/python/intro.md)
 
-* Setting up Your Environment
+* [Setting up Your Environment](book/getting-started/setting-up-your-environment.md)
   * [Choosing an Installation Option](book/getting-started/choosing-an-installation-option.md)
-  * Installing with Docker
+  * [Installing with Docker](book/getting-started/installing-with-docker.md)
     * [Setting Up Your Environment](book/getting-started/docker-setup.md)
     * [Run a Wallaroo Application in Docker](book/getting-started/run-a-wallaroo-application-docker.md)
-  * Installing From Source
+  * [Installing From Source](book/getting-started/installing-from-source.md)
     * [Setting up Your Environment](book/getting-started/setup.md)
       * [MacOS Installation](book/getting-started/macos-setup.md)
       * [Ubuntu Installation](book/getting-started/linux-setup.md)
     * [Run a Wallaroo Application](book/getting-started/run-a-wallaroo-application.md)
   * [Conclusion](book/getting-started/conclusion.md)
 
-* Wallaroo Python API
+* [Wallaroo Python API](book/python/wallaroo-python-api.md)
   * [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
   * [Writing Your Own Application](book/python/writing-your-own-application.md)
   * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
@@ -68,14 +68,14 @@
 ## Wallaroo with Go
 * [Go API Introduction](book/go/intro.md)
 
-* Setting up Your Environment
+* [Setting up Your Environment](book/go/getting-started/setting-up-your-environment.md)
   * [Setting up Your Environment](book/go/getting-started/setup.md)
     * [MacOS Installation](book/go/getting-started/macos-setup.md)
     * [Ubuntu Installation](book/go/getting-started/linux-setup.md)
   * [Run a Wallaroo Go Application](book/go/getting-started/run-a-wallaroo-go-application.md)
   * [Conclusion](book/go/getting-started/conclusion.md)
 
-* Wallaroo Go API
+* [Wallaroo Go API](book/go/api/wallaroo-go-api.md)
   * [Writing Your Own Application](book/go/api/writing-your-own-application.md)
   * [Writing Your Own Stateful Application](book/go/api/writing-your-own-stateful-application.md)
   * [Word Count](book/go/word-count.md)
