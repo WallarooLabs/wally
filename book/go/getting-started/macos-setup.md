@@ -6,7 +6,7 @@ There are a few applications/tools which are required to be installed before you
 
 ## Install Go
 
-You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/dl/).
+You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/doc/install).
 
 ## Installing Xcode Command Line Tools
 
