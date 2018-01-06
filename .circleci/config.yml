@@ -1,0 +1,14 @@
+version: 2
+jobs:
+  verify-changelog:
+    docker:
+      - image: ponylang/changelog-tool:release
+    steps:
+      - checkout
+      - run: changelog-tool verify CHANGELOG.md
+
+workflows:
+  version: 2
+  llvms:
+    jobs:
+      - verify-changelog
