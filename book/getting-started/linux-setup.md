@@ -37,15 +37,15 @@ sudo apt-get install -y build-essential
 sudo apt-get install -y libssl-dev
 ```
 
-### Install GCC 5 or Higher
+### Install GCC 4.7 or Higher
 
-You'll need to be using at least `gcc-5`. We rely on its atomics support. If you have at least `gcc-5` installed on your machine, you don't need to do anything. If you have gcc 4 or lower, you'll need to upgrade. You can check your `gcc` version by running:
+ If you have at least GCC 4.7 installed on your machine, you don't need to do anything. If you have gcc 4.6 or lower, you'll need to upgrade. You can check your `gcc` version by running:
 
 ```bash
 gcc --version
 ```
 
-To upgrade:
+To upgrade to GCC 5 if you don't have at least GCC 4.7:
 
 ```bash
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
