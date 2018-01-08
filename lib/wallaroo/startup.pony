@@ -566,6 +566,21 @@ actor Startup
       Fail()
     end
 
+  be recover_not_join() =>
+    """
+    Called when the cluster informs us we should be recovering instead of
+    joining (i.e. we've already joined, so we must be coming back up).
+    """
+    // Dispose of temporary listener
+    match _joining_listener
+    | let tcp_l: TCPListener =>
+      tcp_l.dispose()
+    else
+      Fail()
+    end
+
+    initialize()
+
   fun ref _set_recovery_file_names(auth: AmbientAuth) =>
     try
       _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)?

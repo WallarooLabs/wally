@@ -238,6 +238,14 @@ primitive ChannelMsgEncoder
       partition_blueprints, stateless_partition_blueprints,
       omni_router_blueprint), auth)?
 
+  fun inform_recover_not_join(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    """
+    This message is sent as a response to a JoinCluster message when we
+    already know the worker name (which indicates that it is recovering, not
+    joining)
+    """
+    _encode(InformRecoverNotJoinMsg, auth)?
+
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
     d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -694,6 +702,8 @@ class val InformJoiningWorkerMsg is ChannelMsg
     partition_router_blueprints = p_blueprints
     stateless_partition_router_blueprints = stateless_p_blueprints
     omni_router_blueprint = omr_blueprint
+
+primitive InformRecoverNotJoinMsg is ChannelMsg
 
 // TODO: Don't send host over since we need to determine that on receipt
 class val JoiningWorkerInitializedMsg is ChannelMsg

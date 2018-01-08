@@ -1654,10 +1654,27 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
     end
 
-  be inform_joining_worker(conn: TCPConnection, worker_name: String) =>
+  be inform_joining_worker(conn: TCPConnection, worker_name: String,
+    worker_count: USize)
+  =>
     match _topology
     | let t: LocalTopology =>
-      _router_registry.inform_joining_worker(conn, worker_name, t)
+      if ArrayHelpers[String].contains[String](t.worker_names, worker_name)
+      then
+        // We know this worker name, which indicates that it is recovering
+        // instead of joining.
+        try
+          @printf[I32]("Previously joined worker %s is recovering\n".cstring(),
+            worker_name.cstring())
+          let msg = ChannelMsgEncoder.inform_recover_not_join(_auth)?
+          conn.writev(msg)
+        else
+          Fail()
+        end
+      else
+        _router_registry.update_joining_worker_count(worker_count)
+        _router_registry.inform_joining_worker(conn, worker_name, t)
+      end
     else
       Fail()
     end

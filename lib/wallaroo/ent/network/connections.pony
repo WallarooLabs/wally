@@ -515,13 +515,20 @@ actor Connections is Cluster
     service: String)
   =>
     _control_addrs(target_name) = (host, service)
-    let tcp_conn_wrapper = ControlConnection
+    let tcp_conn_wrapper =
+      if _control_conns.contains(target_name) then
+        try _control_conns(target_name)? else Fail(); ControlConnection end
+      else
+        ControlConnection
+      end
+    if not _control_conns.contains(target_name) then
+      _control_conns(target_name) = tcp_conn_wrapper
+    end
     _register_disposable(tcp_conn_wrapper)
     let control_notifier: TCPConnectionNotify iso =
       ControlSenderConnectNotifier(_auth, target_name, tcp_conn_wrapper)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
-    _control_conns(target_name) = tcp_conn_wrapper
 
   be reconnect_data_connection(target_name: String) =>
     if _data_conns.contains(target_name) then

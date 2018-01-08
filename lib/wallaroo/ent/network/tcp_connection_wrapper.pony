@@ -20,6 +20,9 @@ actor ControlConnection
     _control_sender.flush(conn)
     _control_sender = _PostTCPConnectionControlSender(conn)
 
+  be closed(conn: TCPConnection) =>
+    _control_sender = _PreTCPConnectionControlSender
+
   be write(data: ByteSeq) =>
     _control_sender.write(data)
 
