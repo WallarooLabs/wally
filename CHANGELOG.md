@@ -10,6 +10,7 @@ All notable changes to Wallaroo will be documented in this file.
 - Fix shrink autoscale query reply ([PR #1862](https://github.com/wallaroolabs/wallaroo/pull/1862))
 ### Added
 
+- Add "Running Wallaroo" section to book ([PR #1914](https://github.com/wallaroolabs/wallaroo/pull/1914))
 - Initial Go API ([PR #1866](https://github.com/wallaroolabs/wallaroo/pull/1866))
 ### Changed
 
