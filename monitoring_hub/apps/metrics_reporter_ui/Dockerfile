@@ -1,6 +1,7 @@
-FROM ubuntu:15.10
+FROM ubuntu:16.04
 
 # Set locale, elixir needs this
+RUN apt-get update && apt-get install -y locales
 RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
