@@ -83,7 +83,8 @@ actor RouterRegistry
   var _stop_the_world_in_process: Bool = false
   var _leaving_in_process: Bool = false
   var _joining_worker_count: USize = 0
-  let _initialized_joining_workers: SetIs[String] = SetIs[String]
+  let _initialized_joining_workers: _StringSet =
+    _initialized_joining_workers.create()
   // Steps migrated out and waiting for acknowledgement
   let _step_waiting_list: SetIs[U128] = _step_waiting_list.create()
   // Workers in running cluster that have been stopped for migration
@@ -530,8 +531,9 @@ actor RouterRegistry
   be joining_worker_initialized(worker: String) =>
     if _joining_worker_count == 0 then
       ifdef debug then
-        @printf[I32]("Joining worker reported as initialized,
-          but we're not waiting for it (perhaps we're joining too\n".cstring())
+        @printf[I32](("Joining worker reported as initialized, but we're " +
+          "not waiting for it. This should mean that either we weren't the " +
+          "worker contacted for the join or we're also joining.\n").cstring())
       end
       return
     end
@@ -542,6 +544,7 @@ actor RouterRegistry
         new_workers.push(w)
       end
       migrate_onto_new_workers(consume new_workers)
+      _initialized_joining_workers.clear()
       _joining_worker_count = 0
     end
 
@@ -1113,6 +1116,9 @@ class _StringSet
 
   fun ref unset(s: String) =>
     try _map.remove(s)? end
+
+  fun ref clear() =>
+    _map.clear()
 
   fun size(): USize =>
     _map.size()
