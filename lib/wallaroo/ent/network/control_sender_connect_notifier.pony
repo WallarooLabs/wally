@@ -43,3 +43,4 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     @printf[I32]("ControlSenderConnectNotifier: server closed\n".cstring())
+    _tcp_conn_wrapper.closed(conn)

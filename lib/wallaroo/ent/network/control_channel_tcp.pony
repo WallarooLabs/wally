@@ -182,6 +182,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           end
           _connections.create_control_connection(m.worker_name, host,
             m.service)
+        else
+          @printf[I32]("Error retrieving remote control address\n".cstring())
         end
       | let m: IdentifyDataPortMsg =>
         ifdef "trace" then
@@ -276,8 +278,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         ifdef "autoscale" then
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
-            lti.inform_joining_worker(conn, m.worker_name)
-            _router_registry.update_joining_worker_count(m.worker_count)
+            lti.inform_joining_worker(conn, m.worker_name, m.worker_count)
           else
             Fail()
           end
@@ -422,6 +423,9 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
+      | let m: InformRecoverNotJoinMsg =>
+        @printf[I32]("Informed that we should recover.\n".cstring())
+        _startup.recover_not_join()
       | let m: CleanShutdownMsg =>
         @printf[I32]("Shutting down early: %s\n".cstring(), m.msg.cstring())
         _startup.dispose()
