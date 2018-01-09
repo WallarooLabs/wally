@@ -24,7 +24,7 @@ docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-src:/src/wallaroo \
 -v /tmp/wallaroo-docker/python-virtualenv:/src/python-virtualenv \
 --name wally \
-wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.3.3
+wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:{{ book.wallaroo_version }}
 ```
 
 ### Breaking down the Docker command
