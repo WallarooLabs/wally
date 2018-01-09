@@ -6,9 +6,9 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
-- Fix but that caused worker joins to fail after the first successful round. ([PR #1927](https://github.com/wallaroolabs/wallaroo/pull/1927))
+- Fix bug that caused worker joins to fail after the first successful round. ([PR #1927](https://github.com/wallaroolabs/wallaroo/pull/1927))
 
-### Added 
+### Added
 
 - Add "Running Wallaroo" section to book ([PR #1914](https://github.com/wallaroolabs/wallaroo/pull/1914))
 
