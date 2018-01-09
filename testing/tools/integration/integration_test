@@ -8,22 +8,14 @@ import random
 import re
 import struct
 
-# set up basic logging
-logging.root.name = 'integration'
-logging.root.setLevel(logging.DEBUG)
-logging.root.formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(logging.root.formatter)
-logging.root.addHandler(stream_handler)
-
-
 from integration import (ex_validate,
                          files_generator,
                          iter_generator,
                          pipeline_test,
-                         sequence_generator)
+                         sequence_generator,
+                         set_logging)
 
+set_logging(name='integration', level=logging.DEBUG)
 
 """
 Run an integration test as a CLI

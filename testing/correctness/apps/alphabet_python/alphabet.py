@@ -25,10 +25,11 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     letter_partitions = [a + b for a in lowercase for b in lowercase]
+    letter_partitions.append('!')
     ab = wallaroo.ApplicationBuilder("alphabet")
     ab.new_pipeline("alphabet",
                     wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-    ab.to_state_partition(add_votes, TotalVotes, "letter state",
+    ab.to_state_partition(add_votes, TotalVotes, "letter-state",
                           partition, letter_partitions)
     ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()

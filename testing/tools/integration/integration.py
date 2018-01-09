@@ -28,9 +28,44 @@ import tempfile
 import threading
 import time
 
-from metrics_parser import MetricsParser
+from metrics_parser import (MetricsData,
+                            MetricsParser,
+                            MetricsParseError)
 
 
+INFO2 = logging.INFO + 1
+logging.addLevelName(INFO2, 'INFO2')
+
+
+DEFAULT_LOG_FMT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+def set_logging(name='', level=logging.INFO, fmt=DEFAULT_LOG_FMT):
+    logging.root.name = name
+    logging.root.setLevel(level)
+    logging.root.formatter = logging.Formatter(fmt)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(logging.root.formatter)
+    logging.root.addHandler(stream_handler)
+
+
+# Error classes
+class StopError(Exception):
+    pass
+
+
+class TimeoutError(StopError):
+    pass
+
+
+class ExpectationError(StopError):
+    pass
+
+
+class PipelineTestError(Exception):
+    pass
+
+
+
+# Integration helper classes
 class StoppableThread(threading.Thread):
     """
     A convenience baseclass for daemonized, stoppable thread classes.
@@ -277,20 +312,59 @@ class MetricsStopper(StoppableThread):
         super(MetricsStopper, self).stop()
 
 
+class MetricsNotifier(StoppableThread):
+    """
+    Stop the sink after receiving an expected value or values.
+    """
+    __base_name__ = 'SinkAwaitValue'
+
+    def __init__(self, sink, values, timeout=30):
+        super(SinkAwaitValue, self).__init__()
+        self.sink = sink
+        if isinstance(values, (list, tuple)):
+            self.values = set(values)
+        else:
+            self.values = set((values, ))
+        self.timeout = timeout
+        self.name = self.__base_name__
+        self.error = None
+        self.position = 0
+
+    def run(self):
+        started = time.time()
+        while not self.stopped():
+            msgs = len(self.sink.data)
+            if msgs and msgs > self.position:
+                while self.position < msgs:
+                    for val in list(self.values):
+                        if self.sink.data[self.position] == val:
+                            self.values.discard(val)
+                            logging.debug("{} matched on value {}."
+                                          .format(self.name,
+                                                  val))
+                    if not self.values:
+                        self.stop()
+                        break
+                    self.position += 1
+            if time.time() - started > self.timeout:
+                self.error = TimeoutError('{}: has timed out after {} seconds'
+                                          ', with {} messages. before '
+                                          'receiving the awaited values '
+                                          '{!r}.'.format(self.name,
+                                                         self.timeout,
+                                                         msgs,
+                                                         self.values))
+                self.stop()
+                break
+            time.sleep(0.1)
+
+    def stop(self):
+        logging.debug('%s: stopping Sink Receiver', self.name)
+        self.sink.stop()
+        super(SinkAwaitValue, self).stop()
+
 class Sink(TCPReceiver):
     __base_name__ = 'Sink'
-
-
-class StopError(Exception):
-    pass
-
-
-class TimeoutError(StopError):
-    pass
-
-
-class ExpectationError(StopError):
-    pass
 
 
 class SinkExpect(StoppableThread):
@@ -619,8 +693,8 @@ class Runner(threading.Thread):
 
     def run(self):
         try:
-            logging.info("{}: Running:\n{}".format(self.name,
-                                                   self.cmd_string))
+            logging.log(INFO2, "{}: Running:\n{}".format(self.name,
+                                                         self.cmd_string))
             self.p = subprocess.Popen(args=self.cmd_args,
                                       stdout=self.file,
                                       stderr=subprocess.STDOUT)
@@ -642,10 +716,31 @@ class Runner(threading.Thread):
         except:
             pass
 
-    def get_output(self):
+    def is_alive(self):
+        if self.p is None:
+            raise ValueError("Runner hasn't started yet.")
+        status = self.p.poll()
+        if status is None:
+            return True
+        else:
+            return False
+
+    def poll(self):
+        if self.p is None:
+            raise ValueError("Runner hasn't started yet.")
+        return self.p.poll()
+
+    def get_output(self, start_from=0):
         self.file.flush()
         with open(self.file.name, 'rb') as ro:
+            ro.seek(start_from)
             return ro.read()
+
+    def tell(self):
+        """
+        Return the STDOUT file's current position
+        """
+        return self.file.tell()
 
     def respawn(self):
         return Runner(self.cmd_string, self.name)
@@ -678,10 +773,7 @@ class RunnerReadyChecker(StoppableThread):
                         self.stop()
                         break
                 if time.time() - started > self.timeout:
-                    outputs = [(r.name, r.get_output()) for r in
-                               self.runners]
-                    outputs = '\n===\n'.join(('\n---\n'.join(t) for t in
-                                              outputs))
+                    outputs = runners_output_format(runners)
                     self.error = TimeoutError(
                         'Application did not report as ready after {} '
                         'seconds. It had the following outputs:\n===\n{}'
@@ -693,10 +785,12 @@ class RunnerReadyChecker(StoppableThread):
 class RunnerChecker(StoppableThread):
     __base_name__ = 'RunnerChecker'
 
-    def __init__(self, runner, patterns, timeout=30):
+    def __init__(self, runner, patterns, timeout=30, start_from=0):
         super(RunnerChecker, self).__init__()
         self.name = self.__base_name__
+        self.runner = runner
         self.runner_name = runner.name
+        self.start_from = start_from
         self._path = runner.file.name
         self.timeout = timeout
         self.error = None
@@ -708,7 +802,7 @@ class RunnerChecker(StoppableThread):
 
     def run(self):
         with open(self._path, 'rb') as r:
-            last_match = 0
+            last_match = self.start_from
             started = time.time()
             while not self.stopped():
                 r.seek(last_match)
@@ -722,23 +816,31 @@ class RunnerChecker(StoppableThread):
                         logging.debug('Pattern %r found in runner STDOUT.'
                                       % match.re.pattern)
                         self.compiled.pop(0)
-                        last_match = 0
+                        last_match = self.start_from
                         if self.compiled:
                             continue
                         self.stop()
                         break
                 if time.time() - started > self.timeout:
-                    r.seek(0)
+                    r.seek(self.start_from)
                     stdout = r.read()
                     self.error = TimeoutError(
                         'Runner {!r} did not have patterns {!r}'
-                        ' after {} '
-                        'seconds. It had the following output:\n---\n{}'
+                        ' after {} seconds.'
                         .format(self.runner_name,
                                 [rx.pattern for rx in self.compiled],
-                                self.timeout, stdout))
+                                self.timeout))
                     self.stop()
                     break
+
+
+def runners_output_format(runners):
+    """
+    Format runners' STDOUTs for printing or for inclusion in an error
+    """
+    outputs = [(r.name, r.get_output()) for r in runners]
+    return '\n===\n'.join(('--- {0} ->\n\n{1}\n\n--- {0} <-'
+                           .format(*t) for t in outputs))
 
 
 def ex_validate(cmd):
@@ -793,10 +895,6 @@ def is_address_available(host, port):
         return False
 
 
-class PipelineTestError(Exception):
-    pass
-
-
 def get_port_values(num=1, host='127.0.0.1', base_port=20000):
     """
     Get the requested number (default: 1) of free ports for a given host
@@ -817,7 +915,6 @@ BASE_COMMAND = r'''{command} \
     --in {inputs} \
     --out {outputs} \
     --metrics {host}:{metrics_port} \
-    --control {host}:{control_port} \
     --resilience-dir {res_dir} \
     --name {{name}} \
     {{initializer_block}} \
@@ -832,10 +929,12 @@ INITIALIZER_CMD = r'''{worker_count} \
     --data {host}:{data_port} \
     --external {host}:{external_port} \
     --cluster-initializer'''
-WORKER_CMD = r'''--my-control {host}:{control_port} \
+WORKER_CMD = r'''
+    --my-control {host}:{control_port} \
     --my-data {host}:{data_port}'''
-JOIN_CMD = r'''--join {host}:{control_port} \
+JOIN_CMD = r'''--join {host}:{join_port} \
     {worker_count}'''
+CONTROL_CMD = r'''--control {host}:{control_port}'''
 WORKER_COUNT_CMD = r'''--worker-count {worker_count}'''
 SPIKE_CMD = r'''--spike-drop \
     {prob} \
@@ -855,7 +954,6 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
                                    inputs=inputs,
                                    outputs=outputs,
                                    metrics_port=metrics_port,
-                                   control_port=control_port,
                                    res_dir=res_dir)
 
     # for each worker, assign `name` and `cluster-initializer` values
@@ -879,9 +977,10 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
             external_port=external_port,
             host=host),
         worker_block='',
-        join_block='',
+        join_block=CONTROL_CMD.format(host=host, control_port=control_port),
         alt_block=alt_block if alt_func(x) else '',
         spike_block=spike_block)
+    logging.log(51, 'initializer command is :\n{}'.format(cmd))
     runners.append(Runner(cmd_string=cmd, name='initializer'))
     for x in range(1, workers):
         if x in spikes:
@@ -897,9 +996,10 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
                               initializer_block='',
                               worker_block=WORKER_CMD.format(
                                   host=host,
-                                  control_port=worker_ports[x-1][0],
-                                  data_port=worker_ports[x-1][1]),
-                              join_block='',
+                                  data_port=worker_ports[x-1][1],
+                                  control_port=worker_ports[x-1][0]),
+                              join_block=CONTROL_CMD.format(host=host,
+                                  control_port=control_port),
                               alt_block=alt_block if alt_func(x) else '',
                               spike_block=spike_block)
         runners.append(Runner(cmd_string=cmd,
@@ -935,7 +1035,6 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
                                    inputs=inputs,
                                    outputs=outputs,
                                    metrics_port=metrics_port,
-                                   control_port=control_port,
                                    res_dir=res_dir)
 
     # Test that the new worker *can* join
@@ -965,7 +1064,7 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
                               data_port=my_data_port),
                           join_block=JOIN_CMD.format(
                               host=host,
-                              control_port=control_port,
+                              join_port=control_port,
                               worker_count=(WORKER_COUNT_CMD.format(
                                   worker_count=workers) if workers else '')),
                           alt_block=alt_block if alt_func(x) else '',
@@ -1341,8 +1440,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 alive.append(r)
         if alive:
             alive_names = ', '.join((r.name for r in alive))
-            outputs = [(r.name, r.get_output()) for r in runners]
-            outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
+            outputs = runners_output_format(runners)
             for a in alive:
                 a.kill()
             raise PipelineTestError("Runners [{}] failed to exit cleanly after"

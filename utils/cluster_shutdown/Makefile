@@ -35,6 +35,8 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
 
+CLUSTER_SHUTDOWN_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 # standard rules generation makefile
 include $(rules_mk_path)
 
