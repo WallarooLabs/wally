@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Do not force shrink count to a minimum of 1 ([PR #1931](https://github.com/wallaroolabs/wallaroo/pull/1931))
 - Fix bug that caused worker joins to fail after the first successful round. ([PR #1927](https://github.com/wallaroolabs/wallaroo/pull/1927))
 
 ### Added
