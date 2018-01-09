@@ -198,10 +198,6 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
   fun apply(h: TestHelper) ? =>
     """
     Test round-trip serialization of ExternalShrinkMsg.
-
-    Note an "ah-hah" requirement: if both the node_names array
-    empty and also num_nodes is zero, then by default we should
-    observe node_names empty and num_nodes equal to *one*.
     """
     let node_names: Array[String] = [""; "a"; "lovely b"; ""; "node c"]
 
