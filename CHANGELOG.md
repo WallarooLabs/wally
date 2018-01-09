@@ -14,6 +14,8 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Changed
 
+- Turn off building with AVX512f CPU extensions to work around a LLVM bug ([PR #1932](https://github.com/WallarooLabs/wallaroo/pull/1932))
+
 ## [0.3.2] - 2017-12-28
 
 ### Fixed
