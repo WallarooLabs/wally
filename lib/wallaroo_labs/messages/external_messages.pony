@@ -135,8 +135,6 @@ primitive ExternalMsgEncoder
   =>
     if (query is true) then
       _encode_shrink(_Shrink(), true, Array[String], 0, wb)
-    elseif (node_names.size() == 0) and (num_nodes == 0) then
-      _encode_shrink(_Shrink(), false, node_names, 1, wb)
     else
       _encode_shrink(_Shrink(), false, node_names, num_nodes, wb)
     end
