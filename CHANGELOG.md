@@ -14,6 +14,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Changed
 
+- New version of Python API based on decorators ([PR #1833](https://github.com/wallaroolabs/wallaroo/pull/1833))
 
 ## [0.3.3] - 2017-01-09
 
