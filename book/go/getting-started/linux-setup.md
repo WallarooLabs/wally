@@ -10,7 +10,7 @@ In order to compile the Wallaroo example applications, your system will need to 
 
 ## Install Go
 
-You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/dl/).
+You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/doc/install).
 
 ## Update apt-get
 
@@ -137,12 +137,12 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Download the Metrics UI
 
 ```bash
-sudo docker pull wallaroolabs/wallaroo-metrics-ui:0.1
+sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.3
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
 
-If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
 
 ```bash
 cd ~/
@@ -155,7 +155,7 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.3.0
+git 0.3.3
 ```
 ## Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool
 

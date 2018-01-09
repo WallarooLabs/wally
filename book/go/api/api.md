@@ -66,7 +66,7 @@ Add a stateless computation that only returns one message to the current pipelin
 
 Similar to `To`, but the computation can return more than one message.
 
-##### `ToStatePartition(stateComputation wallarooapi.StateComputation, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64, multiworker bool) *pipelineBuilder`
+##### `ToStatePartition(stateComputation wallarooapi.StateComputation, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64) *pipelineBuilder`
 
 Add a partitioned state computation that only returns one message to the pipeline.
 
@@ -78,9 +78,7 @@ Add a partitioned state computation that only returns one message to the pipelin
 
 `partitions` is a list of all of the partitions for the partitioned state.
 
-`multiworker` determines how partitions are distributed across workers and should always be true.
-
-##### `ToStatePartitionMulti(stateComputation wallarooapi.StateComputationMulti, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64, multiworker bool) *pipelineBuilder`
+##### `ToStatePartitionMulti(stateComputation wallarooapi.StateComputationMulti, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64) *pipelineBuilder`
 
 Similar to `ToStatePartition`, but the computation can return more than one message.
 

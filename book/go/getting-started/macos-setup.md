@@ -6,7 +6,7 @@ There are a few applications/tools which are required to be installed before you
 
 ## Install Go
 
-You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/dl/).
+You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/doc/install).
 
 ## Installing Xcode Command Line Tools
 
@@ -71,12 +71,12 @@ Installing Docker will result in it running on your machine. After you reboot yo
 ## Download the Metrics UI
 
 ```bash
-docker pull wallaroolabs/wallaroo-metrics-ui:0.1
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.3
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
 
-If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
 
 ```bash
 cd ~/
@@ -90,7 +90,7 @@ cloned the Wallaroo repo, do so now:
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.3.0
+git checkout 0.3.3
 ```
 
 This will create a subdirectory called `wallaroo`.

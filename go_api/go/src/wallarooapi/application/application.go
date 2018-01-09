@@ -57,21 +57,21 @@ func (pb *pipelineBuilder) ToMulti(computationBuilder wa.ComputationMultiBuilder
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 
-func (pb *pipelineBuilder) ToStatePartition(stateComputation wa.StateComputation, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64, multiWorker bool) *pipelineBuilder {
+func (pb *pipelineBuilder) ToStatePartition(stateComputation wa.StateComputation, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64) *pipelineBuilder {
 	computationId := wa.AddComponent(stateComputation, wa.StateComputationTypeId)
 	stateBuilderId := wa.AddComponent(stateBuilder, wa.StateBuilderTypeId)
 	partitionFunctionId := wa.AddComponent(partitionFunction, wa.PartitionFunctionTypeId)
 	partitionId := wa.AddComponent(partitions, wa.PartitionListTypeId)
-	newStepId := pb.pipeline.AddToStatePartition(pb.lastStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId, multiWorker)
+	newStepId := pb.pipeline.AddToStatePartition(pb.lastStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId)
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 
-func (pb *pipelineBuilder) ToStatePartitionMulti(stateComputation wa.StateComputationMulti, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64, multiWorker bool) *pipelineBuilder {
+func (pb *pipelineBuilder) ToStatePartitionMulti(stateComputation wa.StateComputationMulti, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64) *pipelineBuilder {
 	computationId := wa.AddComponent(stateComputation, wa.StateComputationTypeId)
 	stateBuilderId := wa.AddComponent(stateBuilder, wa.StateBuilderTypeId)
 	partitionFunctionId := wa.AddComponent(partitionFunction, wa.PartitionFunctionTypeId)
 	partitionId := wa.AddComponent(partitions, wa.PartitionListTypeId)
-	newStepId := pb.pipeline.AddToStatePartitionMulti(pb.lastStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId, multiWorker)
+	newStepId := pb.pipeline.AddToStatePartitionMulti(pb.lastStepId, computationId, stateBuilderId, stateName, partitionFunctionId, partitionId)
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 

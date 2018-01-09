@@ -2,13 +2,13 @@
 
 In this section, we're going to run an example Wallaroo Go application. By the time you are finished, you'll have validated that your environment is set up and working correctly.
 
-There's a couple Wallaroo support applications that you'll be interacting with for the first time:
+There are a few Wallaroo support applications that you'll be interacting with for the first time:
 
 - Our Metrics UI allows you to monitor the performance and health of your applications.
 - Data Receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
 
-You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data Receiver will receive the output and our Metrics UI will be running so you can observe the overall performance.
+You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data Receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
 
 The Metrics UI process will be run in the background via Docker.  The other three processes (receiver, sender, and Wallaroo) will run in the foreground.  We recommend that you run each process in a separate terminal.
 
@@ -22,7 +22,7 @@ To start the Metrics UI run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  wallaroolabs/wallaroo-metrics-ui:0.1
+  wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.3
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -65,7 +65,7 @@ cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
 make
 ```
 
-Now start up the "Celsius to Fahrenheit" application
+Now start up the "Celsius to Fahrenheit" application.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius

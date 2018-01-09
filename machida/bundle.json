@@ -5,7 +5,7 @@
       },
       { "type": "github",
         "repo": "WallarooLabs/pony-kafka",
-        "tag": "ca9156b"
+        "tag": "0.3.3"
       }
   ]
 }

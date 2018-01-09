@@ -49,7 +49,7 @@ func ApplicationSetup() *C.char {
 
   application := app.MakeApplication("Alphabet")
   application.NewPipeline("Alphabet", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
-    ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions(), true).
+    ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions()).
     ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
   return C.CString(application.ToJson())

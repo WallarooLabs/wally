@@ -608,8 +608,9 @@ class Runner(threading.Thread):
     def __init__(self, cmd_string, name):
         super(Runner, self).__init__()
         self.daemon = True
-        self.cmd_string = cmd_string
-        self.cmd_args = shlex.split(cmd_string)
+        self.cmd_string = ' '.join(v.strip('\\').strip() for v in
+                                  cmd_string.splitlines())
+        self.cmd_args = shlex.split(self.cmd_string)
         self.error = None
         self.file = tempfile.NamedTemporaryFile()
         self.p = None

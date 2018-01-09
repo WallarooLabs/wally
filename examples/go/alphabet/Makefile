@@ -43,6 +43,8 @@ include $(rules_mk_path)
 
 build-examples-go-alphabet: alphabet_go_build
 unit-tests-examples-go-alphabet: build-examples-go-alphabet
+integration-tests-examples-go-alphabet: build-examples-go-alphabet
+integration-tests-examples-go-alphabet: alphabet_go_test
 clean-examples-go-alphabet: alphabet_go_clean
 
 alphabet_go_build: $(ALPHABET_GO_PATH)/alphabet
@@ -56,6 +58,40 @@ $(ALPHABET_GO_PATH)/alphabet: $(ALPHABET_GO_PATH)/lib/libwallaroo.a
 
 $(ALPHABET_GO_PATH)/lib/libwallaroo.a: $(ALPHABET_GO_PATH)/go/src/alphabet/alphabet.go
 	$(QUIET)export GOPATH=$(ALPHABET_GOPATH) && go build -buildmode=c-archive -o $(ALPHABET_GO_PATH)lib/libwallaroo.a alphabet
+
+alphabet_go_test:
+	cd $(ALPHABET_GO_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command './alphabet' \
+		--sink-mode newlines \
+		--sink-expect 1000
+	cd $(ALPHABET_GO_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command './alphabet' \
+		--sink-mode newlines \
+		--sink-expect 1000 \
+		--workers 2
+	cd $(ALPHABET_GO_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command './alphabet' \
+		--sink-mode newlines \
+		--sink-expect 1000 \
+		--workers 3
 
 # end of prevent rules from being evaluated/included multiple times
 endif
