@@ -358,14 +358,14 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     true
 
   fun ref connected(conn: TCPConnection ref) =>
-    @printf[I32]((_name + " is connected.\n").cstring())
+    @printf[I32]("ControlChannelConnectNotifier: connected.\n".cstring())
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    @printf[I32]((_name + ": connection failed!\n").cstring())
+    @printf[I32]("ControlChannelConnectNotifier: connection failed!\n"
+      .cstring())
 
   fun ref closed(conn: TCPConnection ref) =>
-    @printf[I32](("ControlChannelConnectNotifier:" + _name +
-      ": server closed\n").cstring())
+    @printf[I32](("ControlChannelConnectNotifier: server closed\n").cstring())
 
 class JoiningControlSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth

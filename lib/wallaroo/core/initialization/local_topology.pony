@@ -528,8 +528,6 @@ actor LocalTopologyInitializer is LayoutInitializer
       @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
 
-    _connections.recover_connections(this)
-
   fun ref _save_worker_names()
   =>
     """
