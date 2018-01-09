@@ -18,12 +18,14 @@ use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
+use "wallaroo/core/messages"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
 
@@ -79,6 +81,7 @@ actor RouterRegistry
   // Partition Migration
   //////
   var _stop_the_world_in_process: Bool = false
+  var _leaving_in_process: Bool = false
   var _joining_worker_count: USize = 0
   let _initialized_joining_workers: SetIs[String] = SetIs[String]
   // Steps migrated out and waiting for acknowledgement
@@ -89,6 +92,9 @@ actor RouterRegistry
   // Migration targets that have not yet acked migration batch complete
   let _migration_target_ack_list: _StringSet =
     _migration_target_ack_list.create()
+
+  // For keeping track of leaving workers during an autoscale shrink
+  let _leaving_workers: _StringSet = _leaving_workers.create()
   // Used as a proxy for RouterRegistry when muting and unmuting sources
   // and data channel.
   // TODO: Probably change mute()/unmute() interface so we don't need this
@@ -626,7 +632,12 @@ actor RouterRegistry
     """
     _step_waiting_list.unset(step_id)
     if (_step_waiting_list.size() == 0) then
-      _send_migration_batch_complete()
+      if _leaving_in_process then
+        _send_leaving_worker_done_migrating()
+        _connections.shutdown()
+      else
+        _send_migration_batch_complete()
+      end
     end
 
   fun _send_migration_batch_complete() =>
@@ -641,6 +652,20 @@ actor RouterRegistry
       else
         Fail()
       end
+    end
+
+  fun _send_leaving_worker_done_migrating() =>
+    """
+    Inform migration target that the entire migration batch has been sent.
+    """
+    @printf[I32]("--Sending leaving worker done migration msg to cluster\n"
+      .cstring())
+    try
+      let msg = ChannelMsgEncoder.leaving_worker_done_migrating(_worker_name,
+        _auth)?
+      _connections.send_control_to_cluster(msg)
+    else
+      Fail()
     end
 
   be remote_mute_request(originating_worker: String) =>
@@ -662,11 +687,13 @@ actor RouterRegistry
   fun ref _unmute_request(originating_worker: String) =>
     _stopped_worker_waiting_list.unset(originating_worker)
     if (_stopped_worker_waiting_list.size() == 0) then
-      if _migration_target_ack_list.size() == 0 then
+      if (_migration_target_ack_list.size() == 0) and
+        (_leaving_workers.size() == 0)
+      then
         _resume_the_world()
       else
         // We should only unmute ourselves once _migration_target_ack_list is
-        // empty, which means we should never reach this line
+        // empty for grow and _leaving_workers is empty for shrink
         Fail()
       end
     end
@@ -709,7 +736,7 @@ actor RouterRegistry
       source.unmute(_dummy_consumer)
     end
 
-  be try_to_resume_processing_immediately() =>
+  fun ref try_to_resume_processing_immediately() =>
     if _step_waiting_list.size() == 0 then
       _send_migration_batch_complete()
     end
@@ -721,7 +748,7 @@ actor RouterRegistry
     """
     _connections.ack_migration_batch_complete(sender_name)
 
-  fun _migrate_partition_steps(state_name: String,
+  fun ref _migrate_partition_steps(state_name: String,
     target_workers: Array[String] val)
   =>
     """
@@ -733,8 +760,12 @@ actor RouterRegistry
         @printf[I32]("Migrating steps for %s partition to %s\n".cstring(),
           state_name.cstring(), w.cstring())
       end
+
+      let sorted_target_workers =
+        ArrayHelpers[String].sorted[String](target_workers)
+
       let tws = recover trn Array[(String, OutgoingBoundary)] end
-      for w in target_workers.values() do
+      for w in sorted_target_workers.values() do
         let boundary = _outgoing_boundaries(w)?
         tws.push((w, boundary))
       end
@@ -745,7 +776,7 @@ actor RouterRegistry
       Fail()
     end
 
-  fun _migrate_all_partition_steps(state_name: String,
+  fun ref _migrate_all_partition_steps(state_name: String,
     target_workers: Array[(String, OutgoingBoundary)] val)
   =>
     """
@@ -753,28 +784,140 @@ actor RouterRegistry
     workers.
     """
     try
-      @printf[I32]("Migrating steps for %s partition to %d workers\n".cstring(),
-        state_name.cstring(), target_workers.size())
+      @printf[I32]("Migrating steps for %s partition to %d workers\n"
+        .cstring(), state_name.cstring(), target_workers.size())
       let partition_router = _partition_routers(state_name)?
       partition_router.rebalance_steps_shrink(target_workers, state_name, this)
+    else
+      Fail()
     end
 
-
-  be add_to_step_waiting_list(step_id: StepId) =>
+  fun ref add_to_step_waiting_list(step_id: StepId) =>
     _step_waiting_list.set(step_id)
 
+  /////////////////
+  // Shrink to Fit
+  /////////////////
+  be initiate_shrink(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val)
+  =>
+    """
+    This should only be called on the worker contacted via an external
+    message to initiate a shrink.
+    """
+    @printf[I32]("~~~Initiating shrink~~~\n".cstring())
+    @printf[I32]("-- Remaining workers: \n".cstring())
+    for w in remaining_workers.values() do
+      @printf[I32]("-- -- %s\n".cstring(), w.cstring())
+    end
+    @printf[I32]("-- Leaving workers: \n".cstring())
+    for w in leaving_workers.values() do
+      @printf[I32]("-- -- %s\n".cstring(), w.cstring())
+    end
+    _stop_the_world_in_process = true
+    _stop_the_world_for_shrink()
+    let timers = Timers
+    let timer = Timer(PauseBeforeShrinkNotify(_auth, _connections,
+      remaining_workers, leaving_workers), _stop_the_world_pause)
+    timers(consume timer)
+    try
+      let msg = ChannelMsgEncoder.prepare_shrink(remaining_workers,
+        leaving_workers, _auth)?
+      for w in remaining_workers.values() do
+        _connections.send_control(w, msg)
+      end
+    else
+      Fail()
+    end
+    _prepare_shrink(remaining_workers, leaving_workers)
+
+  be prepare_shrink(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val)
+  =>
+    _prepare_shrink(remaining_workers, leaving_workers)
+
+  fun ref _prepare_shrink(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val)
+  =>
+    ifdef debug then
+      Invariant(_leaving_workers.size() == 0)
+    end
+    if not _stop_the_world_in_process then
+      _stop_the_world_in_process = true
+      _stop_the_world_for_shrink()
+    end
+
+    for w in leaving_workers.values() do
+      _leaving_workers.set(w)
+    end
+    for (p_id, router) in _stateless_partition_routers.pairs() do
+      let new_router = router.calculate_shrink(remaining_workers)
+      _distribute_stateless_partition_router(new_router)
+      _stateless_partition_routers(p_id) = new_router
+    end
+
+  be begin_leaving_migration(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val)
+  =>
+    """
+    This should only be called on a worker designated to leave the cluster
+    as part of shrink to fit.
+    """
+    _leaving_in_process = true
+    if _partition_routers.size() == 0 then
+      //no steps have been migrated
+      @printf[I32](("No partitions to migrate.\n").cstring())
+      _send_leaving_worker_done_migrating()
+      return
+    end
+
+    let sorted_remaining_workers =
+      ArrayHelpers[String].sorted[String](remaining_workers)
+
+    let rws_trn = recover trn Array[(String, OutgoingBoundary)] end
+    for w in sorted_remaining_workers.values() do
+      try
+        let boundary = _outgoing_boundaries(w)?
+        rws_trn.push((w, boundary))
+      else
+        Fail()
+      end
+    end
+    let rws = consume val rws_trn
+
+    @printf[I32]("Migrating all partitions to %d remaining workers\n"
+      .cstring(), remaining_workers.size())
+    for state_name in _partition_routers.keys() do
+      _migrate_all_partition_steps(state_name, rws)
+    end
+
+  fun ref _stop_the_world_for_shrink() =>
+    """
+    We currently stop all message processing before migrating partitions and
+    updating routers/routes.
+    """
+    @printf[I32]("~~~Stopping message processing for leaving workers.~~~\n"
+      .cstring())
+    _mute_request(_worker_name)
+    _connections.stop_the_world(recover Array[String] end)
+
+  be disconnect_from_leaving_worker(worker: String) =>
+    _connections.disconnect_from(worker)
+    if not _leaving_in_process then
+      ifdef debug then
+        Invariant(_leaving_workers.size() > 0)
+      end
+      _leaving_workers.unset(worker)
+      if _leaving_workers.size() == 0 then
+        _connections.request_cluster_unmute()
+        _unmute_request(_worker_name)
+      end
+    end
 
   /////
   // Step moved off this worker or new step added to another worker
   /////
-  be move_step_to_proxy(id: U128, proxy_address: ProxyAddress) =>
-    """
-    Called when a stateless step has been migrated off this worker to another
-    worker
-    """
-    _move_step_to_proxy(id, proxy_address)
-
-  be move_stateful_step_to_proxy[K: (Hashable val & Equatable[K] val)](
+  fun ref move_stateful_step_to_proxy[K: (Hashable val & Equatable[K] val)](
     id: U128, proxy_address: ProxyAddress, key: K, state_name: String)
   =>
     """
@@ -844,15 +987,6 @@ actor RouterRegistry
   /////
   // Step moved onto this worker
   /////
-  be move_proxy_to_step(id: U128, target: Consumer,
-    source_worker: String)
-  =>
-    """
-    Called when a stateless step has been migrated to this worker from another
-    worker
-    """
-    _move_proxy_to_step(id, target, source_worker)
-
   be move_proxy_to_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: U128, target: Consumer, key: K, state_name: String,
     source_worker: String)
@@ -930,6 +1064,32 @@ class PauseBeforeMigrationNotify is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     _registry.begin_migration(_target_workers)
+    false
+
+class PauseBeforeShrinkNotify is TimerNotify
+  let _auth: AmbientAuth
+  let _connections: Connections
+  let _remaining_workers: Array[String] val
+  let _leaving_workers: Array[String] val
+
+  new iso create(auth: AmbientAuth, connections: Connections,
+    remaining_workers: Array[String] val, leaving_workers: Array[String] val)
+  =>
+    _auth = auth
+    _connections = connections
+    _remaining_workers = remaining_workers
+    _leaving_workers = leaving_workers
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    try
+      let msg = ChannelMsgEncoder.begin_leaving_migration(_remaining_workers,
+        _leaving_workers, _auth)?
+      for w in _leaving_workers.values() do
+        _connections.send_control(w, msg)?
+      end
+    else
+      Fail()
+    end
     false
 
 class PauseBeforeLogRotationNotify is TimerNotify

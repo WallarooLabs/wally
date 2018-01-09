@@ -1,4 +1,5 @@
-# Wallaroo
+![Wallaroo Logo](wallaroo-logo.png)
+---
 
 Wallaroo is a fast, elastic data processing engine that rapidly takes you from prototype to production by eliminating infrastructure complexity.
 
@@ -37,12 +38,12 @@ Existing language bindings:
 
 - Python 2.7
 - C++
+- Go
 - Pony
 
 Planned Language bindings:
 
 - Python 3
-- Go
 - JavaScript
 
 Please see [status][status section] for language binding support details. Wallaroo is open source software with an expanding software community. Please see the [How to Contribute][contribute section] section if you wish to help support your favorite data analysis language.
@@ -74,11 +75,11 @@ Wallaroo is primarily written in Pony. As such, Pony is the first language to re
 
 - Python 2.7
 
-Currently, Python 2.7 is our primary focus. As we add features to the Wallaroo, we will be adding corresponding Python APIs and documentation.
+Along with Go, Python 2.7 is our primary focus. As we add features to the Wallaroo, we will be adding corresponding Python APIs and documentation.
 
 - Python 3
 
-We are currently working with a client who needs Python 3 bindings. We plan to introduce Python 3 bindings by the end of 2017. 
+We are currently working with a client who needs Python 3 bindings. We plan to introduce Python 3 bindings in early 2018.
 
 - C++
 
@@ -88,7 +89,7 @@ C++ was our first non-Pony API. Since that time we have learned a lot about writ
 
 - Go
 
-We are currently working with a client who needs Go bindings. We plan to introduce Go bindings by the end of 2017. 
+Along with Python 2.7, Go is our primary focus. As we add features to the Wallaroo, we will be adding corresponding Go APIs and documentation. The currently available version of the Go API is our first pass. We're quite interested in getting your feedback and improving it.
 
 - JavaScript 
 
@@ -132,8 +133,6 @@ The [Wallaroo Community License][wallaroo community license] is based on [Apache
 - You can **modify** and **redistribute** any Wallaroo code
 - Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license to run on more than 3 servers or 24 cpus in a production environment. 
 
-
-
 Please [contact us][contact us email] if you have any questions about licensing or Wallaroo Enterprise.
 
 ## Additional Links
@@ -162,6 +161,10 @@ The company behind Wallaroo.
 
 Wallaroo documentation.
 
+- [Wallaroo Labs' Blog][blog]
+
+Wallaroo Labs blog.
+
 - QCon NY 2016: [How did I get here? Building Confidence in a Distributed Stream Processor][qcon16 how did i get here]
 - CodeMesh 2016:[How did I get here? Building Confidence in a Distributed Stream Processor][codemesh16 how did i get here]
 
@@ -188,6 +191,10 @@ Wallaroo example applications in a variety of languages. Currently, only the Pyt
 - giles
 
 TCP utility applications that can stream data over TCP to Wallaroo applications and receive TCP streams from said applications. 
+
+- go_api
+
+Code for writing Wallaroo applications using Go.
 
 - lib
 
@@ -217,6 +224,7 @@ End user utilities designed to make it easier to do various Wallaroo tasks like 
 [additional links]: #additional-links
 [apache 2 license]: https://www.apache.org/licenses/LICENSE-2.0
 [autoscaling website]: http://www.wallaroolabs.com/technology/autoscaling
+[blog]: https://blog.wallaroolabs.com
 [codemesh16 how did i get here]: https://www.youtube.com/watch?v=6MsPDtpe2tg
 [community website]: http://www.wallaroolabs.com/community
 [contact us email]: mailto:hello@wallaroolabs.com

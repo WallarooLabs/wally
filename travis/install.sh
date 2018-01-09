@@ -8,7 +8,7 @@ install_llvm() {
 
   pushd /tmp
   wget "http://llvm.org/releases/${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-debian8.tar.xz"
-  tar -xvf clang+llvm*
+  tar -xf clang+llvm*
   pushd clang+llvm* && sudo mkdir /tmp/llvm && sudo cp -r ./* /tmp/llvm/
   sudo ln -s "/tmp/llvm/bin/llvm-config" "/usr/local/bin/${LLVM_CONFIG}"
   popd
@@ -22,7 +22,7 @@ install_pcre() {
 
   pushd /tmp
   wget "ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2"
-  tar -xjvf pcre2-10.21.tar.bz2
+  tar -xjf pcre2-10.21.tar.bz2
   pushd pcre2-10.21 && ./configure --prefix=/usr && make && sudo make install
   popd
   popd
@@ -96,7 +96,7 @@ install_kafka_compression_libraries() {
   sudo apt-get install libsnappy-dev
   pushd /tmp
   wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
-  tar zxvf liblz4-1.7.5.tar.gz
+  tar zxf liblz4-1.7.5.tar.gz
   pushd lz4-1.7.5
   sudo make install
   popd
@@ -137,6 +137,17 @@ install_python_dependencies() {
   echo "** Python dependencies installed"
 }
 
+install_gitbook_dependencies() {
+  # we need npm
+  sudo apt-get install npm
+  # install gitbook
+  npm install gitbook-cli -g
+  # install any required plugins - this checks book.json for plugin list
+  gitbook install
+  # for uploading generated docs to repo
+  sudo python2 -m pip install ghp-import
+}
+
 echo "----- Installing dependencies"
 
 install_cpuset
@@ -145,5 +156,6 @@ install_pony_stable
 install_kafka_compression_libraries
 install_monitoring_hub_dependencies
 install_python_dependencies
+install_gitbook_dependencies
 
 echo "----- Dependencies installed"

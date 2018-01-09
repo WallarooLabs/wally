@@ -6,7 +6,7 @@ This is an example of a stateless application that takes a floating point Celsiu
 
 ### Input and Output
 
-The inputs and outputs of the "Celsius" application are binary 32-bits float encoded in the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol). Here's an example message, written as a Python string:
+The inputs and outputs of the "Celsius" application are binary 32-bits float encoded in the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html#framed-message-protocols#source-message-framing-protocol). Here's an example message, written as a Python string:
 
 ```
 "\x00\x00\x00\x04\x42\x48\x00\x00"
@@ -102,7 +102,7 @@ export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo
 You can shut down the cluster with this command once processing has finished:
 
 ```bash
-../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down Giles Sender by pressing `Ctrl-c` from its shell.

@@ -40,3 +40,6 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
   fun ref connect_failed(conn: TCPConnection ref) =>
     @printf[I32]("ControlSenderConnectNotifier: connection failed!\n"
       .cstring())
+
+  fun ref closed(conn: TCPConnection ref) =>
+    @printf[I32]("ControlSenderConnectNotifier: server closed\n".cstring())

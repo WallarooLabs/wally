@@ -37,6 +37,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/dag"
 use "wallaroo_labs/equality"
 use "wallaroo_labs/messages"
@@ -58,6 +59,8 @@ class val LocalTopology
   let default_target_id: U128
   // resilience
   let worker_names: Array[String] val
+  // Workers that cannot be removed during shrink to fit
+  let non_shrinkable: SetIs[String] val
 
   new val create(name': String, worker_name': String,
     graph': Dag[StepInitializer] val,
@@ -67,8 +70,8 @@ class val LocalTopology
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder] val | ProxyAddress | None) =
       None,
-    default_state_name': String = "", default_target_id': U128 = 0,
-    worker_names': Array[String] val)
+    default_state_name': String, default_target_id': U128,
+    worker_names': Array[String] val, non_shrinkable': SetIs[String] val)
   =>
     _app_name = name'
     _worker_name = worker_name'
@@ -83,6 +86,7 @@ class val LocalTopology
     default_target_id = default_target_id'
     //resilience
     worker_names = worker_names'
+    non_shrinkable = non_shrinkable'
 
   fun state_builders(): Map[String, StateSubpartition] val =>
     _state_builders
@@ -140,7 +144,7 @@ class val LocalTopology
     new_state_builders(state_name) = new_subpartition
     LocalTopology(_app_name, _worker_name, _graph, _step_map,
       consume new_state_builders, _pre_state_data, _proxy_ids, default_target,
-      default_state_name, default_target_id, worker_names)
+      default_state_name, default_target_id, worker_names, non_shrinkable)
 
   fun val add_worker_name(w: String): LocalTopology =>
     if not worker_names.contains(w) then
@@ -151,10 +155,23 @@ class val LocalTopology
       new_worker_names.push(w)
       LocalTopology(_app_name, _worker_name, _graph, _step_map,
         _state_builders, _pre_state_data, _proxy_ids, default_target,
-        default_state_name, default_target_id, consume new_worker_names)
+        default_state_name, default_target_id, consume new_worker_names,
+        non_shrinkable)
     else
       this
     end
+
+  fun val remove_worker_names(ws: Array[String] val): LocalTopology =>
+    let new_worker_names = recover trn Array[String] end
+    for w in worker_names.values() do
+      if not ArrayHelpers[String].contains[String](ws, w) then
+        new_worker_names.push(w)
+      end
+    end
+    LocalTopology(_app_name, _worker_name, _graph, _step_map,
+      _state_builders, _pre_state_data, _proxy_ids, default_target,
+      default_state_name, default_target_id, consume new_worker_names,
+      non_shrinkable)
 
   fun val for_new_worker(new_worker: String): LocalTopology ? =>
     let w_names =
@@ -176,7 +193,7 @@ class val LocalTopology
     LocalTopology(_app_name, new_worker, g.clone()?,
       _step_map, _state_builders, _pre_state_data, _proxy_ids,
       default_target, default_state_name, default_target_id,
-      w_names)
+      w_names, non_shrinkable)
 
   fun eq(that: box->LocalTopology): Bool =>
     // This assumes that _graph, _pre_state_data, default_target,
@@ -298,6 +315,63 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
       w.cstring())
 
+  be initiate_shrink(target_workers: Array[String] val, shrink_count: USize) =>
+    if target_workers.size() > 0 then
+      if _are_valid_shrink_candidates(target_workers) then
+        let remaining_workers = _remove_worker_names(target_workers)
+        _router_registry.initiate_shrink(remaining_workers, target_workers)
+      else
+        @printf[I32]("**Invalid shrink targets!**\n".cstring())
+      end
+    elseif shrink_count > 0 then
+      let candidates = _get_shrink_candidates(shrink_count)
+      if candidates.size() < shrink_count then
+        @printf[I32]("**Only %s candidates are eligible for removal\n"
+          .cstring(), candidates.size().string().cstring())
+      else
+        @printf[I32]("**%s candidates are eligible for removal\n"
+          .cstring(), candidates.size().string().cstring())
+      end
+      if candidates.size() > 0 then
+        let remaining_workers = _remove_worker_names(candidates)
+        _router_registry.initiate_shrink(remaining_workers, candidates)
+      else
+        @printf[I32]("**Cannot shrink 0 workers!**\n".cstring())
+      end
+    else
+      @printf[I32]("**Cannot shrink 0 workers!**\n".cstring())
+    end
+
+  fun _are_valid_shrink_candidates(candidates: Array[String] val): Bool =>
+    match _topology
+    | let t: LocalTopology =>
+      for c in candidates.values() do
+        if SetHelpers[String].contains[String](t.non_shrinkable, c) then
+          return false
+        end
+      end
+      true
+    else
+      Fail()
+      false
+    end
+
+  fun _get_shrink_candidates(count: USize): Array[String] val =>
+    let candidates = recover trn Array[String] end
+    match _topology
+    | let t: LocalTopology =>
+      for w in t.worker_names.values() do
+        if candidates.size() < count then
+          if not SetHelpers[String].contains[String](t.non_shrinkable, w) then
+            candidates.push(w)
+          end
+        end
+      end
+    else
+      Fail()
+    end
+    consume candidates
+
   be add_boundary_to_joining_worker(w: String, boundary: OutgoingBoundary,
     builder: OutgoingBoundaryBuilder)
   =>
@@ -314,6 +388,19 @@ actor LocalTopologyInitializer is LayoutInitializer
       _save_worker_names()
     else
       Fail()
+    end
+
+  fun ref _remove_worker_names(ws: Array[String] val): Array[String] val =>
+    match _topology
+    | let t: LocalTopology =>
+      let new_topology = t.remove_worker_names(ws)
+      _topology = new_topology
+      _save_local_topology()
+      _save_worker_names()
+      new_topology.worker_names
+    else
+      Fail()
+      recover val Array[String] end
     end
 
   fun ref _add_boundary(target_worker: String, boundary: OutgoingBoundary,
@@ -1543,6 +1630,22 @@ actor LocalTopologyInitializer is LayoutInitializer
       else
         Fail()
       end
+    else
+      Fail()
+    end
+
+  be shrinkable_query(conn: TCPConnection) =>
+    let available = Array[String]
+    match _topology
+    | let t: LocalTopology =>
+      for w in t.worker_names.values() do
+        if not t.non_shrinkable.contains(w) then
+          available.push(w)
+        end
+      end
+      let query_reply = ExternalMsgEncoder.shrink(false, available,
+        available.size())
+      conn.writev(query_reply)
     else
       Fail()
     end

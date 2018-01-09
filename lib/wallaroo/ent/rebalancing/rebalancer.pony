@@ -11,6 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
+use "wallaroo_labs/mort"
 
 primitive PartitionRebalancer
   fun step_counts_to_send(total_steps: USize, worker_portion: USize,
@@ -69,3 +70,23 @@ primitive PartitionRebalancer
       end
     end
     (try_to_send, consume counts_to_send)
+
+  fun step_counts_to_send_on_leaving(total_steps: USize,
+    remaining_workers_count: USize): Array[USize] val
+  =>
+    var remaining_steps = total_steps
+    let counts = recover trn Array[USize] end
+    for i in Range(0, remaining_workers_count) do
+      counts.push(0)
+    end
+    var idx: USize = 0
+    while remaining_steps > 0 do
+      try
+        counts(idx)? = counts(idx)? + 1
+      else
+        Fail()
+      end
+      remaining_steps = remaining_steps - 1
+      idx = (idx + 1) % remaining_workers_count
+    end
+    consume counts

@@ -10,6 +10,7 @@ the License. You may obtain a copy of the License at
 
 */
 
+use "buffered"
 use "net"
 use "collections"
 use "time"
@@ -29,14 +30,17 @@ class ExternalChannelListenNotifier is TCPListenNotify
   var _service: String = ""
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
+  let _local_topology_initializer: LocalTopologyInitializer
 
   new iso create(name: String, auth: AmbientAuth, connections: Connections,
-    recovery_file_cleaner: RecoveryFileCleaner)
+    recovery_file_cleaner: RecoveryFileCleaner,
+    local_topology_initializer: LocalTopologyInitializer)
   =>
     _auth = auth
     _worker_name = name
     _connections = connections
     _recovery_file_cleaner = recovery_file_cleaner
+    _local_topology_initializer = local_topology_initializer
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -56,27 +60,35 @@ class ExternalChannelListenNotifier is TCPListenNotify
       _worker_name.cstring())
     listen.close()
 
-  fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
+  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     ExternalChannelConnectNotifier(_worker_name, _auth, _connections,
-      _recovery_file_cleaner)
+      _recovery_file_cleaner, _local_topology_initializer)
+
+  fun ref closed(listen: TCPListener ref) =>
+    @printf[I32]("&s external: listener closed\n".cstring(),
+      _worker_name.cstring())
 
 class ExternalChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _worker_name: String
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
+  let _local_topology_initializer: LocalTopologyInitializer
   var _header: Bool = true
 
   new iso create(name: String, auth: AmbientAuth, connections: Connections,
-    recovery_file_cleaner: RecoveryFileCleaner)
+    recovery_file_cleaner: RecoveryFileCleaner,
+    local_topology_initializer: LocalTopologyInitializer)
   =>
     _auth = auth
     _worker_name = name
     _connections = connections
     _recovery_file_cleaner = recovery_file_cleaner
+    _local_topology_initializer = local_topology_initializer
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
+    _connections.register_disposable(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
@@ -122,6 +134,13 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
             _recovery_file_cleaner.clean_recovery_files()
           else
             Fail()
+          end
+        | let m: ExternalShrinkMsg =>
+          if m.query is true then
+            _local_topology_initializer.shrinkable_query(conn)
+          else
+            _local_topology_initializer.initiate_shrink(m.node_names,
+              m.num_nodes)
           end
         else
           @printf[I32](("Incoming External Message type not handled by " +

@@ -6,7 +6,7 @@ This is an example application that takes "votes" for different letters of the a
 
 ### Input
 
-The inputs to the "Alphabet Partitioned" application are the letter receiving the vote followed by a 32-bit integer representing the number of votes for this message, with the whole thing encoded in the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol). Here's an example input message, written as a Python string:
+The inputs to the "Alphabet Partitioned" application are the letter receiving the vote followed by a 32-bit integer representing the number of votes for this message, with the whole thing encoded in the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html). Here's an example input message, written as a Python string:
 
 ```
 "\x00\x00\x00\x05A\x00\x00\x15\x34"
@@ -18,7 +18,7 @@ The inputs to the "Alphabet Partitioned" application are the letter receiving th
 
 ### Output
 
-The outputs of the alphabet application are the letter that received the votes that triggered this message, followed by a 64-bit integer representing the total number of votes for this letter, with the whole thing encoded in the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol). Here's an example input message, written as a Python string:
+The outputs of the alphabet application are the letter that received the votes that triggered this message, followed by a 64-bit integer representing the total number of votes for this letter, with the whole thing encoded in the [source message framing protocol](/book/appendix/tcp-decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol). Here's an example input message, written as a Python string:
 
 ```
 "\x00\x00\x00\x09q\x00\x00\x5A\x21\x10\xB7\x11\xA4"
@@ -34,7 +34,7 @@ The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter be
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [Mac OS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [MacOS](/book/getting-started/macos-setup.md) setup instructions.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 

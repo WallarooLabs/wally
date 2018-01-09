@@ -4,7 +4,7 @@ In this section, we will go over how to write a stateful application with the Wa
 
 ## A Stateful Application - Alphabet
 
-Our stateful application is going to be a vote counter, called Alphabet. It receives as its input a message containing an alphabet character and a number of votes, which it then increments in its internal state. After each update, it sends the new updated vote count or that character to its output.
+Our stateful application is going to be a vote counter, called Alphabet. It receives as its input a message containing an alphabet character and a number of votes, which it then increments in its internal state. After each update, it sends the new updated vote count of that character to its output.
 
 As with the Reverse Word example, we will list the components required:
 

@@ -21,22 +21,22 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Get the official Wallaroo image from [Bintray](https://bintray.com/wallaroo-labs/wallaroolabs/first-install%3Awallaroo):
 
 ```bash
-docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.3.2
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.3.3
 ```
 
 ## What's Included in the Wallaroo Docker image
 
-- **Machida**: runs Wallaroo Python applications.
+* **Machida**: runs Wallaroo Python applications.
 
-- **Giles Sender**: supplies data to Wallaroo applications over TCP.
+* **Giles Sender**: supplies data to Wallaroo applications over TCP.
 
-- **Giles Receiver**: receives data from Wallaroo over TCP.
+* **Giles Receiver**: receives data from Wallaroo over TCP.
 
-- **Cluster Shutdown tool**: notifies the cluster to shut down cleanly.
+* **Cluster Shutdown tool**: notifies the cluster to shut down cleanly.
 
-- **Metrics UI**: receives and displays metrics for running Wallaroo applications.
+* **Metrics UI**: receives and displays metrics for running Wallaroo applications.
 
-- **Wallaroo Source Code**: full Wallaroo source code is provided, including Python example applications.
+* **Wallaroo Source Code**: full Wallaroo source code is provided, including Python example applications.
 
 ## Register
 
@@ -49,3 +49,4 @@ Your email address will only be used to facilitate the above.
 ## Conclusion
 
 Awesome! All set. Time to try running your first Wallaroo application in Docker.
+

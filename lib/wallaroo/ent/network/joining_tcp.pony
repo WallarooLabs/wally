@@ -33,8 +33,11 @@ class iso JoiningListenNotifier is TCPListenNotify
     @printf[I32]("Joining Worker Listener: couldn't listen\n".cstring())
     listen.close()
 
-  fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
+  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     JoiningConnectNotifier
+
+  fun ref closed(listen: TCPListener ref) =>
+    @printf[I32]("Joining Worker Listener: listener closed\n".cstring())
 
 class JoiningConnectNotifier is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
@@ -47,3 +50,6 @@ class JoiningConnectNotifier is TCPConnectionNotify
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     @printf[I32](("JoiningConnectNotifier: connection failed!\n").cstring())
+
+  fun ref closed(conn: TCPConnection ref) =>
+    @printf[I32]("JoiningConnectNotifier: server closed\n".cstring())

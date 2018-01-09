@@ -16,7 +16,7 @@ export default class VersionAlert extends React.Component {
 		if (this.state.alertVisible) {
 		     return (
 		        <Alert bsStyle="info">
-		          <p>You're on version <strong>0.3.2</strong>, click <a href="https://www.wallaroolabs.com/ui/latest?version=0.3.2" target="_blank">here</a> to verify you're up to date!</p>
+		          <p>You're on version <strong>0.3.3</strong>, click <a href="https://www.wallaroolabs.com/ui/latest?version=0.3.3" target="_blank">here</a> to verify you're up to date!</p>
 		        </Alert>
 		     );
 		}

@@ -69,7 +69,7 @@ actor Startup
 
   var _connections: (Connections | None) = None
 
-  let _disposables: SetIs[DisposableActor] = _disposables.create()
+  let _join_disposables: SetIs[DisposableActor] = _join_disposables.create()
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -162,14 +162,14 @@ actor Startup
             _startup_options.worker_name, _startup_options.worker_count, this)
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0)?, j_addr(1)?)
-        _disposables.set(control_conn)
+        _join_disposables.set(control_conn)
         @printf[I32]("Attempting to join cluster...\n".cstring())
         // This only exists to keep joining worker alive while it waits for
         // cluster information.
         // TODO: Eliminate the need for this.
         let joining_listener = TCPListener(auth, JoiningListenNotifier)
         _joining_listener = joining_listener
-        _disposables.set(joining_listener)
+        _join_disposables.set(joining_listener)
       else
         initialize()
       end
@@ -299,12 +299,12 @@ actor Startup
         _startup_options.worker_name, auth,
         _startup_options.c_host, _startup_options.c_service,
         _startup_options.d_host, _startup_options.d_service,
-        _external_host, _external_service,
         metrics_conn, m_addr(0)?, m_addr(1)?, _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
+      connections.register_disposable(this)
 
       _setup_shutdown_handler(connections, this, auth)
 
@@ -331,6 +331,17 @@ actor Startup
           _startup_options.is_initializer, data_receivers, event_log, recovery,
           recovery_replayer, _local_topology_file, _data_channel_file,
           _worker_names_file)
+
+      if (_external_host != "") or (_external_service != "") then
+        let external_channel_notifier =
+          ExternalChannelListenNotifier(_startup_options.worker_name, auth,
+            connections, this, local_topology_initializer)
+        let external_listener = TCPListener(auth,
+          consume external_channel_notifier, _external_host, _external_service)
+        connections.register_disposable(external_listener)
+        @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
+          _external_host.cstring(), _external_service.cstring())
+      end
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
@@ -449,13 +460,13 @@ actor Startup
       let connections = Connections(_application.name(),
         _startup_options.worker_name,
         auth, c_host, c_service, d_host, d_service,
-        _external_host, _external_service,
         metrics_conn, m.metrics_host, m.metrics_service,
         _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
+      connections.register_disposable(this)
 
       _setup_shutdown_handler(connections, this, auth)
 
@@ -483,6 +494,17 @@ actor Startup
           event_log, recovery, recovery_replayer,
           _local_topology_file, _data_channel_file, _worker_names_file
           where is_joining = _startup_options.is_joining)
+
+      if (_external_host != "") or (_external_service != "") then
+        let external_channel_notifier =
+          ExternalChannelListenNotifier(_startup_options.worker_name, auth,
+            connections, this, local_topology_initializer)
+        let external_listener = TCPListener(auth,
+          consume external_channel_notifier, _external_host, _external_service)
+        connections.register_disposable(external_listener)
+        @printf[I32]("Set up external channel listener on %s:%s\n".cstring(),
+          _external_host.cstring(), _external_service.cstring())
+      end
 
       router_registry.set_data_router(DataRouter)
       local_topology_initializer.update_topology(m.local_topology)
@@ -597,7 +619,8 @@ actor Startup
     end
 
   be dispose() =>
-    for d in _disposables.values() do
+    @printf[I32]("Shutting down Startup...\n".cstring())
+    for d in _join_disposables.values() do
       d.dispose()
     end
 

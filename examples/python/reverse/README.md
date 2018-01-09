@@ -6,7 +6,7 @@ This is an example application that receives strings as input and outputs the re
 
 ### Input
 
-The inputs of the "Reverse" application are strings encoded in the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol). Here's an example input message, written as a Python string:
+The inputs of the "Reverse" application are strings encoded in the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html#framed-message-protocols#source-message-framing-protocol). Here's an example input message, written as a Python string:
 
 ```
 "\x00\x00\x00\x05hello"

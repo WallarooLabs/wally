@@ -15,7 +15,7 @@ You can read more about Market Spread in [What is Wallaroo](/book/what-is-wallar
 
 ### Input
 
-As mentioned above, Market Spread has two input streams, each of which takes messages in a specific format. Both streams use the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol).
+As mentioned above, Market Spread has two input streams, each of which takes messages in a specific format. Both streams use the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html#framed-message-protocols#source-message-framing-protocol).
 
 #### NBBO Messages
 
@@ -40,7 +40,7 @@ Order messages have the following parts:
 
 ### Output
 
-The output messages use the [source message framing protocol](/book/core-concepts/decoders-and-encoders.md#framed-message-protocols#source-message-framing-protocol) and have the following parts:
+The output messages use the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html#framed-message-protocols#source-message-framing-protocol) and have the following parts:
 * *side* -- the side of the order (buy or sell), 1 byte
 * *account* -- the account that placed this order, 32-bit integer
 * *order id* -- the id of the order, 6 byte string

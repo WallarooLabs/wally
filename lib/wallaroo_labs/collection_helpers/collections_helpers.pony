@@ -31,6 +31,12 @@ primitive SetHelpers[V]
     end
     false
 
+  fun contains[A: Equatable[A] #read](arr: SetIs[A] box, v: A): Bool =>
+    for a in arr.values() do
+      if a == v then return true end
+    end
+    false
+
 primitive ArrayHelpers[V]
   fun forall(arr: Array[V] box, pred: {(box->V!): Bool}): Bool =>
     for v in arr.values() do
@@ -41,5 +47,18 @@ primitive ArrayHelpers[V]
   fun some(arr: Array[V] box, pred: {(box->V!): Bool}): Bool =>
     for v in arr.values() do
       if pred(v) then return true end
+    end
+    false
+
+  fun sorted[A: Comparable[A] val](arr: Array[A] val): Array[A] =>
+    let unsorted = Array[A]
+    for a in arr.values() do
+      unsorted.push(a)
+    end
+    Sort[Array[A], A](unsorted)
+
+  fun contains[A: Equatable[A] #read](arr: Array[A] box, v: A): Bool =>
+    for a in arr.values() do
+      if a == v then return true end
     end
     false

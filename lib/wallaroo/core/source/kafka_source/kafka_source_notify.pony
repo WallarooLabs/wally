@@ -68,7 +68,9 @@ class KafkaSourceNotify[In: Any val]
   fun routes(): Array[Consumer] val =>
     _router.routes()
 
-  fun ref received(src: KafkaSource[In] ref, msg: KafkaMessage val,
+  fun ref received(src: KafkaSource[In] ref, kafka_msg_value: Array[U8] iso,
+    kafka_msg_key: (Array[U8] val | None),
+    kafka_msg_metadata: KafkaMessageMetadata val,
     network_received_timestamp: U64)
   =>
     _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
@@ -83,7 +85,7 @@ class KafkaSourceNotify[In: Any val]
       latest_metrics_id = latest_metrics_id + 1
     end
 
-    let data = msg.get_value()
+    let data = consume kafka_msg_value
 
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())

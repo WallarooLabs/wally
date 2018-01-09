@@ -92,14 +92,19 @@ def _test_log_rotation_external_trigger_no_recovery(command):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, external_port, data_port = (
-            get_port_values(host, sources))
+        num_ports = sources + 3 + (2 * (workers - 1))
+        ports = get_port_values(num=num_ports, host=host)
+        (input_ports, (control_port, data_port, external_port),
+         worker_ports) = (ports[:sources],
+                          ports[sources:sources+3],
+                          zip(ports[-(2*(workers-1)):][::2],
+                              ports[-(2*(workers-1)):][1::2]))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
                       metrics_port, control_port, external_port, data_port,
-                      res_dir, workers)
+                      res_dir, workers, worker_ports)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
@@ -142,7 +147,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             raise stopper.error
 
@@ -169,17 +174,17 @@ def _test_log_rotation_external_trigger_no_recovery(command):
             assert(success)
         except AssertionError:
             print runners[0].name
-            print runners[0].get_output()[0]
+            print runners[0].get_output()
             print '---'
             print runners[1].name
-            print runners[1].get_output()[0]
+            print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate all workers underwent log rotation
         for r in runners[1:]:
-            stdout, stderr = r.get_output()
+            stdout = r.get_output()
             try:
                 assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
                        is not None)
@@ -242,14 +247,19 @@ def _test_log_rotation_external_trigger_recovery(command):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, external_port, data_port = (
-            get_port_values(host, sources))
+        num_ports = sources + 3 + (2 * (workers - 1))
+        ports = get_port_values(num=num_ports, host=host)
+        (input_ports, (control_port, data_port, external_port),
+         worker_ports) = (ports[:sources],
+                          ports[sources:sources+3],
+                          zip(ports[-(2*(workers-1)):][::2],
+                              ports[-(2*(workers-1)):][1::2]))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
                       metrics_port, control_port, external_port, data_port,
-                      res_dir, workers)
+                      res_dir, workers, worker_ports)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
@@ -308,7 +318,7 @@ def _test_log_rotation_external_trigger_recovery(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             raise stopper.error
 
@@ -335,17 +345,17 @@ def _test_log_rotation_external_trigger_recovery(command):
             assert(success)
         except AssertionError:
             print runners[0].name
-            print runners[0].get_output()[0]
+            print runners[0].get_output()
             print '---'
             print runners[1].name
-            print runners[1].get_output()[0]
+            print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate all workers underwent log rotation
         r = runners[1]
-        stdout, stderr = r.get_output()
+        stdout = r.get_output()
         try:
             assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
                    is not None)
@@ -359,17 +369,16 @@ def _test_log_rotation_external_trigger_recovery(command):
                                  % (1, r.name, log_rotated_pattern, stdout))
         # Validate worker actually underwent recovery
         pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."
-        stdout, stderr = runners[-1].get_output()
+        stdout = runners[-1].get_output()
         try:
             assert(re.search(pattern, stdout) is not None)
         except AssertionError:
             raise AssertionError('Worker %d.%r does not appear to have '
                                  'performed recovery as expected. Worker '
                                  'output is '
-                                 'included below.\nSTDOUT\n---\n%s\n---\n'
-                                 'STDERR\n---\n%s'
+                                 'included below.\nSTDOUT\n---\n%s'
                                  % (len(runners)-1, runners[-1].name,
-                                    stdout, stderr))
+                                    stdout))
     finally:
         for r in runners:
             r.stop()
@@ -423,14 +432,19 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, external_port, data_port = (
-            get_port_values(host, sources))
+        num_ports = sources + 3 + (2 * (workers - 1))
+        ports = get_port_values(num=num_ports, host=host)
+        (input_ports, (control_port, data_port, external_port),
+         worker_ports) = (ports[:sources],
+                          ports[sources:sources+3],
+                          zip(ports[-(2*(workers-1)):][::2],
+                              ports[-(2*(workers-1)):][1::2]))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
                       metrics_port, control_port, external_port, data_port,
-                      res_dir, workers)
+                      res_dir, workers, worker_ports)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
@@ -462,7 +476,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             raise stopper.error
 
@@ -487,16 +501,16 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         try:
             assert(success)
         except AssertionError:
-            print runners[0].get_output()[0]
+            print runners[0].get_output()
             print '---'
-            print runners[1].get_output()[0]
+            print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate all workers underwent log rotation
         for r in runners:
-            stdout, stderr = r.get_output()
+            stdout = r.get_output()
             try:
                 assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
                        is not None)
@@ -562,14 +576,19 @@ def _test_log_rotation_file_size_trigger_recovery(command):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        input_ports, control_port, external_port, data_port = (
-            get_port_values(host, sources))
+        num_ports = sources + 3 + (2 * (workers - 1))
+        ports = get_port_values(num=num_ports, host=host)
+        (input_ports, (control_port, data_port, external_port),
+         worker_ports) = (ports[:sources],
+                          ports[sources:sources+3],
+                          zip(ports[-(2*(workers-1)):][::2],
+                              ports[-(2*(workers-1)):][1::2]))
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
                       metrics_port, control_port, external_port, data_port,
-                      res_dir, workers, alt_block, alt_func)
+                      res_dir, workers, worker_ports, alt_block, alt_func)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
@@ -615,7 +634,7 @@ def _test_log_rotation_file_size_trigger_recovery(command):
         if stopper.error:
             for r in runners:
                 print r.name
-                print r.get_output()[0]
+                print r.get_output()
                 print '---'
             raise stopper.error
 
@@ -641,17 +660,17 @@ def _test_log_rotation_file_size_trigger_recovery(command):
             assert(success)
         except AssertionError:
             print runners[-1].name
-            print runners[-1].get_output()[0]
+            print runners[-1].get_output()
             print '---'
             print runners[-2].name
-            print runners[-2].get_output()[0]
+            print runners[-2].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
                                  'error:\n{}'.format(stdout))
 
         # Validate worker underwent log rotation, but not initializer
         i, r = 1, runners[1]
-        stdout, stderr = r.get_output()
+        stdout = r.get_output()
         try:
             assert(re.search(log_rotated_pattern, stdout, re.M | re.S)
                    is not None)
@@ -667,14 +686,14 @@ def _test_log_rotation_file_size_trigger_recovery(command):
 
         # Validate worker actually underwent recovery
         pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."
-        stdout, stderr = runners[-1].get_output()
+        stdout = runners[-1].get_output()
         try:
             assert(re.search(pattern, stdout) is not None)
         except AssertionError:
             raise AssertionError('Worker does not appear to have performed '
                                  'recovery as expected. Worker output is '
-                                 'included below.\nSTDOUT\n---\n%s\n---\n'
-                                 'STDERR\n---\n%s' % (stdout, stderr))
+                                 'included below.\nSTDOUT\n---\n%s'
+                                 % stdout)
     finally:
         for r in runners:
             r.stop()

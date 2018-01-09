@@ -47,6 +47,8 @@ actor DataChannelListener
   var _paused: Bool = false
   var _init_size: USize
   var _max_size: USize
+  let _requested_host: String
+  let _requested_service: String
 
   let _router_registry: RouterRegistry
 
@@ -59,6 +61,8 @@ actor DataChannelListener
     """
     Listens for both IPv4 and IPv6 connections.
     """
+    _requested_host = host
+    _requested_service = service
     _router_registry = router_registry
     _limit = limit
     _notify = consume notify
@@ -80,6 +84,14 @@ actor DataChannelListener
     Stop listening.
     """
     close()
+
+  fun requested_address(): (String, String) =>
+    """
+    Return the host and service that were originally provided to the
+    @pony_os_listen_tcp method.
+    Use this if `local_address().name()` fails.
+    """
+    (_requested_host, _requested_service)
 
   fun local_address(): NetAddress =>
     """

@@ -2,6 +2,20 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
+## [0.3.3] - 2017-01-09
+
+### Fixed
+
+- Fix shrink autoscale query reply ([PR #1862](https://github.com/wallaroolabs/wallaroo/pull/1862))
+
+### Added
+
+- Initial Go API ([PR #1866](https://github.com/wallaroolabs/wallaroo/pull/1866))
+
+### Changed
+
+- Turn off building with AVX512f CPU extensions to work around a LLVM bug ([PR #1932](https://github.com/WallarooLabs/wallaroo/pull/1932))
+
 ## [0.3.2] - 2017-12-28
 
 ### Fixed

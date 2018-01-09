@@ -20,12 +20,4 @@ We recommend using [virtualenv](https://virtualenv.pypa.io/en/stable/) with Wall
 
 ## Next Steps
 
-To set up your environment for writing and running Wallaroo Python application, refer to [Running a Wallaroo Python Application](running-a-wallaroo-python-application.md).
-
-To learn how to write your own application, refer to [Writing Your Own Application](writing-your-own-application.md).
-
-To read about the structure and requirements of each API class, refer to [Wallaroo Python API Classes](api.md).
-
-To read about the command-line arguments Wallaroo takes, refer to [Appendix: Wallaroo Command-Line Options](/book/appendix/wallaroo-command-line-options.md).
-
-To browse complete examples, go to [Wallaroo Python Examples](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python).
+To set up your environment for writing and running Wallaroo Python application, refer to [our installation instructions](/book/getting-started/choosing-an-installation-option.md).
