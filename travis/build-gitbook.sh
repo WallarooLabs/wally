@@ -18,6 +18,11 @@ else
   exit 0
 fi
 
+echo "Sliding version number into book content with sed magic..."
+version=$(< VERSION)
+sed -i -- "s/{{ book.wallaroo_version }}/$version/g" monitoring_hub/apps/metrics_reporter_ui/web/static/js/buffy-ui/components/applications/VersionAlert.js
+find book -name '*.md' -exec sed -i -- "s/{{ book.wallaroo_version }}/$version/g" {} \;
+
 echo "Building book..."
 gitbook build
 
