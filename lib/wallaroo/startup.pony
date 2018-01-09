@@ -369,6 +369,14 @@ actor Startup
           control_channel_filepath, _startup_options.my_d_host,
           _startup_options.my_d_service, event_log, this)
 
+      // We need to recover connections before creating our control
+      // channel listener, since it's at that point that we notify
+      // the cluster of our control address. If the cluster connection
+      // addresses were not yet recovered, we'd only notify the initializer.
+      if is_recovering then
+        connections.recover_connections(local_topology_initializer)
+      end
+
       if _startup_options.is_initializer then
         connections.make_and_register_recoverable_listener(
           auth, consume control_notifier, control_channel_filepath,

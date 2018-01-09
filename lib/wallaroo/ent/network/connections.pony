@@ -521,9 +521,7 @@ actor Connections is Cluster
       else
         ControlConnection
       end
-    if not _control_conns.contains(target_name) then
-      _control_conns(target_name) = tcp_conn_wrapper
-    end
+    _control_conns(target_name) = tcp_conn_wrapper
     _register_disposable(tcp_conn_wrapper)
     let control_notifier: TCPConnectionNotify iso =
       ControlSenderConnectNotifier(_auth, target_name, tcp_conn_wrapper)
