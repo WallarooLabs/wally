@@ -33,26 +33,27 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
-AUTOSCALE_GROW_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH):$(TESTING_ALPHABET_PATH)
+AUTOSCALE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+CUSTOM_PATH += :$(EXTERNAL_SENDER_PATH):$(TESTING_ALPHABET_PATH):$(CLUSTER_SHRINKER_PATH)
 CUSTOM_PYTHONPATH += $(TESTING_ALPHABET_PYTHON_PATH)
 
-build-testing-correctness-tests-autoscale_grow: build-testing-correctness-apps-sequence_window
-build-testing-correctness-tests-autoscale_grow: build-testing-correctness-apps-alphabet
-build-testing-correctness-tests-autoscale_grow: build-machida
-integration-tests-testing-correctness-tests-autoscale_grow: build-testing-correctness-tests-autoscale_grow
-integration-tests-testing-correctness-tests-autoscale_grow: autoscale_grow_tests
+build-testing-correctness-tests-autoscale_tests: build-testing-correctness-apps-alphabet
+build-testing-correctness-tests-autoscale_tests: build-machida
+build-testing-correctness-tests-autoscale_tests: build-testing-tools-external_sender
+build-testing-correctness-tests-autoscale_tests: build-utils-cluster_shrinker
+integration-tests-testing-correctness-tests-autoscale_tests: build-testing-correctness-tests-autoscale_tests
+integration-tests-testing-correctness-tests-autoscale_tests: autoscale_tests
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
 ifeq ($(autoscale),on)
-autoscale_grow_tests:
-	cd $(AUTOSCALE_GROW_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose autoscale_grow.py
+autoscale_tests:
+	cd $(AUTOSCALE_PATH) && \
+	python2 -m pytest --color=yes --tb=native --verbose --exitfirst autoscale_tests.py
 else
-autoscale_grow_tests:
-	$(QUIET)printf "autoscale_grow_tests not run.\nRun make with 'autoscale=on' to run this test.\n"
+autoscale_tests:
+	$(QUIET)printf "autoscale_tests not run.\nRun make with 'autoscale=on' to run this test.\n"
 endif
 
 endif

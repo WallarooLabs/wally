@@ -34,6 +34,8 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
+CLUSTER_SHRINKER_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 # standard rules generation makefile
 include $(rules_mk_path)
 
