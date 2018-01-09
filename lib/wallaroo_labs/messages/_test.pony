@@ -220,11 +220,7 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
         for j in extracted.node_names.keys() do
           h.assert_eq[String](node_names(j)?, extracted.node_names(j)?)
         end
-        if (i == 0) then
-          h.assert_eq[USize](1, extracted.num_nodes) // ah-hah
-        else
-          h.assert_eq[USize](0, extracted.num_nodes)
-        end
+        h.assert_eq[USize](0, extracted.num_nodes)
       else
         h.assert_eq[String]("error", "case 1")
       end
@@ -239,11 +235,7 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
       | let extracted: ExternalShrinkMsg =>
         h.assert_eq[Bool](false, extracted.query)
         h.assert_eq[USize](0, extracted.node_names.size())
-        if (i == 0) then
-          h.assert_eq[USize](1, extracted.num_nodes) // ah-hah
-        else
-          h.assert_eq[USize](i, extracted.num_nodes)
-        end
+        h.assert_eq[USize](i, extracted.num_nodes)
       else
         h.assert_eq[String]("error", "case 2")
       end
