@@ -38,9 +38,9 @@ ab.new_pipeline("Split and Count",
                 wallaroo.TCPSourceConfig(in_host, in_port, decoder))
 ```
 
-Upon receiving some textual input, our word count application will route it to a stateless computation called `split`. `split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateful computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? The `to` method creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(split)`, we are placing the `split` computation on every worker in our cluster.
+Upon receiving some textual input, our word count application will route it to a stateless computation called `split`. `split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateless computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? The `to` method creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(split)`, we are placing the `split` computation on every worker in our cluster.
 
-### `A to` vs `to_parallel` digression
+### A `to` vs `to_parallel` digression
 
 Parallelizing a stateless computation seems like something you'd always want to do. So why does `to` exist? Message ordering. Some applications require that all incoming messages maintain ordering. Some don't. If we don't care about message order, we probably want to use `to_parallel`.
 
@@ -62,7 +62,7 @@ In our current case, counting words, we don't care about the order of the words,
 
 ### Application setup, the return
 
-Back to our application setup
+Back to our application setup:
 
 ```python
 def application_setup(args):
@@ -89,7 +89,7 @@ Beyond `to_parallel`, there's nothing new in our word count application. After w
         partition, word_partitions)
 ```
 
-Note we setup up 27 partitions to count our words, one for each letter plus one called "!" which will handle any "word" that doesn't start with a letter:
+Note we set up 27 partitions to count our words, one for each letter plus one called "!" which will handle any "word" that doesn't start with a letter:
 
 ```python
 word_partitions = list(string.ascii_lowercase)

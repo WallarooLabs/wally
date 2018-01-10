@@ -18,9 +18,7 @@ Our partitioned application is going to be very similar to the Alphabet applicat
 
 ### Partition
 
-If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is:
-
-Create a partition key list:
+If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is to create a partition key list, as illustrated here:
 
 ```python
 letter_partitions = list(string.ascii_lowercase)
