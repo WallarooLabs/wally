@@ -179,7 +179,7 @@ Enter the Wallaroo Docker container:
 docker exec -it wally env-setup
 ```
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 cluster_shutdown 127.0.0.1:5050

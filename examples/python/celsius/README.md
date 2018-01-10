@@ -99,7 +99,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 cluster_shutdown 127.0.0.1:5050

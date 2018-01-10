@@ -124,7 +124,7 @@ Feel free to click around and get a feel for how the Metrics UI is setup and how
 
 ### Terminal 5, Cluster Shutdown
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown

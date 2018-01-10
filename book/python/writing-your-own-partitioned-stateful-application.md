@@ -1,6 +1,6 @@
 # Writing Your Own Wallaroo Python Partitioned Stateful Application
 
-In this section, we will go over how to write a partitioned stateful application with the Wallaroo Python API. If you haven't reviewed the simple state application and simple stateful application examples, you can find them [here](writing-your-own-application.md) and [here](writing-your-own-stateful-application.md).
+In this section, we will go over how to write a partitioned stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless application and simple stateful application examples, you can find them [here](writing-your-own-application.md) and [here](writing-your-own-stateful-application.md).
 
 ## Partitioning
 

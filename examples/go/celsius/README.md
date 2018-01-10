@@ -64,7 +64,7 @@ There will be a stream of output messages in the first shell (where you ran `dat
 
 ## Shutdown
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050

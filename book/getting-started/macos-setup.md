@@ -16,7 +16,7 @@ You can then click “Install” to download and install Xcode Command Line Tool
 
 ## Installing a Package Manager, Homebrew
 
-Homebrew is used for easy installation of certain packages needed by Pony.
+Homebrew is used for easy installation of certain packages needed by Wallaroo.
 
 Instructions for installing Homebrew can be found [on their website](http://brew.sh/).  This book assumes that you use the default installation directory, `/usr/local`.  If you choose an alternate installation directory, please configure your shell's `PATH` environment variable as needed.
 
