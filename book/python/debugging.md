@@ -15,10 +15,10 @@ def compute(self, data):
 In this example, we'll be printing the incoming data before we reverse it.
 
 
-Using `print` is a very useful way to get logged output that you can return to and analyze after your program has completed running. However, there are some downsides when using `print` to debug; you'll need to add a `print` statement everywhere you predict you might need it, you can't get a "state of the world" look at your application, etc.
+Using `print` is a very useful way to get logged output that you can return to and analyze after your program has completed running. However, there are some downsides when using `print` to debug: you'll need to add a `print` statement everywhere you predict you might need it, you can't get a "state of the world" look at your application, etc.
 
 
-Using `print` in Python is not without risks, however. If you try to print a unicode string and your locale isn't set to unicode, you may encounter an error like the following:
+Using `print` in Python is not without risks. If you try to print a unicode string and your locale isn't set to unicode, you may encounter an error like the following:
 
 ```python
 >>> u = u'\ua000abcd\u07b4'

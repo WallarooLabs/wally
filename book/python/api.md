@@ -27,9 +27,9 @@ The recommended way to create your topology structure is by using the [Applicati
 
 ### Application Setup
 
-After Machida has loaded a Wallaroo Python application module, it executes its entry point function: `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. Therefore, any Wallaroo Python application must provide this function.
+After Machida has loaded a Wallaroo Python application module, it executes its entry point function, `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. Therefore, any Wallaroo Python application must provide this function.
 
-The `wallaroo` module provides an [ApplicationBuilder](#wallarooapplicationbuilder) that facilitates the creation of this data structure. When `ApplicationBuilder` is used, a topology can be built using its methods, and then its structure can be return by calling `ApplicationBuilder.build()`.
+The `wallaroo` module provides an [ApplicationBuilder](#wallarooapplicationbuilder) that facilitates the creation of this data structure. When `ApplicationBuilder` is used, a topology can be built using its methods, and then its structure can be returned by calling `ApplicationBuilder.build()`.
 
 For a simple application with a decoder, computation, and encoder, this function may look like
 
@@ -94,7 +94,7 @@ Add a state computation _function_, along with a [State](#state) _class_ and `st
 
 `state_class` must be a [State](#state).
 
-`state_name` must be a str. `state_name` is the name of the state object that we will run computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and in this way, acts as a sort of namespace.
+`state_name` must be a str. `state_name` is the name of the state object that we will run computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and, in this way, acts as a sort of namespace.
 
 ##### `to_state_partition(computation, state, state_partition_name, partition_function, partition_keys)`
 
@@ -104,7 +104,7 @@ Add a partitioned state computation to the current pipeline.
 
 `state` must be [State](#state).
 
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and in this way, acts as a sort of namespace.
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
 
 `partition_function` must be a [PartitionFunction](#partitionfunction).
 
@@ -118,7 +118,7 @@ Add a partitioned stateful computation to the current pipeline.
 
 `state` must be [State](#state).
 
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and in this way, acts as a sort of namespace.
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
 
 `partition_function` must be a [PartitionFunction](#partitionfunction).
 
@@ -134,7 +134,7 @@ Return the complete list of topology tuples. This is the topology structure Wall
 
 ### Computation
 
-A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. e.g. a stateless computation has _no side effects_.
+A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. A stateless computation has _no side effects_.
 
 A `computation` class must be wrapped by the `@computation(name)` decorator, which takes the name of the computation as an argument.
 
@@ -144,7 +144,7 @@ Use `data` to perform a computation and return a new output. `data` is the pytho
 
 ##### `compute_multi(data)`
 
-Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects. Each item in the list will arrive individually at the next step; i.e. not as a list.
+Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects. Each item in the list will arrive individually at the next step, i.e. not as a list.
 
 #### Example Computations
 
@@ -159,7 +159,7 @@ def compute(data):
         return 0
 ```
 
-A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, we filter aka drop the message by returning `None`.
+A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, we filter (drop) the message by returning `None`.
 
 ```python
 @computation_multi("doubledouble"):
@@ -172,7 +172,7 @@ def compute_multi(data):
 
 ### Data
 
-Data is the object that is passed to a [Computation](#computation) and a [StateComputation](#statecomputation)'s method. It is a plain Python object and can be as simple or as complex as you would like it to be.
+Data is the object that is passed to a [Computation](#computation)'s and a [StateComputation](#statecomputation)'s method. It is a plain Python object and can be as simple or as complex as you would like it to be.
 
 It is important to ensure that data returned is always immutable or unique to avoid any unexpected behvaiour due to the asynchronous execution nature of Wallaroo.
 
@@ -182,11 +182,11 @@ Partition Keys must correctly support the `__eq__` (`==`) and `__hash__` operato
 
 ### PartitionFunction
 
-A partition function class must be wrapped in the `@partition_function` decorator and  return the appropriate [Key](#key) for `data`.
+A partition function class must be wrapped in the `@partition_function` decorator and return the appropriate [Key](#key) for `data`.
 
 #### Example PartitionFunction
 
-An example that partitions words for a word-count based on their first character, and buckets all other cases to the empty string key
+An example that partitions words for a word count based on their first character, and buckets all other cases to the empty string key:
 
 ```python
 @partition_function
@@ -209,7 +209,7 @@ Return a `bytes` that can be sent over the network. It is up to the developer to
 
 #### Example TCPSinkEncoder
 
-A complete `TCPSinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian Longs preceded by a big-endian short representing the number of integers in the list:
+A complete `TCPSinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian longs preceded by a big-endian short representing the number of integers in the list:
 
 ```python
 @encoder
@@ -245,7 +245,7 @@ Return a python a python object of the type the next step in the pipeline expect
 
 #### Example TCPSourceDecoder
 
-A complete TCPSourceDecoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bt unsigned int in its _payload_:
+A complete TCPSourceDecoder example that decodes messages with a 32-bit unsigned integer _payload\_length_ and a character followed by a 32-bt unsigned int in its _payload_:
 
 ```python
 @decoder(header_length=4, length_fmt=">L")
@@ -293,7 +293,7 @@ def decode(self, bs):
 
 ### State
 
-State is an object that is passed to the [StateCompution's](#statecomputation) `compute` method. It is a plain Python object and can be as simple or as complex as you would like it to. The class definition must be wrapped in the `@state` decorator.
+State is an object that is passed to the [StateCompution's](#statecomputation) `compute` method. It is a plain Python object and can be as simple or as complex as you would like. The class definition must be wrapped in the `@state` decorator.
 
 A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
 
@@ -301,7 +301,7 @@ In either case, it is up to the developer to provide a side-effect safe value fo
 
 #### Example State
 
-An AlphabetCounts keeps a count for how many times each letter in the English alphabet has been seen
+An `AlphabetCounts` keeps a count for how many times each letter in the English alphabet has been seen:
 
 ```python
 import copy
