@@ -61,10 +61,6 @@ jobs:
       script: bash travis/integration-tests.sh
       env:
         - INTEGRATION_TESTS=t
-    - stage: tests
-      script: bash travis/resilience-integration-tests.sh
-      env:
-        - RESILIENCE_INTEGRATION_TESTS=t
     - stage: deploy
       if: type != pull_request AND ( branch = release OR branch =~ ^release-(\d).(\d).(\d)$ )
       script: /bin/bash travis/docker_release.sh
