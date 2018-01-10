@@ -18,7 +18,7 @@ Installing Docker will result in it running on your machine. After you reboot yo
 
 All of the Docker commands throughout the rest of this manual assume that you have permission to run Docker commands as a non-root user. Follow the [Manage Docker as a non-root user](https://docs.docker.com/engine/installation/linux/linux-postinstall/#manage-docker-as-a-non-root-user) instructions to set that up. If you don't want to allow a non-root user to run Docker commands, you'll need to run `sudo docker` anywhere you see `docker` for a command.
 
-## Get the official Wallaroo image from [Bintray](https://bintray.com/wallaroo-labs/wallaroolabs/first-install%3Awallaroo):
+## Get the official Wallaroo image:
 
 ```bash
 docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
