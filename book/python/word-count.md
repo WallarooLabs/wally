@@ -103,7 +103,7 @@ ab.to_state_partition(count_word, WordTotals, "word totals",
 
 ### Splitting words
 
-Our word splitting is mostly uninteresting, except for one huge difference, our previous examples had one output for each input. When splitting text into words, we take one input and produce multiple outputs. Let's see how that is done.
+Our word splitting is mostly uninteresting, except for one huge difference: our previous examples had one output for each input. When splitting text into words, we take one input and produce multiple outputs. Let's see how that is done.
 
 ```python
 @wallaroo.computation_multi(name="split into words")
@@ -140,9 +140,9 @@ def partition(data):
 
 ### Our counting guts
 
-The next three classes are the core of our word counting application. By this point, our messages has been split into individual words and run through our `partition` function and will arrive at a state computation based on the first letter of the word.
+The next three classes are the core of our word counting application. By this point, our messages have been split into individual words and run through our `partition` function and will arrive at a state computation based on the first letter of the word.
 
-Let's take a look at we have. `CountWord` is a State Computation. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
+Let's take a look at what we have. `CountWord` is a State Computation. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
 
 ```python
 @wallaroo.state_computation(name="Count Word")

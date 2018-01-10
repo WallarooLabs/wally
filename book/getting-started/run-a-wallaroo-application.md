@@ -4,7 +4,7 @@ In this section, we're going to run an example Wallaroo application. By the time
 
 There are a few Wallaroo support applications that you'll be interacting with for the first time:
 
-- Our Metrics UI that allows you to monitor the performance and health of your applications.
+- Our Metrics UI allows you to monitor the performance and health of your applications.
 - Giles receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
 - Machida, our program for running Wallaroo Python applications.
@@ -98,7 +98,7 @@ If the sender is working correctly, you should see `Connected` printed to the sc
 
 ### First Look
 
-Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000) the landing page should show you that the "Celsius to Fahrenheit" application has successfully connected.
+Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000), the landing page should show you that the "Celsius to Fahrenheit" application has successfully connected.
 
 ![Landing Page](/book/metrics/images/landing-page.png)
 
@@ -114,7 +114,7 @@ Now, let's have a look at some metrics. By clicking on the "Celsius to Fahrenhei
 
 You'll see the metric stats update as data continues to be processed in our application.
 
-You can then click into one of the elements within a category, to get to a detailed metrics page for that element. If we were to click into the `Add32` computation, we'll be taken to this page:
+You can then click into one of the elements within a category to get to a detailed metrics page for that element. If we were to click into the `Add32` computation, we'll be taken to this page:
 
 ![Computation Detailed Metrics page](/book/metrics/images/computation-detailed-metrics-page.png)
 

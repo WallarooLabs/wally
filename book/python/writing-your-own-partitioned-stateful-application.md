@@ -26,7 +26,7 @@ Create a partition key list:
 letter_partitions = list(string.ascii_lowercase)
 ```
 
-And then a partitioning function which returns a key from the above list for input data:
+And then we define a partitioning function which returns a key from the above list for input data:
 
 ```python
 class LetterPartitionFunction(object):

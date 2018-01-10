@@ -1,6 +1,6 @@
 # Setting Up Your MacOS Environment for Wallaroo
 
-These instructions have been tested on OSX El Capitan and MacOS Sierra. If you are on Sierra or High Sierra, we recommend installing via [Docker](/book/getting-started/docker-setup.md) due to a Kernel panic caused by a few of the Wallaroo applications, this is currently under investigation.
+These instructions have been tested on OSX El Capitan and MacOS Sierra. If you are on Sierra or High Sierra, we recommend installing via [Docker](/book/getting-started/docker-setup.md) due to a Kernel panic caused by a few of the Wallaroo applications; this is currently under investigation.
 
 There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
@@ -20,7 +20,7 @@ Homebrew is used for easy installation of certain packages needed by Pony.
 
 Instructions for installing Homebrew can be found [on their website](http://brew.sh/).  This book assumes that you use the default installation directory, `/usr/local`.  If you choose an alternate installation directory, please configure your shell's `PATH` environment variable as needed.
 
-**NOTE:** For users of the MacPorts package manager, we strongly recommend *not* using MacPorts.  It is extremely difficult to install correctly the compiler toolchain required by Wallaroo using only MacPorts.
+**NOTE:** For users of the MacPorts package manager, we strongly recommend *not* using MacPorts.  It is extremely difficult to correctly install the compiler toolchain required by Wallaroo using only MacPorts.
 
 ## Installing git
 
@@ -52,7 +52,7 @@ brew install pony-stable
 
 ## Install Compression Development Libraries
 
-Wallaroo's Kafka support requires a `libsnappy` and `liblz` to be installed.
+Wallaroo's Kafka support requires `libsnappy` and `liblz` to be installed.
 
 ```bash
 brew install snappy lz4

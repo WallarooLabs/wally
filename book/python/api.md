@@ -295,7 +295,7 @@ def decode(self, bs):
 
 State is an object that is passed to the [StateCompution's](#statecomputation) `compute` method. It is a plain Python object and can be as simple or as complex as you would like it to. The class definition must be wrapped in the `@state` decorator.
 
-A common issue that arises with asynchronous execution, is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
+A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
 
 In either case, it is up to the developer to provide a side-effect safe value for the Computation to return!
 
@@ -336,11 +336,11 @@ Similarly to a Computation, a StateComputation class must be wrapped in the `@st
 
 `data` is anything that was returned by the previous step in the pipeline, and `state` is the [State](#state) that was defined for this step in the pipeline definition.
 
-Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. Returning `None` will stop processing and no messages will be sent to the next step. The second element is a boolean value instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
+Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. Returning `None` will stop processing that message and no messages will be sent to the next step. The second element is a boolean value instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
 
 Why wouldn't we always return `True`? There are two answers:
 
-1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
+1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
 
 ##### `compute_multi(data, state)`

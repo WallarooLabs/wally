@@ -1,6 +1,6 @@
 # Setting Up Your Environment for Wallaroo in Docker
 
-To get you up and running quickly with Wallaroo, we have provided a Docker image which includes Wallaroo and related tools needed to run and modify a few example applications. We should warn that this Docker image was created with the intent of getting users started quickly with Wallaroo and is not intended to be a fully customizable development environment or suitable for production. MacOS Sierra and High Sierra users are recommended to install via Docker to avoid a kernel panic caused by a few Wallaroo applications, this is currently under investigation.
+To get you up and running quickly with Wallaroo, we have provided a Docker image which includes Wallaroo and related tools needed to run and modify a few example applications. We should warn that this Docker image was created with the intent of getting users started quickly with Wallaroo and is not intended to be a fully customizable development environment or suitable for production. MacOS Sierra and High Sierra users are recommended to install via Docker to avoid a kernel panic caused by a few Wallaroo applications; this is currently under investigation.
 
 ## Installing Docker
 

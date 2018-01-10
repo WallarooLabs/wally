@@ -1,6 +1,6 @@
 # Writing Your Own Wallaroo Python Stateful Application
 
-In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless application example yet, you may find it [here](writing-your-own-application.md).
+In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless application example yet, you can find it [here](writing-your-own-application.md).
 
 ## A Stateful Application - Alphabet
 
@@ -31,9 +31,9 @@ Let's dig into that tuple that we are returning:
 (state.get_votes(data.letter), True)
 ```
 
-The first element, `state.get_votes(data.letter)` is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element. `True` is a to let Wallaroo know if we should store an update for our state. By returning true, we are instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing so, why wouldn't we always return `True`? There are two answers:
+The first element, `state.get_votes(data.letter)`, is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element, `True`, is a to let Wallaroo know if we should store an update for our state. By returning `True`, we are instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing, so why wouldn't we always return `True`? There are two answers:
 
-1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
+1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
 
 ### State and StateBuilder
