@@ -6,9 +6,16 @@ jobs:
     steps:
       - checkout
       - run: changelog-tool verify CHANGELOG.md
+  integration-tests-with-resilience:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:standard
+    steps:
+      - checkout
+      - run: make integration-tests-testing-correctness-tests-all resilience=on debug=true
 
 workflows:
   version: 2
   test:
     jobs:
       - verify-changelog
+      - integration-tests-with-resilience
