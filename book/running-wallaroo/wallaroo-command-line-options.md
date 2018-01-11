@@ -65,6 +65,6 @@ argument:
 
 If you do not specify the number of `ponythreads`, the process will try to use all available cores.
 
-Since Machida (used for the Python API) is single-threaded, you must run it with `--ponythreads 1` or the cluster will crash.
+Since Machida (used for the Python API) is single-threaded, you must run it with `--ponythreads 1` or Machida will exit early.
 
 There are additional performance flags`--ponypinasio` and `--ponynoblock` that can be used as part of a high-performance configuration. Documentation on how to configure for best performance is coming soon.
