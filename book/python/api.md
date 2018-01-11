@@ -201,7 +201,7 @@ def partition(self, data):
 
 The TCP Sink Encoder is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out over a TCP connection.
 
-To do this, wrap your function in the `@encode` decorator.
+Your function must be decorated with `@encoder`.
 
 ##### `encode(data)`
 
@@ -224,13 +224,14 @@ The TCP Source Decoder is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input connection.
 2. Converting those bytes into an object that the rest of the application can process.
 
-To do this, wrap your function with the `@decoder(header_length, fmt)` decorator.
+Your function must be decorated with `@decoder(header_length, fmt)`.
 
 ##### `header_length`
 
 An integer representing the number of bytes from the beginning of an incoming message to return to the function that reads the payload length.
 
 ##### `fmt`
+
 A format string that represents how the message header is encoded. A common encoding used in Wallaroo is a big-endian 32-bit unsigned integer, which can be decoded with the [struct module's](https://docs.python.org/2/library/struct.html) help:
 
 ```python
@@ -259,6 +260,8 @@ The Kafka Sink Encoder is responsible for taking the output of the last computat
 
 To do this, create an encoder function, in the same way you would for a TCP Sink Encoder, but Return a tuple of `(bytes, key)` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes` and `key`, and what information to keep or discard.
 
+Your encoder function must be decorated with `@encoder`.
+
 #### Example KafkaSinkEncoder
 
 A complete `KafkaSinkEncoder` example that takes a word and sends it to the partition corresponding to the first letter of the word:
@@ -280,6 +283,8 @@ The Kafka Source Decoder is responsible for converting bytes into an object that
 Return Python object of the type the next step in the pipeline expects.
 
 `data` is a `bytes` object representing the incoming Kafka message, and it is up to the developer to translate that into a Python object.
+
+Your decoder function must be decorated with `@decoder`.
 
 #### Example Kafka Source Decoder
 
@@ -365,6 +370,10 @@ def compute(self, data, state):
 
 A `TCPSourceConfig` object specifies the host, port, and encoder to use for a TCP source connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `new_pipeline`.
 
+The `decoder` argument must decorated as described in [TCP Source Decoder](#tcp-source-decoder).
+
 ### TCPSinkConfig
 
 A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `to_sink`.
+
+The `encoder` argument must decorated as described in [TCP Source Encoder](#tcp-source-encoder).
