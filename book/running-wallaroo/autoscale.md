@@ -9,47 +9,39 @@ With autoscale enabled, you can add or remove workers from a running cluster. We
 While a Wallaroo cluster is running, new workers can join the cluster.  To add workers to a running cluster, you must know the control channel address of one of the workers in the running cluster.  Let’s assume it’s `127.0.0.1:12500`.  The following command would allow us to add one worker to a running cluster for the `alphabet` example app:
 
 {% codetabs name="Python", type="py" -%}
-```
 machida --application-module alphabet --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 \
   --ponythreads 1
-```
 {%- language name="Go", type="go" -%}
-```
 alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --join 127.0.0.1:12500 --name w3
-```
 {%- endcodetabs %}
 
 The `--in` argument specifies the port that the TCP source will listen on, and the `--out` argument specifies the target address for data output over TCP. `--join` is used to specify the control channel address of the running worker we are contacting in order to join.  `--name` is used to specify the name of the joining worker.
 
-If you want to add more than 1 worker at a time, you must have all workers contact the same running worker and all must specify the same joining worker total as the `worker_count` command line argument.  For example, if 3 workers are joining, then in our case, they could all use `--join 127.0.0.1:12500` and `--worker_count 3`.  Their command lines might be as follows:
+If you want to add more than 1 new worker at a time, you must have all joining workers contact the same running worker and all must specify the same joining worker total as the `worker_count` command line argument.  For example, if 3 workers are joining, then in our case, they could all use `--join 127.0.0.1:12500` and `--worker-count 3`.  Their command lines might be as follows:
 
 {% codetabs name="Python", type="py" -%}
-```
 machida --application-module alphabet --in 127.0.0.1:7010 \
-  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 --worker_count 3 \
+  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 --worker-count 3 \
   --ponythreads 1
 
 machida --application-module alphabet --in 127.0.0.1:7010 \
-  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w4 --worker_count 3 \
+  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w4 --worker-count 3 \
   --ponythreads 1
 
 machida --application-module alphabet --in 127.0.0.1:7010 \
-  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w5 --worker_count 3 \
+  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w5 --worker-count 3 \
   --ponythreads 1
-```
 {%- language name="Go", type="go" -%}
-```
 alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --join 127.0.0.1:12500 --name w3 --worker_count 3
+  --join 127.0.0.1:12500 --name w3 --worker-count 3
 
 alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --join 127.0.0.1:12500 --name w4 --worker_count 3
+  --join 127.0.0.1:12500 --name w4 --worker-count 3
 
 alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --join 127.0.0.1:12500 --name w5 --worker_count 3
-```
+  --join 127.0.0.1:12500 --name w5 --worker-count 3
 {%- endcodetabs %}
 
 ## Shrink to Fit
@@ -76,10 +68,11 @@ If you send in a list of worker names that includes at least one invalid worker 
 
 The leaving workers will migrate state to the remaining workers and then shut down. The remaining workers will then handle all work for the application.
 
-You can query a running cluster to get a list of workers eligible for shutdown. In order to do this, pass `\?` as the argument to `--message` as below:
+You can query a running cluster to get a list of workers eligible for shutdown. In order to do this, pass `?` as the argument to `--message` as below:
 
 ```
 external_sender --type shrink --external 127.0.0.1:5050 --message \? \
   --stay-alive
 ```
 
+In this example, we escape `?` in order to avoid bash globbing. We also pass the `--stay-alive` flag, since otherwise `external_sender` will exit before it has a chance to receive a reply to the query.
