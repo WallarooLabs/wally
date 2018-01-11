@@ -34,7 +34,7 @@ Let's dig into that tuple that we are returning:
 The first element, `state.get_votes(data.letter)`, is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element, `True`, is to let Wallaroo know if we should store an update for our state. By returning `True`, we are instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing, so why wouldn't we always return `True`? There are two answers:
 
 1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
-2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
+2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a trade-off that can be made between performance and safety.
 
 ### State and StateBuilder
 
@@ -138,4 +138,4 @@ The complete alphabet example is available [here](https://github.com/WallarooLab
 
 To learn how to write a stateful application with partitioning, continue to [Writing Your Own Partitioned Stateful Application](writing-your-own-partitioned-stateful-application.md).
 
-To learn how to make your application resilient and able to work across multiple workers, skip ahead to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).
+To learn how to make your application resilient and able to work across multiple workers, skip ahead to [Inter-worker Serialization and Resilience](interworker-serialization-and-resilience.md).

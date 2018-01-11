@@ -190,6 +190,6 @@ The complete example is available [here](https://github.com/WallarooLabs/wallaro
 
 ### Next Steps
 
-To learn how to make your application resilient and able to work across multiple workers, please continue to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).
+To learn how to make your application resilient and able to work across multiple workers, please continue to [Inter-worker Serialization and Resilience](interworker-serialization-and-resilience.md).
 
 For further reading, please refer to the [Wallaroo Python API Classes](api.md).
