@@ -158,7 +158,7 @@ actor Main
           let messages_to_send = m_arg as USize
           let to_host_addr = h_arg as Array[String]
 
-          let store = Store(env.root as AmbientAuth)
+          let store = Store(write_to_file, env.root as AmbientAuth)
           let coordinator = Coordinator(env, store)?
 
           let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
@@ -431,14 +431,19 @@ actor Store
   let _encoder: SentLogEncoder = SentLogEncoder
   var _sent_file: (File|None)
 
-  new create(auth: AmbientAuth) =>
-    _sent_file = try
-      let f = File(FilePath(auth, "sent.txt")?)
-      f.set_length(0)
-      f
-    else
-      None
-    end
+  new create(write_to_file: Bool, auth: AmbientAuth) =>
+    _sent_file =
+      if write_to_file then
+        try
+          let f = File(FilePath(auth, "sent.txt")?)
+          f.set_length(0)
+          f
+        else
+          None
+        end
+      else
+        None
+      end
 
   be sentv(msgs: Array[ByteSeq] val, at: U64) =>
     match _sent_file
