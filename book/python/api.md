@@ -10,16 +10,16 @@ The recommended way to create your topology structure is by using the [Applicati
 
 ## Table of Contents
 
-* [Application setup](#application-setup)
-* [ApplicationBuilder](#wallarooapplicationbuilder)
+* [Application Setup](#application-setup)
+* [ApplicationBuilder](#applicationbuilder)
 * [Computation](#computation)
 * [Data](#data)
 * [Key](#key)
 * [PartitionFunction](#partitionfunction)
-* [TCPSinkEncoder](#tcpsinkencoder)
-* [TCPSourceDecoder](#tcpsourcedecoder)
-* [KafkaSinkEncoder](#kafkasinkencoder)
-* [kafkaSourceDecoder](#kafkasourcedecoder)
+* [TCPSinkEncoder](#tcp-sink-encoder)
+* [TCPSourceDecoder](#tcp-source-decoder)
+* [KafkaSinkEncoder](#kafka-sink-encoder)
+* [KafkaSourceDecoder](#kafka-source-decoder)
 * [State](#state)
 * [StateComputation](#statecomputation)
 * [TCPSourceConfig](#tcpsourceconfig)
@@ -51,7 +51,7 @@ def application_setup(args):
 
 Since the application is run in an embedded Python runtime, it does not have standard access to `sys.argv` from which various options parsers could be used. Instead, Wallaroo provides `application_setup` with `args`: a list of the string command-line arguments it has received.
 
-### wallaroo.ApplicationBuilder
+### ApplicationBuilder
 
 The `ApplicationBuilder` class in `wallaroo` is a utility for constructing application topologies. It also provides some additional validation on the input parameters.
 
