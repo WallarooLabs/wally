@@ -34,7 +34,7 @@ The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter be
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](/book/getting-started/choosing-an-installation-option.md) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
