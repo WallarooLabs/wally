@@ -1,8 +1,8 @@
-# Interworker Serialization and Resilience
+# Inter-worker Serialization and Resilience
 
 Wallaroo applications can scale horizontally by running multiple worker processes (ideally on different machines connected by a fast network). Worker processes send each other encoded objects, some of which may contain Python objects. In order to make this work, the application developer must provide functions called `serialize` and `deserialize` that convert between objects and strings that represent those objects.
 
-Wallaroo applications can be made resilient by persisting their state to disk so that if they crash they can recover their state. The resilience system uses the same mechanism that is used for interworker serialization.
+Wallaroo applications can be made resilient by persisting their state to disk so that if they crash they can recover their state. The resilience system uses the same mechanism that is used for inter-worker serialization.
 
 ## Serialization
 
