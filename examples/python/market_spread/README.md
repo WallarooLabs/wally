@@ -11,7 +11,7 @@ When we break the application down into its key components we get:
 - State in the form of latest market conditions for various stock symbols
 - A calculation to possibly withdraw the trade based on state for that stock symbol
 
-You can read more about Market Spread in [What is Wallaroo](/book/what-is-wallaroo.md)
+You can read more about Market Spread in [What is Wallaroo](https://docs.wallaroolabs.com/book/what-is-wallaroo.html)
 
 ### Input
 
@@ -59,7 +59,7 @@ The Order messages are handled by the `OrderDecoder`'s `decode(...)` method, whi
 
 ## Running Market Spread
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](/book/getting-started/choosing-an-installation-option.md) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 You will need five separate shells to run this application. Open each shell and go to the `examples/python/market_spread` directory.
 
