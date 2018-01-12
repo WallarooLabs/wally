@@ -53,9 +53,9 @@ The output messages use the [source message framing protocol](https://docs.walla
 
 ### Processing
 
-The NBBO messages are handled by the `MarketDataDecoder`'s `decode(...)` method, which takes the input bytes and turns them into `MarketDataMessage` objects, which are then sent to the state partition that handles the state for the stock symbol given by the message, along with the `UpdateMarketData` object. The `UpdateMarketData`'s `compute(...)` method is called on the incoming message and the current state for the stock symbol and the state is updated with new price information.
+The NBBO messages are handled by the `market_data_decoder` function, which takes the input bytes and turns them into `MarketDataMessage` objects, which are then sent to the partition function to determine which state partition to forward the message to. At the state partition, the `MarketDataMessage` is passed, along with the `SymbolData` state for that partition, to the `update_market_data` state computation that updates the price information for the stock symbol given by the message.
 
-The Order messages are handled by the `OrderDecoder`'s `decode(...)` method, which takes the input bytes and turns them into `Order` object, which are then sent to the state partition that handles the state for the stock symbol given in the message, along with the `CheckOrder` object. The `CheckOrder`'s `compute(...)` method is called on the incoming message and the current state for the stock symbol, and if the order is accepted based on the order price and the market price then an `OrderResult` message is sent out. The `Encoder`'s `encode(...)` method turns `OrderResult` messages into byte strings that are then sent out.
+The Order messages are handled by the `order_decoder` function, which takes the input bytes and turns them into an `Order` object, which is then sent to the partition function to determine the state partition to forward the message to. The Order message is then passed, along with the `SymbolData` state object, to the `check_order` State Computation, which will determine whether the order is accepted or rejected. If accepted, the `check_order` State Computation will return an `OrderResult` object which is then encoded by the `order_result_encoder` function into output byte strings.
 
 ## Running Market Spread
 
