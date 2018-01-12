@@ -24,6 +24,7 @@ The recommended way to create your topology structure is by using the [Applicati
 * [StateComputation](#statecomputation)
 * [TCPSourceConfig](#tcpsourceconfig)
 * [TCPSinkConfig](#tcpsinkconfig)
+* [Inter-worker serialization](#inter-worker-serialization)
 
 ### Application Setup
 
@@ -368,3 +369,7 @@ A `TCPSourceConfig` object specifies the host, port, and encoder to use for a TC
 ### TCPSinkConfig
 
 A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `to_sink`.
+
+### Inter-worker serialization
+
+When Wallaroo runs with multiple workers, a built-in serializations and deserialization functions based on pickle take care of the encoding and decoding objects on the wire. The worker processes send each other these encoded objects. In some cases, you may wish to override this built-in serialization. If you wish to know more, please refer to the [Inter-worker serialization and resilience](interworker-serialization-and-resilience.md) section of the manual.
