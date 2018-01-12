@@ -69,7 +69,7 @@ The output will be printed to the console in the first shell. Each line should b
 
 ## Shutdown
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050

@@ -20,7 +20,7 @@ Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate
 
 ### A Note About PYTHONPATH
 
-Machida uses the `PYTHONPATH` environment variable to find modules that are imported by the application. You will have at least two modules in your `PYTHONPATH`: the application module and the `wallaroo` module. For example, if you have followed the directions for setting up the tutorial then the Wallaroo Python module is in `$HOME/wallaroo-tutorial/machida/wallaroo.py` and the "Celsius to Farenheit" application module is in `$HOME/wallaroo-tutorial/examples/python/celsius/celsius.py`, so you would export `PYTHONPATH` like this:
+Machida uses the `PYTHONPATH` environment variable to find modules that are imported by the application. You will have at least two modules in your `PYTHONPATH`: the application module and the `wallaroo` module. For example, if you have followed the directions for setting up the tutorial then the Wallaroo Python module is in `$HOME/wallaroo-tutorial/machida/wallaroo.py` and the "Celsius to Fahrenheit" application module is in `$HOME/wallaroo-tutorial/examples/python/celsius/celsius.py`, so you would export `PYTHONPATH` like this:
 
 ```bash
 export PYTHONPATH="$PYTHONPATH:$HOME/wallaroo-tutorial/machida:$HOME/wallaroo-tutorial/examples/python/celsius"
@@ -44,4 +44,4 @@ To try running an example, go to [the Reverse example application](https://githu
 
 To learn how to write your own Wallaroo Python application, continue to [Writing Your Own Application](writing-your-own-application.md)
 
-To read about the Machida command line arguments, refer to [Appendix: Wallaroo Command-Line Options](/book/appendix/wallaroo-command-line-options.md).
+To find out more detail on the command line arguments and other aspects of running Wallaroo application, see the [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md) section.

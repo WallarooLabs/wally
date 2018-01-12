@@ -86,10 +86,13 @@
   * [Start A Go Project](book/go/api/start-a-project.md)
   * [Wallaroo Go API](book/go/api/api.md)
 
+## Running Wallaroo
+* [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md)
+* [Autoscale](/book/running-wallaroo/autoscale.md)
+* [Command line options](/book/running-wallaroo/wallaroo-command-line-options.md)
+
 ## Appendix
-* [Clustered Wallaroo](book/appendix/clustering.md)
 * [Wallaroo and Virtualenv](book/appendix/virtualenv.md)
-* [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)
 * [TCP Decoders and Encoders](book/appendix/tcp-decoders-and-encoders.md)
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)

@@ -4,7 +4,7 @@ In this section, we're going to run an example Wallaroo application. By the time
 
 There are a few Wallaroo support applications that you'll be interacting with for the first time:
 
-- Our Metrics UI that allows you to monitor the performance and health of your applications.
+- Our Metrics UI allows you to monitor the performance and health of your applications.
 - Giles receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
 - Machida, our program for running Wallaroo Python applications.
@@ -23,7 +23,7 @@ To start the Metrics UI run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.3
+  wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ metrics_ui_version }}
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -98,7 +98,7 @@ If the sender is working correctly, you should see `Connected` printed to the sc
 
 ### First Look
 
-Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000) the landing page should show you that the "Celsius to Fahrenheit" application has successfully connected.
+Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000), the landing page should show you that the "Celsius to Fahrenheit" application has successfully connected.
 
 ![Landing Page](/book/metrics/images/landing-page.png)
 
@@ -114,7 +114,7 @@ Now, let's have a look at some metrics. By clicking on the "Celsius to Fahrenhei
 
 You'll see the metric stats update as data continues to be processed in our application.
 
-You can then click into one of the elements within a category, to get to a detailed metrics page for that element. If we were to click into the `Add32` computation, we'll be taken to this page:
+You can then click into one of the elements within a category to get to a detailed metrics page for that element. If we were to click into the `Add32` computation, we'll be taken to this page:
 
 ![Computation Detailed Metrics page](/book/metrics/images/computation-detailed-metrics-page.png)
 
@@ -124,7 +124,7 @@ Feel free to click around and get a feel for how the Metrics UI is setup and how
 
 ### Terminal 5, Cluster Shutdown
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown

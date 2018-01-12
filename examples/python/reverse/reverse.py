@@ -24,37 +24,23 @@ def application_setup(args):
 
     ab = wallaroo.ApplicationBuilder("Reverse Word")
     ab.new_pipeline("reverse",
-                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
-    ab.to(Reverse)
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
+                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+    ab.to(reverse)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()
 
 
-class Decoder(object):
-    def header_length(self):
-        print "header_length"
-        return 4
-
-    def payload_length(self, bs):
-        print "payload_length", bs
-        return struct.unpack(">I", bs)[0]
-
-    def decode(self, bs):
-        print "decode", bs
-        return bs.decode("utf-8")
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def decoder(bs):
+    return bs.decode("utf-8")
 
 
-class Reverse(object):
-    def name(self):
-        return "reverse"
-
-    def compute(self, data):
-        print "compute", data
-        return data[::-1]
+@wallaroo.computation(name="reverse")
+def reverse(data):
+    return data[::-1]
 
 
-class Encoder(object):
-    def encode(self, data):
-        # data is a string
-        print "encode", data
-        return data + "\n"
+@wallaroo.encoder
+def encoder(data):
+    # data is a string
+    return data + "\n"

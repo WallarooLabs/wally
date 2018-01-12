@@ -137,7 +137,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Download the Metrics UI
 
 ```bash
-sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.3
+sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ metrics_ui_version }}
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -155,7 +155,7 @@ This will be our base directory in what follows. If you haven't already cloned t
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.3.3
+git checkout {{ book.wallaroo_version }}
 ```
 ## Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool
 

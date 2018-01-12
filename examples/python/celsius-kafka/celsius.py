@@ -29,41 +29,35 @@ def application_setup(args):
 
     ab.new_pipeline("convert",
                     wallaroo.KafkaSourceConfig(in_topic, in_brokers, in_log_level,
-                                               Decoder()))
+                                               decoder))
 
-    ab.to(Multiply)
-    ab.to(Add)
+    ab.to(multiply)
+    ab.to(add)
 
     ab.to_sink(wallaroo.KafkaSinkConfig(out_topic, out_brokers, out_log_level,
                                         out_max_produce_buffer_ms,
                                         out_max_message_size,
-                                        Encoder()))
+                                        encoder))
     return ab.build()
 
 
-class Decoder(object):
-    def decode(self, bs):
-        if len(bs) < 4:
-          return 0.0
-        return struct.unpack('>f', bs[:4])[0]
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def decoder(bs):
+    if len(bs) < 4:
+      return 0.0
+    return struct.unpack('>f', bs[:4])[0]
 
-class Multiply(object):
-    def name(self):
-        return "multiply by 1.8"
-
-    def compute(self, data):
-        return data * 1.8
+@wallaroo.computation(name="multiply by 1.8")
+def multiply(data):
+    return data * 1.8
 
 
-class Add(object):
-    def name(self):
-        return "add 32"
-
-    def compute(self, data):
-        return data + 32
+@wallaroo.computation(name="add 32")
+def add(data):
+    return data + 32
 
 
-class Encoder(object):
-    def encode(self, data):
-        # data is a float
-        return (struct.pack('>f', data), None)
+@wallaroo.encoder
+def encoder(data):
+    # data is a float
+    return (struct.pack('>f', data), None)

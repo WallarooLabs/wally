@@ -269,6 +269,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _layout_initializer.create_data_channel_listener(m.workers,
           _d_host, _d_service)
       | let m: JoinClusterMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received JoinClusterMsg on Control Channel\n"
+            .cstring())
+        end
         ifdef "autoscale" then
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>

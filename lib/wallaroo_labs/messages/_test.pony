@@ -198,10 +198,6 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
   fun apply(h: TestHelper) ? =>
     """
     Test round-trip serialization of ExternalShrinkMsg.
-
-    Note an "ah-hah" requirement: if both the node_names array
-    empty and also num_nodes is zero, then by default we should
-    observe node_names empty and num_nodes equal to *one*.
     """
     let node_names: Array[String] = [""; "a"; "lovely b"; ""; "node c"]
 
@@ -220,11 +216,7 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
         for j in extracted.node_names.keys() do
           h.assert_eq[String](node_names(j)?, extracted.node_names(j)?)
         end
-        if (i == 0) then
-          h.assert_eq[USize](1, extracted.num_nodes) // ah-hah
-        else
-          h.assert_eq[USize](0, extracted.num_nodes)
-        end
+        h.assert_eq[USize](0, extracted.num_nodes)
       else
         h.assert_eq[String]("error", "case 1")
       end
@@ -239,11 +231,7 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
       | let extracted: ExternalShrinkMsg =>
         h.assert_eq[Bool](false, extracted.query)
         h.assert_eq[USize](0, extracted.node_names.size())
-        if (i == 0) then
-          h.assert_eq[USize](1, extracted.num_nodes) // ah-hah
-        else
-          h.assert_eq[USize](i, extracted.num_nodes)
-        end
+        h.assert_eq[USize](i, extracted.num_nodes)
       else
         h.assert_eq[String]("error", "case 2")
       end

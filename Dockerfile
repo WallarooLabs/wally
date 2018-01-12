@@ -82,6 +82,7 @@ RUN make clean && \
     cp giles/receiver/receiver /wallaroo-bin/receiver && \
     cp machida/build/machida /wallaroo-bin/machida && \
     cp utils/cluster_shutdown/cluster_shutdown /wallaroo-bin/cluster_shutdown && \
+    cp utils/data_receiver/data_receiver /wallaroo-bin/data_receiver && \
     cp env-setup /wallaroo-bin && \
     make clean
 

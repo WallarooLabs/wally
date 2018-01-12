@@ -1,8 +1,23 @@
-# Changelog
+# Change Log
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [0.3.3] - 2017-01-09
+## [0.4.0] - 2018-01-12
+
+### Fixed
+
+- Do not force shrink count to a minimum of 1 ([PR #1931](https://github.com/wallaroolabs/wallaroo/pull/1931))
+- Fix bug that caused worker joins to fail after the first successful round. ([PR #1927](https://github.com/wallaroolabs/wallaroo/pull/1927))
+
+### Added
+
+- Add "Running Wallaroo" section to book ([PR #1914](https://github.com/wallaroolabs/wallaroo/pull/1914))
+
+### Changed
+
+- New version of Python API based on decorators ([PR #1833](https://github.com/wallaroolabs/wallaroo/pull/1833))
+
+## [0.3.3] - 2018-01-09
 
 ### Fixed
 

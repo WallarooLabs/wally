@@ -20,7 +20,7 @@ You can then click “Install” to download and install Xcode Command Line Tool
 
 ## Installing a Package Manager, Homebrew
 
-Homebrew is used for easy installation of certain packages needed by Pony.
+Homebrew is used for easy installation of certain packages needed by Wallaroo.
 
 Instructions for installing Homebrew can be found [on their website](http://brew.sh/).  This book assumes that you use the default installation directory, `/usr/local`.  If you choose an alternate installation directory, please configure your shell's `PATH` environment variable as needed.
 
@@ -71,7 +71,7 @@ Installing Docker will result in it running on your machine. After you reboot yo
 ## Download the Metrics UI
 
 ```bash
-docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.3.3
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ metrics_ui_version }}
 ```
 
 ## Set up Environment for the Wallaroo Tutorial
@@ -90,7 +90,7 @@ cloned the Wallaroo repo, do so now:
 ```bash
 git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
-git checkout 0.3.3
+git checkout {{ book.wallaroo_version }}
 ```
 
 This will create a subdirectory called `wallaroo`.
