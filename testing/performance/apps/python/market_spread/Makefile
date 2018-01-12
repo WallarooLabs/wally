@@ -43,7 +43,7 @@ include $(rules_mk_path)
 build-testing-performance-apps-python-market_spread: build-machida
 integration-tests-testing-performance-apps-python-market_spread: build-testing-performance-apps-python-market_spread
 
-#integration-tests-testing-performance-apps-python-market_spread: struct_market_spread_py_test
+integration-tests-testing-performance-apps-python-market_spread: struct_market_spread_py_test
 
 struct_market_spread_py_test:
 	cd $(STRUCT_MARKET_SPREAD_PY_PATH) && \

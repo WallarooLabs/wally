@@ -28,7 +28,6 @@ SIDETYPE_SELL = 2
 from market_spread import (FIXTYPE_MARKET_DATA,
                            FIXTYPE_ORDER,
                            OrderResult,
-                           OrderResultEncoder,
                            SIDETYPE_BUY,
                            SIDETYPE_SELL)
 
