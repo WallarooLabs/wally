@@ -24,7 +24,7 @@ The outputs of the application are strings followed by newlines. Here's an examp
 
 ### Processing
 
-The `Decoders`'s `decode(...)` method creates a string from the value represented by the payload. The string is then sent to the `Reverse` computation where it is reversed. The reversed string is then sent to `Encode`'s `encode(...)` method, where a newline is appended to the string.
+The `decoder` function creates a string from the value represented by the payload. The string is then sent to the `reverse` computation where it is reversed. The reversed string is then sent to the `encoder` function, where a newline is appended to the string before it sent out via the sink.
 
 ## Running Reverse
 
