@@ -14,10 +14,6 @@
         "footerTemplate": "©2017 All Rights Reserved, Wallaroo Labs"
     },
 
-    "variables": {
-        "wallaroo_version": "0.3.3"
-    },
-
     "pluginsConfig": {
         "ga": {
             "token": "UA-59652249-3"

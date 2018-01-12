@@ -54,12 +54,18 @@ WALLAROO_LIB =  $(wallaroo_path)/lib
 # "make test" to work.
 build-machida: machida_build
 unit-tests-machida: build-machida
+unit-tests-machida: wallaroo_unit_tests
 clean-machida: machida_clean
 
 machida_clean:
 	$(QUIET)rm -rf $(MACHIDA_BUILD)
 	$(QUIET)rm -f $(MACHIDA_PATH)/machida.d
 	$(QUIET)rm -rf $(MACHIDA_PATH)/.deps
+
+
+wallaroo_unit_tests:
+	cd $(MACHIDA_PATH) && \
+		python2 -m pytest --color=yes --tb=native --verbose wallaroo_test.py
 
 machida_build: $(MACHIDA_BUILD)/machida
 

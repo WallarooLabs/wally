@@ -7,16 +7,35 @@ set -o nounset
 if [[ "$TRAVIS_BRANCH" == "master" ]]
 then
   remote_branch=master
+  ui_version=$(< VERSION)
+  docker_version=$(< VERSION)
+  docker_url="release\/wallaroo:$docker_version"
 elif [[ "$TRAVIS_BRANCH" == "release" ]]
 then
   remote_branch=release
+  ui_version=$(< VERSION)
+  docker_version=$(< VERSION)
+  docker_url="release\/wallaroo:$docker_version"
 elif [[ "$TRAVIS_BRANCH" == *"release-"* ]]
 then
   remote_branch=rc
+  # TODO: automation
+  ui_version="0.4.0"
+  docker_version=$(git describe --tags --always)
+  docker_url="dev\/wallaroo:$docker_version"
 else
   echo "No remote repo to push book to. Exiting"
   exit 0
 fi
+
+echo "Sliding version number into book content with sed magic..."
+version=$(< VERSION)
+echo "Replacing {{ book.wallaroo_version }}"
+find book -name '*.md' -exec sed -i -- "s/{{ book.wallaroo_version }}/$version/g" {} \;
+echo "Replacing {{ metrics_ui_version }}"
+find book -name '*.md' -exec sed -i -- "s/{{ metrics_ui_version }}/$ui_version/g" {} \;
+echo "Replacing {{ docker_version_url }}"
+find book -name '*.md' -exec sed -i -- "s/{{ docker_version_url }}/$docker_url/g" {} \;
 
 echo "Building book..."
 gitbook build

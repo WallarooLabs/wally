@@ -15,10 +15,10 @@ def compute(self, data):
 In this example, we'll be printing the incoming data before we reverse it.
 
 
-Using `print` is a very useful way to get logged output that you can return to and analyze after your program has completed running. However, there are some downsides when using `print` to debug; you'll need to add a `print` statement everywhere you predict you might need it, you can't get a "state of the world" look at your application, etc.
+Using `print` is a very useful way to get logged output that you can return to and analyze after your program has completed running. However, there are some downsides when using `print` to debug: you'll need to add a `print` statement everywhere you predict you might need it, you can't get a "state of the world" look at your application, etc.
 
 
-Using `print` in Python is not without risks, however. If you try to print a unicode string and your locale isn't set to unicode, you may encounter an error like the following:
+Using `print` in Python is not without risks. If you try to print a Unicode string, and your locale does not support Unicode, you may encounter an error like the following:
 
 ```python
 >>> u = u'\ua000abcd\u07b4'
@@ -28,7 +28,7 @@ Traceback (most recent call last):
 UnicodeEncodeError: 'ascii' codec can't encode character u'\ua000' in position 0: ordinal not in range(128)
 ```
 
-With a streaming input application, you can't always be certain about the contents of the data you try to print. However, you can effectively avoid this sort of error by printing the [byte representation](https://docs.python.org/2/library/repr.html) of your data intead, using `print repr(data)`. In that case, the same code that resulted in an error before will provide a useful printout of the contents of the data object:
+With a streaming input application, you can't always be certain about the contents of the data you try to print. However, you can effectively avoid this sort of error by printing the [byte representation](https://docs.python.org/2/library/repr.html) of your data instead, using `print repr(data)`. In that case, the same code that resulted in an error before will provide a useful printout of the contents of the data object:
 
 ```python
 >>> u = u'\ua000abcd\u07b4'

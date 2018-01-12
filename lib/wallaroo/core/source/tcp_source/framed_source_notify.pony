@@ -162,7 +162,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     | let p_router: PartitionRouter =>
       _router = p_router.update_boundaries(obs)
     else
-      ifdef debug then
+      ifdef "trace" then
         @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +
           " Updating boundaries is a noop for this kind of Source.\n")
           .cstring())

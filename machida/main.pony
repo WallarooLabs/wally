@@ -20,6 +20,7 @@ use "collections"
 use "signals"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
+use "wallaroo_labs/thread_count"
 use "wallaroo"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source/tcp_source"
@@ -30,6 +31,12 @@ use "lib:python-wallaroo"
 
 actor Main
   new create(env: Env) =>
+    let pony_thread_count = ThreadCount()
+
+    if pony_thread_count != 1 then
+      FatalUserError("You must provide Machida with the '--ponythreads 1' argument to ensure it is single-threaded for the Python API or the cluster will crash.\n")
+    end
+
     Machida.start_python()
 
     try

@@ -27,29 +27,16 @@ def application_setup(args):
     letter_partitions = list(string.ascii_lowercase)
     ab = wallaroo.ApplicationBuilder("alphabet")
     ab.new_pipeline("alphabet",
-                    wallaroo.TCPSourceConfig(in_host, in_port, Decoder()))
-    ab.to_state_partition(AddVotes(), LetterStateBuilder(), "letter state",
-                          LetterPartitionFunction(), letter_partitions)
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, Encoder()))
+                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+    ab.to_state_partition(add_votes, TotalVotes, "letter state",
+                          partition, letter_partitions)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()
 
 
-def serialize(o):
-    return pickle.dumps(o)
-
-
-def deserialize(bs):
-    return pickle.loads(bs)
-
-
-class LetterPartitionFunction(object):
-    def partition(self, data):
-        return data.letter[0]
-
-
-class LetterStateBuilder(object):
-    def build(self):
-        return TotalVotes()
+@wallaroo.partition
+def partition(data):
+    return data.letter[0]
 
 
 class TotalVotes(object):
@@ -71,30 +58,21 @@ class Votes(object):
         self.votes = votes
 
 
-class Decoder(object):
-    def header_length(self):
-        return 4
-
-    def payload_length(self, bs):
-        return struct.unpack(">I", bs)[0]
-
-    def decode(self, bs):
-        (letter, vote_count) = struct.unpack(">1sI", bs)
-        return Votes(letter, vote_count)
+@wallaroo.decoder(header_length=4, length_fmt='>I')
+def decoder(bs):
+    (letter, vote_count) = struct.unpack(">1sI", bs)
+    return Votes(letter, vote_count)
 
 
-class AddVotes(object):
-    def name(self):
-        return "add votes"
-
-    def compute(self, data, state):
-        state.update(data)
-        return (state.get_votes(), True)
+@wallaroo.state_computation(name="add votes")
+def add_votes(data, state):
+    state.update(data)
+    return (state.get_votes(), True)
 
 
-class Encoder(object):
-    def encode(self, data):
-        # data is a Votes
-        letter = data.letter
-        votes = data.votes
-        return struct.pack(">LsQ", 9, data.letter, data.votes)
+@wallaroo.encoder
+def encoder(data):
+    # data is a Votes
+    letter = data.letter
+    votes = data.votes
+    return struct.pack(">LsQ", 9, data.letter, data.votes)

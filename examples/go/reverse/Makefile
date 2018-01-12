@@ -69,6 +69,5 @@ reverse_go_test:
 		--command './reverse' \
 		--sink-expect 4
 
-
 # end of prevent rules from being evaluated/included multiple times
 endif

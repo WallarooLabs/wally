@@ -188,7 +188,7 @@ extern PyObject *state_builder_build_state(PyObject *state_builder)
 {
   PyObject *pFunc, *pArgs, *pValue;
 
-  pFunc = PyObject_GetAttrString(state_builder, "build");
+  pFunc = PyObject_GetAttrString(state_builder, "____wallaroo_build____");
   pValue = PyObject_CallFunctionObjArgs(pFunc, NULL);
   Py_DECREF(pFunc);
 

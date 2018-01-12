@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export PYTHONPATH="../../machida:."
+
 ../../machida/build/machida --application-module word_count --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --name worker2 --ponythreads=1 -j 127.0.0.1:6000
