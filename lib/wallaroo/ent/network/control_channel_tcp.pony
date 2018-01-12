@@ -102,7 +102,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref not_listening(listen: TCPListener ref) =>
     @printf[I32]((_name + " control: unable to listen on (%s:%s)\n").cstring(),
       _host.cstring(), _service.cstring())
-    listen.close()
+    Fail()
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _auth, _connections,
