@@ -20,7 +20,7 @@ elif [[ "$TRAVIS_BRANCH" == *"release-"* ]]
 then
   remote_branch=rc
   # TODO: automation
-  ui_version="0.3.3"
+  ui_version="0.4.0"
   docker_version=$(git describe --tags --always)
   docker_url="dev\/wallaroo:$docker_version"
 else
