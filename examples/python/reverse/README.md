@@ -24,11 +24,11 @@ The outputs of the application are strings followed by newlines. Here's an examp
 
 ### Processing
 
-The `Decoders`'s `decode(...)` method creates a string from the value represented by the payload. The string is then sent to the `Reverse` computation where it is reversed. The reversed string is then sent to `Encode`'s `encode(...)` method, where a newline is appended to the string.
+The `decoder` function creates a string from the value represented by the payload. The string is then sent to the `reverse` computation where it is reversed. The reversed string is then sent to the `encoder` function, where a newline is appended to the string before it sent out via the sink.
 
 ## Running Reverse
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](/book/getting-started/choosing-an-installation-option.md) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/reverse` directory.
 
@@ -92,7 +92,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 cluster_shutdown 127.0.0.1:5050

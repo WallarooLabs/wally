@@ -1,10 +1,10 @@
 # Run a Wallaroo Application in Docker
 
-In this section, we're going to run an example Wallaroo application in Docker. By the time you are finished, you'll have validated that your Docker environment is set up and working correctly. If you haven't already completed the Docker setup [instructions](book/getting-started/docker-setup.md), please do so before continuing.
+In this section, we're going to run an example Wallaroo application in Docker. By the time you are finished, you'll have validated that your Docker environment is set up and working correctly. If you haven't already completed the Docker setup [instructions](/book/getting-started/docker-setup.md), please do so before continuing.
 
 There are a few Wallaroo support applications that you'll be interacting with for the first time:
 
-* Our Metrics UI that allows you to monitor the performance and health of your applications.
+* Our Metrics UI allows you to monitor the performance and health of your applications.
 * Giles receiver is designed to capture TCP output from Wallaroo applications.
 * Giles sender is used to send test data into Wallaroo applications over TCP.
 * Machida, our program for running Wallaroo Python applications.
@@ -24,7 +24,7 @@ docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-src:/src/wallaroo \
 -v /tmp/wallaroo-docker/python-virtualenv:/src/python-virtualenv \
 --name wally \
-wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:{{ book.wallaroo_version }}
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 ```
 
 ### Breaking down the Docker command
@@ -111,7 +111,7 @@ First, we'll need to get to the python Celsius example directory with the follow
 cd /src/wallaroo/examples/python/celsius
 ```
 
-Now that we are in the proper directory, and the Metrics UI and a data receiver are up and running, we can run the application itself by executing the following command:
+Now that we are in the proper directory, and the Metrics UI and Giles receiver are up and running, we can run the application itself by executing the following command:
 
 ```bash
 machida --application-module celsius --in 127.0.0.1:7000 \
@@ -147,7 +147,7 @@ If the sender is working correctly, you should see `Connected` printed to the sc
 
 ### First Look
 
-Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000) the landing page should show you that the "Celsius to Fahrenheit" application has successfully connected.
+Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000), the landing page should show you that the "Celsius to Fahrenheit" application has successfully connected.
 
 ![Landing Page](/book/metrics/images/landing-page.png)
 
@@ -163,11 +163,11 @@ Now, let's have a look at some metrics. By clicking on the "Celsius to Fahrenhei
 
 You'll see the metric stats update as data continues to be processed in our application.
 
-You can then click into one of the elements within a category, to get to a detailed metrics page for that element. If we were to click into the `Add32` computation, we'll be taken to this page:
+You can then click into one of the elements within a category to get to a detailed metrics page for that element. If we were to click into the `Add32` computation, we'll be taken to this page:
 
 ![Computation Detailed Metrics page](/book/metrics/images/computation-detailed-metrics-page.png)
 
-Feel free to click around and get a feel for how the Metrics UI is setup and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
+Feel free to click around and get a feel for how the Metrics UI is set up and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
 
 ## Shutdown
 
@@ -179,7 +179,7 @@ Enter the Wallaroo Docker container:
 docker exec -it wally env-setup
 ```
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 cluster_shutdown 127.0.0.1:5050

@@ -22,7 +22,7 @@ To start the Metrics UI run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ book.wallaroo_version }}
+  wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ metrics_ui_version }}
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -124,7 +124,7 @@ Feel free to click around and get a feel for how the Metrics UI is setup and how
 
 ### Terminal 5, Cluster Shutdown
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown

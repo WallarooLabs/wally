@@ -6,9 +6,9 @@ In this section, we will go over the components that are required in order to wr
 
 The `reverse.py` application is going to receive text as its input, reverse it, and then send out the reversed text to its sink. In order to do this, our application needs to provide the following functions:
 
-* Input decoding - how to translate the incoming bytestream into a Python string
+* Input decoding - how to translate the incoming byte stream into a Python string
 * Computation - this is where the input string is going to get reversed
-* Output encoding - how to construct and format the bytestream that will be sent out by the sink
+* Output encoding - how to construct and format the byte stream that will be sent out by the sink
 
 ### Computation
 
@@ -57,7 +57,7 @@ For our application purposes, we will simply define the structure and how it is 
 1. Input messages have the following structure: A fixed length `PAYLOAD_SIZE` followed by `PAYLOAD`
 2. Wallaroo requires three methods to parse this type of message:
   1. `header_length()`, which returns the number of bytes used for the `PAYLOAD_SIZE` in the message. This value tells Wallaroo how many bytes to read from the stream as `HEADER`.
-  2. `payload_length(bs)`, which reads `PAYLOAD_SIZE` bytestring of the size returned by `header_length()` and computes the size of `PAYLOAD`. It then returns that size as an integer to Wallaroo, which will then read that many bytes from the stream.
+  2. `payload_length(bs)`, which reads `PAYLOAD_SIZE` byte string of the size returned by `header_length()` and computes the size of `PAYLOAD`. It then returns that size as an integer to Wallaroo, which will then read that many bytes from the stream.
   3. `decode(bs)`, which receives the remainder of the message, `MSG`, and decodes it into a python object.
 
 In our case:
@@ -115,7 +115,7 @@ def application_setup(args):
 
 Configuration objects are used to pass information about sources and sinks to the application builder. Currently the only supported source and sink types are TCP and Kafka.
 
-Wallaroo provides convenience the functions `tcp_parse_input_addrs` and `tcp_parse_output_addrs` to parse host and port information that is passed on the command line, or the user can supply their own code for getting these values. When using the convenience functions, host/port pairs are represented on the command line as colon-separated values and multiple host/port values are represented by a comma-separated list of host/port values. The functions assume that `--in` is used for input addresses, and `--out` is used for output addresses. For example, this set of command line arguments would specify two input host/port values and one output:
+Wallaroo provides the convenience functions `tcp_parse_input_addrs` and `tcp_parse_output_addrs` to parse host and port information that is passed on the command line, or the user can supply their own code for getting these values. When using the convenience functions, host/port pairs are represented on the command line as colon-separated values and multiple host/port values are represented by a comma-separated list of host/port values. The functions assume that `--in` is used for input addresses, and `--out` is used for output addresses. For example, this set of command line arguments would specify two input host/port values and one output:
 
 ```
 --in localhost:7001,localhost:7002 --out localhost:7010

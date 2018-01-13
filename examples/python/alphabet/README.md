@@ -30,11 +30,11 @@ The outputs of the alphabet application are the letter that received the votes t
 
 ### Processing
 
-The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed with the `AddVotes` computation to the state object that stores all of the vote totals, and the `compute(...)` function modifies the state to record the new total number of votes for the letter. It then creates an `AllVotes` message, which is sent to `Encode`'s `encode(...)` method, which converts it into an outgoing message.
+The `decoder` function creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed along with the state object that stores all of the vote totals to the `add_votes` computation. The `add_votes` computation then modifies the state to record the new total number of votes for the letter. It then creates a new `Votes` message, which is sent to the `encoder` function, which converts it into an outgoing message.
 
 ## Running Alphabet
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](/book/getting-started/choosing-an-installation-option.md) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/alphabet` directory.
 

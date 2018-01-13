@@ -1,6 +1,6 @@
 # Writing Your Own Wallaroo Python Partitioned Stateful Application
 
-In this section, we will go over how to write a partitioned stateful application with the Wallaroo Python API. If you haven't reviewed the simple state application and simple stateful application examples, you can find them [here](writing-your-own-application.md) and [here](writing-your-own-stateful-application.md).
+In this section, we will go over how to write a partitioned stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless application and simple stateful application examples, you can find them [here](writing-your-own-application.md) and [here](writing-your-own-stateful-application.md).
 
 ## Partitioning
 
@@ -18,15 +18,13 @@ Our partitioned application is going to be very similar to the Alphabet applicat
 
 ### Partition
 
-If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is:
-
-Create a partition key list:
+If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is to create a partition key list, as illustrated here:
 
 ```python
 letter_partitions = list(string.ascii_lowercase)
 ```
 
-And then a partitioning function which returns a key from the above list for input data:
+And then we define a partitioning function which returns a key from the above list for input data:
 
 ```python
 class LetterPartitionFunction(object):
@@ -113,4 +111,4 @@ import wallaroo
 
 The complete alphabet example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet_partitioned/). To run it, follow the [Alphabet_partitioned application instructions](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet_partitioned/README.md)
 
-To see how everything we've learned so far comes together, check out our [Word Count walkthrough](word-count.md)
+To see how everything we've learned so far comes together, check out our [Word Count walk-through](word-count.md)

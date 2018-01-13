@@ -4,22 +4,22 @@ The Wallaroo Python API allows developers to create Wallaroo applications in Pyt
 
 ## Overview
 
-In order to create a Wallaroo application in Python, developers need to create functions and classes that provide the required interfaces for each step in their pipline, and then connect them together in a topology structure that is returned by the entry-point function `application_setup`.
+In order to create a Wallaroo application in Python, developers need to create functions and classes that provide the required interfaces for each step in their pipeline, and then connect them together in a topology structure that is returned by the entry-point function `application_setup`.
 
 The recommended way to create your topology structure is by using the [ApplicationBuilder](#wallarooapplicationbuilder) in the `wallaroo` module.
 
 ## Table of Contents
 
-* [Application setup](#application-setup)
-* [ApplicationBuilder](#wallarooapplicationbuilder)
+* [Application Setup](#application-setup)
+* [ApplicationBuilder](#applicationbuilder)
 * [Computation](#computation)
 * [Data](#data)
 * [Key](#key)
 * [PartitionFunction](#partitionfunction)
-* [TCPSinkEncoder](#tcpsinkencoder)
-* [TCPSourceDecoder](#tcpsourcedecoder)
-* [KafkaSinkEncoder](#kafkasinkencoder)
-* [kafkaSourceDecoder](#kafkasourcedecoder)
+* [TCPSinkEncoder](#tcp-sink-encoder)
+* [TCPSourceDecoder](#tcp-source-decoder)
+* [KafkaSinkEncoder](#kafka-sink-encoder)
+* [KafkaSourceDecoder](#kafka-source-decoder)
 * [State](#state)
 * [StateComputation](#statecomputation)
 * [TCPSourceConfig](#tcpsourceconfig)
@@ -28,9 +28,9 @@ The recommended way to create your topology structure is by using the [Applicati
 
 ### Application Setup
 
-After Machida has loaded a Wallaroo Python application module, it executes its entry point function: `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. Therefore, any Wallaroo Python application must provide this function.
+After Machida has loaded a Wallaroo Python application module, it executes its entry point function, `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. Therefore, any Wallaroo Python application must provide this function.
 
-The `wallaroo` module provides an [ApplicationBuilder](#wallarooapplicationbuilder) that facilitates the creation of this data structure. When `ApplicationBuilder` is used, a topology can be built using its methods, and then its structure can be return by calling `ApplicationBuilder.build()`.
+The `wallaroo` module provides an [ApplicationBuilder](#wallarooapplicationbuilder) that facilitates the creation of this data structure. When `ApplicationBuilder` is used, a topology can be built using its methods, and then its structure can be returned by calling `ApplicationBuilder.build()`.
 
 For a simple application with a decoder, computation, and encoder, this function may look like
 
@@ -52,7 +52,7 @@ def application_setup(args):
 
 Since the application is run in an embedded Python runtime, it does not have standard access to `sys.argv` from which various options parsers could be used. Instead, Wallaroo provides `application_setup` with `args`: a list of the string command-line arguments it has received.
 
-### wallaroo.ApplicationBuilder
+### ApplicationBuilder
 
 The `ApplicationBuilder` class in `wallaroo` is a utility for constructing application topologies. It also provides some additional validation on the input parameters.
 
@@ -64,7 +64,7 @@ Create a new application with the name `name`.
 
 ##### `new_pipeline(name, source_config)`
 
-Create a new pipline with the name `name` and a source config object.
+Create a new pipeline with the name `name` and a source config object.
 
 If you're adding more than one pipeline, make sure to call `done()` before creating another pipeline.
 
@@ -95,7 +95,7 @@ Add a state computation _function_, along with a [State](#state) _class_ and `st
 
 `state_class` must be a [State](#state).
 
-`state_name` must be a str. `state_name` is the name of the state object that we will run computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and in this way, acts as a sort of namespace.
+`state_name` must be a str. `state_name` is the name of the state object that we will run computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and, in this way, acts as a sort of namespace.
 
 ##### `to_state_partition(computation, state, state_partition_name, partition_function, partition_keys)`
 
@@ -105,7 +105,7 @@ Add a partitioned state computation to the current pipeline.
 
 `state` must be [State](#state).
 
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and in this way, acts as a sort of namespace.
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
 
 `partition_function` must be a [PartitionFunction](#partitionfunction).
 
@@ -119,7 +119,7 @@ Add a partitioned stateful computation to the current pipeline.
 
 `state` must be [State](#state).
 
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and in this way, acts as a sort of namespace.
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
 
 `partition_function` must be a [PartitionFunction](#partitionfunction).
 
@@ -131,11 +131,11 @@ Add a sink to the end of a pipeline. `sink_config` must be an instance of a sink
 
 ##### `build()`
 
-Return the complete list of topology tuples. This is the topology structure Wallaroo requries in order to construct the topology connectinng all of the application components.
+Return the complete list of topology tuples. This is the topology structure Wallaroo requires in order to construct the topology connecting all of the application components.
 
 ### Computation
 
-A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. e.g. a stateless computation has _no side effects_.
+A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. A stateless computation has _no side effects_.
 
 A `computation` class must be wrapped by the `@computation(name)` decorator, which takes the name of the computation as an argument.
 
@@ -145,7 +145,7 @@ Use `data` to perform a computation and return a new output. `data` is the pytho
 
 ##### `compute_multi(data)`
 
-Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects. Each item in the list will arrive individually at the next step; i.e. not as a list.
+Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects. Each item in the list will arrive individually at the next step, i.e. not as a list.
 
 #### Example Computations
 
@@ -160,7 +160,7 @@ def compute(data):
         return 0
 ```
 
-A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, we filter aka drop the message by returning `None`.
+A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, we filter (drop) the message by returning `None`.
 
 ```python
 @computation_multi("doubledouble"):
@@ -173,9 +173,9 @@ def compute_multi(data):
 
 ### Data
 
-Data is the object that is passed to a [Computation](#computation) and a [StateComputation](#statecomputation)'s method. It is a plain Python object and can be as simple or as complex as you would like it to be.
+Data is the object that is passed to a [Computation](#computation)'s and a [StateComputation](#statecomputation)'s method. It is a plain Python object and can be as simple or as complex as you would like it to be.
 
-It is important to ensure that data returned is always immutable or unique to avoid any unexpected behvaiour due to the asynchronous execution nature of Wallaroo.
+It is important to ensure that data returned is always immutable or unique to avoid any unexpected behavior due to the asynchronous execution nature of Wallaroo.
 
 ### Key
 
@@ -183,11 +183,11 @@ Partition Keys must correctly support the `__eq__` (`==`) and `__hash__` operato
 
 ### PartitionFunction
 
-A partition function class must be wrapped in the `@partition_function` decorator and  return the appropriate [Key](#key) for `data`.
+A partition function class must be wrapped in the `@partition_function` decorator and return the appropriate [Key](#key) for `data`.
 
 #### Example PartitionFunction
 
-An example that partitions words for a word-count based on their first character, and buckets all other cases to the empty string key
+An example that partitions words for a word count based on their first character, and buckets all other cases to the empty string key:
 
 ```python
 @partition_function
@@ -202,7 +202,7 @@ def partition(self, data):
 
 The TCP Sink Encoder is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out over a TCP connection.
 
-To do this, wrap your function in the `@encode` decorator.
+Your function must be decorated with `@encoder`.
 
 ##### `encode(data)`
 
@@ -210,7 +210,7 @@ Return a `bytes` that can be sent over the network. It is up to the developer to
 
 #### Example TCPSinkEncoder
 
-A complete `TCPSinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian Longs preceded by a big-endian short representing the number of integers in the list:
+A complete `TCPSinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian longs preceded by a big-endian short representing the number of integers in the list:
 
 ```python
 @encoder
@@ -225,13 +225,14 @@ The TCP Source Decoder is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input connection.
 2. Converting those bytes into an object that the rest of the application can process.
 
-To do this, wrap your function with the `@decoder(header_length, fmt)` decorator.
+Your function must be decorated with `@decoder(header_length, fmt)`.
 
 ##### `header_length`
 
 An integer representing the number of bytes from the beginning of an incoming message to return to the function that reads the payload length.
 
 ##### `fmt`
+
 A format string that represents how the message header is encoded. A common encoding used in Wallaroo is a big-endian 32-bit unsigned integer, which can be decoded with the [struct module's](https://docs.python.org/2/library/struct.html) help:
 
 ```python
@@ -246,7 +247,7 @@ Return a python a python object of the type the next step in the pipeline expect
 
 #### Example TCPSourceDecoder
 
-A complete TCPSourceDecoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bt unsigned int in its _payload_:
+A complete TCPSourceDecoder example that decodes messages with a 32-bit unsigned integer _payload\_length_ and a character followed by a 32-bit unsigned int in its _payload_:
 
 ```python
 @decoder(header_length=4, length_fmt=">L")
@@ -259,6 +260,8 @@ def decode(self, bs):
 The Kafka Sink Encoder is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out to a Kafka sink, along with a `key` or `None`.
 
 To do this, create an encoder function, in the same way you would for a TCP Sink Encoder, but Return a tuple of `(bytes, key)` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes` and `key`, and what information to keep or discard.
+
+Your encoder function must be decorated with `@encoder`.
 
 #### Example KafkaSinkEncoder
 
@@ -282,6 +285,8 @@ Return Python object of the type the next step in the pipeline expects.
 
 `data` is a `bytes` object representing the incoming Kafka message, and it is up to the developer to translate that into a Python object.
 
+Your decoder function must be decorated with `@decoder`.
+
 #### Example Kafka Source Decoder
 
 A complete Kafka Source Decoder example that decodes messages with a 32-bit unsigned int in its _payload_:
@@ -294,15 +299,15 @@ def decode(self, bs):
 
 ### State
 
-State is an object that is passed to the [StateCompution's](#statecomputation) `compute` method. It is a plain Python object and can be as simple or as complex as you would like it to. The class definition must be wrapped in the `@state` decorator.
+State is an object that is passed to the [StateComputation's](#statecomputation) `compute` method. It is a plain Python object and can be as simple or as complex as you would like. The class definition must be wrapped in the `@state` decorator.
 
-A common issue that arises with asynchronous execution, is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
+A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
 
 In either case, it is up to the developer to provide a side-effect safe value for the Computation to return!
 
 #### Example State
 
-An AlphabetCounts keeps a count for how many times each letter in the English alphabet has been seen
+An `AlphabetCounts` keeps a count for how many times each letter in the English alphabet has been seen:
 
 ```python
 import copy
@@ -337,12 +342,12 @@ Similarly to a Computation, a StateComputation class must be wrapped in the `@st
 
 `data` is anything that was returned by the previous step in the pipeline, and `state` is the [State](#state) that was defined for this step in the pipeline definition.
 
-Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. Returning `None` will stop processing and no messages will be sent to the next step. The second element is a boolean value instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
+Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. Returning `None` will stop processing that message and no messages will be sent to the next step. The second element is a boolean value instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
 
 Why wouldn't we always return `True`? There are two answers:
 
-1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
-2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
+1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
+2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a trade-off that can be made between performance and safety.
 
 ##### `compute_multi(data, state)`
 
@@ -366,9 +371,13 @@ def compute(self, data, state):
 
 A `TCPSourceConfig` object specifies the host, port, and encoder to use for a TCP source connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `new_pipeline`.
 
+The `decoder` argument must decorated as described in [TCP Source Decoder](#tcp-source-decoder).
+
 ### TCPSinkConfig
 
 A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `to_sink`.
+
+The `encoder` argument must decorated as described in [TCP Source Encoder](#tcp-source-encoder).
 
 ### Inter-worker serialization
 

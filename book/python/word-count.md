@@ -38,9 +38,9 @@ ab.new_pipeline("Split and Count",
                 wallaroo.TCPSourceConfig(in_host, in_port, decoder))
 ```
 
-Upon receiving some textual input, our word count application will route it to a stateless computation called `split`. `split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateful computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? The `to` method creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(split)`, we are placing the `split` computation on every worker in our cluster.
+Upon receiving some textual input, our word count application will route it to a stateless computation called `split`. `split` is responsible for breaking the text down into individual words. You might notice something a little different about how we set up this stateless computation. In our previous example, we called `to` on our application builder. In this case, we are calling `to_parallel`. What's the difference between `to` and `to_parallel`? The `to` method creates a single instance of the stateless computation. No matter how many workers we might run in our Wallaroo cluster, there will only be a single instance of the computation. Every message that is processed by the computation will need to be routed the worker running that computation. `to_parallel` is different. By doing `to_parallel(split)`, we are placing the `split` computation on every worker in our cluster.
 
-### `A to` vs `to_parallel` digression
+### A `to` vs `to_parallel` digression
 
 Parallelizing a stateless computation seems like something you'd always want to do. So why does `to` exist? Message ordering. Some applications require that all incoming messages maintain ordering. Some don't. If we don't care about message order, we probably want to use `to_parallel`.
 
@@ -62,7 +62,7 @@ In our current case, counting words, we don't care about the order of the words,
 
 ### Application setup, the return
 
-Back to our application setup
+Back to our application setup:
 
 ```python
 def application_setup(args):
@@ -89,7 +89,7 @@ Beyond `to_parallel`, there's nothing new in our word count application. After w
         partition, word_partitions)
 ```
 
-Note we setup up 27 partitions to count our words, one for each letter plus one called "!" which will handle any "word" that doesn't start with a letter:
+Note we set up 27 partitions to count our words, one for each letter plus one called "!" which will handle any "word" that doesn't start with a letter:
 
 ```python
 word_partitions = list(string.ascii_lowercase)
@@ -103,7 +103,7 @@ ab.to_state_partition(count_word, WordTotals, "word totals",
 
 ### Splitting words
 
-Our word splitting is mostly uninteresting, except for one huge difference, our previous examples had one output for each input. When splitting text into words, we take one input and produce multiple outputs. Let's see how that is done.
+Our word splitting is mostly uninteresting, except for one huge difference: our previous examples had one output for each input. When splitting text into words, we take one input and produce multiple outputs. Let's see how that is done.
 
 ```python
 @wallaroo.computation_multi(name="split into words")
@@ -140,9 +140,9 @@ def partition(data):
 
 ### Our counting guts
 
-The next three classes are the core of our word counting application. By this point, our messages has been split into individual words and run through our `partition` function and will arrive at a state computation based on the first letter of the word.
+The next three classes are the core of our word counting application. By this point, our messages have been split into individual words and run through our `partition` function and will arrive at a state computation based on the first letter of the word.
 
-Let's take a look at we have. `CountWord` is a State Computation. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
+Let's take a look at what we have. `CountWord` is a State Computation. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
 
 ```python
 @wallaroo.state_computation(name="Count Word")
@@ -190,6 +190,6 @@ The complete example is available [here](https://github.com/WallarooLabs/wallaro
 
 ### Next Steps
 
-To learn how to make your application resilient and able to work across multiple workers, please continue to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).
+To learn how to make your application resilient and able to work across multiple workers, please continue to [Inter-worker Serialization and Resilience](interworker-serialization-and-resilience.md).
 
 For further reading, please refer to the [Wallaroo Python API Classes](api.md).

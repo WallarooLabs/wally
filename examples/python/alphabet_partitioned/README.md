@@ -30,11 +30,11 @@ The outputs of the alphabet application are the letter that received the votes t
 
 ### Processing
 
-The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed with the `AddVotes` computation to the state object that handles the letter being voted on, and the `AddVotes` function modifies the state to record the new total number of votes for the letter. It then creates an `AllVotes` message, which is sent to `Encode`'s `encode(...)` method, which converts it into an outgoing message.
+The `decoder` creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed to the `partition` function, which determines which partition the message should be sent to. Then the `Votes` message is passed along with the correct `TotalVotes` state to an `add_votes` State Computation, which modifies the state to record the new total number of votes for the letter. The computation then returns a new `Votes` object representing the new total count for that letter, which is sent to the `encoder` function that converts it into an outgoing message.
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](/book/getting-started/choosing-an-installation-option.md) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
@@ -123,7 +123,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/giles/receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
-You can shut down the cluster with this command once processing has finished:
+You can shut down the cluster with this command at any time:
 
 ```bash
 cluster_shutdown 127.0.0.1:5050
