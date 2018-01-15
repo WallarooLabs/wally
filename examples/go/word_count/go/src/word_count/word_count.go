@@ -173,10 +173,6 @@ func (wordTotals *WordTotals) GetCount(word string) *WordCount {
 
 type WordTotalsBuilder struct {}
 
-func (wtb *WordTotalsBuilder) Name() string {
-	return "word totals builder"
-}
-
 func (wtb *WordTotalsBuilder) Build() interface{} {
 	return MakeWordTotals()
 }

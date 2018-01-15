@@ -67,14 +67,7 @@ func StateComputationMultiCompute(computationId uint64, dataId uint64, stateId u
 }
 
 type StateBuilder interface {
-	Name() string
 	Build() interface {}
-}
-
-//export StateBuilderName
-func StateBuilderName(stateBuilderId uint64) *C.char {
-	stateBuilder := GetComponent(stateBuilderId, StateBuilderTypeId).(StateBuilder)
-	return C.CString(stateBuilder.Name())
 }
 
 //export StateBuilderBuild

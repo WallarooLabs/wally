@@ -333,7 +333,7 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
     end
     sr
 
-  fun name(): String => _state_builder.name()
+  fun name(): String => _state_name + " StateRunnerBuilder"
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
   fun id(): U128 => _id

@@ -153,9 +153,6 @@ class PyStateBuilder
   new create(state_builder: Pointer[U8] val) =>
     _state_builder = state_builder
 
-  fun name(): String =>
-    Machida.get_name(_state_builder)
-
   fun apply(): PyState =>
     PyState(@state_builder_build_state(_state_builder))
 

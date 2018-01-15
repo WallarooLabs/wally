@@ -71,10 +71,6 @@ Lastly, a stateful application's pipeline is going to need a `StateBuilder`, so 
 ```go
 type RunningVotesTotalBuilder struct {}
 
-func (rvtb *RunningVotesTotalBuilder) Name() string {
-  return "running votes total builder"
-}
-
 func (rvtb *RunningVotesTotalBuilder) Build() interface{} {
   return &RunningVoteTotal{}
 }

@@ -55,7 +55,6 @@ actor Main
 
 class val LetterStateBuilder
   fun apply(): LetterState => LetterState
-  fun name(): String => "Letter State"
 
 class LetterState is State
   var letter: String = " "
