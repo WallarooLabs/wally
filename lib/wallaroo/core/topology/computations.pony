@@ -153,4 +153,3 @@ interface val ComputationBuilder[In: Any val, Out: Any val]
 
 interface val StateBuilder[S: State ref]
   fun apply(): S
-  fun name(): String

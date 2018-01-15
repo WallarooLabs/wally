@@ -89,10 +89,6 @@ func (tv *RunningVoteTotal) GetVotes() *LetterAndVotes {
 
 type RunningVotesTotalBuilder struct {}
 
-func (rvtb *RunningVotesTotalBuilder) Name() string {
-  return "running votes total builder"
-}
-
 func (rvtb *RunningVotesTotalBuilder) Build() interface{} {
   return &RunningVoteTotal{}
 }

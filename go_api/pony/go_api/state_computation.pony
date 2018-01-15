@@ -10,7 +10,6 @@ use @StateComputationName[Pointer[U8] ref](cid: U64)
 use @StateComputationCompute[U64](cid: U64, did: U64, sid: U64,
   sc: Pointer[U64])
 
-use @StateBuilderName[Pointer[U8] ref](sbid: U64)
 use @StateBuilderBuild[U64](sbid: U64)
 
 class val StateComputation is w.StateComputation[GoData, GoData, GoState]
@@ -127,14 +126,6 @@ class val StateBuilder
 
   new val create(state_builder_id: U64) =>
     _state_builder_id = state_builder_id
-
-  fun name(): String =>
-    recover val
-      let sp = @StateBuilderName(_state_builder_id)
-      let n = String.copy_cstring(sp)
-      @free(sp)
-      n
-    end
 
   fun apply(): GoState =>
     GoState(@StateBuilderBuild(_state_builder_id))

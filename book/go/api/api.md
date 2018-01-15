@@ -364,10 +364,6 @@ A `StateBuilder` is used by Wallaroo to create an initial state object for a `St
 
 #### `wallarooapi.StateBuilder` Methods
 
-##### `Name() string`
-
-Return a string representing the name of the state.
-
 ##### `Build() interface{}`
 
 Return a new state instance.
@@ -378,10 +374,6 @@ Return a `RunningVoteTotal` object with the values initialized to defaults.
 
 ```go
 type RunningVotesTotalBuilder struct {}
-
-func (rvtb *RunningVotesTotalBuilder) Name() string {
-	return "running votes total builder"
-}
 
 func (rvtb *RunningVotesTotalBuilder) Build() interface{} {
 	return &RunningVoteTotal{}
