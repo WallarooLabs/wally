@@ -17,7 +17,6 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "signals"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 use "wallaroo_labs/thread_count"
@@ -40,8 +39,6 @@ actor Main
     Machida.start_python()
 
     try
-      SignalHandler(MachidaShutdownHandler, Sig.int())
-
       var module_name: String = ""
 
       let options = Options(WallarooConfig.application_args(env.args)?, false)
