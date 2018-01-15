@@ -56,7 +56,7 @@ BLOCK 2:
 Fred needs help.
 ```
 
-In the case of word count, it doesn't matter what order we count the messages. We just want to do it quickly. `to_parallel` is our friend. However, if all words starting with the letter "h" were going to be sent along to the same computation after splitting **and** the order they arrived was important than `to_parallel` would not be our friend. If the computation that deals with the letter "h" needs to see "Hello" then "how" and then "help", you have to use `to`. It will maintain ordering by processing the incoming blocks sequentially rather than in parallel.
+In the case of word count, it doesn't matter what order we count the messages. We just want to do it quickly. `to_parallel` is our friend. However, if all words starting with the letter "h" were going to be sent along to the same state computation after splitting **and** the order they arrived was important than `to_parallel` would not be our friend. If the state computation that deals with the letter "h" needs to see "Hello" then "how" and then "help", you have to use `to`. It will maintain ordering by processing the incoming blocks sequentially rather than in parallel.
 
 In our current case, counting words, we don't care about the order of the words, so `to_parallel` is fine.
 
@@ -142,7 +142,7 @@ def partition(data):
 
 The next three classes are the core of our word counting application. By this point, our messages have been split into individual words and run through our `partition` function and will arrive at a state computation based on the first letter of the word.
 
-Let's take a look at what we have. `CountWord` is a State Computation. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
+Let's take a look at what we have. `CountWord` is a state computation. When it's run, we update our `word_totals` state to reflect the new incoming `word`. Then, it returns a tuple of the return value from `word_totals.get_count` and `True`. The return value of `get_count` is an instance of the `WordCount` class containing the word and its current count.
 
 ```python
 @wallaroo.state_computation(name="Count Word")

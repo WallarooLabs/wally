@@ -27,10 +27,10 @@ You can read up on the [Wallaroo Python API](/book/python/api.md).
 
 See [Reverse application instructions](/examples/python/reverse/README.md).
 
-#### Run Alphabet (stateful computation)
+#### Run Alphabet (state computation)
 
 See [Alphabet application instructions](/examples/python/alphabet/README.md).
 
-#### Run Marketspread (stateful computation)
+#### Run Marketspread (state computation)
 
 See [Market Spread application instructions](/examples/python/market_spread/README.md)

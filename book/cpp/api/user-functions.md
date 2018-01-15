@@ -17,7 +17,7 @@ Objects of the following classes must be supported in the
 `w_user_data_deserialize(...)` function:
 
 * data passed as messages between steps (`wallaroo::Data`)
-* stateful computations (`wallaroo::StateComputation`)
+* state computations (`wallaroo::StateComputation`)
 * sink encoders (`wallaroo::SinkEncoder`)
 * keys (`wallaroo::Key`)
 * state change builders (`wallaroo::StateChangeBuilder`)

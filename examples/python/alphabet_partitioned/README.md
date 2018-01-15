@@ -30,7 +30,7 @@ The outputs of the alphabet application are the letter that received the votes t
 
 ### Processing
 
-The `decoder` creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed to the `partition` function, which determines which partition the message should be sent to. Then the `Votes` message is passed along with the correct `TotalVotes` state to an `add_votes` State Computation, which modifies the state to record the new total number of votes for the letter. The computation then returns a new `Votes` object representing the new total count for that letter, which is sent to the `encoder` function that converts it into an outgoing message.
+The `decoder` creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed to the `partition` function, which determines which partition the message should be sent to. Then the `Votes` message is passed along with the correct `TotalVotes` state to an `add_votes` state computation, which modifies the state to record the new total number of votes for the letter. The state computation then returns a new `Votes` object representing the new total count for that letter, which is sent to the `encoder` function that converts it into an outgoing message.
 
 ## Running Alphabet Partitioned
 

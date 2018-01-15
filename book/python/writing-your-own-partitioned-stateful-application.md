@@ -14,7 +14,7 @@ Partitioning is a key aspect of how work is distributed in Wallaroo. From the ap
 
 Our partitioned application is going to be very similar to the Alphabet application. The difference is that it is going to use partitioning to distribute the work, and the state classes will need to reflect that.
 
-**Encode**, **Decode**, **Computation**, and **Votes** are exactly the same as before, so we will not include them here.
+**Encode**, **Decode**, **StateComputation**, and **Votes** are exactly the same as before, so we will not include them here.
 
 ### Partition
 
@@ -75,7 +75,7 @@ class LetterStateBuilder(object):
 
 Finally, the application setup is a little different now that we use partitioning. A partition is an intrinsic part of a pipeline's definition, as it changes how Wallaroo connects elements behind the scenes, so we have to distinguish partitioned state from non-partitioned state. This is done with `to_state_partition` and `to_state_partition_u64` respectively (compared with `to_stateful` in the non-partitioned case, as in the previous section).
 
-As with `to_stateful`, `to_state_partition` takes a Computation, a StateBuilder, and a state name. In addition, it takes a partition function and a partition keys list:
+As with `to_stateful`, `to_state_partition` takes a StateComputation, a StateBuilder, and a state name. In addition, it takes a partition function and a partition keys list:
 
 ```python
 ab.to_state_partition(AddVotes(), LetterStateBuilder(), "letter state",

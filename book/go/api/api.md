@@ -80,7 +80,7 @@ Add a partitioned state computation that only returns one message to the pipelin
 
 ##### `ToStatePartitionMulti(stateComputation wallarooapi.StateComputationMulti, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64) *pipelineBuilder`
 
-Similar to `ToStatePartition`, but the computation can return more than one message.
+Similar to `ToStatePartition`, but the state computation can return more than one message.
 
 ##### `ToSink(sinkConfig SinkConfig)`
 
@@ -410,7 +410,7 @@ The first return value is a message that we will send on to our next step. It sh
 
 Why wouldn't we always return `true`? There are two answers:
 
-1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
+1. Your state computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
 
 #### Example `StateComputation`
@@ -440,7 +440,7 @@ A `StateComputationMulti` is similar to a `StateComputation`, except that its `C
 
 ##### `Name() string`
 
-Return the name of the computation as a string.
+Return the name of the state computation as a string.
 
 ##### `	Compute(data interface{}, state interface{}) ([]interface {}, bool)`
 

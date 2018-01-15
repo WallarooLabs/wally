@@ -1,11 +1,11 @@
 # C++ Serialization
 
-Wallaroo makes it possible to distribute computation across multiple workers. In order to do this, objects must be serialized and deserialized at various points. Wallaroo controls when objects are serialized and deserialized, but the programmer is left with a great deal of control over how this is done.
+Wallaroo makes it possible to distribute computations across multiple workers. In order to do this, objects must be serialized and deserialized at various points. Wallaroo controls when objects are serialized and deserialized, but the programmer is left with a great deal of control over how this is done.
 
 ## Classes That Support Serialization
 
 * data passed as messages between steps (`wallaroo::Data`)
-* stateful computations (`wallaroo::StateComputation`)
+* state computations (`wallaroo::StateComputation`)
 * sink encoders (`wallaroo::SinkEncoder`)
 * keys (`wallaroo::Key`)
 * state change builders (`wallaroo::StateChangeBuilder`)

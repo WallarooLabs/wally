@@ -19,7 +19,7 @@ namespace SerializationTypes
   const uint8_t Votes = 1;
   const uint8_t LetterTotal = 2;
 
-  // stateful computations
+  // state computations
   const uint8_t AddVotes = 3;
 
   // state change builders

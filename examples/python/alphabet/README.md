@@ -30,7 +30,7 @@ The outputs of the alphabet application are the letter that received the votes t
 
 ### Processing
 
-The `decoder` function creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed along with the state object that stores all of the vote totals to the `add_votes` computation. The `add_votes` computation then modifies the state to record the new total number of votes for the letter. It then creates a new `Votes` message, which is sent to the `encoder` function, which converts it into an outgoing message.
+The `decoder` function creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed along with the state object that stores all of the vote totals to the `add_votes` state computation. The `add_votes` state computation then modifies the state to record the new total number of votes for the letter. It then creates a new `Votes` message, which is sent to the `encoder` function, which converts it into an outgoing message.
 
 ## Running Alphabet
 
