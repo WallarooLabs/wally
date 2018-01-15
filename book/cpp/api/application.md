@@ -64,20 +64,19 @@ is responsible for building the computation that will be added.
 
 ### `Application *to_stateful(StateComputation *state_computation_, StateBuilder *state_builder_, const char* state_name_)`
 
-Add a stateful computation to the current pipeline. The
-`state_builder_` builds the state that will be used by the
+Add a state computation to the current pipeline. The
+`state_builder_` builds the state that will be used by the state
 computation. state_name_ is the name of the collection of state objects 
-that we will run computations against. You can share state partitions across 
-pipelines by using the same name. Using different names for different 
+that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different 
 partitions, keeps them separate and in this way, acts as a sort of namespace.
 
 ### `Application *to_state_partition(StateComputation *state_computation_, StateBuilder *state_builder_, const char* state_name_, Partition *partition_, bool multi_worker_)`
 
-Add a partitioned stateful computation to the current pipeline.
+Add a partitioned state computation to the current pipeline.
 
 ###  `Application *to_state_partition_u64(StateComputation *state_computation_, StateBuilder *state_builder_, const char* state_name_, PartitionU64 *partition_, bool multi_worker_)`
 
-Add a partitioned stateful computation that uses a 64-bit integer partitioning key to the current pipeline.
+Add a partitioned state computation that uses a 64-bit integer partitioning key to the current pipeline.
 
 ### `Application *to_sink(SinkEncoder *sink_encoder_)`
 

@@ -22,7 +22,7 @@ The messages are strings terminated with a newline, with the form `LETTER => VOT
 
 ### Processing
 
-The `Decoder`'s `Decode(...)` method creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed with the `AddVotes` computation to the state object that handles the letter being voted on, and the `AddVotes` function modifies the state to record the new total number of votes 
+The `Decoder`'s `Decode(...)` method creates a `Votes` object with the letter being voted on and the number of votes it is receiving with this message. The `Votes` object is passed with the `AddVotes` state computation to the state object that handles the letter being voted on, and the `AddVotes` function modifies the state to record the new total number of votes 
 for the letter. It then creates an `AllVotes` message, which is sent to `Encoder`'s `Encode(...)` method, which converts it into an outgoing message.
 
 ## Building Alphabet

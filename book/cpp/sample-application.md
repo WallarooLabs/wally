@@ -122,9 +122,9 @@ LetterState::LetterState(): m_letter(' '), m_count(0)
 }
 ```
 
-In this case, the state stores a letter and the number of votes it has received. When a state computation is run, the state associated with that computation is passed to the computation. Our application partitions state, so there is one state object for each partition (remember that the partitions are for the letter a to z). So in this case each state object only has to keep track of the information for one letter, not all of the letters.
+In this case, the state stores a letter and the number of votes it has received. When a state computation is run, its associated state is passed to the state computation. Our application partitions state, so there is one state object for each partition (remember that the partitions are for the letter a to z). So in this case each state object only has to keep track of the information for one letter, not all of the letters.
 
-The application developer does not allocate state objects directly. Instead, the application developer provides a state builder that Wallaroo calls when it is ready to create a state object. In addition to creating a state object, the state builder also stores a name for the state. Wallaroo uses the name to determine if more than one state computation wants to use the same state object; if two builders return the same name then only one state object is generated and it is used by both computations.
+The application developer does not allocate state objects directly. Instead, the application developer provides a state builder that Wallaroo calls when it is ready to create a state object. In addition to creating a state object, the state builder also stores a name for the state. Wallaroo uses the name to determine if more than one state computation wants to use the same state object; if two builders return the same name then only one state object is generated and it is used by both state computations.
 
 Here's our state builder:
 
@@ -257,15 +257,15 @@ The `name` method returns the name of the state computation.
 
 The `compute` method does the actual work. It gets the state change handle (this is required by Wallaroo) by calling `w_state_change_repository_lookup_by_name` (if no state change handle can be found then it returns a pointer to `None`, which can be tested by comparing it to the `none` pointer that is passed into the method). It then uses this to get the state change object by calling `w_state_change_get_state_change_object`. It updates the state change object using the `Votes` message data and creates a new outgoing `LetterTotal` message object. Note that the `LetterTotal` object adds the count from the `Votes` data to the count in the state data, because the state object does not get updated until after the `compute` message is run. Finally, the `compute` uses the `w_stateful_computation_get_return` function to generate the return value using the outgoing `LetterTotal` message data and the state change handle.
 
-State functions have zero or more state change builders associated with them. Each state change builder can build a state change, which represents a way of updating the state object. Wallaroo uses the `get_number_of_state_change_builders` method to determine how many state change builders are associated with the computation, and then calls the `get_state_change_builder` method to get each state change builder. In our case there is only one state change builder.
+State functions have zero or more state change builders associated with them. Each state change builder can build a state change, which represents a way of updating the state object. Wallaroo uses the `get_number_of_state_change_builders` method to determine how many state change builders are associated with the state computation, and then calls the `get_state_change_builder` method to get each state change builder. In our case there is only one state change builder.
 
 State computations are passed to the worker that processes a given state partition, so they must implement the [Serializable](serialization.md) interface.
 
 ### State Changes
 
-State objects are used by state computations, but they are not directly updated within the state computation. Instead, computations return state change objects which Wallaroo later applies to the state. The state change object also provides methods that are used to write state changes to the recovery log and read them from the log during recovery.
+State objects are used by state computations, but they are not directly updated within the state computation. Instead, state computations return state change objects which Wallaroo later applies to the state. The state change object also provides methods that are used to write state changes to the recovery log and read them from the log during recovery.
 
-If a new state change object was created each time a computation was run then there could be a negative performance impact on the system. In order to avoid that, state change objects created once and then reused. They are accessed through the state change repository, which can be used to look up a state change handle and the associated state change.
+If a new state change object was created each time a state computation was run then there could be a negative performance impact on the system. In order to avoid that, state change objects created once and then reused. They are accessed through the state change repository, which can be used to look up a state change handle and the associated state change.
 
 Our application only has one state change. It increases the vote count for a letter. Here's our application's state change:
 
@@ -349,7 +349,7 @@ uint64_t AddVotesStateChange::id()
 }
 ```
 
-Our state change object has an `update` method that is used to set the data that will be used to update the state. After the computation completes, Wallaroo calls the `apply` method to apply the stored
+Our state change object has an `update` method that is used to set the data that will be used to update the state. After the state computation completes, Wallaroo calls the `apply` method to apply the stored
 change to the state.
 
 State change objects are not created directly by the developer, instead a state change builder object creates the state change object at some point. Our application's state change builder looks like this:
@@ -465,7 +465,7 @@ namespace SerializationTypes
   const uint8_t Votes = 1;
   const uint8_t LetterTotal = 2;
 
-  // stateful computations
+  // state computations
   const uint8_t AddVotes = 3;
 
   // state change builders

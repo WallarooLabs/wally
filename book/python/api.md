@@ -95,7 +95,7 @@ Add a state computation _function_, along with a [State](#state) _class_ and `st
 
 `state_class` must be a [State](#state).
 
-`state_name` must be a str. `state_name` is the name of the state object that we will run computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and, in this way, acts as a sort of namespace.
+`state_name` must be a str. `state_name` is the name of the state object that we will run state computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and, in this way, acts as a sort of namespace.
 
 ##### `to_state_partition(computation, state, state_partition_name, partition_function, partition_keys)`
 
@@ -105,7 +105,7 @@ Add a partitioned state computation to the current pipeline.
 
 `state` must be [State](#state).
 
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
 
 `partition_function` must be a [PartitionFunction](#partitionfunction).
 
@@ -113,13 +113,13 @@ Add a partitioned state computation to the current pipeline.
 
 ##### `to_state_partition_u64(computation, state_builder, state_partition_name, partition_function, partition_keys)`
 
-Add a partitioned stateful computation to the current pipeline.
+Add a partitioned state computation to the current pipeline.
 
 `computation` must be a [StateComputation](#statecomputation).
 
 `state` must be [State](#state).
 
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
 
 `partition_function` must be a [PartitionFunction](#partitionfunction).
 
@@ -332,7 +332,7 @@ AlphabetCounts(objects):
 
 ### StateComputation
 
-A State Computation is similar to a [Computation](#computation), except that it takes an additional argument: `state`.
+A state computation is similar to a [Computation](#computation), except that it takes an additional argument: `state`.
 
 In order to provide resilience, Wallaroo needs to keep track of state changes, or side effects, and it does so by making `state` an explicit object that is given as input to any StateComputation step.
 
@@ -346,7 +346,7 @@ Returns a tuple. The first element is a message that we will send on to our next
 
 Why wouldn't we always return `True`? There are two answers:
 
-1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
+1. Your state computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a trade-off that can be made between performance and safety.
 
 ##### `compute_multi(data, state)`

@@ -22,7 +22,7 @@ The messages are strings terminated with a newline, with the form `WORD => COUNT
 
 ### Processing
 
-The `decoder` function turns the input message into a string. That string is then passed to the `split` one-to-many computation, which breaks the string into individual words and returns a list containing these words. Each item in the list is sent as a separate message to the partition function which determines which state partition it will go to. At each partition, the word and the `WordTotals` state object for that partition are sent to the `count_word` State Computation, which updates word's count by 1, and returns the current count for this word as its output. That count is then sent to the `encoder` function with formats it for output.
+The `decoder` function turns the input message into a string. That string is then passed to the `split` one-to-many computation, which breaks the string into individual words and returns a list containing these words. Each item in the list is sent as a separate message to the partition function which determines which state partition it will go to. At each partition, the word and the `WordTotals` state object for that partition are sent to the `count_word` state computation, which updates word's count by 1, and returns the current count for this word as its output. That count is then sent to the `encoder` function with formats it for output.
 
 ## Running Word Count
 

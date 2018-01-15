@@ -14,9 +14,9 @@ As with the Reverse Word example, we will list the components required:
 * State objects
 * State change management
 
-### Computation
+### StateComputation
 
-The computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and return some data that tells Wallaroo what to do next.
+The state computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and return some data that tells Wallaroo what to do next.
 
 ```python
 @wallaroo.state_computation(name='add votes')
@@ -33,7 +33,7 @@ Let's dig into that tuple that we are returning:
 
 The first element, `state.get_votes(data.letter)`, is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element, `True`, is to let Wallaroo know if we should store an update for our state. By returning `True`, we are instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing, so why wouldn't we always return `True`? There are two answers:
 
-1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
+1. Your state computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a trade-off that can be made between performance and safety.
 
 ### State and StateBuilder
@@ -120,7 +120,7 @@ here we use:
 ab.to_stateful(add_votes, AllVotes, "letter state")
 ```
 
-That is, while the stateless computation constructor `to` took only a computation class as its argument, the stateful computation constructor `to_stateful` takes a computation _function_, as well as a state _class_, along with the name of that state.
+That is, while the stateless computation constructor `to` took only a computation class as its argument, the state computation constructor `to_stateful` takes a state computation _function_, as well as a state _class_, along with the name of that state.
 
 ### Miscellaneous
 

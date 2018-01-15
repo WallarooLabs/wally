@@ -16,9 +16,9 @@ As with the Reverse Word example, we will list the components required:
 * A list of keys that are valid for partitioning our state objects
 * A partitioning function
 
-### Computation
+### State Computation
 
-The computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and return some data that tells Wallaroo what to do next.
+The state computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and return some data that tells Wallaroo what to do next.
 
 ```go
 type AddVotes struct {}
@@ -43,7 +43,7 @@ return rvt.GetVotes(), true
 
 The first element, `rvt.GetVotes()`, is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element, `true`, is to let Wallaroo know if we should store an update for our state. By returning `true`, we are instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing, so why wouldn't we always return `true`? There are two answers:
 
-1. Your computation might not have updated the state, in which case saving its state for recovery is wasteful.
+1. Your state computation might not have updated the state, in which case saving its state for recovery is wasteful.
 2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
 
 ### State and StateBuilder
@@ -165,7 +165,7 @@ here we use:
 ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions()).
 ```
 
-That is, while the stateless computation constructor `To` took only a computation class as its argument, the stateful computation constructor `ToStatePartition` takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state. Additionally, it takes two arguments needed for partitioning our state.
+That is, while the stateless computation constructor `To` took only a computation class as its argument, the state computation constructor `ToStatePartition` takes a state computation _instance_, as well as a state-builder _instance_, along with the name of that state. Additionally, it takes two arguments needed for partitioning our state.
 
 ## Partitioning
 

@@ -30,7 +30,7 @@ public:
 ### `virtual const char *name()`
 
 This method returns the name of the state change object. This name is
-used to look up the state change object inside stateful computations.
+used to look up the state change object inside state computations.
 
 ### `virtual void apply(State *state_)`
 

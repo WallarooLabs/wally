@@ -1,6 +1,6 @@
 # Partitioning
 
-If all of the application state exists in one state object then only one computation at a time can access that state object. In order to leverage concurrency, that state needs to be divided into multiple distinct state objects. Wallaroo can then automatically distribute these objects in a way that allows them to be accessed by computations in parallel.
+If all of the application state exists in one state object then only one state computation at a time can access that state object. In order to leverage concurrency, that state needs to be divided into multiple distinct state objects. Wallaroo can then automatically distribute these objects in a way that allows them to be accessed by state computations in parallel.
 
 For example, in an application that keeps track of stock prices, the application state might be a dictionary where the stock symbol is used to look up the price of the stock.
 
@@ -34,7 +34,7 @@ func (s *Stocks) Set(symbol string, price float64) {
 }
 {%- endcodetabs %}
 
-If a message came into the system with a new stock price, the computation would take that message, get the symbol and the price, and use them to update the state.
+If a message came into the system with a new stock price, the state computation would take that message, get the symbol and the price, and use them to update the state.
 
 {% codetabs name="Python", type="py" -%}
 @wallaroo.state_computation("update stock")
@@ -57,14 +57,14 @@ func (us *UpdateStock) Compute(data interface{}, state interface{}) (interface{}
 {%- endcodetabs %}
 
 
-However, only one computation may access the state at a time, so in this cases messages are handled one at a time.
+However, only one state computation may access the state at a time, so in this cases messages are handled one at a time.
 
 If we could break the state into pieces and tell Wallaroo about those pieces then we could process many messages concurrently. In the example, each stock could be broken out into it's own piece of state. This is possible because in the model the price of each stock is independent of the price of any other stock, so modifying one has no effect on any of the others.
 
 ## State Partitioning
 
 Wallaroo supports parallel execution by way of _state partitioning_. The state is broken up into distinct parts, and Wallaroo manages access to each part so that they can be accessed in parallel.
-To do this, a _partition function_ is used to determine which _state part_ a particular data should be applied to. Once the _part_ is determined, the data and the associated _state part_ are given to a Computation to perform the update logic.
+To do this, a _partition function_ is used to determine which _state part_ a particular data should be applied to. Once the _part_ is determined, the data and the associated _state part_ are given to a state computation to perform the update logic.
 
 ### Partitioned State
 
@@ -82,7 +82,7 @@ type Stock struct {
 }
 {%- endcodetabs %}
 
-Since the computation only has one stock in its state now, there is no need to do a dictionary look up. Instead, the computation can update the particular Stock's state right away.
+Since the state computation only has one stock in its state now, there is no need to do a dictionary look up. Instead, the state computation can update the particular Stock's state right away.
 
 {% codetabs name="Python", type="py" -%}
 @wallaroo.state_computation(name="update stock")

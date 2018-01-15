@@ -5,7 +5,7 @@ A state builder is responsible for creating state objects.
 Two states with the same name are considered the same, while two
 states with different names, even if they return the same type of
 state object, are considered different. This allows to different
-stateful computations to use the same state object if they have the
+state computations to use the same state object if they have the
 same name, while also allowing two different state objects of the same
 type to be used in different places if they have different names.
 
