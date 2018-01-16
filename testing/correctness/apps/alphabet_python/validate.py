@@ -17,7 +17,7 @@ import argparse
 from json import loads
 from struct import calcsize, unpack
 
-fmt = '>LsQ'
+fmt = '>L2sQ'
 def decoder(bs):
     return unpack(fmt, bs)[1:3]
 

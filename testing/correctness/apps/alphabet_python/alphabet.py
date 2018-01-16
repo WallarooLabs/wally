@@ -13,7 +13,7 @@
 #  permissions and limitations under the License.
 
 
-import string
+from string import lowercase
 import struct
 import pickle
 
@@ -24,7 +24,7 @@ def application_setup(args):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    letter_partitions = list(string.ascii_lowercase)
+    letter_partitions = [a + b for a in lowercase for b in lowercase]
     ab = wallaroo.ApplicationBuilder("alphabet")
     ab.new_pipeline("alphabet",
                     wallaroo.TCPSourceConfig(in_host, in_port, decoder))
@@ -36,7 +36,7 @@ def application_setup(args):
 
 @wallaroo.partition
 def partition(data):
-    return data.letter[0]
+    return data.letter[:2]
 
 
 class TotalVotes(object):
@@ -60,7 +60,7 @@ class Votes(object):
 
 @wallaroo.decoder(header_length=4, length_fmt='>I')
 def decoder(bs):
-    (letter, vote_count) = struct.unpack(">1sI", bs)
+    (letter, vote_count) = struct.unpack(">2sI", bs)
     return Votes(letter, vote_count)
 
 
@@ -75,4 +75,4 @@ def encoder(data):
     # data is a Votes
     letter = data.letter
     votes = data.votes
-    return struct.pack(">LsQ", 9, data.letter, data.votes)
+    return struct.pack(">L2sQ", 10, data.letter, data.votes)

@@ -56,7 +56,7 @@ testing_alphabet_python_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command 'machida --application-module alphabet' \
-		--workers 4 \
+		--workers 10 \
 		--sink-expect 4000
 
 endif
