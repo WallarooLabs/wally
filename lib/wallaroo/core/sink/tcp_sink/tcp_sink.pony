@@ -814,9 +814,9 @@ actor TCPSink is Consumer
         @printf[I32]("BACKPRESSURE tcp_sink: release by %s:%s\n".cstring(),
           _host.cstring(), _service.cstring())
       end
+      _maybe_mute_or_unmute_upstreams()
       _throttled = false
       _notify.unthrottled(this)
-      _maybe_mute_or_unmute_upstreams()
     end
 
   fun ref _maybe_mute_or_unmute_upstreams() =>
@@ -824,7 +824,7 @@ actor TCPSink is Consumer
     | None =>
       Fail()
     | let auth: AmbientAuth =>
-      if _mute_outstanding then
+      if _throttled then
         if _can_send() then
           ifdef debug then
             @printf[I32]("BACKPRESSURE tcp_sink: Backpressure.release by %s:%s\n".cstring(),
