@@ -87,7 +87,6 @@ actor TCPSink is Consumer
 
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
-  var _mute_outstanding: Bool = false
 
   // TCP
   var _notify: WallarooOutgoingNetworkActorNotify
