@@ -33,11 +33,14 @@ actor Main
   new create(env: Env) =>
     try
       let parts: Array[String] val = recover
-        let s = "abcdefghijklmnopqrstuvwxyz!"
+        let s = "abcdefghijklmnopqrstuvwxyz"
         let a = Array[String]
         for b in s.values() do
-          a.push(String.from_array([b]))
+          for c in s.values() do
+            a.push(String.from_array([b ; c]))
+          end
         end
+        a.push("!")
         consume a
       end
 
@@ -91,12 +94,12 @@ primitive VotesDecoder is FramedSourceHandler[Votes val]
     4
 
   fun payload_length(data: Array[U8] iso): USize =>
-    5
+    6
 
   fun decode(data: Array[U8] val): Votes val ? =>
     // Assumption: 1 byte for letter
-    let letter = String.from_array(data.trim(0, 1))
-    let count = Bytes.to_u32(data(1)?, data(2)?, data(3)?, data(4)?)
+    let letter = String.from_array(data.trim(0, 2))
+    let count = Bytes.to_u32(data(2)?, data(3)?, data(4)?, data(5)?)
     Votes(letter, count.u64())
 
 primitive LetterPartitionFunction
@@ -121,7 +124,7 @@ class LetterTotal
 
 primitive LetterTotalEncoder
   fun apply(t: LetterTotal val, wb: Writer = Writer): Array[ByteSeq] val =>
-    wb.u32_be(9)
-    wb.write(t.letter) // Assumption: letter is 1 byte
+    wb.u32_be(10)
+    wb.write(t.letter) // Assumption: letter is 2 bytes
     wb.u64_be(t.count)
     wb.done()
