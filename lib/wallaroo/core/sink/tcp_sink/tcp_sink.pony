@@ -102,9 +102,9 @@ actor TCPSink is Consumer
   var _writeable: Bool = false
   var _throttled: Bool = false
   var _event: AsioEventID = AsioEvent.none()
-  embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
-  embed _pending_writev: Array[USize] = _pending_writev.create()
+  // SLF: Is it bad that I got rid of the 'embed' for _pending_writev?
+  var _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
   var _muted: Bool = false
   var _expect_read_buf: Reader = Reader
@@ -354,7 +354,6 @@ actor TCPSink is Consumer
             _event = event
 
             _pending_writev.clear()
-            _pending.clear()
             _pending_writev_total = 0
 
             _connected = true
@@ -431,7 +430,6 @@ actor TCPSink is Consumer
     for bytes in _notify.sentv(this, data).values() do
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
-      _pending.push((bytes, 0))
       data_size = data_size + bytes.size()
     end
 
@@ -460,7 +458,6 @@ actor TCPSink is Consumer
           _pending_tracking.push((data.size(), id))
         end
     end
-    _pending.push((data, 0))
     _pending_writes()
 
   fun ref _notify_connecting() =>
@@ -527,7 +524,6 @@ actor TCPSink is Consumer
     @pony_asio_event_unsubscribe(_event)
     _pending_tracking.clear()
     _pending_writev.clear()
-    _pending.clear()
     _pending_writev_total = 0
     _readable = false
     _writeable = false
@@ -620,6 +616,7 @@ actor TCPSink is Consumer
     var num_to_send: USize = 0
     var bytes_to_send: USize = 0
     var bytes_sent: USize = 0
+    var base_index: USize = 0
 
     // nothing to send
     if _pending_writev_total == 0 then
@@ -644,20 +641,19 @@ actor TCPSink is Consumer
 
         // Write as much data as possible.
         var len = @pony_os_writev[USize](_event,
-          _pending_writev.cpointer(), num_to_send) ?
+          _pending_writev.cpointer(base_index), num_to_send) ?
 
         // keep track of how many bytes we sent
         bytes_sent = bytes_sent + len
 
+        @printf[I32]("len %d bytes_to_send %d _pending_writev size %d base_index %d\n".cstring(), len, bytes_to_send, _pending_writev.size(), base_index)
         if len < bytes_to_send then
           while len > 0 do
             let iov_p = _pending_writev(0)?
             let iov_s = _pending_writev(1)?
             if iov_s <= len then
               len = len - iov_s
-              _pending_writev.shift()?
-              _pending_writev.shift()?
-              _pending.shift()?
+              base_index = base_index + 2
               _pending_writev_total = _pending_writev_total - iov_s
             else
               _pending_writev.update(0, iov_p+len)?
@@ -671,18 +667,17 @@ actor TCPSink is Consumer
           // sent all data we requested in this batch
           _pending_writev_total = _pending_writev_total - bytes_to_send
           if _pending_writev_total == 0 then
+            @printf[I32]("all done sending, yay 1\n".cstring())
             _pending_writev.clear()
-            _pending.clear()
 
             // do tracking finished stuff
             _tracking_finished(bytes_sent)
             return true
           else
-           for d in Range[USize](0, num_to_send, 1) do
-             _pending_writev.shift()?
-             _pending_writev.shift()?
-             _pending.shift()?
-           end
+            @printf[I32]("all done sending, yay 2 num_to_send for SUBST-shifting = %d\n, slice(%d,%d,1)".cstring(), num_to_send, base_index, _pending_writev.size())
+            base_index = base_index + (num_to_send * 2)
+            _pending_writev = _pending_writev.slice(base_index, _pending_writev.size(), 1)
+            @printf[I32]("new _pending_writev size = %d\n".cstring(), _pending_writev.size())
 
           end
         end
