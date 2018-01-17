@@ -17,7 +17,6 @@ import struct
 import pickle
 
 import wallaroo
-import sys
 
 
 def application_setup(args):
@@ -77,6 +76,5 @@ def add_votes(data, state):
 
 @wallaroo.encoder
 def encoder(data):
-    sys.stdout.write('w')
     # data is a Votes
     return struct.pack(">IsQ", 9, data.letter, data.votes)
