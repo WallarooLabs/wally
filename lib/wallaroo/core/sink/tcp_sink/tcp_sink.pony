@@ -307,6 +307,13 @@ actor TCPSink is Consumer
       if AsioEvent.writeable(flags) then
         // A connection has completed.
         var fd = @pony_asio_event_fd(event)
+        ifdef "setsockopt" then
+          @printf[I32]("YO, fd %d setting buf sizes\n".cstring(), fd)
+          @pony_os_setsockopt_rcvbuf[None](fd, I32(1024))
+          @pony_os_setsockopt_sndbuf[None](fd, I32(1024))
+        else
+          @printf[I32]("YO, 'setsockopt' is not defined, skipping.\n".cstring())
+        end
         _connect_count = _connect_count - 1
 
         if not _connected and not _closed then
