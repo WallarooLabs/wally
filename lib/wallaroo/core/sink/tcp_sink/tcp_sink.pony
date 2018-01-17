@@ -625,6 +625,7 @@ actor TCPSink is Consumer
 
     while _writeable and not _shutdown_peer and (_pending_writev_total > 0) do
       try
+        @printf[I32]("_pending_writes: while top\n".cstring())
         //determine number of bytes and buffers to send
         if (_pending_writev.size()/2) < writev_batch_size then
           num_to_send = _pending_writev.size()/2
@@ -634,10 +635,14 @@ actor TCPSink is Consumer
           //iterate over buffers being sent to add up total
           num_to_send = writev_batch_size
           bytes_to_send = 0
-          for d in Range[USize](1, num_to_send*2, 2) do
-            bytes_to_send = bytes_to_send + _pending_writev(d)?
+          for d in Range[USize](1, (num_to_send*2)-1, 2) do
+            if ((_pending_writev.size() - (base_index + d)) < writev_batch_size) then
+              @printf[I32]("DBG2: size %d i %d\n".cstring(), _pending_writev.size(), base_index + d)
+            end
+            bytes_to_send = bytes_to_send + _pending_writev(base_index + d)?
           end
         end
+        @printf[I32]("_pending_writes: B\n".cstring())
 
         // Write as much data as possible.
         var len = @pony_os_writev[USize](_event,
@@ -648,41 +653,46 @@ actor TCPSink is Consumer
 
         @printf[I32]("len %d bytes_to_send %d _pending_writev size %d base_index %d\n".cstring(), len, bytes_to_send, _pending_writev.size(), base_index)
         if len < bytes_to_send then
+          @printf[I32]("len < bytes_to_send: top\n".cstring())
           while len > 0 do
-            let iov_p = _pending_writev(0)?
-            let iov_s = _pending_writev(1)?
+            let iov_p = _pending_writev(base_index + 0)?
+            let iov_s = _pending_writev(base_index + 1)?
             if iov_s <= len then
+              @printf[I32]("iov_s %d <= len %d\n".cstring(), iov_s, len)
               len = len - iov_s
               base_index = base_index + 2
               _pending_writev_total = _pending_writev_total - iov_s
             else
-              _pending_writev.update(0, iov_p+len)?
-              _pending_writev.update(1, iov_s-len)?
+              @printf[I32]("iov_s %d NOT <= len %d\n".cstring(), iov_s, len)
+              _pending_writev.update(base_index + 0, iov_p+len)?
+              _pending_writev.update(base_index + 1, iov_s-len)?
               _pending_writev_total = _pending_writev_total - len
               len = 0
             end
           end
           _apply_backpressure()
         else
+          @printf[I32]("NOT len < bytes_to_send, sent all data we requested in this batch\n".cstring())
           // sent all data we requested in this batch
           _pending_writev_total = _pending_writev_total - bytes_to_send
-          if _pending_writev_total == 0 then
-            @printf[I32]("all done sending, yay 1\n".cstring())
-            _pending_writev.clear()
+        end
+        if _pending_writev_total == 0 then
+          @printf[I32]("all done sending, yay 1\n".cstring())
+          _pending_writev.clear()
 
-            // do tracking finished stuff
-            _tracking_finished(bytes_sent)
-            return true
-          else
-            @printf[I32]("all done sending, yay 2 num_to_send for SUBST-shifting = %d\n, slice(%d,%d,1)".cstring(), num_to_send, base_index, _pending_writev.size())
-            base_index = base_index + (num_to_send * 2)
-            _pending_writev = _pending_writev.slice(base_index, _pending_writev.size(), 1)
-            @printf[I32]("new _pending_writev size = %d\n".cstring(), _pending_writev.size())
+          // do tracking finished stuff
+          _tracking_finished(bytes_sent)
+          return true
+        else
+          @printf[I32]("all done sending, yay 2 num_to_send for SUBST-shifting = %d, slice(%d,%d,1)\n".cstring(), num_to_send, base_index, _pending_writev.size())
+          base_index = base_index + (num_to_send * 2)
+          /* QQQ not needed? _pending_writev = _pending_writev.slice(base_index, _pending_writev.size(), 1)
+          @printf[I32]("new _pending_writev size = %d\n".cstring(), _pending_writev.size()) *****/
 
-          end
         end
       else
         // Non-graceful shutdown on error.
+        @printf[I32]("UFF, Non-graceful shutdown on error\n".cstring())
         _hard_close()
         _schedule_reconnect()
       end
