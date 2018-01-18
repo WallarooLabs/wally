@@ -653,18 +653,39 @@ actor TCPSink is Consumer
         bytes_sent = bytes_sent + len
 
         if len < bytes_to_send then
+          var qqq_len: USize = len
+          var sent: USize = 0
+          var sent_bytes: USize = 0
+          var todo_sent: Bool = false
+          var update_len: USize = 0
+          var todo_update: Bool = false
+          var iov_p: USize = 0
+          var iov_s: USize = 0
+
           while len > 0 do
-            let iov_p = _pending_writev(0)?
-            let iov_s = _pending_writev(1)?
+            iov_p = _pending_writev(0)?
+            iov_s = _pending_writev(1)?
             if iov_s <= len then
+              sent = sent + 1
+              sent_bytes = sent_bytes + iov_s
+              todo_sent = true
               len = len - iov_s
               _pending_writev_total = _pending_writev_total - iov_s
             else
-              _pending_writev.update(0, iov_p+len)?
-              _pending_writev.update(1, iov_s-len)?
-              _pending_writev_total = _pending_writev_total - len
+              update_len = len
+              todo_update = true
               len = 0
             end
+          end
+          @printf[I32]("todo_sent %s sent %d sent_bytes %d todo_update %s update_len %d qqq_len %d\n".cstring(), todo_sent.string().cstring(), sent, sent_bytes, todo_update.string().cstring(), update_len, qqq_len)
+          if todo_sent then
+            _pending_writev = _pending_writev.slice(sent*2, _pending_writev.size(), 1)
+          end
+          if todo_update then
+            _pending_writev.update(0, iov_p+update_len)?
+            _pending_writev.update(1, iov_s-update_len)?
+            _pending_writev_total = _pending_writev_total - update_len
+            len = 0
           end
           _apply_backpressure()
         else
