@@ -1,5 +1,11 @@
 version: 2
 jobs:
+  build:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:standard
+    steps:
+      - checkout
+      - run: make build debug=true
   verify-changelog:
     docker:
       - image: ponylang/changelog-tool:release
@@ -12,10 +18,17 @@ jobs:
     steps:
       - checkout
       - run: make integration-tests-testing-correctness-tests-all resilience=on debug=true
-
+  unit-tests:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:standard
+    steps:
+      - checkout
+      - run: make unit-tests debug=true
 workflows:
   version: 2
   test:
     jobs:
+      - build
       - verify-changelog
       - integration-tests-with-resilience
+      - unit-tests
