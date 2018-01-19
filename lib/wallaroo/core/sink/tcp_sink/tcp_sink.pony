@@ -103,8 +103,7 @@ actor TCPSink is Consumer
   var _throttled: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
-  // SLF: Is it bad that I got rid of the 'embed' for _pending_writev?
-  var _pending_writev: Array[USize] = _pending_writev.create()
+  embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
   var _muted: Bool = false
   var _expect_read_buf: Reader = Reader
@@ -673,9 +672,11 @@ actor TCPSink is Consumer
               len = 0
             end
           end
-          @printf[I32]("todo_sent %s sent %d sent_bytes %d todo_update %s update_len %d qqq_len %d\n".cstring(), todo_sent.string().cstring(), sent, sent_bytes, todo_update.string().cstring(), update_len, qqq_len)
+          ifdef debug then
+            @printf[I32]("todo_sent %s sent %d sent_bytes %d todo_update %s update_len %d qqq_len %d\n".cstring(), todo_sent.string().cstring(), sent, sent_bytes, todo_update.string().cstring(), update_len, qqq_len)
+          end
           if todo_sent then
-            _pending_writev = _pending_writev.slice(sent*2, _pending_writev.size(), 1)
+            _pending_writev.trim_in_place(0, sent*2)
           end
           if todo_update then
             _pending_writev.update(0, iov_p+update_len)?
@@ -694,7 +695,7 @@ actor TCPSink is Consumer
             _tracking_finished(bytes_sent)
             return true
           else
-            _pending_writev = _pending_writev.slice(num_to_send*2, _pending_writev.size(), 1)
+            _pending_writev.trim_in_place(0, num_to_send*2)
           end
         end
       else
@@ -821,6 +822,7 @@ actor TCPSink is Consumer
         Fail()
       | let auth: AmbientAuth =>
         Backpressure.apply(auth)
+        @printf[I32]("NOTE: _pending_writev.size() = %d\n".cstring(), _pending_writev.size())
       end
     end
 
