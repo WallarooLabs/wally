@@ -216,8 +216,6 @@ actor TCPSink is Consumer
       Fail()
     end
 
-    _maybe_mute_or_unmute_upstreams()
-
   fun ref _next_tracking_id(i_producer: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)
   =>
@@ -346,7 +344,6 @@ actor TCPSink is Consumer
                 _release_backpressure()
               end
             end
-            _maybe_mute_or_unmute_upstreams()
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -379,7 +376,6 @@ actor TCPSink is Consumer
                 //sent all data; release backpressure
                 _release_backpressure()
               end
-              _maybe_mute_or_unmute_upstreams()
             end
           else
             // The connection failed, unsubscribe the event and close.
@@ -820,7 +816,12 @@ actor TCPSink is Consumer
       @pony_asio_event_set_writeable[None](_event, false)
       @pony_asio_event_resubscribe_write(_event)
       _notify.throttled(this)
-      _maybe_mute_or_unmute_upstreams()
+      match _env.root
+      | None =>
+        Fail()
+      | let auth: AmbientAuth =>
+        Backpressure.apply(auth)
+      end
     end
 
   fun ref _release_backpressure() =>
@@ -829,32 +830,13 @@ actor TCPSink is Consumer
         @printf[I32]("BACKPRESSURE tcp_sink: release by %s:%s\n".cstring(),
           _host.cstring(), _service.cstring())
       end
-      _maybe_mute_or_unmute_upstreams()
       _throttled = false
       _notify.unthrottled(this)
-    end
-
-  fun ref _maybe_mute_or_unmute_upstreams() =>
-    match _env.root
-    | None =>
-      Fail()
-    | let auth: AmbientAuth =>
-      if _throttled then
-        if _can_send() then
-          ifdef debug then
-            @printf[I32]("BACKPRESSURE tcp_sink: Backpressure.release by %s:%s\n".cstring(),
-              _host.cstring(), _service.cstring())
-          end
-          Backpressure.release(auth)
-        end
-      else
-        if not _can_send() then
-          ifdef debug then
-            @printf[I32]("BACKPRESSURE tcp_sink: Backpressure.apply by %s:%s\n".cstring(),
-              _host.cstring(), _service.cstring())
-          end
-          Backpressure.apply(auth)
-        end
+      match _env.root
+      | None =>
+        Fail()
+      | let auth: AmbientAuth =>
+        Backpressure.release(auth)
       end
     end
 
