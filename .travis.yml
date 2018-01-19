@@ -8,7 +8,6 @@ notifications:
 
 branches:
   only:
-    - master
     - release
     - /^release-(\d).(\d).(\d)$/
 
