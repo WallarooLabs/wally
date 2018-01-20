@@ -52,7 +52,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
   let _topic: String
-  let _partition_id: I32
+  let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
 
   new create(listen: KafkaSourceListener[In],
@@ -63,7 +63,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     default_target: (Consumer | None) = None,
     forward_route_builder: (RouteBuilder | None) = None,
     metrics_reporter: MetricsReporter iso,
-    topic: String, partition_id: I32, kafka_client: KafkaClient tag,
+    topic: String, partition_id: KafkaPartitionId, kafka_client: KafkaClient tag,
     router_registry: RouterRegistry)
   =>
     _topic = topic
@@ -237,8 +237,8 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
   fun ref is_muted(): Bool =>
     _muted
 
-  be receive_kafka_message(value: Array[U8] iso, key: (Array[U8] val | None),
-    msg_metadata: KafkaMessageMetadata val,
+  be receive_kafka_message(client: KafkaClient, value: Array[U8] iso,
+    key: (Array[U8] val | None), msg_metadata: KafkaMessageMetadata val,
     network_received_timestamp: U64)
   =>
     if (msg_metadata.get_topic() != _topic)

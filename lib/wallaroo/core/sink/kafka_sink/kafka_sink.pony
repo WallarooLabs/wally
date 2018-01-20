@@ -81,26 +81,26 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
                ""
              end
 
-  fun ref create_producer_mapping(mapping: KafkaProducerMapping):
+  fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
   =>
     _kafka_producer_mapping = mapping
 
-  fun ref producer_mapping(): (KafkaProducerMapping | None) =>
+  fun ref producer_mapping(client: KafkaClient): (KafkaProducerMapping | None) =>
     _kafka_producer_mapping
 
-  be kafka_client_error(error_report: KafkaErrorReport) =>
+  be kafka_client_error(client: KafkaClient, error_report: KafkaErrorReport) =>
     @printf[I32](("ERROR: Kafka client encountered an unrecoverable error! " +
       error_report.string() + "\n").cstring())
 
     Fail()
 
-  be receive_kafka_topics_partitions(new_topic_partitions: Map[String,
-    (KafkaTopicType, Set[I32])] val)
+  be receive_kafka_topics_partitions(client: KafkaClient, new_topic_partitions: Map[String,
+    (KafkaTopicType, Set[KafkaPartitionId])] val)
   =>
     None
 
-  be kafka_producer_ready() =>
+  be kafka_producer_ready(client: KafkaClient) =>
     _ready_to_produce = true
 
     // we either signal back to intializer that we're ready to work here or in
@@ -118,7 +118,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       _unmute_upstreams()
     end
 
-  be kafka_message_delivery_report(delivery_report: KafkaProducerDeliveryReport)
+  be kafka_message_delivery_report(client: KafkaClient, delivery_report: KafkaProducerDeliveryReport)
   =>
     try
       if not _pending_delivery_report.contains(delivery_report.opaque) then
@@ -165,17 +165,15 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
         .cstring())
     end
 
-  fun ref _kafka_producer_throttled(topic_mapping: Map[String, Map[I32, I32]]
-    val)
+  fun ref _kafka_producer_throttled(client: KafkaClient, topic_partitions_throttled: Map[String, Set[KafkaPartitionId]] val)
   =>
     if not _mute_outstanding then
       _mute_upstreams()
     end
 
-  fun ref _kafka_producer_unthrottled(topic_mapping: Map[String, Map[I32, I32]]
-    val, fully_unthrottled: Bool)
+  fun ref _kafka_producer_unthrottled(client: KafkaClient, topic_partitions_throttled: Map[String, Set[KafkaPartitionId]] val)
   =>
-    if fully_unthrottled and _mute_outstanding then
+    if (topic_partitions_throttled.size() == 0) and _mute_outstanding then
       _unmute_upstreams()
     end
 

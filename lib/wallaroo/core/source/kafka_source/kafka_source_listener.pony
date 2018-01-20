@@ -105,9 +105,9 @@ class val KafkaSourceListenerBuilder[In: Any val]
 
 
 class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
-  let _consumers: Map[I32, KafkaConsumer tag] val
+  let _consumers: Map[KafkaPartitionId, KafkaConsumer tag] val
 
-  new create(consumers: Map[I32, KafkaConsumer tag] val) =>
+  new create(consumers: Map[KafkaPartitionId, KafkaConsumer tag] val) =>
     _consumers = consumers
 
   fun ref apply(consumers: Array[KafkaConsumer tag] val,
@@ -134,7 +134,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _ksco: KafkaConfigOptions val
   let _tcp_auth: TCPConnectionAuth
   let _kc: (KafkaClient tag | None)
-  let _kafka_topic_partition_sources: Map[String, Map[I32, KafkaSource[In]]] =
+  let _kafka_topic_partition_sources: Map[String, Map[KafkaPartitionId, KafkaSource[In]]] =
     _kafka_topic_partition_sources.create()
 
   new create(env: Env, source_builder: SourceBuilder, router: Router,
@@ -177,7 +177,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _kc = match KafkaConfigFactory(_ksco, _env.out)
     | let kc: KafkaConfig val =>
       for topic in kc.consumer_topics.values() do
-        _kafka_topic_partition_sources(topic) = Map[I32, KafkaSource[In]]
+        _kafka_topic_partition_sources(topic) = Map[KafkaPartitionId, KafkaSource[In]]
       end
       // create kafka client
       KafkaClient(_tcp_auth, kc, this)
@@ -187,14 +187,14 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       None
     end
 
-  be kafka_client_error(error_report: KafkaErrorReport) =>
+  be kafka_client_error(client: KafkaClient, error_report: KafkaErrorReport) =>
     @printf[I32](("ERROR: Kafka client encountered an unrecoverable error! " +
       error_report.string() + "\n").cstring())
 
     Fail()
 
-  be receive_kafka_topics_partitions(new_topic_partitions: Map[String,
-    (KafkaTopicType, Set[I32])] val)
+  be receive_kafka_topics_partitions(client: KafkaClient, new_topic_partitions: Map[String,
+    (KafkaTopicType, Set[KafkaPartitionId])] val)
   =>
     var partitions_changed: Bool = false
 
@@ -205,7 +205,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       let partitions_sources = try
              _kafka_topic_partition_sources(topic)?
            else
-             let m = Map[I32, KafkaSource[In]]
+             let m = Map[KafkaPartitionId, KafkaSource[In]]
              _kafka_topic_partition_sources(topic) = m
              m
            end
@@ -254,8 +254,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       // about the latest mappings
       // TODO: add logic to update starting offsets to consume from kafka
       for (topic, consumers) in _kafka_topic_partition_sources.pairs() do
-        let my_consumers: Map[I32, KafkaConsumer tag] iso = recover iso
-          Map[I32, KafkaConsumer tag] end
+        let my_consumers: Map[KafkaPartitionId, KafkaConsumer tag] iso = recover iso
+          Map[KafkaPartitionId, KafkaConsumer tag] end
         for (part_id, consumer) in consumers.pairs() do
           my_consumers(part_id) = consumer
         end
