@@ -35,6 +35,7 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -79,6 +80,10 @@ actor TCPSink is Consumer
   """
   let _env: Env
   // Steplike
+  let _sink_id: StepId
+  let _event_log: EventLog
+  let _recovering: Bool
+  let _name: String
   let _encoder: TCPEncoderWrapper
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
@@ -126,7 +131,8 @@ actor TCPSink is Consumer
 
   let _terminus_route: TerminusRoute = TerminusRoute
 
-  new create(env: Env, encoder_wrapper: TCPEncoderWrapper,
+  new create(sink_id: StepId, sink_name: String, event_log: EventLog,
+    recovering: Bool, env: Env, encoder_wrapper: TCPEncoderWrapper,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
@@ -137,6 +143,10 @@ actor TCPSink is Consumer
     will be made from the specified interface.
     """
     _env = env
+    _sink_id = sink_id
+    _name = sink_name
+    _event_log = event_log
+    _recovering = recovering
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].>undefined(init_size) end

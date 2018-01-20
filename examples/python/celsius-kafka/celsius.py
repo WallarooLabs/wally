@@ -60,4 +60,4 @@ def add(data):
 @wallaroo.encoder
 def encoder(data):
     # data is a float
-    return (struct.pack(">f", data), None)
+    return (struct.pack(">f", data), None, None)

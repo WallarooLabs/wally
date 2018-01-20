@@ -1061,8 +1061,9 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // egress_builder finds it from _outgoing_boundaries
                 let sink =
                   try
-                    egress_builder(_worker_name, consume sink_reporter, _env,
-                      _auth, _outgoing_boundaries)?
+                    egress_builder(_worker_name, consume sink_reporter,
+                      _event_log, _recovering, _env, _auth,
+                      _outgoing_boundaries)?
                   else
                     @printf[I32]("Failed to build sink from egress_builder\n"
                       .cstring())
@@ -1265,7 +1266,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 out_router, _router_registry,
                 source_data.route_builder(),
                 _outgoing_boundary_builders,
-                _event_log, _auth, this,  consume source_reporter))
+                _event_log, _auth, pipeline_name,
+                this,  consume source_reporter, _recovering))
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
@@ -1453,7 +1455,8 @@ actor LocalTopologyInitializer is LayoutInitializer
               // Create a sink or OutgoingBoundary. If the latter,
               // egress_builder finds it from _outgoing_boundaries
               let sink = egress_builder(_worker_name,
-                consume sink_reporter, _env, _auth, _outgoing_boundaries)?
+                consume sink_reporter, _event_log, _recovering, _env, _auth,
+                _outgoing_boundaries)?
 
               _initializables.set(sink)
 

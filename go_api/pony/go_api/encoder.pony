@@ -1,5 +1,6 @@
 use "buffered"
 use "wallaroo/core/sink"
+use "pony-kafka"
 
 use @EncoderEncode[Pointer[U8] ref](eid: U64, did: U64, size: Pointer[U64])
 use @KafkaEncoderEncode[None](eid: U64, did: U64, value: Pointer[Pointer[U8]],
@@ -40,7 +41,7 @@ class val GoKafkaEncoder
   new val create(encoder_id: U64) =>
     _encoder_id = encoder_id
 
-  fun apply(data: GoData, wb: Writer): (Array[ByteSeq] val, (Array[ByteSeq] val | None)) =>
+  fun apply(data: GoData, wb: Writer): (Array[ByteSeq] val, (Array[ByteSeq] val | None), (None | KafkaPartitionId)) =>
     let k_v: (Array[U8] val, (Array[U8] val | None)) = recover val
       var value_res: Pointer[U8] = Pointer[U8]
       var value_size: U64 = 0
@@ -75,7 +76,7 @@ class val GoKafkaEncoder
       None
     end
 
-    (consume value, consume key)
+    (consume value, consume key, None)
 
     // var s: U64 = 0
     // let r = recover val

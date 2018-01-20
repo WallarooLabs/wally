@@ -18,9 +18,11 @@ Copyright 2017 The Wallaroo Authors.
 
 use "options"
 use "wallaroo"
+use "wallaroo/core/common"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
+use "wallaroo/ent/recovery"
 
 primitive TCPSinkConfigCLIParser
   fun apply(args: Array[String] val): Array[TCPSinkConfigOptions] val ? =>
@@ -104,9 +106,13 @@ class val TCPSinkBuilder
     _service = service
     _initial_msgs = initial_msgs
 
-  fun apply(reporter: MetricsReporter iso, env: Env): Sink =>
+  fun apply(sink_name: String, event_log: EventLog,
+    reporter: MetricsReporter iso, env: Env, recovering: Bool): Sink
+  =>
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
 
-    TCPSink(env, _encoder_wrapper, consume reporter, _host, _service,
-      _initial_msgs)
+    let id: StepId = StepIdGenerator()
+
+    TCPSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
+      consume reporter, _host, _service, _initial_msgs)

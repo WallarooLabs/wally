@@ -436,13 +436,14 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
     _sink_encoder = sink_encoder
 
   fun apply(data: PyData val, wb: Writer):
-    (Array[ByteSeq] val, (Array[ByteSeq] val | None))
+    (Array[ByteSeq] val, (Array[ByteSeq] val | None), (None | KafkaPartitionId))
   =>
-    let out_and_key = Machida.sink_encoder_encode(_sink_encoder, data.obj())
-    // `out_and_key` is a tuple of `(out, key)`, where `out` is a
-    // string and key is `None` or a string.
-    let out_p = @PyTuple_GetItem(out_and_key, 0)
-    let key_p = @PyTuple_GetItem(out_and_key, 1)
+    let out_and_key_and_part_id = Machida.sink_encoder_encode(_sink_encoder, data.obj())
+    // `out_and_key_and_part_id` is a tuple of `(out, key, part_id)`, where `out` is a
+    // string and key is `None` or a string and `part_id` is `None` or a KafkaPartitionId.
+    let out_p = @PyTuple_GetItem(out_and_key_and_part_id, 0)
+    let key_p = @PyTuple_GetItem(out_and_key_and_part_id, 1)
+    let part_id_p = @PyTuple_GetItem(out_and_key_and_part_id, 2)
 
     let out = wb.>write(recover val
         // create a temporary Array[U8] wrapper for the C array, then clone it
@@ -459,9 +460,15 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
           end).done()
       end
 
-    Machida.dec_ref(out_and_key)
+    let part_id = if Machida.is_py_none(part_id_p) then
+        None
+      else
+        @PyInt_AsLong(part_id_p).i32()
+      end
 
-    (consume out, consume key)
+    Machida.dec_ref(out_and_key_and_part_id)
+
+    (consume out, consume key, part_id)
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_sink_encoder)

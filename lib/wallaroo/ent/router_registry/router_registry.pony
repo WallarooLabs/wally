@@ -684,15 +684,9 @@ actor RouterRegistry is InFlightAckRequester
     """
     Start the log rotation and initiate snapshots.
     """
-    let steps: Map[U128, Step] iso = recover steps.create() end
-    for pr in _partition_routers.values() do
-      for (i, v) in pr.local_map().pairs() do
-        steps(i) = v
-      end
-    end
     match _event_log
     | let e: EventLog =>
-      e.rotate_file(consume steps)
+      e.rotate_file()
     else
       Fail()
     end

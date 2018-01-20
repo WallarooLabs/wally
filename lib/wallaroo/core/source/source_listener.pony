@@ -36,7 +36,7 @@ interface val SourceListenerBuilderBuilder
   fun apply(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso,
+    metrics_reporter: MetricsReporter iso, recovering: Bool,
     target_router: Router = EmptyRouter): SourceListenerBuilder
