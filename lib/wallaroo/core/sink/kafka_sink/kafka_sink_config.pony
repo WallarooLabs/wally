@@ -16,18 +16,23 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "buffered"
+use "crypto"
 use "net"
 use "options"
 use "pony-kafka"
 use "pony-kafka/customlogger"
+use "wallaroo/core/common"
 use "wallaroo_labs/mort"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
+use "wallaroo/ent/recovery"
 
 
 primitive KafkaSinkConfigCLIParser
-  fun apply(out: OutStream, prefix: String = "kafka_sink"): KafkaConfigCLIParser =>
+  fun apply(out: OutStream, prefix: String = "kafka_sink"): KafkaConfigCLIParser
+  =>
     KafkaConfigCLIParser(out, KafkaProduceOnly where prefix = prefix)
 
 class val KafkaSinkConfig[Out: Any val] is SinkConfig[Out]
@@ -60,12 +65,22 @@ class val KafkaSinkBuilder
     _ksco = ksco
     _auth = auth
 
-  fun apply(reporter: MetricsReporter iso, env: Env): Sink =>
-    // create kafka config
+  fun apply(sink_name: String, event_log: EventLog,
+    reporter: MetricsReporter iso, env: Env, recovering: Bool): Sink
+  =>
+    // generate md5 hash for sink id
+    let rb: Reader = Reader
+    let name = sink_name + "-KafkaSink-" + _ksco.topic
+    let temp_id = MD5(name)
+    rb.append(temp_id)
 
+    let sink_id = try rb.u128_le()? else Fail(); 0 end
+
+    // create kafka config
     match KafkaConfigFactory(_ksco, env.out)
     | let kc: KafkaConfig val =>
-      KafkaSink(_encoder_wrapper, consume reporter, kc, _auth)
+      KafkaSink(sink_id, name, event_log, recovering, _encoder_wrapper,
+        consume reporter, kc, _auth)
     | let ksce: KafkaConfigError =>
       @printf[U32]("%s\n".cstring(), ksce.message().cstring())
       Fail()

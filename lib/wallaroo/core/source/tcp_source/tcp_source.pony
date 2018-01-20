@@ -34,6 +34,7 @@ use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
@@ -93,13 +94,16 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
   let _router_registry: RouterRegistry
 
+  let _event_log: EventLog
+  let _acker_x: Acker
+
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
   var _in_flight_ack_waiter: InFlightAckWaiter
 
   new _accept(source_id: StepId, listen: TCPSourceListener,
-    notify: TCPSourceNotify iso, routes: Array[Consumer] val,
-    route_builder: RouteBuilder,
+    notify: TCPSourceNotify iso, event_log: EventLog,
+    routes: Array[Consumer] val, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     fd: U32, init_size: USize = 64, max_size: USize = 16384,
@@ -110,6 +114,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     """
     _source_id = source_id
     _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
+    _event_log = event_log
     _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
@@ -136,6 +141,10 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       end
     end
 
+    // register resilient with event log
+    _event_log.register_resilient(this, _source_id)
+    _acker_x = Acker
+
     //TODO: either only accept when we are done recovering or don't start
     //listening until we are done recovering
     _notify.accepted(this)
@@ -160,6 +169,9 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       // directly. route lifecycle needs to be broken out better from
       // application lifecycle
       r.application_created()
+      ifdef "resilience" then
+        _acker_x.add_route(r)
+      end
     end
 
     for r in _routes.values() do
@@ -181,7 +193,9 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
     for target in new_router.routes().values() do
       if not _routes.contains(target) then
-        _routes(target) = _route_builder(this, target, _metrics_reporter)
+        let new_route = _route_builder(this, target, _metrics_reporter)
+        _acker_x.add_route(new_route)
+        _routes(target) = new_route
       end
     end
 
@@ -210,8 +224,9 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
           target_worker_name, _layout_initializer)
         _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
-        _routes(boundary) =
-          _route_builder(this, boundary, _metrics_reporter)
+        let new_route = _route_builder(this, boundary, _metrics_reporter)
+        _acker_x.add_route(new_route)
+        _routes(boundary) = new_route
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)
@@ -249,31 +264,82 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   //////////////
   // ORIGIN (resilience)
   be request_ack() =>
+    ifdef "trace" then
+      @printf[I32]("request_ack in TCPSource\n".cstring())
+    end
+    for route in _routes.values() do
+      route.request_ack()
+    end
+
+  be log_replay_finished() => None
+
+  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq)
+  =>
+    ifdef "trace" then
+      @printf[I32]("replaying log entry on recovery: in TCPSource\n".cstring())
+    end
     None
 
+  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
+    ifdef "trace" then
+      @printf[I32](("initializing sequence id on recovery: " + seq_id.string() +
+        " in TCPSource\n").cstring())
+    end
+    // update to use correct seq_id for recovery
+    _seq_id = seq_id
+
   fun ref _acker(): Acker =>
-    // TODO: we don't really need this
-    // Because we dont actually do any resilience work
-    Acker
+    _acker_x
 
   // Override these for TCPSource as we are currently
   // not resilient.
   fun ref flush(low_watermark: U64) =>
+    ifdef "trace" then
+      @printf[I32]("flushing at and below: %llu in TCPSource\n".cstring(),
+        low_watermark)
+    end
+    _event_log.flush_buffer(_source_id, low_watermark)
+
+  // Log-rotation
+  be snapshot_state() =>
+    ifdef "trace" then
+      @printf[I32]("snapshot_state in TCPSource\n".cstring())
+    end
     None
 
   be log_flushed(low_watermark: SeqId) =>
-    None
+    ifdef "trace" then
+      @printf[I32]("log_flushed for: %llu in TCPSource\n".cstring(),
+        low_watermark)
+    end
+    _acker().flushed(low_watermark)
 
   fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
-    None
+    ifdef "trace" then
+      @printf[I32](
+        "Bookkeeping called for route %llu, o_seq_id: %llu in TCPSource\n"
+        .cstring(), o_route_id, o_seq_id)
+    end
+    ifdef "resilience" then
+      _acker().sent(o_route_id, o_seq_id)
+    end
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
     ifdef "trace" then
       @printf[I32]("TCPSource received update_watermark\n".cstring())
     end
+    _update_watermark(route_id, seq_id)
 
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    None
+    ifdef "trace" then
+      @printf[I32]((
+      "Update watermark called with " +
+      "route_id: " + route_id.string() +
+      "\tseq_id: " + seq_id.string() + " in TCPSource\n\n").cstring())
+    end
+
+    _acker().ack_received(this, route_id, seq_id)
 
   be dispose() =>
     """
@@ -337,8 +403,8 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     request_id: RequestId, requester_id: StepId,
     requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
-      request_id, requester_id, requester)
+    if _in_flight_ack_waiter.request_in_flight_resume_ack(
+      in_flight_resume_ack_id, request_id, requester_id, requester)
     then
       for w in leaving_workers.values() do
         _remove_boundary(w)

@@ -28,6 +28,7 @@ use "wallaroo/core/topology"
 
 class val TCPSourceListenerBuilder
   let _source_builder: SourceBuilder
+  let _pipeline_name: String
   let _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
@@ -43,13 +44,14 @@ class val TCPSourceListenerBuilder
   new val create(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     target_router: Router = EmptyRouter,
     host: String = "", service: String = "0")
   =>
     _source_builder = source_builder
+    _pipeline_name = pipeline_name
     _router = router
     _router_registry = router_registry
     _route_builder = route_builder
@@ -64,8 +66,8 @@ class val TCPSourceListenerBuilder
 
   fun apply(env: Env): SourceListener =>
     TCPSourceListener(env, _source_builder, _router, _router_registry,
-      _route_builder, _outgoing_boundary_builders,
-      _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
+      _route_builder, _outgoing_boundary_builders, _event_log, _auth,
+      _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
       _target_router, _host, _service)
 
 class val TCPSourceListenerBuilderBuilder
@@ -79,14 +81,14 @@ class val TCPSourceListenerBuilderBuilder
   fun apply(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso,
+    metrics_reporter: MetricsReporter iso, recovering: Bool,
     target_router: Router = EmptyRouter): TCPSourceListenerBuilder
   =>
     TCPSourceListenerBuilder(source_builder, router, router_registry,
       route_builder,
-      outgoing_boundary_builders, event_log, auth,
+      outgoing_boundary_builders, event_log, auth, pipeline_name,
       layout_initializer, consume metrics_reporter, target_router, _host,
       _service)
 

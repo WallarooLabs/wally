@@ -97,7 +97,6 @@ class KafkaSourceNotify[In: Any val]
 
     (let is_finished, let last_ts) =
       try
-        source.next_sequence_id()
         let decoded =
           try
             _handler.decode(consume data)?

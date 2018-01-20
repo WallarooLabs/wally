@@ -185,7 +185,7 @@ class val EgressBuilder
     _proxy_addr
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,
-    env: Env, auth: AmbientAuth,
+    event_log: EventLog, recovering: Bool, env: Env, auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val =
       recover Map[String, OutgoingBoundary] end): Consumer ?
   =>
@@ -200,7 +200,7 @@ class val EgressBuilder
     | None =>
       match _sink_builder
       | let sb: SinkBuilder =>
-        sb(reporter.clone(), env)
+        sb(_name, event_log, reporter.clone(), env, recovering)
       else
         EmptySink
       end

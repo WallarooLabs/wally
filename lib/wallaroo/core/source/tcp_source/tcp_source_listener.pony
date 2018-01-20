@@ -47,6 +47,7 @@ actor TCPSourceListener is SourceListener
   """
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _env: Env
+  let _pipeline_name: String
   var _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
@@ -68,7 +69,7 @@ actor TCPSourceListener is SourceListener
   new create(env: Env, source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     target_router: Router = EmptyRouter,
@@ -79,6 +80,7 @@ actor TCPSourceListener is SourceListener
     Listens for both IPv4 and IPv6 connections.
     """
     _env = env
+    _pipeline_name = pipeline_name
     _router = router
     _router_registry = router_registry
     _route_builder = route_builder
@@ -208,9 +210,10 @@ actor TCPSourceListener is SourceListener
     try
       let source_id = _step_id_gen()
       let source = TCPSource._accept(source_id, this,
-        _notify_connected(source_id)?, _router.routes(), _route_builder,
-        _outgoing_boundary_builders, _layout_initializer, ns, _init_size,
-        _max_size, _metrics_reporter.clone(), _router_registry)
+        _notify_connected(source_id)?, _event_log, _router.routes(),
+        _route_builder, _outgoing_boundary_builders, _layout_initializer,
+        ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry)
+
       // TODO: We need to figure out how to unregister this when the
       // connection dies
       _router_registry.register_source(source, source_id)
@@ -232,7 +235,8 @@ actor TCPSourceListener is SourceListener
     Inform the notifier that we're listening.
     """
     if not _event.is_null() then
-      @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
+      @printf[I32]((_source_builder.name() + " source is listening\n")
+        .cstring())
     else
       _closed = true
       @printf[I32]((_source_builder.name() +
@@ -246,7 +250,8 @@ actor TCPSourceListener is SourceListener
         as TCPSourceNotify iso^
     else
       @printf[I32](
-        (_source_builder.name() + " could not create a TCPSourceNotify\n").cstring())
+        (_source_builder.name() + " could not create a TCPSourceNotify\n")
+        .cstring())
       Fail()
       error
     end

@@ -96,7 +96,7 @@ actor Step is (Producer & Consumer)
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
-    _event_log.register_producer(this, id)
+    _event_log.register_resilient(this, id)
 
     let initial_router = _runner.clone_router_and_set_input_type(router)
     _update_router(initial_router)
@@ -439,6 +439,8 @@ actor Step is (Producer & Consumer)
       @printf[I32]("flushing at and below: %llu\n".cstring(), low_watermark)
     end
     _event_log.flush_buffer(_id, low_watermark)
+
+  be log_replay_finished() => None
 
   be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq val)

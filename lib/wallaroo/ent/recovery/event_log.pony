@@ -21,10 +21,15 @@ use "wallaroo/core/messages"
 use "wallaroo/core/topology"
 
 interface tag Resilient
+  be log_replay_finished()
   be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq)
   be initialize_seq_id_on_recovery(seq_id: SeqId)
   be log_flushed(low_watermark: SeqId)
+
+  // Log-rotation
+  be snapshot_state()
+
 
 class val EventLogConfig
   let log_dir: (FilePath | AmbientAuth | None)
@@ -49,7 +54,7 @@ class val EventLogConfig
     suffix = suffix'
 
 actor EventLog
-  let _producers: Map[U128, Resilient] = _producers.create()
+  let _resilients: Map[StepId, Resilient] = _resilients.create()
   let _backend: Backend
   let _replay_complete_markers: Map[U64, Bool] =
     _replay_complete_markers.create()
@@ -58,7 +63,7 @@ actor EventLog
   var _flush_waiting: USize = 0
   var _initialized: Bool = false
   var _recovery: (Recovery | None) = None
-  var _steps_to_snapshot: SetIs[U128] = _steps_to_snapshot.create()
+  var _resilients_to_snapshot: SetIs[StepId] = _resilients_to_snapshot.create()
   var _router_registry: (RouterRegistry | None) = None
   var _rotating: Bool = false
   var _backend_bytes_after_snapshot: USize
@@ -108,6 +113,10 @@ actor EventLog
     _backend.start_log_replay()
 
   be log_replay_finished() =>
+    for r in _resilients.values() do
+      r.log_replay_finished()
+    end
+
     match _recovery
     | let r: Recovery =>
       r.log_replay_finished()
@@ -115,12 +124,12 @@ actor EventLog
       Fail()
     end
 
-  be replay_log_entry(producer_id: U128,
+  be replay_log_entry(resilient_id: StepId,
     uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq val)
   =>
     try
-      _producers(producer_id)?.replay_log_entry(uid, frac_ids,
+      _resilients(resilient_id)?.replay_log_entry(uid, frac_ids,
         statechange_id, payload)
     else
       @printf[I32](("FATAL: Unable to replay event log, because a replay " +
@@ -128,28 +137,29 @@ actor EventLog
       Fail()
     end
 
-  be initialize_seq_ids(seq_ids: Map[U128, SeqId] val) =>
-    for (producer_id, seq_id) in seq_ids.pairs() do
+  be initialize_seq_ids(seq_ids: Map[StepId, SeqId] val) =>
+    for (resilient_id, seq_id) in seq_ids.pairs() do
       try
-        _producers(producer_id)?.initialize_seq_id_on_recovery(seq_id)
+        _resilients(resilient_id)?.initialize_seq_id_on_recovery(seq_id)
       else
-        @printf[I32]("Could not initialize seq id. Producer does not exist\n"
+        @printf[I32](("Could not initialize seq id " + seq_id.string() +
+          ". Resilient " + resilient_id.string() + " does not exist\n")
           .cstring())
         Fail()
       end
     end
 
-  be register_producer(producer: Resilient, id: U128) =>
-    _producers(id) = producer
+  be register_resilient(resilient: Resilient, id: StepId) =>
+    _resilients(id) = resilient
 
-  be queue_log_entry(producer_id: U128, uid: U128,
+  be queue_log_entry(resilient_id: StepId, uid: U128,
     frac_ids: FractionalMessageId, statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] val)
   =>
-    _queue_log_entry(producer_id, uid, frac_ids, statechange_id, seq_id,
+    _queue_log_entry(resilient_id, uid, frac_ids, statechange_id, seq_id,
       payload)
 
-  fun ref _queue_log_entry(producer_id: U128, uid: U128,
+  fun ref _queue_log_entry(resilient_id: StepId, uid: U128,
     frac_ids: FractionalMessageId,
     statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] val, force_write: Bool = false)
@@ -158,7 +168,7 @@ actor EventLog
       // add to backend buffer after encoding
       // encode right away to amortize encoding cost per entry when received
       // as opposed to when writing a batch to disk
-      _backend.encode_entry((false, producer_id, uid, frac_ids, statechange_id,
+      _backend.encode_entry((false, resilient_id, uid, frac_ids, statechange_id,
         seq_id, payload))
 
       num_encoded = num_encoded + 1
@@ -182,17 +192,18 @@ actor EventLog
       Fail()
     end
 
-  be flush_buffer(producer_id: U128, low_watermark: U64) =>
-    _flush_buffer(producer_id, low_watermark)
+  be flush_buffer(resilient_id: StepId, low_watermark: U64) =>
+    _flush_buffer(resilient_id, low_watermark)
 
-  fun ref _flush_buffer(producer_id: U128, low_watermark: U64) =>
+  fun ref _flush_buffer(resilient_id: StepId, low_watermark: U64) =>
     ifdef "trace" then
-      @printf[I32]("flush_buffer for id: %d\n\n".cstring(), producer_id)
+      @printf[I32](("flush_buffer for id: " + resilient_id.string() + "\n\n")
+        .cstring())
     end
 
     try
       // Add low watermark ack to buffer
-      _backend.encode_entry((true, producer_id, 0, None, 0, low_watermark,
+      _backend.encode_entry((true, resilient_id, 0, None, 0, low_watermark,
         recover Array[ByteSeq] end))
 
       num_encoded = num_encoded + 1
@@ -206,24 +217,25 @@ actor EventLog
       //   _backend.datasync()
       // end
 
-      _producers(producer_id)?.log_flushed(low_watermark)
+      _resilients(resilient_id)?.log_flushed(low_watermark)
     else
       @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
       Fail()
     end
 
-  be snapshot_state(producer_id: U128, uid: U128,
+  be snapshot_state(resilient_id: StepId, uid: U128,
     statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] val)
   =>
     ifdef "trace" then
-      @printf[I32]("Snapshotting state for step %lu\n".cstring(), producer_id)
+      @printf[I32](("Snapshotting state for resilient " + resilient_id.string()
+        + "\n").cstring())
     end
-    if _steps_to_snapshot.contains(producer_id) then
-      _steps_to_snapshot.unset(producer_id)
+    if _resilients_to_snapshot.contains(resilient_id) then
+      _resilients_to_snapshot.unset(resilient_id)
     else
       @printf[I32](("Error writing snapshot to logfile. StepId not in set " +
-        "of expected steps!\n").cstring())
+        "of expected resilients!\n").cstring())
       Fail()
     end
 
@@ -231,10 +243,10 @@ actor EventLog
     // is acked by now, which isn't being validated here.
     // This should be addressed by
     // https://github.com/WallarooLabs/wallaroo/issues/1132
-    _flush_buffer(producer_id, seq_id)
-    _queue_log_entry(producer_id, uid, None, statechange_id, seq_id,
+    _flush_buffer(resilient_id, seq_id)
+    _queue_log_entry(resilient_id, uid, None, statechange_id, seq_id,
       payload, true)
-    if _steps_to_snapshot.size() == 0 then
+    if _resilients_to_snapshot.size() == 0 then
       rotation_complete()
     end
 
@@ -256,20 +268,20 @@ actor EventLog
         + " ignored.\n").cstring())
     end
 
-  be rotate_file(steps: Map[U128, Step] val) =>
-    @printf[I32]("Snapshotting %d steps to new log file.\n".cstring(),
-      steps.size())
+  be rotate_file() =>
+    @printf[I32]("Snapshotting %d resilients to new log file.\n".cstring(),
+      _resilients.size())
     match _router_registry
     | None =>
       Fail()
     end
     _rotate_file()
-    _steps_to_snapshot = _steps_to_snapshot.create()
-    for v in steps.keys() do
-      _steps_to_snapshot.set(v)
+    _resilients_to_snapshot = _resilients_to_snapshot.create()
+    for v in _resilients.keys() do
+      _resilients_to_snapshot.set(v)
     end
-    for s in steps.values() do
-      s.snapshot_state()
+    for r in _resilients.values() do
+      r.snapshot_state()
     end
 
   fun ref _rotate_file() =>
@@ -286,7 +298,8 @@ actor EventLog
     end
 
   fun ref rotation_complete() =>
-    @printf[I32]("Steps snapshotting to new log file complete.\n".cstring())
+    @printf[I32]("Resilients snapshotting to new log file complete.\n"
+      .cstring())
     try
       _backend.sync()?
       _backend.datasync()?

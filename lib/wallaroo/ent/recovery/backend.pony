@@ -20,14 +20,14 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 
-// (is_watermark, producer_id, uid, frac_ids, statechange_id, seq_id, payload)
-type LogEntry is (Bool, U128, U128, FractionalMessageId, U64, U64,
+// (is_watermark, resilient_id, uid, frac_ids, statechange_id, seq_id, payload)
+type LogEntry is (Bool, StepId, U128, FractionalMessageId, U64, U64,
   Array[ByteSeq] val)
 
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
-// (producer_id, uid, frac_ids, statechange_id, seq_id, payload)
-type ReplayEntry is (U128, U128, FractionalMessageId, U64, U64, ByteSeq val)
+// (resilient_id, uid, frac_ids, statechange_id, seq_id, payload)
+type ReplayEntry is (StepId, U128, FractionalMessageId, U64, U64, ByteSeq val)
 
 //////////////////////////////////
 // Helpers for RotatingFileBackend
@@ -144,19 +144,19 @@ class FileBackend is Backend
         // be replayed
         var replay_buffer: Array[ReplayEntry val] ref = replay_buffer.create()
 
-        let watermarks_trn = recover trn Map[U128, SeqId] end
+        let watermarks_trn = recover trn Map[StepId, SeqId] end
 
         //start iterating until we reach original EOF
         while _file.position() < size do
           r.append(_file.read(25))
           let is_watermark = BoolConverter.u8_to_bool(r.u8()?)
-          let producer_id = r.u128_be()?
+          let resilient_id = r.u128_be()?
           let seq_id = r.u64_be()?
           if is_watermark then
             ifdef debug then
               Invariant(
                 try
-                  let last_seq_id = watermarks_trn(producer_id)?
+                  let last_seq_id = watermarks_trn(resilient_id)?
                   seq_id > last_seq_id
                 else
                   true
@@ -165,7 +165,7 @@ class FileBackend is Backend
             end
 
             // save last watermark read from file
-            watermarks_trn(producer_id) = seq_id
+            watermarks_trn(resilient_id) = seq_id
           else
             r.append(_file.read(24))
             let uid = r.u128_be()?
@@ -197,7 +197,7 @@ class FileBackend is Backend
             end
 
             // put entry into temporary recovered buffer
-            replay_buffer.push((producer_id, uid, frac_ids, statechange_id,
+            replay_buffer.push((resilient_id, uid, frac_ids, statechange_id,
               seq_id, payload))
           end
 
@@ -253,7 +253,7 @@ class FileBackend is Backend
 
   fun ref encode_entry(entry: LogEntry)
   =>
-    (let is_watermark: Bool, let producer_id: U128,
+    (let is_watermark: Bool, let resilient_id: StepId,
      let uid: U128, let frac_ids: FractionalMessageId,
      let statechange_id: U64, let seq_id: U64,
      let payload: Array[ByteSeq] val) = entry
@@ -267,7 +267,7 @@ class FileBackend is Backend
     end
 
     _writer.u8(BoolConverter.bool_to_u8(is_watermark))
-    _writer.u128_be(producer_id)
+    _writer.u128_be(resilient_id)
     _writer.u64_be(seq_id)
 
     if not is_watermark then
@@ -291,10 +291,10 @@ class FileBackend is Backend
         payload_size = payload_size + p.size()
       end
       _writer.u64_be(payload_size.u64())
-    end
 
-    // write data to write buffer
-    _writer.writev(payload)
+      // write data to write buffer
+      _writer.writev(payload)
+    end
 
   fun ref sync() ? =>
     _file.sync()

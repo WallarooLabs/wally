@@ -16,11 +16,13 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "buffered"
 use "collections"
 use "pony-kafka"
 use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
@@ -40,6 +42,23 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   let _layout_initializer: LayoutInitializer
   var _unregistered: Bool = false
 
+  let _event_log: EventLog
+  let _acker_x: Acker
+  let _map_seq_id_offset: Map[SeqId, KafkaOffset] = _map_seq_id_offset.create()
+
+  var _last_flushed_offset: KafkaOffset = 0
+
+  var _last_flushed_seq_id: SeqId = 1
+
+  var _last_processed_offset: KafkaOffset = -1
+
+  var _recovering: Bool
+
+  let _name: String
+
+  let _rb: Reader = Reader
+  let _wb: Writer = Writer
+
   let _metrics_reporter: MetricsReporter
 
   let _listen: KafkaSourceListener[In]
@@ -55,17 +74,18 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   var _in_flight_ack_waiter: InFlightAckWaiter
 
   let _topic: String
-  let _partition_id: I32
+  let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
 
-  new create(source_id: StepId, listen: KafkaSourceListener[In],
-    notify: KafkaSourceNotify[In] iso,
+  new create(source_id: StepId, name: String, listen: KafkaSourceListener[In],
+    notify: KafkaSourceNotify[In] iso, event_log: EventLog,
     routes: Array[Consumer] val, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    topic: String, partition_id: I32, kafka_client: KafkaClient tag,
-    router_registry: RouterRegistry)
+    topic: String, partition_id: KafkaPartitionId,
+    kafka_client: KafkaClient tag, router_registry: RouterRegistry,
+    recovering: Bool)
   =>
     _source_id = source_id
     _topic = topic
@@ -75,6 +95,15 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
+    _event_log = event_log
+    _acker_x = Acker
+
+    _recovering = recovering
+
+    _name = name
+
+    // register resilient with event log
+    _event_log.register_resilient(this, _source_id)
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
@@ -108,6 +137,9 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       // directly. route lifecycle needs to be broken out better from
       // application lifecycle
       r.application_created()
+      ifdef "resilience" then
+        _acker_x.add_route(r)
+      end
     end
 
     for r in _routes.values() do
@@ -130,7 +162,9 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
     for target in new_router.routes().values() do
       if not _routes.contains(target) then
-        _routes(target) = _route_builder(this, target, _metrics_reporter)
+        let new_route = _route_builder(this, target, _metrics_reporter)
+        _acker_x.add_route(new_route)
+        _routes(target) = new_route
       end
     end
     _notify.update_router(new_router)
@@ -158,8 +192,9 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
           target_worker_name, _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
-        _routes(boundary) =
-          _route_builder(this, boundary, _metrics_reporter)
+        let new_route = _route_builder(this, boundary, _metrics_reporter)
+        _acker_x.add_route(new_route)
+        _routes(boundary) = new_route
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)
@@ -194,31 +229,118 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   //////////////
   // ORIGIN (resilience)
   be request_ack() =>
-    None
+    ifdef "trace" then
+      @printf[I32]("request_ack in %s\n".cstring(), _name.cstring())
+    end
+    for route in _routes.values() do
+      route.request_ack()
+    end
+
+  be log_replay_finished()
+  =>
+    // now that log replay is finished, we are no longer "recovering"
+    _recovering = false
+
+    // try and unmute if downstreams are already unmuted
+    if _muted_downstream.size() == 0 then
+      _unmute()
+    end
+
+  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq)
+  =>
+    _rb.append(payload)
+    _last_processed_offset = try _rb.i64_le()?
+                             else Fail(); _last_processed_offset end
+
+    ifdef "trace" then
+      @printf[I32](("replaying log entry on recovery with last processed" +
+        " offset: %lld in %s\n").cstring(), _last_processed_offset,
+        _name.cstring())
+    end
+
+  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
+    ifdef "trace" then
+      @printf[I32](("initializing sequence id on recovery: " + seq_id.string() +
+        " in %s\n").cstring(), _name.cstring())
+    end
+    // update to use correct seq_id for recovery
+    _seq_id = seq_id
 
   fun ref _acker(): Acker =>
-    // TODO: we don't really need this
-    // Because we dont actually do any resilience work
-    Acker
+    _acker_x
 
-  // Override these for KafkaSource as we are currently
-  // not resilient.
   fun ref flush(low_watermark: U64) =>
-    None
+    ifdef "trace" then
+      @printf[I32]("flushing at and below: %llu in %s\n".cstring(),
+        low_watermark, _name.cstring())
+    end
+
+    (_, let offset) = try _map_seq_id_offset.remove(low_watermark)?
+                      else Fail(); (0, -1) end
+
+    // remove all other lower seq_ids that we're tracking offsets for
+    for s in Range[U64](_last_flushed_seq_id, low_watermark) do
+      if _map_seq_id_offset.contains(s) then
+        try _map_seq_id_offset.remove(s)? else Fail() end
+      end
+    end
+
+    _wb.i64_le(offset)
+    let payload = _wb.done()
+
+    // store offset
+    _event_log.queue_log_entry(_source_id, 0, None, 0, low_watermark,
+      consume payload)
+
+    // store low watermark so it is properly replayed
+    _event_log.flush_buffer(_source_id, low_watermark)
+
+    _last_flushed_seq_id = low_watermark
+    _last_flushed_offset = offset
+
+
+  // Log-rotation
+  be snapshot_state() =>
+    ifdef "trace" then
+      @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
+    end
+    _wb.i64_le(_last_flushed_offset)
+    let payload = _wb.done()
+    _event_log.snapshot_state(_source_id, 0, 0, _last_flushed_seq_id,
+      consume payload)
 
   be log_flushed(low_watermark: SeqId) =>
-    None
+    ifdef "trace" then
+      @printf[I32]("log_flushed for: %llu in %s\n".cstring(), low_watermark,
+        _name.cstring())
+    end
+    _acker().flushed(low_watermark)
 
   fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
-    None
+    ifdef "trace" then
+      @printf[I32]("Bookkeeping called for route %llu in %s\n".cstring(),
+        o_route_id, _name.cstring())
+    end
+    ifdef "resilience" then
+      _acker().sent(o_route_id, o_seq_id)
+    end
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
     ifdef debug then
-      @printf[I32]("KafkaSource received update_watermark\n".cstring())
+      @printf[I32]("%s received update_watermark\n".cstring(), _name.cstring())
     end
+    _update_watermark(route_id, seq_id)
 
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    None
+    ifdef "trace" then
+      @printf[I32]((
+      "Update watermark called with " +
+      "route_id: " + route_id.string() +
+      "\tseq_id: " + seq_id.string() + " in %s\n\n").cstring(), _name.cstring())
+    end
+
+    _acker().ack_received(this, route_id, seq_id)
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
@@ -269,8 +391,8 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     request_id: RequestId, requester_id: StepId,
     requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
-      request_id, requester_id, requester)
+    if _in_flight_ack_waiter.request_in_flight_resume_ack(
+      in_flight_resume_ack_id, request_id, requester_id, requester)
     then
       for route in _routes.values() do
         let new_request_id =
@@ -292,17 +414,33 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
   fun ref _mute() =>
     ifdef debug then
-      @printf[I32]("Muting KafkaSource\n".cstring())
+      @printf[I32]("Muting %s\n".cstring(), _name.cstring())
     end
     _kc.consumer_pause(_topic, _partition_id)
 
     _muted = true
 
   fun ref _unmute() =>
-    ifdef debug then
-      @printf[I32]("Unmuting KafkaSource\n".cstring())
+    if _recovering then
+      ifdef debug then
+        @printf[I32]("NOT Unmuting %s because it is currently recovering\n"
+          .cstring(), _name.cstring())
+      end
+      return
     end
-    _kc.consumer_resume(_topic, _partition_id)
+    if _last_processed_offset != -1 then
+      ifdef debug then
+        @printf[I32](("Unmuting %s with custom offset: " +
+          (_last_processed_offset + 1).string() + "\n").cstring(),
+          _name.cstring())
+      end
+      _kc.consumer_resume(_topic, _partition_id, _last_processed_offset + 1)
+    else
+      ifdef debug then
+        @printf[I32]("Unmuting %s\n".cstring(), _name.cstring())
+      end
+      _kc.consumer_resume(_topic, _partition_id)
+    end
 
     _muted = false
 
@@ -320,21 +458,29 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   fun ref is_muted(): Bool =>
     _muted
 
-  be receive_kafka_message(value: Array[U8] iso, key: (Array[U8] val | None),
-    msg_metadata: KafkaMessageMetadata val,
+  be receive_kafka_message(client: KafkaClient, value: Array[U8] iso,
+    key: (Array[U8] val | None), msg_metadata: KafkaMessageMetadata val,
     network_received_timestamp: U64)
   =>
     if (msg_metadata.get_topic() != _topic)
       or (msg_metadata.get_partition_id() != _partition_id) then
-      @printf[I32](("Msg topic: " + msg_metadata.get_topic() + " != _topic: " + _topic
-        + " or Msg partition: " + msg_metadata.get_partition_id().string() + " != "
-        + " _partition_id: " + _partition_id.string() + "!").cstring())
+      @printf[I32](("Msg topic: " + msg_metadata.get_topic() + " != _topic: " +
+        _topic + " or Msg partition: " + msg_metadata.get_partition_id().string()
+        + " != " + " _partition_id: " + _partition_id.string() + "!").cstring())
       Fail()
     end
-    _notify.received(this, consume value, key, msg_metadata, network_received_timestamp)
+    _notify.received(this, consume value, key, msg_metadata,
+      network_received_timestamp)
+
+    ifdef "trace" then
+      @printf[I32](("seq_id: " + current_sequence_id().string() + " => offset: "
+      + msg_metadata.get_offset().string() + " in %s\n").cstring(),
+      _name.cstring())
+    end
+    _map_seq_id_offset(current_sequence_id()) = msg_metadata.get_offset()
 
   be dispose() =>
-    @printf[I32]("Shutting down KafkaSource\n".cstring())
+    @printf[I32]("Shutting down %s\n".cstring(), _name.cstring())
 
     for b in _outgoing_boundaries.values() do
       b.dispose()

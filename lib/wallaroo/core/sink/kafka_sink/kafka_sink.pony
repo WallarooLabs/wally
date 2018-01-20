@@ -23,6 +23,7 @@ use "pony-kafka"
 use "pony-kafka/customlogger"
 use "time"
 use "wallaroo/core/common"
+use "wallaroo/ent/recovery"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -35,6 +36,10 @@ use "wallaroo/core/topology"
 
 actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   // Steplike
+  let _name: String
+  let _sink_id: StepId
+  let _event_log: EventLog
+  var _recovering: Bool
   let _encoder: KafkaEncoderWrapper
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
@@ -65,10 +70,14 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   let _pending_delivery_report: MapIs[Any tag, (String, U16, U64, U64, U64,
     (U64 | None))] = _pending_delivery_report.create()
 
-  new create(encoder_wrapper: KafkaEncoderWrapper,
-    metrics_reporter: MetricsReporter iso, conf: KafkaConfig val,
-    auth: TCPConnectionAuth)
+  new create(sink_id: StepId, name: String, event_log: EventLog, recovering: Bool,
+    encoder_wrapper: KafkaEncoderWrapper, metrics_reporter: MetricsReporter iso,
+    conf: KafkaConfig val, auth: TCPConnectionAuth)
   =>
+    _name = name
+    _recovering = recovering
+    _sink_id = sink_id
+    _event_log = event_log
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _conf = conf
@@ -81,26 +90,29 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
                ""
              end
 
-  fun ref create_producer_mapping(mapping: KafkaProducerMapping):
+    // register resilient with event log
+    _event_log.register_resilient(this, _sink_id)
+
+  fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
   =>
     _kafka_producer_mapping = mapping
 
-  fun ref producer_mapping(): (KafkaProducerMapping | None) =>
+  fun ref producer_mapping(client: KafkaClient): (KafkaProducerMapping | None) =>
     _kafka_producer_mapping
 
-  be kafka_client_error(error_report: KafkaErrorReport) =>
+  be kafka_client_error(client: KafkaClient, error_report: KafkaErrorReport) =>
     @printf[I32](("ERROR: Kafka client encountered an unrecoverable error! " +
       error_report.string() + "\n").cstring())
 
     Fail()
 
-  be receive_kafka_topics_partitions(new_topic_partitions: Map[String,
-    (KafkaTopicType, Set[I32])] val)
+  be receive_kafka_topics_partitions(client: KafkaClient, new_topic_partitions: Map[String,
+    (KafkaTopicType, Set[KafkaPartitionId])] val)
   =>
     None
 
-  be kafka_producer_ready() =>
+  be kafka_producer_ready(client: KafkaClient) =>
     _ready_to_produce = true
 
     // we either signal back to intializer that we're ready to work here or in
@@ -115,10 +127,12 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
         Fail()
       end
 
-      _unmute_upstreams()
+      if _mute_outstanding and not _recovering then
+        _unmute_upstreams()
+      end
     end
 
-  be kafka_message_delivery_report(delivery_report: KafkaProducerDeliveryReport)
+  be kafka_message_delivery_report(client: KafkaClient, delivery_report: KafkaProducerDeliveryReport)
   =>
     try
       if not _pending_delivery_report.contains(delivery_report.opaque) then
@@ -136,6 +150,8 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
           + delivery_report.status.string() + "\n").cstring())
         error
       end
+
+      // TODO: Resilience: log_flushed here to update low watermark for recovery?
 
       ifdef "resilience" then
         match tracking_id
@@ -165,17 +181,15 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
         .cstring())
     end
 
-  fun ref _kafka_producer_throttled(topic_mapping: Map[String, Map[I32, I32]]
-    val)
+  fun ref _kafka_producer_throttled(client: KafkaClient, topic_partitions_throttled: Map[String, Set[KafkaPartitionId]] val)
   =>
     if not _mute_outstanding then
       _mute_upstreams()
     end
 
-  fun ref _kafka_producer_unthrottled(topic_mapping: Map[String, Map[I32, I32]]
-    val, fully_unthrottled: Bool)
+  fun ref _kafka_producer_unthrottled(client: KafkaClient, topic_partitions_throttled: Map[String, Set[KafkaPartitionId]] val)
   =>
-    if fully_unthrottled and _mute_outstanding then
+    if (topic_partitions_throttled.size() == 0) and _mute_outstanding then
       _unmute_upstreams()
     end
 
@@ -214,13 +228,19 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       initializer.report_ready_to_work(this)
       _initializer = None
 
-      _unmute_upstreams()
+      if _mute_outstanding and not _recovering then
+        _unmute_upstreams()
+      end
     end
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
   be request_ack() =>
+    ifdef "trace" then
+      @printf[I32]("request_ack in %s\n".cstring(), _name.cstring())
+    end
+
     _terminus_route.request_ack()
 
   fun ref _next_tracking_id(i_producer: Producer, i_route_id: RouteId,
@@ -279,7 +299,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       @printf[I32]("Rcvd msg at KafkaSink\n".cstring())
     end
     try
-      (let encoded_value, let encoded_key) = _encoder.encode[D](data, _wb)?
+      (let encoded_value, let encoded_key, let part_id) = _encoder.encode[D](data, _wb)?
       my_metrics_id = ifdef "detailed-metrics" then
           var old_ts = my_latest_ts = Time.nanos()
           _metrics_reporter.step_metric(metric_name, "Sink encoding time", 9998,
@@ -292,12 +312,17 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       try
         // `any` is required because if `data` is used directly, there are
         // issues with the items not being found in `_pending_delivery_report`.
+        // This is mainly when `data` is a primitive where it will get automagically
+        // boxed on message send and the `tag` for that boxed version of the primitive
+        // will not match the when checked against the `_pending_delivery_report` map.
         let any: Any tag = data
         let ret = (_kafka_producer_mapping as KafkaProducerMapping ref)
-          .send_topic_message(_topic, any, encoded_value, encoded_key)
+          .send_topic_message(_topic, any, encoded_value, encoded_key where partition_id = part_id)
 
         // TODO: Proper error handling
         if ret isnt None then error end
+
+        // TODO: Resilience: Write data to event log for recovery purposes
 
         let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
         _pending_delivery_report(any) = (metric_name, my_metrics_id,
@@ -318,11 +343,58 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    ifdef "trace" then
+      @printf[I32]("replay_run in %s\n".cstring(), _name.cstring())
+    end
     // TODO: implement this once state save/recover is handled
     Fail()
 
   be receive_state(state: ByteSeq val) =>
+    ifdef "trace" then
+      @printf[I32]("receive_state in %s\n".cstring(), _name.cstring())
+    end
     // TODO: implement state recovery
+    Fail()
+
+  be log_replay_finished()
+  =>
+    ifdef "trace" then
+      @printf[I32]("log_replay_finished in %s\n".cstring(), _name.cstring())
+    end
+    _recovering = false
+    if _mute_outstanding then
+      _unmute_upstreams()
+    end
+
+  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+    statechange_id: U64, payload: ByteSeq)
+  =>
+    ifdef "trace" then
+      @printf[I32]("replay_log_entry in %s\n".cstring(), _name.cstring())
+    end
+    // TODO: implement this for resilience/recovery
+    Fail()
+
+  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
+    ifdef "trace" then
+      @printf[I32]("initialize_seq_id_on_recovery in %s\n".cstring(), _name.cstring())
+    end
+    // TODO: implement this for resilience/recovery
+    Fail()
+
+  // Log-rotation
+  be snapshot_state() =>
+    ifdef "trace" then
+      @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
+    end
+    // TODO: implement this for resilience/recovery
+    Fail()
+
+  be log_flushed(low_watermark: SeqId) =>
+    ifdef "trace" then
+      @printf[I32]("log_flushed in %s\n".cstring(), _name.cstring())
+    end
+    // TODO: implement this for resilience/recovery
     Fail()
 
   be dispose() =>
