@@ -80,6 +80,8 @@ ifndef ponyc_arch_args
   ponyc_arch_args :=
 endif
 
+wallaroo_version = $(shell cat $(ROOT_PATH)/VERSION)
+
 # function to lazily initialize a variable on first use and to only evaluate the expression once
 # see: http://www.oreilly.com/openbook/make3/book/ch10.pdf
 # $(call lazy-init,variable-name,value)
@@ -296,7 +298,7 @@ define MONHUBR
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) npm install \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
-  $(QUIET)cd $(1) && $(monhub_docker_args) npm run build:production \
+  $(QUIET)cd $(1) && $(monhub_docker_args) WALLAROO_VERSION=$(wallaroo_version) npm run build:production \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix phx.digest \
     $(if $(filter $(monhub_docker_args),docker),$(quote))
