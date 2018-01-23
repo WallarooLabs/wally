@@ -28,9 +28,6 @@ then
 	echo "Docker image: $wallaroo_docker_image_path already exists."
 	exit 0
 else
-	# insert version into UI
-	version=$(< VERSION)
-	sed -i -- "s/{{ book.wallaroo_version }}/$version/g" monitoring_hub/apps/metrics_reporter_ui/web/static/js/buffy-ui/components/applications/VersionAlert.js
 	# build the image
 	docker login -u wallaroolabs -p $DOCKER_PASSWORD $wallaroo_docker_repo_host
 	make release-monitoring_hub-apps-metrics_reporter_ui
