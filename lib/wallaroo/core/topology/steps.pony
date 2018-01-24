@@ -201,18 +201,16 @@ actor Step is (Producer & Consumer)
     end
 
   be update_omni_router(omni_router: OmniRouter) =>
-    try
-      let old_router = _omni_router
-      _omni_router = omni_router
-      for outdated_consumer in old_router.routes_not_in(_omni_router).values()
-      do
+    let old_router = _omni_router
+    _omni_router = omni_router
+    for outdated_consumer in old_router.routes_not_in(_omni_router).values()
+    do
+      try
         let outdated_route = _routes(outdated_consumer)?
         _acker_x.remove_route(outdated_route)
       end
-      _add_boundaries(omni_router.boundaries())
-    else
-      Fail()
     end
+    _add_boundaries(omni_router.boundaries())
 
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
     _add_boundaries(boundaries)
