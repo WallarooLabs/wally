@@ -47,16 +47,18 @@ alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
 ## Shrink to Fit
 
 It is also possible to remove one or more workers from a running cluster. 
-There are two ways to specify that workers should be removed from the cluster.  You can either specify the worker names or the total count of workers to be removed.  You must know the external channel address of one worker in the running cluster.  You can use the `external_sender` tool to send a shrink message to this channel. For example, if the external address is `127.0.0.1:5050` and we want to remove 2 workers from the cluster, we can run the following:
+There are two ways to specify that workers should be removed from the cluster.  You can either specify the worker names or the total count of workers to be removed.  You must know the external channel address of one worker in the running cluster. 
+
+You can use the `cluster_shrinker` tool to send a shrink message to this channel. For example, if the external address is `127.0.0.1:5050` and we want to remove 2 workers from the cluster, we can run the following:
 
 ```
-external_sender --type shrink --external 127.0.0.1:5050 --message 2
+cluster_shrinker --external 127.0.0.1:5050 --message 2
 ```
 
 The `--message` argument is used either to pass in a count or to pass in a list of comma-separated worker names.  To request that workers `w2` and `w3` be removed, we can run:
 
 ```
-external_sender --type shrink --external 127.0.0.1:5050 --message w2,w3
+cluster_shrinker --external 127.0.0.1:5050 --message w2,w3
 ```
 
 To qualify for removal from the cluster, a worker must currently meet two criteria:
@@ -71,8 +73,7 @@ The leaving workers will migrate state to the remaining workers and then shut do
 You can query a running cluster to get a list of workers eligible for shutdown. In order to do this, pass `?` as the argument to `--message` as below:
 
 ```
-external_sender --type shrink --external 127.0.0.1:5050 --message \? \
-  --stay-alive
+cluster_shrinker --external 127.0.0.1:5050 --message \?
 ```
 
-In this example, we escape `?` in order to avoid bash globbing. We also pass the `--stay-alive` flag, since otherwise `external_sender` will exit before it has a chance to receive a reply to the query.
+In this example, we escape `?` in order to avoid bash globbing. 
