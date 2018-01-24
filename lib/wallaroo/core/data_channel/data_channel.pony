@@ -182,6 +182,9 @@ actor DataChannel
     end
 
   be writev(data: ByteSeqIter) =>
+    _writev(data)
+
+  fun ref _writev(data: ByteSeqIter) =>
     """
     Write a sequence of sequences of bytes.
     """

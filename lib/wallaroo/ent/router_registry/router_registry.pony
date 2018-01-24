@@ -105,9 +105,6 @@ actor RouterRegistry
 
   var _waiting_to_finish_join: Bool = false
 
-  /////
-  // LOG ROTATION
-  /////
   var _event_log: (EventLog | None) = None
 
   new create(auth: AmbientAuth, worker_name: String,
@@ -373,6 +370,19 @@ actor RouterRegistry
       Fail()
     end
     _distribute_omni_router()
+
+  fun _distribute_boundary_builders() =>
+    let boundary_builders =
+      recover trn Map[String, OutgoingBoundaryBuilder] end
+    for (worker, builder) in _outgoing_boundaries_builders.pairs() do
+      boundary_builders(worker) = builder
+    end
+
+    let boundary_builders_to_send = consume val boundary_builders
+
+    for source_listener in _source_listeners.values() do
+      source_listener.update_boundary_builders(boundary_builders_to_send)
+    end
 
   be create_partition_routers_from_blueprints(
     partition_blueprints: Map[String, PartitionRouterBlueprint] val)
@@ -906,6 +916,11 @@ actor RouterRegistry
 
   be disconnect_from_leaving_worker(worker: String) =>
     _connections.disconnect_from(worker)
+    try
+      _outgoing_boundaries.remove(worker)?
+      _outgoing_boundaries_builders.remove(worker)?
+    end
+    _distribute_boundary_builders()
     if not _leaving_in_process then
       ifdef debug then
         Invariant(_leaving_workers.size() > 0)
