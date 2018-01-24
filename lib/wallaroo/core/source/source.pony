@@ -103,3 +103,5 @@ interface tag SourceListener is DisposableActor
   be update_router(router: PartitionRouter)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
+  be update_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)

@@ -979,6 +979,8 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
         end
         conn.receive_connect_ack(ac.last_id_seen)
+      | let dd: DataDisconnectMsg =>
+        _outgoing_boundary.dispose()
       | let sn: StartNormalDataSendingMsg =>
         ifdef "trace" then
           @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"

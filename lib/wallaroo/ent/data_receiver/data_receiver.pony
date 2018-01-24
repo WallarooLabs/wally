@@ -238,6 +238,12 @@ actor DataReceiver is Producer
     _timers.dispose()
     match _latest_conn
     | let conn: DataChannel =>
+      try
+        let msg = ChannelMsgEncoder.data_disconnect(_auth)?
+        conn.writev(msg)
+      else
+        Fail()
+      end
       conn.dispose()
     end
 

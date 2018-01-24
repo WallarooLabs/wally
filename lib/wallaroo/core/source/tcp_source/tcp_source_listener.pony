@@ -137,6 +137,11 @@ actor TCPSourceListener is SourceListener
     end
     _outgoing_boundary_builders = consume new_builders
 
+  be update_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
+  =>
+    _outgoing_boundary_builders = boundary_builders
+
   be dispose() =>
     @printf[I32]("Shutting down TCPSourceListener\n".cstring())
     _close()

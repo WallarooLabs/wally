@@ -165,6 +165,9 @@ primitive ChannelMsgEncoder
   =>
     _encode(AckDataConnectMsg(last_id_seen), auth)?
 
+  fun data_disconnect(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(DataDisconnectMsg, auth)?
+
   fun start_normal_data_sending(last_id_seen: SeqId, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -347,6 +350,8 @@ class val DataConnectMsg is ChannelMsg
   new val create(sender_name': String, sender_boundary_id': U128) =>
     sender_name = sender_name'
     sender_boundary_id = sender_boundary_id'
+
+primitive DataDisconnectMsg is ChannelMsg
 
 class val AckDataConnectMsg is ChannelMsg
   let last_id_seen: SeqId

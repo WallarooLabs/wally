@@ -294,5 +294,10 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     end
     _outgoing_boundary_builders = consume new_builders
 
+  be update_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
+  =>
+    _outgoing_boundary_builders = boundary_builders
+
   be dispose() =>
     None
