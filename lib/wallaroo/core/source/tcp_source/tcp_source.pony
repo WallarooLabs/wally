@@ -182,6 +182,13 @@ actor TCPSource is Producer
       else
         router
       end
+
+    for target in new_router.routes().values() do
+      if not _routes.contains(target) then
+        _routes(target) = _route_builder(this, target, _metrics_reporter)
+      end
+    end
+
     _notify.update_router(new_router)
 
   be add_boundary_builders(

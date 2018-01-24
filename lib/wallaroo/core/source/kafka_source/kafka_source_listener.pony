@@ -123,7 +123,7 @@ class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
 actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _env: Env
   let _notify: KafkaSourceListenerNotify[In]
-  let _router: Router
+  var _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
   let _default_in_route_builder: (RouteBuilder | None)
@@ -273,6 +273,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     end
 
   be update_router(router: Router) =>
+    _router = router
     _notify.update_router(router)
 
   be remove_route_for(moving_step: Consumer) =>

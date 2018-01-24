@@ -47,7 +47,7 @@ actor TCPSourceListener is SourceListener
   """
 
   let _env: Env
-  let _router: Router
+  var _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
   let _default_in_route_builder: (RouteBuilder | None)
@@ -118,6 +118,7 @@ actor TCPSourceListener is SourceListener
 
   be update_router(router: Router) =>
     _source_builder = _source_builder.update_router(router)
+    _router = router
 
   be remove_route_for(moving_step: Consumer) =>
     None

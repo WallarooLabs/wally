@@ -830,7 +830,7 @@ class val LocalPartitionRouter[In: Any val,
                 latest_ts, metrics_id, worker_ingress_ts)
               (false, keep_sending, latest_ts)
             else
-              // TODO: What do we do if we get None?
+              Fail()
               (true, true, latest_ts)
             end
           | let p: ProxyRouter =>
@@ -868,9 +868,11 @@ class val LocalPartitionRouter[In: Any val,
           @printf[I32](("LocalPartitionRouter.route: InputWrapper doesn't " +
             "contain data of type In\n").cstring())
         end
+        Fail()
         (true, true, latest_ts)
       end
     else
+      Fail()
       (true, true, latest_ts)
     end
 
@@ -1072,8 +1074,8 @@ class val LocalPartitionRouter[In: Any val,
       router_registry.move_stateful_step_to_proxy[Key](step_id,
         ProxyAddress(target_worker, step_id), key, state_name')
       @printf[I32](
-        "^^Migrating step %lx to outgoing boundary %s/%lx\n".cstring(),
-        step, target_worker.cstring(), boundary)
+        "^^Migrating step %s to outgoing boundary %s/%lx\n".cstring(),
+        step_id.string().cstring(), target_worker.cstring(), boundary)
     end
 
   fun blueprint(): PartitionRouterBlueprint =>
