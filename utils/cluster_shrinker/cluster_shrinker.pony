@@ -52,28 +52,42 @@ actor Main
           | ("workers", let arg: String) =>
             workers = arg.split(",")
           | ("help", None) =>
-            env.out.print(
-              """
-              PARAMETERS:
-              -----------------------------------------------------------------------------------
-              --external/-e [Specifies address to send message to]
-              --query/-q [Queries for workers eligible for removal]
-              --count/-c [Specifies count of workers to remove from cluster]
-              --workers/-w [Specifies workers to remove from cluster (provided as a comma-separated list of names)]
-              -----------------------------------------------------------------------------------
-              """)
+            _print_help(env)
             return
           end
         end
+
+      // Check that exactly one of query, count, or workers was specified.
+      if (query and ((count > 0) or (workers.size() > 0)) or
+        (not query and (count == 0) and (workers.size() == 0)) or
+        ((count > 0) and (workers.size() > 0))
+      then
+        env.err.print(("You must specify exactly one of --query, --count, " +  "or --workers"))
+        env.exitcode(1)
+      end
 
       let auth = env.root as AmbientAuth
       let msg = ExternalMsgEncoder.shrink(query, workers, count)
       let tcp_auth = TCPConnectAuth(auth)
       _conn = TCPConnection(tcp_auth, ClusterShrinkerConnectNotifier(env, auth,
-        msg, query), x_host, x_service)
+        msg, query, x_host, x_service), x_host, x_service)
     else
+      _print_help(env)
       env.exitcode(1)
     end
+
+  fun _print_help(env: Env) =>
+    env.out.print(
+      """
+      PARAMETERS:
+      -----------------------------------------------------------------------------------
+      --external/-e [Specifies address to send message to]
+      Specify exactly one of the following:
+      --query/-q [Queries for workers eligible for removal]
+      --count/-c [Specifies count of workers to remove from cluster]
+      --workers/-w [Specifies workers to remove from cluster (provided as a comma-separated list of names)]
+      -----------------------------------------------------------------------------------
+      """)
 
 class ClusterShrinkerConnectNotifier is TCPConnectionNotify
   let _env: Env
@@ -81,14 +95,18 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
   let _msg: Array[ByteSeq] val
   let _wait_for_response: Bool
   var _header: Bool = true
+  let _host: String
+  let _service: String
 
   new iso create(env: Env, auth: AmbientAuth, msg: Array[ByteSeq] val,
-    wait_for_response: Bool)
+    wait_for_response: Bool, host: String, service: String)
   =>
     _env = env
     _auth = auth
     _msg = msg
     _wait_for_response = wait_for_response
+    _host = host
+    _service = service
 
   fun ref connected(conn: TCPConnection ref) =>
     conn.writev(_msg)
@@ -109,6 +127,7 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
         _header = false
       else
         _env.err.print("Error reading header")
+        _env.exitcode(1)
       end
     else
       try
@@ -117,10 +136,12 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
           _env.out.print("Received ExternalShrinkMsg: " + m.string())
           conn.dispose()
         else
-          _env.err.print("Received non-shrink msg")
+          _env.err.print("Received non-shrink message")
+          _env.exitcode(1)
         end
       else
-        _env.err.print("Received invalid msg")
+        _env.err.print("Received invalid message")
+        _env.exitcode(1)
       end
       conn.expect(4)
       _header = true
@@ -128,4 +149,5 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
     true
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    None
+    _env.err.print("Failed to connect to " + _host + ":" + _service)
+    _env.exitcode(1)

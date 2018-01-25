@@ -10,9 +10,9 @@ make
 
 ## Run
 
-You must know the external address for a running worker in the cluster in order to send in a shrink message.
+You must know the external address for a running worker in the cluster in order to send in a shrink message. Pass in a string of the form `HOST:PORT` via the `--external` command line argument.
 
-There are three ways to use this tool:
+There are three ways to use this tool. You must specify exactly one of `--count`, `--workers`, or `--query`, depending on which of the three you choose. These are described in the following:
 
 1) Specify the number of workers to remove from the cluster.
 
@@ -39,7 +39,3 @@ If you use the `--query` flag, then Wallaroo will inform you both how many worke
 ```bash
 ./cluster_shrinker --external 127.0.0.1:5050 --query
 ```
-
-
-
-
