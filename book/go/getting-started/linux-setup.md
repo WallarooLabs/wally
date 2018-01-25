@@ -169,7 +169,7 @@ To compile all three, run
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/
-make build-utils-all
+make build-giles-all build-utils-all
 ```
 
 ## Register
