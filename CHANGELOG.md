@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Ensure that new sources don't try to connect to old workers ([PR #2004](https://github.com/wallaroolabs/wallaroo/pull/2004))
 - Fail when control channel can't listen ([PR #1982](https://github.com/wallaroolabs/wallaroo/pull/1982))
 - Only create output file for Giles sender when writing ([PR #1964](https://github.com/wallaroolabs/wallaroo/pull/1964))
 
