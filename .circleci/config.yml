@@ -12,6 +12,12 @@ jobs:
     steps:
       - checkout
       - run: changelog-tool verify CHANGELOG.md
+  integration-tests:
+    docker:
+      - image: wallaroolabs/wallaroo-ci:standard
+    steps:
+      - checkout
+      - run: make integration-tests debug=true
   integration-tests-with-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:standard
@@ -30,5 +36,6 @@ workflows:
     jobs:
       - build
       - verify-changelog
+      - integration-tests
       - integration-tests-with-resilience
       - unit-tests
