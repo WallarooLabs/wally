@@ -977,15 +977,19 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
 
 
 DEFAULT_SINK_STOP_TIMEOUT = 30
+DEFAULT_RUNNER_JOIN_TIMEOUT = 30
 
 
 def pipeline_test(generator, expected, command, workers=1, sources=1,
                   mode='framed', sinks=1, decoder=None, pre_processor=None,
-                  batch_size=1, sink_expect=None, sink_stop_timeout=None,
+                  batch_size=1, sink_expect=None,
+                  sink_stop_timeout=DEFAULT_SINK_STOP_TIMEOUT,
                   sink_await=None, delay=None,
                   validate_file=None, giles_mode=False,
                   host='127.0.0.1', listen_attempts=1,
-                  ready_timeout=30, resilience_dir='/tmp/res-dir',
+                  ready_timeout=30,
+                  runner_join_timeout=DEFAULT_RUNNER_JOIN_TIMEOUT,
+                  resilience_dir='/tmp/res-dir',
                   spikes={}):
     """
     Run a pipeline test without having to instrument everything
@@ -1046,6 +1050,9 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         Default 1.
     - `ready_timeout`: number of seconds before an error is raised if the
         application does not report as ready. Default 30
+    - `runner_join_timeout`: the timeout in seconds to use when waiting for
+      the runners to exit cleanly. If the timeout is exceeded, the runners
+      are killed and an error is raised.
     - `resilience_dir`: The directory where resilience file are kept. This
         path will be cleaned up before and after each run.
     - `spikes`: A dict of 3-tuples with the worker index as its key, and
@@ -1163,8 +1170,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         # Use sink, metrics, or a timer to determine when to stop the
         # runners and sinks and begin validation
         if sink_expect:
-            if sink_stop_timeout is None:
-                sink_stop_timeout = DEFAULT_SINK_STOP_TIMEOUT
             logging.debug('Waiting for {} messages at the sinks with a timeout'
                           ' of {} seconds'.format(sink_expect,
                                                   sink_stop_timeout))
@@ -1184,8 +1189,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                         print r.get_output()
                     raise stopper.error
         elif sink_await:
-            if sink_stop_timeout is None:
-                sink_stop_timeout = DEFAULT_SINK_STOP_TIMEOUT
             logging.debug('Awaiting {} values at the sinks with a timeout of '
                           '{} seconds'.format(sum(map(len, sink_await)),
                                               sink_stop_timeout))
@@ -1309,4 +1312,25 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         # clean up any remaining runner processes
         for r in runners:
             r.stop()
+        # Wait on runners to finish waiting on their subprocesses to exit
+        for r in runners:
+            r.join(runner_join_timeout)
+        alive = []
+        for r in runners:
+            if r.is_alive():
+                alive.append(r)
+        if alive:
+            alive_names = ', '.join((r.name for r in alive))
+            outputs = [(r.name, r.get_output()) for r in runners]
+            outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
+            for a in alive:
+                a.kill()
+            raise PipelineTestError("Runners [{}] failed to exit cleanly after"
+                                    " {} seconds.\n"
+                                    "Runner outputs are attached below:"
+                                    "\n===\n{}"
+                                    .format(alive_names, runner_join_timeout,
+                                            outputs))
+
+    # Return runner names and outputs if try block didn't have a return
     return [(r.name, r.get_output()) for r in runners]

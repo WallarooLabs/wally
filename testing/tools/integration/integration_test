@@ -412,7 +412,7 @@ def CLI():
                          metavar=('value', 'header'),
                          help=("Stop after receiving all await values in the"
                                "sink"))
-    expect.add_argument('--sink-stop-timeout', type=float,
+    expect.add_argument('--sink-stop-timeout', type=float, default=30,
                         help=("Timeout in seconds before raising a "
                               "TimeoutError"))
     stopper.add_argument('--delay', type=float, default=None,
@@ -432,6 +432,12 @@ def CLI():
                            choices=['none', 'debug', 'info', 'warning',
                                     'error', 'critical'],
                            default='info')
+
+    term_group = parser.add_argument_group('Termination')
+    term_group.add_argument('--runner-join_timeout', type=float, default=30,
+                            help=("Timeout in seconds before killing any "
+                                  "remaining live workers and raising an "
+                                  "error."))
 
     args = parser.parse_args()
     set_log_level(args.log_level)
@@ -474,6 +480,7 @@ def CLI():
                                        False),
                       giles_mode = 'giles' if args.giles_mode else None,
                       host=args.host,
+                      runner_join_timeout=args.runner_join_timeout,
                       resilience_dir=args.resilience_dir,
                       spikes=args.spike))
     except Exception as err:
