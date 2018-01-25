@@ -315,7 +315,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
       w.cstring())
 
-  be initiate_shrink(target_workers: Array[String] val, shrink_count: USize) =>
+  be initiate_shrink(target_workers: Array[String] val, shrink_count: U64) =>
     if target_workers.size() > 0 then
       if _are_valid_shrink_candidates(target_workers) then
         let remaining_workers = _remove_worker_names(target_workers)
@@ -324,8 +324,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         @printf[I32]("**Invalid shrink targets!**\n".cstring())
       end
     elseif shrink_count > 0 then
-      let candidates = _get_shrink_candidates(shrink_count)
-      if candidates.size() < shrink_count then
+      let candidates = _get_shrink_candidates(shrink_count.usize())
+      if candidates.size() < shrink_count.usize() then
         @printf[I32]("**Only %s candidates are eligible for removal\n"
           .cstring(), candidates.size().string().cstring())
       else
@@ -1644,7 +1644,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
       end
       let query_reply = ExternalMsgEncoder.shrink(false, available,
-        available.size())
+        available.size().u64())
       conn.writev(query_reply)
     else
       Fail()

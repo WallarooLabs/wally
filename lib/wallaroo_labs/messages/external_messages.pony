@@ -48,7 +48,7 @@ primitive ExternalMsgEncoder
     wb.done()
 
   fun _encode_shrink(id: U16, query: Bool, node_names: Array[String],
-    num_nodes: USize, wb: Writer): Array[ByteSeq] val
+    num_nodes: U64, wb: Writer): Array[ByteSeq] val
   =>
     var num_bytes: U32 = 0
 
@@ -131,7 +131,7 @@ primitive ExternalMsgEncoder
     _encode(_CleanShutdown(), msg, wb)
 
   fun shrink(query: Bool, node_names: Array[String] = Array[String],
-    num_nodes: USize = 0, wb: Writer = Writer): Array[ByteSeq] val
+    num_nodes: U64 = 0, wb: Writer = Writer): Array[ByteSeq] val
   =>
     if (query is true) then
       _encode_shrink(_Shrink(), true, Array[String], 0, wb)
@@ -219,14 +219,14 @@ primitive ExternalMsgDecoder
     | (_CleanShutdown(), let s: String) =>
       ExternalCleanShutdownMsg(s)
     | (_Shrink(), let query: Bool,
-      let node_names: Array[String] val, let num_nodes: USize) =>
+      let node_names: Array[String] val, let num_nodes: U64) =>
       ExternalShrinkMsg(query, node_names, num_nodes)
     else
       error
     end
 
   fun _decode(data: Array[U8] val):
-    ((U16, String) | (U16, Bool, Array[String] val, USize)) ?
+    ((U16, String) | (U16, Bool, Array[String] val, U64)) ?
   =>
     let rb = Reader
     rb.append(data)
@@ -250,7 +250,7 @@ primitive ExternalMsgDecoder
         let n = String.from_array(rb.block(size)?)
         node_names.push(n)
       end
-      let num_nodes = USize.from[U32](rb.u32_be()?)
+      let num_nodes = U64.from[U32](rb.u32_be()?)
 
       (id, query, consume node_names, num_nodes)
     else
@@ -324,11 +324,11 @@ class val ExternalCleanShutdownMsg is ExternalMsg
 class val ExternalShrinkMsg is ExternalMsg
   let query: Bool
   let node_names: Array[String] val
-  let num_nodes: USize
+  let num_nodes: U64
   var _header: Bool = true
 
   new val create(query': Bool,
-    node_names': Array[String] val, num_nodes': USize) =>
+    node_names': Array[String] val, num_nodes': U64) =>
     query = query'
     node_names = node_names'
     num_nodes = num_nodes'

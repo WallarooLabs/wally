@@ -107,8 +107,7 @@ To compile all three, run
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/
-make build-giles-all build-utils-cluster_shutdown-all \
-  build-utils-cluster_shrinker-all build-utils-data_receiver-all
+make build-utils-all
 ```
 
 ## Register

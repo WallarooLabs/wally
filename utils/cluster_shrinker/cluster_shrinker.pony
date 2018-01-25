@@ -25,14 +25,18 @@ actor Main
 
   new create(env: Env) =>
     try
+      let options = Options(env.args)
       var x_host: String = ""
       var x_service: String = "0"
-      var message: String = ""
-      let options = Options(env.args)
+      var query = false
+      var count = U64(0)
+      var workers = Array[String]
 
       options
         .add("external", "e", StringArgument)
-        .add("message", "m", StringArgument)
+        .add("query", "q", None)
+        .add("count", "c", I64Argument)
+        .add("workers", "w", StringArgument)
         .add("help", "h", None)
 
         for option in options do
@@ -41,63 +45,54 @@ actor Main
             let x_addr = arg.split(":")
             x_host = x_addr(0)?
             x_service = x_addr(1)?
-          | ("message", let arg: String) => message = arg
+          | ("query", None) =>
+            query = true
+          | ("count", let arg: I64) =>
+            count = arg.u64()
+          | ("workers", let arg: String) =>
+            workers = arg.split(",")
           | ("help", None) =>
-            @printf[I32](
+            env.out.print(
               """
               PARAMETERS:
               -----------------------------------------------------------------------------------
               --external/-e [Specifies address to send message to]
-              --message/-m [Specifies message contents to send]
-                  Specify names of nodes or number of nodes.
-                  If 1st char is a digit, specify number of of nodes;
-                  else specify comma-separated list of node names.
+              --query/-q [Queries for workers eligible for removal]
+              --count/-c [Specifies count of workers to remove from cluster]
+              --workers/-w [Specifies workers to remove from cluster (provided as a comma-separated list of names)]
               -----------------------------------------------------------------------------------
-              """.cstring())
+              """)
             return
           end
         end
 
       let auth = env.root as AmbientAuth
-      (let query: Bool, let node_names: Array[String], let num_nodes: USize) =
-        parse_shrink_cmd_line(message)?
-      let msg = ExternalMsgEncoder.shrink(query, node_names, num_nodes)
+      let msg = ExternalMsgEncoder.shrink(query, workers, count)
       let tcp_auth = TCPConnectAuth(auth)
-      _conn = TCPConnection(tcp_auth, ExternalSenderConnectNotifier(auth,
+      _conn = TCPConnection(tcp_auth, ClusterShrinkerConnectNotifier(env, auth,
         msg, query), x_host, x_service)
     else
-      @printf[I32]("Error sending.\n".cstring())
+      env.exitcode(1)
     end
 
-    fun parse_shrink_cmd_line(s: String): (Bool, Array[String], USize) ? =>
-      let first: U8 = s(0)?
-
-      if (first == '?') then
-        return (true, [], 0)
-      elseif (first >= U8('0')) and (first <= U8('9')) then
-        return (false, [], s.usize()?)
-      else
-        return (false, s.split(","), 0)
-      end
-
-class ExternalSenderConnectNotifier is TCPConnectionNotify
+class ClusterShrinkerConnectNotifier is TCPConnectionNotify
+  let _env: Env
   let _auth: AmbientAuth
   let _msg: Array[ByteSeq] val
-  let _stay_alive: Bool
+  let _wait_for_response: Bool
   var _header: Bool = true
 
-  new iso create(auth: AmbientAuth, msg: Array[ByteSeq] val,
-    stay_alive: Bool)
+  new iso create(env: Env, auth: AmbientAuth, msg: Array[ByteSeq] val,
+    wait_for_response: Bool)
   =>
+    _env = env
     _auth = auth
     _msg = msg
-    _stay_alive = stay_alive
+    _wait_for_response = wait_for_response
 
   fun ref connected(conn: TCPConnection ref) =>
-    @printf[I32]("Connected...\n".cstring())
     conn.writev(_msg)
-    @printf[I32]("Sent message!\n".cstring())
-    if _stay_alive then
+    if _wait_for_response then
       conn.expect(4)
     else
       conn.dispose()
@@ -113,19 +108,19 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        @printf[I32]("Error reading header\n".cstring())
+        _env.err.print("Error reading header")
       end
     else
       try
         match ExternalMsgDecoder(consume data)?
         | let m: ExternalShrinkMsg =>
-          @printf[I32]("Received ExternalShrinkMsg: %s\n".cstring(),
-            m.string().cstring())
+          _env.out.print("Received ExternalShrinkMsg: " + m.string())
+          conn.dispose()
         else
-          @printf[I32]("Received non-shrink msg\n".cstring())
+          _env.err.print("Received non-shrink msg")
         end
       else
-        @printf[I32]("Received invalid msg\n".cstring())
+        _env.err.print("Received invalid msg")
       end
       conn.expect(4)
       _header = true
