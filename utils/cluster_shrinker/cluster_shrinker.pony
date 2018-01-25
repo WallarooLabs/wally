@@ -58,16 +58,17 @@ actor Main
         end
 
       // Check that exactly one of query, count, or workers was specified.
-      if (query and ((count > 0) or (workers.size() > 0)) or
+      if (query and ((count > 0) or (workers.size() > 0))) or
         (not query and (count == 0) and (workers.size() == 0)) or
         ((count > 0) and (workers.size() > 0))
       then
         env.err.print(("You must specify exactly one of --query, --count, " +  "or --workers"))
         env.exitcode(1)
+        return
       end
 
       let auth = env.root as AmbientAuth
-      let msg = ExternalMsgEncoder.shrink(query, workers, count)
+      let msg = ExternalMsgEncoder.shrink_request(query, workers, count)
       let tcp_auth = TCPConnectAuth(auth)
       _conn = TCPConnection(tcp_auth, ClusterShrinkerConnectNotifier(env, auth,
         msg, query, x_host, x_service), x_host, x_service)
@@ -93,7 +94,6 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
   let _msg: Array[ByteSeq] val
-  let _wait_for_response: Bool
   var _header: Bool = true
   let _host: String
   let _service: String
@@ -104,17 +104,12 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
     _env = env
     _auth = auth
     _msg = msg
-    _wait_for_response = wait_for_response
     _host = host
     _service = service
 
   fun ref connected(conn: TCPConnection ref) =>
     conn.writev(_msg)
-    if _wait_for_response then
-      conn.expect(4)
-    else
-      conn.dispose()
-    end
+    conn.expect(4)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
@@ -128,20 +123,26 @@ class ClusterShrinkerConnectNotifier is TCPConnectionNotify
       else
         _env.err.print("Error reading header")
         _env.exitcode(1)
+        conn.dispose()
       end
     else
       try
         match ExternalMsgDecoder(consume data)?
-        | let m: ExternalShrinkMsg =>
-          _env.out.print("Received ExternalShrinkMsg: " + m.string())
+        | let m: ExternalShrinkQueryResponseMsg =>
+          _env.out.print("Eligible for shrink: " + m.string())
+          conn.dispose()
+        | let m: ExternalShrinkErrorResponseMsg =>
+          _env.out.print("Cluster shrink response: " + m.msg.string())
           conn.dispose()
         else
-          _env.err.print("Received non-shrink message")
+          _env.err.print("Received incorrect external message type")
           _env.exitcode(1)
+          conn.dispose()
         end
       else
         _env.err.print("Received invalid message")
         _env.exitcode(1)
+        conn.dispose()
       end
       conn.expect(4)
       _header = true

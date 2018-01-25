@@ -204,13 +204,14 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
     // Use Range so that num_nodes array size 0 is tested.
     for i in Range[U64](0, node_names.size().u64()) do
       let e1: Array[ByteSeq] val =
-        ExternalMsgEncoder.shrink(false, node_names.slice(0, i.usize()), 0)
+        ExternalMsgEncoder.shrink_request(false, node_names.slice(0,
+          i.usize()), 0)
       // encode & decode are not symmetric -- we need to chop off
       // the first 4 bytes before we can decode.
       let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
 
       match ExternalMsgDecoder(e1')?
-      | let extracted: ExternalShrinkMsg =>
+      | let extracted: ExternalShrinkRequestMsg =>
         h.assert_eq[Bool](false, extracted.query)
         h.assert_eq[USize](i.usize(), extracted.node_names.size())
         for j in extracted.node_names.keys() do
@@ -224,11 +225,12 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
 
     // Use Range so that num_nodes = 0 is included
     for i in Range[U64](0, 4) do
-      let e1: Array[ByteSeq] val = ExternalMsgEncoder.shrink(false, [], i)
+      let e1: Array[ByteSeq] val = ExternalMsgEncoder.shrink_request(false, [],
+        i)
       let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
 
       match ExternalMsgDecoder(e1')?
-      | let extracted: ExternalShrinkMsg =>
+      | let extracted: ExternalShrinkRequestMsg =>
         h.assert_eq[Bool](false, extracted.query)
         h.assert_eq[USize](0, extracted.node_names.size())
         h.assert_eq[U64](i, extracted.num_nodes)
@@ -238,11 +240,11 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
     end
 
     // Let's now try a round trip for a query
-    let e2: Array[ByteSeq] val = ExternalMsgEncoder.shrink(true, [], 0)
+    let e2: Array[ByteSeq] val = ExternalMsgEncoder.shrink_request(true, [], 0)
     let e2': Array[U8] val = recover Help.flatten(e2).slice(4) end
 
     match ExternalMsgDecoder(e2')?
-    | let extracted: ExternalShrinkMsg =>
+    | let extracted: ExternalShrinkRequestMsg =>
       h.assert_eq[Bool](true, extracted.query)
       h.assert_eq[USize](0, extracted.node_names.size())
       h.assert_eq[U64](0, extracted.num_nodes)
