@@ -1,0 +1,3 @@
+#!/bin/bash
+
+../../testing/tools/external_sender/external_sender --type shrink --external 127.0.0.1:6010 --message worker3
