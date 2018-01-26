@@ -315,17 +315,25 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
       w.cstring())
 
-  be initiate_shrink(target_workers: Array[String] val, shrink_count: USize) =>
+  be initiate_shrink(target_workers: Array[String] val, shrink_count: U64,
+    conn: TCPConnection)
+  =>
     if target_workers.size() > 0 then
       if _are_valid_shrink_candidates(target_workers) then
         let remaining_workers = _remove_worker_names(target_workers)
         _router_registry.initiate_shrink(remaining_workers, target_workers)
+        let reply = ExternalMsgEncoder.shrink_error_response(
+          "Shrinking by " + target_workers.size().string() + " workers!")
+        conn.writev(reply)
       else
         @printf[I32]("**Invalid shrink targets!**\n".cstring())
+        let error_reply = ExternalMsgEncoder.shrink_error_response(
+          "Invalid shrink targets!")
+        conn.writev(error_reply)
       end
     elseif shrink_count > 0 then
-      let candidates = _get_shrink_candidates(shrink_count)
-      if candidates.size() < shrink_count then
+      let candidates = _get_shrink_candidates(shrink_count.usize())
+      if candidates.size() < shrink_count.usize() then
         @printf[I32]("**Only %s candidates are eligible for removal\n"
           .cstring(), candidates.size().string().cstring())
       else
@@ -335,11 +343,20 @@ actor LocalTopologyInitializer is LayoutInitializer
       if candidates.size() > 0 then
         let remaining_workers = _remove_worker_names(candidates)
         _router_registry.initiate_shrink(remaining_workers, candidates)
+        let reply = ExternalMsgEncoder.shrink_error_response(
+          "Shrinking by " + candidates.size().string() + " workers!")
+        conn.writev(reply)
       else
         @printf[I32]("**Cannot shrink 0 workers!**\n".cstring())
+        let error_reply = ExternalMsgEncoder.shrink_error_response(
+          "Cannot shrink 0 workers!")
+        conn.writev(error_reply)
       end
     else
       @printf[I32]("**Cannot shrink 0 workers!**\n".cstring())
+      let error_reply = ExternalMsgEncoder.shrink_error_response(
+        "Cannot shrink 0 workers!")
+      conn.writev(error_reply)
     end
 
   fun _are_valid_shrink_candidates(candidates: Array[String] val): Bool =>
@@ -1643,8 +1660,8 @@ actor LocalTopologyInitializer is LayoutInitializer
           available.push(w)
         end
       end
-      let query_reply = ExternalMsgEncoder.shrink(false, available,
-        available.size())
+      let query_reply = ExternalMsgEncoder.shrink_query_response(available,
+        available.size().u64())
       conn.writev(query_reply)
     else
       Fail()

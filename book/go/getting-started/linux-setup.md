@@ -157,18 +157,19 @@ git clone https://github.com/WallarooLabs/wallaroo
 cd wallaroo
 git checkout {{ book.wallaroo_version }}
 ```
-## Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool
+## Compiling Giles Sender, Data Receiver, Cluster Shutdown, and Cluster Shrinker tools
 
 Giles Sender is used to supply data to Wallaroo applications over TCP, and Data Receiver is used as a fast TCP Sink that can write the messages it receives to STDOUT. The two together are useful when developing and testing applications that use TCP Sources and a TCP Sink.
 
 The Cluster Shutdown tool is used to instruct the cluster to shutdown cleanly, clearing away any resilience and recovery files it may have created.
 
+The Cluster Shrinker tool is used to tell a running cluster to reduce the number of workers in the cluster and to query the cluster for information about how many workers are eligible for removal.
+
 To compile all three, run
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/
-make build-giles-all build-utils-cluster_shutdown-all \
-  build-utils-data_receiver-all
+make build-giles-all build-utils-all
 ```
 
 ## Register
