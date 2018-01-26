@@ -12,6 +12,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Added
 
+- Add tool to allow an operator to shrink a Wallaroo cluster ([PR #2005](https://github.com/wallaroolabs/wallaroo/pull/2005))
 
 ### Changed
 
