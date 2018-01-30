@@ -8,7 +8,7 @@ This is the Market Spread application in Go.
 export GOPATH="$(realpath .)/go:$(realpath ../../go)"
 go build -buildmode=c-archive -o lib/libwallaroo.a market_spread
 stable fetch
-stable env ponyc --debug -D autoscale
+stable env ponyc -D autoscale
 ```
 
 ## Run Single Worker
@@ -48,8 +48,8 @@ Send new market data.
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7011 --file \
   ../../../testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg \
-  --batch-size 20 --interval 100_000_000 -m 10000000000 --binary \
-  --ponythreads=1 --ponynoblock --msg-size 46 --no-write
+  -s 150 -i 2_500_000 -m 10000000000 --binary \
+  --ponythreads=1 --ponynoblock --msg-size 46 --no-write -r
 ```
 
 ### Shell 4
@@ -59,8 +59,8 @@ Send the order data.
 ```bash
 ../../../giles/sender/sender --host 127.0.0.1:7010 --file \
   ../../../testing/data/market_spread/orders/350-symbols_orders-fixish.msg \
-  --batch-size 20 --interval 100_000_000 --messages 1000000 --binary \
-  --repeat --ponythreads=1 --ponynoblock --msg-size 57 --no-write
+  -s 150 -i 5_000_000 --messages 10000000000 --binary \
+  --repeat --ponythreads=1 --ponynoblock --msg-size 57 --no-write -r
 ```
 
 ## Run Multi-Worker

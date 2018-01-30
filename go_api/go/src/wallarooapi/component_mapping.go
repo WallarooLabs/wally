@@ -3,6 +3,7 @@ package wallarooapi
 import (
 	"C"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -34,34 +35,29 @@ func makeComponentDicts() []*ComponentDict {
 var componentDicts = makeComponentDicts()
 
 type ComponentDict struct {
-	mu sync.RWMutex
-	components map[uint64]interface{}
-	nextId uint64
+	id uint64
+	//components sync.Map
+	components ConcurrentMap
 }
 
 func NewComponentDict() *ComponentDict {
-	return &ComponentDict {sync.RWMutex{}, make(map[uint64]interface{}), 1}
+	return &ComponentDict{0, NewConcurrentMap()}
+	//return &ComponentDict{id: 0}
 }
 
 func (cd *ComponentDict) add(component interface{}) uint64 {
-	cd.mu.Lock()
-	defer cd.mu.Unlock()
-	cd.components[cd.nextId] = component
-	lastId := cd.nextId
-	cd.nextId++
-	return lastId
+	var id = atomic.AddUint64(&cd.id, 1)
+	cd.components.Store(id, component)
+	return id
 }
 
 func (cd *ComponentDict) get(id uint64) interface{} {
-	cd.mu.RLock()
-	defer cd.mu.RUnlock()
-	return cd.components[id]
+	result, _ := cd.components.Load(id)
+	return result
 }
 
 func (cd *ComponentDict) remove(id uint64) {
-	cd.mu.Lock()
-	defer cd.mu.Unlock()
-	delete(cd.components, id)
+	cd.components.Delete(id)
 }
 
 //export GetComponent
@@ -77,5 +73,54 @@ func AddComponent(component interface{}, componentType uint64) uint64 {
 //export RemoveComponent
 func RemoveComponent(id uint64, componentType uint64) {
 	componentDicts[componentType].remove(id)
-	RemoveSerialized(id, componentType)
+	//RemoveSerialized(id, componentType)
+}
+
+// MAP
+
+var SHARD_COUNT = uint64(1024)
+
+type ConcurrentMap []*ConcurrentMapShared
+
+type ConcurrentMapShared struct {
+	items map[uint64]interface{}
+	sync.RWMutex
+}
+
+func NewConcurrentMap() ConcurrentMap {
+	m := make(ConcurrentMap, SHARD_COUNT)
+	for i := uint64(0); i < SHARD_COUNT; i++ {
+		m[i] = &ConcurrentMapShared{items: make(map[uint64]interface{})}
+	}
+	return m
+}
+
+func (m ConcurrentMap) GetShard(key uint64) *ConcurrentMapShared {
+	return m[key%SHARD_COUNT]
+}
+
+func (m ConcurrentMap) Store(key uint64, value interface{}) {
+	// Get map shard.
+	shard := m.GetShard(key)
+	shard.Lock()
+	shard.items[key] = value
+	shard.Unlock()
+}
+
+func (m ConcurrentMap) Load(key uint64) (interface{}, bool) {
+	// Get shard
+	shard := m.GetShard(key)
+	shard.RLock()
+	// Get item from shard.
+	val, ok := shard.items[key]
+	shard.RUnlock()
+	return val, ok
+}
+
+func (m ConcurrentMap) Delete(key uint64) {
+	// Try to get shard.
+	shard := m.GetShard(key)
+	shard.Lock()
+	delete(shard.items, key)
+	shard.Unlock()
 }
