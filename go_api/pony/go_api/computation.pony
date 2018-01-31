@@ -34,7 +34,7 @@ class Computation is w.Computation[GoData, GoData]
       None
     else
       GoData(res)
-    end*
+    end
 
   fun _serialise_space(): USize =>
     ComponentSerializeGetSpace(_computation_id, ComponentType.computation())
