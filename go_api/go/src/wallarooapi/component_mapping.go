@@ -80,7 +80,7 @@ func RemoveComponent(id uint64, componentType uint64) {
 
 // MAP
 
-var SHARD_COUNT = uint64(65536)
+var SHARD_COUNT = uint64(16384)
 
 type ConcurrentMap []*ConcurrentMapShared
 
