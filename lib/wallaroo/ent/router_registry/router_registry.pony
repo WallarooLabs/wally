@@ -1021,8 +1021,8 @@ actor RouterRegistry is FinishedAckRequester
         Fail()
       end
       _prepare_shrink(remaining_workers, leaving_workers)
-      _request_finished_acks(LeavingMigrationAction(_auth, remaining_workers,
-        leaving_workers, _connections))
+      _request_finished_acks(LeavingMigrationAction(_auth, _worker_name,
+        remaining_workers, leaving_workers, _connections))
     end
 
   be prepare_shrink(remaining_workers: Array[String] val,
@@ -1271,14 +1271,13 @@ class MigrationAction is CustomAction
 class LeavingMigrationAction is CustomAction
   let _auth: AmbientAuth
   let _worker_name: String
-  let _connections: Connections
   let _remaining_workers: Array[String] val
   let _leaving_workers: Array[String] val
   let _connections: Connections
 
   new iso create(auth: AmbientAuth, worker_name: String,
-    connections: Connections, remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val, connections: Connections)
+    remaining_workers: Array[String] val, leaving_workers: Array[String] val,
+    connections: Connections)
   =>
     _auth = auth
     _worker_name = worker_name
