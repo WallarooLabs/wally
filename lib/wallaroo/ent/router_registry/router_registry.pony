@@ -13,6 +13,7 @@ the License. You may obtain a copy of the License at
 use "collections"
 use "net"
 use "time"
+use "wallaroo"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
@@ -34,6 +35,7 @@ actor RouterRegistry
   let _data_receivers: DataReceivers
   let _worker_name: String
   let _connections: Connections
+  let _recovery_file_cleaner: RecoveryFileCleaner
   var _data_router: DataRouter =
     DataRouter(recover Map[U128, Consumer] end)
   var _pre_state_data: (Array[PreStateData] val | None) = None
@@ -108,12 +110,14 @@ actor RouterRegistry
   var _event_log: (EventLog | None) = None
 
   new create(auth: AmbientAuth, worker_name: String,
-    data_receivers: DataReceivers, c: Connections, stop_the_world_pause: U64)
+    data_receivers: DataReceivers, c: Connections,
+    recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64)
   =>
     _auth = auth
     _worker_name = worker_name
     _data_receivers = data_receivers
     _connections = c
+    _recovery_file_cleaner = recovery_file_cleaner
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
 
@@ -647,7 +651,7 @@ actor RouterRegistry
     if (_step_waiting_list.size() == 0) then
       if _leaving_in_process then
         _send_leaving_worker_done_migrating()
-        _connections.shutdown()
+        _recovery_file_cleaner.clean_recovery_files()
       else
         _send_migration_batch_complete()
       end
