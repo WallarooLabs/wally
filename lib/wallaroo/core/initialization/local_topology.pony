@@ -359,6 +359,18 @@ actor LocalTopologyInitializer is LayoutInitializer
       conn.writev(error_reply)
     end
 
+  be take_over_initiate_shrink(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val)
+  =>
+    _remove_worker_names(leaving_workers)
+    _router_registry.initiate_shrink(remaining_workers, leaving_workers)
+
+  be prepare_shrink(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val)
+  =>
+    _remove_worker_names(leaving_workers)
+    _router_registry.prepare_shrink(remaining_workers, leaving_workers)
+
   fun _are_valid_shrink_candidates(candidates: Array[String] val): Bool =>
     match _topology
     | let t: LocalTopology =>

@@ -855,31 +855,47 @@ actor RouterRegistry
     This should only be called on the worker contacted via an external
     message to initiate a shrink.
     """
-    @printf[I32]("~~~Initiating shrink~~~\n".cstring())
-    @printf[I32]("-- Remaining workers: \n".cstring())
-    for w in remaining_workers.values() do
-      @printf[I32]("-- -- %s\n".cstring(), w.cstring())
-    end
-    @printf[I32]("-- Leaving workers: \n".cstring())
-    for w in leaving_workers.values() do
-      @printf[I32]("-- -- %s\n".cstring(), w.cstring())
-    end
-    _stop_the_world_in_process = true
-    _stop_the_world_for_shrink()
-    let timers = Timers
-    let timer = Timer(PauseBeforeShrinkNotify(_auth, _connections,
-      remaining_workers, leaving_workers), _stop_the_world_pause)
-    timers(consume timer)
-    try
-      let msg = ChannelMsgEncoder.prepare_shrink(remaining_workers,
-        leaving_workers, _auth)?
-      for w in remaining_workers.values() do
-        _connections.send_control(w, msg)
+
+    if ArrayHelpers[String].contains[String](leaving_workers, _worker_name)
+    then
+      // Since we're one of the leaving workers, we're handing off
+      // responsibility for the shrink to one of the remaining workers.
+      try
+        let shrink_initiator = remaining_workers(0)?
+        let msg = ChannelMsgEncoder.initiate_shrink(remaining_workers,
+          leaving_workers, _auth)?
+        _connections.send_control(shrink_initiator, msg)
+      else
+        Fail()
       end
     else
-      Fail()
+      @printf[I32]("~~~Initiating shrink~~~\n".cstring())
+      @printf[I32]("-- Remaining workers: \n".cstring())
+      for w in remaining_workers.values() do
+        @printf[I32]("-- -- %s\n".cstring(), w.cstring())
+      end
+      @printf[I32]("-- Leaving workers: \n".cstring())
+      for w in leaving_workers.values() do
+        @printf[I32]("-- -- %s\n".cstring(), w.cstring())
+      end
+      _stop_the_world_in_process = true
+      _stop_the_world_for_shrink()
+      let timers = Timers
+      let timer = Timer(PauseBeforeShrinkNotify(_auth, _worker_name,
+        _connections, remaining_workers, leaving_workers),
+        _stop_the_world_pause)
+      timers(consume timer)
+      try
+        let msg = ChannelMsgEncoder.prepare_shrink(remaining_workers,
+          leaving_workers, _auth)?
+        for w in remaining_workers.values() do
+          _connections.send_control(w, msg)
+        end
+      else
+        Fail()
+      end
+      _prepare_shrink(remaining_workers, leaving_workers)
     end
-    _prepare_shrink(remaining_workers, leaving_workers)
 
   be prepare_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val)
@@ -1129,14 +1145,17 @@ class PauseBeforeMigrationNotify is TimerNotify
 
 class PauseBeforeShrinkNotify is TimerNotify
   let _auth: AmbientAuth
+  let _worker_name: String
   let _connections: Connections
   let _remaining_workers: Array[String] val
   let _leaving_workers: Array[String] val
 
-  new iso create(auth: AmbientAuth, connections: Connections,
-    remaining_workers: Array[String] val, leaving_workers: Array[String] val)
+  new iso create(auth: AmbientAuth, worker_name: String,
+    connections: Connections, remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val)
   =>
     _auth = auth
+    _worker_name = worker_name
     _connections = connections
     _remaining_workers = remaining_workers
     _leaving_workers = leaving_workers
@@ -1146,7 +1165,12 @@ class PauseBeforeShrinkNotify is TimerNotify
       let msg = ChannelMsgEncoder.begin_leaving_migration(_remaining_workers,
         _leaving_workers, _auth)?
       for w in _leaving_workers.values() do
-        _connections.send_control(w, msg)?
+        if w == _worker_name then
+          // Leaving workers shouldn't be managing the shrink process.
+          Fail()
+        else
+          _connections.send_control(w, msg)?
+        end
       end
     else
       Fail()

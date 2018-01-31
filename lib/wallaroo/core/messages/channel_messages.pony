@@ -93,6 +93,12 @@ primitive ChannelMsgEncoder
     _encode(BeginLeavingMigrationMsg(remaining_workers, leaving_workers),
       auth)?
 
+  fun initiate_shrink(remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(InitiateShrinkMsg(remaining_workers, leaving_workers), auth)?
+
   fun prepare_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -487,6 +493,16 @@ class val StepMigrationCompleteMsg is ChannelMsg
     step_id = step_id'
 
 class val BeginLeavingMigrationMsg is ChannelMsg
+  let remaining_workers: Array[String] val
+  let leaving_workers: Array[String] val
+
+  new val create(remaining_workers': Array[String] val,
+    leaving_workers': Array[String] val)
+  =>
+    remaining_workers = remaining_workers'
+    leaving_workers = leaving_workers'
+
+class val InitiateShrinkMsg is ChannelMsg
   let remaining_workers: Array[String] val
   let leaving_workers: Array[String] val
 
