@@ -203,7 +203,7 @@ ifeq ($(use_placement_group),true)
     $(error Can't use use_placement_group=true unless using provider=aws.)
   endif
   valid_instances := $(shell curl -s \
-    http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html \
+    https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html \
     | grep -o '<\(code\).*</\1>' | egrep -o '\w{2,3}\.\w{5,}' | grep -v amazon)
   ifeq (,$(findstring -var follower_instance_type=,$(terraform_args)))
     $(error Must override follower_instance_type with terraform_args when using\
