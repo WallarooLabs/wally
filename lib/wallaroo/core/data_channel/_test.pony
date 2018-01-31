@@ -82,7 +82,8 @@ class _TestDataChannel is DataChannelListenNotify
         true, "/tmp/foo_connections.txt", false
         where event_log = event_log)
       let dr = DataReceivers(auth, conns, "worker_name")
-      let rr = RouterRegistry(auth, "worker_name", dr, conns, 1)
+      let rr = RouterRegistry(auth, "worker_name", dr, conns,
+        _DummyRecoveryFileCleaner, 1)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
       h.dispose_when_done(conns)
       h.complete_action("server create")
@@ -519,4 +520,8 @@ actor _NullMetricsSink
     None
 
   be dispose() =>
+    None
+
+actor _DummyRecoveryFileCleaner
+  be clean_recovery_files() =>
     None
