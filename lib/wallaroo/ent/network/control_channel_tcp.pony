@@ -324,12 +324,25 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
         _router_registry.begin_leaving_migration(m.remaining_workers,
           m.leaving_workers)
+      | let m: InitiateShrinkMsg =>
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          lti.take_over_initiate_shrink(m.remaining_workers,
+            m.leaving_workers)
+        else
+          Fail()
+        end
       | let m: PrepareShrinkMsg =>
         ifdef "trace" then
           @printf[I32](("Received PrepareShrinkMsg on Control " +
             "Channel\n").cstring())
         end
-        _router_registry.prepare_shrink(m.remaining_workers, m.leaving_workers)
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          lti.prepare_shrink(m.remaining_workers, m.leaving_workers)
+        else
+          Fail()
+        end
       | let m: MuteRequestMsg =>
         @printf[I32]("Control Ch: Received Mute Request from %s\n".cstring(),
           m.originating_worker.cstring())
