@@ -39,7 +39,7 @@ trait val Router
   fun routes_not_in(router: Router): Array[Consumer] val
 
   fun request_finished_ack(request_id: RequestId, requester_id: StepId,
-    producer: FinishedAckRequester)
+    requester: FinishedAckRequester)
 
 class val EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -101,6 +101,12 @@ class val DirectRouter is Router
     else
       recover [_target] end
     end
+
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack DirectRouter\n".cstring())
+    _target.request_finished_ack(request_id, requester_id, requester)
 
 class val MultiRouter is Router
   let _routers: Array[Router] val
@@ -170,10 +176,12 @@ class val MultiRouter is Router
     consume rs
 
   fun request_finished_ack(request_id: RequestId, requester_id: StepId,
-    producer: FinishedAckRequester)
+    requester: FinishedAckRequester)
   =>
-    @printf[I32]("request_finished_ack DirectRouter\n".cstring())
-    _target.request_finished_ack(request_id, requester_id, producer)
+    // !@ TODO: Handle this correctly for multi sink
+    for router in _routers.values() do
+      router.request_finished_ack(request_id, requester_id, requester)
+    end
 
 class val ProxyRouter is (Router & Equatable[ProxyRouter])
   let _worker_name: String
