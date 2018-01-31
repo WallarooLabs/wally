@@ -1656,7 +1656,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       for w in t.worker_names.values() do
-        if not t.non_shrinkable.contains(w) then
+        if not SetHelpers[String].contains[String](t.non_shrinkable, w) then
           available.push(w)
         end
       end
