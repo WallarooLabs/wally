@@ -21,9 +21,9 @@ class val GoFramedSourceHandler is FramedSourceHandler[GoData]
     //42
 
   fun decode(data: Array[U8] val): GoData =>
-    //GoData(@DecoderDecode(_decoder_id, data.cpointer(), data.size().u64()))
-    @DecoderDecode(_decoder_id, data.cpointer(), data.size().u64())
-    GoData(1)
+    GoData(@DecoderDecode(_decoder_id, data.cpointer(), data.size().u64()))
+    //@DecoderDecode(_decoder_id, data.cpointer(), data.size().u64())
+    //GoData(1)
 
   fun _serialise_space(): USize =>
     ComponentSerializeGetSpace(_decoder_id, ComponentType.decoder())
