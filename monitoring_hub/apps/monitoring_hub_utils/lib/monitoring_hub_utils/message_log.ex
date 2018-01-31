@@ -186,6 +186,10 @@ defmodule MonitoringHubUtils.MessageLog do
     do_log_sec_throughput_message(tid, start_timestamp, end_timestamp, per_sec_throughput, pipeline_key)
   end
 
+  defp do_log_sec_throughput_message(_tid, start_timestamp, current_timestamp, _total_throughput, _pipeline_key)
+    when start_timestamp == current_timestamp do
+  end
+
   defp do_log_sec_throughput_message(tid, start_timestamp, current_timestamp, total_throughput, pipeline_key) do
     throughput_message = create_throughput_msg(current_timestamp, pipeline_key, total_throughput)
     _result = do_log_throughput_message(tid, throughput_message)
