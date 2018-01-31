@@ -1,7 +1,7 @@
 use "wallaroo/core/source"
 
-use @DecoderHeaderLength[U64](did: U64)
-//use @DecoderPayloadLength[U64](did: U64, dp: Pointer[U8] tag, ds: U64)
+//use @DecoderHeaderLength[U64](did: U64)
+use @DecoderPayloadLength[U64](did: U64, dp: Pointer[U8] tag, ds: U64)
 use @DecoderPayloadLength[U64]()
 use @DecoderDecode[U64](did: U64, dp: Pointer[U8] tag, ds: U64)
 
