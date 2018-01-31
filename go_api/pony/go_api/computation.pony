@@ -16,9 +16,11 @@ class Computation is w.Computation[GoData, GoData]
   var _computation_id: U64
 
   new create(computation_id: U64) =>
+    @printf[I32]("eeek, computation create called\n".cstring())
     _computation_id = computation_id
 
   fun name(): String =>
+    @printf[I32]("eeek, computation name called\n".cstring())
     recover val
       let sp = @ComputationName(_computation_id)
       let n = String.copy_cstring(sp)
@@ -27,14 +29,15 @@ class Computation is w.Computation[GoData, GoData]
     end
 
   fun apply(data: GoData): (GoData | None) =>
-    let res = @ComputationCompute(_computation_id, data.id())
+    /*let res = @ComputationCompute(_computation_id, data.id())
 
     match res
     | 0 =>
       None
     else
       GoData(res)
-    end
+    end*/
+    None
 
   fun _serialise_space(): USize =>
     ComponentSerializeGetSpace(_computation_id, ComponentType.computation())

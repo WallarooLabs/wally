@@ -55,6 +55,8 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _omni_router: OmniRouter = EmptyOmniRouter
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
+  var _count: U64 = 0
+  var _total_time: U64 = 0
 
   new iso create(pipeline_name: String, env: Env, auth: AmbientAuth,
     handler: FramedSourceHandler[In] val,
@@ -78,7 +80,15 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
       try
+        let the_start = Time.nanos()
         let payload_size: USize = _handler.payload_length(consume data)?
+        let the_end = Time.nanos()
+
+        _count = _count + 1
+        _total_time = _total_time + (the_end - the_start)
+        if (_count % 100000) == 0 then
+          @printf[I32]("%llu %llu\n".cstring(), _count, _total_time)
+        end
 
         conn.expect(payload_size)
         _header = false

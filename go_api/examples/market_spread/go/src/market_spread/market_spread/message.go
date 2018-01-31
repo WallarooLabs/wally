@@ -71,13 +71,14 @@ func NewMarketData(symbol string, transactTime string, bidPrice float64, offerPr
 }
 
 func MarketDataFromByteSlice(buff []byte) *MarketData {
-	symbol := string(buff[0:4])
+	/*symbol := string(buff[0:4])
 	transactTime := string(buff[4:25])
 	bidPrice := float64FromByteSlice(buff[25:33])
 	offerPrice := float64FromByteSlice(buff[33:41])
 	mid := (bidPrice + offerPrice) / 2.0
 
-	return NewMarketData(symbol, transactTime, bidPrice, offerPrice, mid)
+	return NewMarketData(symbol, transactTime, bidPrice, offerPrice, mid)*/
+	return NewMarketData("INTC", "31231233", 0.14, 0.18, 0.1)
 }
 
 func (md *MarketData) GetSymbol() string {

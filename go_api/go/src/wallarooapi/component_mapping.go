@@ -47,7 +47,9 @@ func NewComponentDict() *ComponentDict {
 
 func (cd *ComponentDict) add(component interface{}) uint64 {
 	var id = atomic.AddUint64(&cd.id, 1)
+	//var id = cd.id + 1
 	cd.components.Store(id, component)
+	//cd.id = id
 	return id
 }
 

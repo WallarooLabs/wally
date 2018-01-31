@@ -1,3 +1,5 @@
+// #cgo CFLAGS: -O3
+
 package main
 
 import (

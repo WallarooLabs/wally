@@ -17,14 +17,19 @@ type Decoder interface {
 
 //export DecoderHeaderLength
 func DecoderHeaderLength(decoderId uint64) uint64 {
-	decoder := GetComponent(decoderId, DecoderTypeId).(FramedDecoder)
-	return decoder.HeaderLength()
+	//decoder := GetComponent(decoderId, DecoderTypeId).(FramedDecoder)
+	//return decoder.HeaderLength()
+
+	return 4;
 }
 
 //export DecoderPayloadLength
-func DecoderPayloadLength(decoderId uint64, b unsafe.Pointer, size uint64) uint64 {
-	decoder := GetComponent(decoderId, DecoderTypeId).(FramedDecoder)
-	return decoder.PayloadLength(C.GoBytes(b, C.int(size)))
+func DecoderPayloadLength() uint64 {
+//func DecoderPayloadLength(decoderId uint64, b unsafe.Pointer, size uint64) uint64 {
+	//decoder := GetComponent(decoderId, DecoderTypeId).(FramedDecoder)
+	//return decoder.PayloadLength(C.GoBytes(b, C.int(size)))
+
+	return 42;
 }
 
 //export DecoderDecode

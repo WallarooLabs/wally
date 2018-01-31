@@ -1,8 +1,8 @@
 package market_spread
 
-import (
-	"encoding/binary"
-)
+//import (
+//	"encoding/binary"
+//)
 
 type MarketDataDecoder struct {}
 
@@ -11,13 +11,15 @@ func (decoder *MarketDataDecoder) HeaderLength() uint64 {
 }
 
 func (decoder *MarketDataDecoder) PayloadLength(b []byte) uint64 {
-	return uint64(binary.BigEndian.Uint32(b[0:4]))
+	//return uint64(binary.BigEndian.Uint32(b[0:4]))
+  return 42
 }
 
 func (decoder *MarketDataDecoder) Decode(b []byte) interface{} {
-	msgType := MessageType(b[0])
+	/*msgType := MessageType(b[0])
 	if msgType != MarketDataType {
 		panic("Wrong Fix message type, expected Market Data message. Did you connect the senders the wrong way around?")
 	}
-	return MarketDataFromByteSlice(b[1:])
+	return MarketDataFromByteSlice(b[1:])*/
+  return NewMarketData("INTC", "31231233", 0.14, 0.18, 0.1)
 }

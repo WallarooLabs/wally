@@ -11,7 +11,8 @@ class val PartitionFunctionU64
     _partition_function_id = partition_function_id
 
   fun apply(data: GoData val): U64 =>
-    @PartitionFunctionU64Partition(_partition_function_id, data.id())
+    //@PartitionFunctionU64Partition(_partition_function_id, data.id())
+    1
 
   fun _serialise_space(): USize =>
     ComponentSerializeGetSpace(_partition_function_id, ComponentType.partition_function())
