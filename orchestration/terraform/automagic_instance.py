@@ -90,7 +90,7 @@ CURRENT_GEN_URL = "https://a0.awsstatic.com/pricing/1/ec2/linux-od.js"
 PREVIOUS_GEN_URL = "https://a0.awsstatic.com/pricing/1/ec2/" + \
                    "previous-generation/linux-od.js"
 SPOT_PRICING_URL = "https://spot-price.s3.amazonaws.com/spot.js"
-PG_URL = "http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/" + \
+PG_URL = "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/" + \
          "placement-groups.html"
 
 TINY_INSTS = { 't1.micro': '0.1', 't2.nano': '0.05', 't2.micro': '0.10'
