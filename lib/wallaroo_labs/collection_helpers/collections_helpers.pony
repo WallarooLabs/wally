@@ -62,3 +62,18 @@ primitive ArrayHelpers[V]
       if a == v then return true end
     end
     false
+
+  fun eq[A: Equatable[A] #read](arr1: Array[A] box, arr2: Array[A] box): Bool
+  =>
+    if arr1.size() == arr2.size() then
+      for i in Range(0, arr1.size()) do
+        try
+          if arr1(i)? != arr2(i)? then return false end
+        else
+          return false
+        end
+      end
+    else
+      return false
+    end
+    true
