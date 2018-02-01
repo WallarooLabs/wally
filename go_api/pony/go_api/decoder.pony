@@ -16,9 +16,9 @@ class val GoFramedSourceHandler is FramedSourceHandler[GoData]
 
   fun payload_length(data: Array[U8] iso): USize =>
     //@DecoderPayloadLength().usize()
-    @DecoderPayloadLength(_decoder_id, data.cpointer(),
-      data.size().u64()).usize()
-    //42
+    //@DecoderPayloadLength(_decoder_id, data.cpointer(),
+     // data.size().u64()).usize()
+    42
 
   fun decode(data: Array[U8] val): GoData =>
     GoData(@DecoderDecode(_decoder_id, data.cpointer(), data.size().u64()))
