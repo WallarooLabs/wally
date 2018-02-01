@@ -119,6 +119,9 @@ actor OutgoingBoundary is Consumer
   var _writeable: Bool = false
   var _throttled: Bool = false
   var _event: AsioEventID = AsioEvent.none()
+  // _pending is used to avoid GC prematurely reaping memory.
+  // See Wallaroo commit 75f1c394e for more.  It looks like a write-only
+  // data structure, but its use is important until the Pony runtime changes.
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
