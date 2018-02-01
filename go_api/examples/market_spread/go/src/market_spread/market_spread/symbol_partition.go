@@ -9,6 +9,7 @@ import (
 
 func symbolToKey(symbol string) uint64 {
 	x := uint64(binary.BigEndian.Uint32([]byte(fmt.Sprintf("%4s", symbol))))
+	fmt.Println("Symbol is ", symbol)
 	fmt.Println("Key is ", x)
 	return x
 }
