@@ -102,6 +102,7 @@ actor TCPSink is Consumer
   var _writeable: Bool = false
   var _throttled: Bool = false
   var _event: AsioEventID = AsioEvent.none()
+  embed _ffi_gc_refs: List[(ByteSeq, USize)] = _ffi_gc_refs.create()
   embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -357,6 +358,7 @@ actor TCPSink is Consumer
             _event = event
 
             _pending_writev.clear()
+            _ffi_gc_refs.clear()
             _pending_writev_total = 0
 
             _connected = true
@@ -432,6 +434,7 @@ actor TCPSink is Consumer
     for bytes in _notify.sentv(this, data).values() do
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
+      _ffi_gc_refs.push((bytes, 0))
       data_size = data_size + bytes.size()
     end
 
@@ -441,7 +444,6 @@ actor TCPSink is Consumer
         _pending_tracking.push((data_size, id))
       end
     end
-
     _pending_writes()
 
     _in_sent = false
@@ -460,6 +462,7 @@ actor TCPSink is Consumer
           _pending_tracking.push((data.size(), id))
         end
     end
+    _ffi_gc_refs.push((data, 0))
     _pending_writes()
 
   fun ref _notify_connecting() =>
@@ -526,6 +529,7 @@ actor TCPSink is Consumer
     @pony_asio_event_unsubscribe(_event)
     _pending_tracking.clear()
     _pending_writev.clear()
+    _ffi_gc_refs.clear()
     _pending_writev_total = 0
     _readable = false
     _writeable = false
@@ -655,6 +659,7 @@ actor TCPSink is Consumer
               len = len - iov_s
               _pending_writev.shift()?
               _pending_writev.shift()?
+              _ffi_gc_refs.shift()?
               _pending_writev_total = _pending_writev_total - iov_s
             else
               _pending_writev.update(0, iov_p+len)?
@@ -669,6 +674,7 @@ actor TCPSink is Consumer
           _pending_writev_total = _pending_writev_total - bytes_to_send
           if _pending_writev_total == 0 then
             _pending_writev.clear()
+            _ffi_gc_refs.clear()
 
             // do tracking finished stuff
             _tracking_finished(bytes_sent)
@@ -677,6 +683,7 @@ actor TCPSink is Consumer
            for d in Range[USize](0, num_to_send, 1) do
              _pending_writev.shift()?
              _pending_writev.shift()?
+             _ffi_gc_refs.shift()?
            end
 
           end
