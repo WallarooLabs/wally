@@ -30,7 +30,7 @@ class val StateComputation is w.StateComputation[GoData, GoData, GoState]
     state: GoState):
     ((GoData | None), (None | DirectStateChange))
   =>
-    var state_changed: U64 = 0
+    /*var state_changed: U64 = 0
     let res = @StateComputationCompute(_computation_id, data.id(), state.id(),
       addressof state_changed)
 
@@ -45,7 +45,8 @@ class val StateComputation is w.StateComputation[GoData, GoData, GoState]
       (None, state_changed_indicator)
     else
       (GoData(res), state_changed_indicator)
-    end
+    end*/
+    (None, None)
 
   fun state_change_builders(): Array[StateChangeBuilder[GoState]] val =>
     recover val Array[StateChangeBuilder[GoState] val] end
