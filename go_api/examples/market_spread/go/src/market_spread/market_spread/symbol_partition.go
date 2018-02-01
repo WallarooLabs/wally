@@ -8,7 +8,9 @@ import (
 )
 
 func symbolToKey(symbol string) uint64 {
-	return uint64(binary.BigEndian.Uint32([]byte(fmt.Sprintf("%4s", symbol))))
+	x := uint64(binary.BigEndian.Uint32([]byte(fmt.Sprintf("%4s", symbol))))
+	fmt.println("Key is ", x)
+	x
 }
 
 func LoadValidSymbols() []uint64 {
