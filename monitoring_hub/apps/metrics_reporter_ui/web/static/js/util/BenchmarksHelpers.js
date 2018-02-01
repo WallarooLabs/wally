@@ -8,6 +8,6 @@ function filterLast5Minutes(benchmarks) {
     })
 }
 
-export default {
-	filterLast5Minutes: filterLast5Minutes
+export {
+	filterLast5Minutes
 }

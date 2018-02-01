@@ -4,8 +4,12 @@
   "description": "Metrics Reporter UI",
   "private": true,
   "main": "main.js",
+  "babel": {
+     "plugins": ["transform-inline-environment-variables", "add-module-exports"],
+     "presets": ["env", "react"]
+    },
   "scripts": {
-    "compile": "mkdir -p priv/static/js && browserify web/static/js/main.js -t [ babelify --presets [ env react ] --plugins [ transform-inline-environment-variables add-module-exports ] ] --outfile priv/static/js/bundle.js",
+    "compile": "mkdir -p priv/static/js && browserify web/static/js/main.js -t [ babelify ] --outfile priv/static/js/bundle.js",
     "build:css": "mkdir -p priv/static/css && node-sass --include-path web/static/css web/static/css/style.scss priv/static/css/style.css && cp web/static/css/bootstrap-flatly.min.css priv/static/css/bootstrap-flatly.min.css  && cp web/static/css/bootstrap-3.3.5.min.css priv/static/css/bootstrap-3.3.5.min.css",
     "build:assets": "mkdir -p priv/static/fonts && mkdir -p priv/static/images && cp web/static/fonts/* priv/static/fonts/ && cp web/static/images/* priv/static/images/",
     "build": "npm run compile && npm run build:css && npm run build:assets",
