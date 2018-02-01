@@ -1,8 +1,8 @@
 package market_spread
 
-//import (
-//	"encoding/binary"
-//)
+import (
+	"encoding/binary"
+)
 
 type MarketDataDecoder struct {}
 
