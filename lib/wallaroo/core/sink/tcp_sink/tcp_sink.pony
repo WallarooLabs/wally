@@ -105,7 +105,7 @@ actor TCPSink is Consumer
   // _pending is used to avoid GC prematurely reaping memory.
   // See Wallaroo commit 75f1c394e for more.  It looks like a write-only
   // data structure, but its use is important until the Pony runtime changes.
-  embed _pending: List[(ByteSeq, USize)] = _pending.create()
+  embed _pending: List[ByteSeq] = _pending.create()
   embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -437,7 +437,7 @@ actor TCPSink is Consumer
     for bytes in _notify.sentv(this, data).values() do
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
-      _pending.push((bytes, 0))
+      _pending.push(bytes)
       data_size = data_size + bytes.size()
     end
 
@@ -465,7 +465,7 @@ actor TCPSink is Consumer
           _pending_tracking.push((data.size(), id))
         end
     end
-    _pending.push((data, 0))
+    _pending.push(data)
     _pending_writes()
 
   fun ref _notify_connecting() =>
