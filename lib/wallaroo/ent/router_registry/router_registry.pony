@@ -1019,7 +1019,7 @@ actor RouterRegistry
         _data_router = _data_router.add_route(id, step)
         _distribute_data_router()
         _register_omni_router_step(step)
-         _distribute_omni_router()
+        _distribute_omni_router()
         let partition_router =
           _partition_routers(state_name)?.update_route[K](key, step)?
         _distribute_partition_router(partition_router)
@@ -1049,7 +1049,7 @@ actor RouterRegistry
     else
       Fail()
     end
-    // _move_proxy_to_step(id, target, source_worker)
+    _move_proxy_to_step(id, target, source_worker)
     _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name,
       recover [source_worker] end)
 
@@ -1059,10 +1059,6 @@ actor RouterRegistry
     """
     Called when a step has been migrated to this worker from another worker
     """
-    let new_data_router = _data_router.add_route(id, target)
-    _data_router = new_data_router
-    _distribute_data_router()
-
     match _omni_router
     | let o: OmniRouter =>
       _omni_router = o.update_route_to_step(id, target)
