@@ -1664,7 +1664,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be shrinkable_query(conn: TCPConnection) =>
-    let available = Array[String]
+    let available = recover iso Array[String] end
     match _topology
     | let t: LocalTopology =>
       for w in t.worker_names.values() do
@@ -1672,8 +1672,9 @@ actor LocalTopologyInitializer is LayoutInitializer
           available.push(w)
         end
       end
-      let query_reply = ExternalMsgEncoder.shrink_query_response(available,
-        available.size().u64())
+      let size = available.size()
+      let query_reply = ExternalMsgEncoder.shrink_query_response(
+        consume available, size.u64())
       conn.writev(query_reply)
     else
       Fail()
