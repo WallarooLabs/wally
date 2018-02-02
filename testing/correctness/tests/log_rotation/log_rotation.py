@@ -61,7 +61,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data'
+    res_dir = '/tmp/res-data.%f' % time.time()
     expect = 2000
     last_value_0 = '[{}]'.format(','.join((str(expect-v)
                                          for v in range(6,-2,-2))))
@@ -217,7 +217,7 @@ def _test_log_rotation_external_trigger_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data'
+    res_dir = '/tmp/res-data.%f' % time.time()
     expect = 2000
     last_value_0 = '[{}]'.format(','.join((str(expect-v)
                                          for v in range(6,-2,-2))))
@@ -401,7 +401,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data'
+    res_dir = '/tmp/res-data.%f' % time.time()
     expect = 2000
     event_log_file_size = 50000
     last_value_0 = '[{}]'.format(','.join((str(expect-v)
@@ -545,7 +545,7 @@ def _test_log_rotation_file_size_trigger_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data'
+    res_dir = '/tmp/res-data.%f' % time.time()
     expect = 2000
     event_log_file_size = 50000
     last_value_0 = '[{}]'.format(','.join((str(expect-v)

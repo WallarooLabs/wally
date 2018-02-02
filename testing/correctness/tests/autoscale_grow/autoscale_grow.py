@@ -26,6 +26,7 @@ from integration import (add_runner,
                          RunnerReadyChecker,
                          Sender,
                          setup_resilience_path,
+                         clean_resilience_path,
                          Sink,
                          SinkAwaitValue,
                          start_runners,
@@ -88,7 +89,7 @@ def _test_autoscale_grow(command, worker_count=1):
     sources = 1
     workers = 1
     joiners = worker_count - workers
-    res_dir = '/tmp/res-data'
+    res_dir = '/tmp/res-data.%f' % time.time()
     expect = 2000
 
     patterns_i = ([re.escape(r'***Worker worker{} attempting to join the '
@@ -271,3 +272,4 @@ def _test_autoscale_grow(command, worker_count=1):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)
