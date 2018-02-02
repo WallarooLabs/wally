@@ -13,6 +13,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Added
 
+- Add support for query requesting information about partition step distribution across workers ([PR #2025](https://github.com/wallaroolabs/wallaroo/pull/2025))
 - Add tool to allow an operator to shrink a Wallaroo cluster ([PR #2005](https://github.com/wallaroolabs/wallaroo/pull/2005))
 
 ### Changed
