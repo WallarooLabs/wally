@@ -63,7 +63,7 @@ class WordCount(object):
 
 @wallaroo.partition
 def partition(data):
-    if data[0] >= 'a' or data[0] <= 'z':
+    if data[0] >= 'a' and data[0] <= 'z':
         return data[0]
     else:
         return "!"
