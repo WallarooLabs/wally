@@ -781,9 +781,9 @@ def empty_resilience_dir(res_dir):
             print 'Warning: remove %s failed: %s' % (path, e)
 
 def clean_resilience_path(res_dir):
-    os.write(os.open('/dev/tty', os.WRONLY|os.APPEND), "clean %s" % res_dir)
-    empty_resilience_dir(res_dir)
-    delete_resilience_dir(res_dir)
+    if os.path.exists(res_dir):
+        empty_resilience_dir(res_dir)
+        delete_resilience_dir(res_dir)
 
 
 def is_address_available(host, port):
