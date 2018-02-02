@@ -756,10 +756,34 @@ def ex_validate(cmd):
 def setup_resilience_path(res_dir):
     # create resilience data directory if it doesn't already exist
     if not os.path.exists(res_dir):
+        create_resilience_dir(res_dir)
+    empty_resilience_dir(res_dir)
+
+def create_resilience_dir(res_dir):
+    try:
         os.mkdir(res_dir)
+    except Exception as e:
+        print 'Warning: mkdir %s failed: %s' % (res_dir, e)
+
+def delete_resilience_dir(res_dir):
+    try:
+        os.rmdir(res_dir)
+    except Exception as e:
+        print 'Warning: rmdir %s failed: %s' % (res_dir, e)
+
+def empty_resilience_dir(res_dir):
     # if any files are in this directory, remove them
     for f in os.listdir(res_dir):
-        os.remove(os.path.join(res_dir, f))
+        path = os.path.join(res_dir, f)
+        try:
+            os.remove(path)
+        except Exception as e:
+            print 'Warning: remove %s failed: %s' % (path, e)
+
+def clean_resilience_path(res_dir):
+    os.write(os.open('/dev/tty', os.WRONLY|os.APPEND), "clean %s" % res_dir)
+    empty_resilience_dir(res_dir)
+    delete_resilience_dir(res_dir)
 
 
 def is_address_available(host, port):

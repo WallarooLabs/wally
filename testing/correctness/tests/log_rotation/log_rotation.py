@@ -24,6 +24,7 @@ from integration import (ex_validate,
                          Sender,
                          sequence_generator,
                          setup_resilience_path,
+                         clean_resilience_path,
                          Sink,
                          SinkAwaitValue,
                          start_runners,
@@ -199,6 +200,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)
 
 
 def test_log_rotation_external_trigger_recovery_pony():
@@ -382,6 +384,7 @@ def _test_log_rotation_external_trigger_recovery(command):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)
 
 
 def test_log_rotation_file_size_trigger_no_recovery_pony():
@@ -525,6 +528,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)
 
 
 def test_log_rotation_file_size_trigger_recovery_pony():
@@ -697,3 +701,4 @@ def _test_log_rotation_file_size_trigger_recovery(command):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)
