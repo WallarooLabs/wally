@@ -543,6 +543,11 @@ actor RouterRegistry
     _joining_worker_count = count
 
   be joining_worker_initialized(worker: String) =>
+    """
+    When a joining worker has initialized its topology, it contacts all
+    current workers. This behavior is called when that control
+    message is received.
+    """
     if _joining_worker_count == 0 then
       ifdef debug then
         @printf[I32](("Joining worker reported as initialized, but we're " +
@@ -571,6 +576,13 @@ actor RouterRegistry
     end
 
   be remote_migration_request(new_workers: Array[String] val) =>
+    """
+    Only one worker is contacted by all joining workers to indicate that a
+    join is requested. That worker, when it's ready to begin step migration,
+    then sends a message to all other current workers, telling them to begin
+    migration to the joining workers as well. This behavior is called when
+    that message is received.
+    """
     if not ArrayHelpers[String].contains[String](new_workers, _worker_name)
     then
       migrate_onto_new_workers(new_workers)
@@ -865,6 +877,12 @@ actor RouterRegistry
   be prepare_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val)
   =>
+    """
+    One worker is contacted via external message to begin autoscale
+    shrink. That worker then informs every other worker to prepare for
+    shrink. This behavior is called in response to receiving that message
+    from the contacted worker.
+    """
     _prepare_shrink(remaining_workers, leaving_workers)
 
   fun ref _prepare_shrink(remaining_workers: Array[String] val,
