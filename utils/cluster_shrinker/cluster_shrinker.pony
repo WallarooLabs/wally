@@ -30,7 +30,7 @@ actor Main
       var x_service: String = "0"
       var query = false
       var count = U64(0)
-      var workers = Array[String]
+      var workers = recover iso Array[String] end
 
       options
         .add("external", "e", StringArgument)
@@ -68,7 +68,8 @@ actor Main
       end
 
       let auth = env.root as AmbientAuth
-      let msg = ExternalMsgEncoder.shrink_request(query, workers, count)
+      let msg = ExternalMsgEncoder.shrink_request(query, consume workers,
+        count)
       let tcp_auth = TCPConnectAuth(auth)
       _conn = TCPConnection(tcp_auth, ClusterShrinkerConnectNotifier(env, auth,
         msg, query, x_host, x_service), x_host, x_service)

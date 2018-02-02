@@ -22,131 +22,24 @@ use "net"
 use "../query"
 use "../../wallaroo/core/topology"
 
-primitive _Data                                 fun apply(): U16 => 1
-primitive _Ready                                fun apply(): U16 => 2
-primitive _TopologyReady                        fun apply(): U16 => 3
-primitive _Start                                fun apply(): U16 => 4
-primitive _Shutdown                             fun apply(): U16 => 5
-primitive _DoneShutdown                         fun apply(): U16 => 6
-primitive _Done                                 fun apply(): U16 => 7
-primitive _Unknown                              fun apply(): U16 => 8
-primitive _StartGilesSenders                    fun apply(): U16 => 9
-primitive _GilesSendersStarted                  fun apply(): U16 => 10
-primitive _Print                                fun apply(): U16 => 11
-primitive _RotateLog                            fun apply(): U16 => 12
-primitive _CleanShutdown                        fun apply(): U16 => 13
-primitive _ShrinkRequest                        fun apply(): U16 => 14
-primitive _ShrinkQueryResponse                  fun apply(): U16 => 15
-primitive _ShrinkErrorResponse                  fun apply(): U16 => 16
-primitive _PartitionQuery                       fun apply(): U16 => 17
-primitive _PartitionQueryResponse               fun apply(): U16 => 18
-
-primitive _StringMessageDecodeTag               fun apply(): U8 => 1
-primitive _ShrinkRequestMessageDecodeTag        fun apply(): U8 => 2
-primitive _ShrinkQueryResponseMessageDecodeTag  fun apply(): U8 => 3
+primitive _Print                                fun apply(): U16 => 1
+primitive _RotateLog                            fun apply(): U16 => 2
+primitive _CleanShutdown                        fun apply(): U16 => 3
+primitive _ShrinkRequest                        fun apply(): U16 => 4
+primitive _ShrinkQueryResponse                  fun apply(): U16 => 5
+primitive _ShrinkErrorResponse                  fun apply(): U16 => 6
+primitive _PartitionQuery                       fun apply(): U16 => 7
+primitive _PartitionQueryResponse               fun apply(): U16 => 8
 
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
     let s_array = s.array()
     let size = s_array.size()
-    wb.u32_be(1 + 2 + 4 + size.u32())
-    wb.u8(_StringMessageDecodeTag())
+    wb.u32_be(2 + size.u32())
     wb.u16_be(id)
-    wb.u32_be(size.u32())
     wb.write(s_array)
     wb.done()
-
-  fun _encode_shrink_request(id: U16, query: Bool, node_names: Array[String],
-    num_nodes: U64, wb: Writer): Array[ByteSeq] val
-  =>
-    var num_bytes: U32 = 0
-
-    for n in node_names.values() do
-      num_bytes = num_bytes + 4 + U32.from[USize](n.size())
-    end
-
-    wb.u32_be(1 + 2 + 1 + 4 + num_bytes + 4)
-    wb.u8(_ShrinkRequestMessageDecodeTag())
-    wb.u16_be(id)
-    wb.u8(if query is true then 1 else 0 end)
-    wb.u32_be(node_names.size().u32())
-    for n in node_names.values() do
-      let n_array = n.array()
-      let size = n_array.size()
-      wb.u32_be(size.u32())
-      wb.write(n_array)
-    end
-    wb.u32_be(num_nodes.u32())
-    wb.done()
-
-
-  fun _encode_shrink_query_response(id: U16, node_names: Array[String],
-    num_nodes: U64, wb: Writer): Array[ByteSeq] val
-  =>
-    var num_bytes: U32 = 0
-
-    for n in node_names.values() do
-      num_bytes = num_bytes + 4 + U32.from[USize](n.size())
-    end
-
-    wb.u32_be(1 + 2 + 4 + num_bytes + 4)
-    wb.u8(_ShrinkQueryResponseMessageDecodeTag())
-    wb.u16_be(id)
-    wb.u32_be(node_names.size().u32())
-    for n in node_names.values() do
-      let n_array = n.array()
-      let size = n_array.size()
-      wb.u32_be(size.u32())
-      wb.write(n_array)
-    end
-    wb.u32_be(num_nodes.u32())
-    wb.done()
-
-  fun data(d: Stringable val, wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-    _encode(_Data(), d.string(), wb)
-
-  fun ready(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-    _encode(_Ready(), node_name, wb)
-
-  fun topology_ready(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-    _encode(_TopologyReady(), node_name, wb)
-
-  fun start(wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-    _encode(_Start(), "", wb)
-
-  fun shutdown(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-    _encode(_Shutdown(), node_name, wb)
-
-  fun done_shutdown(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-    _encode(_DoneShutdown(), node_name, wb)
-
-  fun done(node_name: String, wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-    _encode(_Done(), node_name, wb)
-
-  fun start_giles_senders(wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-      _encode(_StartGilesSenders(), "", wb)
-
-  fun senders_started(wb: Writer = Writer):
-    Array[ByteSeq] val
-  =>
-    _encode(_GilesSendersStarted(), "", wb)
 
   fun print_message(message: String, wb: Writer = Writer):
     Array[ByteSeq] val
@@ -163,21 +56,19 @@ primitive ExternalMsgEncoder
   =>
     _encode(_CleanShutdown(), msg, wb)
 
-  fun shrink_request(query: Bool, node_names: Array[String] = Array[String],
-    num_nodes: U64 = 0, wb: Writer = Writer): Array[ByteSeq] val
+  fun shrink_request(query: Bool, node_names: Array[String] val =
+    recover Array[String] end, num_nodes: U64 = 0, wb: Writer = Writer):
+    Array[ByteSeq] val
   =>
-    if (query is true) then
-      _encode_shrink_request(_ShrinkRequest(), true, Array[String], 0, wb)
-    else
-      _encode_shrink_request(_ShrinkRequest(), false, node_names, num_nodes,
-        wb)
-    end
+    _encode(_ShrinkRequest(), ShrinkQueryJsonEncoder.request(query, node_names,
+      num_nodes), wb)
 
-  fun shrink_query_response(node_names: Array[String] = Array[String],
-    num_nodes: U64 = 0, wb: Writer = Writer): Array[ByteSeq] val
+  fun shrink_query_response(node_names: Array[String] val =
+    recover Array[String] end, num_nodes: U64 = 0, wb: Writer = Writer):
+    Array[ByteSeq] val
   =>
-    _encode_shrink_query_response(_ShrinkQueryResponse(), node_names,
-      num_nodes, wb)
+    _encode(_ShrinkQueryResponse(), ShrinkQueryJsonEncoder.response(node_names,
+      num_nodes), wb)
 
   fun shrink_error_response(message: String, wb: Writer = Writer):
     Array[ByteSeq] val
@@ -210,48 +101,6 @@ primitive ExternalMsgEncoder
     let pqr = PartitionQueryEncoder.state_and_stateless(digest_map)
     _encode(_PartitionQueryResponse(), pqr, wb)
 
-class BufferedExternalMsgEncoder
-  let _buffer: Writer
-
-  new create(wb: Writer = Writer, chunks: USize = 0) =>
-    _buffer = wb
-    _buffer.reserve_chunks(chunks)
-
-  fun ref _encode_and_add(id: U16, s: String): BufferedExternalMsgEncoder =>
-    let s_array = s.array()
-    let size = s_array.size() + 2
-    _buffer.u32_be(size.u32())
-    _buffer.u16_be(id)
-    _buffer.write(s_array)
-    this
-
-  fun ref add_data(d: Stringable val): BufferedExternalMsgEncoder =>
-    _encode_and_add(_Data(), d.string())
-
-  fun ref add_ready(node_name: String): BufferedExternalMsgEncoder =>
-    _encode_and_add(_Ready(), node_name)
-
-  fun ref add_topology_ready(node_name: String): BufferedExternalMsgEncoder =>
-    _encode_and_add(_TopologyReady(), node_name)
-
-  fun ref add_start(): BufferedExternalMsgEncoder =>
-    _encode_and_add(_Start(), "")
-
-  fun ref add_shutdown(node_name: String): BufferedExternalMsgEncoder =>
-    _encode_and_add(_Shutdown(), node_name)
-
-  fun ref add_done_shutdown(node_name: String): BufferedExternalMsgEncoder =>
-    _encode_and_add(_DoneShutdown(), node_name)
-
-  fun ref add_done(node_name: String): BufferedExternalMsgEncoder =>
-    _encode_and_add(_Done(), node_name)
-
-  fun ref reserve_chunks(chunks: USize = 0) =>
-    _buffer.reserve_chunks(chunks)
-
-  fun ref done(): Array[ByteSeq] val =>
-    _buffer.done()
-
 primitive ExternalMsgDecoder
   fun apply(data: Array[U8] val): ExternalMsg val ? =>
     """
@@ -265,36 +114,16 @@ primitive ExternalMsgDecoder
           ExternalChannelConnectNotifier's operation.
     """
     match _decode(data)?
-    | (_Data(), let s: String) =>
-      ExternalDataMsg(s)
-    | (_Ready(), let s: String) =>
-      ExternalReadyMsg(s)
-    | (_TopologyReady(), let s: String) =>
-      ExternalTopologyReadyMsg(s)
-    | (_Start(), let s: String) =>
-      ExternalStartMsg
-    | (_Shutdown(), let s: String) =>
-      ExternalShutdownMsg(s)
-    | (_DoneShutdown(), let s: String) =>
-      ExternalDoneShutdownMsg(s)
-    | (_Done(), let s: String) =>
-      ExternalDoneMsg(s)
-    | (_StartGilesSenders(), let s: String) =>
-      ExternalStartGilesSendersMsg
-    | (_GilesSendersStarted(), let s: String) =>
-      ExternalGilesSendersStartedMsg
     | (_Print(), let s: String) =>
       ExternalPrintMsg(s)
     | (_RotateLog(), let s: String) =>
       ExternalRotateLogFilesMsg(s)
     | (_CleanShutdown(), let s: String) =>
       ExternalCleanShutdownMsg(s)
-    | (_ShrinkRequest(), let query: Bool,
-      let node_names: Array[String] val, let num_nodes: U64) =>
-      ExternalShrinkRequestMsg(query, node_names, num_nodes)
-    | (_ShrinkQueryResponse(), let node_names: Array[String] val,
-      let num_nodes: U64) =>
-      ExternalShrinkQueryResponseMsg(node_names, num_nodes)
+    | (_ShrinkRequest(), let json: String) =>
+      ShrinkQueryJsonDecoder.request(json)?
+    | (_ShrinkQueryResponse(), let json: String) =>
+      ShrinkQueryJsonDecoder.response(json)?
     | (_ShrinkErrorResponse(), let s: String) =>
       ExternalShrinkErrorResponseMsg(s)
     | (_PartitionQuery(), let s: String) =>
@@ -305,50 +134,13 @@ primitive ExternalMsgDecoder
       error
     end
 
-  fun _decode(data: Array[U8] val):
-    ((U16, String) | (U16, Bool, Array[String] val, U64) |
-      (U16, Array[String] val, U64)) ?
-  =>
+  fun _decode(data: Array[U8] val): (U16, String) ? =>
+    let s_len = data.size() - 2
     let rb = Reader
     rb.append(data)
-    let type_tag = rb.u8()? // serialization type tag
-
-    match type_tag
-    | _StringMessageDecodeTag() =>
-      let id = rb.u16_be()?
-      let s_len: USize = USize.from[U32](rb.u32_be()?)
-      let s = String.from_array(rb.block(s_len)?)
-      (id, s)
-    | _ShrinkRequestMessageDecodeTag() =>
-      let id = rb.u16_be()?
-      let query: Bool = if (rb.u8()? == 1) then true else false end
-      let node_names = recover trn Array[String] end
-      let node_names_size = USize.from[U32](rb.u32_be()?)
-
-      for i in Range[USize](0, node_names_size) do
-        let size = USize.from[U32](rb.u32_be()?)
-        let n = String.from_array(rb.block(size)?)
-        node_names.push(n)
-      end
-      let num_nodes = U64.from[U32](rb.u32_be()?)
-
-      (id, query, consume node_names, num_nodes)
-    | _ShrinkQueryResponseMessageDecodeTag() =>
-      let id = rb.u16_be()?
-      let node_names = recover trn Array[String] end
-      let node_names_size = USize.from[U32](rb.u32_be()?)
-
-      for i in Range[USize](0, node_names_size) do
-        let size = USize.from[U32](rb.u32_be()?)
-        let n = String.from_array(rb.block(size)?)
-        node_names.push(n)
-      end
-      let num_nodes = U64.from[U32](rb.u32_be()?)
-
-      (id, consume node_names, num_nodes)
-    else
-      error
-    end
+    let id = rb.u16_be()?
+    let s = String.from_array(rb.block(s_len)?)
+    (id, s)
 
 trait val ExternalMsg
   fun the_string() => String

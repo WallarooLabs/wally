@@ -136,46 +136,6 @@ class iso _TestGeneralExtEncDecSimple is UnitTest
   fun name(): String => "General Encode/decode for simple external messages"
 
   fun apply(h: TestHelper) ? =>
-    Help.general(h, ExternalMsgEncoder~data(),
-      {(em: ExternalMsg) =>
-        match em | let x: ExternalDataMsg => x.data
-        else "bad data" end
-      })?
-    Help.general(h, ExternalMsgEncoder~ready(),
-      {(em: ExternalMsg) =>
-        match em | let x: ExternalReadyMsg => x.node_name
-        else "bad read" end
-      })?
-    Help.general(h, ExternalMsgEncoder~topology_ready(),
-      {(em: ExternalMsg) =>
-        match em | let x: ExternalTopologyReadyMsg => x.node_name
-        else "bad topology_ready" end
-      })?
-    Help.general(h, ExternalMsgEncoder~start(),
-      {(em: ExternalMsg) =>
-        match em | let x: ExternalStartMsg => None
-        else "bad start" end
-      })?
-    Help.general(h, ExternalMsgEncoder~shutdown(),
-      {(em: ExternalMsg) =>
-        match em | let x: ExternalShutdownMsg => x.node_name
-        else "bad shutdown" end
-      })?
-    Help.general(h, ExternalMsgEncoder~done(),
-      {(em: ExternalMsg) =>
-        match em | let x: ExternalDoneMsg => x.node_name
-        else "bad done" end
-      })?
-    Help.general(h, ExternalMsgEncoder~start_giles_senders(),
-      {(em: ExternalMsg) =>
-        match em | let x: ExternalStartGilesSendersMsg => None
-        else "bad start_giles_senders" end
-      })?
-    Help.general(h, ExternalMsgEncoder~senders_started(),
-      {(em: ExternalMsg) =>
-        match em | let x: ExternalGilesSendersStartedMsg => None
-        else "bad senders_started" end
-      })?
     Help.general(h, ExternalMsgEncoder~print_message(),
       {(em: ExternalMsg) =>
         match em | let x: ExternalPrintMsg => x.message
@@ -199,13 +159,17 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
     """
     Test round-trip serialization of ExternalShrinkMsg.
     """
-    let node_names: Array[String] = [""; "a"; "lovely b"; ""; "node c"]
+    let node_names =
+      recover val ["5"; "a"; "lovely b"; "cool"; "node c"] end
 
     // Use Range so that num_nodes array size 0 is tested.
     for i in Range[U64](0, node_names.size().u64()) do
+      let next_names = recover iso Array[String] end
+      for n in Range(0, i.usize()) do
+        next_names.push(node_names(n)?)
+      end
       let e1: Array[ByteSeq] val =
-        ExternalMsgEncoder.shrink_request(false, node_names.slice(0,
-          i.usize()), 0)
+        ExternalMsgEncoder.shrink_request(false, consume next_names, 0)
       // encode & decode are not symmetric -- we need to chop off
       // the first 4 bytes before we can decode.
       let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
@@ -225,8 +189,8 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
 
     // Use Range so that num_nodes = 0 is included
     for i in Range[U64](0, 4) do
-      let e1: Array[ByteSeq] val = ExternalMsgEncoder.shrink_request(false, [],
-        i)
+      let e1: Array[ByteSeq] val = ExternalMsgEncoder.shrink_request(false,
+        recover [] end, i)
       let e1': Array[U8] val = recover Help.flatten(e1).slice(4) end
 
       match ExternalMsgDecoder(e1')?
@@ -240,7 +204,8 @@ class iso _TestGeneralExtEncDecShrink is UnitTest
     end
 
     // Let's now try a round trip for a query
-    let e2: Array[ByteSeq] val = ExternalMsgEncoder.shrink_request(true, [], 0)
+    let e2: Array[ByteSeq] val = ExternalMsgEncoder.shrink_request(true,
+      recover [] end, 0)
     let e2': Array[U8] val = recover Help.flatten(e2).slice(4) end
 
     match ExternalMsgDecoder(e2')?

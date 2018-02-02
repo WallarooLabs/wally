@@ -95,7 +95,8 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?)
+          .usize()
         conn.expect(expect)
         _header = false
       else
@@ -136,6 +137,10 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         | let m: ExternalShrinkRequestMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalShrinkRequestMsg on External " +
+              "Channel\n").cstring())
+          end
           if m.query is true then
             _local_topology_initializer.shrinkable_query(conn)
           else
