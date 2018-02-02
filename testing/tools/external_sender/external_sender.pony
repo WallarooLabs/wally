@@ -30,6 +30,7 @@ actor Main
       var message: String = ""
       var message_type: String = "Print"
       let options = Options(env.args)
+      var await_response = false
 
       options
         .add("external", "e", StringArgument)
@@ -52,7 +53,7 @@ actor Main
               -----------------------------------------------------------------------------------
               --external/-e [Specifies address to send message to]
               --type/-t [Specifies message type]
-                  clean-shutdown | rotate-log | print
+                  clean-shutdown | rotate-log | partition-query | print
               --message/-m [Specifies message contents to send]
                   rotate-log
                       Node name to rotate log files
@@ -71,36 +72,78 @@ actor Main
           ExternalMsgEncoder.clean_shutdown(message)
         | "rotate-log" =>
           ExternalMsgEncoder.rotate_log(message)
+        | "partition-query" =>
+          await_response = true
+          ExternalMsgEncoder.partition_query()
         else // default to print
           ExternalMsgEncoder.print_message(message)
         end
       let tcp_auth = TCPConnectAuth(auth)
-      _conn = TCPConnection(tcp_auth, ExternalSenderConnectNotifier(auth,
-        msg), x_host, x_service)
+      _conn = TCPConnection(tcp_auth, ExternalSenderConnectNotifier(env, auth,
+        msg, await_response), x_host, x_service)
     else
-      @printf[I32]("Error sending.\n".cstring())
+      env.err.print("Error sending.")
     end
 
 class ExternalSenderConnectNotifier is TCPConnectionNotify
+  let _env: Env
   let _auth: AmbientAuth
   let _msg: Array[ByteSeq] val
+  let _await_response: Bool
   var _header: Bool = true
 
-  new iso create(auth: AmbientAuth, msg: Array[ByteSeq] val)
+  new iso create(env: Env, auth: AmbientAuth, msg: Array[ByteSeq] val,
+    await_response: Bool)
   =>
+    _env = env
     _auth = auth
     _msg = msg
+    _await_response = await_response
 
   fun ref connected(conn: TCPConnection ref) =>
-    @printf[I32]("Connected...\n".cstring())
+    _env.out.print("Connected...")
     conn.writev(_msg)
-    @printf[I32]("Sent message!\n".cstring())
-    conn.dispose()
+    if not _await_response then
+      conn.dispose()
+    end
+    conn.expect(4)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
   =>
+    if _header then
+      try
+        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?)
+          .usize()
+        conn.expect(expect)
+        _header = false
+      else
+        _env.err.print("Error reading header")
+        _env.exitcode(1)
+        conn.dispose()
+      end
+    else
+      try
+        match ExternalMsgDecoder(consume data)?
+        | let m: ExternalPartitionQueryResponseMsg =>
+          _env.out.print("Partition Distribution:")
+          _env.out.print(m.msg)
+          conn.dispose()
+        else
+          _env.err.print("Received unhandled external message type")
+          _env.exitcode(1)
+          conn.dispose()
+        end
+      else
+        _env.err.print("Received invalid message")
+        _env.exitcode(1)
+        conn.dispose()
+      end
+      conn.expect(4)
+      _header = true
+    end
     true
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    None
+    _env.err.print("Failed to connect")
+    conn.dispose()

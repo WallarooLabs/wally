@@ -27,7 +27,9 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/collection_helpers"
+use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/query"
 
 
 actor RouterRegistry
@@ -481,6 +483,11 @@ actor RouterRegistry
     for source in _sources.values() do
       source.reconnect_boundary(target_worker)
     end
+
+  be partition_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.partition_query_response(
+      _partition_routers, _stateless_partition_routers)
+    conn.writev(msg)
 
   //////////////
   // LOG ROTATION

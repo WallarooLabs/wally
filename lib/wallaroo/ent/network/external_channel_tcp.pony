@@ -142,6 +142,12 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
             _local_topology_initializer.initiate_shrink(m.node_names,
               m.num_nodes, conn)
           end
+        | let m: ExternalPartitionQueryMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalPartitionQueryMsg on External " +
+              "Channel\n").cstring())
+          end
+          _local_topology_initializer.partition_query(conn)
         else
           @printf[I32](("Incoming External Message type not handled by " +
             "external channel.\n").cstring())
