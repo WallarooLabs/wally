@@ -309,6 +309,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
+      | let m: InitiateJoinMigrationMsg =>
+        _router_registry.remote_migration_request(m.new_workers)
       | let m: LeavingWorkerDoneMigratingMsg =>
         _router_registry.disconnect_from_leaving_worker(m.worker_name)
       | let m: AckMigrationBatchCompleteMsg =>

@@ -553,13 +553,27 @@ actor RouterRegistry
     end
     _initialized_joining_workers.set(worker)
     if _initialized_joining_workers.size() == _joining_worker_count then
-      let new_workers = recover trn Array[String] end
+      let nws = recover trn Array[String] end
       for w in _initialized_joining_workers.values() do
-        new_workers.push(w)
+        nws.push(w)
       end
-      migrate_onto_new_workers(consume new_workers)
+      let new_workers = consume val nws
+      try
+        let msg =
+          ChannelMsgEncoder.initiate_join_migration(new_workers, _auth)?
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
+      migrate_onto_new_workers(new_workers)
       _initialized_joining_workers.clear()
       _joining_worker_count = 0
+    end
+
+  be remote_migration_request(new_workers: Array[String] val) =>
+    if not ArrayHelpers[String].contains[String](new_workers, _worker_name)
+    then
+      migrate_onto_new_workers(new_workers)
     end
 
   fun ref migrate_onto_new_workers(new_workers: Array[String] val) =>

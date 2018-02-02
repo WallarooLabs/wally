@@ -223,6 +223,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)?
 
+  fun initiate_join_migration(new_workers: Array[String] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(InitiateJoinMigrationMsg(new_workers), auth)?
+
   fun leaving_worker_done_migrating(worker_name: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -657,6 +662,12 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
     worker_name = name
     control_addr = c_addr
     data_addr = d_addr
+
+class val InitiateJoinMigrationMsg is ChannelMsg
+  let new_workers: Array[String] val
+
+  new val create(ws: Array[String] val) =>
+    new_workers = ws
 
 class val LeavingWorkerDoneMigratingMsg is ChannelMsg
   let worker_name: String
