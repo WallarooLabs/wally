@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Ensure that all running workers migrate to joiners ([PR #2027](https://github.com/wallaroolabs/wallaroo/pull/2027))
 - Clean up recovery files during shrink ([PR #2012](https://github.com/wallaroolabs/wallaroo/pull/2012))
 - Ensure that new sources don't try to connect to old workers ([PR #2004](https://github.com/wallaroolabs/wallaroo/pull/2004))
 - Fail when control channel can't listen ([PR #1982](https://github.com/wallaroolabs/wallaroo/pull/1982))
