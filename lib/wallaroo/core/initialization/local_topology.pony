@@ -1667,6 +1667,9 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
+  be partition_query(conn: TCPConnection) =>
+    _router_registry.partition_query(conn)
+
   be initialize_join_initializables() =>
     _initialize_join_initializables()
 

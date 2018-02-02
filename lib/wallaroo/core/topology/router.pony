@@ -741,6 +741,7 @@ trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     PartitionRouter
   fun blueprint(): PartitionRouterBlueprint
+  fun distribution_digest(): Map[String, Array[String] val] val
   fun route_builder(): RouteBuilder
 
 trait val AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)]
@@ -1095,6 +1096,43 @@ class val LocalPartitionRouter[In: Any val,
     LocalPartitionRouterBlueprint[In, Key, S](_state_name, _step_ids,
       consume partition_addresses, _partition_function)
 
+  fun distribution_digest(): Map[String, Array[String] val] val =>
+    // Return a map of form {worker_name: step_ids_as_strings}
+    let digest = recover iso Map[String, Array[String] val] end
+    // First for this worker
+    let a = recover iso Array[String] end
+    for id in _local_map.keys() do
+      a.push(id.string())
+    end
+    digest(_worker_name) = consume a
+    // Now the other workers
+    let others = Map[String, Array[String]]
+    try
+      for target in _partition_routes.values() do
+        match target
+        | let pr: ProxyRouter =>
+          let pa = pr.proxy_address()
+          if others.contains(pa.worker) then
+            others(pa.worker)?.push(pa.step_id.string())
+          else
+            let next = Array[String]
+            next.push(pa.step_id.string())
+            others(pa.worker) = next
+          end
+        end
+      end
+    else
+      Fail()
+    end
+    for (k, v) in others.pairs() do
+      let next = recover iso Array[String] end
+      for id in v.values() do
+        next.push(id)
+      end
+      digest(k) = consume next
+    end
+    consume digest
+
   fun eq(that: box->PartitionRouter): Bool =>
     match that
     | let o: box->LocalPartitionRouter[In, Key, S] =>
@@ -1188,6 +1226,7 @@ trait val StatelessPartitionRouter is (Router &
   fun calculate_shrink(remaining_workers: Array[String] val):
     StatelessPartitionRouter
   fun blueprint(): StatelessPartitionRouterBlueprint
+  fun distribution_digest(): Map[String, Array[String] val] val
 
 class val LocalStatelessPartitionRouter is StatelessPartitionRouter
   let _partition_id: U128
@@ -1410,6 +1449,43 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
 
     LocalStatelessPartitionRouterBlueprint(_partition_id, _step_ids,
       consume partition_addresses, _steps_per_worker)
+
+  fun distribution_digest(): Map[String, Array[String] val] val =>
+    // Return a map of form {worker_name: step_ids_as_strings}
+    let digest = recover iso Map[String, Array[String] val] end
+    // First for this worker
+    let a = recover iso Array[String] end
+    for id in _step_ids.values() do
+      a.push(id.string())
+    end
+    digest(_worker_name) = consume a
+    // Now the other workers
+    let others = Map[String, Array[String]]
+    try
+      for target in _partition_routes.values() do
+        match target
+        | let pr: ProxyRouter =>
+          let pa = pr.proxy_address()
+          if others.contains(pa.worker) then
+            others(pa.worker)?.push(pa.step_id.string())
+          else
+            let next = Array[String]
+            next.push(pa.step_id.string())
+            others(pa.worker) = next
+          end
+        end
+      end
+    else
+      Fail()
+    end
+    for (k, v) in others.pairs() do
+      let next = recover iso Array[String] end
+      for id in v.values() do
+        next.push(id)
+      end
+      digest(k) = consume next
+    end
+    consume digest
 
   fun eq(that: box->StatelessPartitionRouter): Bool =>
     match that

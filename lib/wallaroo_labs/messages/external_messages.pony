@@ -19,6 +19,8 @@ Copyright 2017 The Wallaroo Authors.
 use "buffered"
 use "collections"
 use "net"
+use "../query"
+use "../../wallaroo/core/topology"
 
 primitive _Data                                 fun apply(): U16 => 1
 primitive _Ready                                fun apply(): U16 => 2
@@ -36,10 +38,13 @@ primitive _CleanShutdown                        fun apply(): U16 => 13
 primitive _ShrinkRequest                        fun apply(): U16 => 14
 primitive _ShrinkQueryResponse                  fun apply(): U16 => 15
 primitive _ShrinkErrorResponse                  fun apply(): U16 => 16
+primitive _PartitionQuery                       fun apply(): U16 => 17
+primitive _PartitionQueryResponse               fun apply(): U16 => 18
 
 primitive _StringMessageDecodeTag               fun apply(): U8 => 1
 primitive _ShrinkRequestMessageDecodeTag        fun apply(): U8 => 2
 primitive _ShrinkQueryResponseMessageDecodeTag  fun apply(): U8 => 3
+
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -179,6 +184,32 @@ primitive ExternalMsgEncoder
   =>
     _encode(_ShrinkErrorResponse(), message, wb)
 
+  fun partition_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    _encode(_PartitionQuery(), "", wb)
+
+  fun partition_query_response(state_routers: Map[String, PartitionRouter],
+    stateless_routers: Map[U128, StatelessPartitionRouter],
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let state_ps =
+      recover iso Map[String, Map[String, Array[String] val] val] end
+    let stateless_ps =
+      recover iso Map[String, Map[String, Array[String] val] val] end
+
+    for (k, v) in state_routers.pairs() do
+      state_ps(k) = v.distribution_digest()
+    end
+
+    for (k, v) in stateless_routers.pairs() do
+      stateless_ps(k.string()) = v.distribution_digest()
+    end
+    let digest_map =
+      Map[String, Map[String, Map[String, Array[String] val] val] val]
+    digest_map("state_partitions") = consume state_ps
+    digest_map("stateless_partitions") = consume stateless_ps
+    let pqr = PartitionQueryEncoder.state_and_stateless(digest_map)
+    _encode(_PartitionQueryResponse(), pqr, wb)
+
 class BufferedExternalMsgEncoder
   let _buffer: Writer
 
@@ -266,6 +297,10 @@ primitive ExternalMsgDecoder
       ExternalShrinkQueryResponseMsg(node_names, num_nodes)
     | (_ShrinkErrorResponse(), let s: String) =>
       ExternalShrinkErrorResponseMsg(s)
+    | (_PartitionQuery(), let s: String) =>
+      ExternalPartitionQueryMsg
+    | (_PartitionQueryResponse(), let s: String) =>
+      ExternalPartitionQueryResponseMsg(s)
     else
       error
     end
@@ -424,6 +459,14 @@ class val ExternalShrinkQueryResponseMsg is ExternalMsg
     "Node count: " + num_nodes.string() + ", Nodes: " + nodes_string
 
 class val ExternalShrinkErrorResponseMsg is ExternalMsg
+  let msg: String
+
+  new val create(m: String) =>
+    msg = m
+
+primitive ExternalPartitionQueryMsg is ExternalMsg
+
+class val ExternalPartitionQueryResponseMsg is ExternalMsg
   let msg: String
 
   new val create(m: String) =>
