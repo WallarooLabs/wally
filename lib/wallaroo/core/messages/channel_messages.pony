@@ -84,6 +84,12 @@ primitive ChannelMsgEncoder
     leaving_workers: Array[String] val, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
+    """
+    This message is sent by the current worker coordinating autoscale shrink to
+    all leaving workers once all in-flight messages have finished processing
+    after stopping the world. At that point, it's safe for leaving workers to
+    migrate steps to the remaining workers.
+    """
     _encode(BeginLeavingMigrationMsg(remaining_workers, leaving_workers),
       auth)?
 
@@ -91,12 +97,20 @@ primitive ChannelMsgEncoder
     leaving_workers: Array[String] val, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
+    """
+    The worker initially contacted for autoscale shrink sends this message to
+    all other remaining workers so they can prepare for the shrink event.
+    """
     _encode(PrepareShrinkMsg(remaining_workers, leaving_workers), auth)?
 
-  fun mute_request(originating_worker: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+  fun mute_request(originating_worker: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
     _encode(MuteRequestMsg(originating_worker), auth)?
 
-  fun unmute_request(originating_worker: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+  fun unmute_request(originating_worker: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
     _encode(UnmuteRequestMsg(originating_worker), auth)?
 
   fun delivery[D: Any val](target_id: U128,
@@ -221,11 +235,31 @@ primitive ChannelMsgEncoder
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
     d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
   =>
+    """
+    This message is sent after a joining worker uses partition blueprints and
+    other topology information to initialize its topology. It indicates that
+    it is ready to receive migrated steps.
+    """
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)?
+
+  fun initiate_join_migration(new_workers: Array[String] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    One worker is contacted by all joining workers and initially coordinates
+    state migration to those workers. When it is ready to migrate steps, it
+    sends this message to every other current worker informing them to begin
+    migration as well.
+    """
+    _encode(InitiateJoinMigrationMsg(new_workers), auth)?
 
   fun leaving_worker_done_migrating(worker_name: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
+    """
+    A leaving worker sends this to indicate it has migrated all steps back to
+    remaining workers.
+    """
     _encode(LeavingWorkerDoneMigratingMsg(worker_name), auth)?
 
   fun request_boundary_count(sender: String, auth: AmbientAuth):
@@ -657,6 +691,12 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
     worker_name = name
     control_addr = c_addr
     data_addr = d_addr
+
+class val InitiateJoinMigrationMsg is ChannelMsg
+  let new_workers: Array[String] val
+
+  new val create(ws: Array[String] val) =>
+    new_workers = ws
 
 class val LeavingWorkerDoneMigratingMsg is ChannelMsg
   let worker_name: String
