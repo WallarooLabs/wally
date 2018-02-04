@@ -29,27 +29,21 @@ class ThroughputsStore extends ReduceStore {
 			return emptyThroughputs;
 		}
 	}
-	filterTotalThroughputData(state, category, metricsKey, nextTotalThroughputData) {
-		const now = toSeconds(Date.now());
-		let throughputsList;
-		if (state.hasIn([category, metricsKey])) {
-			throughputsList = state.getIn([category, metricsKey]);
-		} else {
-			throughputsList = List();
-		}
-		const updatedThroughputsList = throughputsList.push(fromJS(nextTotalThroughputData))
-			.filter(d => {
-				return now - d.get("time") < minutes(5)
-			});
-		return state.setIn([category, metricsKey], updatedThroughputsList);
+	filterTotalThroughputData(state, category, metricsKey, nextTotalThroughputMsg) {
+		let sortedThroughputsList = fromJS(nextTotalThroughputMsg.data).sort(
+			(a,b) => {
+				a.get("time") - b.get("time")
+			}
+		)
+		return state.setIn([category, metricsKey], sortedThroughputsList);
 	}
-	filterInitialTotalThroughputsData(state, category, metricsKey, throughputs) {
-		const now = toSeconds(Date.now());
-		let sortedTotalThroughputsList = fromJS(throughputs.data)
-			.filter(d => {
-				return now - d.get("time") < minutes(5)
-			});
-			return state.setIn([category, metricsKey], sortedTotalThroughputsList);
+	filterInitialTotalThroughputsData(state, category, metricsKey, nextTotalThroughputMsg) {
+		let sortedThroughputsList = fromJS(nextTotalThroughputMsg.data).sort(
+			(a,b) => {
+				a.get("time") - b.get("time")
+			}
+		)
+		return state.setIn([category, metricsKey], sortedThroughputsList);
 	}
 	reduce(state, action) {
 		let category;
