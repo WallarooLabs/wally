@@ -1273,7 +1273,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             validation_files = validate_file.split(',')
             for sink, fp in zip(sinks, validation_files):
                 sink.save(fp, giles_mode)
-            return [(r.name, r.get_output()) for r in runners]
+            # let the code after 'finally' return our data
 
         else:  # compare expected to processed
             # Decode captured output from sink
