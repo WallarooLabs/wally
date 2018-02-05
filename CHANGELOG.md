@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Only try to shrink if supplied worker names are still in the cluster ([PR #2034](https://github.com/wallaroolabs/wallaroo/pull/2034))
 - Fix bug when using cluster_shrinker with non-initializer ([PR #2011](https://github.com/wallaroolabs/wallaroo/pull/2011))
 - Ensure that all running workers migrate to joiners ([PR #2027](https://github.com/wallaroolabs/wallaroo/pull/2027))
 - Clean up recovery files during shrink ([PR #2012](https://github.com/wallaroolabs/wallaroo/pull/2012))
