@@ -1,3 +1,3 @@
 #!/bin/bash
 
-../../utils/cluster_shrinker --external 127.0.0.1:6010 --workers worker3
+../../utils/cluster_shrinker/cluster_shrinker --external 127.0.0.1:6010 --workers worker3
