@@ -20,6 +20,7 @@ import os
 import random
 import re
 import shlex
+import shutil
 import socket
 import struct
 import subprocess
@@ -757,22 +758,6 @@ def setup_resilience_path(res_dir):
     # create resilience data directory if it doesn't already exist
     if not os.path.exists(res_dir):
         create_resilience_dir(res_dir)
-    empty_resilience_dir(res_dir)
-
-def create_resilience_dir(res_dir):
-    try:
-        os.mkdir(res_dir)
-    except Exception as e:
-        print 'Warning: mkdir %s failed: %s' % (res_dir, e)
-
-def delete_resilience_dir(res_dir):
-    try:
-        os.rmdir(res_dir)
-    except Exception as e:
-        print 'Warning: rmdir %s failed: %s' % (res_dir, e)
-
-def empty_resilience_dir(res_dir):
-    # if any files are in this directory, remove them
     for f in os.listdir(res_dir):
         path = os.path.join(res_dir, f)
         try:
@@ -780,16 +765,26 @@ def empty_resilience_dir(res_dir):
         except Exception as e:
             print 'Warning: remove %s failed: %s' % (path, e)
 
+def create_resilience_dir(res_dir):
+    try:
+        os.mkdir(res_dir)
+    except Exception as e:
+        logging.exception('Warning: mkdir %s failed: %s' % (res_dir, e))
+
+def delete_resilience_dir(res_dir):
+    try:
+        os.rmdir(res_dir)
+    except Exception as e:
+        logging.warning('Warning: rmdir %s failed: %s' % (res_dir, e))
+
 def clean_resilience_path(res_dir):
     try:
         os.environ['KEEP_RESILIENCE_PATH']
-        keep = True
+        delete = False
     except:
-        keep = False
-    if keep and os.path.exists(res_dir):
-        empty_resilience_dir(res_dir)
-        delete_resilience_dir(res_dir)
-
+        delete = True
+    if delete and os.path.exists(res_dir):
+        shutil.rmtree(res_dir, True)
 
 def is_address_available(host, port):
     """
@@ -1018,7 +1013,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                   host='127.0.0.1', listen_attempts=1,
                   ready_timeout=30,
                   runner_join_timeout=DEFAULT_RUNNER_JOIN_TIMEOUT,
-                  resilience_dir=tempfile.mkdtemp(dir='/tmp/', prefix='res-data.'),
+                  resilience_dir=None,
                   spikes={}):
     """
     Run a pipeline test without having to instrument everything
@@ -1095,6 +1090,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
     then expected should be [1,1,1,2,2,2].
     """
 
+    if resilience_dir == None:
+        resilience_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     setup_resilience_path(resilience_dir)
     runners = []
     try:
@@ -1338,6 +1335,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                          " received {!r}".format(expected,
                                                                  processed))
     finally:
+        os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** finally %s\n" % resilience_dir)
         # clean up any remaining runner processes
         for r in runners:
             r.stop()
@@ -1348,12 +1346,14 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         for r in runners:
             if r.is_alive():
                 alive.append(r)
+        os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** finally 2%s\n" % resilience_dir)
         if alive:
             alive_names = ', '.join((r.name for r in alive))
             outputs = [(r.name, r.get_output()) for r in runners]
             outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
             for a in alive:
                 a.kill()
+            os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** finally 3%s\n" % resilience_dir)
             raise PipelineTestError("Runners [{}] failed to exit cleanly after"
                                     " {} seconds.\n"
                                     "Runner outputs are attached below:"
@@ -1362,6 +1362,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                             outputs))
 
     # Return runner names and outputs if try block didn't have a return
+    os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** bottom %s\n" % resilience_dir)
     return_value = [(r.name, r.get_output()) for r in runners]
+    os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** clean_resilience_path %s\n" % resilience_dir)
     clean_resilience_path(resilience_dir)
     return return_value
