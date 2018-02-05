@@ -1335,7 +1335,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                          " received {!r}".format(expected,
                                                                  processed))
     finally:
-        os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** finally %s\n" % resilience_dir)
         # clean up any remaining runner processes
         for r in runners:
             r.stop()
@@ -1346,14 +1345,12 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         for r in runners:
             if r.is_alive():
                 alive.append(r)
-        os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** finally 2%s\n" % resilience_dir)
         if alive:
             alive_names = ', '.join((r.name for r in alive))
             outputs = [(r.name, r.get_output()) for r in runners]
             outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
             for a in alive:
                 a.kill()
-            os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** finally 3%s\n" % resilience_dir)
             raise PipelineTestError("Runners [{}] failed to exit cleanly after"
                                     " {} seconds.\n"
                                     "Runner outputs are attached below:"
@@ -1362,8 +1359,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                             outputs))
 
     # Return runner names and outputs if try block didn't have a return
-    os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** bottom %s\n" % resilience_dir)
     return_value = [(r.name, r.get_output()) for r in runners]
-    os.write(os.open('/dev/tty', os.O_WRONLY|os.O_APPEND), "\n\t*********** clean_resilience_path %s\n" % resilience_dir)
     clean_resilience_path(resilience_dir)
     return return_value
