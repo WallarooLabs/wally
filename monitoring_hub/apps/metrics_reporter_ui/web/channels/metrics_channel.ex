@@ -153,7 +153,7 @@ defmodule MetricsReporterUI.MetricsChannel do
     log_name = generate_throughput_log_name(app_name, category, pipeline_key)
     total_throughput_args = [log_name: log_name, interval_key: "last-1-sec", pipeline_key: pipeline_key, app_name: app_name, category: category, msg_timestamp: msg_timestamp]
     ThroughputsBroadcaster.Supervisor.find_or_start_worker(total_throughput_args)
-    throughput_stats_args = [log_name: log_name, interval_key: "last-5-mins", pipeline_key: pipeline_key, app_name: app_name, category: category, stats_interval: 300]
+    throughput_stats_args = [log_name: log_name, interval_key: "last-5-mins", pipeline_key: pipeline_key, app_name: app_name, category: category, stats_interval: 300, msg_timestamp: msg_timestamp]
     ThroughputStatsBroadcaster.Supervisor.find_or_start_worker(throughput_stats_args)
   end
 
