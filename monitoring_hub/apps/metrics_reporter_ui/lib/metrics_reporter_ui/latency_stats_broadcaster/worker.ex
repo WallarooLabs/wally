@@ -9,7 +9,7 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
 
   def start_link([log_name: log_name, interval_key: interval_key,
     pipeline_key: _, aggregate_interval: _, app_name: _app_name,
-    category: _category] = args) do
+    category: _category, msg_timestamp: _msg_timestamp] = args) do
     server_name = via_tuple(log_name, interval_key)
     {:ok, _pid} = GenServer.start_link(__MODULE__, args, name: server_name)
   end
@@ -19,7 +19,7 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
   def init(args) do
     [log_name: log_name, interval_key: interval_key, pipeline_key: pipeline_key,
      aggregate_interval: aggregate_interval, app_name: app_name,
-     category: category] = args
+     category: category, msg_timestamp: msg_timestamp] = args
     msg_log_name = message_log_name(app_name, category, pipeline_key, interval_key)
     stats_msg_log_name = stats_message_log_name(app_name, category, pipeline_key, interval_key)
     bins_type = Application.get_env(:metrics_reporter_ui, :bins_type)
@@ -29,36 +29,34 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
       ["0", "10", "19", "20", "21", "22", "23", "24", "25", "26", "27", "30", "64"]
     end
     all_bins = get_all_bins()
+    time_diff = calculate_time_diff(msg_timestamp)
     send(self(), :calculate_and_publish_latency_percentage_bins_msgs)
     {:ok, %{
       log_name: log_name, interval_key: interval_key, aggregate_interval: aggregate_interval, bins: bins, all_bins: all_bins,
-      category: category, pipeline_key: pipeline_key, msg_log_name: msg_log_name, stats_msg_log_name: stats_msg_log_name}}
+      category: category, pipeline_key: pipeline_key, msg_log_name: msg_log_name, stats_msg_log_name: stats_msg_log_name,
+      time_diff: time_diff, start_time: msg_timestamp}}
   end
 
   def handle_info(:calculate_and_publish_latency_percentage_bins_msgs, state) do
     %{log_name: log_name, msg_log_name: msg_log_name, interval_key: interval_key, stats_msg_log_name: stats_msg_log_name,
-    pipeline_key: pipeline_key, aggregate_interval: aggregate_interval, category: category, bins: bins, all_bins: all_bins} = state
+    pipeline_key: pipeline_key, aggregate_interval: aggregate_interval, category: category, bins: bins, all_bins: all_bins,
+    time_diff: time_diff, start_time: _start_time} = state
     :timer.sleep(2500)
-    time_now = :os.system_time(:seconds)
-    start_time = time_now - aggregate_interval
-    case get_latency_bins_list(log_name, start_time) do
-      [] ->
-        :ok
-      [_partial_latency_bin_msg] ->
-        :ok
-      latency_bins_list ->
-        latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(latency_bins_list, bins)
-        latency_percentage_bins_msg = generate_latency_percentage_bins_msg(latency_percentage_bins_data, pipeline_key, time_now)
-        {:ok, ^latency_percentage_bins_msg} = store_latest_latency_percentage_bins_msg(msg_log_name, latency_percentage_bins_msg)
-        broadcast_latest_latency_percentage_bins_msg(category, pipeline_key, interval_key, latency_percentage_bins_msg)
+    current_time = calculate_time_diff(time_diff)
+    logs_start_time = current_time - aggregate_interval
 
-        all_latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(latency_bins_list, all_bins)
-        cumalative_latency_percentage_bins_data = LatencyStatsCalculator.calculate_cumalative_latency_percentage_bins_data(all_latency_percentage_bins_data)
-        latency_bins_percentile_data = LatencyStatsCalculator.calculate_latency_percentile_bin_stats(cumalative_latency_percentage_bins_data)
-        latency_bins_percentile_stats_msg = generate_latency_bins_percentile_stats_msg(latency_bins_percentile_data, pipeline_key, time_now)
-        {:ok, ^latency_bins_percentile_stats_msg} = store_latest_latency_bins_percentile_stats_msg(stats_msg_log_name, latency_bins_percentile_stats_msg)
-        broadcast_latest_latency_bins_percentile_stats_msg(category, pipeline_key, interval_key, latency_bins_percentile_stats_msg)
-    end
+    latency_bins_list = get_latency_bins_list(log_name, logs_start_time)
+    latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(latency_bins_list, bins)
+    latency_percentage_bins_msg = generate_latency_percentage_bins_msg(latency_percentage_bins_data, pipeline_key, current_time)
+
+    {:ok, latency_percentage_bins_msg} = store_latest_latency_percentage_bins_msg(msg_log_name, latency_percentage_bins_msg)
+    broadcast_latest_latency_percentage_bins_msg(category, pipeline_key, interval_key, latency_percentage_bins_msg)
+    all_latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(latency_bins_list, all_bins)
+    cumalative_latency_percentage_bins_data = LatencyStatsCalculator.calculate_cumalative_latency_percentage_bins_data(all_latency_percentage_bins_data)
+    latency_bins_percentile_data = LatencyStatsCalculator.calculate_latency_percentile_bin_stats(cumalative_latency_percentage_bins_data)
+    latency_bins_percentile_stats_msg = generate_latency_bins_percentile_stats_msg(latency_bins_percentile_data, pipeline_key, current_time)
+    {:ok, ^latency_bins_percentile_stats_msg} = store_latest_latency_bins_percentile_stats_msg(stats_msg_log_name, latency_bins_percentile_stats_msg)
+    broadcast_latest_latency_bins_percentile_stats_msg(category, pipeline_key, interval_key, latency_bins_percentile_stats_msg)
     send(self(), :calculate_and_publish_latency_percentage_bins_msgs)
     {:noreply, state}
   end
@@ -82,8 +80,7 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
 
   defp get_latency_bins_list(log_name, start_time) do
     :ok = MessageLog.Supervisor.lookup_or_create(log_name)
-    latency_bins_list = MessageLog.get_logs(log_name, [start_time: start_time])
-    List.delete_at(latency_bins_list, -1)
+    MessageLog.get_logs(log_name, [start_time: start_time])
   end
 
   defp generate_latency_bins_percentile_stats_msg(latency_bins_percentile_data, pipeline_key, time_now) do
@@ -130,6 +127,10 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
   defp generate_latency_percentage_bins_msg(latency_percentage_bins_data, pipeline_key, time_now) do
     empty_latency_percentage_bins_msg = generate_empty_latency_percentage_bins_msg(time_now, pipeline_key)
     Map.put(empty_latency_percentage_bins_msg, "latency_bins", latency_percentage_bins_data)
+  end
+
+  defp calculate_time_diff(timestamp) do
+    :os.system_time(:seconds) - timestamp
   end
 
 end
