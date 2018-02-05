@@ -81,11 +81,8 @@ trait BasicPipeline
   fun source_builder(): SourceBuilderBuilder ?
   fun source_route_builder(): RouteBuilder
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
-  fun sink_builder(): (SinkBuilder | None)
-  // TODO: Change this when we need more sinks per pipeline
-  // ASSUMPTION: There is at most one sink per pipeline
-  fun sink_id(): (U128 | None)
-  // The index into the list of provided sink addresses
+  fun val sink_builders(): Array[SinkBuilder]
+  fun val sink_ids(): Array[StepId] val
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder ?
   fun size(): USize
@@ -98,9 +95,9 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _source_builder: (SourceBuilderBuilder | None) = None
   let _source_route_builder: RouteBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
-  var _sink_builder: (SinkBuilder | None) = None
+  var _sink_builders: Array[SinkBuilder] = Array[SinkBuilder]
 
-  var _sink_id: (U128 | None) = None
+  var _sink_ids: Array[StepId] = Array[StepId]
   let _is_coalesced: Bool
 
   new create(app_name: String, p_id: USize, n: String,
@@ -120,8 +117,9 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun apply(i: USize): RunnerBuilder ? => _runner_builders(i)?
 
-  fun ref update_sink(sink_builder': SinkBuilder) =>
-    _sink_builder = sink_builder'
+  fun ref add_sink(sink_builder: SinkBuilder) =>
+    _sink_builders.push(sink_builder)
+    _add_sink_id()
 
   fun source_id(): USize => _pipeline_id
 
@@ -133,14 +131,12 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder
 
-  fun sink_builder(): (SinkBuilder | None) => _sink_builder
+  fun val sink_builders(): Array[SinkBuilder] val | None) => _sink_builders
 
-  // TODO: Change this when we need more sinks per pipeline
-  // ASSUMPTION: There is at most one sink per pipeline
-  fun sink_id(): (U128 | None) => _sink_id
+  fun val sink_ids(): Array[StepId] val => _sink_ids
 
-  fun ref update_sink_id() =>
-    _sink_id = StepIdGenerator()
+  fun ref _add_sink_id() =>
+    _sink_ids.push(StepIdGenerator())
 
   fun is_coalesced(): Bool => _is_coalesced
 
@@ -257,7 +253,16 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   fun ref to_sink(sink_information: SinkConfig[Out]): Application =>
     let sink_builder = sink_information()
     _a.increment_sink_count()
-    _p.update_sink(sink_builder)
-    _p.update_sink_id()
+    _p.add_sink(sink_builder)
     _a.add_pipeline(_p)
+    _a
+
+  fun ref to_sinks(sink_configs: Array[SinkConfig[Out]]): Application =>
+    if sink_configs.size() == 0 then
+      FatalUserError(("You must specify at least one sink when using " +
+        "to_sinks()")
+    end
+    for config in sink_configs.values() do
+      to_sink(config)
+    end
     _a
