@@ -33,6 +33,7 @@ use messages = "messages"
 use options = "options"
 use queue = "queue"
 use weighted = "weighted"
+use query = "query"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -49,3 +50,4 @@ actor Main is TestList
     options.Main.make().tests(test)
     queue.Main.make().tests(test)
     weighted.Main.make().tests(test)
+    query.Main.make().tests(test)

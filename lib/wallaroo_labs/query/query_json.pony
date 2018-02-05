@@ -74,8 +74,9 @@ primitive PartitionQueryEncoder
   fun state_and_stateless(m: Map[String, _PartitionQueryMap]): String =>
     let entries = recover iso Array[String] end
     try
-      entries.push("state_partitions:" + partitions(m("state_partitions")?))
-      entries.push("stateless_partitions:" +
+      entries.push(_Quoted("state_partitions") + ":" +
+        partitions(m("state_partitions")?))
+      entries.push(_Quoted("stateless_partitions") + ":" +
         partitions(m("stateless_partitions")?))
     else
       Fail()
