@@ -2,7 +2,7 @@
   "deps": [
     {
       "type": "local",
-      "local-path": "../../../lib"
+      "local-path": "../../../../../lib"
     },
     {
       "type": "local",
@@ -10,7 +10,7 @@
     },
     {
       "type": "local",
-      "local-path": "../../pony"
+      "local-path": "../../../../../go_api/pony"
     },
     {
       "type": "github",

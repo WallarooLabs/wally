@@ -5,10 +5,7 @@ This is the Market Spread application in Go.
 ## Build
 
 ```bash
-export GOPATH="$(realpath .)/go:$(realpath ../../go)"
-go build -buildmode=c-archive -o lib/libwallaroo.a market_spread
-stable fetch
-stable env ponyc --debug -D autoscale
+make
 ```
 
 ## Run Single Worker
