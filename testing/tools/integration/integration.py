@@ -781,7 +781,12 @@ def empty_resilience_dir(res_dir):
             print 'Warning: remove %s failed: %s' % (path, e)
 
 def clean_resilience_path(res_dir):
-    if os.path.exists(res_dir):
+    try:
+        os.environ['KEEP_RESILIENCE_PATH']
+        keep = True
+    except:
+        keep = False
+    if keep and os.path.exists(res_dir):
         empty_resilience_dir(res_dir)
         delete_resilience_dir(res_dir)
 
