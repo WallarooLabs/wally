@@ -375,7 +375,11 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       for c in candidates.values() do
-        if SetHelpers[String].contains[String](t.non_shrinkable, c) then
+        // A worker name is not a valid candidate if it is non shrinkable
+        // or if it's not in the current cluster.
+        if SetHelpers[String].contains[String](t.non_shrinkable, c) or
+          (not ArrayHelpers[String].contains[String](t.worker_names, c))
+        then
           return false
         end
       end
