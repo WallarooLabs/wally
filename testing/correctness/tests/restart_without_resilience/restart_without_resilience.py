@@ -31,6 +31,7 @@ from integration import (ex_validate,
 import os
 import re
 import struct
+import tempfile
 import time
 
 
@@ -49,7 +50,7 @@ def _test_restart(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data.%f' % time.time()
+    res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     expect = 200
     last_value_0 = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
     last_value_1 = '[{}]'.format(','.join((str(expect-1-v) for v in range(6,-2,-2))))

@@ -1018,7 +1018,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                   host='127.0.0.1', listen_attempts=1,
                   ready_timeout=30,
                   runner_join_timeout=DEFAULT_RUNNER_JOIN_TIMEOUT,
-                  resilience_dir='/tmp/res-data.%f' % time.time(),
+                  resilience_dir=tempfile.mkdtemp(dir='/tmp/', prefix='res-data.'),
                   spikes={}):
     """
     Run a pipeline test without having to instrument everything

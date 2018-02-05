@@ -37,6 +37,7 @@ from itertools import cycle
 from string import lowercase
 from struct import pack, unpack
 import re
+import tempfile
 import time
 
 
@@ -89,7 +90,7 @@ def _test_autoscale_grow(command, worker_count=1):
     sources = 1
     workers = 1
     joiners = worker_count - workers
-    res_dir = '/tmp/res-data.%f' % time.time()
+    res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     expect = 2000
 
     patterns_i = ([re.escape(r'***Worker worker{} attempting to join the '
