@@ -1090,7 +1090,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
     then expected should be [1,1,1,2,2,2].
     """
 
-    if resilience_dir == None:
+    if resilience_dir is None:
         resilience_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     setup_resilience_path(resilience_dir)
     runners = []
