@@ -183,7 +183,8 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
   defp do_add_metrics_channel_to_app_config(app_config,  "start-to-end-by-worker" = category, channel) do
     update_in(app_config, ["metrics", category], fn pipelines_map ->
       [category_and_pipeline_name, worker_name] = String.split(channel, "@")
-      [_category, pipeline_name] = String.split(category_and_pipeline_name, ":")
+      [_category, app_and_pipeline_name] = String.split(category_and_pipeline_name, ":")
+      [_app_name, pipeline_name] = String.split(app_and_pipeline_name, "||")
       pipelines_map
         |> Map.update(pipeline_name, [channel], fn channel_list ->
           channel_list ++ [channel]

@@ -33,19 +33,20 @@ defmodule MetricsReporterUI.ThroughputsBroadcaster.Worker do
       time_diff: time_diff, start_time: start_time} = state
       :timer.sleep(1000)
       current_time = calculate_time_diff(time_diff)
-      expected_start_time = current_time - 300
+      end_time_without_partials = current_time - 2
+      expected_start_time = end_time_without_partials - 300
       logs_start_time = if (expected_start_time < start_time), do: start_time, else: expected_start_time
       received_throughput_msgs = get_throughput_msgs(log_name, logs_start_time, current_time)
-      complete_throughput_msgs = for timestamp <- logs_start_time..current_time, into: [] do
+      complete_throughput_msgs = for timestamp <- logs_start_time..end_time_without_partials, into: [] do
         Enum.find(received_throughput_msgs, generate_empty_throughput_msg(pipeline_key, timestamp), fn throughput_msg ->
           throughput_msg["time"] == timestamp
         end)
       end
       store_latest_throughput_msgs(msg_log_name, complete_throughput_msgs)
-      topic_name =  category <> ":" <> pipeline_key
+      topic_name = MonitoringHubUtils.Helpers.create_channel_name(category, app_name, pipeline_key)
       event_name = get_event_name(interval_key)
       {:ok, _app_config} = AppConfigStore.add_metrics_channel_to_app_config(app_name, category, topic_name)
-      broadcast_latest_throughput_msgs(topic_name, event_name, pipeline_key, complete_throughput_msgs)
+      broadcast_latest_throughput_msgs(topic_name, event_name, app_name, pipeline_key, complete_throughput_msgs)
       send(self(), :get_and_broadcast_latest_throughput_msgs)
       {:noreply, state}
   end
@@ -62,8 +63,10 @@ defmodule MetricsReporterUI.ThroughputsBroadcaster.Worker do
     end)
   end
 
-  defp broadcast_latest_throughput_msgs(topic, event, pipeline_key, throughput_msgs) do
-      MetricsReporterUI.Endpoint.broadcast! topic, event, %{"data" => throughput_msgs, "pipeline_key" => pipeline_key}
+  defp broadcast_latest_throughput_msgs(topic, event, app_name, pipeline_key, throughput_msgs) do
+      MetricsReporterUI.Endpoint.broadcast! topic, event, %{"data" => throughput_msgs,
+        "pipeline_key" => pipeline_key,
+        "app_name" => app_name}
   end
 
   defp via_tuple(log_name, interval_key) do

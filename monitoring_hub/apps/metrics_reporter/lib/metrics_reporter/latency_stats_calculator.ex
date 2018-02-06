@@ -57,6 +57,13 @@ defmodule MetricsReporter.LatencyStatsCalculator do
       end)
   end
 
+  def generate_empty_latency_percentile_bin_stats do
+    get_percentiles() |>
+      Enum.reduce(%{}, fn percentile, percentile_map ->
+        Map.put(percentile_map, percentile, "0")
+      end)
+  end
+
   defp calculate_latency_bins_total(latency_bins_data) do
     Map.keys(latency_bins_data)
       |> Enum.reduce(0, &(latency_bins_data[&1] + &2))

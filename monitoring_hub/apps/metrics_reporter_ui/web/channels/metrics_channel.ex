@@ -78,7 +78,8 @@ defmodule MetricsReporterUI.MetricsChannel do
     store_period_throughput_msg(app_name, "computation-by-worker", pipeline_key, throughput_msg)
     {_response, _pid} = find_or_start_latency_bins_worker(app_name, "computation-by-worker", pipeline_key, msg_timestamp)
     {_response, _pid} = find_or_start_throughput_workers(app_name, "computation-by-worker", pipeline_key, msg_timestamp)
-    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_and_worker_name, pipeline_key, "computation-by-worker:" <> pipeline_key)
+    comp_by_worker_topic = MonitoringHubUtils.Helpers.create_channel_name("computation-by-worker", app_name, pipeline_key)
+    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_and_worker_name, pipeline_key, comp_by_worker_topic)
     # By Computation
     latency_list_msg = create_latency_list_msg(computation_name, end_timestamp, latency_list)
     store_latency_list_msg(app_name, category, computation_name, latency_list_msg)
@@ -87,7 +88,8 @@ defmodule MetricsReporterUI.MetricsChannel do
     store_period_throughput_msg(app_name, category, computation_name, throughput_msg)
     {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, computation_name, msg_timestamp)
     {_response, _pid} = find_or_start_throughput_workers(app_name, category, computation_name, msg_timestamp)
-    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_name, computation_name, "computation:" <> computation_name)
+    comp_topic = MonitoringHubUtils.Helpers.create_channel_name("computation", app_name, computation_name)
+    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_name, computation_name, comp_topic)
     {:noreply, socket}
   end
 

@@ -10,7 +10,7 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Supervisor do
 
   def start_worker([log_name: _log_name, interval_key: _interval_key,
     pipeline_key: _pipeline_key, app_name: _app_name, category: _category,
-    stats_interval: _stats_interval, msg_timestamp: msg_timestamp] = args) do
+    stats_interval: _stats_interval, msg_timestamp: _msg_timestamp] = args) do
     Supervisor.start_child(@name, [args])
   end
 

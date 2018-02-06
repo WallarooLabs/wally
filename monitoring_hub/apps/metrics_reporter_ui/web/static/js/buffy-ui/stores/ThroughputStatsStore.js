@@ -14,65 +14,64 @@ class ThroughputStatsStore extends ReduceStore {
 		super(dispatcher);
 	}
 	getInitialState() {
-		let state = Map()
-			.set("start-to-end", Map())
-			.set("node-ingress-egress", Map())
-			.set("computation", Map())
-			.set("pipeline", Map())
-			.set("pipeline-ingestion", Map())
-			.set("start-to-end-by-worker", Map())
-			.set("computation-by-worker", Map())
-			.set("node-ingress-egress-by-pipeline", Map())
+		let state = Map();
 		return state;
 	}
-	getThroughputStats(category, metricsKey) {
-		// console.log("Category: " + category + " MetricsKey: " + metricsKey);
-		// console.log("Throughput Stats: " + this.getState());
-		if (this.getState().hasIn([category, metricsKey])) {
-			return this.getState().getIn([category, metricsKey]);
+	getThroughputStats(appName, category, metricsKey) {
+		if (this.getState().hasIn([appName, category, metricsKey])) {
+			return this.getState().getIn([appName, category, metricsKey]);
 		} else {
 			return emptyThroughputStats;
 		}
 	}
-	storeThroughputStats(category, metricsKey, throughputStats, state) {
-		return state.setIn([category, metricsKey], fromJS(throughputStats["throughput_stats"]));
+	storeThroughputStats(appName, category, metricsKey, throughputStats, state) {
+		return state.setIn([appName, category, metricsKey], fromJS(throughputStats["throughput_stats"]));
 	}
 	reduce(state, action) {
 		let category;
 		let metricsKey;
+		let appName;
 		switch(action.actionType) {
 			case Actions.RECEIVE_STEP_THROUGHPUT_STATS.actionType:
 				category = "computation";
+				appName = action["throughput-stats"].app_name;
 				metricsKey = action["throughput-stats"].pipeline_key;
-				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+				return this.storeThroughputStats(appName, category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_STEP_BY_WORKER_THROUGHPUT_STATS.actionType:
 				category = "computation-by-worker";
+				appName = action["throughput-stats"].app_name;
 				metricsKey = action["throughput-stats"].pipeline_key;
-				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+				return this.storeThroughputStats(appName, category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_INGRESS_EGRESS_THROUGHPUT_STATS.actionType:
 				category = "node-ingress-egress";
+				appName = action["throughput-stats"].app_name;
 				metricsKey = action["throughput-stats"].pipeline_key;
-				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+				return this.storeThroughputStats(appName, category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_INGRESS_EGRESS_BY_PIPELINE_THROUGHPUT_STATS.actionType:
 				category = "node-ingress-egress-by-pipeline";
+				appName = action["throughput-stats"].app_name;
 				metricsKey = action["throughput-stats"].pipeline_key;
-				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+				return this.storeThroughputStats(appName, category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_SOURCE_SINK_THROUGHPUT_STATS.actionType:
 				category = "start-to-end";
+				appName = action["throughput-stats"].app_name;
 				metricsKey = action["throughput-stats"].pipeline_key;
-				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+				return this.storeThroughputStats(appName, category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_SOURCE_SINK_BY_WORKER_THROUGHPUT_STATS.actionType:
 				category = "start-to-end-by-worker";
+				appName = action["throughput-stats"].app_name;
 				metricsKey = action["throughput-stats"].pipeline_key;
-				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+				return this.storeThroughputStats(appName, category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_PIPELINE_THROUGHPUT_STATS.actionType:
 				category = "pipeline";
+				appName = action["throughput-stats"].app_name;
 				metricsKey = action["throughput-stats"].pipeline_key;
-				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+				return this.storeThroughputStats(appName, category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_PIPELINE_INGESTION_THROUGHPUT_STATS.actionType:
 				category = "pipeline-ingestion";
+				appName = action["throughput-stats"].app_name;
 				metricsKey = action["throughput-stats"].pipeline_key;
-				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
+				return this.storeThroughputStats(appName, category, metricsKey, action["throughput-stats"], state);
 			default:
 				return state;
 		}

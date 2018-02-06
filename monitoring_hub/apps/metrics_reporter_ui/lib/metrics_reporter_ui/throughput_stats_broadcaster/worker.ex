@@ -29,7 +29,7 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
 
   def handle_info(:get_and_broadcast_latest_throughput_stat_msgs, state) do
     %{log_name: log_name, interval_key: interval_key, msg_log_name: msg_log_name,
-      app_name: _app_name, category: category, pipeline_key: pipeline_key,
+      app_name: app_name, category: category, pipeline_key: pipeline_key,
       stats_interval: stats_interval, time_diff: time_diff, start_time: start_time} = state
     :timer.sleep(2500)
     current_time = calculate_time_diff(time_diff)
@@ -38,13 +38,13 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
     received_throughput_msgs = get_throughput_msgs(log_name, logs_start_time, current_time)
     throughput_stats_msg = case received_throughput_msgs do
       [] ->
-        create_throughput_stats_msg(empty_throughput_stats_msg(), pipeline_key, current_time)
+        create_throughput_stats_msg(empty_throughput_stats_msg(), app_name, pipeline_key, current_time)
       throughput_msgs ->
         throughput_stats = MetricsReporter.ThroughputStatsCalculator.calculate_throughput_stats(throughput_msgs)
-        create_throughput_stats_msg(throughput_stats, pipeline_key, current_time)
+        create_throughput_stats_msg(throughput_stats, app_name, pipeline_key, current_time)
     end
     {:ok, ^throughput_stats_msg} = store_throughput_stats_msg(msg_log_name, throughput_stats_msg)
-    broadcast_throughput_stats_msg(category, pipeline_key, interval_key, throughput_stats_msg)
+    broadcast_throughput_stats_msg(category, app_name, pipeline_key, interval_key, throughput_stats_msg)
     send(self(), :get_and_broadcast_latest_throughput_stat_msgs)
     {:noreply, state}
   end
@@ -54,11 +54,12 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
      MessageLog.get_logs(log_name, [start_time: start_time, end_time: end_time])
   end
 
-  defp create_throughput_stats_msg(throughput_stats, pipeline_key, time_now) do
+  defp create_throughput_stats_msg(throughput_stats, app_name, pipeline_key, time_now) do
     %{
       "time" => time_now,
       "pipeline_key" => pipeline_key,
-      "throughput_stats" => throughput_stats
+      "throughput_stats" => throughput_stats,
+      "app_name" => app_name
     }
   end
 
@@ -71,8 +72,8 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
     {:ok, ^throughput_stats_msg} = MessageLog.log_message(msg_log_name, throughput_stats_msg)
   end
 
-  defp broadcast_throughput_stats_msg(category, pipeline_key, interval_key, throughput_stats_msg) do
-    topic = category <> ":" <> pipeline_key
+  defp broadcast_throughput_stats_msg(category, app_name, pipeline_key, interval_key, throughput_stats_msg) do
+    topic = MonitoringHubUtils.Helpers.create_channel_name(category, app_name, pipeline_key)
     event = "throughput-stats:" <> interval_key
     MetricsReporterUI.Endpoint.broadcast! topic, event, throughput_stats_msg
   end

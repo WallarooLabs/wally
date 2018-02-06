@@ -19,7 +19,7 @@ export default class SourcesTable extends React.Component {
 				case "computations-for-pipeline":
 					updatedSourceType = "computation";
 			}
-			const sourceName = sourceKey.replace(updatedSourceType + ":", "");
+			const sourceName = sourceKey.split("||")[1];
 			return <SourceTableBodyContainer
 						linked={linked}
 						appName={appName}
