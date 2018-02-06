@@ -188,7 +188,6 @@ endif
 ifeq ($(shell uname -s),Linux)
   extra_xargs_arg := -r
   docker_user_arg := -u `id -u`
-  extra_awk_arg := \\
   host_ip_src = $(shell ifconfig `route -n | grep '^0.0.0.0' | awk '{print $$8}'` | egrep -o 'inet addr:[^ ]+' | awk -F: '{print $$2}')
   system_cpus := $(shell which cset > /dev/null && sudo cset set -l -r | grep '/system' | awk '{print $$2}')
   ifneq (,$(system_cpus))
@@ -544,7 +543,7 @@ help: ## this help message
 	$(QUIET)echo ''
 	$(QUIET)echo 'Options:'
 	$(QUIET)grep -h -E '^[a-zA-Z0-9_-]+ *\?=.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
-          'BEGIN {FS = "$(extra_awk_arg)?="}; {printf "\033[36m%-40s\033[0m ##%s\n", $$1, \
+          'BEGIN {FS = "\\?="}; {printf "\033[36m%-40s\033[0m ##%s\n", $$1, \
           $$2}' | awk 'BEGIN {FS = "## "}; {printf "%s%s \033[36m(Default:\
  %s)\033[0m\n", $$1, $$3, $$2}'
 	$(QUIET)grep -h -E 'ifeq.*filter.*\)$$' $(MAKEFILE_LIST) | sort -u | awk \
