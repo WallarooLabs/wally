@@ -747,8 +747,7 @@ trait val PartitionRouter is (Router & Equatable[PartitionRouter])
 trait val AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)]
   is PartitionRouter
   fun clone_and_set_input_type[NewIn: Any val](
-    new_p_function: PartitionFunction[NewIn, Key] val,
-    new_default_router: (Router | None) = None): PartitionRouter
+    new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter
 
 class val LocalPartitionRouter[In: Any val,
   Key: (Hashable val & Equatable[Key] val), S: State ref]
@@ -759,14 +758,12 @@ class val LocalPartitionRouter[In: Any val,
   let _step_ids: Map[Key, StepId] val
   let _partition_routes: Map[Key, (Step | ProxyRouter)] val
   let _partition_function: PartitionFunction[In, Key] val
-  let _default_router: (Router | None)
 
   new val create(state_name': String, worker_name: String,
     local_map': Map[StepId, Step] val,
     s_ids: Map[Key, StepId] val,
     partition_routes: Map[Key, (Step | ProxyRouter)] val,
-    partition_function: PartitionFunction[In, Key] val,
-    default_router: (Router | None) = None)
+    partition_function: PartitionFunction[In, Key] val)
   =>
     _state_name = state_name'
     _worker_name = worker_name
@@ -774,7 +771,6 @@ class val LocalPartitionRouter[In: Any val,
     _step_ids = s_ids
     _partition_routes = partition_routes
     _partition_function = partition_function
-    _default_router = default_router
 
   fun size(): USize =>
     _partition_routes.size()
@@ -839,29 +835,17 @@ class val LocalPartitionRouter[In: Any val,
               i_msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
           end
         else
-          // There is no entry for this key!
-          // If there's a default, use that
-          match _default_router
-          | let r: Router =>
-            ifdef "trace" then
-              @printf[I32](("PartitionRouter sending to default step as " +
-                "there was no entry for key\n").cstring())
+          ifdef debug then
+            match key
+            | let k: Stringable val =>
+              @printf[I32](("LocalPartitionRouter.route: No entry for " +
+              "key %s\n\n").cstring(), k.string().cstring())
+            else
+              @printf[I32](("LocalPartitionRouter.route: No entry for " +
+              "this key\n\n").cstring())
             end
-            r.route[In](metric_name, pipeline_time_spent, input, producer,
-              i_msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
-          else
-            ifdef debug then
-              match key
-              | let k: Stringable val =>
-                @printf[I32](("LocalPartitionRouter.route: No entry for " +
-                "key %s and no default\n\n").cstring(), k.string().cstring())
-              else
-                @printf[I32](("LocalPartitionRouter.route: No entry for " +
-                "this key and no default\n\n").cstring())
-              end
-            end
-            (true, true, latest_ts)
           end
+          (true, true, latest_ts)
         end
       else
         // InputWrapper doesn't wrap In
@@ -876,18 +860,10 @@ class val LocalPartitionRouter[In: Any val,
     end
 
   fun clone_and_set_input_type[NewIn: Any val](
-    new_p_function: PartitionFunction[NewIn, Key] val,
-    new_d_router: (Router | None) = None): PartitionRouter
+    new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter
   =>
-    match new_d_router
-    | let dr: Router =>
-      LocalPartitionRouter[NewIn, Key, S](_state_name, _worker_name,
-        _local_map, _step_ids, _partition_routes, new_p_function, dr)
-    else
-      LocalPartitionRouter[NewIn, Key, S](_state_name, _worker_name,
-        _local_map, _step_ids, _partition_routes, new_p_function,
-        _default_router)
-    end
+    LocalPartitionRouter[NewIn, Key, S](_state_name, _worker_name,
+      _local_map, _step_ids, _partition_routes, new_p_function)
 
   fun register_routes(router: Router, route_builder': RouteBuilder) =>
     for r in _partition_routes.values() do
@@ -944,7 +920,7 @@ class val LocalPartitionRouter[In: Any val,
         end
         LocalPartitionRouter[In, Key, S](_state_name, _worker_name,
           consume new_local_map, _step_ids, consume new_partition_routes,
-          _partition_function, _default_router)
+          _partition_function)
       | let proxy_router: ProxyRouter =>
         for (id, s) in _local_map.pairs() do
           if id != target_id then new_local_map(id) = s end
@@ -958,7 +934,7 @@ class val LocalPartitionRouter[In: Any val,
         end
         LocalPartitionRouter[In, Key, S](_state_name, _worker_name,
           consume new_local_map, _step_ids, consume new_partition_routes,
-          _partition_function, _default_router)
+          _partition_function)
       end
     else
       error
@@ -977,8 +953,7 @@ class val LocalPartitionRouter[In: Any val,
       end
     end
     LocalPartitionRouter[In, Key, S](_state_name, _worker_name, _local_map,
-      _step_ids, consume new_partition_routes, _partition_function,
-      _default_router)
+      _step_ids, consume new_partition_routes, _partition_function)
 
   fun rebalance_steps_grow(
     target_workers: Array[(String, OutgoingBoundary)] val,
@@ -1139,8 +1114,7 @@ class val LocalPartitionRouter[In: Any val,
       MapTagEquality[StepId, Step](_local_map, o._local_map) and
         MapEquality[Key, StepId](_step_ids, o._step_ids) and
         _partition_routes_eq(o._partition_routes) and
-        (_partition_function is o._partition_function) and
-        (_default_router is o._default_router)
+        (_partition_function is o._partition_function)
     else
       false
     end
@@ -1207,12 +1181,9 @@ class val LocalPartitionRouterBlueprint[In: Any val,
     else
       Fail()
     end
-    // Since default routers are deprecated, this does not
-    // support them (passing None in instead).
     LocalPartitionRouter[In, Key, S](_state_name, worker_name,
       recover val Map[StepId, Step] end,
-      _step_ids, consume partition_routes, _partition_function,
-      None)
+      _step_ids, consume partition_routes, _partition_function)
 
 trait val StatelessPartitionRouter is (Router &
   Equatable[StatelessPartitionRouter])

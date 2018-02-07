@@ -88,12 +88,6 @@ actor ApplicationDistributor is Distributor
       // Map from step_id to worker name
       let steps: Map[U128, String] = steps.create()
 
-      // TODO: Replace this when POC default target strategy is updated
-      // Map from worker name to default target
-      let default_targets:
-        Map[String, (Array[StepBuilder] val | ProxyAddress)]
-          = default_targets.create()
-
       // We use these graphs to build the local graphs for each worker
       var local_graphs = recover trn Map[String, Dag[StepInitializer] trn] end
 
@@ -150,12 +144,6 @@ actor ApplicationDistributor is Distributor
         | let sid: U128 =>
           step_map(sid) = sid
         end
-
-        // TODO: Replace this when we have a better post-POC default strategy.
-        // This is set if we need a default target in this pipeline.
-        // Currently there can only be one default target per topology.
-        var pipeline_default_state_name = ""
-        var pipeline_default_target_worker = ""
 
         @printf[I32](("The " + pipeline.name() + " pipeline has " +
           pipeline.size().string() + " uncoalesced runner builders\n")
@@ -390,10 +378,6 @@ actor ApplicationDistributor is Distributor
                 .cstring())
               error
             end
-          if state_builder.default_state_name() != "" then
-            pipeline_default_state_name = state_builder.default_state_name()
-            pipeline_default_target_worker = initializer_name
-          end
         end
 
         let source_initializer = SourceData(source_node_id,
@@ -614,16 +598,6 @@ actor ApplicationDistributor is Distributor
                       .cstring())
                     error
                   end
-
-                // TODO: Update this approach when we create post-POC default
-                // strategy.
-                // ASSUMPTION: There is only one partititon default target
-                // per application.
-                if state_builder.default_state_name() != "" then
-                  pipeline_default_state_name =
-                    state_builder.default_state_name()
-                  pipeline_default_target_worker = "worker"
-                end
 
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
@@ -864,98 +838,6 @@ actor ApplicationDistributor is Distributor
           // Finished with this worker for this pipeline
         end
 
-        ////////////////////////////////////////////////////////////////
-        // HANDLE PARTITION DEFAULT STEP IF ONE EXISTS FOR THIS PIPELINE
-        ////////
-        // TODO: Replace this default strategy with a better one
-        // after POC
-        if pipeline_default_state_name != "" then
-          @printf[I32]("-----We have a real default target name\n".cstring())
-          match application.default_target
-          | let default_target: Array[RunnerBuilder] val =>
-            @printf[I32](("Preparing to spin up default target state on " +
-              pipeline_default_target_worker + "\n").cstring())
-
-            // The target will always be the sink (a stipulation of
-            // the temporary POC strategy)
-            match pipeline.sink_id()
-            | let default_pre_state_target_id: U128 =>
-              let pre_state_runner_builder =
-                try
-                  default_target(0)?
-                else
-                  @printf[I32]("Default target had no prestate value!\n"
-                    .cstring())
-                  error
-                end
-
-              let state_runner_builder =
-                try
-                  default_target(1)?
-                else
-                  @printf[I32]("Default target had no state value!\n"
-                    .cstring())
-                  error
-                end
-
-              let pre_state_id = pre_state_runner_builder.id()
-              let state_id = state_runner_builder.id()
-
-              // Add default prestate to PreStateData
-              let psd = PreStateData(pre_state_runner_builder,
-                default_pre_state_target_id, true)
-              pre_state_data.push(psd)
-
-              let pre_state_builder = StepBuilder(application.name(),
-                pipeline_default_target_worker,
-                pipeline.name(),
-                pre_state_runner_builder, pre_state_id,
-                false,
-                default_pre_state_target_id,
-                pre_state_runner_builder.forward_route_builder())
-
-              @printf[I32](("Preparing to spin up default target state for " +
-                state_runner_builder.name() + " on " +
-                pipeline_default_target_worker + "\n").cstring())
-
-              let state_builder = StepBuilder(application.name(),
-                pipeline_default_target_worker,
-                pipeline.name(),
-                state_runner_builder, state_id,
-                true
-                where forward_route_builder' =
-                  state_runner_builder.route_builder())
-
-              steps(pre_state_id) = pipeline_default_target_worker
-              steps(state_id) = pipeline_default_target_worker
-
-              let next_default_targets = recover trn Array[StepBuilder] end
-
-              next_default_targets.push(pre_state_builder)
-              next_default_targets.push(state_builder)
-
-              @printf[I32](("Adding default target for " +
-                pipeline_default_target_worker + "\n").cstring())
-              default_targets(pipeline_default_target_worker) =
-                consume next_default_targets
-
-              // Create ProxyAddresses for the other workers
-              let proxy_address = ProxyAddress(pipeline_default_target_worker,
-                pre_state_id)
-
-              for w in worker_names.values() do
-                default_targets(w) = proxy_address
-              end
-            else
-              // We currently assume that a default step will target a sink
-              // but apparently there is no sink for this pipeline
-              Fail()
-            end
-          else
-            @printf[I32]("----But no default target!\n".cstring())
-          end
-        end
-
         // Prepare to initialize the next pipeline
         pipeline_id = pipeline_id + 1
       end
@@ -1016,22 +898,11 @@ actor ApplicationDistributor is Distributor
           p_ids(target) = p_id
         end
 
-        let default_target =
-          try
-            default_targets(w)?
-          else
-            @printf[I32](("No default target specified for " + w + "\n")
-              .cstring())
-            None
-          end
-
         let local_topology =
           try
             LocalTopology(application.name(), w, g.clone()?,
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
-              consume p_ids, default_target, application.default_state_name,
-              application.default_target_id,
-              all_workers, non_shrinkable_to_send)
+              consume p_ids, all_workers, non_shrinkable_to_send)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

@@ -44,27 +44,23 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder | None) = None,
     target_router: Router = EmptyRouter): KafkaSourceListenerBuilder[In]
   =>
     KafkaSourceListenerBuilder[In](source_builder, router, router_registry,
       route_builder,
       outgoing_boundary_builders, event_log, auth,
-      layout_initializer, consume metrics_reporter, default_target,
-      default_in_route_builder, target_router, _ksco, _auth)
+      layout_initializer, consume metrics_reporter, target_router, _ksco,
+      _auth)
 
 class val KafkaSourceListenerBuilder[In: Any val]
   let _source_builder: SourceBuilder
   let _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
-  let _default_in_route_builder: (RouteBuilder | None)
   let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
   let _auth: AmbientAuth
-  let _default_target: (Step | None)
   let _target_router: Router
   let _metrics_reporter: MetricsReporter
   let _ksco: KafkaConfigOptions val
@@ -76,8 +72,6 @@ class val KafkaSourceListenerBuilder[In: Any val]
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder | None) = None,
     target_router: Router = EmptyRouter,
     ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth)
   =>
@@ -85,12 +79,10 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _router = router
     _router_registry = router_registry
     _route_builder = route_builder
-    _default_in_route_builder = default_in_route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _layout_initializer = layout_initializer
     _event_log = event_log
     _auth = auth
-    _default_target = default_target
     _target_router = target_router
     _metrics_reporter = consume metrics_reporter
     _ksco = ksco
@@ -100,8 +92,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
     KafkaSourceListener[In](env, _source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
-      _default_target, _default_in_route_builder, _target_router, _ksco,
-      _tcp_auth)
+      _target_router, _ksco, _tcp_auth)
 
 
 class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
@@ -126,10 +117,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
-  let _default_in_route_builder: (RouteBuilder | None)
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
-  let _default_target: (Step | None)
   let _metrics_reporter: MetricsReporter
   let _ksco: KafkaConfigOptions val
   let _tcp_auth: TCPConnectionAuth
@@ -143,8 +132,6 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder | None) = None,
     target_router: Router = EmptyRouter,
     ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth)
   =>
@@ -154,10 +141,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _router = router
     _router_registry = router_registry
     _route_builder = route_builder
-    _default_in_route_builder = default_in_route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _layout_initializer = layout_initializer
-    _default_target = default_target
     _metrics_reporter = consume metrics_reporter
 
     _ksco = ksco
@@ -222,10 +207,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
             | let kc: KafkaClient tag =>
               let source = KafkaSource[In](this, _notify.build_source(_env)?,
                 _router.routes(), _route_builder, _outgoing_boundary_builders,
-                _layout_initializer, _default_target,
-                _default_in_route_builder,
-                _metrics_reporter.clone(), topic, part_id, kc,
-                _router_registry)
+                _layout_initializer, _metrics_reporter.clone(), topic, part_id,
+                kc, _router_registry)
               partitions_sources(part_id) = source
               _router_registry.register_source(source)
               match _router

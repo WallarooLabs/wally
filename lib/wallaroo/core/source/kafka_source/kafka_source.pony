@@ -60,8 +60,6 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     routes: Array[Consumer] val, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    default_target: (Consumer | None) = None,
-    forward_route_builder: (RouteBuilder | None) = None,
     metrics_reporter: MetricsReporter iso,
     topic: String, partition_id: I32, kafka_client: KafkaClient tag,
     router_registry: RouterRegistry)
@@ -96,14 +94,6 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     end
 
     _notify.update_boundaries(_outgoing_boundaries)
-
-    match default_target
-    | let r: Consumer =>
-      match forward_route_builder
-      | let frb: RouteBuilder =>
-        _routes(r) = frb(this, r, _metrics_reporter)
-      end
-    end
 
     for r in _routes.values() do
       // TODO: this is a hack, we shouldn't be calling application events

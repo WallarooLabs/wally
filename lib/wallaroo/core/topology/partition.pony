@@ -156,8 +156,7 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer],
-    default_router: (Router | None) = None): PartitionRouter
+    data_routes: Map[U128, Consumer]): PartitionRouter
   fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
     pa: ProxyAddress): StateSubpartition ?
   fun runner_builder(): RunnerBuilder
@@ -193,8 +192,7 @@ class val KeyedStateSubpartition[PIn: Any val,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer],
-    default_router: (Router | None) = None):
+    data_routes: Map[U128, Consumer]):
     LocalPartitionRouter[PIn, Key, S] val
   =>
     let routes = recover trn Map[Key, (Step | ProxyRouter)] end
@@ -238,7 +236,7 @@ class val KeyedStateSubpartition[PIn: Any val,
       " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
     LocalPartitionRouter[PIn, Key, S](_state_name, worker_name, consume m,
-      _id_map, consume routes, _partition_function, default_router)
+      _id_map, consume routes, _partition_function)
 
   fun update_key[K: (Hashable val & Equatable[K] val)](k: K,
     pa: ProxyAddress): StateSubpartition ?

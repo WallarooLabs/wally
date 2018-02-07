@@ -99,9 +99,7 @@ actor TCPSource is Producer
     routes: Array[Consumer] val, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    fd: U32, default_target: (Consumer | None) = None,
-    forward_route_builder: (RouteBuilder | None) = None,
-    init_size: USize = 64, max_size: USize = 16384,
+    fd: U32, init_size: USize = 64, max_size: USize = 16384,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
   =>
     """
@@ -150,14 +148,6 @@ actor TCPSource is Producer
     end
 
     _notify.update_boundaries(_outgoing_boundaries)
-
-    match default_target
-    | let r: Consumer =>
-      match forward_route_builder
-      | let frb: RouteBuilder =>
-        _routes(r) = frb(this, r, _metrics_reporter)
-      end
-    end
 
     for r in _routes.values() do
       // TODO: this is a hack, we shouldn't be calling application events

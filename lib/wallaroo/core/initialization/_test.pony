@@ -45,15 +45,14 @@ class iso _TestLocalTopologyEquality is UnitTest
     // equality check to pass in this test. Once they become dynamic, this test
     // will need to be updated.
     let dag = _DagGenerator()
-    let default_target = _DefaultTargetGenerator()
     let partition_function = _PartitionFunctionGenerator()
     let runner_builder = _RunnerBuilderGenerator()
     let pre_state_data = _PreStateDataArrayGenerator(runner_builder)
 
     var base_topology = _BaseLocalTopologyGenerator(dag, pre_state_data,
-      default_target, partition_function, runner_builder)
+      partition_function, runner_builder)
     let target_topology = _TargetLocalTopologyGenerator(dag, pre_state_data,
-      default_target, partition_function, runner_builder)
+      partition_function, runner_builder)
     h.assert_eq[Bool](false, base_topology == target_topology)
     base_topology = base_topology.update_proxy_address_for_state_key[String](
       "state", "k1", ProxyAddress("w2", 10))?
@@ -63,26 +62,22 @@ class iso _TestLocalTopologyEquality is UnitTest
 primitive _BaseLocalTopologyGenerator
   fun apply(dag: Dag[StepInitializer] val,
     psd: Array[PreStateData] val,
-    default_target: (Array[StepBuilder] val | ProxyAddress | None),
     pf: PartitionFunction[String, String] val,
     rb: RunnerBuilder): LocalTopology
   =>
     LocalTopology("test", "w1", dag, _StepMapGenerator(),
       _BaseStateBuildersGenerator(rb, pf), psd, _ProxyIdsGenerator(),
-      default_target, "test-default", 1, _BaseWorkerNamesGenerator(),
-      recover val SetIs[String] end)
+      _BaseWorkerNamesGenerator(), recover val SetIs[String] end)
 
 primitive _TargetLocalTopologyGenerator
   fun apply(dag: Dag[StepInitializer] val,
     psd: Array[PreStateData] val,
-    default_target: (Array[StepBuilder] val | ProxyAddress | None),
     pf: PartitionFunction[String, String] val,
     rb: RunnerBuilder): LocalTopology
   =>
     LocalTopology("test", "w1", dag, _StepMapGenerator(),
       _TargetStateBuildersGenerator(rb, pf), psd, _ProxyIdsGenerator(),
-      default_target, "test-default", 1, _TargetWorkerNamesGenerator(),
-      recover val SetIs[String] end)
+      _TargetWorkerNamesGenerator(), recover val SetIs[String] end)
 
 primitive _DagGenerator
   fun apply(): Dag[StepInitializer] val =>
@@ -185,10 +180,6 @@ class val _IdentityComputation[V]
 primitive _ProxyIdsGenerator
   fun apply(): Map[String, U128] val =>
     recover Map[String, U128] end
-
-primitive _DefaultTargetGenerator
-  fun apply(): (Array[StepBuilder] val | ProxyAddress | None) =>
-    None
 
 primitive _BaseWorkerNamesGenerator
   fun apply(): Array[String] val =>
