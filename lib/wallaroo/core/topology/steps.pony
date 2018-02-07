@@ -45,9 +45,6 @@ actor Step is (Producer & Consumer)
   var _omni_router: OmniRouter
   var _route_builder: RouteBuilder
   let _metrics_reporter: MetricsReporter
-  // If this is a state step and the state partition uses a default step,
-  // then this is used to create a route to that step during initialization.
-  let _default_target: (Step | None)
   // list of envelopes
   let _deduplication_list: DeduplicationList = _deduplication_list.create()
   let _event_log: EventLog
@@ -72,7 +69,7 @@ actor Step is (Producer & Consumer)
     id: U128, route_builder: RouteBuilder, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    router: Router = EmptyRouter, default_target: (Step | None) = None,
+    router: Router = EmptyRouter,
     omni_router: OmniRouter = EmptyOmniRouter)
   =>
     _runner = consume runner
@@ -86,7 +83,6 @@ actor Step is (Producer & Consumer)
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
     _id = id
-    _default_target = default_target
     for (state_name, boundary) in _outgoing_boundaries.pairs() do
       _outgoing_boundaries(state_name) = boundary
     end
@@ -115,11 +111,6 @@ actor Step is (Producer & Consumer)
     for boundary in _outgoing_boundaries.values() do
       _routes(boundary) =
         _route_builder(this, boundary, _metrics_reporter)
-    end
-
-    match _default_target
-    | let r: Consumer =>
-      _routes(r) = _route_builder(this, r, _metrics_reporter)
     end
 
     for r in _routes.values() do

@@ -62,13 +62,6 @@ class val StepBuilder
 
   fun name(): String => _runner_builder.name()
   fun state_name(): String => _state_name
-  fun default_state_name(): String =>
-    match _runner_builder
-    | let ds: DefaultStateable val =>
-      if ds.default_state_name() != "" then ds.default_state_name() else "" end
-    else
-      ""
-    end
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
@@ -78,24 +71,21 @@ class val StepBuilder
   fun forward_route_builder(): RouteBuilder => _forward_route_builder
   fun in_route_builder(): (RouteBuilder | None) =>
     _runner_builder.in_route_builder()
-  fun clone_router_and_set_input_type(r: Router,
-    default_r: (Router | None) = None): Router
-  =>
-    _runner_builder.clone_router_and_set_input_type(r, default_r)
+  fun clone_router_and_set_input_type(r: Router): Router =>
+    _runner_builder.clone_router_and_set_input_type(r)
 
   fun apply(next: Router, metrics_conn: MetricsSink, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router: Router = EmptyRouter,
-    omni_router: OmniRouter = EmptyOmniRouter,
-    default_target: (Step | None) = None): Step tag
+    omni_router: OmniRouter = EmptyOmniRouter): Step tag
   =>
     let runner = _runner_builder(where event_log = event_log, auth = auth,
       router = router, pre_state_target_id' = pre_state_target_id())
     let step = Step(consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
       _runner_builder.route_builder(), event_log, recovery_replayer,
-      outgoing_boundaries, router, default_target, omni_router)
+      outgoing_boundaries, router, omni_router)
     step.update_router(next)
     step
 
@@ -138,13 +128,6 @@ class val SourceData
 
   fun name(): String => _name
   fun state_name(): String => _state_name
-  fun default_state_name(): String =>
-    match _runner_builder
-    | let ds: DefaultStateable val =>
-      if ds.default_state_name() != "" then ds.default_state_name() else "" end
-    else
-      ""
-    end
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
@@ -153,10 +136,9 @@ class val SourceData
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder =>
     _runner_builder.forward_route_builder()
-  fun clone_router_and_set_input_type(r: Router,
-    default_r: (Router | None) = None): Router
+  fun clone_router_and_set_input_type(r: Router): Router
   =>
-    _runner_builder.clone_router_and_set_input_type(r, default_r)
+    _runner_builder.clone_router_and_set_input_type(r)
 
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder
@@ -230,16 +212,13 @@ class val PreStateData
   let _runner_builder: RunnerBuilder
   let _target_id: (U128 | None)
   let _forward_route_builder: RouteBuilder
-  let _is_default_target: Bool
 
-  new val create(runner_builder: RunnerBuilder, t_id: (U128 | None),
-    is_default_target': Bool = false) =>
+  new val create(runner_builder: RunnerBuilder, t_id: (U128 | None)) =>
     _runner_builder = runner_builder
     _state_name = runner_builder.state_name()
     _pre_state_name = runner_builder.name()
     _target_id = t_id
     _forward_route_builder = runner_builder.forward_route_builder()
-    _is_default_target = is_default_target'
 
   fun state_name(): String => _state_name
   fun pre_state_name(): String => _pre_state_name
@@ -247,7 +226,6 @@ class val PreStateData
   fun forward_route_builder(): RouteBuilder => _forward_route_builder
   fun clone_router_and_set_input_type(r: Router): Router =>
     _runner_builder.clone_router_and_set_input_type(r)
-  fun is_default_target(): Bool => _is_default_target
 
 class val PreStatelessData
   """

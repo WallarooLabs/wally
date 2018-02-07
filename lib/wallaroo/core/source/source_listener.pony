@@ -39,6 +39,4 @@ interface val SourceListenerBuilderBuilder
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder | None) = None,
     target_router: Router = EmptyRouter): SourceListenerBuilder
