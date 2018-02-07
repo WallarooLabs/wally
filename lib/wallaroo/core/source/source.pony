@@ -39,7 +39,7 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
   let _handler: SH
   let _router: Router
   let _metrics_conn: MetricsSink
-  let _pre_state_target_id: (U128 | None)
+  let _pre_state_target_ids: Array[StepId] val
   let _metrics_reporter: MetricsReporter
   let _source_notify_builder: SourceNotifyBuilder[In, SH]
 
@@ -48,7 +48,7 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
     runner_builder: RunnerBuilder,
     handler: SH,
     router: Router, metrics_conn: MetricsSink,
-    pre_state_target_id: (U128 | None) = None,
+    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end,
     metrics_reporter: MetricsReporter iso,
     source_notify_builder: SourceNotifyBuilder[In, SH])
   =>
@@ -59,7 +59,7 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
     _handler = handler
     _router = router
     _metrics_conn = metrics_conn
-    _pre_state_target_id = pre_state_target_id
+    _pre_state_target_ids = pre_state_target_ids
     _metrics_reporter = consume metrics_reporter
     _source_notify_builder = source_notify_builder
 
@@ -70,17 +70,18 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
   =>
     _source_notify_builder(_name, env, auth, _handler, _runner_builder,
       _router, _metrics_reporter.clone(), event_log, target_router,
-      _pre_state_target_id)
+      _pre_state_target_ids)
 
   fun val update_router(router: Router): SourceBuilder =>
     BasicSourceBuilder[In, SH](_app_name, _worker_name, _name, _runner_builder,
-      _handler, router, _metrics_conn, _pre_state_target_id,
+      _handler, router, _metrics_conn, _pre_state_target_ids,
       _metrics_reporter.clone(), _source_notify_builder)
 
 interface val SourceBuilderBuilder
   fun name(): String
   fun apply(runner_builder: RunnerBuilder, router: Router,
-    metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
+    metrics_conn: MetricsSink,
+    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end,
     worker_name: String,
     metrics_reporter: MetricsReporter iso):
       SourceBuilder

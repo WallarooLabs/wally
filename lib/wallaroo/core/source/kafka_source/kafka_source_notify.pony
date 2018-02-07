@@ -32,12 +32,13 @@ primitive KafkaSourceNotifyBuilder[In: Any val]
     handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router, pre_state_target_id: (U128 | None) = None):
+    target_router: Router,
+    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
     SourceNotify iso^
   =>
     KafkaSourceNotify[In](pipeline_name, env, auth, handler, runner_builder,
       router, consume metrics_reporter, event_log, target_router,
-      pre_state_target_id)
+      pre_state_target_ids)
 
 class KafkaSourceNotify[In: Any val]
   let _env: Env
@@ -54,14 +55,15 @@ class KafkaSourceNotify[In: Any val]
     handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router, pre_state_target_id: (U128 | None) = None)
+    target_router: Router,
+    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
   =>
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
     _env = env
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
-      target_router, pre_state_target_id)
+      target_router, pre_state_target_ids)
     _router = _runner.clone_router_and_set_input_type(router)
     _metrics_reporter = consume metrics_reporter
 

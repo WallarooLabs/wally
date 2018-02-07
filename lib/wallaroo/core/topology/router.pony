@@ -93,6 +93,73 @@ class val DirectRouter is Router
       recover [_target] end
     end
 
+class val MultiRouter is Router
+  let _routers: Array[DirectRouter] val
+
+  new val create(routers: Array[DirectRouter] val) =>
+    ifdef debug then
+      Invariant(routers.size() > 1)
+    end
+    _routers = routers
+
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
+  =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at MultiRouter\n".cstring())
+    end
+    var is_finished = true
+    for (next_o_frac_id, router) in _routers.pairs() do
+      let o_frac_ids =
+        match frac_ids
+        | None =>
+          recover val Array[U32].init(next_o_frac_id.u32(), 1) end
+        | let f_ids: Array[U32 val] val =>
+          recover val
+            let z = Array[U32](f_ids.size() + 1)
+            for f_id in f_ids.values() do
+              z.push(f_id)
+            end
+            z.push(next_o_frac_id.u32())
+            z
+          end
+        end
+      (let is_f, _) = r.route[D](metric_name, pipeline_time_spent, data,
+        // hand down producer so we can call _next_sequence_id()
+        producer,
+        // incoming envelope
+        i_msg_uid, o_frac_ids,
+        latest_ts, metrics_id, worker_ingress_ts)
+      // If any of the messages sent downstream are not finished, then
+      // we report that this message is not finished yet.
+      if not is_f then is_finished = false end
+    end
+    (is_finished, latest_ts)
+
+  fun routes(): Array[Consumer] val =>
+    let r_set = SetIs[Consumer]
+    for router in _routers.values() do
+      for r in router.routes() do
+        r_set..set(r)
+      end
+    end
+    let rs = recover iso Array[Consumer] end
+    for r in r_set.values() do
+      rs.push(r)
+    end
+    consume rs
+
+  fun routes_not_in(router: Router): Array[Consumer] val =>
+    let rs = recover iso Array[Consumer] end
+    let those_routes = router.routes()
+    for r in routes().values() do
+      if not those_routes.contains(r) then
+        rs.push(r)
+      end
+    end
+    consume rs
+
 class val ProxyRouter is (Router & Equatable[ProxyRouter])
   let _worker_name: String
   let _target: OutgoingBoundary
@@ -136,7 +203,7 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
       (true, latest_ts)
     end
 
-  fun copy_with_new_target_id(target_id: U128): ProxyRouter =>
+  fun copy_with_new_target_id(target_id: StepId): ProxyRouter =>
     ProxyRouter(_worker_name, _target,
       ProxyAddress(_target_proxy_address.worker, target_id), _auth)
 
@@ -178,7 +245,7 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
 // An OmniRouter is a router that can route a message to any Consumer in the
 // system by using a target id.
 trait val OmniRouter is Equatable[OmniRouter]
-  fun route_with_target_id[D: Any val](target_id: U128,
+  fun route_with_target_ids[D: Any val](target_ids: Array[StepId] val,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
@@ -204,12 +271,12 @@ trait val OmniRouter is Equatable[OmniRouter]
   fun blueprint(): OmniRouterBlueprint
 
 class val EmptyOmniRouter is OmniRouter
-  fun route_with_target_id[D: Any val](target_id: U128,
+  fun route_with_target_ids[D: Any val](target_ids: Array[StepId] val,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
-    @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n"
+    @printf[I32]("route_with_target_ids() was called on an EmptyOmniRouter\n"
       .cstring())
     (true, latest_ts)
 
@@ -270,7 +337,7 @@ class val StepIdRouter is OmniRouter
     _outgoing_boundaries = outgoing_boundaries
     _stateless_partitions = stateless_partitions
 
-  fun route_with_target_id[D: Any val](target_id: U128,
+  fun route_with_target_ids[D: Any val](target_ids: Array[StepId] val,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
@@ -278,7 +345,51 @@ class val StepIdRouter is OmniRouter
     ifdef "trace" then
       @printf[I32]("Rcvd msg at OmniRouter\n".cstring())
     end
+    ifdef debug then
+      Invariant(target_ids.size() > 0)
+    end
+    var is_finished = true
+    if target_ids.size() == 1 then
+      try
+        (is_finished, _) = _route_with_target_id[D](target_ids(0)?,
+          metric_name, pipeline_time_spent, data, producer, msg_uid, frac_ids,
+          latest_ts, metrics_id, worker_ingress_ts)
+      else
+        Fail()
+      end
+    else
+      for (next_o_frac_id, next_target_id) in target_ids.pairs() do
+        let o_frac_ids =
+          match frac_ids
+          | None =>
+            recover val Array[U32].init(next_o_frac_id.u32(), 1) end
+          | let f_ids: Array[U32 val] val =>
+            recover val
+              let z = Array[U32](f_ids.size() + 1)
+              for f_id in f_ids.values() do
+                z.push(f_id)
+              end
+              z.push(next_o_frac_id.u32())
+              z
+            end
+          end
 
+        (let is_f, _) = _route_with_target_id[D](next_target_id, metric_name,
+          pipeline_time_spent, data, producer, msg_uid, o_frac_ids, latest_ts,
+          metrics_id, worker_ingress_ts)
+
+        // If at least one downstream message is not finished, then this
+        // message is not yet finished
+        if not is_f then is_finished = false end
+      end
+    end
+    (is_finished, latest_ts)
+
+  fun _route_with_target_id[D: Any val](target_id: StepId,
+    metric_name: String, pipeline_time_spent: U64, data: D,
+    producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
+  =>
     if _data_routes.contains(target_id) then
       try
         let target = _data_routes(target_id)?

@@ -540,33 +540,20 @@ class ComputationRunner[In: Any val, Out: Any val]
     _next.clone_router_and_set_input_type(r)
 
 class PreStateRunner[In: Any val, Out: Any val, S: State ref]
-  let _target_id: U128
+  let _target_id: Array[StepId] val
   let _state_comp: StateComputation[In, Out, S] val
   let _name: String
   let _prep_name: String
   let _state_name: String
 
   new iso create(state_comp: StateComputation[In, Out, S] val,
-    state_name': String, target_id: U128)
+    state_name': String, target_ids: Array[StepId] val)
   =>
-    _target_id = target_id
+    _target_ids = target_ids
     _state_comp = state_comp
     _name = _state_comp.name()
     _prep_name = _name + " prep"
     _state_name = state_name'
-    //TODO: Fix the types on this so we can check something like this.
-    // We want to prove that target_id is 0 iff the output type is None
-    // and not just a subtype of (X | None)
-    // ifdef debug then
-    //   Invariant(
-    //     match None
-    //     | let o: Out =>
-    //       _target_id == 0
-    //     else
-    //       _target_id != 0
-    //     end
-    //   )
-    // end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router,
@@ -583,11 +570,11 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
         | let shared_state_router: Router =>
           let processor: StateComputationWrapper[In, Out, S] =
             StateComputationWrapper[In, Out, S](input, _state_comp,
-              _target_id)
-          shared_state_router.route[
-            StateComputationWrapper[In, Out, S]](
+              _target_ids)
+          shared_state_router.route[StateComputationWrapper[In, Out, S]](
             metric_name, pipeline_time_spent, processor, producer,
-            i_msg_uid, frac_ids, latest_ts, metrics_id + 1, worker_ingress_ts)
+            i_msg_uid, frac_ids, latest_ts, metrics_id + 1,
+            worker_ingress_ts)
         end
       else
         @printf[I32]("StateRunner: Input was not a StateProcessor!\n"
