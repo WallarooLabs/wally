@@ -65,12 +65,13 @@ class val KafkaSourceBuilderBuilder[In: Any val]
   fun name(): String => _name
 
   fun apply(runner_builder: RunnerBuilder, router: Router,
-    metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
+    metrics_conn: MetricsSink,
+    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end,
     worker_name: String, metrics_reporter: MetricsReporter iso):
       SourceBuilder
   =>
     BasicSourceBuilder[In, SourceHandler[In] val](_app_name, worker_name,
       _name, runner_builder, _handler, router,
-      metrics_conn, pre_state_target_id, consume metrics_reporter,
+      metrics_conn, pre_state_target_ids, consume metrics_reporter,
       KafkaSourceNotifyBuilder[In])
 

@@ -36,12 +36,13 @@ primitive TCPFramedSourceNotifyBuilder[In: Any val]
     handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router, pre_state_target_id: (U128 | None) = None):
+    target_router: Router,
+    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
     SourceNotify iso^
   =>
     TCPFramedSourceNotify[In](pipeline_name, env, auth, handler,
       runner_builder, router, consume metrics_reporter, event_log,
-      target_router, pre_state_target_id)
+      target_router, pre_state_target_ids)
 
 class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _env: Env
@@ -60,14 +61,15 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router, pre_state_target_id: (U128 | None) = None)
+    target_router: Router,
+    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
   =>
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
     _env = env
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
-      target_router, pre_state_target_id)
+      target_router, pre_state_target_ids)
     _router = _runner.clone_router_and_set_input_type(router)
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()

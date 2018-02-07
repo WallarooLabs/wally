@@ -210,19 +210,19 @@ class val PreStateData
   let _state_name: String
   let _pre_state_name: String
   let _runner_builder: RunnerBuilder
-  let _target_id: (U128 | None)
+  let _target_ids: Array[StepId] val
   let _forward_route_builder: RouteBuilder
 
-  new val create(runner_builder: RunnerBuilder, t_id: (U128 | None)) =>
+  new val create(runner_builder: RunnerBuilder, t_id: Array[StepId] val) =>
     _runner_builder = runner_builder
     _state_name = runner_builder.state_name()
     _pre_state_name = runner_builder.name()
-    _target_id = t_id
+    _target_ids = t_ids
     _forward_route_builder = runner_builder.forward_route_builder()
 
   fun state_name(): String => _state_name
   fun pre_state_name(): String => _pre_state_name
-  fun target_id(): (U128 | None) => _target_id
+  fun target_ids(): Array[StepId] val => _target_ids
   fun forward_route_builder(): RouteBuilder => _forward_route_builder
   fun clone_router_and_set_input_type(r: Router): Router =>
     _runner_builder.clone_router_and_set_input_type(r)
