@@ -270,7 +270,7 @@ actor Step is (Producer & Consumer)
       @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
     end
 
-    (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
+    (let is_finished, let last_ts) = _runner.run[D](metric_name,
       pipeline_time_spent, data, this, _router, _omni_router,
       msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
       _metrics_reporter)

@@ -96,7 +96,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
         @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
       end
 
-      (let is_finished, let keep_sending, let last_ts) =
+      (let is_finished, let last_ts) =
         try
           let decoded =
             try
@@ -126,7 +126,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
           ifdef debug then
             Fail()
           end
-          (true, true, ingest_ts)
+          (true, ingest_ts)
         end
 
       if is_finished then

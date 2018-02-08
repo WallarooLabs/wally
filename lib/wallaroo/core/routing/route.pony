@@ -33,12 +33,12 @@ trait Route
   // should mute
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16,
-    metric_name: String, worker_ingress_ts: U64): Bool
+    metric_name: String, worker_ingress_ts: U64)
 
   fun ref request_ack()
 
@@ -97,7 +97,7 @@ class EmptyRoute is Route
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
     true
@@ -105,7 +105,7 @@ class EmptyRoute is Route
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16,
-    metric_name: String, worker_ingress_ts: U64): Bool
+    metric_name: String, worker_ingress_ts: U64)
   =>
     Fail()
     true
