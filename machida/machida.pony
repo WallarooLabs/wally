@@ -112,9 +112,11 @@ type ModuleP is Pointer[U8] val
 
 class PyData
   var _data: Pointer[U8] val
+  let _python: Pointer[U8] val
 
-  new create(data: Pointer[U8] val) =>
+  new create(data: Pointer[U8] val, python: Pointer[U8] val) =>
     _data = data
+    _python = python
 
   fun obj(): Pointer[U8] val =>
     _data
@@ -129,13 +131,17 @@ class PyData
     _data = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
+    @PyEval_AcquireThread(_python)
     Machida.dec_ref(_data)
+    @PyEval_ReleaseThread(_python)
 
 class PyState is State
   var _state: Pointer[U8] val
+  let _python: Pointer[U8] val
 
-  new create(state: Pointer[U8] val) =>
+  new create(state: Pointer[U8] val, python: Pointer[U8] val) =>
     _state = state
+    _python = python
 
   fun obj(): Pointer[U8] val =>
     _state
@@ -150,7 +156,9 @@ class PyState is State
     _state = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
+    @PyEval_AcquireThread(_python)
     Machida.dec_ref(_state)
+    @PyEval_ReleaseThread(_python)
 
 class PyStateBuilder
   var _state_builder: Pointer[U8] val
@@ -162,7 +170,7 @@ class PyStateBuilder
 
   fun apply(): PyState =>
     @PyEval_AcquireThread(_python)
-    let r = PyState(@state_builder_build_state(_state_builder))
+    let r = PyState(@state_builder_build_state(_state_builder), _python)
     @PyEval_ReleaseThread(_python)
     r
 
@@ -179,9 +187,7 @@ class PyStateBuilder
     r
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    @PyEval_AcquireThread(_python)
     _state_builder = recover Machida.user_deserialization(bytes) end
-    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
     @PyEval_AcquireThread(_python)
@@ -214,9 +220,7 @@ class PyPartitionFunctionU64
     @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    @PyEval_AcquireThread(_python)
     _partition_function = recover Machida.user_deserialization(bytes) end
-    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
     Machida.dec_ref(_partition_function)
@@ -284,7 +288,7 @@ class PySourceHandler is SourceHandler[PyData val]
     recover
       @PyEval_AcquireThread(_python)
       let r = PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
-        data.size()))
+        data.size()), _python)
       @PyEval_ReleaseThread(_python)
       r
     end
@@ -301,9 +305,7 @@ class PySourceHandler is SourceHandler[PyData val]
     @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    @PyEval_AcquireThread(_python)
     _source_decoder = recover Machida.user_deserialization(bytes) end
-    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
     @PyEval_AcquireThread(_python)
@@ -340,7 +342,7 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
     recover
       @PyEval_AcquireThread(_python)
       let r = PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
-        data.size()))
+        data.size()), _python)
       @PyEval_ReleaseThread(_python)
       r
     end
@@ -357,9 +359,7 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
     @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    @PyEval_AcquireThread(_python)
     _source_decoder = recover Machida.user_deserialization(bytes) end
-    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
     @PyEval_AcquireThread(_python)
@@ -394,7 +394,7 @@ class PyComputation is Computation[PyData val, PyData val]
     @PyEval_ReleaseThread(_python)
 
     if not r.is_null() then
-      Machida.process_computation_results(r, _is_multi)
+      Machida.process_computation_results(r, _is_multi, _python)
     else
       None
     end
@@ -414,9 +414,7 @@ class PyComputation is Computation[PyData val, PyData val]
     @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    @PyEval_AcquireThread(_python)
     _computation = recover Machida.user_deserialization(bytes) end
-    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
     @PyEval_AcquireThread(_python)
@@ -448,7 +446,7 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
         Machida.dec_ref(data)
         None
       else
-        Machida.process_computation_results(data, _is_multi)
+        Machida.process_computation_results(data, _is_multi, _python)
       end
     end
     @PyEval_ReleaseThread(_python)
@@ -478,9 +476,7 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
     @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    @PyEval_AcquireThread(_python)
     _computation = recover Machida.user_deserialization(bytes) end
-    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
     @PyEval_AcquireThread(_python)
@@ -522,9 +518,7 @@ class PyTCPEncoder is TCPSinkEncoder[PyData val]
     @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    @PyEval_AcquireThread(_python)
     _sink_encoder = recover Machida.user_deserialization(bytes) end
-    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
     @PyEval_AcquireThread(_python)
@@ -891,7 +885,7 @@ primitive Machida
 
     consume arr
 
-  fun py_list_int_to_pony_array_pydata(py_array: Pointer[U8] val):
+  fun py_list_int_to_pony_array_pydata(py_array: Pointer[U8] val, python: Pointer[U8] val):
     Array[PyData val] val
   =>
     let size = @PyList_Size(py_array)
@@ -900,7 +894,7 @@ primitive Machida
     for i in Range(0, size) do
       let obj = @PyList_GetItem(py_array, i)
       Machida.inc_ref(obj)
-      arr.push(recover val PyData(obj) end)
+      arr.push(recover val PyData(obj, python) end)
     end
 
     consume arr
@@ -961,14 +955,14 @@ primitive Machida
   fun dec_ref(o: Pointer[U8] box) =>
     @py_decref(o)
 
-  fun process_computation_results(data: Pointer[U8] val, multi: Bool):
+  fun process_computation_results(data: Pointer[U8] val, multi: Bool, python: Pointer[U8] val):
     (PyData val | Array[PyData val] val)
   =>
     if not multi then
-      recover val PyData(data) end
+      recover val PyData(data, python) end
     else
       if @py_list_check(data) == 1 then
-        let out = Machida.py_list_int_to_pony_array_pydata(data)
+        let out = Machida.py_list_int_to_pony_array_pydata(data, python)
         Machida.dec_ref(data)
         out
       else
