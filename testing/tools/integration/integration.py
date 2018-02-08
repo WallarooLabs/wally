@@ -763,19 +763,13 @@ def setup_resilience_path(res_dir):
         try:
             os.remove(path)
         except Exception as e:
-            print 'Warning: remove %s failed: %s' % (path, e)
+            logging.warning('Warning: remove %s failed: %s' % (path, e))
 
 def create_resilience_dir(res_dir):
     try:
         os.mkdir(res_dir)
     except Exception as e:
         logging.exception('Warning: mkdir %s failed: %s' % (res_dir, e))
-
-def delete_resilience_dir(res_dir):
-    try:
-        os.rmdir(res_dir)
-    except Exception as e:
-        logging.warning('Warning: rmdir %s failed: %s' % (res_dir, e))
 
 def clean_resilience_path(res_dir):
     try:
