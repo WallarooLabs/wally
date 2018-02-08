@@ -154,42 +154,69 @@ class PyState is State
 
 class PyStateBuilder
   var _state_builder: Pointer[U8] val
+  let _python: Pointer[U8] val
 
-  new create(state_builder: Pointer[U8] val) =>
+  new create(state_builder: Pointer[U8] val, python: Pointer[U8] val) =>
     _state_builder = state_builder
+    _python = python
 
   fun apply(): PyState =>
-    PyState(@state_builder_build_state(_state_builder))
+    @PyEval_AcquireThread(_python)
+    let r = PyState(@state_builder_build_state(_state_builder))
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_state_builder)
+    @PyEval_AcquireThread(_python)
+    let r = Machida.user_serialization_get_size(_state_builder)
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    Machida.user_serialization(_state_builder, bytes)
+    @PyEval_AcquireThread(_python)
+    let r = Machida.user_serialization(_state_builder, bytes)
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     _state_builder = recover Machida.user_deserialization(bytes) end
+    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
+    @PyEval_AcquireThread(_python)
     Machida.dec_ref(_state_builder)
+    @PyEval_ReleaseThread(_python)
 
 class PyPartitionFunctionU64
   var _partition_function: Pointer[U8] val
+  let _python: Pointer[U8] val
 
-  new create(partition_function: Pointer[U8] val) =>
+  new create(partition_function: Pointer[U8] val, python: Pointer[U8] val) =>
     _partition_function = partition_function
+    _python = python
 
   fun apply(data: PyData val): U64 =>
-    Machida.partition_function_partition_u64(_partition_function, data.obj())
+    @PyEval_AcquireThread(_python)
+    let r = Machida.partition_function_partition_u64(_partition_function, data.obj())
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_partition_function)
+    @PyEval_AcquireThread(_python)
+    let r = Machida.user_serialization_get_size(_partition_function)
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     Machida.user_serialization(_partition_function, bytes)
+    @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     _partition_function = recover Machida.user_deserialization(bytes) end
+    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
     Machida.dec_ref(_partition_function)
@@ -361,8 +388,10 @@ class PyComputation is Computation[PyData val, PyData val]
     _python = python
 
   fun apply(input: PyData val): (PyData val | Array[PyData val] val |None) =>
+    @PyEval_AcquireThread(_python)
     let r: Pointer[U8] val =
       Machida.computation_compute(_computation, input.obj(), _is_multi, _python)
+    @PyEval_ReleaseThread(_python)
 
     if not r.is_null() then
       Machida.process_computation_results(r, _is_multi)
@@ -410,6 +439,7 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
     sc_repo: StateChangeRepository[PyState], state: PyState):
     ((PyData val | Array[PyData val] val | None), (None | DirectStateChange))
   =>
+    @PyEval_AcquireThread(_python)
     (let data, let persist) =
       Machida.stateful_computation_compute(_computation, input.obj(),
         state.obj(), _is_multi, _python)
@@ -421,6 +451,7 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
         Machida.process_computation_results(data, _is_multi)
       end
     end
+    @PyEval_ReleaseThread(_python)
 
     let p = if Machida.bool_check(persist) then
       DirectStateChange
@@ -436,16 +467,25 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
     recover val Array[StateChangeBuilder[PyState] val] end
 
   fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_computation)
+    @PyEval_AcquireThread(_python)
+    let r = Machida.user_serialization_get_size(_computation)
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     Machida.user_serialization(_computation, bytes)
+    @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     _computation = recover Machida.user_deserialization(bytes) end
+    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
+    @PyEval_AcquireThread(_python)
     Machida.dec_ref(_computation)
+    @PyEval_ReleaseThread(_python)
 
 class PyTCPEncoder is TCPSinkEncoder[PyData val]
   var _sink_encoder: Pointer[U8] val
@@ -645,7 +685,7 @@ primitive Machida
         let state_builderp = @PyTuple_GetItem(item, 2)
         Machida.inc_ref(state_builderp)
         let state_builder = recover val
-          PyStateBuilder(state_builderp)
+          PyStateBuilder(state_builderp, python)
         end
 
         let state_name = recover val
@@ -664,7 +704,7 @@ primitive Machida
         let state_builderp = @PyTuple_GetItem(item, 2)
         Machida.inc_ref(state_builderp)
         let state_builder = recover val
-          PyStateBuilder(state_builderp)
+          PyStateBuilder(state_builderp, python)
         end
 
         let state_name = recover val
@@ -674,7 +714,7 @@ primitive Machida
         let partition_functionp = @PyTuple_GetItem(item, 4)
         Machida.inc_ref(partition_functionp)
         let partition_function = recover val
-          PyPartitionFunctionU64(partition_functionp)
+          PyPartitionFunctionU64(partition_functionp, python)
         end
 
         let partition_values = Machida.py_list_int_to_pony_array_u64(
@@ -695,7 +735,7 @@ primitive Machida
         let state_builderp = @PyTuple_GetItem(item, 2)
         Machida.inc_ref(state_builderp)
         let state_builder = recover val
-          PyStateBuilder(state_builderp)
+          PyStateBuilder(state_builderp, python)
         end
 
         let state_name = recover val
@@ -774,9 +814,7 @@ primitive Machida
     multi: Bool, python: Pointer[U8] val): Pointer[U8] val
   =>
     let method = if multi then "compute_multi" else "compute" end
-    @PyEval_AcquireThread(python)
     let r = @computation_compute(computation, data, method.cstring())
-    @PyEval_ReleaseThread(python)
     print_errors()
     r
 
@@ -786,10 +824,8 @@ primitive Machida
   (Pointer[U8] val, Pointer[U8] val)
   =>
     let method = if multi then "compute_multi" else "compute" end
-    @PyEval_AcquireThread(python)
     let r =
       @stateful_computation_compute(computation, data, state, method.cstring())
-    @PyEval_ReleaseThread(python)
     print_errors()
     let msg = @PyTuple_GetItem(r, 0)
     let persist = @PyTuple_GetItem(r, 1)
