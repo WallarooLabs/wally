@@ -35,16 +35,15 @@ use "wallaroo/core/state"
 
 
 interface Runner
-  // Return a Bool indicating whether the message is finished processing,
-  // a Bool indicating whether the Route has filled its queue, and a U64
-  // indicating the last timestamp for calculating the duration of the
-  // computation
+  // Return a Bool indicating whether the message is finished processing
+  // and a U64 indicating the last timestamp for calculating the duration of
+  // the computation
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
+    metrics_reporter: MetricsReporter ref): (Bool, U64)
   fun name(): String
   fun state_name(): String
   fun clone_router_and_set_input_type(r: Router): Router
@@ -452,12 +451,12 @@ class ComputationRunner[In: Any val, Out: Any val]
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
+    metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
     var computation_start: U64 = 0
     var computation_end: U64 = 0
 
-    (let is_finished, let keep_sending, let last_ts) =
+    (let is_finished, let last_ts) =
       match data
       | let input: In =>
         computation_start = Time.nanos()
@@ -472,7 +471,7 @@ class ComputationRunner[In: Any val, Out: Any val]
           end
 
         match result
-        | None => (true, true, computation_end)
+        | None => (true, computation_end)
         | let output: Out =>
           _next.run[Out](metric_name, pipeline_time_spent, output, producer,
             router, omni_router,
@@ -482,9 +481,6 @@ class ComputationRunner[In: Any val, Out: Any val]
         | let outputs: Array[Out] val =>
           var this_is_finished = true
           var this_last_ts = computation_end
-          // this is unused and kept here only for short term posterity until
-          // https://github.com/WallarooLabs/wallaroo/issues/1010 is addressed
-          let this_keep_sending = true
 
           for (frac_id, output) in outputs.pairs() do
             let o_frac_ids = match frac_ids
@@ -503,7 +499,7 @@ class ComputationRunner[In: Any val, Out: Any val]
               end
             end
 
-            (let f, let s, let ts) = _next.run[Out](metric_name,
+            (let f, let ts) = _next.run[Out](metric_name,
               pipeline_time_spent, output, producer,
               router, omni_router,
               i_msg_uid, o_frac_ids,
@@ -518,10 +514,10 @@ class ComputationRunner[In: Any val, Out: Any val]
 
             this_last_ts = ts
           end
-          (this_is_finished, this_keep_sending, this_last_ts)
+          (this_is_finished, this_last_ts)
         end
       else
-        (true, true, latest_ts)
+        (true, latest_ts)
       end
 
     let latest_metrics_id = ifdef "detailed-metrics" then
@@ -535,7 +531,7 @@ class ComputationRunner[In: Any val, Out: Any val]
     metrics_reporter.step_metric(metric_name, _computation_name,
       latest_metrics_id, computation_start, computation_end)
 
-    (is_finished, keep_sending, last_ts)
+    (is_finished, last_ts)
 
   fun name(): String => _computation.name()
   fun state_name(): String => ""
@@ -577,10 +573,10 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
+    metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
     let wrapper_creation_start_ts = Time.nanos()
-    (let is_finished, let keep_sending, let last_ts) =
+    (let is_finished, let last_ts) =
       match data
       | let input: In =>
         match router
@@ -596,13 +592,13 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
       else
         @printf[I32]("StateRunner: Input was not a StateProcessor!\n"
           .cstring())
-        (true, true, latest_ts)
+        (true, latest_ts)
       end
     let wrapper_creation_end_ts = Time.nanos()
     metrics_reporter.step_metric(metric_name, _name, metrics_id,
       wrapper_creation_start_ts, wrapper_creation_end_ts
       where prefix = "Pre:")
-    (is_finished, keep_sending, last_ts)
+    (is_finished, last_ts)
 
   fun name(): String => _name
   fun state_name(): String => _state_name
@@ -661,7 +657,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
+    metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
     match data
     | let sp: StateProcessor[S] =>
@@ -677,11 +673,10 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
         metric_name, pipeline_time_spent, producer,
         i_msg_uid, frac_ids, latest_ts, new_metrics_id, worker_ingress_ts)
       let is_finished = result._1
-      let keep_sending = result._2
-      let state_change = result._3
-      let sc_start_ts = result._4
-      let sc_end_ts = result._5
-      let last_ts = result._6
+      let state_change = result._2
+      let sc_start_ts = result._3
+      let sc_end_ts = result._4
+      let last_ts = result._5
 
       let latest_metrics_id = ifdef "detailed-metrics" then
           metrics_reporter.step_metric(metric_name, sp.name(), metrics_id,
@@ -722,10 +717,10 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
         end
       end
 
-      (is_finished, keep_sending, last_ts)
+      (is_finished, last_ts)
     else
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
-      (true, true, latest_ts)
+      (true, latest_ts)
     end
 
   fun rotate_log() =>
@@ -766,7 +761,7 @@ class iso RouterRunner
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
+    metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
     match router
     | let r: Router =>

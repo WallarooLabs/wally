@@ -55,7 +55,7 @@ trait val StateProcessor[S: State ref] is BasicComputation
     omni_router: OmniRouter, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
-    (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
+    (Bool, (StateChange[S] ref | DirectStateChange | None), U64,
       U64, U64)
 
 trait InputWrapper
@@ -79,7 +79,7 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
     omni_router: OmniRouter, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
-    (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
+    (Bool, (StateChange[S] ref | DirectStateChange | None), U64,
       U64, U64)
   =>
     let computation_start = Time.nanos()
@@ -89,21 +89,17 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
     // It matters that the None check comes first, since Out could be
     // type None if you always filter/end processing there
     match result
-    | (None, _) => (true, true, result._2, computation_start,
+    | (None, _) => (true, result._2, computation_start,
         computation_end, computation_end) // This must come first
     | (let output: Out, _) =>
-      (let is_finished, let keep_sending, let last_ts) = omni_router.route_with_target_id[Out](
+      (let is_finished, let last_ts) = omni_router.route_with_target_id[Out](
         _target_id, metric_name, pipeline_time_spent, output, producer,
         i_msg_uid, frac_ids, computation_end, metrics_id, worker_ingress_ts)
 
-      (is_finished, keep_sending, result._2, computation_start,
-        computation_end, last_ts)
+      (is_finished, result._2, computation_start, computation_end, last_ts)
       | (let outputs: Array[Out] val, _) =>
           var this_is_finished = true
           var this_last_ts = computation_end
-          // this is unused and kept here only for short term posterity until
-          // https://github.com/WallarooLabs/wallaroo/issues/1010 is addressed
-          let this_keep_sending = true
 
           for (frac_id, output) in outputs.pairs() do
             let o_frac_ids = match frac_ids
@@ -122,7 +118,7 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
               end
             end
 
-            (let f, let s, let ts) =
+            (let f, let ts) =
               omni_router.route_with_target_id[Out](
                 _target_id, metric_name, pipeline_time_spent, output, producer,
                 i_msg_uid, o_frac_ids,
@@ -136,10 +132,10 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
 
             this_last_ts = ts
           end
-          (this_is_finished, this_keep_sending, result._2,
-            computation_start, computation_end, this_last_ts)
+          (this_is_finished, result._2, computation_start, computation_end,
+            this_last_ts)
     else
-      (true, true, result._2, computation_start, computation_end,
+      (true, result._2, computation_start, computation_end,
         computation_end)
     end
 

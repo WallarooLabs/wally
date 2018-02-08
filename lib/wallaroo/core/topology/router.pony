@@ -34,16 +34,16 @@ use "wallaroo/core/state"
 trait val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   fun routes(): Array[Consumer] val
   fun routes_not_in(router: Router): Array[Consumer] val
 
 class val EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
-    (true, true, latest_ts)
+    (true, latest_ts)
 
   fun routes(): Array[Consumer] val =>
     recover Array[Consumer] end
@@ -59,7 +59,7 @@ class val DirectRouter is Router
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DirectRouter\n".cstring())
@@ -71,18 +71,17 @@ class val DirectRouter is Router
       ifdef "trace" then
         @printf[I32]("DirectRouter found Route\n".cstring())
       end
-      let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
+      r.run[D](metric_name, pipeline_time_spent, data,
         // hand down producer so we can call _next_sequence_id()
         producer,
         // incoming envelope
         i_msg_uid, frac_ids,
         latest_ts, metrics_id, worker_ingress_ts)
-      (false, keep_sending, latest_ts)
+      (false, latest_ts)
     else
       // TODO: What do we do if we get None?
-      (true, true, latest_ts)
+      (true, latest_ts)
     end
-
 
   fun routes(): Array[Consumer] val =>
     recover [_target] end
@@ -92,14 +91,6 @@ class val DirectRouter is Router
       recover Array[Consumer] end
     else
       recover [_target] end
-    end
-
-  fun has_sink(): Bool =>
-    match _target
-    | let tcp: Sink =>
-      true
-    else
-      false
     end
 
 class val ProxyRouter is (Router & Equatable[ProxyRouter])
@@ -118,7 +109,7 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at ProxyRouter\n".cstring())
@@ -136,13 +127,13 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
         _target_proxy_address,
         msg_uid, frac_ids)
 
-      let keep_sending = r.forward(delivery_msg, pipeline_time_spent, producer,
+      r.forward(delivery_msg, pipeline_time_spent, producer,
         latest_ts, metrics_id, metric_name, worker_ingress_ts)
 
-      (false, keep_sending, latest_ts)
+      (false, latest_ts)
     else
       Fail()
-      (true, true, latest_ts)
+      (true, latest_ts)
     end
 
   fun copy_with_new_target_id(target_id: U128): ProxyRouter =>
@@ -190,7 +181,7 @@ trait val OmniRouter is Equatable[OmniRouter]
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
 
   fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter
 
@@ -216,11 +207,11 @@ class val EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n"
       .cstring())
-    (true, true, latest_ts)
+    (true, latest_ts)
 
   fun val add_boundary(w: String,
     boundary: OutgoingBoundary): OmniRouter
@@ -282,7 +273,7 @@ class val StepIdRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at OmniRouter\n".cstring())
@@ -298,19 +289,19 @@ class val StepIdRouter is OmniRouter
           ifdef "trace" then
             @printf[I32]("OmniRouter found Route to Step\n".cstring())
           end
-          let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
+          r.run[D](metric_name, pipeline_time_spent, data,
             producer, msg_uid, frac_ids,
             latest_ts, metrics_id, worker_ingress_ts)
 
-          (false, keep_sending, latest_ts)
+          (false, latest_ts)
         else
           // No route for this target
           Fail()
-          (true, true, latest_ts)
+          (true, latest_ts)
         end
       else
         Unreachable()
-        (true, true, latest_ts)
+        (true, latest_ts)
       end
     else
       // This target_id step exists on another worker
@@ -332,17 +323,17 @@ class val StepIdRouter is OmniRouter
                   _worker_name, data, metric_name,
                   pa, msg_uid, frac_ids)
 
-                let keep_sending = r.forward(delivery_msg, pipeline_time_spent,
+                r.forward(delivery_msg, pipeline_time_spent,
                   producer, latest_ts, metrics_id,
                   metric_name, worker_ingress_ts)
-                (false, keep_sending, latest_ts)
+                (false, latest_ts)
               else
                 // We don't have a route to this boundary
                 ifdef debug then
                   @printf[I32]("OmniRouter had no Route\n".cstring())
                 end
                 Fail()
-                (true, true, latest_ts)
+                (true, latest_ts)
               end
             else
               // We don't have a reference to the right outgoing boundary
@@ -351,14 +342,14 @@ class val StepIdRouter is OmniRouter
                   " OutgoingBoundary\n").cstring())
               end
               Fail()
-              (true, true, latest_ts)
+              (true, latest_ts)
             end
           | let sink_id: StepId =>
-            (true, true, latest_ts)
+            (true, latest_ts)
           end
         else
           Fail()
-          (true, true, latest_ts)
+          (true, latest_ts)
         end
       else
         try
@@ -372,7 +363,7 @@ class val StepIdRouter is OmniRouter
               " step id\n").cstring())
           end
           Fail()
-          (true, true, latest_ts)
+          (true, latest_ts)
         end
       end
     end
@@ -801,7 +792,7 @@ class val LocalPartitionRouter[In: Any val,
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at PartitionRouter\n".cstring())
@@ -822,13 +813,13 @@ class val LocalPartitionRouter[In: Any val,
               ifdef "trace" then
                 @printf[I32]("PartitionRouter found Route\n".cstring())
               end
-              let keep_sending = r.run[D](metric_name, pipeline_time_spent,
+              r.run[D](metric_name, pipeline_time_spent,
                 data, producer, i_msg_uid, frac_ids,
                 latest_ts, metrics_id, worker_ingress_ts)
-              (false, keep_sending, latest_ts)
+              (false, latest_ts)
             else
               // TODO: What do we do if we get None?
-              (true, true, latest_ts)
+              (true, latest_ts)
             end
           | let p: ProxyRouter =>
             p.route[D](metric_name, pipeline_time_spent, data, producer,
@@ -845,7 +836,7 @@ class val LocalPartitionRouter[In: Any val,
               "this key\n\n").cstring())
             end
           end
-          (true, true, latest_ts)
+          (true, latest_ts)
         end
       else
         // InputWrapper doesn't wrap In
@@ -853,10 +844,10 @@ class val LocalPartitionRouter[In: Any val,
           @printf[I32](("LocalPartitionRouter.route: InputWrapper doesn't " +
             "contain data of type In\n").cstring())
         end
-        (true, true, latest_ts)
+        (true, latest_ts)
       end
     else
-      (true, true, latest_ts)
+      (true, latest_ts)
     end
 
   fun clone_and_set_input_type[NewIn: Any val](
@@ -1228,7 +1219,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at StatelessPartitionRouter\n".cstring())
@@ -1244,13 +1235,13 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
           ifdef "trace" then
             @printf[I32]("StatelessPartitionRouter found Route\n".cstring())
           end
-          let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
+          r.run[D](metric_name, pipeline_time_spent, data,
             producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
             worker_ingress_ts)
-          (false, keep_sending, latest_ts)
+          (false, latest_ts)
         else
           // TODO: What do we do if we get None?
-          (true, true, latest_ts)
+          (true, latest_ts)
         end
       | let p: ProxyRouter =>
         p.route[D](metric_name, pipeline_time_spent, data, producer,
@@ -1258,7 +1249,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       end
     else
       // Can't find route
-      (true, true, latest_ts)
+      (true, latest_ts)
     end
 
   fun register_routes(router: Router, route_builder': RouteBuilder) =>

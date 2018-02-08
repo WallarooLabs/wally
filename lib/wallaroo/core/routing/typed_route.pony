@@ -64,7 +64,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("--Rcvd msg at Route (%s)\n".cstring(),
@@ -90,7 +90,7 @@ class TypedRoute[In: Any val] is Route
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
-    worker_ingress_ts: U64): Bool
+    worker_ingress_ts: U64)
   =>
     // Forward should never be called on a TypedRoute
     Fail()
