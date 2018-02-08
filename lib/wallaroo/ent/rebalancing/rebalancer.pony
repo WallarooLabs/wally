@@ -55,21 +55,27 @@ primitive PartitionRebalancer
       let common_amount = try_to_send / joining_worker_count
       var leftover = try_to_send - (common_amount * joining_worker_count)
       for i in Range(0, joining_worker_count) do
-        counts_to_send.push(
+        let next_count_to_send =
           if leftover > 0 then
             leftover = leftover - 1
             common_amount + 1
           else
             common_amount
           end
-        )
+        counts_to_send.push(next_count_to_send)
       end
     else
       for i in Range(0, joining_worker_count) do
         counts_to_send.push(0)
       end
     end
-    (try_to_send, consume counts_to_send)
+
+    var total_to_send: USize = 0
+    for c in counts_to_send.values() do
+      total_to_send = total_to_send + c
+    end
+
+    (total_to_send, consume counts_to_send)
 
   fun step_counts_to_send_on_leaving(total_steps: USize,
     remaining_workers_count: USize): Array[USize] val

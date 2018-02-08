@@ -141,6 +141,7 @@ class iso _TestRebalancerStepsForTwo4GrowCycles is UnitTest
     h.assert_eq[Bool](true, _Worker4GrowIterations(5, tolerance)?)
     h.assert_eq[Bool](true, _Worker4GrowIterations(10, tolerance)?)
     h.assert_eq[Bool](true, _Worker4GrowIterations(11, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(27, tolerance)?)
     h.assert_eq[Bool](true, _Worker4GrowIterations(349, tolerance)?)
     h.assert_eq[Bool](true, _Worker4GrowIterations(350, tolerance)?)
     h.assert_eq[Bool](true, _Worker4GrowIterations(750, tolerance)?)
