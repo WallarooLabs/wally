@@ -72,7 +72,7 @@ machida_build: $(MACHIDA_BUILD)/machida
 -include $(MACHIDA_PATH)/machida.d
 $(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a
 	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS) --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD))
+	$(eval PONYCFLAGS := $(original_PONYCFLAGS) --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD) --debug)
 	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
 	$(eval PONYCFLAGS := $(original_PONYCFLAGS))
 

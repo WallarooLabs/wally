@@ -87,6 +87,11 @@ use @py_decref[None](o: Pointer[U8] box)
 use @py_list_check[I32](b: Pointer[U8] box)
 
 use @Py_Initialize[None]()
+use @PyEval_InitThreads[None]()
+use @PyEval_SaveThread[Pointer[U8] val]()
+use @PyEval_RestoreThread[None](thread: Pointer[U8] val)
+use @PyEval_AcquireThread[None](thread: Pointer[U8] val)
+use @PyEval_ReleaseThread[None](thread: Pointer[U8] val)
 use @PyErr_Clear[None]()
 use @PyErr_Occurred[Pointer[U8]]()
 use @PyErr_print[None]()
@@ -242,34 +247,50 @@ class PyPartitionFunction
 
 class PySourceHandler is SourceHandler[PyData val]
   var _source_decoder: Pointer[U8] val
+  let _python: Pointer[U8] val
 
-  new create(source_decoder: Pointer[U8] val) =>
+  new create(source_decoder: Pointer[U8] val, python: Pointer[U8] val) =>
     _source_decoder = source_decoder
+    _python = python
 
   fun decode(data: Array[U8] val): PyData val =>
     recover
-      PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
+      @PyEval_AcquireThread(_python)
+      let r = PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
         data.size()))
+      @PyEval_ReleaseThread(_python)
+      r
     end
 
   fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_source_decoder)
+    @PyEval_AcquireThread(_python)
+    let r = Machida.user_serialization_get_size(_source_decoder)
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     Machida.user_serialization(_source_decoder, bytes)
+    @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     _source_decoder = recover Machida.user_deserialization(bytes) end
+    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
+    @PyEval_AcquireThread(_python)
     Machida.dec_ref(_source_decoder)
+    @PyEval_ReleaseThread(_python)
 
 class PyFramedSourceHandler is FramedSourceHandler[PyData val]
   var _source_decoder: Pointer[U8] val
   let _header_length: USize
+  let _python: Pointer[U8] val
 
-  new create(source_decoder: Pointer[U8] val) ? =>
+  new create(source_decoder: Pointer[U8] val, python: Pointer[U8] val) ? =>
     _source_decoder = source_decoder
+    _python = python
     let hl = Machida.framed_source_decoder_header_length(_source_decoder)
     if (Machida.err_occurred()) or (hl == 0) then
       @printf[U32]("ERROR: _header_length %d is invalid\n".cstring(), hl)
@@ -282,32 +303,47 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
     _header_length
 
   fun payload_length(data: Array[U8] iso): USize =>
-    Machida.framed_source_decoder_payload_length(_source_decoder, data.cpointer(),
+    @PyEval_AcquireThread(_python)
+    let r = Machida.framed_source_decoder_payload_length(_source_decoder, data.cpointer(),
       data.size())
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun decode(data: Array[U8] val): PyData val =>
     recover
-      PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
+      @PyEval_AcquireThread(_python)
+      let r = PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
         data.size()))
+      @PyEval_ReleaseThread(_python)
+      r
     end
 
   fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_source_decoder)
+    @PyEval_AcquireThread(_python)
+    let r = Machida.user_serialization_get_size(_source_decoder)
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     Machida.user_serialization(_source_decoder, bytes)
+    @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     _source_decoder = recover Machida.user_deserialization(bytes) end
+    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
+    @PyEval_AcquireThread(_python)
     Machida.dec_ref(_source_decoder)
+    @PyEval_ReleaseThread(_python)
 
 class PyComputationBuilder
   var _computation: PyComputation val
 
-  new create(computation: Pointer[U8] val) =>
-    _computation = recover val PyComputation(computation) end
+  new create(computation: Pointer[U8] val, python: Pointer[U8] val) =>
+    _computation = recover val PyComputation(computation, python) end
 
   fun apply(): PyComputation val =>
     _computation
@@ -316,15 +352,17 @@ class PyComputation is Computation[PyData val, PyData val]
   var _computation: Pointer[U8] val
   let _name: String
   let _is_multi: Bool
+  let _python: Pointer[U8] val
 
-  new create(computation: Pointer[U8] val) =>
+  new create(computation: Pointer[U8] val, python: Pointer[U8] val) =>
     _computation = computation
     _name = Machida.get_name(_computation)
     _is_multi = Machida.implements_compute_multi(_computation)
+    _python = python
 
   fun apply(input: PyData val): (PyData val | Array[PyData val] val |None) =>
     let r: Pointer[U8] val =
-      Machida.computation_compute(_computation, input.obj(), _is_multi)
+      Machida.computation_compute(_computation, input.obj(), _is_multi, _python)
 
     if not r.is_null() then
       Machida.process_computation_results(r, _is_multi)
@@ -336,26 +374,37 @@ class PyComputation is Computation[PyData val, PyData val]
     _name
 
   fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_computation)
+    @PyEval_AcquireThread(_python)
+    let r = Machida.user_serialization_get_size(_computation)
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     Machida.user_serialization(_computation, bytes)
+    @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     _computation = recover Machida.user_deserialization(bytes) end
+    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
+    @PyEval_AcquireThread(_python)
     Machida.dec_ref(_computation)
+    @PyEval_ReleaseThread(_python)
 
 class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
   var _computation: Pointer[U8] val
   let _name: String
   let _is_multi: Bool
+  let _python: Pointer[U8] val
 
-  new create(computation: Pointer[U8] val) =>
+  new create(computation: Pointer[U8] val, python: Pointer[U8] val) =>
     _computation = computation
     _name = Machida.get_name(_computation)
     _is_multi = Machida.implements_compute_multi(_computation)
+    _python = python
 
   fun apply(input: PyData val,
     sc_repo: StateChangeRepository[PyState], state: PyState):
@@ -363,7 +412,7 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
   =>
     (let data, let persist) =
       Machida.stateful_computation_compute(_computation, input.obj(),
-        state.obj(), _is_multi)
+        state.obj(), _is_multi, _python)
 
     let d = recover if Machida.is_py_none(data) then
         Machida.dec_ref(data)
@@ -400,11 +449,14 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
 
 class PyTCPEncoder is TCPSinkEncoder[PyData val]
   var _sink_encoder: Pointer[U8] val
+  let _python: Pointer[U8] val
 
-  new create(sink_encoder: Pointer[U8] val) =>
+  new create(sink_encoder: Pointer[U8] val, python: Pointer[U8] val) =>
     _sink_encoder = sink_encoder
+    _python = python
 
   fun apply(data: PyData val, wb: Writer): Array[ByteSeq] val =>
+    @PyEval_AcquireThread(_python)
     let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
     if not byte_buffer.is_null() and not Machida.is_py_none(byte_buffer) then
       let arr = recover val
@@ -415,19 +467,29 @@ class PyTCPEncoder is TCPSinkEncoder[PyData val]
       Machida.dec_ref(byte_buffer)
       wb.write(arr)
     end
+    @PyEval_ReleaseThread(_python)
     wb.done()
 
   fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_sink_encoder)
+    @PyEval_AcquireThread(_python)
+    let r = Machida.user_serialization_get_size(_sink_encoder)
+    @PyEval_ReleaseThread(_python)
+    r
 
   fun _serialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     Machida.user_serialization(_sink_encoder, bytes)
+    @PyEval_ReleaseThread(_python)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    @PyEval_AcquireThread(_python)
     _sink_encoder = recover Machida.user_deserialization(bytes) end
+    @PyEval_ReleaseThread(_python)
 
   fun _final() =>
+    @PyEval_AcquireThread(_python)
     Machida.dec_ref(_sink_encoder)
+    @PyEval_ReleaseThread(_python)
 
 class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
   var _sink_encoder: Pointer[U8] val
@@ -494,6 +556,7 @@ primitive Machida
 
   fun start_python() =>
     @Py_Initialize()
+    @PyEval_InitThreads()
 
   fun load_module(module_name: String): ModuleP ? =>
     let r = @load_module(module_name.cstring())
@@ -519,6 +582,8 @@ primitive Machida
     let application_setup_item_count = @list_item_count(application_setup_data)
 
     var app: (None | Application) = None
+    let python = @PyEval_SaveThread()
+    @PyEval_AcquireThread(python)
 
     for idx in Range(0, application_setup_item_count) do
       let item = @get_application_setup_item(application_setup_data, idx)
@@ -551,7 +616,7 @@ primitive Machida
 
         let source_config = recover val
           let sct = @PyTuple_GetItem(item, 2)
-          _SourceConfig.from_tuple(sct, env)?
+          _SourceConfig.from_tuple(sct, env, python)?
         end
 
         latest = (latest as Application).new_pipeline[PyData val, PyData val](
@@ -561,20 +626,20 @@ primitive Machida
       | "to" =>
         let computation = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(computation)
-        let builder = recover val PyComputationBuilder(computation) end
+        let builder = recover val PyComputationBuilder(computation, python) end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to[PyData val](builder)
       | "to_parallel" =>
         let computation = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(computation)
-        let builder = recover val PyComputationBuilder(computation) end
+        let builder = recover val PyComputationBuilder(computation, python) end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_parallel[PyData val](builder)
       | "to_stateful" =>
         let state_computationp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(state_computationp)
         let state_computation = recover val
-          PyStateComputation(state_computationp)
+          PyStateComputation(state_computationp, python)
         end
 
         let state_builderp = @PyTuple_GetItem(item, 2)
@@ -593,7 +658,7 @@ primitive Machida
         let state_computationp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(state_computationp)
         let state_computation = recover val
-          PyStateComputation(state_computationp)
+          PyStateComputation(state_computationp, python)
         end
 
         let state_builderp = @PyTuple_GetItem(item, 2)
@@ -624,7 +689,7 @@ primitive Machida
         let state_computationp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(state_computationp)
         let state_computation = recover val
-          PyStateComputation(state_computationp)
+          PyStateComputation(state_computationp, python)
         end
 
         let state_builderp = @PyTuple_GetItem(item, 2)
@@ -654,7 +719,7 @@ primitive Machida
       | "to_sink" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_sink(
-          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env)?)
+          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env, python)?)
         sink_idx = sink_idx + 1
         latest
       | "done" =>
@@ -665,6 +730,7 @@ primitive Machida
     end
 
     Machida.dec_ref(application_setup_data)
+    @PyEval_ReleaseThread(python)
     app as Application
 
   fun framed_source_decoder_header_length(source_decoder: Pointer[U8] val): USize =>
@@ -705,20 +771,25 @@ primitive Machida
     r
 
   fun computation_compute(computation: Pointer[U8] val, data: Pointer[U8] val,
-    multi: Bool): Pointer[U8] val
+    multi: Bool, python: Pointer[U8] val): Pointer[U8] val
   =>
     let method = if multi then "compute_multi" else "compute" end
+    @PyEval_AcquireThread(python)
     let r = @computation_compute(computation, data, method.cstring())
+    @PyEval_ReleaseThread(python)
     print_errors()
     r
 
   fun stateful_computation_compute(computation: Pointer[U8] val,
-    data: Pointer[U8] val, state: Pointer[U8] val, multi: Bool):
+    data: Pointer[U8] val, state: Pointer[U8] val, multi: Bool, python:
+    Pointer[U8] val):
   (Pointer[U8] val, Pointer[U8] val)
   =>
     let method = if multi then "compute_multi" else "compute" end
+    @PyEval_AcquireThread(python)
     let r =
       @stateful_computation_compute(computation, data, state, method.cstring())
+    @PyEval_ReleaseThread(python)
     print_errors()
     let msg = @PyTuple_GetItem(r, 0)
     let persist = @PyTuple_GetItem(r, 1)
@@ -878,7 +949,7 @@ primitive Machida
     @PyObject_HasAttrString(o, method.cstring()) == 1
 
 primitive _SourceConfig
-  fun from_tuple(source_config_tuple: Pointer[U8] val, env: Env):
+  fun from_tuple(source_config_tuple: Pointer[U8] val, env: Env, python: Pointer[U8] val):
     SourceConfig[PyData val] ?
   =>
     let name = recover val
@@ -898,7 +969,7 @@ primitive _SourceConfig
       let decoder = recover val
         let d = @PyTuple_GetItem(source_config_tuple, 3)
         Machida.inc_ref(d)
-        PyFramedSourceHandler(d)?
+        PyFramedSourceHandler(d, python)?
       end
 
       TCPSourceConfig[PyData val](decoder, host, port)
@@ -908,7 +979,7 @@ primitive _SourceConfig
       let decoder = recover val
         let d = @PyTuple_GetItem(source_config_tuple, 4)
         Machida.inc_ref(d)
-        PySourceHandler(d)
+        PySourceHandler(d, python)
       end
 
       KafkaSourceConfig[PyData val](consume ksco, (env.root as TCPConnectionAuth), decoder)
@@ -947,7 +1018,7 @@ primitive _SourceConfig
     KafkaConfigOptions("Wallaroo Kafka Source", KafkaConsumeOnly, topic, brokers, log_level)
 
 primitive _SinkConfig
-  fun from_tuple(sink_config_tuple: Pointer[U8] val, env: Env):
+  fun from_tuple(sink_config_tuple: Pointer[U8] val, env: Env, python: Pointer[U8] val):
     SinkConfig[PyData val] ?
   =>
     let name = recover val
@@ -967,7 +1038,7 @@ primitive _SinkConfig
       let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
       Machida.inc_ref(encoderp)
       let encoder = recover val
-        PyTCPEncoder(encoderp)
+        PyTCPEncoder(encoderp, python)
       end
 
       TCPSinkConfig[PyData val](encoder, host, port)
