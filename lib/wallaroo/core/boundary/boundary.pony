@@ -437,9 +437,10 @@ actor OutgoingBoundary is Consumer
     _upstreams.set(producer)
 
   be unregister_producer(producer: Producer) =>
-    ifdef debug then
-      Invariant(_upstreams.contains(producer))
-    end
+    // TODO: Determine if we need this Invariant.
+    // ifdef debug then
+    //   Invariant(_upstreams.contains(producer))
+    // end
 
     _upstreams.unset(producer)
 
