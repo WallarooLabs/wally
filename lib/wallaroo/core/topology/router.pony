@@ -954,9 +954,11 @@ class val LocalPartitionRouter[In: Any val,
     worker_count: USize, state_name': String,
     router_registry: RouterRegistry ref)
   =>
+    let joining_worker_count = target_workers.size()
+    let former_worker_count = worker_count - joining_worker_count
     (let total_to_send, let to_send_counts) =
       PartitionRebalancer.step_counts_to_send(size(), _local_map.size(),
-        worker_count - 1, target_workers.size())
+        former_worker_count, joining_worker_count)
 
     let steps_to_migrate' = steps_to_migrate(total_to_send, to_send_counts,
       target_workers)
