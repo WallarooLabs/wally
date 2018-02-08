@@ -20,6 +20,7 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     test(_TestRebalancerStepsFromOne)
     test(_TestRebalancerStepsForNewWorker)
+    test(_TestRebalancerStepsForTwo4GrowCycles)
 
 class iso _TestRebalancerStepsFromOne is UnitTest
   """
@@ -128,6 +129,25 @@ class iso _TestRebalancerStepsForNewWorker is UnitTest
     h.assert_eq[Bool](true, _WorkerIterations(5500, tolerance))
     h.assert_eq[Bool](true, _WorkerIterations(105_500, tolerance))
 
+class iso _TestRebalancerStepsForTwo4GrowCycles is UnitTest
+  fun name(): String =>
+    "rebalancing/RebalancerStepsForTwo4GrowCycles"
+
+  fun ref apply(h: TestHelper) ? =>
+    // The tolerance is how far we allow a worker's step count to be off from
+    // the ideal (where the ideal is the total partition size divided by the
+    // number of workers).
+    let tolerance: F64 = 4.0
+    h.assert_eq[Bool](true, _Worker4GrowIterations(5, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(10, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(11, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(349, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(350, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(750, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(2111, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(5050, tolerance)?)
+    h.assert_eq[Bool](true, _Worker4GrowIterations(103_340, tolerance)?)
+
 primitive _From3Workers
   fun apply(partition_size: USize, tolerance: F64): Bool =>
     let current_workers_count: USize = 3
@@ -225,3 +245,106 @@ primitive _WorkerIterations
       partition_size.f64() / (current_workers_count + 1).f64()
     diff = w5_count.f64() - w5_ideal
     (diff <= tolerance) and (diff >= -tolerance)
+
+primitive _Worker4GrowIterations
+  fun apply(partition_size: USize, tolerance: F64): Bool ? =>
+    //////
+    // Begin with 1 worker.  Add 4.  Then add 4 again.
+    //////
+    var current_workers_count: USize = 1
+
+    //Initial step counts
+    var initializer_count: USize = partition_size
+    var w1_count: USize = 0
+    var w2_count: USize = 0
+    var w3_count: USize = 0
+    var w4_count: USize = 0
+    var w5_count: USize = 0
+    var w6_count: USize = 0
+    var w7_count: USize = 0
+    var w8_count: USize = 0
+
+    (var total_to_send1, var counts_to_send1) = PartitionRebalancer.
+      step_counts_to_send(partition_size, initializer_count,
+        current_workers_count, 4)
+    // Distribute steps to first 4 joining workers
+    w1_count = counts_to_send1(0)?
+    w2_count = counts_to_send1(1)?
+    w3_count = counts_to_send1(2)?
+    w4_count = counts_to_send1(3)?
+    initializer_count = initializer_count - total_to_send1
+
+    current_workers_count = 5
+
+    let first_round_ideal: F64 =
+      partition_size.f64() / current_workers_count.f64()
+    var diff0 = initializer_count.f64() - first_round_ideal
+    var diff1 = w1_count.f64() - first_round_ideal
+    var diff2 = w2_count.f64() - first_round_ideal
+    var diff3 = w3_count.f64() - first_round_ideal
+    var diff4 = w4_count.f64() - first_round_ideal
+    if not (((diff0 <= tolerance) and (diff0 >= -tolerance)) and
+      ((diff1 <= tolerance) and (diff1 >= -tolerance)) and
+      ((diff2 <= tolerance) and (diff2 >= -tolerance)) and
+      ((diff3 <= tolerance) and (diff3 >= -tolerance)) and
+      ((diff4 <= tolerance) and (diff4 >= -tolerance)))
+    then
+      return false
+    end
+
+    // Init
+    (var init_total_to_send, var init_counts_to_send) = PartitionRebalancer.
+      step_counts_to_send(partition_size, initializer_count,
+        current_workers_count, 4)
+    // w1
+    (var w1_total_to_send, var w1_counts_to_send) = PartitionRebalancer.
+      step_counts_to_send(partition_size, w1_count, current_workers_count, 4)
+    // w2
+    (var w2_total_to_send, var w2_counts_to_send) = PartitionRebalancer.
+      step_counts_to_send(partition_size, w2_count, current_workers_count, 4)
+    // w3
+    (var w3_total_to_send, var w3_counts_to_send) = PartitionRebalancer.
+      step_counts_to_send(partition_size, w3_count, current_workers_count, 4)
+    // w4
+    (var w4_total_to_send, var w4_counts_to_send) = PartitionRebalancer.
+      step_counts_to_send(partition_size, w4_count, current_workers_count, 4)
+
+    // Distribute steps to second 4 joining workers
+    w5_count = init_counts_to_send(0)? + w1_counts_to_send(0)? +
+      w2_counts_to_send(0)? + w3_counts_to_send(0)? + w4_counts_to_send(0)?
+    w6_count = init_counts_to_send(1)? + w1_counts_to_send(1)? +
+      w2_counts_to_send(1)? + w3_counts_to_send(1)? + w4_counts_to_send(1)?
+    w7_count = init_counts_to_send(2)? + w1_counts_to_send(2)? +
+      w2_counts_to_send(2)? + w3_counts_to_send(2)? + w4_counts_to_send(2)?
+    w8_count = init_counts_to_send(3)? + w1_counts_to_send(3)? +
+      w2_counts_to_send(3)? + w3_counts_to_send(3)? + w4_counts_to_send(3)?
+    initializer_count = initializer_count - init_total_to_send
+    w1_count = w1_count - w1_total_to_send
+    w2_count = w2_count - w2_total_to_send
+    w3_count = w3_count - w3_total_to_send
+    w4_count = w4_count - w4_total_to_send
+
+    current_workers_count = 9
+
+    let second_round_ideal: F64 =
+      partition_size.f64() / current_workers_count.f64()
+
+    diff0 = initializer_count.f64() - second_round_ideal
+    diff1 = w1_count.f64() - second_round_ideal
+    diff2 = w2_count.f64() - second_round_ideal
+    diff3 = w3_count.f64() - second_round_ideal
+    diff4 = w4_count.f64() - second_round_ideal
+    var diff5 = w5_count.f64() - second_round_ideal
+    var diff6 = w6_count.f64() - second_round_ideal
+    var diff7 = w7_count.f64() - second_round_ideal
+    var diff8 = w8_count.f64() - second_round_ideal
+    (((diff0 <= tolerance) and (diff0 >= -tolerance)) and
+      ((diff1 <= tolerance) and (diff1 >= -tolerance)) and
+      ((diff2 <= tolerance) and (diff2 >= -tolerance)) and
+      ((diff3 <= tolerance) and (diff3 >= -tolerance)) and
+      ((diff4 <= tolerance) and (diff4 >= -tolerance)) and
+      ((diff5 <= tolerance) and (diff5 >= -tolerance)) and
+      ((diff6 <= tolerance) and (diff6 >= -tolerance)) and
+      ((diff7 <= tolerance) and (diff7 >= -tolerance)) and
+      ((diff8 <= tolerance) and (diff8 >= -tolerance)))
+
