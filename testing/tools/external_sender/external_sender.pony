@@ -53,7 +53,8 @@ actor Main
               -----------------------------------------------------------------------------------
               --external/-e [Specifies address to send message to]
               --type/-t [Specifies message type]
-                  clean-shutdown | rotate-log | partition-query | print
+                  clean-shutdown | rotate-log | partition-query |
+                  cluster-status-query | print
               --message/-m [Specifies message contents to send]
                   rotate-log
                       Node name to rotate log files
@@ -75,6 +76,9 @@ actor Main
         | "partition-query" =>
           await_response = true
           ExternalMsgEncoder.partition_query()
+        | "cluster-status-query" =>
+          await_response = true
+          ExternalMsgEncoder.cluster_status_query()
         else // default to print
           ExternalMsgEncoder.print_message(message)
         end
@@ -128,6 +132,10 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
         | let m: ExternalPartitionQueryResponseMsg =>
           _env.out.print("Partition Distribution:")
           _env.out.print(m.msg)
+          conn.dispose()
+        | let m: ExternalClusterStatusQueryResponseMsg =>
+          _env.out.print("Cluster Status:")
+          _env.out.print(m.string())
           conn.dispose()
         else
           _env.err.print("Received unhandled external message type")

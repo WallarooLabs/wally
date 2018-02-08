@@ -30,7 +30,8 @@ primitive _ShrinkQueryResponse                  fun apply(): U16 => 5
 primitive _ShrinkErrorResponse                  fun apply(): U16 => 6
 primitive _PartitionQuery                       fun apply(): U16 => 7
 primitive _PartitionQueryResponse               fun apply(): U16 => 8
-
+primitive _ClusterStatusQuery                   fun apply(): U16 => 9
+primitive _ClusterStatusQueryResponse           fun apply(): U16 => 10
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -76,6 +77,10 @@ primitive ExternalMsgEncoder
     _encode(_ShrinkErrorResponse(), message, wb)
 
   fun partition_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    A message requesting the current distribution of partition steps across
+    workers (organized by partition type and partition name).
+    """
     _encode(_PartitionQuery(), "", wb)
 
   fun partition_query_response(state_routers: Map[String, PartitionRouter],
@@ -100,6 +105,22 @@ primitive ExternalMsgEncoder
     digest_map("stateless_partitions") = consume stateless_ps
     let pqr = PartitionQueryEncoder.state_and_stateless(digest_map)
     _encode(_PartitionQueryResponse(), pqr, wb)
+
+  fun cluster_status_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    A message requesting current cluster status. How many workers? What are
+    the worker names? Is the cluster currently processing messages (i.e. not
+    in a stop the world phase)?
+    """
+    _encode(_ClusterStatusQuery(), "", wb)
+
+  fun cluster_status_query_response(worker_count: USize,
+    worker_names: Array[String] val, stop_the_world_in_process: Bool,
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let csr = ClusterStatusQueryJsonEncoder.response(worker_count.u64(),
+      worker_names, stop_the_world_in_process)
+    _encode(_ClusterStatusQueryResponse(), csr, wb)
 
 primitive ExternalMsgDecoder
   fun apply(data: Array[U8] val): ExternalMsg val ? =>
@@ -130,6 +151,10 @@ primitive ExternalMsgDecoder
       ExternalPartitionQueryMsg
     | (_PartitionQueryResponse(), let s: String) =>
       ExternalPartitionQueryResponseMsg(s)
+    | (_ClusterStatusQuery(), let s: String) =>
+      ExternalClusterStatusQueryMsg
+    | (_ClusterStatusQueryResponse(), let s: String) =>
+      ClusterStatusQueryJsonDecoder.response(s)?
     else
       error
     end
@@ -263,3 +288,31 @@ class val ExternalPartitionQueryResponseMsg is ExternalMsg
 
   new val create(m: String) =>
     msg = m
+
+primitive ExternalClusterStatusQueryMsg is ExternalMsg
+
+class val ExternalClusterStatusQueryResponseMsg is ExternalMsg
+  let worker_count: U64
+  let worker_names: Array[String] val
+  let processing_messages: Bool
+
+  new val create(worker_count': U64, worker_names': Array[String] val,
+    processing_messages': Bool)
+  =>
+    worker_count = worker_count'
+    worker_names = worker_names'
+    processing_messages = processing_messages'
+
+  fun string(): String =>
+    let ws = Array[String]
+    for w in worker_names.values() do
+      ws.push(w)
+    end
+    var workers_string = "|"
+    for w in ws.values() do
+     workers_string = workers_string + w + ","
+    end
+    workers_string = workers_string + "|"
+    "Processing messages: " + processing_messages.string() +
+      ", Worker count: " + worker_count.string() + ", Workers: " +
+      workers_string
