@@ -100,6 +100,18 @@ primitive ShrinkQueryJsonEncoder
     entries.push(_Quoted("node_count") + ":" + node_count.string())
     _JsonEncoder(consume entries, _JsonMap)
 
+primitive ClusterStatusQueryJsonEncoder
+  fun response(worker_count: U64, worker_names: Array[String] val,
+    stop_the_world_in_process: Bool): String
+  =>
+    let entries = recover iso Array[String] end
+    entries.push(_Quoted("processing_messages") + ":" +
+      (not stop_the_world_in_process).string())
+    entries.push(_Quoted("worker_names") + ":" + _JsonEncoder(worker_names,
+      _JsonArray))
+    entries.push(_Quoted("worker_count") + ":" + worker_count.string())
+    _JsonEncoder(consume entries, _JsonMap)
+
 primitive JsonDecoder
   fun string_array(s: String): Array[String] val =>
     let items = recover iso Array[String] end
@@ -300,3 +312,48 @@ primitive ShrinkQueryJsonDecoder
     let node_count: U64 = p_map("node_count")?.u64()?
 
     ExternalShrinkQueryResponseMsg(node_names, node_count)
+
+primitive ClusterStatusQueryJsonDecoder
+  fun response(json: String): ExternalClusterStatusQueryResponseMsg ? =>
+    let p_map = Map[String, String]
+    var is_key = true
+    var this_key = ""
+    var next_key = recover iso Array[U8] end
+    var next_str = recover iso Array[U8] end
+    for i in Range(1, json.size()) do
+      let next_char = json(i)?
+      if is_key then
+        if next_char == ':' then
+          is_key = false
+          this_key = String.from_array(next_key = recover iso Array[U8] end)
+        elseif (next_char != '"') and (next_char != ',') then
+          next_key.push(next_char)
+        end
+      else
+        let delimiter: U8 =
+          match this_key
+          | "processing_messages" => ','
+          | "worker_names" => ']'
+          | "worker_count" => '}'
+          else error
+          end
+        if next_char == delimiter then
+          let str = String.from_array(next_str = recover iso Array[U8] end)
+          p_map(this_key) = str
+          is_key = true
+        else
+          next_str.push(next_char)
+        end
+      end
+    end
+
+    let processing_string = p_map("processing_messages")?
+    let is_processing = if processing_string == "true" then true else false end
+
+    let workers_string = p_map("worker_names")?
+    let worker_names = JsonDecoder.string_array(workers_string)
+
+    let worker_count: U64 = p_map("worker_count")?.u64()?
+
+    ExternalClusterStatusQueryResponseMsg(worker_count, worker_names,
+      is_processing)

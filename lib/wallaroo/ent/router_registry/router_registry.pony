@@ -489,6 +489,13 @@ actor RouterRegistry
       _partition_routers, _stateless_partition_routers)
     conn.writev(msg)
 
+  be cluster_status_query(worker_names: Array[String] val,
+    conn: TCPConnection)
+  =>
+    let msg = ExternalMsgEncoder.cluster_status_query_response(
+      worker_names.size(), worker_names, _stop_the_world_in_process)
+    conn.writev(msg)
+
   //////////////
   // LOG ROTATION
   //////////////
