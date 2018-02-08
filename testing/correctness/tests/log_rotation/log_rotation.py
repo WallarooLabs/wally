@@ -24,12 +24,14 @@ from integration import (ex_validate,
                          Sender,
                          sequence_generator,
                          setup_resilience_path,
+                         clean_resilience_path,
                          Sink,
                          SinkAwaitValue,
                          start_runners,
                          TimeoutError)
 import os
 import re
+import tempfile
 import time
 import struct
 
@@ -60,7 +62,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data'
+    res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     expect = 2000
     last_value_0 = '[{}]'.format(','.join((str(expect-v)
                                          for v in range(6,-2,-2))))
@@ -199,6 +201,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)
 
 
 def test_log_rotation_external_trigger_recovery_pony():
@@ -215,7 +218,7 @@ def _test_log_rotation_external_trigger_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data'
+    res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     expect = 2000
     last_value_0 = '[{}]'.format(','.join((str(expect-v)
                                          for v in range(6,-2,-2))))
@@ -382,6 +385,7 @@ def _test_log_rotation_external_trigger_recovery(command):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)
 
 
 def test_log_rotation_file_size_trigger_no_recovery_pony():
@@ -398,7 +402,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data'
+    res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     expect = 2000
     event_log_file_size = 50000
     last_value_0 = '[{}]'.format(','.join((str(expect-v)
@@ -525,6 +529,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)
 
 
 def test_log_rotation_file_size_trigger_recovery_pony():
@@ -541,7 +546,7 @@ def _test_log_rotation_file_size_trigger_recovery(command):
     host = '127.0.0.1'
     sources = 1
     workers = 2
-    res_dir = '/tmp/res-data'
+    res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     expect = 2000
     event_log_file_size = 50000
     last_value_0 = '[{}]'.format(','.join((str(expect-v)
@@ -697,3 +702,4 @@ def _test_log_rotation_file_size_trigger_recovery(command):
     finally:
         for r in runners:
             r.stop()
+        clean_resilience_path(res_dir)

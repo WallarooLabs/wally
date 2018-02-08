@@ -400,8 +400,10 @@ def CLI():
     parser.add_argument('--batch-size', type=int, default=1,
                         help=("The batch size to use in the senders. "
                               "The same batch size is used in all senders."))
-    parser.add_argument('--resilience-dir', type=str, default='/tmp/res-dir',
-                        help=("The path of the resilience data files."))
+    parser.add_argument('--resilience-dir', type=str, default=None,
+                        help=("The path of the resilience data files. "
+                              "(default=random directory in /tmp created by "
+                              "tempfile.mkdtemp()."))
 
     # When to stop the run and begin validation
     stopper = parser.add_mutually_exclusive_group()

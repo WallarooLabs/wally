@@ -20,6 +20,7 @@ import os
 import random
 import re
 import shlex
+import shutil
 import socket
 import struct
 import subprocess
@@ -756,11 +757,28 @@ def ex_validate(cmd):
 def setup_resilience_path(res_dir):
     # create resilience data directory if it doesn't already exist
     if not os.path.exists(res_dir):
-        os.mkdir(res_dir)
-    # if any files are in this directory, remove them
+        create_resilience_dir(res_dir)
     for f in os.listdir(res_dir):
-        os.remove(os.path.join(res_dir, f))
+        path = os.path.join(res_dir, f)
+        try:
+            os.remove(path)
+        except Exception as e:
+            logging.warning('Warning: remove %s failed: %s' % (path, e))
 
+def create_resilience_dir(res_dir):
+    try:
+        os.mkdir(res_dir)
+    except Exception as e:
+        logging.exception('Warning: mkdir %s failed: %s' % (res_dir, e))
+
+def clean_resilience_path(res_dir):
+    try:
+        os.environ['KEEP_RESILIENCE_PATH']
+        delete = False
+    except:
+        delete = True
+    if delete and os.path.exists(res_dir):
+        shutil.rmtree(res_dir, True)
 
 def is_address_available(host, port):
     """
@@ -989,7 +1007,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                   host='127.0.0.1', listen_attempts=1,
                   ready_timeout=30,
                   runner_join_timeout=DEFAULT_RUNNER_JOIN_TIMEOUT,
-                  resilience_dir='/tmp/res-dir',
+                  resilience_dir=None,
                   spikes={}):
     """
     Run a pipeline test without having to instrument everything
@@ -1066,6 +1084,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
     then expected should be [1,1,1,2,2,2].
     """
 
+    if resilience_dir is None:
+        resilience_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     setup_resilience_path(resilience_dir)
     runners = []
     try:
@@ -1247,7 +1267,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             validation_files = validate_file.split(',')
             for sink, fp in zip(sinks, validation_files):
                 sink.save(fp, giles_mode)
-            return [(r.name, r.get_output()) for r in runners]
+            # let the code after 'finally' return our data
 
         else:  # compare expected to processed
             # Decode captured output from sink
@@ -1333,4 +1353,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                             outputs))
 
     # Return runner names and outputs if try block didn't have a return
-    return [(r.name, r.get_output()) for r in runners]
+    return_value = [(r.name, r.get_output()) for r in runners]
+    clean_resilience_path(resilience_dir)
+    return return_value
