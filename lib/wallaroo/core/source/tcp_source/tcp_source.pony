@@ -396,14 +396,15 @@ actor TCPSource is Producer
     if not _unregistered then
       _dispose_routes()
     end
-    _unregistered = true
 
   fun ref _dispose_routes() =>
-    for r in _routes.values() do
-      r.dispose()
+    if not _unregistered then
+      for r in _routes.values() do
+        r.dispose()
+      end
+      _unregistered = true
     end
     _muted = true
-    _unregistered = true
 
   fun ref _pending_reads() =>
     """
