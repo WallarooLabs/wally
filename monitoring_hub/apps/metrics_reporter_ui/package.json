@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "accounting": "^0.4.1",
-    "d3": "github:wallaroolabs/d3#master",
+    "d3": "github:wallaroolabs/d3#v3.5.7",
     "express": "^4.13.3",
     "flux": "^2.1.1",
     "history": "^1.12.6",
