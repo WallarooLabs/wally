@@ -15,7 +15,6 @@
 
 import string
 import struct
-import pickle
 
 import wallaroo
 
@@ -32,14 +31,6 @@ def application_setup(args):
                           partition, letter_partitions)
     ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()
-
-
-def serialize(o):
-    return pickle.dumps(o)
-
-
-def deserialize(bs):
-    return pickle.loads(bs)
 
 
 @wallaroo.partition
