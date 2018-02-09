@@ -58,10 +58,7 @@ class BoundaryRoute is Route
     _route_id
 
   fun ref dispose() =>
-    """
-    Return unused credits to downstream consumer
-    """
-    _route.dispose()
+    None
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,

@@ -57,9 +57,6 @@ class TypedRoute[In: Any val] is Route
     _route_id
 
   fun ref dispose() =>
-    """
-    Return unused credits to downstream consumer
-    """
     _route.dispose()
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
