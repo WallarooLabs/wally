@@ -33,11 +33,12 @@ defmodule MetricsReporterUI.ThroughputsBroadcaster.Worker do
       time_diff: time_diff, start_time: start_time} = state
       :timer.sleep(1000)
       current_time = calculate_time_diff(time_diff)
-      end_time_without_partials = current_time - 2
+      reporting_period = 2
+      end_time_without_partials = current_time - reporting_period
       expected_start_time = end_time_without_partials - 300
       logs_start_time = if (expected_start_time < start_time), do: start_time, else: expected_start_time
-      received_throughput_msgs = get_throughput_msgs(log_name, logs_start_time, current_time)
-      complete_throughput_msgs = for timestamp <- logs_start_time..end_time_without_partials, into: [] do
+      received_throughput_msgs = get_throughput_msgs(log_name, logs_start_time, end_time_without_partials)
+      complete_throughput_msgs = for timestamp <- logs_start_time..(end_time_without_partials - reporting_period), into: [] do
         Enum.find(received_throughput_msgs, generate_empty_throughput_msg(pipeline_key, timestamp), fn throughput_msg ->
           throughput_msg["time"] == timestamp
         end)
