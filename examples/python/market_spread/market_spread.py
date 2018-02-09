@@ -13,7 +13,6 @@
 #  permissions and limitations under the License.
 
 
-import pickle
 import struct
 import time
 
@@ -67,14 +66,6 @@ def application_setup(args):
             symbol_partition_function, symbol_partitions
         ).done()
     return ab.build()
-
-
-def serialize(o):
-    return pickle.dumps(o)
-
-
-def deserialize(bs):
-    return pickle.loads(bs)
 
 
 class MarketSpreadError(Exception):
