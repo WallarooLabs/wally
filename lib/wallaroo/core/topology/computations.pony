@@ -92,7 +92,7 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
     | (None, _) => (true, result._2, computation_start,
         computation_end, computation_end) // This must come first
     | (let output: Out, _) =>
-      (let is_finished, let last_ts) = omni_router.route_with_target_id[Out](
+      (let is_finished, let last_ts) = omni_router.route_with_target_ids[Out](
         _target_ids, metric_name, pipeline_time_spent, output, producer,
         i_msg_uid, frac_ids, computation_end, metrics_id, worker_ingress_ts)
 
@@ -119,10 +119,9 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
             end
 
             (let f, let ts) =
-              omni_router.route_with_target_id[Out](
-                _target_ids, metric_name, pipeline_time_spent, output,
-                producer, i_msg_uid, o_frac_ids, computation_end, metrics_id,
-                worker_ingress_ts)
+              omni_router.route_with_target_ids[Out](_target_ids, metric_name,
+                pipeline_time_spent, output, producer, i_msg_uid, o_frac_ids,
+                computation_end, metrics_id, worker_ingress_ts)
 
             // we are sending multiple messages, only mark this message as
             // finished if all are finished

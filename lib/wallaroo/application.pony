@@ -81,7 +81,7 @@ trait BasicPipeline
   fun source_builder(): SourceBuilderBuilder ?
   fun source_route_builder(): RouteBuilder
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
-  fun val sink_builders(): Array[SinkBuilder]
+  fun val sink_builders(): Array[SinkBuilder] val
   fun val sink_ids(): Array[StepId] val
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder ?
@@ -131,7 +131,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder
 
-  fun val sink_builders(): Array[SinkBuilder] val | None) => _sink_builders
+  fun val sink_builders(): Array[SinkBuilder] val => _sink_builders
 
   fun val sink_ids(): Array[StepId] val => _sink_ids
 
@@ -259,7 +259,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
   fun ref to_sinks(sink_configs: Array[SinkConfig[Out]]): Application =>
     if sink_configs.size() == 0 then
-      FatalUserError(("You must specify at least one sink when using " +
+      FatalUserError("You must specify at least one sink when using " +
         "to_sinks()")
     end
     for config in sink_configs.values() do

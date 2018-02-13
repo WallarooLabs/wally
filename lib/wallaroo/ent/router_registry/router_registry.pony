@@ -1094,8 +1094,7 @@ actor RouterRegistry
         | let psds: Array[PreStateData] val =>
           for psd in psds.values() do
             if psd.state_name() == state_name then
-              match psd.target_id()
-              | let tid: U128 =>
+              for tid in psd.target_ids().values() do
                 try
                   let target_router =
                     DirectRouter(_data_router.step_for_id(tid)?)
