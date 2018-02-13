@@ -39,15 +39,15 @@ class val StepBuilder
   let _pipeline_name: String
   let _state_name: String
   let _runner_builder: RunnerBuilder
-  let _id: U128
-  let _pre_state_target_id: (U128 | None)
+  let _id: StepId
+  let _pre_state_target_ids: Array[StepId] val
   let _is_stateful: Bool
   let _forward_route_builder: RouteBuilder
 
   new val create(app_name: String, worker_name: String,
-    pipeline_name': String, r: RunnerBuilder, id': U128,
+    pipeline_name': String, r: RunnerBuilder, id': StepId,
     is_stateful': Bool = false,
-    pre_state_target_id': (U128 | None) = None,
+    pre_state_target_ids': Array[StepId] val,
     forward_route_builder': RouteBuilder = BoundaryOnlyRouteBuilder)
   =>
     _app_name = app_name
@@ -57,14 +57,14 @@ class val StepBuilder
     _state_name = _runner_builder.state_name()
     _id = id'
     _is_stateful = is_stateful'
-    _pre_state_target_id = pre_state_target_id'
+    _pre_state_target_ids = pre_state_target_ids'
     _forward_route_builder = forward_route_builder'
 
   fun name(): String => _runner_builder.name()
   fun state_name(): String => _state_name
   fun pipeline_name(): String => _pipeline_name
-  fun id(): U128 => _id
-  fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
+  fun id(): StepId => _id
+  fun pre_state_target_ids(): Array[StepId] val => _pre_state_target_ids
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
@@ -90,7 +90,7 @@ class val StepBuilder
     step
 
 class val SourceData
-  let _id: U128
+  let _id: StepId
   let _pipeline_name: String
   let _name: String
   let _state_name: String
@@ -98,12 +98,12 @@ class val SourceData
   let _runner_builder: RunnerBuilder
   let _route_builder: RouteBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
-  let _pre_state_target_id: (U128 | None)
+  let _pre_state_target_ids: Array[StepId] val
 
-  new val create(id': U128, b: SourceBuilderBuilder, r: RunnerBuilder,
+  new val create(id': StepId, b: SourceBuilderBuilder, r: RunnerBuilder,
     default_source_route_builder: RouteBuilder,
     s: SourceListenerBuilderBuilder,
-    pre_state_target_id': (U128 | None) = None)
+    pre_state_target_id': Array[StepId] val)
   =>
     _id = id'
     _pipeline_name = b.name()
@@ -120,7 +120,7 @@ class val SourceData
       end
     _source_listener_builder_builder = s
 
-    _pre_state_target_id = pre_state_target_id'
+    _pre_state_target_ids = pre_state_target_id'
 
   fun builder(): SourceBuilderBuilder => _builder
   fun runner_builder(): RunnerBuilder => _runner_builder
@@ -129,8 +129,8 @@ class val SourceData
   fun name(): String => _name
   fun state_name(): String => _state_name
   fun pipeline_name(): String => _pipeline_name
-  fun id(): U128 => _id
-  fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
+  fun id(): StepId => _id
+  fun pre_state_target_ids(): Array[StepId] val => _pre_state_target_ids
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
@@ -147,12 +147,12 @@ class val SourceData
 class val EgressBuilder
   let _name: String
   let _pipeline_name: String
-  let _id: U128
+  let _id: StepId
   // None if this is a sink to an external system
   let _proxy_addr: (ProxyAddress | None)
   let _sink_builder: (SinkBuilder | None)
 
-  new val create(pipeline_name': String, id': U128,
+  new val create(pipeline_name': String, id': StepId,
     sink_builder: (SinkBuilder | None) = None,
     proxy_addr: (ProxyAddress | None) = None)
   =>
@@ -172,8 +172,8 @@ class val EgressBuilder
   fun name(): String => _name
   fun state_name(): String => ""
   fun pipeline_name(): String => _pipeline_name
-  fun id(): U128 => _id
-  fun pre_state_target_id(): (U128 | None) => None
+  fun id(): StepId => _id
+  fun pre_state_target_ids(): Array[StepId] val => recover Array[StepId] end
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
