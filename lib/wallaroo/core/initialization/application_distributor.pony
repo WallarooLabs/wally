@@ -117,7 +117,7 @@ actor ApplicationDistributor is Distributor
         consume ssb_trn
 
       // Keep track of sink ids
-      let sink_ids: Array[U128] = sink_ids.create()
+      let sink_ids: Array[StepId] = sink_ids.create()
 
       // Keep track of proxy ids per worker
       let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
@@ -137,12 +137,11 @@ actor ApplicationDistributor is Distributor
             " pipeline\n").cstring())
         end
 
-        // Since every worker will have an instance of the sink, we record
-        // the step id and not the proxy address in our step map if there
-        // is a step id for this pipeline.
-        match pipeline.sink_id()
-        | let sid: U128 =>
-          step_map(sid) = sid
+        // Since every worker will have an instance of the sinks, we record
+        // the step ids and not the proxy addresses in our step map if there
+        // are sink step ids for this pipeline.
+        for s_id in pipeline.sink_ids().values() do
+          step_map(s_id) = s_id
         end
 
         @printf[I32](("The " + pipeline.name() + " pipeline has " +
@@ -319,18 +318,18 @@ actor ApplicationDistributor is Distributor
           end
 
         // If the source contains a prestate runner, then we might need
-        // a pre state target id, None if not
-        let source_pre_state_target_id: (U128 | None) =
+        // pre state target ids
+        let source_pre_state_target_ids: Array[StepId] val = recover val
+          let ids = recover iso Array[StepId] end
           if source_seq_builder.is_prestate() then
             try
-              step_runner_builders(0)?.id()
+              ids.push(step_runner_builders(0)?.id())
             else
-              match pipeline.sink_id()
-              | let sid: U128 =>
+              for (idx, sid) in pipeline.sink_ids().pairs() do
                 // We need a sink on every worker involved in the
                 // partition
                 let egress_builder = EgressBuilder(pipeline.name(),
-                  sid, pipeline.sink_builder())
+                  sid, pipeline.sink_builders()(idx)?)
 
                 match source_partition_workers
                 | let w: String =>
@@ -352,22 +351,20 @@ actor ApplicationDistributor is Distributor
                       error
                     end
                   end
-                // source_partition_workers shouldn't be None since we showed
-                // that source_seq_builders.is_prestate() is true
                 end
 
+                // Add to our array of all sink ids
                 sink_ids.push(sid)
+                // Add to our running array for this source seq builder
+                ids.push(sid)
               end
-
-              pipeline.sink_id()
             end
-          else
-            None
+            ids
           end
 
         if source_seq_builder.is_prestate() then
           let psd = PreStateData(source_seq_builder,
-            source_pre_state_target_id)
+            source_pre_state_target_ids)
           pre_state_data.push(psd)
 
           let state_builder =
@@ -384,7 +381,7 @@ actor ApplicationDistributor is Distributor
           pipeline.source_builder()?, source_seq_builder,
           pipeline.source_route_builder(),
           pipeline.source_listener_builder_builder(),
-          source_pre_state_target_id)
+          source_pre_state_target_ids)
 
         non_shrinkable.set(initializer_name)
 
@@ -542,16 +539,17 @@ actor ApplicationDistributor is Distributor
                     worker
                   end
 
-                let pre_state_target_id: (U128 | None) =
+                let pre_state_target_ids: Array[StepId] val = recover val
+                  let ids = Array[StepId]
                   try
-                    step_runner_builders(runner_builder_idx + 1)?.id()
+                    ids.push(
+                      step_runner_builders(runner_builder_idx + 1)?.id())
                   else
-                    match pipeline.sink_id()
-                    | let sid: U128 =>
+                    for (idx, sid) in pipeline.sink_ids().pairs() do
                       // We need a sink on every worker involved in the
                       // partition
                       let egress_builder = EgressBuilder(pipeline.name(),
-                        sid, pipeline.sink_builder())
+                        sid, pipeline.sink_builders()(idx)?)
 
                       match partition_workers
                       | let w: String =>
@@ -576,10 +574,14 @@ actor ApplicationDistributor is Distributor
                         end
                       end
 
+                      // Push to our array of all sink ids
                       sink_ids.push(sid)
+                      // Push to our running array of sink ids for this runner
+                      // builder
+                      ids.push(sid)
                     end
 
-                    pipeline.sink_id()
+                    ids
                   end
 
                 @printf[I32](("Preparing to spin up prestate step " +
@@ -587,7 +589,7 @@ actor ApplicationDistributor is Distributor
                   .cstring())
 
                 let psd = PreStateData(next_runner_builder,
-                  pre_state_target_id)
+                  pre_state_target_ids)
                 pre_state_data.push(psd)
 
                 let state_builder =
@@ -602,7 +604,7 @@ actor ApplicationDistributor is Distributor
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
                   worker, pipeline.name(), next_runner_builder,
-                  next_id where pre_state_target_id' = pre_state_target_id)
+                  next_id where pre_state_target_ids' = pre_state_target_ids)
                 step_map(next_id) = ProxyAddress(worker, next_id)
                 try
                   local_graphs(worker)?.add_node(next_initializer, next_id)
@@ -645,16 +647,18 @@ actor ApplicationDistributor is Distributor
 
                 // Get the id for the step that all stateless partition
                 // computations will connect to as their output target.
-                let successor_step_id: (U128 | None) =
-                  if (runner_builder_idx + 1) < step_runner_builders.size()
-                  then
-                    step_runner_builders(runner_builder_idx + 1)?.id()
-                  else
-                    match pipeline.sink_id()
-                    | let sink_id: U128 => sink_id
+                let successor_step_ids: Array[StepId] val = recover val
+                    let ids = Array[StepId]
+                    if (runner_builder_idx + 1) < step_runner_builders.size()
+                    then
+                      ids.push(
+                        step_runner_builders(runner_builder_idx + 1)?.id())
                     else
-                      None
+                      for sid in pipeline.sink_ids().values() do
+                        ids.push(sid)
+                      end
                     end
+                    ids
                   end
 
                 // Add nodes for all stateless partition computations on
@@ -678,15 +682,15 @@ actor ApplicationDistributor is Distributor
                       if w == worker then
                         last_initializer_ids.push(s_id)
                       else
-                        match successor_step_id
-                        | let ss_id: StepId =>
+                        for ss_id in successor_step_ids().values() do
                           // We have not yet built the node corresponding
                           // to our successor step id (i.e. the node that
                           // this node has an edge to). So we keep track of
                           // that here and use that later, once we know
                           // all nodes have been added to the graphs.
                           unbuilt_edges(w)?.push((s_id, ss_id))
-                        else
+                        end
+                        if successor_step_ids.size() == 0 then
                           @printf[I32](("There is no step or sink after a " +
                             "stateless computation partition. This means " +
                             "unnecessary work is occurring in the topology." +
@@ -806,10 +810,9 @@ actor ApplicationDistributor is Distributor
           ///////
           // There are no more steps to go in this pipeline, so check if
           // we need a sink
-            match pipeline.sink_id()
-            | let sid: U128 =>
+            for (idx, sid) in pipeline.sink_ids().pairs() do
               let egress_builder = EgressBuilder(pipeline.name(),
-                sid, pipeline.sink_builder())
+                sid, pipeline.sink_builders()(idx)?)
 
               try
                 // Add a sink to each worker
