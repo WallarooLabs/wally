@@ -36,13 +36,17 @@ actor Main
               TCPSourceConfigCLIParser(env.args)?(0)?))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
-            .to_sinks([
-                TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
-                  TCPSinkConfigCLIParser(env.args)?(0)?)
-                TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
-                  TCPSinkConfigCLIParser(env.args)?(1)?) ])
+            .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+               TCPSinkConfigCLIParser(env.args)?(0)?))
+          .new_pipeline[F32, F32]("Celsius Conversion",
+            TCPSourceConfig[F32].from_options(CelsiusDecoder,
+              TCPSourceConfigCLIParser(env.args)?(0)?))
+            .to[F32]({(): Multiply => Multiply})
+            .to[F32]({(): Add => Add})
+            .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+               TCPSinkConfigCLIParser(env.args)?(0)?))
       end
-      Startup(env, application, "celsius-multi-sink")
+      Startup(env, application, "celsius-multi-pipeline")
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
