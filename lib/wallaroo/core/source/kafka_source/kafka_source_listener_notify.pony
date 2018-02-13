@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
+use "wallaroo/core/common"
 use "wallaroo/core/metrics"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"

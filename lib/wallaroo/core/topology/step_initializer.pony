@@ -47,7 +47,7 @@ class val StepBuilder
   new val create(app_name: String, worker_name: String,
     pipeline_name': String, r: RunnerBuilder, id': StepId,
     is_stateful': Bool = false,
-    pre_state_target_ids': Array[StepId] val,
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end,
     forward_route_builder': RouteBuilder = BoundaryOnlyRouteBuilder)
   =>
     _app_name = app_name
@@ -81,7 +81,7 @@ class val StepBuilder
     omni_router: OmniRouter = EmptyOmniRouter): Step tag
   =>
     let runner = _runner_builder(where event_log = event_log, auth = auth,
-      router = router, pre_state_target_id' = pre_state_target_id())
+      router = router, pre_state_target_ids' = pre_state_target_ids())
     let step = Step(consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
       _runner_builder.route_builder(), event_log, recovery_replayer,
@@ -103,7 +103,7 @@ class val SourceData
   new val create(id': StepId, b: SourceBuilderBuilder, r: RunnerBuilder,
     default_source_route_builder: RouteBuilder,
     s: SourceListenerBuilderBuilder,
-    pre_state_target_id': Array[StepId] val)
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end)
   =>
     _id = id'
     _pipeline_name = b.name()
@@ -120,7 +120,7 @@ class val SourceData
       end
     _source_listener_builder_builder = s
 
-    _pre_state_target_ids = pre_state_target_id'
+    _pre_state_target_ids = pre_state_target_ids'
 
   fun builder(): SourceBuilderBuilder => _builder
   fun runner_builder(): RunnerBuilder => _runner_builder
@@ -213,7 +213,7 @@ class val PreStateData
   let _target_ids: Array[StepId] val
   let _forward_route_builder: RouteBuilder
 
-  new val create(runner_builder: RunnerBuilder, t_id: Array[StepId] val) =>
+  new val create(runner_builder: RunnerBuilder, t_ids: Array[StepId] val) =>
     _runner_builder = runner_builder
     _state_name = runner_builder.state_name()
     _pre_state_name = runner_builder.name()
@@ -263,7 +263,7 @@ class val PreStatelessData
   fun state_name(): String => ""
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
-  fun pre_state_target_id(): (U128 | None) => None
+  fun pre_state_target_ids(): Array[StepId] val => recover Array[StepId] end
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false

@@ -31,6 +31,7 @@ use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/core/data_channel"
+use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
@@ -691,8 +692,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         //
         // Assumptions:
         //   I. Acylic graph
-        //   II. No splits (only joins), ignoring partitions
-        //   III. No direct chains of different partitions
         /////////
 
         let frontier = Array[DagNode[StepInitializer] val]
@@ -741,7 +740,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         //          been created
         //       if no, send to bottom of frontier stack.
         //       if yes, add ins to frontier stack, then build the step
-        //       (connecting it to its out step, which has already been built)
+        //         (connecting it to its out steps, which have already been
+        //         built)
         // If there are no cycles (I), this will terminate
         while frontier.size() > 0 do
           let next_node =
@@ -764,8 +764,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           end
 
           // We are only ready to build a node if all of its outputs
-          // have been built (though currently, because there are no
-          // splits (II), there will only be at most one output per node)
+          // have been built
           if _is_ready_for_building(next_node, built_routers) then
             @printf[I32](("Handling " + next_node.value.name() + " node\n")
               .cstring())
@@ -813,17 +812,28 @@ actor LocalTopologyInitializer is LayoutInitializer
                   end
 
                 let state_comp_target_router =
-                  match builder.pre_state_target_id()
-                  | let id: U128 =>
-                    try
-                      built_routers(id)?
+                  if builder.pre_state_target_ids().size() > 0 then
+                    let routers = recover iso Array[Router] end
+                    for id in builder.pre_state_target_ids().values() do
+                      try
+                        routers.push(builder.clone_router_and_set_input_type(
+                          built_routers(id)?))
+                      else
+                        @printf[I32]("No router found to prestate target\n"
+                          .cstring())
+                        error
+                      end
+                    end
+                    ifdef debug then
+                      Invariant(routers.size() > 0)
+                    end
+                    if routers.size() == 1 then
+                      routers(0)?
                     else
-                      @printf[I32]("No router found to prestate target step\n"
-                        .cstring())
-                      error
+                      MultiRouter(consume routers)
                     end
                   else
-                    // This prestate has no computation target
+                    // This prestate has no computation targets
                     EmptyRouter
                   end
 
@@ -844,39 +854,45 @@ actor LocalTopologyInitializer is LayoutInitializer
               // STATELESS, NON-PRESTATE BUILDER
                 @printf[I32](("----Spinning up " + builder.name() + "----\n")
                   .cstring())
-                // Currently there are no splits (II), so we know that a node
-                // has only one output in the graph. We also know this is not
-                // a sink or proxy, so there is at most one output.
-                let out_id: (U128 | None) =
+                let out_ids: Array[StepId] val =
                   try
-                    match _get_output_node_id(next_node)?
-                    | let id: U128 => id
-                    else
-                      None
-                    end
+                    _get_output_node_ids(next_node)?
                   else
                     @printf[I32]("Failed to get output node id\n".cstring())
                     error
                   end
 
                 let out_router =
-                  match out_id
-                  | let id: U128 =>
-                    try
-                      builder.clone_router_and_set_input_type(
-                        built_routers(id)?)
+                  if out_ids.size() > 0 then
+                    let routers = recover iso Array[Router] end
+                    for id in out_ids.values() do
+                      try
+                        routers.push(builder.clone_router_and_set_input_type(
+                          built_routers(id)?))
+                      else
+                        @printf[I32]("No router found to target\n".cstring())
+                        error
+                      end
+                    end
+                    ifdef debug then
+                      Invariant(routers.size() > 0)
+                    end
+                    if routers.size() == 1 then
+                      routers(0)?
                     else
-                      @printf[I32](("Invariant was violated: node was not " +
-                        "built before one of its inputs.\n").cstring())
-                      error
+                      MultiRouter(consume routers)
                     end
                   else
+                    // This prestate has no computation targets
                     EmptyRouter
                   end
 
                 let next_step = builder(out_router, _metrics_conn, _event_log,
                   _recovery_replayer, _auth, _outgoing_boundaries)
 
+                // ASSUMPTION: If an out_router is a MultiRouter, then none
+                // of its subrouters are partition routers. Put differently,
+                // we assume that splits never include partition routers.
                 match out_router
                 | let pr: StatelessPartitionRouter =>
                   _router_registry
@@ -898,12 +914,10 @@ actor LocalTopologyInitializer is LayoutInitializer
 
                 // First, we must check that all state computation targets
                 // have been built.  If they haven't, then we send this node
-                // to the back of the frontier queue (it will eventually
-                // be processed because of no splits (II))
+                // to the back of the frontier queue.
                 var targets_ready = true
                 for in_node in next_node.ins() do
-                  match in_node.value.pre_state_target_id()
-                  | let id: U128 =>
+                  for id in in_node.value.pre_state_target_ids().values() do
                     try
                       built_routers(id)?
                     else
@@ -938,14 +952,22 @@ actor LocalTopologyInitializer is LayoutInitializer
                       .cstring())
 
                     let state_comp_target =
-                      match b.pre_state_target_id()
-                      | let id: U128 =>
-                        try
-                          built_routers(id)?
+                      if b.pre_state_target_ids().size() > 0 then
+                        let routers = recover iso Array[Router] end
+                        for id in b.pre_state_target_ids().values() do
+                          routers.push(built_routers(id)?)
                         else
                           @printf[I32](("Prestate comp target not built! We " +
                             "should have already caught this\n").cstring())
                           error
+                        end
+                        ifdef debug then
+                          Invariant(routers.size() > 0)
+                        end
+                        if routers.size() == 1 then
+                          routers(0)?
+                        else
+                          MultiRouter(consume routers)
                         end
                       else
                         @printf[I32](("There is no prestate comp target. " +
@@ -989,8 +1011,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               let next_id = egress_builder.id()
               if not built_routers.contains(next_id) then
                 let sink_reporter = MetricsReporter(t.name(),
-                  t.worker_name(),
-                  _metrics_conn)
+                  t.worker_name(), _metrics_conn)
 
                 // Create a sink or OutgoingBoundary proxy. If the latter,
                 // egress_builder finds it from _outgoing_boundaries
@@ -1077,8 +1098,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       let proxy_address = ProxyAddress(target_worker, step_id)
 
                       partition_routes(p_id) = ProxyRouter(target_worker,
-                        _outgoing_boundaries(target_worker)?,
-                        proxy_address, _auth)
+                        _outgoing_boundaries(target_worker)?, proxy_address,
+                        _auth)
                     end
                   end
 
@@ -1125,18 +1146,26 @@ actor LocalTopologyInitializer is LayoutInitializer
 
               let state_comp_target_router =
                 if source_data.is_prestate() then
-                  match source_data.pre_state_target_id()
-                  | let id: U128 =>
-                    try
-                      built_routers(id)?
+                  if source_data.pre_state_target_ids().size() > 0 then
+                    let routers = recover iso Array[Router] end
+                    for id in source_data.pre_state_target_ids().values() do
+                      routers.push(built_routers(id)?)
                     else
                       @printf[I32](("Prestate comp target not built! We " +
                         "should have already caught this\n").cstring())
                       error
                     end
+                    ifdef debug then
+                      Invariant(routers.size() > 0)
+                    end
+                    if routers.size() == 1 then
+                      routers(0)?
+                    else
+                      MultiRouter(consume routers)
+                    end
                   else
-                    @printf[I32](("There is no prestate comp target. Using " +
-                      "an EmptyRouter\n").cstring())
+                    @printf[I32](("There is no prestate comp target. " +
+                      "using an EmptyRouter\n").cstring())
                     EmptyRouter
                   end
                 else
@@ -1145,28 +1174,17 @@ actor LocalTopologyInitializer is LayoutInitializer
 
               let out_router =
                 if source_data.state_name() == "" then
-                  // Currently there are no splits (II), so we know that a
-                  // node has only one output in the graph. We also know this
-                  // is not a sink or proxy, so there is exactly one output.
-                  let out_id: (U128 | None) =
-                    try
-                      _get_output_node_id(next_node)?
-                    else
-                      @printf[I32]("Failed to get output node id\n".cstring())
-                      error
-                    end
+                  let out_ids = _get_output_node_ids(next_node)?
 
-                  match out_id
-                  | let id: U128 => id
-                    try
-                      built_routers(id)?
-                    else
-                      @printf[I32](("Invariant was violated: node was not " +
-                        "built before one of its inputs.\n").cstring())
-                      error
-                    end
+                  match out_ids.size()
+                  | 0 => EmptyRouter
+                  | 1 => built_routers(out_ids(0)?)?
                   else
-                    EmptyRouter
+                    let routers = recover iso Array[Router] end
+                    for id in out_ids.values() do
+                      routers.push(built_routers(id)?)
+                    end
+                    MultiRouter(consume routers)
                   end
                 else
                   // Source has a prestate runner on it, so we have no
@@ -1183,8 +1201,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   end
                 end
 
-              let source_reporter = MetricsReporter(t.name(),
-                t.worker_name(),
+              let source_reporter = MetricsReporter(t.name(), t.worker_name(),
                 _metrics_conn)
 
               let listen_auth = TCPListenAuth(_auth)
@@ -1194,7 +1211,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               sl_builders.push(source_data.source_listener_builder_builder()(
                 source_data.builder()(source_data.runner_builder(),
                   out_router, _metrics_conn,
-                  source_data.pre_state_target_id(), t.worker_name(),
+                  source_data.pre_state_target_ids(), t.worker_name(),
                   source_reporter.clone()),
                 out_router, _router_registry,
                 source_data.route_builder(),
@@ -1239,8 +1256,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         /////
         // Register pre state target routes on corresponding state steps
         for psd in t.pre_state_data().values() do
-          match psd.target_id()
-          | let tid: U128 =>
+          if psd.target_ids().size() > 0 then
             // If the corresponding state has not been built yet, build it
             // now
             if psd.state_name() != "" then
@@ -1263,20 +1279,23 @@ actor LocalTopologyInitializer is LayoutInitializer
                   "state partition.\n").cstring())
                 error
               end
-            let target_router =
-              try
-                built_routers(tid)?
-              else
-                @printf[I32](("Failed to find built router for " +
-                  "target_router to %s\n").cstring(), tid.string().cstring())
-                error
-              end
             match partition_router
             | let pr: PartitionRouter =>
               _router_registry.set_partition_router(psd.state_name(), pr)
-              pr.register_routes(target_router, psd.forward_route_builder())
-              @printf[I32](("Registered routes on state steps for " +
-                psd.pre_state_name() + "\n").cstring())
+              for tid in psd.target_ids().values() do
+                let target_router =
+                  try
+                    built_routers(tid)?
+                  else
+                    @printf[I32](("Failed to find built router for " +
+                      "target_router to %s\n").cstring(),
+                      tid.string().cstring())
+                    error
+                  end
+                pr.register_routes(target_router, psd.forward_route_builder())
+                @printf[I32](("Registered routes on state steps for " +
+                  psd.pre_state_name() + "\n").cstring())
+              end
             else
               @printf[I32](("Expected PartitionRouter but found something " +
                 "else!\n").cstring())
@@ -1684,20 +1703,16 @@ actor LocalTopologyInitializer is LayoutInitializer
     for out in node.outs() do
       if not built_routers.contains(out.id) then is_ready = false end
     end
-    match node.value.pre_state_target_id()
-    | let id: U128 =>
+    for id in node.value.pre_state_target_ids().values() do
       if not built_routers.contains(id) then
         is_ready = false
       end
     end
     is_ready
 
-  fun _get_output_node_id(node: DagNode[StepInitializer] val):
-    (U128 | None) ?
+  fun _get_output_node_ids(node: DagNode[StepInitializer] val):
+    Array[StepId] val ?
   =>
-    // Currently there are no splits (II), so we know that a node has
-    // only one output in the graph.
-
     // Make sure this is not a sink or proxy node.
     match node.value
     | let eb: EgressBuilder =>
@@ -1706,13 +1721,11 @@ actor LocalTopologyInitializer is LayoutInitializer
       error
     end
 
-    // ASSUMPTION: Since this is not a sink or proxy, there should be at most
-    // one output.
-    var out_id: (U128 | None) = None
+    var out_ids = recover iso Array[StepId] end
     for out in node.outs() do
-      out_id = out.id
+      out_ids.push(out.id)
     end
-    out_id
+    consume out_ids
 
   be request_new_worker() =>
     try

@@ -94,9 +94,9 @@ class val DirectRouter is Router
     end
 
 class val MultiRouter is Router
-  let _routers: Array[DirectRouter] val
+  let _routers: Array[Router] val
 
-  new val create(routers: Array[DirectRouter] val) =>
+  new val create(routers: Array[Router] val) =>
     ifdef debug then
       Invariant(routers.size() > 1)
     end
@@ -125,7 +125,7 @@ class val MultiRouter is Router
             z
           end
         end
-      (let is_f, _) = r.route[D](metric_name, pipeline_time_spent, data,
+      (let is_f, _) = router.route[D](metric_name, pipeline_time_spent, data,
         // hand down producer so we can call _next_sequence_id()
         producer,
         // incoming envelope
@@ -140,8 +140,8 @@ class val MultiRouter is Router
   fun routes(): Array[Consumer] val =>
     let r_set = SetIs[Consumer]
     for router in _routers.values() do
-      for r in router.routes() do
-        r_set..set(r)
+      for r in router.routes().values() do
+        r_set.set(r)
       end
     end
     let rs = recover iso Array[Consumer] end

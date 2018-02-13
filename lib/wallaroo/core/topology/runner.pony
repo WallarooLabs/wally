@@ -62,7 +62,8 @@ trait val RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_id': (U128 | None) = None): Runner iso^
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+      Runner iso^
 
   fun name(): String
   fun state_name(): String => ""
@@ -70,7 +71,7 @@ trait val RunnerBuilder
   fun is_stateful(): Bool
   fun is_stateless_parallel(): Bool => false
   fun is_multi(): Bool => false
-  fun id(): U128
+  fun id(): StepId
   fun route_builder(): RouteBuilder
   fun forward_route_builder(): RouteBuilder
   fun in_route_builder(): (RouteBuilder | None) => None
@@ -123,7 +124,8 @@ class val RunnerSequenceBuilder is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_id': (U128 | None) = None): Runner iso^
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+      Runner iso^
   =>
     var remaining: USize = _runner_builders.size()
     var latest_runner: Runner iso = RouterRunner
@@ -137,7 +139,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
       match next_builder
       | let rb: RunnerBuilder =>
         latest_runner = rb(event_log, auth,
-          consume latest_runner, router, pre_state_target_id')
+          consume latest_runner, router, pre_state_target_ids')
       end
       remaining = remaining - 1
     end
@@ -165,7 +167,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
     else
       false
     end
-  fun id(): U128 => _id
+  fun id(): StepId => _id
   fun route_builder(): RouteBuilder =>
     try
       _runner_builders(_runner_builders.size() - 1)?.route_builder()
@@ -202,7 +204,8 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_id': (U128 | None) = None): Runner iso^
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+      Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
@@ -215,7 +218,7 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun state_name(): String => ""
   fun is_stateful(): Bool => false
   fun is_stateless_parallel(): Bool => _parallelized
-  fun id(): U128 => _id
+  fun id(): StepId => _id
   fun route_builder(): RouteBuilder => _route_builder
   fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
 
@@ -252,21 +255,17 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_id': (U128 | None) = None): Runner iso^
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+      Runner iso^
   =>
-    match pre_state_target_id'
-    | let t_id: U128 =>
-      PreStateRunner[In, Out, S](_state_comp, _state_name, t_id)
-    else
-      PreStateRunner[In, Out, S](_state_comp, _state_name, 0)
-    end
+    PreStateRunner[In, Out, S](_state_comp, _state_name, pre_state_target_ids')
 
   fun name(): String => _state_comp.name()
   fun state_name(): String => _state_name
   fun is_prestate(): Bool => true
   fun is_stateful(): Bool => true
   fun is_multi(): Bool => _is_multi
-  fun id(): U128 => _id
+  fun id(): StepId => _id
   fun route_builder(): RouteBuilder => _route_builder
   fun forward_route_builder(): RouteBuilder => _forward_route_builder
   fun in_route_builder(): (RouteBuilder | None) =>
@@ -302,7 +301,8 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_id': (U128 | None) = None): Runner iso^
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+      Runner iso^
   =>
     let sr = StateRunner[S](_state_builder, event_log, auth)
     for scb in _state_change_builders.values() do
@@ -313,7 +313,7 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
   fun name(): String => _state_name + " StateRunnerBuilder"
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
-  fun id(): U128 => _id
+  fun id(): StepId => _id
   fun route_builder(): RouteBuilder => _route_builder
   fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
 
@@ -360,15 +360,15 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_id': (U128 | None) = None): Runner iso^
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+      Runner iso^
   =>
-    _state_runner_builder(event_log, auth,
-      consume next_runner, router)
+    _state_runner_builder(event_log, auth, consume next_runner, router)
 
   fun name(): String => _state_name
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
-  fun id(): U128 => _id
+  fun id(): StepId => _id
   fun step_id_map(): Map[Key, U128] val => _step_id_map
   fun route_builder(): RouteBuilder => _route_builder
   fun forward_route_builder(): RouteBuilder => _forward_route_builder
@@ -540,7 +540,7 @@ class ComputationRunner[In: Any val, Out: Any val]
     _next.clone_router_and_set_input_type(r)
 
 class PreStateRunner[In: Any val, Out: Any val, S: State ref]
-  let _target_id: Array[StepId] val
+  let _target_ids: Array[StepId] val
   let _state_comp: StateComputation[In, Out, S] val
   let _name: String
   let _prep_name: String

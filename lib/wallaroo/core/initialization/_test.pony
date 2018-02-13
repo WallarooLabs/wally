@@ -161,7 +161,7 @@ primitive _PreStateDataArrayGenerator
 
 primitive _PreStateDataGenerator
   fun apply(rb: RunnerBuilder): PreStateData =>
-    PreStateData(rb, 1000)
+    PreStateData(rb, recover Array[StepId] end)
 
 primitive _RunnerBuilderGenerator
   fun apply(): RunnerBuilder =>
