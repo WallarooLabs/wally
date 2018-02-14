@@ -263,6 +263,9 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
         "to_sinks()")
     end
     for config in sink_configs.values() do
-      to_sink(config)
+      let sink_builder = config()
+      _a.increment_sink_count()
+      _p.add_sink(sink_builder)
     end
+    _a.add_pipeline(_p)
     _a
