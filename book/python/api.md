@@ -129,6 +129,10 @@ Add a partitioned state computation to the current pipeline.
 
 Add a sink to the end of a pipeline. `sink_config` must be an instance of a sink configuration.
 
+##### `to_sinks(sink_configs)`
+
+Add multiple sink to the end of a pipeline. `sink_configs` must be a list of sink configuration instances. Currently, the same pipeline output is sent via all sinks.
+
 ##### `build()`
 
 Return the complete list of topology tuples. This is the topology structure Wallaroo requires in order to construct the topology connecting all of the application components.
@@ -375,7 +379,7 @@ The `decoder` argument must decorated as described in [TCP Source Decoder](#tcp-
 
 ### TCPSinkConfig
 
-A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `to_sink`.
+A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `to_sink` or as a member of the list passed to `to_sinks`.
 
 The `encoder` argument must decorated as described in [TCP Source Encoder](#tcp-source-encoder).
 

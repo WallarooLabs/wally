@@ -657,6 +657,18 @@ primitive Machida
           _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env)?)
         sink_idx = sink_idx + 1
         latest
+      | "to_sinks" =>
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        let list = @PyTuple_GetItem(item, 1)
+        let sink_count = @PyList_Size(list)
+        let sinks = Array[SinkConfig[PyData val]]
+        for i in Range(0, sink_count) do
+          let sink = _SinkConfig.from_tuple(@PyList_GetItem(list, i), env)?
+          sinks.push(sink)
+        end
+        latest = pb.to_sinks(sinks)
+        sink_idx = sink_idx + 1
+        latest
       | "done" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.done()

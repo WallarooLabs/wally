@@ -132,8 +132,8 @@ def test_autoscale_python_grow_by_many():
 #    autoscale_sequence(CMD_PYTHON, ops=[-1,4], cycles=CYCLES)
 #
 #
-def test_autoscale_python_shrink_by_1():
-    autoscale_sequence(CMD_PYTHON, ops=[-1], cycles=CYCLES)
+# def test_autoscale_python_shrink_by_1():
+#     autoscale_sequence(CMD_PYTHON, ops=[-1], cycles=CYCLES)
 #
 #
 #def test_autoscale_python_shrink_by_1_shrink_by_many():
