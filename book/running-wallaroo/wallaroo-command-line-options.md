@@ -36,7 +36,7 @@ When running a Wallaroo application, we use some of the following command line p
     world]
 ```
 
-Wallaroo currently supports one source per pipeline, which is setup by the application code. Each pipeline may have at most one sink, which is also set up by the application code.
+Wallaroo currently supports one source per pipeline, which is setup by the application code. Each pipeline may have one or more sinks, each of which is also set up by the application code.
 
 In order to monitor metrics, the target address for metrics data should be defined via the `--metrics/-m` parameter, using a `host:port` format (e.g. `127.0.0.1:5002`).
 

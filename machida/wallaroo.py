@@ -72,6 +72,13 @@ class ApplicationBuilder(object):
         self._actions.append(("to_sink", sink_config.to_tuple()))
         return self
 
+    def to_sinks(self, sink_configs):
+        sinks = []
+        for sc in sink_configs:
+            sinks.append(sc.to_tuple())
+        self._actions.append(("to_sinks", sinks))
+        return self
+
     def done(self):
         self._actions.append(("done",))
         return self

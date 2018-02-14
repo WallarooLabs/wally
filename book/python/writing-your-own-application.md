@@ -74,7 +74,7 @@ For this, two things are needed:
 
 #### Application Builder and Pipelines
 
-An application is constructed of pipelines which, in turn, are constructed from a sequence of a source, steps, and optionally a sink. Our reverse application only has one pipeline, so we only need to create one:
+An application is constructed of pipelines which, in turn, are constructed from a sequence of a source, steps, and optionally one or more sinks. Our reverse application only has one pipeline, so we only need to create one:
 
 ```python
 ab = wallaroo.ApplicationBuilder("Reverse Word")

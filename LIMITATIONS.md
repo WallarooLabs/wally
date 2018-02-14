@@ -28,7 +28,6 @@ The following is a list of limitations and gotchas with existing supported featu
 
 ### Sinks
 
-* [Issue #1084](https://github.com/WallarooLabs/wallaroo/issues/1084) A pipeline currently supports at most one sink.
 * [Issue #1009](https://github.com/WallarooLabs/wallaroo/issues/1009) Each sink is currently duplicated on every worker to reduce latency. But with enough workers, this will cause an excessive number of connections to external systems.
 * [Issue #1059](https://github.com/WallarooLabs/wallaroo/issues/1059) We support dynamically created Sources (for example, as connections are created over TCP to a Wallaroo application), but we do not currently support dynamically created sinks.
 
