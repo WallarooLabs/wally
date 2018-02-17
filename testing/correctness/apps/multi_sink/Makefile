@@ -34,9 +34,25 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
+MULTI_SINK_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
+
+integration-tests-testing-correctness-apps-multi_sink: build-testing-correctness-apps-multi_sink
+integration-tests-testing-correctness-apps-multi_sink: multi_sink_test
+
+multi_sink_test:
+	cd $(MULTI_SINK_PATH) && \
+	integration_test \
+		--framed-file-sender _test.msg 0 \
+		--validation-cmp \
+	  --expected-file _expected.msg \
+		--log-level error \
+		--command './multi_sink' \
+		--sink-expect 100 \
+		--sinks 2 \
+		--sources 1
 
 # end of prevent rules from being evaluated/included multiple times
 endif
