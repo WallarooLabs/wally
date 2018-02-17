@@ -35,8 +35,26 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
 
+MULTI_PIPELINE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 # standard rules generation makefile
 include $(rules_mk_path)
+
+integration-tests-testing-correctness-apps-multi_pipeline: build-testing-correctness-apps-multi_pipeline
+integration-tests-testing-correctness-apps-multi_pipeline: multi_pipeline_test
+
+multi_pipeline_test:
+	cd $(MULTI_PIPELINE_PATH) && \
+	integration_test \
+		--framed-file-sender _test.msg 0 \
+		--framed-file-sender _test.msg 1 \
+		--validation-cmp \
+	  --expected-file _expected.msg \
+		--log-level error \
+		--command './multi_pipeline' \
+		--sink-expect 100 \
+		--sinks 2 \
+		--sources 2
 
 # end of prevent rules from being evaluated/included multiple times
 endif
