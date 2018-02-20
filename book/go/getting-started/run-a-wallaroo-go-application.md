@@ -14,7 +14,9 @@ The Metrics UI process will be run in the background via Docker.  The other thre
 
 Let's get started!
 
-## Terminal 1, Start the Metrics UI
+Since Wallaroo is a distributed application, its components need to run separately, and concurrently, so that they may connect to one another to form the application cluster. For this example, you will need 5 separate terminal shells to run the metrics UI, run a source, run a sink, run the Celsius application, and eventually, to send a cluster shutdown command.
+
+## Shell 1: Start the Metrics UI
 
 NOTE: You might need to run with sudo depending on how you set up Docker.
 
@@ -45,7 +47,7 @@ If you need to start the UI after stopping it, run:
 docker start mui
 ```
 
-## Terminal 2, Run Data Receiver
+## Shell 2: Run the Data Receiver
 
 We'll use Data Receiver to listen for data from our Wallaroo application.
 
@@ -56,7 +58,7 @@ cd ~/wallaroo-tutorial/wallaroo/utils/data_receiver
 
 Data Receiver will start up and receive data without creating any output. By default, it prints received data to standard out, but we are giving it the `--no-write` flag which results in no output.
 
-## Terminal 3, Run the "Celsius to Fahrenheit" Application
+## Shell 3: Run the "Celsius to Fahrenheit" Application
 
 First, we need to build the application.
 
@@ -77,9 +79,7 @@ cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
 
 This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
 
-## Terminal 4
-
-### Sending Data with Giles Sender
+## Shell 4: Sending Data with Giles Sender
 
 We will be sending in 25,000,000 messages using a pre-generated data file. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
 
@@ -122,7 +122,7 @@ Feel free to click around and get a feel for how the Metrics UI is setup and how
 
 ## Shutdown
 
-### Terminal 5, Cluster Shutdown
+### Shell 5: Cluster Shutdown
 
 You can shut down the cluster with this command at any time:
 

@@ -30,9 +30,37 @@ The `decoder` function creates a string from the value represented by the payloa
 
 In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
-You will need three separate shells to run this application. Open each shell and go to the `examples/python/reverse` directory.
+You will need five separate shells to run this application. Open each shell and go to the `examples/python/reverse` directory.
 
-### Shell 1
+### Shell 1: Metrics
+
+Start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
+You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
+
+If you need to restart the UI, run:
+
+```bash
+docker restart mui
+```
+
+When it's time to stop the UI, run:
+
+```bash
+docker stop mui
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+docker start mui
+```
+
+### Shell 2: Data Receiver
 
 Run `nc` to listen for the output messages:
 
@@ -40,7 +68,7 @@ Run `nc` to listen for the output messages:
 nc -l 127.0.0.1 7002
 ```
 
-### Shell 2
+### Shell 3: Reverse
 
 Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `reverse.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -60,7 +88,7 @@ machida --application-module reverse --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --ponythreads=1 --ponynoblock
 ```
 
-### Shell 3
+### Shell 4: Sender
 
 Set `PATH` to refer to the directory that contains the `sender`  executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -82,7 +110,7 @@ sender --host 127.0.0.1:7010 --file words.txt \
 
 The output will be printed to the console in the first shell. Each line should be the reverse of a word found in the `words.txt` file.
 
-## Shutdown
+## Shell 5: Shutdown
 
 Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
 
@@ -99,3 +127,9 @@ cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down Giles Sender by pressing `Ctrl-c` from its shell.
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+docker stop mui
+```

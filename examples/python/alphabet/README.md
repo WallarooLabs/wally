@@ -36,10 +36,37 @@ The `decoder` function creates a `Votes` object with the letter being voted on a
 
 In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
-You will need three separate shells to run this application. Open each shell and go to the `examples/python/alphabet` directory.
+You will need five separate shells to run this application. Open each shell and go to the `examples/python/alphabet` directory.
 
+### Shell 1: Metrics
 
-### Shell 1
+Start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
+You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
+
+If you need to restart the UI, run:
+
+```bash
+docker restart mui
+```
+
+When it's time to stop the UI, run:
+
+```bash
+docker stop mui
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+docker start mui
+```
+
+### Shell 2: Data Receiver
 
 Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
 
@@ -47,7 +74,7 @@ Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
 nc -l 127.0.0.1 7002 > alphabet.out
 ```
 
-### Shell 2
+### Shell 3: Alphabet
 
 Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `alphabet.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -67,7 +94,7 @@ machida --application-module alphabet --in 127.0.0.1:7010 \
   --name worker-name --ponythreads=1 --ponynoblock
 ```
 
-### Shell 3
+### Shell 4: Sender
 
 Set `PATH` to refer to the directory that contains the `sender`  executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -100,7 +127,7 @@ with open('alphabet.out', 'rb') as f:
             break
 ```
 
-## Shutdown
+## Shell 5: Shutdown
 
 Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
 
@@ -117,3 +144,9 @@ cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down Giles Sender by pressing `Ctrl-c` from its shell.
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+docker stop mui
+```

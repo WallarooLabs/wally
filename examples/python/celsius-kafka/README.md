@@ -27,9 +27,37 @@ You will also need access to a Kafka cluster. This example assumes that there is
 
 **NOTE:** If running in Docker, the kafkfa cluster and kafkacat should be run from your host and not within the Docker container.
 
-You will need three separate shells to run this application. Open each shell and go to the `examples/python/celsius-kafka` directory.
+You will need five separate shells to run this application. Open each shell and go to the `examples/python/celsius-kafka` directory.
 
-### Shell 1
+### Shell 1: Metrics
+
+Start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
+You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
+
+If you need to restart the UI, run:
+
+```bash
+docker restart mui
+```
+
+When it's time to stop the UI, run:
+
+```bash
+docker stop mui
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+docker start mui
+```
+
+### Shell 2: Kafka setup and listener
 
 #### Start kafka and create the `test-in` and `test-out` topics
 
@@ -84,7 +112,7 @@ To run `kafkacat` to listen to the `test-out` topic via Docker:
 docker run --rm -it ryane/kafkacat -C -b 127.0.0.1:9092 -t test-out -q > celsius.out
 ```
 
-### Shell 2
+### Shell 3: Celsius-kafka
 
 Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `celsius.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -111,7 +139,7 @@ machida --application-module celsius \
 
 `kafka_sink_max_produce_buffer_ms` controls maximum time (in ms) to buffer messages before sending to kafka. Either don't specify it or set it to `0` to disable batching on produce.
 
-### Shell 3
+### Shell 4: Sender
 
 Send data into Kafka. Again, we use `kafakcat`.
 
@@ -141,7 +169,7 @@ with open('celsius.out', 'rb') as f:
             break
 ```
 
-## Shutdown
+## Shell 5: Shutdown
 
 Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
 
@@ -169,4 +197,10 @@ If you followed the commands earlier to start kafka you can stop it by running:
 ```bash
 cd /tmp/local-kafka-cluster
 ./cluster down # shut down cluster
+```
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+docker stop mui
 ```

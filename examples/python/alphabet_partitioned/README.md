@@ -36,9 +36,37 @@ The `decoder` creates a `Votes` object with the letter being voted on and the nu
 
 In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
-You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
+You will need six separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
-### Shell 1
+### Shell 1: Metrics
+
+Start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
+You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
+
+If you need to restart the UI, run:
+
+```bash
+docker restart mui
+```
+
+When it's time to stop the UI, run:
+
+```bash
+docker stop mui
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+docker start mui
+```
+
+### Shell 2: Data Receiver
 
 Set `PATH` to refer to the directory that contains the `receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -55,7 +83,7 @@ receiver --ponythreads=1 --ponynoblock \
   --listen 127.0.0.1:7002 --no-write
 ```
 
-### Shell 2
+### Shell 3: Alphabet (initializer)
 
 Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `alphabet_partitioned.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Machida according to the tutorial instructions you would do:
 
@@ -75,7 +103,7 @@ machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --external 127.0.0.1:5050 --ponythreads=1 --ponynoblock
 ```
 
-### Shell 3
+### Shell 4: Alphabet (worker-2)
 
 Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `alphabet_partitioned.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Machida according to the tutorial instructions you would do:
 
@@ -94,7 +122,7 @@ machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --name worker-2 --external 127.0.0.1:6010 --ponythreads=1 --ponynoblock
 ```
 
-### Shell 4
+### Shell 5: Sender
 
 Set `PATH` to refer to the directory that contains the `sender`  executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -113,7 +141,7 @@ sender --host 127.0.0.1:7010 \
   --ponynoblock --no-write
 ```
 
-## Shutdown
+## Shell 6: Shutdown
 
 Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
 
@@ -130,3 +158,9 @@ cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down Giles Sender and Giles Receiver by pressing `Ctrl-c` from their respective shells.
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+docker stop mui
+```

@@ -17,7 +17,9 @@ NOTE: If you haven't set up Docker to run without root, you will need to use `su
 
 Let's get started!
 
-## Terminal 1, Start the Wallaroo Docker container
+Since Wallaroo is a distributed application, its components need to run separately, and concurrently, so that they may connect to one another to form the application cluster. For this example, you will need 6 separate terminal shells to start the docker container, run the metrics UI, run a source, run a sink, run the Celsius application, and eventually, to send a cluster shutdown command.
+
+## Shell 1: Start the Wallaroo Docker container
 
 ```bash
 docker run --rm -it --privileged -p 4000:4000 \
@@ -45,7 +47,7 @@ wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 
 * `--name wally`: The name for the container. This setting is optional but makes it easier to reference the container in later commands.
 
-## Terminal 2, Start the Metrics UI
+## Shell 2: Metrics UI
 
 Enter the Wallaroo Docker container:
 
@@ -81,7 +83,7 @@ If you need to start the UI after stopping it, run:
 metrics_reporter_ui start
 ```
 
-## Terminal 3, Run Giles Receiver
+## Shell 3: Giles Receiver
 
 Enter the Wallaroo Docker container:
 
@@ -97,7 +99,7 @@ receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
 
 You should see the line `Listening for data` that indicates that Giles receiver is running.
 
-## Terminal 4, Run the "Celsius to Fahrenheit" Application
+## Shell 4: Run the "Celsius to Fahrenheit" Application
 
 Enter the Wallaroo Docker container:
 
@@ -122,7 +124,7 @@ machida --application-module celsius --in 127.0.0.1:7000 \
 
 This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
 
-## Terminal 5, Sending Data
+## Shell 5: Sending Data
 
 Enter the Wallaroo Docker container:
 
@@ -171,7 +173,7 @@ Feel free to click around and get a feel for how the Metrics UI is set up and ho
 
 ## Shutdown
 
-### Terminal 6, Cluster Shutdown
+### Shell 6: Cluster Shutdown
 
 Enter the Wallaroo Docker container:
 
