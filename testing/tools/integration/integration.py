@@ -773,7 +773,7 @@ class RunnerReadyChecker(StoppableThread):
                         self.stop()
                         break
                 if time.time() - started > self.timeout:
-                    outputs = runners_output_format(runners)
+                    outputs = runners_output_format(self.runners)
                     self.error = TimeoutError(
                         'Application did not report as ready after {} '
                         'seconds. It had the following outputs:\n===\n{}'
