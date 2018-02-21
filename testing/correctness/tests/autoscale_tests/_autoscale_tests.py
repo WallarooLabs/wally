@@ -424,9 +424,9 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                              re.escape(r'Shutting down Startup...'),
                              re.escape(r'Shutting down DataChannel'),
                              re.escape(r'metrics connection closed'),
-                             re.escape(r'TCPSink connection closed')])
-                        patterns_l_per = [
-                            r'ControlChannelConnectNotifier:{}: server closed']
+                             re.escape(r'TCPSink connection closed'),
+                             re.escape(r'ControlChannelConnectNotifier: server closed')])
+                        patterns_l_per = []
 
                         left_checkers = []
 
