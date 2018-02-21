@@ -50,6 +50,23 @@ func (ts *ToSink) Repr() interface{} {
 	return repr.MakeToSink(ts.stepId, ts.fromStepId, ts.SinkConfig.SinkConfigRepr())
 }
 
+func makeToSinks(stepId uint64, fromStepId uint64, sinkConfigs []SinkConfig) *ToSinks {
+	return &ToSinks{&Step{stepId, fromStepId}, sinkConfigs}
+}
+
+type ToSinks struct {
+	*Step
+	SinkConfigs []SinkConfig
+}
+
+func (ts *ToSinks) Repr() interface{} {
+	sinkConfigsRepr := make([]interface{}, 0)
+	for _, sc := range ts.SinkConfigs {
+		sinkConfigsRepr = append(sinkConfigsRepr, sc.SinkConfigRepr())
+	}
+	return repr.MakeToSinks(ts.stepId, ts.fromStepId, sinkConfigsRepr)
+}
+
 func makeDone(stepId uint64, fromStepId uint64) *Done {
 	return &Done{&Step{stepId, fromStepId}}
 }

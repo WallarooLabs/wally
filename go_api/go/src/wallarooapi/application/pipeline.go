@@ -84,6 +84,15 @@ func (p *pipeline) AddToSink(fromStepId uint64, sinkConfig SinkConfig) uint64 {
 	return newStepId
 }
 
+func (p *pipeline) AddToSinks(fromStepId uint64, sinkConfigs []SinkConfig) uint64 {
+	for _, sinkConfig := range sinkConfigs {
+		p.components = append(p.components, sinkConfig.MakeEncoder())
+	}
+	newStepId := p.newStepId()
+	p.connections = append(p.connections, makeToSinks(newStepId, fromStepId, sinkConfigs))
+	return newStepId
+}
+
 func (p *pipeline) AddDone(fromStepId uint64) {
 	newStepId := p.newStepId()
 	p.connections = append(p.connections, makeDone(newStepId, fromStepId))

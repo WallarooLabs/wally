@@ -40,6 +40,17 @@ type ToSink struct {
 	Sink interface{}
 }
 
+func MakeToSinks(stepId uint64, fromStepId uint64, sinkConfigs []interface{}) *ToSinks {
+	return &ToSinks{"ToSinks", stepId, fromStepId, sinkConfigs}
+}
+
+type ToSinks struct {
+	Class string
+	StepId uint64
+	FromStepId uint64
+	Sinks []interface{}
+}
+
 func MakeDone(stepId uint64, fromStepId uint64) *Done {
 	return &Done{"Done", stepId, fromStepId}
 }
