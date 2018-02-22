@@ -51,8 +51,7 @@ func ApplicationSetup() *C.char {
 	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
 		ToMulti(&SplitBuilder{}).
 		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition()).
-		// ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
-		ToSinks(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
+		ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
 	json := application.ToJson()
 
