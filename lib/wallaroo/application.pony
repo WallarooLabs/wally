@@ -257,7 +257,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _a.add_pipeline(_p)
     _a
 
-  fun ref to_sinks(sink_configs: Array[SinkConfig[Out]]): Application =>
+  fun ref to_sinks(sink_configs: Array[SinkConfig[Out]] box): Application =>
     if sink_configs.size() == 0 then
       FatalUserError("You must specify at least one sink when using " +
         "to_sinks()")

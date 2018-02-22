@@ -112,6 +112,27 @@ class val _ToSink is _Connection
   fun connect(pipeline: _PipelineInfo box, steps_map: Map[U64, _StepInfo])? =>
     steps_map(_from_step_id)?.to_sink(_sink_config)
 
+class val _ToSinks is _Connection
+  let _step_id: U64
+  let _from_step_id: U64
+  let _sink_configs: Array[SinkConfig[GoData]] val
+
+  new val create(step_id': U64, from_step_id': U64,
+    sink_configs: Array[SinkConfig[GoData]] val)
+  =>
+    _step_id = step_id'
+    _from_step_id = from_step_id'
+    _sink_configs = sink_configs
+
+  fun step_id(): U64 =>
+    _step_id
+
+  fun from_step_id(): U64 =>
+    _from_step_id
+
+  fun connect(pipeline: _PipelineInfo box, steps_map: Map[U64, _StepInfo])? =>
+    steps_map(_from_step_id)?.to_sinks(_sink_configs)
+
 class val _Done is _Connection
   let _step_id: U64
   let _from_step_id: U64
@@ -150,6 +171,14 @@ primitive _ConnectionFactory
       let sink_j = connection_j("Sink")?
       let sink = _SinkConfig.from_json_ez_data(sink_j, env)?
       _ToSink(step_id, from_step_id, sink)
+    | "ToSinks" =>
+      let sinks_j = connection_j("Sinks")?
+      let sinks = recover iso Array[SinkConfig[GoData]] end
+      for sink_j in sinks_j.array()?.values() do
+        let sink = _SinkConfig.from_json_ez_data(sink_j, env)?
+        sinks.push(sink)
+      end
+      _ToSinks(step_id, from_step_id, consume sinks)
     | "Done" =>
       _Done(step_id, from_step_id)
     else
@@ -178,6 +207,9 @@ class _StepInfo
 
   fun ref to_sink(sink_config: SinkConfig[GoData]) =>
     _pipeline_builder.to_sink(sink_config)
+
+  fun ref to_sinks(sink_configs: Array[SinkConfig[GoData]] val) =>
+    _pipeline_builder.to_sinks(sink_configs)
 
   fun ref done() =>
     _pipeline_builder.done()
