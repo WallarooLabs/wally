@@ -414,6 +414,10 @@ actor Step is (Producer & Consumer)
   be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId,
     requester: FinishedAckRequester)
   =>
+    match _step_message_processor
+    | let nmp: NormalStepMessageProcessor =>
+      _step_message_processor = QueuingStepMessageProcessor(this)
+    end
     @printf[I32]("!@ request_finished_ack STEP %s\n".cstring(),
       _id.string().cstring())
     _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
@@ -426,6 +430,20 @@ actor Step is (Producer & Consumer)
       end
     else
       _finished_ack_waiter.try_finish_request_early(requester_id)
+    end
+
+  be request_finished_ack_complete(requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack_complete STEP\n".cstring())
+    match _step_message_processor
+    | let qmp: QueuingStepMessageProcessor =>
+      // Process all queued messages
+      qmp.flush()
+      _step_message_processor = NormalStepMessageProcessor(this)
+      for r in _routes.values() do
+        r.request_finished_ack_complete(_id, this)
+      end
     end
 
   be try_finish_request_early(requester_id: StepId) =>

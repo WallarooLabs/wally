@@ -285,7 +285,7 @@ actor Connections is Cluster
     exclusions: Array[String] val = recover Array[String] end)
   =>
     let id_gen = RequestIdGenerator
-    let request_ids = recover trn Array[RequestId] end
+    let request_ids = recover Array[RequestId] end
     var sent_request_msg = false
     try
       for (target, ch) in _control_conns.pairs() do
@@ -310,6 +310,22 @@ actor Connections is Cluster
       router_registry.add_connection_request_ids(consume request_ids)
     else
       router_registry.try_finish_request_early(requester_id)
+    end
+
+  be request_finished_acks_complete(requester_id: StepId,
+    router_registry: RouterRegistry)
+  =>
+    try
+      for (target, ch) in _control_conns.pairs() do
+        if target != _worker_name then
+          let finished_ack_request_complete_msg =
+            ChannelMsgEncoder.request_finished_ack_complete(_worker_name,
+              requester_id, _auth)?
+          ch.writev(finished_ack_request_complete_msg)
+        end
+      end
+    else
+      Fail()
     end
 
   be request_cluster_unmute() =>

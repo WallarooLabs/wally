@@ -309,6 +309,7 @@ trait _DataReceiverWrapper
   fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   fun request_finished_ack(request_id: RequestId, requester_id: StepId)
+  fun request_finished_ack_complete(requester_id: StepId)
 
 class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
@@ -328,6 +329,10 @@ class _InitDataReceiver is _DataReceiverWrapper
     Fail()
 
   fun request_finished_ack(request_id: RequestId, requester_id: StepId) =>
+    Fail()
+
+  fun request_finished_ack_complete(requester_id: StepId)
+  =>
     Fail()
 
 class _DataReceiver is _DataReceiverWrapper
@@ -353,3 +358,7 @@ class _DataReceiver is _DataReceiverWrapper
 
   fun request_finished_ack(request_id: RequestId, requester_id: StepId) =>
     data_receiver.request_finished_ack(request_id, requester_id)
+
+  fun request_finished_ack_complete(requester_id: StepId)
+  =>
+    data_receiver.request_finished_ack_complete(requester_id)

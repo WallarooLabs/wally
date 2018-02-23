@@ -37,6 +37,12 @@ actor DummyConsumer is Consumer
     @printf[I32]("!@ request_finished_ack DUMMY\n".cstring())
     producer.receive_finished_ack(request_id)
 
+  be request_finished_ack_complete(requester_id: StepId,
+    producer: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack_complete DUMMY\n".cstring())
+    None
+
   be try_finish_request_early(requester_id: StepId) =>
     None
 
