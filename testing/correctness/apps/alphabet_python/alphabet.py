@@ -42,7 +42,7 @@ def partition(data):
 
 class TotalVotes(object):
     def __init__(self):
-        self.letter = 'X'
+        self.letter = "X"
         self.votes = 0
 
     def update(self, votes):
@@ -59,7 +59,7 @@ class Votes(object):
         self.votes = votes
 
 
-@wallaroo.decoder(header_length=4, length_fmt='>I')
+@wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     (letter, vote_count) = struct.unpack(">2sI", bs)
     return Votes(letter, vote_count)

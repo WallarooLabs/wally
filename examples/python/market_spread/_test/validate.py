@@ -17,14 +17,14 @@ import argparse
 from struct import calcsize, unpack
 
 
-parser = argparse.ArgumentParser('Alphabet validator')
-parser.add_argument('--output', type=argparse.FileType('rb'),
+parser = argparse.ArgumentParser("Alphabet validator")
+parser.add_argument("--output", type=argparse.FileType("rb"),
                     help="The output file of the application")
-parser.add_argument('--expected', type=argparse.FileType('rb'),
+parser.add_argument("--expected", type=argparse.FileType("rb"),
                     help=("A file containing the expected output"))
 args = parser.parse_args()
 
-header_fmt = '>I'
+header_fmt = ">I"
 header_size = calcsize(header_fmt)
 
 # Since order isn't identical in every run (multiple workers)

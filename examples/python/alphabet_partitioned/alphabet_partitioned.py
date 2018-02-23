@@ -40,7 +40,7 @@ def partition(data):
 
 class TotalVotes(object):
     def __init__(self):
-        self.letter = 'X'
+        self.letter = "X"
         self.votes = 0
 
     def update(self, votes):

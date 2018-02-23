@@ -45,7 +45,7 @@ def application_setup(args):
 def decoder(bs):
     if len(bs) < 4:
       return 0.0
-    return struct.unpack('>f', bs[:4])[0]
+    return struct.unpack(">f", bs[:4])[0]
 
 @wallaroo.computation(name="multiply by 1.8")
 def multiply(data):
@@ -60,4 +60,4 @@ def add(data):
 @wallaroo.encoder
 def encoder(data):
     # data is a float
-    return (struct.pack('>f', data), None)
+    return (struct.pack(">f", data), None)

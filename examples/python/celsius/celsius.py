@@ -33,7 +33,7 @@ def application_setup(args):
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
-    return struct.unpack('>f', bs)[0]
+    return struct.unpack(">f", bs)[0]
 
 
 @wallaroo.computation(name="multiply by 1.8")
@@ -48,4 +48,4 @@ def add(data):
 
 @wallaroo.encoder
 def encoder(data):
-    return struct.pack('>If', 4, data)
+    return struct.pack(">If", 4, data)

@@ -35,7 +35,7 @@ def str_to_partition(stringable):
 
 
 def load_valid_symbols():
-    with open('symbols.txt', 'rb') as f:
+    with open("symbols.txt", "rb") as f:
         return f.read().splitlines()
 
 
@@ -92,38 +92,38 @@ def serialize(o):
     1 - ?b object data (if required)
     """
     if isinstance(o, update_market_data.__class__):
-        s = struct.Struct('>I')
+        s = struct.Struct(">I")
         return s.pack(SerializedTypes.UPDATEMARKETDATA)
     elif isinstance(o, symbol_partition_function.__class__):
-        s = struct.Struct('>I')
+        s = struct.Struct(">I")
         return s.pack(SerializedTypes.SYMBOLPARTITIONFUNCTION)
     elif isinstance(o, check_order.__class__):
-        s = struct.Struct('>I')
+        s = struct.Struct(">I")
         return s.pack(SerializedTypes.CHECKORDER)
     elif isinstance(o, order_result_encoder.__class__):
-        s = struct.Struct('>I')
+        s = struct.Struct(">I")
         return s.pack(SerializedTypes.ORDERRESULTENCODER)
     elif isinstance(o, MarketDataMessage):
-        s = struct.Struct('>I4s21sdd')
+        s = struct.Struct(">I4s21sdd")
         return s.pack(SerializedTypes.MARKETDATAMESSAGE,
                       o.symbol, o.transact_time, o.bid, o.offer)
     elif isinstance(o, market_data_decoder.__class__):
-        s = struct.Struct('>I')
+        s = struct.Struct(">I")
         return s.pack(SerializedTypes.MARKETDATADECODER)
     elif isinstance(o, Order):
-        s = struct.Struct('>IBI6s4sdd21s')
+        s = struct.Struct(">IBI6s4sdd21s")
         return s.pack(SerializedTypes.ORDERMESSAGE, o.side, o.account,
                       o.order_id, o.symbol, o.qty, o.price, o.transact_time)
     elif isinstance(o, order_decoder.__class__):
-        s = struct.Struct('>I')
+        s = struct.Struct(">I")
         return s.pack(SerializedTypes.ORDERDECODER)
     elif isinstance(o, SymbolData):
-        s = struct.Struct('>Idd?')
+        s = struct.Struct(">Idd?")
         return s.pack(SerializedTypes.SYMBOLDATA,
             o.last_bid, o.last_offer, o.should_reject_trades)
     elif isinstance(o, wallaroo.StateBuilder):
         if o.state_cls is SymbolData:
-            s = struct.Struct('>I')
+            s = struct.Struct(">I")
             return s.pack(SerializedTypes.SYMBOLDATABUILDER)
         else:
             print("Unknown state class {}".format(type(o.state_cls).__name__))
@@ -137,7 +137,7 @@ def deserialize(bs):
     0 - 4b object class (SerializedTypes)
     1 - ?b object data (if required)
     """
-    (obj_type,), bs = struct.unpack('>I', bs[:4]), bs[4:]
+    (obj_type,), bs = struct.unpack(">I", bs[:4]), bs[4:]
     if obj_type == SerializedTypes.UPDATEMARKETDATA:
         return update_market_data
     elif obj_type == SerializedTypes.SYMBOLPARTITIONFUNCTION:
@@ -149,18 +149,18 @@ def deserialize(bs):
     elif obj_type == SerializedTypes.ORDERRESULTENCODER:
         return order_result_encoder
     elif obj_type == SerializedTypes.MARKETDATAMESSAGE:
-        (symbol, time, bid, offer) = struct.unpack('>4s21sdd', bs)
+        (symbol, time, bid, offer) = struct.unpack(">4s21sdd", bs)
         return MarketDataMessage(symbol, time, bid, offer)
     elif obj_type == SerializedTypes.MARKETDATADECODER:
         return market_data_decoder
     elif obj_type == SerializedTypes.ORDERMESSAGE:
         (side, acct, oid, symbol, qty, price, t_time) = struct.unpack(
-                '>BI6s4sdd21s', bs)
+                ">BI6s4sdd21s", bs)
         return Order(side, acct, oid, symbol, qty, price, t_time)
     elif obj_type == SerializedTypes.ORDERDECODER:
         return order_decoder
     elif obj_type == SerializedTypes.SYMBOLDATA:
-        (last_bid, last_offer, should_reject_trades) = struct.unpack('>dd?', bs)
+        (last_bid, last_offer, should_reject_trades) = struct.unpack(">dd?", bs)
         return SymbolData(last_bid, last_offer, should_reject_trades)
     else:
         print("Don't know how to deserialize: {}".format(obj_type))
@@ -249,7 +249,7 @@ def order_result_encoder(data):
                     data.bid,
                     data.offer,
                     data.timestamp)
-    out = struct.pack('>I{}s'.format(len(p)), len(p), p)
+    out = struct.pack(">I{}s".format(len(p)), len(p), p)
     return out
 
 
