@@ -19,12 +19,12 @@ import struct
 
 
 def generate_messages(num_messages):
-    with open('celsius.msg', 'wb') as f:
+    with open("celsius.msg", "wb") as f:
         for x in xrange(num_messages):
-            f.write(struct.pack('>If', 4, random.uniform(0, 10000)))
+            f.write(struct.pack(">If", 4, random.uniform(0, 10000)))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
     try:
         num_messages = int(sys.argv[1])

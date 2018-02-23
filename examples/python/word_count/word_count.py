@@ -37,13 +37,13 @@ def application_setup(args):
 
 @wallaroo.computation_multi(name="split into words")
 def split(data):
-    punctuation = " !\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
+    punctuation = " !\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~"
 
     words = []
 
     for line in data.split("\n"):
         clean_line = line.lower().strip(punctuation)
-        for word in clean_line.split(' '):
+        for word in clean_line.split(" "):
             clean_word = word.strip(punctuation)
             words.append(clean_word)
 
@@ -78,7 +78,7 @@ class WordCount(object):
 
 @wallaroo.partition
 def partition(data):
-    if data[0] >= 'a' and data[0] <= 'z':
+    if data[0] >= "a" and data[0] <= "z":
         return data[0]
     else:
         return "!"

@@ -17,7 +17,7 @@ import argparse
 from json import loads
 from struct import calcsize, unpack
 
-fmt = '>L2sQ'
+fmt = ">L2sQ"
 def decoder(bs):
     return unpack(fmt, bs)[1:3]
 
@@ -27,13 +27,13 @@ def pre_processor(decoded):
         totals[c] = v
     return totals
 
-parser = argparse.ArgumentParser('Alphabet validator')
-parser.add_argument('--output', type=argparse.FileType('rb'),
+parser = argparse.ArgumentParser("Alphabet validator")
+parser.add_argument("--output", type=argparse.FileType("rb"),
                     help="The output file of the application.")
-parser.add_argument('--expected', type=argparse.FileType('r'),
+parser.add_argument("--expected", type=argparse.FileType("r"),
                     help=("A file containing the expected final vote tally as "
                           "JSON serialised dict."))
-parser.add_argument('--repetitions', type=int, default=1,
+parser.add_argument("--repetitions", type=int, default=1,
                     help="Number of times the input file is repeated.")
 args = parser.parse_args()
 

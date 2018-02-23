@@ -54,7 +54,7 @@ class SequenceWindow(object):
         return list(self.window)
 
 
-@wallaroo.decoder(header_length=4, length_fmt='>I')
+@wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     # Expecting a 64-bit unsigned int in big endian
     value = struct.unpack(">Q", bs)[0]
@@ -93,5 +93,5 @@ def observe_new_value(data, state):
 @wallaroo.encoder
 def encoder(data):
     # data is a list of integers
-    s = '[{}]'.format(','.join(str(v) for v in data))
-    return struct.pack('>L{}s'.format(len(s)), len(s), s)
+    s = "[{}]".format(",".join(str(v) for v in data))
+    return struct.pack(">L{}s".format(len(s)), len(s), s)

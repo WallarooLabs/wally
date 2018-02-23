@@ -34,7 +34,7 @@ def str_to_partition(stringable):
 
 
 def load_valid_symbols():
-    with open('symbols.txt', 'rb') as f:
+    with open("symbols.txt", "rb") as f:
         return f.read().splitlines()
 
 
@@ -152,7 +152,7 @@ def order_result_encoder(data):
                     data.bid,
                     data.offer,
                     data.timestamp)
-    out = struct.pack('>I{}s'.format(len(p)), len(p), p)
+    out = struct.pack(">I{}s".format(len(p)), len(p), p)
     return out
 
 

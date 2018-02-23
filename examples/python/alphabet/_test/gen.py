@@ -24,12 +24,12 @@ data = []
 for x in xrange(1000):
     c = choice(lowercase)
     v = randrange(1,10000)
-    data.append(pack('>IsI',5, c, v))
+    data.append(pack(">IsI",5, c, v))
     expected[c] = expected.get(c, 0) + v
 
-with open('_test.txt', 'wb') as fin:
+with open("_test.txt", "wb") as fin:
     for v in data:
         fin.write(v)
 
-with open('_expected.json', 'wb') as fout:
+with open("_expected.json", "wb") as fout:
     fout.write(dumps(expected))
