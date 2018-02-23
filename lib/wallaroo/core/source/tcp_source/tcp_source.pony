@@ -302,6 +302,15 @@ actor TCPSource is (Producer & FinishedAckResponder)
       requester.try_finish_request_early(requester_id)
     end
 
+  be request_finished_ack_complete(requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack_complete TCPSource\n".cstring())
+    for route in _routes.values() do
+      @printf[I32]("!@ ---*****---- Complete consumer request at Source\n".cstring())
+      route.request_finished_ack_complete(_source_id, this)
+    end
+
   be try_finish_request_early(requester_id: StepId) =>
     _finished_ack_waiter.try_finish_request_early(requester_id)
 
