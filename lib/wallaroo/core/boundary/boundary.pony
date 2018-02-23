@@ -459,6 +459,17 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
+  be request_finished_ack_complete(requester_id: StepId,
+    producer: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack_complete BOUNDARY\n".cstring())
+    try
+      _writev(ChannelMsgEncoder.request_finished_ack_complete(_worker_name,
+        requester_id, _auth)?)
+    else
+      Fail()
+    end
+
   be try_finish_request_early(requester_id: StepId) =>
     _finished_ack_waiter.try_finish_request_early(requester_id)
 

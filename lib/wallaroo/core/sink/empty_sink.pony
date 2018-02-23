@@ -69,6 +69,11 @@ actor EmptySink is Consumer
     @printf[I32]("!@ request_finished_ack EmptySink\n".cstring())
     producer.receive_finished_ack(request_id)
 
+  be request_finished_ack_complete(requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack_complete EmptySink\n".cstring())
+
   be try_finish_request_early(requester_id: StepId) =>
     None
 

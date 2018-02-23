@@ -42,7 +42,9 @@ trait Route
 
   fun ref request_ack()
   fun ref request_finished_ack(request_id: RequestId, requester_id: StepId,
-    producer: FinishedAckRequester)
+    requester: FinishedAckRequester)
+  fun ref request_finished_ack_complete(requester_id: StepId,
+    requester: FinishedAckRequester)
   fun ref receive_finished_ack(request_id: RequestId)
 
 trait RouteLogic
@@ -114,6 +116,11 @@ class EmptyRoute is Route
     true
 
   fun ref request_finished_ack(request_id: RequestId, requester_id: StepId,
+    producer: FinishedAckRequester)
+  =>
+    Fail()
+
+  fun ref request_finished_ack_complete(requester_id: StepId,
     producer: FinishedAckRequester)
   =>
     Fail()

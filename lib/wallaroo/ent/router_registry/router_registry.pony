@@ -609,7 +609,7 @@ actor RouterRegistry is FinishedAckRequester
 
   be rotation_complete() =>
     """
-    Called when rotation has copmleted and we should resume processing
+    Called when rotation has completed and we should resume processing
     """
     _connections.request_cluster_unmute()
     _resume_the_world()
@@ -696,13 +696,11 @@ actor RouterRegistry is FinishedAckRequester
     _mute_request(_worker_name)
     _connections.stop_the_world(new_workers)
 
-  be resume_the_world() =>
-    _resume_the_world()
-
   fun ref _resume_the_world() =>
     """
     Migration is complete and we're ready to resume message processing
     """
+    _connections.request_finished_acks_complete(_id, this)
     _resume_all_local()
     _stop_the_world_in_process = false
     @printf[I32]("~~~Resuming message processing.~~~\n".cstring())
@@ -838,6 +836,17 @@ actor RouterRegistry is FinishedAckRequester
         let request_id =
           _finished_ack_waiter.add_consumer_request(upstream_requester_id)
         source.request_finished_ack(request_id, _id, this)
+      end
+    else
+      _finished_ack_waiter.try_finish_request_early(upstream_requester_id)
+    end
+
+  be remote_request_finished_ack_complete(originating_worker: String,
+    upstream_requester_id: StepId)
+  =>
+    if _sources.size() > 0 then
+      for source in _sources.values() do
+        source.request_finished_ack_complete(_id, this)
       end
     else
       _finished_ack_waiter.try_finish_request_early(upstream_requester_id)

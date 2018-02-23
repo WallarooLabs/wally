@@ -148,6 +148,9 @@ actor DataReceiver is Producer
       where custom_action = _WriteFinishedAck(this, upstream_request_id))
     _router.request_finished_ack(requester_id, this, _finished_ack_waiter)
 
+  be request_finished_ack_complete(requester_id: StepId) =>
+    @printf[I32]("!@ request_finished_ack_complete DATA RECEIVER\n".cstring())
+
   be try_finish_request_early(requester_id: StepId) =>
     _finished_ack_waiter.try_finish_request_early(requester_id)
 
