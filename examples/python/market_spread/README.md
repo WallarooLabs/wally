@@ -141,7 +141,7 @@ sender --host 127.0.0.1:7011 --file \
 
 This will run for a few seconds and then terminate.
 
-To begin send market messages, run this command:
+To begin sending market messages, run this command:
 
 ```bash
 sender --host 127.0.0.1:7011 --file \
