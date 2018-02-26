@@ -448,15 +448,20 @@ actor OutgoingBoundary is Consumer
   be request_finished_ack(upstream_request_id: RequestId,
     requester_id: StepId, upstream_requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack BOUNDARY\n".cstring())
-    try
-      _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
-        upstream_requester)
-      let request_id = _finished_ack_waiter.add_consumer_request(requester_id)
-      _writev(ChannelMsgEncoder.request_finished_ack(_worker_name, request_id,
-        requester_id, _auth)?)
+    @printf[I32]("!@ request_finished_ack BOUNDARY requester_id: %s, upstream_request_id: %s\n".cstring(), requester_id.string().cstring(), upstream_request_id.string().cstring())
+    if not _finished_ack_waiter.already_added_request(requester_id) then
+      try
+        _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
+          upstream_requester)
+        let request_id = _finished_ack_waiter.add_consumer_request(
+          requester_id)
+        _writev(ChannelMsgEncoder.request_finished_ack(_worker_name,
+          request_id, requester_id, _auth)?)
+      else
+        Fail()
+      end
     else
-      Fail()
+      upstream_requester.receive_finished_ack(upstream_request_id)
     end
 
   be request_finished_ack_complete(requester_id: StepId,
@@ -474,6 +479,7 @@ actor OutgoingBoundary is Consumer
     _finished_ack_waiter.try_finish_request_early(requester_id)
 
   be receive_finished_ack(request_id: RequestId) =>
+    @printf[I32]("!@ receive_finished_ack BOUNDARY\n".cstring())
     _finished_ack_waiter.unmark_consumer_request(request_id)
 
   //
@@ -1006,25 +1012,31 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
       ifdef "trace" then
         @printf[I32]("Rcvd msg at OutgoingBoundary\n".cstring())
       end
+      @printf[I32]("!@ Recvd msg at OutgoingBoundary\n".cstring())
       match ChannelMsgDecoder(consume data, _auth)
       | let ac: AckDataConnectMsg =>
-        ifdef "trace" then
+        //!@
+        // ifdef "trace" then
           @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
-        end
+        // end
         conn.receive_connect_ack(ac.last_id_seen)
       | let dd: DataDisconnectMsg =>
+        //!@
+        @printf[I32]("!@ Rcvd DataDisconnectMsg at Boundary\n".cstring())
         _outgoing_boundary.dispose()
       | let sn: StartNormalDataSendingMsg =>
-        ifdef "trace" then
+        //!@
+        // ifdef "trace" then
           @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"
             .cstring())
-        end
+        // end
         conn.receive_connect_ack(sn.last_id_seen)
         conn.start_normal_sending()
       | let aw: AckWatermarkMsg =>
-        ifdef "trace" then
+        //!@
+        // ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
-        end
+        // end
         conn.receive_ack(aw.seq_id)
       | let fa: FinishedAckMsg =>
         @printf[I32]("Received FinishedAckMsg from %s\n".cstring(),

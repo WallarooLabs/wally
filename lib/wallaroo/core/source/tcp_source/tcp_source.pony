@@ -95,7 +95,7 @@ actor TCPSource is (Producer & FinishedAckResponder)
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
+  var _finished_ack_waiter: FinishedAckWaiter
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[Consumer] val, route_builder: RouteBuilder,
@@ -108,6 +108,7 @@ actor TCPSource is (Producer & FinishedAckResponder)
     A new connection accepted on a server.
     """
     _source_id = _step_id_gen()
+    _finished_ack_waiter = FinishedAckWaiter(_source_id)
     _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
@@ -287,7 +288,7 @@ actor TCPSource is (Producer & FinishedAckResponder)
     requester: FinishedAckRequester)
   =>
     @printf[I32]("!@ Source stopping world (%s)\n".cstring(),
-      (digestof this).string().cstring())
+      _source_id.string().cstring())
     _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
       requester)
 

@@ -20,11 +20,13 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "serialise"
 use "time"
 use "wallaroo_labs/guid"
 use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/state"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/rebalancing"
@@ -38,6 +40,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 
 actor Step is (Producer & Consumer)
+  let _auth: AmbientAuth
   var _id: U128
   let _runner: Runner
   var _router: Router = EmptyRouter
@@ -60,7 +63,7 @@ actor Step is (Producer & Consumer)
   var _initialized: Bool = false
   var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
-  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
+  var _finished_ack_waiter: FinishedAckWaiter
   let _recovery_replayer: RecoveryReplayer
 
   let _acker_x: Acker = Acker
@@ -68,13 +71,15 @@ actor Step is (Producer & Consumer)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
 
-  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
+  new create(auth: AmbientAuth, runner: Runner iso,
+    metrics_reporter: MetricsReporter iso,
     id: U128, route_builder: RouteBuilder, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router: Router = EmptyRouter,
     omni_router: OmniRouter = EmptyOmniRouter)
   =>
+    _auth = auth
     _runner = consume runner
     match _runner
     | let r: ReplayableRunner => r.set_step_id(id)
@@ -86,6 +91,8 @@ actor Step is (Producer & Consumer)
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
     _id = id
+    _finished_ack_waiter = FinishedAckWaiter(_id)
+
     for (state_name, boundary) in _outgoing_boundaries.pairs() do
       _outgoing_boundaries(state_name) = boundary
     end
@@ -416,20 +423,23 @@ actor Step is (Producer & Consumer)
   =>
     match _step_message_processor
     | let nmp: NormalStepMessageProcessor =>
-      _step_message_processor = QueuingStepMessageProcessor(this)
+      _step_message_processor = QueueingStepMessageProcessor(this)
     end
-    @printf[I32]("!@ request_finished_ack STEP %s\n".cstring(),
-      _id.string().cstring())
-    _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
-      requester)
-    if _routes.size() > 0 then
-      for r in _routes.values() do
-        let request_id = _finished_ack_waiter.add_consumer_request(
-          requester_id)
-        r.request_finished_ack(request_id, _id, this)
+    @printf[I32]("!@ request_finished_ack STEP %s, upstream_request_id: %s\n".cstring(), _id.string().cstring(), upstream_request_id.string().cstring())
+    if not _finished_ack_waiter.already_added_request(requester_id) then
+      _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
+        requester)
+      if _routes.size() > 0 then
+        for r in _routes.values() do
+          let request_id = _finished_ack_waiter.add_consumer_request(
+            requester_id)
+          r.request_finished_ack(request_id, _id, this)
+        end
+      else
+        _finished_ack_waiter.try_finish_request_early(requester_id)
       end
     else
-      _finished_ack_waiter.try_finish_request_early(requester_id)
+      requester.receive_finished_ack(upstream_request_id)
     end
 
   be request_finished_ack_complete(requester_id: StepId,
@@ -437,7 +447,7 @@ actor Step is (Producer & Consumer)
   =>
     @printf[I32]("!@ request_finished_ack_complete STEP\n".cstring())
     match _step_message_processor
-    | let qmp: QueuingStepMessageProcessor =>
+    | let qmp: QueueingStepMessageProcessor =>
       // Process all queued messages
       qmp.flush()
       _step_message_processor = NormalStepMessageProcessor(this)
@@ -466,19 +476,47 @@ actor Step is (Producer & Consumer)
   // GROW-TO-FIT
   be receive_state(state: ByteSeq val) =>
     ifdef "autoscale" then
-      StepStateMigrator.receive_state(_runner, state)
+      try
+        match Serialised.input(InputSerialisedAuth(_auth),
+          state as Array[U8] val)(DeserialiseAuth(_auth))?
+        | let shipped_state: ShippedState =>
+          _step_message_processor = QueueingStepMessageProcessor(this,
+            shipped_state.pending_messages)
+          StepStateMigrator.receive_state(_runner, shipped_state.state_bytes)
+        else
+          Fail()
+        end
+      else
+        Fail()
+      end
     end
 
   be send_state_to_neighbour(neighbour: Step) =>
     ifdef "autoscale" then
-      StepStateMigrator.send_state_to_neighbour(_runner, neighbour)
+      match _step_message_processor
+      | let nmp: NormalStepMessageProcessor =>
+        // TODO: Should this be possible?
+        StepStateMigrator.send_state_to_neighbour(_runner, neighbour,
+          Array[QueuedStepMessage], _auth)
+      | let qmp: QueueingStepMessageProcessor =>
+        StepStateMigrator.send_state_to_neighbour(_runner, neighbour,
+          qmp.messages, _auth)
+      end
     end
 
   be send_state[K: (Hashable val & Equatable[K] val)](
     boundary: OutgoingBoundary, state_name: String, key: K)
   =>
     ifdef "autoscale" then
-      StepStateMigrator.send_state[K](_runner, _id, boundary, state_name, key)
+      match _step_message_processor
+      | let nmp: NormalStepMessageProcessor =>
+        // TODO: Should this be possible?
+        StepStateMigrator.send_state[K](_runner, _id, boundary, state_name,
+          key, Array[QueuedStepMessage], _auth)
+      | let qmp: QueueingStepMessageProcessor =>
+        StepStateMigrator.send_state[K](_runner, _id, boundary, state_name,
+          key, qmp.messages, _auth)
+      end
     end
 
   // Log-rotation
