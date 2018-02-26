@@ -27,12 +27,18 @@ actor InitialFinishedAckRequester is FinishedAckRequester
   """
   Used when we are the initiator of a chain of finished ack requests
   """
+  let _step_id: StepId
+
+  new create(step_id: StepId) =>
+    _step_id = step_id
+
   be receive_finished_ack(request_id: RequestId) =>
     ifdef debug then
+      // !@TODO: Remove "This step id"
       @printf[I32](("Received finished ack at InitialFinishedAckRequester. " +
         "This indicates the originator of a chain of finished ack requests " +
-        "has received the final ack. Request id: %s\n").cstring(),
-        request_id.string().cstring())
+        "has received the final ack. Request id received: %s. This step id: %s\n").cstring(),
+        request_id.string().cstring(), _step_id.string().cstring())
     end
     None
 
@@ -40,6 +46,8 @@ actor InitialFinishedAckRequester is FinishedAckRequester
     None
 
 class FinishedAckWaiter
+  // This will be 0 for data receivers, router registry, and boundaries
+  let _step_id: StepId
   let _id_gen: RequestIdGenerator = _id_gen.create()
   // Map from the requester_id to the request id it sent us
   let _upstream_request_ids: Map[StepId, RequestId] =
@@ -53,19 +61,29 @@ class FinishedAckWaiter
     _upstream_requesters.create()
   let _custom_actions: Map[StepId, CustomAction] = _custom_actions.create()
 
+  new create(id: StepId = 0) =>
+    _step_id = id
+
   fun ref initiate_request(initiator_id: StepId,
     custom_action: (CustomAction | None) = None)
   =>
-    add_new_request(initiator_id, 0, InitialFinishedAckRequester)
+    add_new_request(initiator_id, 0, InitialFinishedAckRequester(_step_id))
     match custom_action
     | let ca: CustomAction =>
       set_custom_action(initiator_id, ca)
     end
 
   fun ref add_new_request(requester_id: StepId, request_id: RequestId,
-    upstream_requester: FinishedAckRequester = InitialFinishedAckRequester,
+    upstream_requester': (FinishedAckRequester | None) = None,
     custom_action: (CustomAction | None) = None)
   =>
+    let upstream_requester =
+      match upstream_requester'
+      | let far: FinishedAckRequester => far
+      else
+        InitialFinishedAckRequester(_step_id)
+      end
+
     // If _upstream_request_ids contains the requester_id, then we're
     // already processing a request from it.
     if not _upstream_request_ids.contains(requester_id) then
@@ -113,6 +131,9 @@ class FinishedAckWaiter
     end
     request_id
 
+  fun already_added_request(requester_id: StepId): Bool =>
+    _upstream_request_ids.contains(requester_id)
+
   fun ref unmark_consumer_request(request_id: RequestId) =>
     try
       @printf[I32]("!@ -> _downstream_request_ids.lookup %s\n".cstring(), request_id.string().cstring())
@@ -131,10 +152,15 @@ class FinishedAckWaiter
     end
 
   fun ref try_finish_request_early(requester_id: StepId) =>
+    @printf[I32]("!@ try_finish_request_early\n".cstring())
     _check_send_run(requester_id)
 
   fun ref _check_send_run(requester_id: StepId) =>
     try
+      @printf[I32]("!@ _pending_acks size: %s for requester_id %s (reported from %s). Listing pending acks:\n".cstring(), _pending_acks(requester_id)?.size().string().cstring(), requester_id.string().cstring(), _step_id.string().cstring())
+      for pending_ack in _pending_acks(requester_id)?.values() do
+        @printf[I32]("!@ -- %s\n".cstring(), pending_ack.string().cstring())
+      end
       if _pending_acks(requester_id)?.size() == 0 then
         let upstream_request_id = _upstream_request_ids(requester_id)?
         _upstream_requesters(requester_id)?

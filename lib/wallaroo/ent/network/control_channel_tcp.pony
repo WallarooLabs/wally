@@ -362,7 +362,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           m.requester_id)
       | let m: FinishedAckMsg =>
         @printf[I32]("Received FinishedAckMsg from %s\n".cstring(),
-          m.sender)
+          m.sender.cstring())
         _router_registry.receive_finished_ack(m.request_id)
       | let m: RotateLogFilesMsg =>
         @printf[I32]("Control Ch: Received Rotate Log Files request\n"

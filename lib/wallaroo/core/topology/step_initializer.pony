@@ -74,15 +74,15 @@ class val StepBuilder
   fun clone_router_and_set_input_type(r: Router): Router =>
     _runner_builder.clone_router_and_set_input_type(r)
 
-  fun apply(next: Router, metrics_conn: MetricsSink, event_log: EventLog,
-    recovery_replayer: RecoveryReplayer,
+  fun apply(next: Router, metrics_conn: MetricsSink,
+    event_log: EventLog, recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router: Router = EmptyRouter,
     omni_router: OmniRouter = EmptyOmniRouter): Step tag
   =>
     let runner = _runner_builder(where event_log = event_log, auth = auth,
       router = router, pre_state_target_ids' = pre_state_target_ids())
-    let step = Step(consume runner,
+    let step = Step(auth, consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
       _runner_builder.route_builder(), event_log, recovery_replayer,
       outgoing_boundaries, router, omni_router)
