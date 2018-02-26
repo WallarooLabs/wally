@@ -52,7 +52,7 @@ actor KafkaSource[In: Any val] is (Producer & FinishedAckResponder &
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
+  var _finished_ack_waiter: FinishedAckWaiter
 
   let _topic: String
   let _partition_id: I32
@@ -81,6 +81,8 @@ actor KafkaSource[In: Any val] is (Producer & FinishedAckResponder &
     _route_builder = route_builder
 
     _source_id = _step_id_gen()
+    _finished_ack_waiter = FinishedAckWaiter(_source_id)
+
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       let new_boundary =
         builder.build_and_initialize(_step_id_gen(), _layout_initializer)

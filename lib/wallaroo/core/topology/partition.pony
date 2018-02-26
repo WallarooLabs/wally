@@ -207,7 +207,7 @@ class val KeyedStateSubpartition[PIn: Any val,
       | let pa: ProxyAddress =>
         if pa.worker == worker_name then
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
-          let next_state_step = Step(_runner_builder(where event_log =
+          let next_state_step = Step(auth, _runner_builder(where event_log =
             event_log, auth=auth),
             consume reporter, id, _runner_builder.route_builder(),
               event_log, recovery_replayer, outgoing_boundaries)

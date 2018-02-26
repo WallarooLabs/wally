@@ -61,18 +61,24 @@ class NormalStepMessageProcessor is StepMessageProcessor
     end
     None
 
-class QueuingStepMessageProcessor is StepMessageProcessor
+class QueueingStepMessageProcessor is StepMessageProcessor
   let step: Step ref
   var messages: Array[QueuedStepMessage] = messages.create()
 
-  new create(s: Step ref) =>
+  new create(s: Step ref, messages': Array[QueuedStepMessage] val =
+    recover Array[QueuedStepMessage] end)
+  =>
     step = s
+    for m in messages'.values() do
+      messages.push(m)
+    end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    @printf[I32]("!@ QUEUING MSG\n".cstring())
     let msg = TypedQueuedStepMessage[D](metric_name, pipeline_time_spent, data,
       i_producer, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
       metrics_id, worker_ingress_ts)

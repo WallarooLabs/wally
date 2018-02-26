@@ -144,12 +144,17 @@ actor DataReceiver is Producer
   be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId)
   =>
     @printf[I32]("!@ request_finished_ack DATA RECEIVER\n".cstring())
-    _finished_ack_waiter.add_new_request(requester_id, upstream_request_id
-      where custom_action = _WriteFinishedAck(this, upstream_request_id))
-    _router.request_finished_ack(requester_id, this, _finished_ack_waiter)
+    if not _finished_ack_waiter.already_added_request(requester_id) then
+      _finished_ack_waiter.add_new_request(requester_id, upstream_request_id
+        where custom_action = _WriteFinishedAck(this, upstream_request_id))
+      _router.request_finished_ack(requester_id, this, _finished_ack_waiter)
+    else
+      write_finished_ack(upstream_request_id)
+    end
 
   be request_finished_ack_complete(requester_id: StepId) =>
     @printf[I32]("!@ request_finished_ack_complete DATA RECEIVER\n".cstring())
+    _router.request_finished_ack_complete(requester_id, this)
 
   be try_finish_request_early(requester_id: StepId) =>
     _finished_ack_waiter.try_finish_request_early(requester_id)
@@ -159,6 +164,9 @@ actor DataReceiver is Producer
     _finished_ack_waiter.unmark_consumer_request(request_id)
 
   be write_finished_ack(upstream_request_id: RequestId) =>
+    _write_finished_ack(upstream_request_id)
+
+  fun ref _write_finished_ack(upstream_request_id: RequestId) =>
     @printf[I32]("!@ !! DataReceiver: write_finished_ack\n".cstring())
     try
       let ack_msg = ChannelMsgEncoder.finished_ack(_worker_name,
@@ -351,4 +359,5 @@ class _WriteFinishedAck is CustomAction
     _request_id = request_id
 
   fun ref apply() =>
+    @printf[I32]("!@ _WriteFinishedAck DataReceiver\n".cstring())
     _data_receiver.write_finished_ack(_request_id)

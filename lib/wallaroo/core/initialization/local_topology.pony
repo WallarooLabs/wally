@@ -1489,7 +1489,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         let runner_builder = subpartition.runner_builder()
         let reporter = MetricsReporter(t.name(), t.worker_name(),
           _metrics_conn)
-        let step = Step(runner_builder(where event_log = _event_log,
+        let step = Step(_auth, runner_builder(where event_log = _event_log,
           auth = _auth), consume reporter, msg.step_id(),
           runner_builder.route_builder(), _event_log, _recovery_replayer,
           _outgoing_boundaries)
