@@ -112,10 +112,10 @@ func (m ConcurrentMap) Store(key uint64, value interface{}) {
 func (m ConcurrentMap) Load(key uint64) (interface{}, bool) {
 	// Get shard
 	shard := m.GetShard(key)
-	shard.RLock()
+	//shard.RLock()
 	// Get item from shard.
 	val, ok := shard.items[key]
-	shard.RUnlock()
+	//shard.RUnlock()
 	return val, ok
 }
 
