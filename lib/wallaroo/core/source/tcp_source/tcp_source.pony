@@ -201,6 +201,19 @@ actor TCPSource is Producer
     end
     _notify.update_boundaries(_outgoing_boundaries)
 
+  be remove_boundary(worker: String) =>
+    if _outgoing_boundaries.contains(worker) then
+      try
+        let boundary = _outgoing_boundaries(worker)?
+        _routes(boundary)?.dispose()
+        _routes.remove(boundary)?
+        _outgoing_boundaries.remove(worker)?
+      else
+        Fail()
+      end
+    end
+    _notify.update_boundaries(_outgoing_boundaries)
+
   be reconnect_boundary(target_worker_name: String) =>
     try
       _outgoing_boundaries(target_worker_name)?.reconnect()

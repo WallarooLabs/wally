@@ -216,12 +216,24 @@ actor Step is (Producer & Consumer)
     _add_boundaries(boundaries)
 
   fun ref _add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
-    for (state_name, boundary) in boundaries.pairs() do
-      if not _outgoing_boundaries.contains(state_name) then
-        _outgoing_boundaries(state_name) = boundary
+    for (worker, boundary) in boundaries.pairs() do
+      if not _outgoing_boundaries.contains(worker) then
+        _outgoing_boundaries(worker) = boundary
         let new_route = _route_builder(this, boundary, _metrics_reporter)
         _acker_x.add_route(new_route)
         _routes(boundary) = new_route
+      end
+    end
+
+  be remove_boundary(worker: String) =>
+    if _outgoing_boundaries.contains(worker) then
+      try
+        let boundary = _outgoing_boundaries(worker)?
+        _routes(boundary)?.dispose()
+        _routes.remove(boundary)?
+        _outgoing_boundaries.remove(worker)?
+      else
+        Fail()
       end
     end
 
@@ -390,7 +402,6 @@ actor Step is (Producer & Consumer)
     // ifdef debug then
     //   Invariant(_upstreams.contains(producer))
     // end
-
     _upstreams.unset(producer)
 
   be mute(c: Consumer) =>
