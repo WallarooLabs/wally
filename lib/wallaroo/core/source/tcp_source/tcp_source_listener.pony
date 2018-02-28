@@ -137,6 +137,15 @@ actor TCPSourceListener is SourceListener
   =>
     _outgoing_boundary_builders = boundary_builders
 
+  be remove_boundary(worker: String) =>
+    let new_boundary_builders =
+      recover iso Map[String, OutgoingBoundaryBuilder] end
+    for (w, b) in _outgoing_boundary_builders.pairs() do
+      if w != worker then new_boundary_builders(w) = b end
+    end
+
+    _outgoing_boundary_builders = consume new_boundary_builders
+
   be dispose() =>
     @printf[I32]("Shutting down TCPSourceListener\n".cstring())
     _close()

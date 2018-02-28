@@ -31,6 +31,9 @@ trait tag Producer is (Muteable & Ackable & AckRequester)
 interface tag RouterUpdateable
   be update_router(r: Router)
 
+interface tag BoundaryUpdateable
+  be remove_boundary(worker: String)
+
 trait tag Consumer is (Runnable & StateReceiver & AckRequester & Initializable)
   be register_producer(producer: Producer)
   be unregister_producer(producer: Producer)

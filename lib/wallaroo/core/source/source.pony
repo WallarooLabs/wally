@@ -92,7 +92,7 @@ interface val SourceConfig[In: Any val]
   fun source_builder(app_name: String, name: String):
     SourceBuilderBuilder
 
-interface tag Source is DisposableActor
+interface tag Source is (DisposableActor & BoundaryUpdateable)
   be update_router(router: PartitionRouter)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
@@ -100,7 +100,7 @@ interface tag Source is DisposableActor
   be mute(c: Consumer)
   be unmute(c: Consumer)
 
-interface tag SourceListener is DisposableActor
+interface tag SourceListener is (DisposableActor & BoundaryUpdateable)
   be update_router(router: PartitionRouter)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)

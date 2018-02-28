@@ -377,6 +377,34 @@ actor RouterRegistry
     end
     _distribute_omni_router()
 
+  fun _distribute_boundary_removal(worker: String) =>
+    for subs in _partition_router_subs.values() do
+      for sub in subs.values() do
+        match sub
+        | let r: BoundaryUpdateable =>
+          r.remove_boundary(worker)
+        end
+      end
+    end
+    for subs in _stateless_partition_router_subs.values() do
+      for sub in subs.values() do
+        match sub
+        | let r: BoundaryUpdateable =>
+          r.remove_boundary(worker)
+        end
+      end
+    end
+    for step in _omni_router_steps.values() do
+      step.remove_boundary(worker)
+    end
+
+    for source in _sources.values() do
+      source.remove_boundary(worker)
+    end
+    for source_listener in _source_listeners.values() do
+      source_listener.remove_boundary(worker)
+    end
+
   fun _distribute_boundary_builders() =>
     let boundary_builders =
       recover trn Map[String, OutgoingBoundaryBuilder] end
@@ -978,11 +1006,12 @@ actor RouterRegistry
     @printf[I32]("~~~Stopping message processing for leaving workers.~~~\n"
       .cstring())
     _mute_request(_worker_name)
-    _connections.stop_the_world(recover Array[String] end)
+    _connections.stop_the_world()
 
   be disconnect_from_leaving_worker(worker: String) =>
     _connections.disconnect_from(worker)
     try
+      _distribute_boundary_removal(worker)
       _outgoing_boundaries.remove(worker)?
       _outgoing_boundaries_builders.remove(worker)?
     end
