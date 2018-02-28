@@ -308,6 +308,7 @@ actor RouterRegistry
         Fail()
       end
       if not _outgoing_boundaries_builders.contains(worker) then
+        _outgoing_boundaries_builders(worker) = builder
         new_boundary_builders(worker) = builder
       end
     end
@@ -1015,6 +1016,7 @@ actor RouterRegistry
       _outgoing_boundaries.remove(worker)?
       _outgoing_boundaries_builders.remove(worker)?
     end
+
     _distribute_boundary_builders()
     if not _leaving_in_process then
       ifdef debug then
