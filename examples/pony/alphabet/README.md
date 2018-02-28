@@ -32,22 +32,47 @@ This will create a `votes.msg` file in your current working directory.
 
 ## Running Alphabet
 
-In a separate shell, each:
+You will need five separate shells to run this application. Open each shell and go to the `examples/pony/alphabet` directory.
 
-0. In a shell, start up the Metrics UI if you don't already have it running:
+### Shell 1: Metrics
+
+Start up the Metrics UI if you don't already have it running:
 
 ```bash
 docker start mui
 ```
 
-1. Start a listener
+You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
+
+If you need to restart the UI, run:
+
+```bash
+docker restart mui
+```
+
+When it's time to stop the UI, run:
+
+```bash
+docker stop mui
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+docker start mui
+```
+
+### Shell 2: Data Receiver
+
+Start a listener
 
 ```bash
 ../../../../giles/receiver/receiver --listen 127.0.0.1:7002 --no-write \
   --ponythreads=1 --ponynoblock
 ```
 
-2. Start the application
+### Shell 3: Alphabet
+Start the application
 
 ```bash
 ./alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
@@ -55,7 +80,9 @@ docker start mui
   --cluster-initializer --ponynoblock --ponythreads=1
 ```
 
-3. Start a sender
+### Shell 4: Sender
+
+Start a sender
 
 ```bash
 ../../../../giles/sender/sender --host 127.0.0.1:7010 \
@@ -64,8 +91,21 @@ docker start mui
   --ponynoblock --no-write
 ```
 
-4. Shut down cluster once finished processing
+## Shutdown
+
+### Shell 5: Shutdown
+
+You can shut down the cluster with this command at any time:
 
 ```bash
-../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
+./cluster_shutdown 127.0.0.1:5050
+```
+
+You can shut down Giles Sender and Giles Receiver by pressing Ctrl-c from their respective shells.
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+docker stop mui
 ```

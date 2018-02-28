@@ -26,9 +26,37 @@ In the celsius directory, run `make`.
 
 In order to run the application you will need Giles Sender, Data Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/go/getting-started/linux-setup.md) or [MacOS](/book/go/getting-started/macos-setup.md) setup instructions.
 
-You will need three separate shells to run this application. Open each shell and go to the `examples/go/celsius` directory.
+You will need five separate shells to run this application. Open each shell and go to the `examples/go/celsius` directory.
 
-### Shell 1
+### Shell 1: Metrics
+
+Start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
+You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
+
+If you need to restart the UI, run:
+
+```bash
+docker restart mui
+```
+
+When it's time to stop the UI, run:
+
+```bash
+docker stop mui
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+docker start mui
+```
+
+### Shell 2: Data Receiver
 
 Run `data_receiver` to listen for TCP output on `127.0.0.1` port `7002`:
 
@@ -36,7 +64,7 @@ Run `data_receiver` to listen for TCP output on `127.0.0.1` port `7002`:
 ../../../utils/data_receiver/data_receiver --listen 127.0.0.1:7002
 ```
 
-### Shell 2
+### Shell 3: Celsius
 
 Run `celsius`.
 
@@ -47,7 +75,7 @@ Run `celsius`.
   --ponythreads=1 --ponynoblock
 ```
 
-### Shell 3
+### Shell 4: Sender
 
 Send messages:
 
@@ -55,14 +83,14 @@ Send messages:
 ../../../giles/sender/sender --host 127.0.0.1:7010 \
   --file celsius.msg --batch-size 50 --interval 10_000_000 \
   --messages 500 --repeat --binary --msg-size 8 --no-write \
-  --ponythreads=1 --ponynoblock 
+  --ponythreads=1 --ponynoblock
 ```
 
 ## Reading the Output
 
 There will be a stream of output messages in the first shell (where you ran `data_receiver`).
 
-## Shutdown
+## Shell 5: Shutdown
 
 You can shut down the cluster with this command at any time:
 
@@ -71,3 +99,9 @@ You can shut down the cluster with this command at any time:
 ```
 
 You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their respective shells.
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+docker stop mui
+```

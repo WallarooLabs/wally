@@ -30,7 +30,35 @@ In order to run the application you will need Machida, Giles Sender, and the Clu
 
 You will need three separate shells to run this application. Open each shell and go to the `examples/python/word_count` directory.
 
-### Shell 1
+### Shell 1: Metrics
+
+Start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
+You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
+
+If you need to restart the UI, run:
+
+```bash
+docker restart mui
+```
+
+When it's time to stop the UI, run:
+
+```bash
+docker stop mui
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+docker start mui
+```
+
+### Shell 2: Data Receiver
 
 Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
 
@@ -38,7 +66,7 @@ Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
 nc -l 127.0.0.1 7002
 ```
 
-### Shell 2
+### Shell 3: Word Count
 
 Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `word_count.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -58,7 +86,7 @@ machida --application-module word_count --in 127.0.0.1:7010 --out 127.0.0.1:7002
   --ponythreads=1 --ponynoblock
 ```
 
-### Shell 3
+### Shell 4: Sender
 
 Set `PATH` to refer to the directory that contains the `sender`  executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
@@ -79,7 +107,7 @@ sender --host 127.0.0.1:7010 --file count_this.txt \
 
 There will be a stream of output messages in the first shell (where you ran `nc`).
 
-## Shutdown
+## Shell 5: Shutdown
 
 Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
 
@@ -96,3 +124,9 @@ cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down Giles Sender by pressing `Ctrl-c` from its shell.
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+docker stop mui
+```
