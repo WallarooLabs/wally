@@ -501,8 +501,6 @@ actor TCPSource is Producer
     """
     Resize the read buffer.
     """
-
-
     let size = if _expect != 0 then
       _expect
     else
