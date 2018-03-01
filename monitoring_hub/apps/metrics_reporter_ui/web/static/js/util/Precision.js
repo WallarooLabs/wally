@@ -24,6 +24,6 @@ function round(value, exp) {
     return +(value[0] + 'e' + (value[1] ? (+value[1] - exp) : -exp));
 }
 
-export default {
-    cleanTrailing: cleanTrailing
+export  {
+    cleanTrailing
 }

@@ -13,16 +13,16 @@ import {List} from "immutable"
 export default class SourceDashboard extends React.Component {
 	render() {
 		const {appName, appConfig, sourceType, sourceName, throughputs, throughputStats, latencyPercentageBins, latencyPercentileBinStats} = this.props;
-		let sourcesList;
-		let sourcesListType;
-		let compsList;
-		let pipelineName;
-		let workerName;
+		var sourcesList;
+		var sourcesListType;
+		var compsList;
+		var pipelineName;
+		var workerName;
 		switch(sourceType) {
 			case "node-ingress-egress":
 				sourcesListType = "node-ingress-egress-by-pipeline"
 				sourcesList = appConfig.getIn(["metrics", sourcesListType, sourceName], List());
-				let compsList = appConfig.getIn(["metrics", "computation-by-worker", sourceName], List());
+				compsList = appConfig.getIn(["metrics", "computation-by-worker", sourceName], List());
 				break;
 			case "computation":
 				sourcesListType = "computation-by-worker"
@@ -41,7 +41,7 @@ export default class SourceDashboard extends React.Component {
 				break;
 			case "start-to-end-by-worker":
 				[pipelineName, workerName] = sourceName.split("@");
-				let sourcesListType = "computation-by-worker"
+				sourcesListType = "computation-by-worker"
 				sourcesList = appConfig.getIn(["metrics", "pipeline-computations", sourceName], List());
 				break;
 			default:

@@ -32,15 +32,16 @@ export default class SourceDashboardContainer extends React.Component {
 		AppStreamConnections.connectSourceMetricsChannels(PhoenixConnector, sourceType, sourceName);
 	}
 	connectToMetricStoresAndUpdateState(props) {
-		const { sourceType, sourceName } = props.params;
-		this.connectMetricChannels(sourceType, sourceName);
-		const throughputStats = ThroughputStatsStore.getThroughputStats(sourceType, sourceName);
-		const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(sourceType, sourceName);
-		const latencyPercentageBins = LatencyPercentageBinsStore.getLatencyPercentageBins(sourceType, sourceName);
-		const throughputs = ThroughputsStore.getThroughputs(sourceType, sourceName);
+		const { appName, sourceType, sourceName } = props.params;
+		const metricChannel = appName + "||" + sourceName;
+		this.connectMetricChannels(sourceType, metricChannel);
+		const throughputStats = ThroughputStatsStore.getThroughputStats(appName, sourceType, sourceName);
+		const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(appName, sourceType, sourceName);
+		const latencyPercentageBins = LatencyPercentageBinsStore.getLatencyPercentageBins(appName, sourceType, sourceName);
+		const throughputs = ThroughputsStore.getThroughputs(appName, sourceType, sourceName);
 		let throughputsListener = ThroughputsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const throughputs = ThroughputsStore.getThroughputs(sourceType, sourceName);
+				const throughputs = ThroughputsStore.getThroughputs(appName, sourceType, sourceName);
 				this.setState({
 					throughputs: throughputs
 				});
@@ -48,7 +49,7 @@ export default class SourceDashboardContainer extends React.Component {
 		}.bind(this));
 		let throughputStatsListener = ThroughputStatsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const throughputStats = ThroughputStatsStore.getThroughputStats(sourceType, sourceName);
+				const throughputStats = ThroughputStatsStore.getThroughputStats(appName, sourceType, sourceName);
 				this.setState({
 					throughputStats: throughputStats
 				});
@@ -56,7 +57,7 @@ export default class SourceDashboardContainer extends React.Component {
 		}.bind(this));
 		let latencyPercentileBinStatsListener = LatencyPercentileBinStatsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(sourceType, sourceName);
+				const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(appName, sourceType, sourceName);
 				this.setState({
 					latencyPercentileBinStats: latencyPercentileBinStats
 				});
@@ -64,7 +65,7 @@ export default class SourceDashboardContainer extends React.Component {
 		}.bind(this));
 		let latencyPercentageBinsListener = LatencyPercentageBinsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const latencyPercentageBins = LatencyPercentageBinsStore.getLatencyPercentageBins(sourceType, sourceName);
+				const latencyPercentageBins = LatencyPercentageBinsStore.getLatencyPercentageBins(appName, sourceType, sourceName);
 				this.setState({
 					latencyPercentageBins: latencyPercentageBins
 				});

@@ -12,6 +12,6 @@ function partition(l, pred) {
     return List.of(fromJS(asArrays[0]), fromJS(asArrays[1]))
 }
 
-export default {
-    partition: partition
+export {
+    partition
 }

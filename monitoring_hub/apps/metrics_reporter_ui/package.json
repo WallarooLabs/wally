@@ -4,8 +4,18 @@
   "description": "Metrics Reporter UI",
   "private": true,
   "main": "main.js",
+  "babel": {
+    "plugins": [
+      "transform-inline-environment-variables",
+      "add-module-exports"
+    ],
+    "presets": [
+      "env",
+      "react"
+    ]
+  },
   "scripts": {
-    "compile": "mkdir -p priv/static/js && browserify web/static/js/main.js -t [ babelify --presets [ env react ] --plugins [ transform-inline-environment-variables ] ] --outfile priv/static/js/bundle.js",
+    "compile": "mkdir -p priv/static/js && browserify web/static/js/main.js -t [ babelify ] --outfile priv/static/js/bundle.js",
     "build:css": "mkdir -p priv/static/css && node-sass --include-path web/static/css web/static/css/style.scss priv/static/css/style.css && cp web/static/css/bootstrap-flatly.min.css priv/static/css/bootstrap-flatly.min.css  && cp web/static/css/bootstrap-3.3.5.min.css priv/static/css/bootstrap-3.3.5.min.css",
     "build:assets": "mkdir -p priv/static/fonts && mkdir -p priv/static/images && cp web/static/fonts/* priv/static/fonts/ && cp web/static/images/* priv/static/images/",
     "build": "npm run compile && npm run build:css && npm run build:assets",
@@ -22,6 +32,7 @@
   "license": "ISC",
   "devDependencies": {
     "babel-core": "^6.0.20",
+    "babel-plugin-add-module-exports": "^0.2.1",
     "babel-plugin-transform-inline-environment-variables": "0.2.0",
     "babel-preset-env": "1.6.1",
     "babel-preset-react": "6.24.1",
@@ -36,7 +47,7 @@
   },
   "dependencies": {
     "accounting": "^0.4.1",
-    "d3": "wallaroolabs/d3",
+    "d3": "github:wallaroolabs/d3#v3.5.7",
     "express": "^4.13.3",
     "flux": "^2.1.1",
     "history": "^1.12.6",

@@ -23,16 +23,18 @@ defmodule MetricsReporterUI.MetricsChannel do
     latency_list_msg = create_latency_list_msg(pipeline_key, end_timestamp, latency_list)
     store_latency_list_msg(app_name, "start-to-end-by-worker", pipeline_key, latency_list_msg)
     throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    msg_timestamp = throughput_msg["time"]
     store_period_throughput_msg(app_name, "start-to-end-by-worker", pipeline_key, throughput_msg)
-    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "start-to-end-by-worker", pipeline_key)
-    {_response, _pid} = find_or_start_throughput_workers(app_name, "start-to-end-by-worker", pipeline_key)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "start-to-end-by-worker", pipeline_key, msg_timestamp)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, "start-to-end-by-worker", pipeline_key, msg_timestamp)
     # By Pipeline
     latency_list_msg = create_latency_list_msg(pipeline_name, end_timestamp, latency_list)
     store_latency_list_msg(app_name, category, pipeline_name, latency_list_msg)
     throughput_msg = create_throughput_msg_from_latency_list(pipeline_name, end_timestamp, period, latency_list)
+    msg_timestamp = throughput_msg["time"]
     store_period_throughput_msg(app_name, category, pipeline_name, throughput_msg)
-    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, pipeline_name)
-    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_name)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, pipeline_name, msg_timestamp)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_name, msg_timestamp)
     {:noreply, socket}
   end
 
@@ -45,17 +47,19 @@ defmodule MetricsReporterUI.MetricsChannel do
     latency_list_msg = create_latency_list_msg(pipeline_key, end_timestamp, latency_list)
     store_latency_list_msg(app_name, "node-ingress-egress-by-pipeline", pipeline_key, latency_list_msg)
     throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    msg_timestamp = throughput_msg["time"]
     store_period_throughput_msg(app_name, "node-ingress-egress-by-pipeline", pipeline_key, throughput_msg)
-    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "node-ingress-egress-by-pipeline", pipeline_key)
-    {_response, _pid} = find_or_start_throughput_workers(app_name, "node-ingress-egress-by-pipeline", pipeline_key)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "node-ingress-egress-by-pipeline", pipeline_key, msg_timestamp)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, "node-ingress-egress-by-pipeline", pipeline_key, msg_timestamp)
     # By Worker
     [_pipeline_name, worker_name] = String.split(pipeline_key, "*")
     latency_list_msg = create_latency_list_msg(worker_name, end_timestamp, latency_list)
     store_latency_list_msg(app_name, category, worker_name, latency_list_msg)
     throughput_msg = create_throughput_msg_from_latency_list(worker_name, end_timestamp, period, latency_list)
+    msg_timestamp = throughput_msg["time"]
     store_period_throughput_msg(app_name, category, worker_name, throughput_msg)
-    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, worker_name)
-    {_response, _pid} = find_or_start_throughput_workers(app_name, category, worker_name)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, worker_name, msg_timestamp)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, worker_name, msg_timestamp)
     {:noreply, socket}
   end
 
@@ -70,18 +74,22 @@ defmodule MetricsReporterUI.MetricsChannel do
     latency_list_msg = create_latency_list_msg(pipeline_key, end_timestamp, latency_list)
     store_latency_list_msg(app_name, "computation-by-worker", pipeline_key, latency_list_msg)
     throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    msg_timestamp = throughput_msg["time"]
     store_period_throughput_msg(app_name, "computation-by-worker", pipeline_key, throughput_msg)
-    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "computation-by-worker", pipeline_key)
-    {_response, _pid} = find_or_start_throughput_workers(app_name, "computation-by-worker", pipeline_key)
-    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_and_worker_name, pipeline_key, "computation-by-worker:" <> pipeline_key)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, "computation-by-worker", pipeline_key, msg_timestamp)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, "computation-by-worker", pipeline_key, msg_timestamp)
+    comp_by_worker_topic = MonitoringHubUtils.Helpers.create_channel_name("computation-by-worker", app_name, pipeline_key)
+    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_and_worker_name, pipeline_key, comp_by_worker_topic)
     # By Computation
     latency_list_msg = create_latency_list_msg(computation_name, end_timestamp, latency_list)
     store_latency_list_msg(app_name, category, computation_name, latency_list_msg)
     throughput_msg = create_throughput_msg_from_latency_list(computation_name, end_timestamp, period, latency_list)
+    msg_timestamp = throughput_msg["time"]
     store_period_throughput_msg(app_name, category, computation_name, throughput_msg)
-    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, computation_name)
-    {_response, _pid} = find_or_start_throughput_workers(app_name, category, computation_name)
-    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_name, computation_name, "computation:" <> computation_name)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, computation_name, msg_timestamp)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, computation_name, msg_timestamp)
+    comp_topic = MonitoringHubUtils.Helpers.create_channel_name("computation", app_name, computation_name)
+    AppConfigStore.add_pipeline_computation_to_app_config(app_name, pipeline_name, computation_name, comp_topic)
     {:noreply, socket}
   end
 
@@ -91,8 +99,9 @@ defmodule MetricsReporterUI.MetricsChannel do
       "timestamp" => end_timestamp, "period" => period, "name" => pipeline_key,
       "min" => _min, "max" => _max} = metrics_msg
     throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    msg_timestamp = throughput_msg["time"]
     store_period_throughput_msg(app_name, category, pipeline_key, throughput_msg)
-    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key, msg_timestamp)
     {:noreply, socket}
   end
 
@@ -104,9 +113,10 @@ defmodule MetricsReporterUI.MetricsChannel do
     latency_list_msg = create_latency_list_msg(pipeline_key, end_timestamp, latency_list)
     store_latency_list_msg(app_name, category, pipeline_key, latency_list_msg)
     throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
+    msg_timestamp = throughput_msg["time"]
     store_period_throughput_msg(app_name, category, pipeline_key, throughput_msg)
-    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, pipeline_key)
-    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, pipeline_key, msg_timestamp)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key, msg_timestamp)
     {:noreply, socket}
   end
 
@@ -141,18 +151,18 @@ defmodule MetricsReporterUI.MetricsChannel do
     "app_name:" <> app_name <> "::category:" <> category <> "::latency-bins:" <> pipeline_key
   end
 
-  defp find_or_start_throughput_workers(app_name, category, pipeline_key) do
+  defp find_or_start_throughput_workers(app_name, category, pipeline_key, msg_timestamp) do
     log_name = generate_throughput_log_name(app_name, category, pipeline_key)
-    total_throughput_args = [log_name: log_name, interval_key: "last-1-sec", pipeline_key: pipeline_key, app_name: app_name, category: category]
+    total_throughput_args = [log_name: log_name, interval_key: "last-1-sec", pipeline_key: pipeline_key, app_name: app_name, category: category, msg_timestamp: msg_timestamp]
     ThroughputsBroadcaster.Supervisor.find_or_start_worker(total_throughput_args)
-    throughput_stats_args = [log_name: log_name, interval_key: "last-5-mins", pipeline_key: pipeline_key, app_name: app_name, category: category, stats_interval: 300]
+    throughput_stats_args = [log_name: log_name, interval_key: "last-5-mins", pipeline_key: pipeline_key, app_name: app_name, category: category, stats_interval: 300, msg_timestamp: msg_timestamp]
     ThroughputStatsBroadcaster.Supervisor.find_or_start_worker(throughput_stats_args)
   end
 
-  defp find_or_start_latency_bins_worker(app_name, category, pipeline_key) do
+  defp find_or_start_latency_bins_worker(app_name, category, pipeline_key, msg_timestamp) do
     log_name = generate_latency_bins_log_name(app_name, category, pipeline_key)
     args = [log_name: log_name, interval_key: "last-5-mins",  pipeline_key: pipeline_key,
-      aggregate_interval: 300, app_name: app_name, category: category]
+      aggregate_interval: 300, app_name: app_name, category: category, msg_timestamp: msg_timestamp]
     LatencyStatsBroadcaster.Supervisor.find_or_start_worker(args)
   end
 end

@@ -32,20 +32,22 @@ export default class IngestionSourceDashboardContainer extends React.Component {
 		AppStreamConnections.connectSourceMetricsChannels(PhoenixConnector, sourceType, sourceName);
 	}
 	connectToMetricStoresAndUpdateState(props) {
-		const { sourceName } = props.params;
+		const { appName, sourceName } = props.params;
 		const sourceType = "start-to-end";
 		const ingestionSourceType = "pipeline-ingestion";
 		const ingestionSourceName = sourceName + " source";
-		this.connectMetricChannels(sourceType, sourceName);
-		this.connectMetricChannels(ingestionSourceType, ingestionSourceName);
-		const throughputStats = ThroughputStatsStore.getThroughputStats(sourceType, sourceName);
-		const ingestionThroughputStats = ThroughputStatsStore.getThroughputStats(ingestionSourceType, ingestionSourceName);
-		const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(sourceType, sourceName);
-		const latencyPercentageBins = LatencyPercentageBinsStore.getLatencyPercentageBins(sourceType, sourceName);
-		const throughputs = ThroughputsStore.getThroughputs(sourceType, sourceName);
+		const sourceMetricChannel = appName + "||" + sourceName;
+		const ingestionSourceMetricChannel = appName + "||" + ingestionSourceName;
+		this.connectMetricChannels(sourceType, sourceMetricChannel);
+		this.connectMetricChannels(ingestionSourceType, ingestionSourceMetricChannel);
+		const throughputStats = ThroughputStatsStore.getThroughputStats(appName, sourceType, sourceName);
+		const ingestionThroughputStats = ThroughputStatsStore.getThroughputStats(appName, ingestionSourceType, ingestionSourceName);
+		const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(appName, sourceType, sourceName);
+		const latencyPercentageBins = LatencyPercentageBinsStore.getLatencyPercentageBins(appName, sourceType, sourceName);
+		const throughputs = ThroughputsStore.getThroughputs(appName, sourceType, sourceName);
 		let throughputsListener = ThroughputsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const throughputs = ThroughputsStore.getThroughputs(sourceType, sourceName);
+				const throughputs = ThroughputsStore.getThroughputs(appName, sourceType, sourceName);
 				this.setState({
 					throughputs: throughputs
 				});
@@ -53,8 +55,8 @@ export default class IngestionSourceDashboardContainer extends React.Component {
 		}.bind(this));
 		let throughputStatsListener = ThroughputStatsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const throughputStats = ThroughputStatsStore.getThroughputStats(sourceType, sourceName);
-				const ingestionThroughputStats = ThroughputStatsStore.getThroughputStats(ingestionSourceType, ingestionSourceName);
+				const throughputStats = ThroughputStatsStore.getThroughputStats(appName, sourceType, sourceName);
+				const ingestionThroughputStats = ThroughputStatsStore.getThroughputStats(appName, ingestionSourceType, ingestionSourceName);
 				this.setState({
 					throughputStats: throughputStats,
 					ingestionThroughputStats: ingestionThroughputStats
@@ -63,7 +65,7 @@ export default class IngestionSourceDashboardContainer extends React.Component {
 		}.bind(this));
 		let latencyPercentileBinStatsListener = LatencyPercentileBinStatsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(sourceType, sourceName);
+				const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(appName, sourceType, sourceName);
 				this.setState({
 					latencyPercentileBinStats: latencyPercentileBinStats
 				});
@@ -71,7 +73,7 @@ export default class IngestionSourceDashboardContainer extends React.Component {
 		}.bind(this));
 		let latencyPercentageBinsListener = LatencyPercentageBinsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const latencyPercentageBins = LatencyPercentageBinsStore.getLatencyPercentageBins(sourceType, sourceName);
+				const latencyPercentageBins = LatencyPercentageBinsStore.getLatencyPercentageBins(appName, sourceType, sourceName);
 				this.setState({
 					latencyPercentageBins: latencyPercentageBins
 				});

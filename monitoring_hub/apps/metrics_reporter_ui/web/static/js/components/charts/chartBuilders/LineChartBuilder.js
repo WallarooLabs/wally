@@ -40,7 +40,7 @@ export default class LineChartBuilder {
         if (data.isEmpty()) return this.emptyChart();
 
         const hasRightAxis = this.hasRightAxis() && data.has("line2") && !data.get("line2").isEmpty();
-        
+
         let lineData = data.get("line");
         let line2Data;
         if (this.hasRightAxis()) {
@@ -53,7 +53,9 @@ export default class LineChartBuilder {
         const xMax = (options.xMax) ? options.xMax : lineData.max(xComparator).get("x");
         const xMin = (options.xMin) ? options.xMin : lineData.min(xComparator).get("x");
 
-        let yLeftMax = lineData.max(yComparator).get("y");
+        // let yLeftMax = lineData.max(yComparator).get("y");
+        let yLeftMax = lineData.sort((a,b) => a.get("y") - b.get("y")).get(-1).get("y");
+
         if (threshold) {
             yLeftMax = Math.max((4/3) * threshold, yLeftMax);
         }
@@ -63,7 +65,7 @@ export default class LineChartBuilder {
             yLeftDomain = this.yLeftDomain;
         } else {
             yLeftDomain = [0, yLeftMax];
-        } 
+        }
 
         let yRightMax;
         if (hasRightAxis) {

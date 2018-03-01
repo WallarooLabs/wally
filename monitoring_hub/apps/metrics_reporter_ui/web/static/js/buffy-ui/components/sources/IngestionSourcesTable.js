@@ -20,9 +20,10 @@ export default class IngestionSourcesTable extends React.Component {
 				case "computations-for-pipeline":
 					updatedSourceType = "computation";
 			}
-			const sourceName = sourceKey.replace(updatedSourceType + ":", "");
+			const ingestionSourceChannel = sourceKey.split(":")[1];
+			const sourceName = sourceKey.split("||")[1];
 			const ingestionSourceType = "pipeline-ingestion:"
-			const ingestionSourceKey = ingestionSourceType + sourceName + " source";
+			const ingestionSourceKey = ingestionSourceType + ingestionSourceChannel + " source";
 			if (ingestionSourceKeys.includes(ingestionSourceKey)) {
 				const ingestionSourceName = sourceName + " source";
 				return <IngestionSourceTableBodyContainer
