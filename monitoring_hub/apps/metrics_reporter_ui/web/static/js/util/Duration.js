@@ -36,18 +36,17 @@ function toWeeks(ms) {
     return toDays(ms) / 7;
 }
 
-export default {
-    milliseconds: milliseconds,
-    seconds: seconds,
-    minutes: minutes,
-    hours: hours,
-    days: days,
-    weeks: weeks,
-    toMilliseconds: toMilliseconds,
-    toSeconds: toSeconds,
-    toMinutes: toMinutes,
-    toHours: toHours,
-    toDays: toDays,
-    toWeeks: toWeeks
-
+export {
+    milliseconds,
+    seconds,
+    minutes,
+    hours,
+    days,
+    weeks,
+    toMilliseconds,
+    toSeconds,
+    toMinutes,
+    toHours,
+    toDays,
+    toWeeks
 }

@@ -8,7 +8,7 @@ export default class Applications extends React.Component {
 		const { appConfigs } = this.props;
 		return(
 			<div>
-				{this.props.children || 
+				{this.props.children ||
 						<ApplicationsTable appConfigs={appConfigs} />
 				}
 			</div>

@@ -6,7 +6,10 @@ import LatencyPercentileBinStatsStore from "../../stores/LatencyPercentileBinSta
 export default class SourceTableBodyContainer extends React.Component {
 	constructor(props) {
 		super(props);
-		const { sourceType, sourceName } = this.props;
+		this.state = this.connectToMetricStoresAndUpdateState(props);
+	}
+	connectToMetricStoresAndUpdateState(props) {
+		const { appName, sourceType, sourceName } = props;
 		let updatedSourceType;
 		switch(sourceType) {
 			case "computations-on-worker":
@@ -22,34 +25,50 @@ export default class SourceTableBodyContainer extends React.Component {
 				updatedSourceType = sourceType;
 				break;
 		}
-		const throughputStats = ThroughputStatsStore.getThroughputStats(updatedSourceType, sourceName);
-		const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(updatedSourceType, sourceName);
-		this.state = {
-			throughputStats: throughputStats,
-			latencyPercentileBinStats: latencyPercentileBinStats
-		}
-		ThroughputStatsStore.addListener(function() {
+		const throughputStats = ThroughputStatsStore.getThroughputStats(appName, updatedSourceType, sourceName);
+		const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(appName, updatedSourceType, sourceName);
+
+		let throughputStatsListener = ThroughputStatsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const throughputStats = ThroughputStatsStore.getThroughputStats(updatedSourceType, sourceName);
+				const throughputStats = ThroughputStatsStore.getThroughputStats(appName, updatedSourceType, sourceName);
 				this.setState({
 					throughputStats: throughputStats
 				});
 			}
 		}.bind(this));
-		LatencyPercentileBinStatsStore.addListener(function() {
+		let latencyPercentileBinStatsListener = LatencyPercentileBinStatsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(updatedSourceType, sourceName);
+				const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(appName, updatedSourceType, sourceName);
 				this.setState({
 					latencyPercentileBinStats: latencyPercentileBinStats
 				});
 			}
 		}.bind(this));
+		let listeners = [throughputStatsListener, latencyPercentileBinStatsListener];
+		return {
+			throughputStats: throughputStats,
+			latencyPercentileBinStats: latencyPercentileBinStats,
+			listeners: listeners
+		}
 	}
 	componentDidMount() {
 		this.isUnmounted = false;
 	}
 	componentWillUnmount() {
 		this.isUnmounted = true;
+		this.removeListeners(this.state);
+	}
+	componentWillReceiveProps(nextProps) {
+		if (this.props.appName != nextProps.appName) {
+			this.removeListeners(this.state);
+        	const newState = this.connectToMetricStoresAndUpdateState(nextProps);
+		}
+	}
+	removeListeners(state) {
+		let listeners = state.listeners;
+		listeners.forEach((listener) => {
+			listener.remove();
+		})
 	}
 	render() {
 		const { appName, linked, sourceName, sourceType } = this.props;

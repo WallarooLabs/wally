@@ -195,16 +195,16 @@ function isUpperCase(str) {
     return str === str.toUpperCase();
 }
 
-export default {
-    throughputInThousands: throughputInThousands,
-    numberWithCommas: numberWithCommas,
-    formatTime: formatTime,
-    formatThroughput: formatThroughput,
-    formatLatency: formatLatency,
-    displayInterval: displayInterval,
-    labelForLimit: labelForLimit,
-    latencyInMilliseconds: latencyInMilliseconds,
-    formatOrderId: formatOrderId,
-    formatLatencyBin: formatLatencyBin,
-    titleize: titleize
+export {
+    throughputInThousands,
+    numberWithCommas,
+    formatTime,
+    formatThroughput,
+    formatLatency,
+    displayInterval,
+    labelForLimit,
+    latencyInMilliseconds,
+    formatOrderId,
+    formatLatencyBin,
+    titleize
 }

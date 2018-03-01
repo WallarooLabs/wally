@@ -7,7 +7,7 @@ import { titleize } from "../../util/Format"
 export default class AppNav extends React.Component {
 	generateSourceLinks(appPath, sourceType, sourceKeys) {
 		return sourceKeys.map((sourceKey) => {
-			const sourceName = sourceKey.replace(sourceType + ":", "");
+			const sourceName = sourceKey.split("||")[1];
 			return(
 				<LinkContainer to={appPath + "/" + sourceType + "/" + sourceName} key={sourceKey}>
 					<MenuItem>{titleize(sourceName)}</MenuItem>

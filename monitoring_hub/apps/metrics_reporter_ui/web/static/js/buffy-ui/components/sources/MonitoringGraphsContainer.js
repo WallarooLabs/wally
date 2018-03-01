@@ -29,10 +29,10 @@ export default class MonitoringGraphsContainer extends React.Component {
 	}
 	render() {
 		const {throughputs, chartInterval, latencyPercentageBins} = this.props;
-		const last5MinTroughputs = filterLast5Minutes(throughputs);
+
 		return(
 			<MonitoringGraphs
-				throughputChartData={this.toChartData(last5MinTroughputs, "total_throughput")}
+				throughputChartData={this.toChartData(throughputs, "total_throughput")}
 				chartInterval={chartInterval}
 				latencyPercentageBinData={this.binsToChartData(latencyPercentageBins)} />
 		)

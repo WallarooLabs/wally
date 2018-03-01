@@ -6,7 +6,7 @@ import LatencyPercentileBinStatsStore from "../../stores/LatencyPercentileBinSta
 export default class SourceTableBodyContainer extends React.Component {
 	constructor(props) {
 		super(props);
-		const { sourceType, sourceName, ingestionSourceName } = this.props;
+		const { appName, sourceType, sourceName, ingestionSourceName } = this.props;
 		const ingestionSourceType = "pipeline-ingestion";
 		let updatedSourceType;
 		switch(sourceType) {
@@ -23,9 +23,9 @@ export default class SourceTableBodyContainer extends React.Component {
 				updatedSourceType = sourceType;
 				break;
 		}
-		const throughputStats = ThroughputStatsStore.getThroughputStats(updatedSourceType, sourceName);
-		const ingestionThroughputStats = ThroughputStatsStore.getThroughputStats(ingestionSourceType, ingestionSourceName);
-		const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(updatedSourceType, sourceName);
+		const throughputStats = ThroughputStatsStore.getThroughputStats(appName, updatedSourceType, sourceName);
+		const ingestionThroughputStats = ThroughputStatsStore.getThroughputStats(appName, ingestionSourceType, ingestionSourceName);
+		const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(appName, updatedSourceType, sourceName);
 		this.state = {
 			throughputStats: throughputStats,
 			ingestionThroughputStats: ingestionThroughputStats,
@@ -33,8 +33,8 @@ export default class SourceTableBodyContainer extends React.Component {
 		}
 		ThroughputStatsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const throughputStats = ThroughputStatsStore.getThroughputStats(updatedSourceType, sourceName);
-				const ingestionThroughputStats = ThroughputStatsStore.getThroughputStats(ingestionSourceType, ingestionSourceName);
+				const throughputStats = ThroughputStatsStore.getThroughputStats(appName, updatedSourceType, sourceName);
+				const ingestionThroughputStats = ThroughputStatsStore.getThroughputStats(appName, ingestionSourceType, ingestionSourceName);
 				this.setState({
 					throughputStats: throughputStats,
 					ingestionThroughputStats: ingestionThroughputStats
@@ -43,7 +43,7 @@ export default class SourceTableBodyContainer extends React.Component {
 		}.bind(this));
 		LatencyPercentileBinStatsStore.addListener(function() {
 			if (!this.isUnmounted) {
-				const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(updatedSourceType, sourceName);
+				const latencyPercentileBinStats = LatencyPercentileBinStatsStore.getLatencyPercentileBinStats(appName, updatedSourceType, sourceName);
 				this.setState({
 					latencyPercentileBinStats: latencyPercentileBinStats
 				});
