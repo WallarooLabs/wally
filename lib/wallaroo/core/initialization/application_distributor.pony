@@ -62,6 +62,11 @@ actor ApplicationDistributor is Distributor
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("vvvvvv|Initializing Topologies for Workers|vvvvvv\n\n".cstring())
 
+    match application.validate()
+    | let err_msg: String =>
+      FatalUserError(err_msg)
+    end
+
     try
       let all_workers_trn = recover trn Array[String] end
       all_workers_trn.push(initializer_name)
@@ -934,6 +939,7 @@ actor ApplicationDistributor is Distributor
         "---\n").cstring())
     else
       @printf[I32]("Error initializing application!\n".cstring())
+      Fail()
     end
 
   fun ref _add_edges_to_graph(producer_ids: (U128 | Array[U128] | None),

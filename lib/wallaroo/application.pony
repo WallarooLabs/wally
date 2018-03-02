@@ -75,6 +75,16 @@ class Application
 
   fun name(): String => _name
 
+  // Returns a String with an error message if this application fails this
+  // validation test
+  fun validate(): (String | None) =>
+    if pipelines.size() == 0 then
+      "You must provide at least 1 pipeline in an application. Did you " +
+        "forget to close out a pipeline?"
+    else
+      None
+    end
+
 trait BasicPipeline
   fun name(): String
   fun source_id(): USize
