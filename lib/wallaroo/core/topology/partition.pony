@@ -55,12 +55,12 @@ primitive SingleStepPartitionFunction[In: Any val] is
   PartitionFunction[In, U8]
   fun apply(input: In): U8 => 0
 
-interface PartitionAddresses is Equatable[PartitionAddresses]
+interface val PartitionAddresses is Equatable[PartitionAddresses]
   fun apply(key: Any val): (ProxyAddress | None)
   fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
     pa: ProxyAddress): PartitionAddresses val ?
 
-class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
+class val KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, ProxyAddress] val
 
   new val create(a: Map[Key, ProxyAddress] val) =>

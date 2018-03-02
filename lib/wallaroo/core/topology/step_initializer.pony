@@ -240,16 +240,16 @@ class val PreStatelessData
   graph that have edges into it.
   """
   let _pipeline_name: String
-  let _id: U128
+  let _id: StepId
   let partition_id_to_worker: Map[U64, String] val
-  let partition_id_to_step_id: Map[U64, U128] val
-  let worker_to_step_id: Map[String, Array[U128] val] val
+  let partition_id_to_step_id: Map[U64, StepId] val
+  let worker_to_step_id: Map[String, Array[StepId] val] val
   let steps_per_worker: USize
 
-  new val create(pipeline_name': String, step_id': U128,
+  new val create(pipeline_name': String, step_id': StepId,
     partition_id_to_worker': Map[U64, String] val,
-    partition_id_to_step_id': Map[U64, U128] val,
-    worker_to_step_id': Map[String, Array[U128] val] val,
+    partition_id_to_step_id': Map[U64, StepId] val,
+    worker_to_step_id': Map[String, Array[StepId] val] val,
     steps_per_worker': USize)
   =>
     _pipeline_name = pipeline_name'
@@ -262,7 +262,7 @@ class val PreStatelessData
   fun name(): String => "PreStatelessData"
   fun state_name(): String => ""
   fun pipeline_name(): String => _pipeline_name
-  fun id(): U128 => _id
+  fun id(): StepId => _id
   fun pre_state_target_ids(): Array[StepId] val => recover Array[StepId] end
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false

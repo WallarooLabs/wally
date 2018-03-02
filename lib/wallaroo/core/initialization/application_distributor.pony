@@ -116,7 +116,8 @@ actor ApplicationDistributor is Distributor
 
       let ssb_trn = recover trn Map[String, StateSubpartition] end
       for (s_name, p_builder) in application.state_builders().pairs() do
-        ssb_trn(s_name) = p_builder.state_subpartition(all_workers)
+        ssb_trn(s_name) = p_builder.state_subpartition(all_workers,
+          initializer_name, application.is_contended)
       end
       let state_subpartitions: Map[String, StateSubpartition] val =
         consume ssb_trn
@@ -636,7 +637,8 @@ actor ApplicationDistributor is Distributor
                 let next_id = next_runner_builder.id()
                 let pony_thread_count = ThreadCount()
                 let psd = StatelessPartition.pre_stateless_data(
-                  pipeline.name(), next_id, all_workers, pony_thread_count)?
+                  pipeline.name(), next_id, all_workers, pony_thread_count,
+                  initializer_name, application.is_contended)?
 
                 local_graphs(worker)?.add_node(psd, next_id)
                 local_graphs = _add_edges_to_graph(
@@ -673,39 +675,41 @@ actor ApplicationDistributor is Distributor
                   if w != worker then
                     local_graphs(w)?.add_node(psd, next_id)
                   end
+                  // Check whether the next worker contains partition steps
+                  if psd.worker_to_step_id.contains(w) then
+                    for s_id in psd.worker_to_step_id(w)?.values() do
+                      let next_initializer = StepBuilder(application.name(),
+                        w, pipeline.name(), next_runner_builder, s_id)
+                      step_map(s_id) = ProxyAddress(w, s_id)
 
-                  for s_id in psd.worker_to_step_id(w)?.values() do
-                    let next_initializer = StepBuilder(application.name(),
-                      w, pipeline.name(), next_runner_builder, s_id)
-                    step_map(s_id) = ProxyAddress(w, s_id)
-
-                    try
-                      local_graphs(w)?.add_node(next_initializer, s_id)
-                      if w == worker then
-                        last_initializer_ids.push(s_id)
+                      try
+                        local_graphs(w)?.add_node(next_initializer, s_id)
+                        if w == worker then
+                          last_initializer_ids.push(s_id)
+                        else
+                          for ss_id in successor_step_ids.values() do
+                            // We have not yet built the node corresponding
+                            // to our successor step id (i.e. the node that
+                            // this node has an edge to). So we keep track of
+                            // that here and use that later, once we know
+                            // all nodes have been added to the graphs.
+                            unbuilt_edges(w)?.push((s_id, ss_id))
+                          end
+                          if successor_step_ids.size() == 0 then
+                            @printf[I32](("There is no step or sink after a " +
+                              "stateless computation partition. This means " +
+                              "unnecessary work is occurring in the topology." +
+                              "\n").cstring())
+                          end
+                        end
                       else
-                        for ss_id in successor_step_ids.values() do
-                          // We have not yet built the node corresponding
-                          // to our successor step id (i.e. the node that
-                          // this node has an edge to). So we keep track of
-                          // that here and use that later, once we know
-                          // all nodes have been added to the graphs.
-                          unbuilt_edges(w)?.push((s_id, ss_id))
-                        end
-                        if successor_step_ids.size() == 0 then
-                          @printf[I32](("There is no step or sink after a " +
-                            "stateless computation partition. This means " +
-                            "unnecessary work is occurring in the topology." +
-                            "\n").cstring())
-                        end
+                        @printf[I32](("No graph for worker " + worker + "\n")
+                          .cstring())
+                        error
                       end
-                    else
-                      @printf[I32](("No graph for worker " + worker + "\n")
-                        .cstring())
-                      error
-                    end
 
-                    steps(s_id) = worker
+                      steps(s_id) = worker
+                    end
                   end
 
                   last_initializer = last_initializer_ids

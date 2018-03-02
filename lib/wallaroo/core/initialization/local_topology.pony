@@ -1062,7 +1062,13 @@ actor LocalTopologyInitializer is LayoutInitializer
             //////////////////////
               try
                 let local_step_ids =
-                  pre_stateless_data.worker_to_step_id(_worker_name)?
+                  if pre_stateless_data.worker_to_step_id
+                    .contains(_worker_name)
+                  then
+                    pre_stateless_data.worker_to_step_id(_worker_name)?
+                  else
+                    recover val Array[StepId] end
+                  end
 
                 // Make sure all local steps for this stateless partition
                 // have already been initialized on this worker.

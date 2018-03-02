@@ -38,9 +38,11 @@ class Application
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, PartitionBuilder] = _state_builders.create()
   var sink_count: USize = 0
+  let is_contended: Bool
 
-  new create(name': String) =>
+  new create(name': String, is_contended': Bool = false) =>
     _name = name'
+    is_contended = is_contended'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (pipeline_name: String,
     source_config: SourceConfig[In]): PipelineBuilder[In, Out, In]

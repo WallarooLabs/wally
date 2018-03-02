@@ -1,10 +1,13 @@
 use "collections"
 use "wallaroo/core/common"
+use "wallaroo/core/invariant"
+use "wallaroo_labs/mort"
 
 
 primitive StatelessPartition
   fun pre_stateless_data(pipeline_name: String, partition_id: StepId,
-    workers: Array[String] val, threads_per_worker: USize): PreStatelessData ?
+    workers: Array[String] val, threads_per_worker: USize,
+    initializer_name: String, is_contended: Bool): PreStatelessData ?
   =>
     let step_id_gen = StepIdGenerator
 
@@ -16,10 +19,32 @@ primitive StatelessPartition
     // initialization. The third, worker_to_step_id, will be used
     // here to determine which step ids we will put in which
     // local graphs.
-    let ws = Array[String]
-    for w in workers.values() do ws.push(w) end
-    let sorted_workers = Sort[Array[String], String](ws)
-    let worker_count = workers.size()
+    let partition_workers = Array[String]
+    if workers.size() == 1 then
+      // If we only have 1 worker, it should be the initializer, and we will
+      // put stateless partition steps on it even if using a contended API.
+      try
+        Invariant(workers(0)? == initializer_name)
+        partition_workers.push(initializer_name)
+      else
+        Fail()
+      end
+    else
+      // If we are using a contended API, then do not put partition steps on
+      // the initializer (since it contains Sources).
+      // ASSUMPTION: Only the initializer can have Sources.
+      if is_contended then
+        for w in workers.values() do
+          if w != initializer_name then partition_workers.push(w) end
+        end
+      else
+        for w in workers.values() do
+          partition_workers.push(w)
+        end
+      end
+    end
+    let sorted_workers = Sort[Array[String], String](partition_workers)
+    let worker_count = sorted_workers.size()
     let partition_count = worker_count * threads_per_worker
     let partition_id_to_worker_trn =
       recover trn Map[U64, String] end
