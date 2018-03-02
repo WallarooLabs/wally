@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Correctly remove boundary references when worker leaves ([PR #2073](https://github.com/wallaroolabs/wallaroo/pull/2073))
 - Correctly update routers after shrink ([PR #2018](https://github.com/wallaroolabs/wallaroo/pull/2018))
 - Only try to shrink if supplied worker names are still in the cluster ([PR #2034](https://github.com/wallaroolabs/wallaroo/pull/2034))
 - Fix bug when using cluster_shrinker with non-initializer ([PR #2011](https://github.com/wallaroolabs/wallaroo/pull/2011))
