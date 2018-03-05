@@ -246,6 +246,9 @@ actor Step is (Producer & Consumer)
       else
         Fail()
       end
+    //!@
+    else
+      @printf[I32]("!@ !!!!!!!! FAIL CAN'T REMOVE! %s from %s\n".cstring(), worker.cstring(), _id.string().cstring())
     end
 
   be remove_route_for(step: Consumer) =>
@@ -425,7 +428,7 @@ actor Step is (Producer & Consumer)
     | let nmp: NormalStepMessageProcessor =>
       _step_message_processor = QueueingStepMessageProcessor(this)
     end
-    @printf[I32]("!@ request_finished_ack STEP %s, upstream_request_id: %s\n".cstring(), _id.string().cstring(), upstream_request_id.string().cstring())
+    @printf[I32]("!@ request_finished_ack STEP %s, upstream_request_id: %s, requester_id: %s\n".cstring(), _id.string().cstring(), upstream_request_id.string().cstring(), requester_id.string().cstring())
     if not _finished_ack_waiter.already_added_request(requester_id) then
       _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
         requester)

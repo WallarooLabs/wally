@@ -54,7 +54,8 @@ actor DataReceiver is Producer
   var _processing_phase: _DataReceiverProcessingPhase =
     _DataReceiverNotProcessingPhase
 
-  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
+  //!@ remove 3
+  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter(3)
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     initialized: Bool = false)
@@ -143,7 +144,7 @@ actor DataReceiver is Producer
 
   be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId)
   =>
-    @printf[I32]("!@ request_finished_ack DATA RECEIVER\n".cstring())
+    @printf[I32]("!@ request_finished_ack DATA RECEIVER upstream_request_id: %s, requester_id: %s\n".cstring(), upstream_request_id.string().cstring(), requester_id.string().cstring())
     if not _finished_ack_waiter.already_added_request(requester_id) then
       _finished_ack_waiter.add_new_request(requester_id, upstream_request_id
         where custom_action = _WriteFinishedAck(this, upstream_request_id))

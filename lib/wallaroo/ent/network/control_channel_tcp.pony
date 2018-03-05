@@ -313,6 +313,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: InitiateJoinMigrationMsg =>
         _router_registry.remote_migration_request(m.new_workers)
       | let m: LeavingWorkerDoneMigratingMsg =>
+        @printf[I32]("!@ -- RECVD LeavingWorkerDoneMigratingMsg\n".cstring())
         _router_registry.disconnect_from_leaving_worker(m.worker_name)
       | let m: AckMigrationBatchCompleteMsg =>
         ifdef "trace" then

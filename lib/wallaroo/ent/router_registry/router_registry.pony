@@ -51,7 +51,8 @@ actor RouterRegistry is FinishedAckRequester
 
   var _application_ready_to_work: Bool = false
 
-  let _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
+  // !@ remove 1
+  let _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter(1)
 
   ////////////////
   // Subscribers
@@ -1109,11 +1110,14 @@ actor RouterRegistry is FinishedAckRequester
     _connections.stop_the_world()
 
   be disconnect_from_leaving_worker(worker: String) =>
+    @printf[I32]("!@ disconnect_from_leaving_worker REGISTRY\n".cstring())
     _connections.disconnect_from(worker)
     try
       _distribute_boundary_removal(worker)
       _outgoing_boundaries.remove(worker)?
       _outgoing_boundaries_builders.remove(worker)?
+    else
+      Fail()
     end
 
     _distribute_boundary_builders()
