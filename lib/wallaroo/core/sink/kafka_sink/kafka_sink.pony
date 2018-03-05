@@ -242,6 +242,14 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
     _upstreams.unset(producer)
 
+  be request_finished_ack(request_id: RequestId, requester_id: StepId,
+    producer: FinishedAckRequester)
+  =>
+    producer.receive_finished_ack(request_id)
+
+  be try_finish_request_early(requester_id: StepId) =>
+    None
+
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId,

@@ -287,6 +287,7 @@ actor TCPSink is Consumer
     end
 
   be request_ack() =>
+    @printf[I32]("!@ request_finished_ack TCP SINK\n".cstring())
     _terminus_route.request_ack()
 
   be register_producer(producer: Producer) =>
@@ -298,6 +299,15 @@ actor TCPSink is Consumer
     end
 
     _upstreams.unset(producer)
+
+  be request_finished_ack(request_id: RequestId, requester_id: StepId,
+    producer: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack TCPSink\n".cstring())
+    producer.receive_finished_ack(request_id)
+
+  be try_finish_request_early(requester_id: StepId) =>
+    None
 
   //
   // TCP

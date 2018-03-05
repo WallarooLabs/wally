@@ -268,6 +268,10 @@ class DataChannelConnectNotifier is DataChannelNotify
           c.boundary_id)
       | let m: SpinUpLocalTopologyMsg =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
+      | let m: RequestFinishedAckMsg =>
+        @printf[I32]("Received RequestFinishedAckMsg from %s\n".cstring(),
+          m.sender.cstring())
+        _receiver.request_finished_ack(m.request_id, m.requester_id)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
           .cstring())
@@ -304,6 +308,7 @@ trait _DataReceiverWrapper
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId)
 
 class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
@@ -320,6 +325,9 @@ class _InitDataReceiver is _DataReceiverWrapper
     Fail()
 
   fun upstream_replay_finished() =>
+    Fail()
+
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId) =>
     Fail()
 
 class _DataReceiver is _DataReceiverWrapper
@@ -342,3 +350,6 @@ class _DataReceiver is _DataReceiverWrapper
   =>
     data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
+
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId) =>
+    data_receiver.request_finished_ack(request_id, requester_id)

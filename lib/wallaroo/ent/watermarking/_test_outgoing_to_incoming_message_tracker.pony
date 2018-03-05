@@ -414,3 +414,9 @@ actor _TestProducer is Producer
 
   be request_ack() =>
     None
+
+  be receive_finished_ack(request_id: RequestId) =>
+    None
+
+  be try_finish_request_early(requester_id: StepId) =>
+    None

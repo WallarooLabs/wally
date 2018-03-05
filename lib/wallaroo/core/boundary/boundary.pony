@@ -103,6 +103,7 @@ actor OutgoingBoundary is Consumer
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
+  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
 
   // TCP
   var _notify: WallarooOutgoingNetworkActorNotify
@@ -443,6 +444,26 @@ actor OutgoingBoundary is Consumer
     // end
 
     _upstreams.unset(producer)
+
+  be request_finished_ack(upstream_request_id: RequestId,
+    requester_id: StepId, upstream_requester: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack BOUNDARY\n".cstring())
+    try
+      _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
+        upstream_requester)
+      let request_id = _finished_ack_waiter.add_consumer_request(requester_id)
+      _writev(ChannelMsgEncoder.request_finished_ack(_worker_name, request_id,
+        requester_id, _auth)?)
+    else
+      Fail()
+    end
+
+  be try_finish_request_early(requester_id: StepId) =>
+    _finished_ack_waiter.try_finish_request_early(requester_id)
+
+  be receive_finished_ack(request_id: RequestId) =>
+    _finished_ack_waiter.unmark_consumer_request(request_id)
 
   //
   // TCP
@@ -994,6 +1015,10 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
+      | let fa: FinishedAckMsg =>
+        @printf[I32]("Received FinishedAckMsg from %s\n".cstring(),
+          fa.sender.cstring())
+        _outgoing_boundary.receive_finished_ack(fa.request_id)
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())

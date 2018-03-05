@@ -58,6 +58,7 @@ actor Step is (Producer & Consumer)
   var _initialized: Bool = false
   var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
+  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
   let _recovery_replayer: RecoveryReplayer
 
   let _acker_x: Acker = Acker
@@ -403,6 +404,29 @@ actor Step is (Producer & Consumer)
     //   Invariant(_upstreams.contains(producer))
     // end
     _upstreams.unset(producer)
+
+  be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ request_finished_ack STEP %s\n".cstring(),
+      _id.string().cstring())
+    _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
+      requester)
+    if _routes.size() > 0 then
+      for r in _routes.values() do
+        let request_id = _finished_ack_waiter.add_consumer_request(
+          requester_id)
+        r.request_finished_ack(request_id, _id, this)
+      end
+    else
+      _finished_ack_waiter.try_finish_request_early(requester_id)
+    end
+
+  be try_finish_request_early(requester_id: StepId) =>
+    _finished_ack_waiter.try_finish_request_early(requester_id)
+
+  be receive_finished_ack(request_id: RequestId) =>
+    _finished_ack_waiter.unmark_consumer_request(request_id)
 
   be mute(c: Consumer) =>
     for u in _upstreams.values() do
