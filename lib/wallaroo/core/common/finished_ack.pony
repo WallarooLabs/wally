@@ -136,15 +136,13 @@ class FinishedAckWaiter
 
   fun ref unmark_consumer_request(request_id: RequestId) =>
     try
-      @printf[I32]("!@ -> _downstream_request_ids.lookup %s\n".cstring(), request_id.string().cstring())
       let requester_id = _downstream_request_ids(request_id)?
-      @printf[I32]("!@ -> _pending_acks.lookup\n".cstring())
+      @printf[I32]("!@ received ack for request_id %s (associated with requester %s). (reported from %s)\n".cstring(), request_id.string().cstring(), requester_id.string().cstring(), _step_id.string().cstring())
       let id_set = _pending_acks(requester_id)?
       ifdef debug then
         Invariant(id_set.contains(request_id))
       end
       id_set.unset(request_id)
-      @printf[I32]("!@ -> _downstream_request_ids.remove\n".cstring())
       _downstream_request_ids.remove(request_id)?
       _check_send_run(requester_id)
     else

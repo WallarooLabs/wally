@@ -277,6 +277,7 @@ actor OutgoingBoundary is Consumer
 
   be register_step_id(step_id: StepId) =>
     _step_id = step_id
+    _finished_ack_waiter = FinishedAckWaiter(_step_id)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
@@ -448,7 +449,7 @@ actor OutgoingBoundary is Consumer
   be request_finished_ack(upstream_request_id: RequestId,
     requester_id: StepId, upstream_requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack BOUNDARY requester_id: %s, upstream_request_id: %s\n".cstring(), requester_id.string().cstring(), upstream_request_id.string().cstring())
+    @printf[I32]("!@ request_finished_ack BOUNDARY %s, requester_id: %s, upstream_request_id: %s\n".cstring(), _step_id.string().cstring(), requester_id.string().cstring(), upstream_request_id.string().cstring())
     if not _finished_ack_waiter.already_added_request(requester_id) then
       try
         _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
