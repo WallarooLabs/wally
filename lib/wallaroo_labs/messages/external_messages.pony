@@ -32,6 +32,8 @@ primitive _PartitionQuery                       fun apply(): U16 => 7
 primitive _PartitionQueryResponse               fun apply(): U16 => 8
 primitive _ClusterStatusQuery                   fun apply(): U16 => 9
 primitive _ClusterStatusQueryResponse           fun apply(): U16 => 10
+primitive _PartitionCountQuery                  fun apply(): U16 => 11
+primitive _PartitionCountQueryResponse          fun apply(): U16 => 12
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -87,22 +89,7 @@ primitive ExternalMsgEncoder
     stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
-    let state_ps =
-      recover iso Map[String, Map[String, Array[String] val] val] end
-    let stateless_ps =
-      recover iso Map[String, Map[String, Array[String] val] val] end
-
-    for (k, v) in state_routers.pairs() do
-      state_ps(k) = v.distribution_digest()
-    end
-
-    for (k, v) in stateless_routers.pairs() do
-      stateless_ps(k.string()) = v.distribution_digest()
-    end
-    let digest_map =
-      Map[String, Map[String, Map[String, Array[String] val] val] val]
-    digest_map("state_partitions") = consume state_ps
-    digest_map("stateless_partitions") = consume stateless_ps
+    let digest_map = _partition_digest(state_routers, stateless_routers)
     let pqr = PartitionQueryEncoder.state_and_stateless(digest_map)
     _encode(_PartitionQueryResponse(), pqr, wb)
 
@@ -121,6 +108,43 @@ primitive ExternalMsgEncoder
     let csr = ClusterStatusQueryJsonEncoder.response(worker_count.u64(),
       worker_names, stop_the_world_in_process)
     _encode(_ClusterStatusQueryResponse(), csr, wb)
+
+  fun partition_count_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    A message requesting the current count of partition steps across
+    workers (organized by partition type and partition name).
+    """
+    _encode(_PartitionCountQuery(), "", wb)
+
+  fun partition_count_query_response(state_routers: Map[String,
+    PartitionRouter], stateless_routers: Map[U128, StatelessPartitionRouter],
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let digest_map = _partition_digest(state_routers, stateless_routers)
+    let pqr = PartitionQueryEncoder.state_and_stateless_by_count(digest_map)
+    _encode(_PartitionCountQueryResponse(), pqr, wb)
+
+  fun _partition_digest(state_routers: Map[String,
+    PartitionRouter], stateless_routers: Map[U128, StatelessPartitionRouter]):
+    Map[String, Map[String, Map[String, Array[String] val] val] val]
+  =>
+    let state_ps =
+      recover iso Map[String, Map[String, Array[String] val] val] end
+    let stateless_ps =
+      recover iso Map[String, Map[String, Array[String] val] val] end
+
+    for (k, v) in state_routers.pairs() do
+      state_ps(k) = v.distribution_digest()
+    end
+
+    for (k, v) in stateless_routers.pairs() do
+      stateless_ps(k.string()) = v.distribution_digest()
+    end
+    let digest_map =
+      Map[String, Map[String, Map[String, Array[String] val] val] val]
+    digest_map("state_partitions") = consume state_ps
+    digest_map("stateless_partitions") = consume stateless_ps
+    digest_map
 
 primitive ExternalMsgDecoder
   fun apply(data: Array[U8] val): ExternalMsg val ? =>
@@ -155,6 +179,10 @@ primitive ExternalMsgDecoder
       ExternalClusterStatusQueryMsg
     | (_ClusterStatusQueryResponse(), let s: String) =>
       ClusterStatusQueryJsonDecoder.response(s)?
+    | (_PartitionCountQuery(), let s: String) =>
+      ExternalPartitionCountQueryMsg
+    | (_PartitionCountQueryResponse(), let s: String) =>
+      ExternalPartitionCountQueryResponseMsg(s)
     else
       error
     end
@@ -316,3 +344,11 @@ class val ExternalClusterStatusQueryResponseMsg is ExternalMsg
     "Processing messages: " + processing_messages.string() +
       ", Worker count: " + worker_count.string() + ", Workers: " +
       workers_string
+
+primitive ExternalPartitionCountQueryMsg is ExternalMsg
+
+class val ExternalPartitionCountQueryResponseMsg is ExternalMsg
+  let msg: String
+
+  new val create(m: String) =>
+    msg = m

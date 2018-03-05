@@ -76,6 +76,9 @@ actor Main
         | "partition-query" =>
           await_response = true
           ExternalMsgEncoder.partition_query()
+        | "partition-count-query" =>
+          await_response = true
+          ExternalMsgEncoder.partition_count_query()
         | "cluster-status-query" =>
           await_response = true
           ExternalMsgEncoder.cluster_status_query()
@@ -136,6 +139,10 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
         | let m: ExternalClusterStatusQueryResponseMsg =>
           _env.out.print("Cluster Status:")
           _env.out.print(m.string())
+          conn.dispose()
+        | let m: ExternalPartitionCountQueryResponseMsg =>
+          _env.out.print("Partition Distribution (counts):")
+          _env.out.print(m.msg)
           conn.dispose()
         else
           _env.err.print("Received unhandled external message type")

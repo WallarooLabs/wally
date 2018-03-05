@@ -71,6 +71,20 @@ primitive PartitionQueryEncoder
     end
     _JsonEncoder(consume entries, _JsonMap)
 
+  fun partition_counts_by_worker(se: _StepIdsByWorker): String =>
+    let entries = recover iso Array[String] end
+    for (k, v) in se.pairs() do
+      entries.push(_Quoted(k) + ":" + v.size().string())
+    end
+    _JsonEncoder(consume entries, _JsonMap)
+
+  fun partition_counts(qm: _PartitionQueryMap): String =>
+    let entries = recover iso Array[String] end
+    for (k, v) in qm.pairs() do
+      entries.push(_Quoted(k) + ":" + partition_counts_by_worker(v))
+    end
+    _JsonEncoder(consume entries, _JsonMap)
+
   fun state_and_stateless(m: Map[String, _PartitionQueryMap]): String =>
     let entries = recover iso Array[String] end
     try
@@ -78,6 +92,20 @@ primitive PartitionQueryEncoder
         partitions(m("state_partitions")?))
       entries.push(_Quoted("stateless_partitions") + ":" +
         partitions(m("stateless_partitions")?))
+    else
+      Fail()
+    end
+    _JsonEncoder(consume entries, _JsonMap)
+
+  fun state_and_stateless_by_count(m: Map[String, _PartitionQueryMap]):
+    String
+  =>
+    let entries = recover iso Array[String] end
+    try
+      entries.push(_Quoted("state_partitions") + ":" +
+        partition_counts(m("state_partitions")?))
+      entries.push(_Quoted("stateless_partitions") + ":" +
+        partition_counts(m("stateless_partitions")?))
     else
       Fail()
     end
