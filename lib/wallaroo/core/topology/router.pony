@@ -38,6 +38,9 @@ trait val Router
   fun routes(): Array[Consumer] val
   fun routes_not_in(router: Router): Array[Consumer] val
 
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId,
+    producer: FinishedAckRequester)
+
 class val EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
@@ -50,6 +53,12 @@ class val EmptyRouter is Router
 
   fun routes_not_in(router: Router): Array[Consumer] val =>
     recover Array[Consumer] end
+
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("request_finished_ack EmptyRouter\n".cstring())
+    requester.receive_finished_ack(request_id)
 
 class val DirectRouter is Router
   let _target: Consumer
@@ -160,6 +169,12 @@ class val MultiRouter is Router
     end
     consume rs
 
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId,
+    producer: FinishedAckRequester)
+  =>
+    @printf[I32]("request_finished_ack DirectRouter\n".cstring())
+    _target.request_finished_ack(request_id, requester_id, producer)
+
 class val ProxyRouter is (Router & Equatable[ProxyRouter])
   let _worker_name: String
   let _target: OutgoingBoundary
@@ -241,6 +256,12 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
     (_worker_name == that._worker_name) and
       (_target is that._target) and
       (_target_proxy_address == that._target_proxy_address)
+
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId,
+    producer: FinishedAckRequester)
+  =>
+    @printf[I32]("request_finished_ack ProxyRouter\n".cstring())
+    _target.request_finished_ack(request_id, requester_id, producer)
 
 // An OmniRouter is a router that can route a message to any Consumer in the
 // system by using a target id.
@@ -826,6 +847,23 @@ class val DataRouter is Equatable[DataRouter]
       Fail()
     end
 
+  fun request_finished_ack(requester_id: StepId, requester: DataReceiver,
+    finished_ack_waiter: FinishedAckWaiter)
+  =>
+    @printf[I32]("!@ request_finished_ack DataRouter\n".cstring())
+    ifdef "trace" then
+      @printf[I32]("Finished ack requested at DataRouter\n".cstring())
+    end
+    if _data_routes.size() > 0 then
+      for consumer in _data_routes.values() do
+        let request_id = finished_ack_waiter.add_consumer_request(
+          requester_id)
+        consumer.request_finished_ack(request_id, requester_id, requester)
+      end
+    else
+      requester.try_finish_request_early(requester_id)
+    end
+
 trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun state_name(): String
   fun local_map(): Map[StepId, Step] val
@@ -845,6 +883,8 @@ trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun blueprint(): PartitionRouterBlueprint
   fun distribution_digest(): Map[String, Array[String] val] val
   fun route_builder(): RouteBuilder
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId,
+    producer: FinishedAckRequester)
 
 trait val AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)]
   is PartitionRouter
@@ -882,24 +922,6 @@ class val LocalPartitionRouter[In: Any val,
 
   fun route_builder(): RouteBuilder =>
     TypedRouteBuilder[StateProcessor[S]]
-
-  // fun migrate_step[K: (Hashable val & Equatable[K] val)](
-  //   boundary: OutgoingBoundary, k: K)
-  // =>
-  //   match k
-  //   | let key: Key =>
-  //     try
-  //       match _partition_routes(key)?
-  //       | let s: Step => s.send_state[Key](boundary, _state_name, key)
-  //       else
-  //         Fail()
-  //       end
-  //     else
-  //       Fail()
-  //     end
-  //   else
-  //     Fail()
-  //   end
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
@@ -1251,6 +1273,19 @@ class val LocalPartitionRouter[In: Any val,
       false
     end
 
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("request_finished_ack LocalPartitionRouter\n".cstring())
+    if _local_map.size() > 0 then
+      for step in _local_map.values() do
+        //TODO: this needs to have a producer belonging to the router
+        step.request_finished_ack(request_id, requester_id, requester)
+      end
+    else
+      requester.try_finish_request_early(requester_id)
+    end
+
 trait val PartitionRouterBlueprint
   fun build_router(worker_name: String,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
@@ -1594,6 +1629,24 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       true
     else
       false
+    end
+
+  fun request_finished_ack(request_id: RequestId, requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("request_finished_ack StatelessPartitionRouter\n".cstring())
+    if _partition_routes.size() > 0 then
+      for rs in _partition_routes.values() do
+        //TODO: use AckWaiter and new ids, with dummy producer
+        match rs
+        | let r: ProxyRouter => r.request_finished_ack(request_id,
+          requester_id, requester)
+        | let s: Step => s.request_finished_ack(request_id, requester_id,
+          requester)
+        end
+      end
+    else
+      requester.try_finish_request_early(requester_id)
     end
 
 trait val StatelessPartitionRouterBlueprint

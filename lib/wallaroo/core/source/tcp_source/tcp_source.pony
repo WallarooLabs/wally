@@ -51,13 +51,14 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is Producer
+actor TCPSource is (Producer & FinishedAckResponder)
   """
   # TCPSource
 
   ## Future work
   * Switch to requesting credits via promise
   """
+  let _source_id: StepId
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder
@@ -94,6 +95,7 @@ actor TCPSource is Producer
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
+  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[Consumer] val, route_builder: RouteBuilder,
@@ -105,6 +107,7 @@ actor TCPSource is Producer
     """
     A new connection accepted on a server.
     """
+    _source_id = _step_id_gen()
     _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
@@ -280,6 +283,32 @@ actor TCPSource is Producer
   fun ref current_sequence_id(): SeqId =>
     _seq_id
 
+  be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    @printf[I32]("!@ Source stopping world (%s)\n".cstring(),
+      (digestof this).string().cstring())
+    _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
+      requester)
+
+    if _routes.size() > 0 then
+      for route in _routes.values() do
+        @printf[I32]("!@ ---*****---- Add consumer request at Source\n".cstring())
+        let request_id = _finished_ack_waiter.add_consumer_request(
+          requester_id)
+        route.request_finished_ack(request_id, _source_id, this)
+      end
+    else
+      requester.try_finish_request_early(requester_id)
+    end
+
+  be try_finish_request_early(requester_id: StepId) =>
+    _finished_ack_waiter.try_finish_request_early(requester_id)
+
+  be receive_finished_ack(request_id: RequestId) =>
+    @printf[I32]("!@ receive_finished_ack RECEIVE TCPSource\n".cstring())
+    _finished_ack_waiter.unmark_consumer_request(request_id)
+
   //
   // TCP
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -429,7 +458,7 @@ actor TCPSource is Producer
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
-    guessing the next packet length as we go. If we read 4 kb of data, send
+    guessing the next packet length as we go. If we read 5 kb of data, send
     ourself a resume message and stop reading, to avoid starving other actors.
     """
     try

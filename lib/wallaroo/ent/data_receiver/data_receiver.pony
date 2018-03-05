@@ -54,6 +54,8 @@ actor DataReceiver is Producer
   var _processing_phase: _DataReceiverProcessingPhase =
     _DataReceiverNotProcessingPhase
 
+  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
+
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     initialized: Bool = false)
   =>
@@ -138,6 +140,30 @@ actor DataReceiver is Producer
   fun ref flush(low_watermark: SeqId) =>
     """This is not a real Producer, so it doesn't write any State"""
     None
+
+  be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId)
+  =>
+    @printf[I32]("!@ request_finished_ack DATA RECEIVER\n".cstring())
+    _finished_ack_waiter.add_new_request(requester_id, upstream_request_id
+      where custom_action = _WriteFinishedAck(this, upstream_request_id))
+    _router.request_finished_ack(requester_id, this, _finished_ack_waiter)
+
+  be try_finish_request_early(requester_id: StepId) =>
+    _finished_ack_waiter.try_finish_request_early(requester_id)
+
+  be receive_finished_ack(request_id: RequestId) =>
+    @printf[I32]("!@ receive_finished_ack DataReceiver\n".cstring())
+    _finished_ack_waiter.unmark_consumer_request(request_id)
+
+  be write_finished_ack(upstream_request_id: RequestId) =>
+    @printf[I32]("!@ !! DataReceiver: write_finished_ack\n".cstring())
+    try
+      let ack_msg = ChannelMsgEncoder.finished_ack(_worker_name,
+        upstream_request_id, _auth)?
+      _write_on_conn(ack_msg)
+    else
+      Fail()
+    end
 
   //////////////
   // ORIGIN (resilience)
@@ -312,3 +338,14 @@ class _RequestAck is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _d.request_ack()
     true
+
+class _WriteFinishedAck is CustomAction
+  let _data_receiver: DataReceiver
+  let _request_id: RequestId
+
+  new iso create(data_receiver: DataReceiver, request_id: RequestId) =>
+    _data_receiver = data_receiver
+    _request_id = request_id
+
+  fun ref apply() =>
+    _data_receiver.write_finished_ack(_request_id)

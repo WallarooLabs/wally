@@ -276,8 +276,40 @@ actor Connections is Cluster
           ch.writev(mute_request_msg)
         end
       end
-   else
+    else
       Fail()
+    end
+
+  be request_finished_acks(requester_id: StepId,
+    router_registry: RouterRegistry,
+    exclusions: Array[String] val = recover Array[String] end)
+  =>
+    let id_gen = RequestIdGenerator
+    let request_ids = recover trn Array[RequestId] end
+    var sent_request_msg = false
+    try
+      for (target, ch) in _control_conns.pairs() do
+        if
+          (target != _worker_name) and
+          (not exclusions.contains(target,
+            {(a: String, b: String): Bool => a == b}))
+        then
+          let next_request_id = id_gen()
+          request_ids.push(next_request_id)
+          let finished_ack_request_msg =
+            ChannelMsgEncoder.request_finished_ack(_worker_name,
+              next_request_id, requester_id, _auth)?
+          ch.writev(finished_ack_request_msg)
+          sent_request_msg = true
+        end
+      end
+    else
+      Fail()
+    end
+    if sent_request_msg then
+      router_registry.add_connection_request_ids(consume request_ids)
+    else
+      router_registry.try_finish_request_early(requester_id)
     end
 
   be request_cluster_unmute() =>
