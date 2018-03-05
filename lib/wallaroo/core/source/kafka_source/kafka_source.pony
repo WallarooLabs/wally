@@ -29,7 +29,9 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
+actor KafkaSource[In: Any val] is (Producer & FinishedAckResponder &
+  KafkaConsumer)
+  let _source_id: StepId
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder
@@ -50,6 +52,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
+  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
 
   let _topic: String
   let _partition_id: I32
@@ -76,6 +79,8 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     _router_registry = router_registry
 
     _route_builder = route_builder
+
+    _source_id = _step_id_gen()
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       let new_boundary =
         builder.build_and_initialize(_step_id_gen(), _layout_initializer)
@@ -215,6 +220,28 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id
+
+  be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId,
+    requester: FinishedAckRequester)
+  =>
+    _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
+      requester)
+
+    if _routes.size() > 0 then
+      for route in _routes.values() do
+        let request_id = _finished_ack_waiter.add_consumer_request(
+          requester_id)
+        route.request_finished_ack(request_id, _source_id, this)
+      end
+    else
+      requester.try_finish_request_early(requester_id)
+    end
+
+  be try_finish_request_early(requester_id: StepId) =>
+    _finished_ack_waiter.try_finish_request_early(requester_id)
+
+  be receive_finished_ack(request_id: RequestId) =>
+    _finished_ack_waiter.unmark_consumer_request(request_id)
 
   fun ref _mute() =>
     ifdef debug then

@@ -32,7 +32,8 @@ use "wallaroo_labs/mort"
 use "wallaroo_labs/query"
 
 
-actor RouterRegistry
+actor RouterRegistry is FinishedAckRequester
+  let _id: StepId
   let _auth: AmbientAuth
   let _data_receivers: DataReceivers
   let _worker_name: String
@@ -49,6 +50,8 @@ actor RouterRegistry
   var _omni_router: (OmniRouter | None) = None
 
   var _application_ready_to_work: Bool = false
+
+  let _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
 
   ////////////////
   // Subscribers
@@ -84,7 +87,10 @@ actor RouterRegistry
   //////
   // Partition Migration
   //////
+
+  //!@
   var _stop_the_world_in_process: Bool = false
+
   var _leaving_in_process: Bool = false
   var _joining_worker_count: USize = 0
   let _initialized_joining_workers: _StringSet =
@@ -122,6 +128,7 @@ actor RouterRegistry
     _recovery_file_cleaner = recovery_file_cleaner
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
+    _id = (digestof this).u128()
 
   fun _worker_count(): USize =>
     _outgoing_boundaries.size() + 1
@@ -573,11 +580,15 @@ actor RouterRegistry
     _stop_the_world_in_process = true
     _stop_all_local()
     _stop_the_world_for_log_rotation()
-    // await acks?
+
+    //!@
     let timers = Timers
     let timer = Timer(PauseBeforeLogRotationNotify(this),
-      _stop_the_world_pause)
+    _stop_the_world_pause)
     timers(consume timer)
+
+    //!@
+    // _request_finished_acks(LogRotationAction(this))
 
   be begin_log_rotation() =>
     """
@@ -669,13 +680,10 @@ actor RouterRegistry
     in-flight messages to finish processing.
     """
     _stop_the_world_in_process = true
-    _stop_the_world(new_workers)
-    let timers = Timers
-    let timer = Timer(PauseBeforeMigrationNotify(this, new_workers),
-      _stop_the_world_pause)
-    timers(consume timer)
+    _stop_the_world_for_grow_migration(new_workers)
+    _request_finished_acks(MigrationAction(this, new_workers))
 
-  fun ref _stop_the_world(new_workers: Array[String] val) =>
+  fun ref _stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
     """
     We currently stop all message processing before migrating partitions and
     updating routers/routes.
@@ -703,6 +711,7 @@ actor RouterRegistry
     """
     Begin partition migration
     """
+    @printf[I32]("!@ Beginning migration\n".cstring())
     if _partition_routers.size() == 0 then
       //no steps have been migrated
       @printf[I32](("Resuming message processing immediately. No partitions " +
@@ -815,6 +824,25 @@ actor RouterRegistry
       end
     end
 
+  be remote_request_finished_ack(originating_worker: String,
+    upstream_request_id: RequestId, upstream_requester_id: StepId)
+  =>
+    _finished_ack_waiter.add_new_request(upstream_requester_id,
+      upstream_request_id where custom_action = AckFinishedAction(_auth,
+        _worker_name, originating_worker, upstream_request_id, _connections))
+
+    if _sources.size() > 0 then
+      for source in _sources.values() do
+        @printf[I32]("!@ -- Stopping world for source %s\n".cstring(),
+          (digestof source).string().cstring())
+        let request_id =
+          _finished_ack_waiter.add_consumer_request(upstream_requester_id)
+        source.request_finished_ack(request_id, _id, this)
+      end
+    else
+      _finished_ack_waiter.try_finish_request_early(upstream_requester_id)
+    end
+
   be process_migrating_target_ack(target: String) =>
     """
     Called when we receive a migration batch ack from the new worker
@@ -830,6 +858,42 @@ actor RouterRegistry
       _connections.request_cluster_unmute()
       _unmute_request(_worker_name)
     end
+
+  fun ref _request_finished_acks(custom_action: CustomAction,
+    excluded_workers: Array[String] val = recover Array[String] end)
+  =>
+    """
+    Get finished acks from all sources
+    """
+    _finished_ack_waiter.initiate_request(_id, custom_action)
+    _connections.request_finished_acks(_id, this, excluded_workers)
+
+    //TODO: request finished acks on remote workers
+    ifdef debug then
+      @printf[I32](("RouterRegistry requesting finished acks for local " +
+        "sources.\n").cstring())
+    end
+    @printf[I32]("!@ Stopping world on %s sources\n".cstring(),
+      _sources.size().string().cstring())
+    for source in _sources.values() do
+      @printf[I32]("!@ -- Stopping world for source %s\n".cstring(),
+        (digestof source).string().cstring())
+      let request_id = _finished_ack_waiter.add_consumer_request(_id)
+      source.request_finished_ack(request_id, _id, this)
+    end
+
+  be add_connection_request_ids(r_ids: Array[RequestId] val) =>
+    for r_id in r_ids.values() do
+      _finished_ack_waiter.add_consumer_request(_id, r_id)
+    end
+
+  be try_finish_request_early(requester_id: StepId) =>
+    _finished_ack_waiter.try_finish_request_early(requester_id)
+
+  be receive_finished_ack(request_id: RequestId) =>
+    @printf[I32]("!@ receive_finished_ack REGISTRY for %s\n".cstring(),
+      request_id.string().cstring())
+    _finished_ack_waiter.unmark_consumer_request(request_id)
 
   fun _stop_all_local() =>
     """
@@ -922,7 +986,6 @@ actor RouterRegistry
     This should only be called on the worker contacted via an external
     message to initiate a shrink.
     """
-
     if ArrayHelpers[String].contains[String](leaving_workers, _worker_name)
     then
       // Since we're one of the leaving workers, we're handing off
@@ -941,17 +1004,13 @@ actor RouterRegistry
       for w in remaining_workers.values() do
         @printf[I32]("-- -- %s\n".cstring(), w.cstring())
       end
+
       @printf[I32]("-- Leaving workers: \n".cstring())
       for w in leaving_workers.values() do
         @printf[I32]("-- -- %s\n".cstring(), w.cstring())
       end
       _stop_the_world_in_process = true
-      _stop_the_world_for_shrink()
-      let timers = Timers
-      let timer = Timer(PauseBeforeShrinkNotify(_auth, _worker_name,
-        _connections, remaining_workers, leaving_workers),
-        _stop_the_world_pause)
-      timers(consume timer)
+      _stop_the_world_for_shrink_migration()
       try
         let msg = ChannelMsgEncoder.prepare_shrink(remaining_workers,
           leaving_workers, _auth)?
@@ -962,6 +1021,8 @@ actor RouterRegistry
         Fail()
       end
       _prepare_shrink(remaining_workers, leaving_workers)
+      _request_finished_acks(LeavingMigrationAction(_auth, remaining_workers,
+        leaving_workers, _connections))
     end
 
   be prepare_shrink(remaining_workers: Array[String] val,
@@ -983,7 +1044,7 @@ actor RouterRegistry
     end
     if not _stop_the_world_in_process then
       _stop_the_world_in_process = true
-      _stop_the_world_for_shrink()
+      _stop_the_world_for_shrink_migration()
     end
 
     for w in leaving_workers.values() do
@@ -1030,7 +1091,7 @@ actor RouterRegistry
       _migrate_all_partition_steps(state_name, rws)
     end
 
-  fun ref _stop_the_world_for_shrink() =>
+  fun ref _stop_the_world_for_shrink_migration() =>
     """
     We currently stop all message processing before migrating partitions and
     updating routers/routes.
@@ -1194,7 +1255,7 @@ actor RouterRegistry
       Fail()
     end
 
-class PauseBeforeMigrationNotify is TimerNotify
+class MigrationAction is CustomAction
   let _registry: RouterRegistry
   let _target_workers: Array[String] val
 
@@ -1203,28 +1264,29 @@ class PauseBeforeMigrationNotify is TimerNotify
     _registry = registry
     _target_workers = target_workers
 
-  fun ref apply(timer: Timer, count: U64): Bool =>
+  fun ref apply() =>
+    @printf[I32]("!@ Running MigrationAction\n".cstring())
     _registry.begin_migration(_target_workers)
-    false
 
-class PauseBeforeShrinkNotify is TimerNotify
+class LeavingMigrationAction is CustomAction
   let _auth: AmbientAuth
   let _worker_name: String
   let _connections: Connections
   let _remaining_workers: Array[String] val
   let _leaving_workers: Array[String] val
+  let _connections: Connections
 
   new iso create(auth: AmbientAuth, worker_name: String,
     connections: Connections, remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val)
+    leaving_workers: Array[String] val, connections: Connections)
   =>
     _auth = auth
     _worker_name = worker_name
-    _connections = connections
     _remaining_workers = remaining_workers
     _leaving_workers = leaving_workers
+    _connections = connections
 
-  fun ref apply(timer: Timer, count: U64): Bool =>
+  fun ref apply() =>
     try
       let msg = ChannelMsgEncoder.begin_leaving_migration(_remaining_workers,
         _leaving_workers, _auth)?
@@ -1239,13 +1301,47 @@ class PauseBeforeShrinkNotify is TimerNotify
     else
       Fail()
     end
-    false
 
-class PauseBeforeLogRotationNotify is TimerNotify
+class AckFinishedAction is CustomAction
+  let _auth: AmbientAuth
+  let _worker: String
+  let _originating_worker: String
+  let _request_id: RequestId
+  let _connections: Connections
+
+  new iso create(auth: AmbientAuth, worker: String, originating_worker: String,
+    request_id: RequestId, connections: Connections)
+  =>
+    _auth = auth
+    _worker = worker
+    _originating_worker = originating_worker
+    _request_id = request_id
+    _connections = connections
+
+  fun apply() =>
+    try
+      let finished_ack_msg =
+        ChannelMsgEncoder.finished_ack(_worker, _request_id, _auth)?
+      _connections.send_control(_originating_worker, finished_ack_msg)
+    else
+      Fail()
+    end
+
+class LogRotationAction is CustomAction
   let _registry: RouterRegistry
 
   new iso create(registry: RouterRegistry) =>
     _registry = registry
+
+  fun ref apply() =>
+    _registry.begin_log_rotation()
+
+//!@
+class PauseBeforeLogRotationNotify is TimerNotify
+   let _registry: RouterRegistry
+
+   new iso create(registry: RouterRegistry) =>
+     _registry = registry
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     _registry.begin_log_rotation()
