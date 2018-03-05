@@ -1531,17 +1531,15 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
   fun distribution_digest(): Map[String, Array[String] val] val =>
     // Return a map of form {worker_name: step_ids_as_strings}
     let digest = recover iso Map[String, Array[String] val] end
-    // First for this worker
-    let a = recover iso Array[String] end
-    for id in _step_ids.values() do
-      a.push(id.string())
-    end
-    digest(_worker_name) = consume a
-    // Now the other workers
+    // Accumulate step_ids per worker
     let others = Map[String, Array[String]]
+    others(_worker_name) = Array[String]
     try
-      for target in _partition_routes.values() do
+      for (p_id, target) in _partition_routes.pairs() do
         match target
+        | let s: Step =>
+          let step_id = _step_ids(p_id)?
+          others(_worker_name)?.push(step_id.string())
         | let pr: ProxyRouter =>
           let pa = pr.proxy_address()
           if others.contains(pa.worker) then
