@@ -943,8 +943,14 @@ actor OutgoingBoundary is Consumer
   fun _backup_queue_is_overflowing(): Bool =>
     _queue.size() >= 16_384
 
-  fun ref get_fd(): U32 =>
-    _fd
+  fun ref set_so_sndbuf(bufsiz: U32): U32 =>
+    (let x1: U32, let x2: U32) = OSSocket.get_so_sndbuf(_fd)
+    @printf[I32]("OutgoingBoundary get SO_SNDBUF = %d %d\n".cstring(), x1, x2)
+    let y: U32 = OSSocket.set_so_sndbuf(_fd, 4433)
+    @printf[I32]("OutgoingBoundary set SO_SNDBUF = %d\n".cstring(), y)
+    (let z1: U32, let z2: U32) = OSSocket.get_so_sndbuf(_fd)
+    @printf[I32]("OutgoingBoundary get SO_SNDBUF = %d %d\n".cstring(), z1, z2)
+    y
 
 class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
@@ -1040,8 +1046,6 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
 
-  fun ref get_fd(conn: WallarooOutgoingNetworkActor ref): U32 =>
-    conn.get_fd()
 
 class _PauseBeforeReconnect is TimerNotify
   let _ob: OutgoingBoundary

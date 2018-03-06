@@ -85,9 +85,3 @@ trait WallarooOutgoingNetworkActorNotify
     Called when the parent actor's dispose is called.
     """
     None
-
-  fun ref get_fd(conn: WallarooOutgoingNetworkActor ref): U32 =>
-    """
-    Temp hack
-    """
-    665544

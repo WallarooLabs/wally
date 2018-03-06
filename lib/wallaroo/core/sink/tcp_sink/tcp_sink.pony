@@ -866,8 +866,14 @@ actor TCPSink is Consumer
     """
     None
 
-  fun ref get_fd(): U32 =>
-    _fd
+  fun ref set_so_sndbuf(bufsiz: U32): U32 =>
+    (let x1: U32, let x2: U32) = OSSocket.get_so_sndbuf(_fd)
+    @printf[I32]("TCPSink get SO_SNDBUF = %d %d\n".cstring(), x1, x2)
+    let y: U32 = OSSocket.set_so_sndbuf(_fd, 4433)
+    @printf[I32]("TCPSink set SO_SNDBUF = %d\n".cstring(), y)
+    (let z1: U32, let z2: U32) = OSSocket.get_so_sndbuf(_fd)
+    @printf[I32]("TCPSink get SO_SNDBUF = %d %d\n".cstring(), z1, z2)
+    y
 
 class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
   fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
@@ -876,12 +882,8 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("TCPSink connected\n".cstring())
     conn.set_nodelay(true)
-    (let x1: U32, let x2: U32) = OSSocket.get_so_sndbuf(conn.get_fd())
-    @printf[I32]("TCPSink get SO_SNDBUF = %d %d\n".cstring(), x1, x2)
-    let y: U32 = OSSocket.set_so_sndbuf(conn.get_fd(), 4433)
-    @printf[I32]("TCPSink set SO_SNDBUF = %d\n".cstring(), y)
-    (let z1: U32, let z2: U32) = OSSocket.get_so_sndbuf(conn.get_fd())
-    @printf[I32]("TCPSink get SO_SNDBUF = %d %d\n".cstring(), z1, z2)
+    let x = conn.set_so_sndbuf(4323)
+    @printf[I32]("TCPSink connected set_so_sndbuf was %d\n".cstring(), x)
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("TCPSink connection closed\n".cstring())
@@ -909,8 +911,6 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
     @printf[I32](("TCPSink is no longer experiencing" +
       " back pressure\n").cstring())
 
-  fun ref get_fd(conn: WallarooOutgoingNetworkActor ref): U32 =>
-    conn.get_fd()
 
 class PauseBeforeReconnectTCPSink is TimerNotify
   let _tcp_sink: TCPSink

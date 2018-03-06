@@ -50,8 +50,8 @@ interface WallarooOutgoingNetworkActor
     Called to close the connection in a graceful fashion
     """
 
-  fun ref get_fd(): U32 =>
+  fun ref set_so_sndbuf(bufsiz: U32): U32 =>
     """
     Temp hack
     """
-    663322
+    8823783 // not implemented
