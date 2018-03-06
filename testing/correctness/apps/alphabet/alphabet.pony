@@ -40,7 +40,7 @@ actor Main
             a.push(String.from_array([b ; c]))
           end
         end
-        a.push("!")
+        a.push("!!")
         consume a
       end
 
