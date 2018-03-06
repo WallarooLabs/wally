@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Fix bug that caused Wallaroo to shut down when connecting a new source after a 3->2 shrink ([PR #2072](https://github.com/wallaroolabs/wallaroo/pull/2072))
 - Correctly remove boundary references when worker leaves ([PR #2073](https://github.com/wallaroolabs/wallaroo/pull/2073))
 - Correctly update routers after shrink ([PR #2018](https://github.com/wallaroolabs/wallaroo/pull/2018))
 - Only try to shrink if supplied worker names are still in the cluster ([PR #2034](https://github.com/wallaroolabs/wallaroo/pull/2034))
