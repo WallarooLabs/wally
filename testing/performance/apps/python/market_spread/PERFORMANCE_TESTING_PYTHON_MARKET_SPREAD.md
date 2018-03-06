@@ -182,7 +182,7 @@ sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida" cset proc -s user -e numa
 
 These senders send out roughly 45k messages per second per stream, this is the current baseline for maximum performance of Python Market Spread, depending what you are testing this may need to be adjusted. Please visit the "Wallaroo Data Senders Commands" section of the [WALLAROO PERFORMANCE TESTING GUIDE](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#wallaroo-data-senders-commands) for more information regarding adjusting these values.
 
-SSH into `wallaroo-leader-1`
+SSH into `wallaroo-follower-1`
 
 You can run the following commands individually or in a script, the only sender that must be run to completion before starting any of the others is the Initial NBBO Sender.
 
@@ -208,12 +208,12 @@ sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/
 
 When it's time to shutdown your Market Spread cluster, you'd want to do the following.
 
-SSH into `wallaroo-leader-1`
+SSH into `wallaroo-follower-1`
 
 Run the following command to shutdown the cluster:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio
+sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio
 ```
 
 ## Record Information
@@ -352,12 +352,12 @@ sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/
 
 When it's time to shutdown your Market Spread cluster, you'd want to do the following.
 
-SSH into `wallaroo-follower-2`
+SSH into `wallaroo-follower-1`
 
 Run the following command to shutdown the cluster:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio
+sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 ~/wallaroo/utils/cluster_shutdown/cluster_shutdown wallaroo-leader-1:5050 --ponythreads=1 --ponynoblock --ponypinasio
 ```
 
 ## Record Information
