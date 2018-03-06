@@ -53,4 +53,8 @@ for k in expected.keys():
     s_key = str(k)
     expected[s_key] = args.repetitions * expected.pop(k)
 
-assert(expected == processed)
+try:
+    assert(expected == processed)
+except:
+    print("Output does not match expected!")
+    raise
