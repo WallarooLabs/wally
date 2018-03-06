@@ -528,7 +528,7 @@ primitive Machida
         let name = recover val
           String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(item, 1)))
         end
-        app = Application(name)
+        app = Application(name, true)
         break
       end
     end
