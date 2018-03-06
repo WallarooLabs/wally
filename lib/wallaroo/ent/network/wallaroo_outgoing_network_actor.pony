@@ -49,3 +49,9 @@ interface WallarooOutgoingNetworkActor
     """
     Called to close the connection in a graceful fashion
     """
+
+  fun ref get_fd(): U32 =>
+    """
+    Temp hack
+    """
+    663322

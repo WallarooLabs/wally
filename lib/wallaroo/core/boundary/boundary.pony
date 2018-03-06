@@ -943,6 +943,9 @@ actor OutgoingBoundary is Consumer
   fun _backup_queue_is_overflowing(): Bool =>
     _queue.size() >= 16_384
 
+  fun ref get_fd(): U32 =>
+    _fd
+
 class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
@@ -1036,6 +1039,9 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
+
+  fun ref get_fd(conn: WallarooOutgoingNetworkActor ref): U32 =>
+    conn.get_fd()
 
 class _PauseBeforeReconnect is TimerNotify
   let _ob: OutgoingBoundary
