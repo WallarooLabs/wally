@@ -312,7 +312,7 @@ actor _Cluster is Cluster
   =>
     None
 
-actor _NullMetricsSink
+actor _NullMetricsSink is MetricsSink
   be send_metrics(metrics: MetricDataList val) =>
     None
 

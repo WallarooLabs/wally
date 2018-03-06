@@ -22,3 +22,8 @@ interface tag MetricsSink is DisposableActor
   be send_metrics(metrics: MetricDataList val)
   fun ref set_nodelay(state: Bool)
   be writev(data: ByteSeqIter)
+  fun ref set_so_sndbuf(bufsiz: U32): U32 =>
+    """
+    Temp hack
+    """
+    389238 // not implemented

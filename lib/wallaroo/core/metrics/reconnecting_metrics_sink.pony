@@ -31,6 +31,7 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
+use "wallaroo/ent/network"
 use "wallaroo_labs/hub"
 use "wallaroo_labs/mort"
 
@@ -851,6 +852,15 @@ actor ReconnectingMetricsSink
       _notify.unthrottled(this)
     end
 
+  fun ref set_so_sndbuf(bufsiz: U32): U32 =>
+    (let x1: U32, let x2: U32) = OSSocket.get_so_sndbuf(_fd)
+    @printf[I32]("ReconnectingMetricsSink get SO_SNDBUF = %d %d\n".cstring(), x1, x2)
+    let y: U32 = OSSocket.set_so_sndbuf(_fd, 4433)
+    @printf[I32]("ReconnectingMetricsSink set SO_SNDBUF = %d\n".cstring(), y)
+    (let z1: U32, let z2: U32) = OSSocket.get_so_sndbuf(_fd)
+    @printf[I32]("ReconnectingMetricsSink get SO_SNDBUF = %d %d\n".cstring(), z1, z2)
+    y
+
 interface _MetricsSinkNotify
   fun ref connecting(conn: MetricsSink ref, count: U32) =>
     """
@@ -959,6 +969,7 @@ class MetricsSinkNotify is _MetricsSinkNotify
   fun ref connected(sock: MetricsSink ref) =>
     @printf[I32]("%s outgoing connected\n".cstring(),
       _name.cstring())
+    sock.set_so_sndbuf(1234)
 		let connect_msg = HubProtocol.connect()
 		let metrics_join_msg = HubProtocol.join_metrics(
 			"metrics:" + _application_name,

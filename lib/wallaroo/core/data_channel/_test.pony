@@ -509,7 +509,7 @@ class _TestDataChannelThrottleSendNotify is DataChannelNotify
   =>
     None
 
-actor _NullMetricsSink
+actor _NullMetricsSink is MetricsSink
   be send_metrics(metrics: MetricDataList val) =>
     None
 
