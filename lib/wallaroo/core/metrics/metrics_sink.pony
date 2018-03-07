@@ -24,6 +24,6 @@ interface tag MetricsSink is DisposableActor
   be writev(data: ByteSeqIter)
   fun ref set_so_sndbuf(bufsiz: U32): U32 =>
     """
-    Temp hack
+    This impl. is only for use as fallback by test classes.
     """
-    389238 // not implemented
+    0

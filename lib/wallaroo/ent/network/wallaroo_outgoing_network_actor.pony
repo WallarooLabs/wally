@@ -52,6 +52,6 @@ interface WallarooOutgoingNetworkActor
 
   fun ref set_so_sndbuf(bufsiz: U32): U32 =>
     """
-    Temp hack
+    This impl. is only for use as fallback by test classes.
     """
-    8823783 // not implemented
+    0
