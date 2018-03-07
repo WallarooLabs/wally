@@ -1025,6 +1025,7 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
     conn.set_nodelay(true)
+    conn.set_so_sndbuf(1881)
     conn.expect(4)
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
