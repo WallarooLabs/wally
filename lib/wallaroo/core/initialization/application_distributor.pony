@@ -67,6 +67,12 @@ actor ApplicationDistributor is Distributor
       FatalUserError(err_msg)
     end
 
+    if application.is_contended then
+      ifdef debug then
+        @printf[I32]("Using Contended API.\n".cstring())
+      end
+    end
+
     try
       let all_workers_trn = recover trn Array[String] end
       all_workers_trn.push(initializer_name)

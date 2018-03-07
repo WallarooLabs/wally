@@ -320,9 +320,9 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
 trait val PartitionBuilder
   // These two methods need to be deterministic at the moment since they
   // are called at different times
-  fun state_subpartition(workers: (String | Array[String] val),
+  fun state_subpartition(workers: Array[String] val,
     initializer_name: String, is_contended: Bool): StateSubpartition
-  fun partition_addresses(workers: (String | Array[String] val),
+  fun partition_addresses(workers: Array[String] val,
     initializer_name: String, is_contended: Bool):
     PartitionAddresses
   fun state_name(): String
@@ -375,7 +375,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
   fun forward_route_builder(): RouteBuilder => _forward_route_builder
   fun is_multi(): Bool => _multi_worker
 
-  fun state_subpartition(workers: (String | Array[String] val),
+  fun state_subpartition(workers: Array[String] val,
     initializer_name: String, is_contended: Bool): StateSubpartition
   =>
     KeyedStateSubpartition[PIn, Key, S](_state_name,
@@ -383,15 +383,15 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
       _step_id_map, _state_runner_builder, _partition.function(),
       _pipeline_name)
 
-  fun partition_addresses(workers: (String | Array[String] val),
+  fun partition_addresses(workers: Array[String] val,
     initializer_name: String, is_contended: Bool):
     KeyedPartitionAddresses[Key]
   =>
     let m = recover trn Map[Key, ProxyAddress] end
 
-    match workers
-    | let w: String =>
+    if workers.size() == 1 then
       // With one worker, all the keys go on that worker
+      let w = try workers(0)? else Fail(); "" end
       match _partition.keys()
       | let wks: Array[WeightedKey[Key]] val =>
         for wkey in wks.values() do
@@ -406,20 +406,20 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
           end
         end
       end
-    | let all_ws: Array[String] val =>
+    else
       // With multiple workers, we need to determine our distribution of keys
       let ws: Array[String] val =
         if is_contended then
           // With contended APIs, we keep steps off the initializer
           recover
             let xs = Array[String]
-            for w in all_ws.values() do
+            for w in workers.values() do
               if w != initializer_name then xs.push(w) end
             end
             xs
           end
         else
-          all_ws
+          workers
         end
       let w_count = ws.size()
       var idx: USize = 0
