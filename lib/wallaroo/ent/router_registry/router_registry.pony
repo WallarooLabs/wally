@@ -464,32 +464,61 @@ actor RouterRegistry
     lti.initialize_join_initializables()
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
-    local_topology: LocalTopology)
+    worker_count: USize, local_topology: LocalTopology)
   =>
-    let state_blueprints =
-      recover trn Map[String, PartitionRouterBlueprint] end
-    for (w, r) in _partition_routers.pairs() do
-      state_blueprints(w) = r.blueprint()
+    if _joining_worker_count == 0 then
+      _joining_worker_count = worker_count
     end
-
-    let stateless_blueprints =
-      recover trn Map[U128, StatelessPartitionRouterBlueprint] end
-    for (id, r) in _stateless_partition_routers.pairs() do
-      stateless_blueprints(id) = r.blueprint()
-    end
-
-    let omni_router_blueprint =
-      match _omni_router
-      | let omr: OmniRouter =>
-        omr.blueprint()
+    if (_joining_worker_count > 0) and (worker_count != _joining_worker_count)
+    then
+      @printf[I32]("Join error: Joining worker supplied invalid worker count\n"
+        .cstring())
+      let error_msg = "All joining workers must supply the same worker " +
+        "count. Current pending count is " + _joining_worker_count.string() +
+        ". You supplied " + worker_count.string() + "."
+      try
+        let msg = ChannelMsgEncoder.inform_join_error(error_msg, _auth)?
+        conn.writev(msg)
       else
         Fail()
-        EmptyOmniRouterBlueprint
+      end
+    elseif worker_count < 1 then
+      @printf[I32](("Join error: Joining worker supplied a worker count " +
+        "less than 1\n").cstring())
+      let error_msg = "Joining worker must supply a worker count greater " +
+        "than 0."
+      try
+        let msg = ChannelMsgEncoder.inform_join_error(error_msg, _auth)?
+        conn.writev(msg)
+      else
+        Fail()
+      end
+    else
+      let state_blueprints =
+        recover trn Map[String, PartitionRouterBlueprint] end
+      for (w, r) in _partition_routers.pairs() do
+        state_blueprints(w) = r.blueprint()
       end
 
-    _connections.inform_joining_worker(conn, worker, local_topology,
-      consume state_blueprints, consume stateless_blueprints,
-      omni_router_blueprint)
+      let stateless_blueprints =
+        recover trn Map[U128, StatelessPartitionRouterBlueprint] end
+      for (id, r) in _stateless_partition_routers.pairs() do
+        stateless_blueprints(id) = r.blueprint()
+      end
+
+      let omni_router_blueprint =
+        match _omni_router
+        | let omr: OmniRouter =>
+          omr.blueprint()
+        else
+          Fail()
+          EmptyOmniRouterBlueprint
+        end
+
+      _connections.inform_joining_worker(conn, worker, local_topology,
+        consume state_blueprints, consume stateless_blueprints,
+        omni_router_blueprint)
+    end
 
   be inform_cluster_of_join() =>
     _inform_cluster_of_join()
@@ -582,9 +611,6 @@ actor RouterRegistry
   //////////////
   // NEW WORKER PARTITION MIGRATION
   //////////////
-  be update_joining_worker_count(count: USize) =>
-    _joining_worker_count = count
-
   be joining_worker_initialized(worker: String) =>
     """
     When a joining worker has initialized its topology, it contacts all
