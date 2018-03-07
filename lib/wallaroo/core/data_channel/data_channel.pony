@@ -33,6 +33,7 @@ use "net"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/network"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -807,3 +808,22 @@ actor DataChannel
       _notify.unthrottled(this)
     end
 
+  fun ref set_so_rcvbuf(bufsiz: U32): U32 =>
+    @printf[I32]("DataChannel set_so_rcvbuf arg = %d\n".cstring(), bufsiz)
+    (let x1: U32, let x2: U32) = OSSocket.get_so_rcvbuf(_fd)
+    @printf[I32]("DataChannel get SO_RCVBUF = %d %d\n".cstring(), x1, x2)
+    let y: U32 = OSSocket.set_so_rcvbuf(_fd, 2020)
+    @printf[I32]("DataChannel set SO_RCVBUF = %d\n".cstring(), y)
+    (let z1: U32, let z2: U32) = OSSocket.get_so_rcvbuf(_fd)
+    @printf[I32]("DataChannel get SO_RCVBUF = %d %d\n".cstring(), z1, z2)
+    y
+
+  fun ref set_so_sndbuf(bufsiz: U32): U32 =>
+    @printf[I32]("DataChannel set_so_sndbuf arg = %d\n".cstring(), bufsiz)
+    (let x1: U32, let x2: U32) = OSSocket.get_so_sndbuf(_fd)
+    @printf[I32]("DataChannel get SO_SNDBUF = %d %d\n".cstring(), x1, x2)
+    let y: U32 = OSSocket.set_so_sndbuf(_fd, 2321)
+    @printf[I32]("DataChannel set SO_SNDBUF = %d\n".cstring(), y)
+    (let z1: U32, let z2: U32) = OSSocket.get_so_sndbuf(_fd)
+    @printf[I32]("DataChannel get SO_SNDBUF = %d %d\n".cstring(), z1, z2)
+    y

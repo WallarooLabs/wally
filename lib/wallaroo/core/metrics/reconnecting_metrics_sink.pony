@@ -872,9 +872,10 @@ actor ReconnectingMetricsSink
     end
 
   fun ref set_so_sndbuf(bufsiz: U32): U32 =>
+    @printf[I32]("ReconnectingMetricsSink set_so_sndbuf arg = %d\n".cstring(), bufsiz)
     (let x1: U32, let x2: U32) = OSSocket.get_so_sndbuf(_fd)
     @printf[I32]("ReconnectingMetricsSink get SO_SNDBUF = %d %d\n".cstring(), x1, x2)
-    let y: U32 = OSSocket.set_so_sndbuf(_fd, 4433)
+    let y: U32 = OSSocket.set_so_sndbuf(_fd, 1919)
     @printf[I32]("ReconnectingMetricsSink set SO_SNDBUF = %d\n".cstring(), y)
     (let z1: U32, let z2: U32) = OSSocket.get_so_sndbuf(_fd)
     @printf[I32]("ReconnectingMetricsSink get SO_SNDBUF = %d %d\n".cstring(), z1, z2)

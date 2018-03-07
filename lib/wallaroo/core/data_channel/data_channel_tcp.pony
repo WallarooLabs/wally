@@ -288,10 +288,12 @@ class DataChannelConnectNotifier is DataChannelNotify
   fun ref accepted(conn: DataChannel ref) =>
     @printf[I32]("accepted data channel connection\n".cstring())
     conn.set_nodelay(true)
+    conn.set_so_rcvbuf(4451)
     conn.expect(4)
 
   fun ref connected(sock: DataChannel ref) =>
     @printf[I32]("incoming connected on data channel\n".cstring())
+    sock.set_so_sndbuf(4541)
 
   fun ref closed(conn: DataChannel ref) =>
     @printf[I32]("DataChannelConnectNotifier: server closed\n".cstring())

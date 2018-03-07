@@ -173,6 +173,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun ref accepted(conn: TCPSource ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
+    conn.set_so_rcvbuf(4456)
     conn.expect(_header_size)
 
   fun ref closed(conn: TCPSource ref) =>
