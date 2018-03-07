@@ -568,7 +568,7 @@ actor TCPSource is Producer
     @printf[I32]("TCPSource set_so_rcvbuf arg = %d\n".cstring(), bufsiz)
     (let x1: U32, let x2: U32) = OSSocket.get_so_rcvbuf(_fd)
     @printf[I32]("TCPSource get SO_RCVBUF = %d %d\n".cstring(), x1, x2)
-    let y: U32 = OSSocket.set_so_rcvbuf(_fd, 2121)
+    let y: U32 = OSSocket.set_so_rcvbuf(_fd, bufsiz)
     @printf[I32]("TCPSource set SO_RCVBUF = %d\n".cstring(), y)
     (let z1: U32, let z2: U32) = OSSocket.get_so_rcvbuf(_fd)
     @printf[I32]("TCPSource get SO_RCVBUF = %d %d\n".cstring(), z1, z2)

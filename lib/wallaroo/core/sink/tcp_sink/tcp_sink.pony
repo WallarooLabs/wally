@@ -870,7 +870,7 @@ actor TCPSink is Consumer
     @printf[I32]("TCPSink set_so_sndbuf arg = %d\n".cstring(), bufsiz)
     (let x1: U32, let x2: U32) = OSSocket.get_so_sndbuf(_fd)
     @printf[I32]("TCPSink get SO_SNDBUF = %d %d\n".cstring(), x1, x2)
-    let y: U32 = OSSocket.set_so_sndbuf(_fd, 2121)
+    let y: U32 = OSSocket.set_so_sndbuf(_fd, bufsiz)
     @printf[I32]("TCPSink set SO_SNDBUF = %d\n".cstring(), y)
     (let z1: U32, let z2: U32) = OSSocket.get_so_sndbuf(_fd)
     @printf[I32]("TCPSink get SO_SNDBUF = %d %d\n".cstring(), z1, z2)
@@ -883,7 +883,7 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("TCPSink connected\n".cstring())
     conn.set_nodelay(true)
-    let x = conn.set_so_sndbuf(4323)
+    let x = conn.set_so_sndbuf(1777)
     @printf[I32]("TCPSink connected set_so_sndbuf was %d\n".cstring(), x)
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>

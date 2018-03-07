@@ -947,7 +947,7 @@ actor OutgoingBoundary is Consumer
     @printf[I32]("OutgoingBoundary set_so_sndbuf arg = %d\n".cstring(), bufsiz)
     (let x1: U32, let x2: U32) = OSSocket.get_so_sndbuf(_fd)
     @printf[I32]("OutgoingBoundary get SO_SNDBUF = %d %d\n".cstring(), x1, x2)
-    let y: U32 = OSSocket.set_so_sndbuf(_fd, 2020)
+    let y: U32 = OSSocket.set_so_sndbuf(_fd, bufsiz)
     @printf[I32]("OutgoingBoundary set SO_SNDBUF = %d\n".cstring(), y)
     (let z1: U32, let z2: U32) = OSSocket.get_so_sndbuf(_fd)
     @printf[I32]("OutgoingBoundary get SO_SNDBUF = %d %d\n".cstring(), z1, z2)
