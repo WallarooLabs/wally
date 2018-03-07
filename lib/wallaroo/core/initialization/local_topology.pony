@@ -1692,8 +1692,8 @@ actor LocalTopologyInitializer is LayoutInitializer
           Fail()
         end
       else
-        _router_registry.update_joining_worker_count(worker_count)
-        _router_registry.inform_joining_worker(conn, worker_name, t)
+        _router_registry.inform_joining_worker(conn, worker_name, worker_count,
+          t)
       end
     else
       Fail()

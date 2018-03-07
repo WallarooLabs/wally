@@ -238,6 +238,14 @@ primitive ChannelMsgEncoder
       partition_blueprints, stateless_partition_blueprints,
       omni_router_blueprint), auth)?
 
+  fun inform_join_error(msg: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    This message is sent as a response to a JoinCluster message when there is
+    a join error and the joiner should shut down.
+    """
+    _encode(InformJoinErrorMsg(msg), auth)?
+
   fun inform_recover_not_join(auth: AmbientAuth): Array[ByteSeq] val ? =>
     """
     This message is sent as a response to a JoinCluster message when we
@@ -702,6 +710,12 @@ class val InformJoiningWorkerMsg is ChannelMsg
     partition_router_blueprints = p_blueprints
     stateless_partition_router_blueprints = stateless_p_blueprints
     omni_router_blueprint = omr_blueprint
+
+class val InformJoinErrorMsg is ChannelMsg
+  let message: String
+
+  new val create(m: String) =>
+    message = m
 
 primitive InformRecoverNotJoinMsg is ChannelMsg
 
