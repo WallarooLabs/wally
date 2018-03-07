@@ -19,6 +19,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Added
 
+- Add partition count observability query ([PR #2081](https://github.com/wallaroolabs/wallaroo/pull/2081))
 - Add support for multiple sinks per pipeline ([PR #2060](https://github.com/wallaroolabs/wallaroo/pull/2060))
 -  Allow joined worker to recover with original command line ([PR #1933](https://github.com/wallaroolabs/wallaroo/pull/1933))
 - Add support for query requesting information about partition step distribution across workers ([PR #2025](https://github.com/wallaroolabs/wallaroo/pull/2025))
