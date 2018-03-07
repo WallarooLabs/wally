@@ -518,6 +518,11 @@ actor RouterRegistry
       _partition_routers, _stateless_partition_routers)
     conn.writev(msg)
 
+  be partition_count_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.partition_count_query_response(
+      _partition_routers, _stateless_partition_routers)
+    conn.writev(msg)
+
   be cluster_status_query(worker_names: Array[String] val,
     conn: TCPConnection)
   =>

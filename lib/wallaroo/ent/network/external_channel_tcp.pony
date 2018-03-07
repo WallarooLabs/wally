@@ -153,6 +153,12 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
               "Channel\n").cstring())
           end
           _local_topology_initializer.partition_query(conn)
+        | let m: ExternalPartitionCountQueryMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalPartitionCountQueryMsg on " +
+              "External Channel\n").cstring())
+          end
+          _local_topology_initializer.partition_count_query(conn)
         | let m: ExternalClusterStatusQueryMsg =>
           ifdef "trace" then
             @printf[I32](("Received ExternalClusterStatusQueryMsg on " +
