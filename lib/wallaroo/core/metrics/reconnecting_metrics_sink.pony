@@ -207,12 +207,23 @@ actor ReconnectingMetricsSink
           write_final(bytes)
         end
       else
+/**** broken
+        // TODO: Discard metrics when we are throttled
+        if not _throttled then
+          for bytes in _notify.sentv(this, data).values() do
+            _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
+            _pending_writev_total = _pending_writev_total + bytes.size()
+            _pending.push((bytes, 0))
+          end
+        else
+          @printf[I32]("THR,".cstring())
+        end
+ ****/
         for bytes in _notify.sentv(this, data).values() do
           _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
           _pending_writev_total = _pending_writev_total + bytes.size()
           _pending.push((bytes, 0))
         end
-
         _pending_writes()
       end
 
@@ -360,8 +371,7 @@ actor ReconnectingMetricsSink
             _fd = fd
             _event = event
 
-            _pending_writev.clear()
-            _pending.clear()
+            _clear_pending_arrays()
             _pending_writev_total = 0
 
             _connected = true
@@ -509,6 +519,7 @@ actor ReconnectingMetricsSink
     it sent all pending data or not.
     """
     ifdef not windows then
+      @printf[I32]("RconnMetrics: _pending_writev size = %d\n".cstring(), _pending_writev.size())
       // TODO: Make writev_batch_size user configurable
       let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
       var num_to_send: USize = 0
@@ -795,8 +806,7 @@ actor ReconnectingMetricsSink
     ifdef not windows then
       // Unsubscribe immediately and drop all pending writes.
       @pony_asio_event_unsubscribe(_event)
-      _pending_writev.clear()
-      _pending.clear()
+      _clear_pending_arrays()
       _pending_writev_total = 0
       _readable = false
       _writeable = false
@@ -809,6 +819,10 @@ actor ReconnectingMetricsSink
     _fd = -1
 
     _notify.closed(this)
+
+  fun ref _clear_pending_arrays() =>
+    _pending_writev.clear()
+    _pending.clear()
 
   fun ref _schedule_reconnect() =>
     if (_host != "") and (_service != "") and not _no_more_reconnect then
@@ -835,7 +849,11 @@ actor ReconnectingMetricsSink
 
   fun ref _apply_backpressure() =>
     if not _throttled then
+      @printf[I32]("RconnMetrics: _apply_backpressure\n".cstring())
       _throttled = true
+      // Discard metrics when we are throttled
+      _clear_pending_arrays()
+      _pending_writev_total = 0
       ifdef not windows then
         _writeable = false
         // this is safe because asio thread isn't currently subscribed
@@ -848,6 +866,7 @@ actor ReconnectingMetricsSink
 
   fun ref _release_backpressure() =>
     if _throttled then
+      @printf[I32]("RconnMetrics: _release_backpressure\n".cstring())
       _throttled = false
       _notify.unthrottled(this)
     end
