@@ -29,6 +29,7 @@ use "ponytest"
 use bytes = "bytes"
 use container_queue = "container_queue"
 use fix = "fix"
+use math = "math"
 use messages = "messages"
 use options = "options"
 use queue = "queue"
@@ -46,6 +47,7 @@ actor Main is TestList
     bytes.Main.make().tests(test)
     container_queue.Main.make().tests(test)
     fix.Main.make().tests(test)
+    math.Main.make().tests(test)
     messages.Main.make().tests(test)
     options.Main.make().tests(test)
     queue.Main.make().tests(test)
