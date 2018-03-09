@@ -28,10 +28,6 @@ import tempfile
 import threading
 import time
 
-from metrics_parser import (MetricsData,
-                            MetricsParser,
-                            MetricsParseError)
-
 
 INFO2 = logging.INFO + 1
 logging.addLevelName(INFO2, 'INFO2')
@@ -62,7 +58,6 @@ class ExpectationError(StopError):
 
 class PipelineTestError(Exception):
     pass
-
 
 
 # Integration helper classes

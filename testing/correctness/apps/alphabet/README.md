@@ -41,7 +41,7 @@ Worker 2/2
 ```
 ./alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
   --my-control 127.0.0.1:12504 --my-data 127.0.0.1:12505 --join 127.0.0.1:12500 \
-  --name worker2 \
+  --name worker2 --worker-count 2 \
   --ponynoblock --ponythreads=1
 ```
 

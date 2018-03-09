@@ -65,6 +65,7 @@ Alternatively, for a CLI style integration tester, you may use the
 
 
 from integration import (add_runner,
+                         clean_resilience_path,
                          ex_validate,
                          files_generator,
                          get_port_values,
@@ -72,9 +73,6 @@ from integration import (add_runner,
                          is_address_available,
                          iter_generator,
                          Metrics,
-                         MetricsData,
-                         MetricsParser,
-                         MetricsParseError,
                          MetricsStopper,
                          Reader,
                          Runner,
@@ -84,7 +82,6 @@ from integration import (add_runner,
                          Sender,
                          sequence_generator,
                          setup_resilience_path,
-                         clean_resilience_path,
                          start_runners,
                          pipeline_test,
                          set_logging,
@@ -93,3 +90,15 @@ from integration import (add_runner,
                          SinkExpect,
                          TCPReceiver,
                          TimeoutError)
+
+
+from metrics_parser import (MetricsData,
+                            MetricsParser,
+                            MetricsParseError)
+
+
+from observability import (cluster_status_query,
+                           ObservabilityNotifier,
+                           ObservabilityTimeoutError,
+                           partition_counts_query,
+                           partitions_query)
