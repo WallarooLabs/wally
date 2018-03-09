@@ -150,6 +150,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     _connections.register_disposable(conn)
+    //SLF: TODO
     conn.expect(4)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
@@ -374,6 +375,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 
   fun ref connected(conn: TCPConnection ref) =>
     @printf[I32]("ControlChannelConnectNotifier: connected.\n".cstring())
+    //SLF: TODO
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     @printf[I32]("ControlChannelConnectNotifier: connection failed!\n"
@@ -381,6 +383,14 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     @printf[I32](("ControlChannelConnectNotifier: server closed\n").cstring())
+
+  fun ref throttled(conn: TCPConnection ref) =>
+    @printf[I32]("ControlChannelConnectNotifier: throttled.\n".cstring())
+    //SLF: TODO
+
+  fun ref unthrottled(conn: TCPConnection ref) =>
+    @printf[I32]("ControlChannelConnectNotifier: unthrottled.\n".cstring())
+    //SLF: TODO
 
 class JoiningControlSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
