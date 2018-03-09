@@ -895,11 +895,13 @@ interface _MetricsSinkNotify
     """
     Called when we have successfully connected to the server.
     """
+    // mandatory
 
   fun ref accepted(conn: MetricsSink ref)
     """
     Called when we have successfully accepted a connection.
     """
+    // mandatory
 
   fun ref connect_failed(conn: MetricsSink ref) =>
     """
@@ -962,6 +964,7 @@ interface _MetricsSinkNotify
     the `throttled` notification will result in outgoing data queuing in the
     connection and increasing memory usage.
     """
+    // mandatory
 
   fun ref unthrottled(conn: MetricsSink ref)
     """
@@ -969,6 +972,7 @@ interface _MetricsSinkNotify
     receiving this notification, you should feel free to start making calls to
     `write` and `writev` again.
     """
+    // mandatory
 
 class MetricsSinkNotify is _MetricsSinkNotify
   let _name: String
@@ -1023,7 +1027,7 @@ class MetricsSinkNotify is _MetricsSinkNotify
     //SLF: TODO
 
   fun ref accepted(sock: MetricsSink ref) =>
-    None
+    Unreachable()
 
 
 class _PauseBeforeReconnect is TimerNotify
