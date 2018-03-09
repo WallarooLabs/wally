@@ -42,13 +42,14 @@ trait Route
 
   fun ref request_ack()
 
-  //!@
   fun ref report_status(code: ReportStatusCode)
-  fun ref request_finished_ack(request_id: RequestId, requester_id: StepId,
-    requester: FinishedAckRequester)
-  fun ref request_finished_ack_complete(requester_id: StepId,
-    requester: FinishedAckRequester)
-  fun ref receive_finished_ack(request_id: RequestId)
+  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  fun ref request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  fun ref receive_in_flight_ack(request_id: RequestId)
 
 trait RouteLogic
   fun ref application_initialized(step_type: String)
@@ -118,19 +119,20 @@ class EmptyRoute is Route
     Fail()
     true
 
-  //!@
   fun ref report_status(code: ReportStatusCode) =>
     Fail()
 
-  fun ref request_finished_ack(request_id: RequestId, requester_id: StepId,
-    producer: FinishedAckRequester)
+  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
   =>
     Fail()
 
-  fun ref request_finished_ack_complete(requester_id: StepId,
-    producer: FinishedAckRequester)
+  fun ref request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
   =>
     Fail()
 
-  fun ref receive_finished_ack(request_id: RequestId) =>
+  fun ref receive_in_flight_ack(request_id: RequestId) =>
     None

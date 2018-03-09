@@ -103,7 +103,7 @@ actor OutgoingBoundary is Consumer
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
-  var _finished_ack_waiter: FinishedAckWaiter = FinishedAckWaiter
+  var _in_flight_ack_waiter: InFlightAckWaiter = InFlightAckWaiter
 
   // TCP
   var _notify: WallarooOutgoingNetworkActorNotify
@@ -150,9 +150,6 @@ actor OutgoingBoundary is Consumer
 
   var _reconnect_pause: U64 = 10_000_000_000
   let _timers: Timers = Timers
-
-  //!@
-  var _finished_ack_status: Bool = false
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -280,7 +277,7 @@ actor OutgoingBoundary is Consumer
 
   be register_step_id(step_id: StepId) =>
     _step_id = step_id
-    _finished_ack_waiter = FinishedAckWaiter(_step_id)
+    _in_flight_ack_waiter = InFlightAckWaiter(_step_id)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
@@ -449,61 +446,57 @@ actor OutgoingBoundary is Consumer
 
     _upstreams.unset(producer)
 
-  //!@
   be report_status(code: ReportStatusCode) =>
-    if not _finished_ack_status then
-      _finished_ack_status = true
-      _finished_ack_waiter.report_status(code)
-      try
-        _writev(ChannelMsgEncoder.report_status(code, _auth)?)
-      else
-        Fail()
-      end
+    _in_flight_ack_waiter.report_status(code)
+    try
+      _writev(ChannelMsgEncoder.report_status(code, _auth)?)
+    else
+      Fail()
     end
 
-  be request_finished_ack(upstream_request_id: RequestId,
-    requester_id: StepId, upstream_requester: FinishedAckRequester)
+  be request_in_flight_ack(upstream_request_id: RequestId,
+    requester_id: StepId, upstream_requester: InFlightAckRequester)
   =>
-    // @printf[I32]("!@ request_finished_ack BOUNDARY %s, requester_id: %s, upstream_request_id: %s\n".cstring(), _step_id.string().cstring(), requester_id.string().cstring(), upstream_request_id.string().cstring())
-
-    // !@
-    // if not _finished_ack_waiter.pending_request() then
-    if not _finished_ack_waiter.already_added_request(requester_id) then
+    if not _in_flight_ack_waiter.already_added_request(requester_id) then
       try
-        _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
+        _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
           upstream_requester)
-        let request_id = _finished_ack_waiter.add_consumer_request(
+        let request_id = _in_flight_ack_waiter.add_consumer_request(
           requester_id)
-        _writev(ChannelMsgEncoder.request_finished_ack(_worker_name,
+        _writev(ChannelMsgEncoder.request_in_flight_ack(_worker_name,
           request_id, requester_id, _auth)?)
       else
         Fail()
       end
     else
-      upstream_requester.receive_finished_ack(upstream_request_id)
+      upstream_requester.receive_in_flight_ack(upstream_request_id)
     end
 
-  be request_finished_ack_complete(requester_id: StepId,
-    producer: FinishedAckRequester)
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
   =>
-    // @printf[I32]("!@ request_finished_ack_complete BOUNDARY\n".cstring())
-    _finished_ack_waiter.clear()
-    try
-      _writev(ChannelMsgEncoder.request_finished_ack_complete(_worker_name,
-        requester_id, _auth)?)
-    else
-      Fail()
+    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
+      request_id, requester_id, requester)
+    then
+      try
+        let new_request_id =
+          _in_flight_ack_waiter.add_consumer_resume_request()
+        _writev(ChannelMsgEncoder.request_in_flight_resume_ack(_worker_name,
+          in_flight_resume_ack_id, new_request_id, _step_id, _auth)?)
+      else
+        Fail()
+      end
     end
 
-    //!@
-    _finished_ack_status = false
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
+    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
 
-  be try_finish_request_early(requester_id: StepId) =>
-    _finished_ack_waiter.try_finish_request_early(requester_id)
+  be receive_in_flight_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_request(request_id)
 
-  be receive_finished_ack(request_id: RequestId) =>
-    // @printf[I32]("!@ receive_finished_ack BOUNDARY %s\n".cstring(), _step_id.string().cstring())
-    _finished_ack_waiter.unmark_consumer_request(request_id)
+  be receive_in_flight_resume_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
   //
   // TCP
@@ -1042,15 +1035,12 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         end
         conn.receive_connect_ack(ac.last_id_seen)
       | let dd: DataDisconnectMsg =>
-        //!@
-        @printf[I32]("!@ Rcvd DataDisconnectMsg at Boundary\n".cstring())
         _outgoing_boundary.dispose()
       | let sn: StartNormalDataSendingMsg =>
-        //!@
-        // ifdef "trace" then
+        ifdef "trace" then
           @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"
             .cstring())
-        // end
+        end
         conn.receive_connect_ack(sn.last_id_seen)
         conn.start_normal_sending()
       | let aw: AckWatermarkMsg =>
@@ -1058,12 +1048,18 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
-      | let fa: FinishedAckMsg =>
+      | let fa: InFlightAckMsg =>
         ifdef "trace" then
-          @printf[I32]("Received FinishedAckMsg from %s\n".cstring(),
+          @printf[I32]("Received InFlightAckMsg from %s\n".cstring(),
             fa.sender.cstring())
         end
-        _outgoing_boundary.receive_finished_ack(fa.request_id)
+        _outgoing_boundary.receive_in_flight_ack(fa.request_id)
+      | let fa: FinishedCompleteAckMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received FinishedCompleteAckMsg from %s\n".cstring(),
+            fa.sender.cstring())
+        end
+        _outgoing_boundary.receive_in_flight_resume_ack(fa.request_id)
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())

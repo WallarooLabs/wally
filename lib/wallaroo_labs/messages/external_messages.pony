@@ -37,8 +37,7 @@ primitive _PartitionCountQuery                  fun apply(): U16 => 11
 primitive _PartitionCountQueryResponse          fun apply(): U16 => 12
 primitive _SourceIdsQuery                       fun apply(): U16 => 13
 primitive _SourceIdsQueryResponse               fun apply(): U16 => 14
-//!@
-primitive _ReportStatus                         fun apply(): U16 => 9999
+primitive _ReportStatus                         fun apply(): U16 => 15
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -163,7 +162,6 @@ primitive ExternalMsgEncoder
     digest_map("stateless_partitions") = consume stateless_ps
     digest_map
 
-  //!@
   fun report_status(code: String, wb: Writer = Writer): Array[ByteSeq] val =>
     _encode(_ReportStatus(), code, wb)
 
@@ -208,7 +206,6 @@ primitive ExternalMsgDecoder
       ExternalSourceIdsQueryMsg
     | (_SourceIdsQueryResponse(), let s: String) =>
       SourceIdsQueryJsonDecoder.response(s)
-    //!@
     | (_ReportStatus(), let s: String) =>
       ExternalReportStatusMsg(s)
     else
@@ -391,7 +388,6 @@ class val ExternalSourceIdsQueryResponseMsg is ExternalMsg
   new val create(m: Array[String] val) =>
     source_ids = m
 
-//!@
 class val ExternalReportStatusMsg is ExternalMsg
   let code: String
 

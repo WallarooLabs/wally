@@ -299,26 +299,21 @@ actor TCPSink is Consumer
 
     _upstreams.unset(producer)
 
-  //!@
   be report_status(code: ReportStatusCode) =>
-    match code
-    | FinishedAcksStatus =>
-      @printf[I32]("!@ tcp sink finished_ack_status\n".cstring())
-    end
-
-  be request_finished_ack(request_id: RequestId, requester_id: StepId,
-    requester: FinishedAckRequester)
-  =>
-    // @printf[I32]("!@ request_finished_ack TCPSink, upstream_request_id: %s, requester_id: %s\n".cstring(), request_id.string().cstring(), requester_id.string().cstring())
-    requester.receive_finished_ack(request_id)
-
-  be request_finished_ack_complete(requester_id: StepId,
-    requester: FinishedAckRequester)
-  =>
-    // @printf[I32]("!@ request_finished_ack_complete TCPSink\n".cstring())
     None
 
-  be try_finish_request_early(requester_id: StepId) =>
+  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  =>
+    requester.receive_in_flight_ack(request_id)
+
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  =>
+    requester.receive_in_flight_resume_ack(request_id)
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
     None
 
   //
