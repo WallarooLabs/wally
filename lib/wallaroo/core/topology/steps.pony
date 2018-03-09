@@ -93,7 +93,7 @@ actor Step is (Producer & Consumer)
     _id = id
     _finished_ack_waiter = FinishedAckWaiter(_id)
 
-    for (worker, boundary) in _outgoing_boundaries.pairs() do
+    for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
     _event_log.register_producer(this, id)
