@@ -210,6 +210,12 @@ class _TestDataChannelExpectNotify is DataChannelNotify
     buf.append(data)
     conn.write(consume buf)
 
+  fun ref throttled(conn: DataChannel ref) =>
+    None
+
+  fun ref unthrottled(conn: DataChannel ref) =>
+    None
+
 class iso _TestDataChannelWritev is UnitTest
   """
   Test writev (and sent/sentv notification).
@@ -244,6 +250,15 @@ class _TestDataChannelWritevNotifyClient is DataChannelNotify
   =>
     None
 
+  fun ref throttled(conn: DataChannel ref) =>
+    None
+
+  fun ref unthrottled(conn: DataChannel ref) =>
+    None
+
+  fun ref accepted(conn: DataChannel ref) =>
+    None
+
 class _TestDataChannelWritevNotifyServer is DataChannelNotify
   let _h: TestHelper
   var _buffer: String iso = recover iso String end
@@ -268,6 +283,18 @@ class _TestDataChannelWritevNotifyServer is DataChannelNotify
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
     conn: DataChannel ref)
   =>
+    None
+
+  fun ref throttled(conn: DataChannel ref) =>
+    None
+
+  fun ref unthrottled(conn: DataChannel ref) =>
+    None
+
+  fun ref accepted(conn: DataChannel ref) =>
+    None
+
+  fun ref connected(conn: DataChannel ref) =>
     None
 
 class iso _TestDataChannelMute is UnitTest
@@ -327,6 +354,15 @@ class _TestDataChannelMuteReceiveNotify is DataChannelNotify
   =>
     None
 
+  fun ref throttled(conn: DataChannel ref) =>
+    None
+
+  fun ref unthrottled(conn: DataChannel ref) =>
+    None
+
+  fun ref connected(conn: DataChannel ref) =>
+    None
+
 class _TestDataChannelMuteSendNotify is DataChannelNotify
   """
   Notifier that sends data back when it receives any. Used in conjunction with
@@ -357,6 +393,15 @@ class _TestDataChannelMuteSendNotify is DataChannelNotify
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
     conn: DataChannel ref)
   =>
+    None
+
+  fun ref throttled(conn: DataChannel ref) =>
+    None
+
+  fun ref unthrottled(conn: DataChannel ref) =>
+    None
+
+  fun ref accepted(conn: DataChannel ref) =>
     None
 
 class iso _TestDataChannelUnmute is UnitTest
@@ -415,6 +460,15 @@ class _TestDataChannelUnmuteReceiveNotify is DataChannelNotify
   =>
     None
 
+  fun ref throttled(conn: DataChannel ref) =>
+    None
+
+  fun ref unthrottled(conn: DataChannel ref) =>
+    None
+
+  fun ref connected(conn: DataChannel ref) =>
+    None
+
 class iso _TestDataChannelThrottle is UnitTest
   """
   Test that when we experience backpressure when sending that the `throttled`
@@ -465,6 +519,15 @@ class _TestDataChannelThrottleReceiveNotify is DataChannelNotify
   =>
     None
 
+  fun ref throttled(conn: DataChannel ref) =>
+    None
+
+  fun ref unthrottled(conn: DataChannel ref) =>
+    None
+
+  fun ref connected(conn: DataChannel ref) =>
+    None
+
 class _TestDataChannelThrottleSendNotify is DataChannelNotify
   """
   Notifier that sends data back when it receives any. Used in conjunction with
@@ -498,6 +561,9 @@ class _TestDataChannelThrottleSendNotify is DataChannelNotify
     _h.complete_action("sender throttled")
     _h.dispose_when_done(conn)
 
+  fun ref unthrottled(conn: DataChannel ref) =>
+    None
+
   fun ref sent(conn: DataChannel ref, data: ByteSeq): ByteSeq =>
     if not _throttled_yet then
       conn.write("this is more data that you won't ever read")
@@ -507,6 +573,9 @@ class _TestDataChannelThrottleSendNotify is DataChannelNotify
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
     conn: DataChannel ref)
   =>
+    None
+
+  fun ref accepted(conn: DataChannel ref) =>
     None
 
 actor _NullMetricsSink is MetricsSink

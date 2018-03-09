@@ -48,11 +48,11 @@ interface DataChannelNotify
     the DataChannel corresponding to this notify.
     """
 
-  fun ref accepted(conn: DataChannel ref) =>
+  fun ref accepted(conn: DataChannel ref)
     """
     Called when a DataChannel is accepted by a DataChannelListener.
     """
-    None
+    // mandatory
 
   fun ref connecting(conn: DataChannel ref, count: U32) =>
     """
@@ -63,11 +63,11 @@ interface DataChannelNotify
     """
     None
 
-  fun ref connected(conn: DataChannel ref) =>
+  fun ref connected(conn: DataChannel ref)
     """
     Called when we have successfully connected to the server.
     """
-    None
+    // mandatory
 
   fun ref connect_failed(conn: DataChannel ref) =>
     """
@@ -129,7 +129,7 @@ interface DataChannelNotify
     """
     None
 
-  fun ref throttled(conn: DataChannel ref) =>
+  fun ref throttled(conn: DataChannel ref)
     """
     Called when the connection starts experiencing TCP backpressure. You should
     respond to this by pausing additional calls to `write` and `writev` until
@@ -137,12 +137,12 @@ interface DataChannelNotify
     the `throttled` notification will result in outgoing data queuing in the
     connection and increasing memory usage.
     """
-    None
+    // mandatory
 
-  fun ref unthrottled(conn: DataChannel ref) =>
+  fun ref unthrottled(conn: DataChannel ref)
     """
     Called when the connection stops experiencing TCP backpressure. Upon
     receiving this notification, you should feel free to start making calls to
     `write` and `writev` again.
     """
-    None
+    // mandatory

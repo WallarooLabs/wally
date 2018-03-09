@@ -1044,9 +1044,11 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: throttled\n\n".cstring())
+    //SLF: TODO
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
+    //SLF: TODO
 
 
 class _PauseBeforeReconnect is TimerNotify

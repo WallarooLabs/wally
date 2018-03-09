@@ -300,6 +300,14 @@ class DataChannelConnectNotifier is DataChannelNotify
     //TODO: Initiate reconnect to downstream node here. We need to
     //      create a new connection in OutgoingBoundary
 
+  fun ref throttled(conn: DataChannel ref) =>
+    @printf[I32]("DataChannelConnectNotifier: throttled\n\n".cstring())
+    //SLF: TODO
+
+  fun ref unthrottled(conn: DataChannel ref) =>
+    @printf[I32]("DataChannelConnectNotifier: unthrottled\n\n".cstring())
+    //SLF: TODO
+
 trait _DataReceiverWrapper
   fun data_connect(sender_step_id: StepId, conn: DataChannel)
   fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
