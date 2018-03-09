@@ -23,25 +23,27 @@ use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-trait tag FinishedAckRequester
-  be receive_finished_ack(request_id: RequestId)
-  be try_finish_request_early(requester_id: StepId)
+trait tag InFlightAckRequester
+  be receive_in_flight_ack(request_id: RequestId)
+  be receive_in_flight_resume_ack(request_id: RequestId)
+  be try_finish_in_flight_request_early(requester_id: StepId)
 
-trait tag FinishedAckResponder
-  //!@
-  be request_finished_ack(request_id: RequestId, requester_id: StepId,
-    requester: FinishedAckRequester)
-  be request_finished_ack_complete(requester_id: StepId,
-    requester: FinishedAckRequester)
+trait tag InFlightAckResponder
+  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
 
 trait tag StatusReporter
   be report_status(code: ReportStatusCode)
 
 trait tag Producer is (Muteable & Ackable & AckRequester &
-  FinishedAckRequester)
+  InFlightAckRequester)
   fun ref route_to(c: Consumer): (Route | None)
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
+  be remove_route_to_consumer(c: Consumer)
 
 interface tag RouterUpdateable
   be update_router(r: Router)
@@ -50,7 +52,7 @@ interface tag BoundaryUpdateable
   be remove_boundary(worker: String)
 
 trait tag Consumer is (Runnable & StateReceiver & AckRequester &
-  Initializable & FinishedAckResponder & StatusReporter)
+  Initializable & InFlightAckResponder & StatusReporter)
   be register_producer(producer: Producer)
   be unregister_producer(producer: Producer)
 

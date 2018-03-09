@@ -242,24 +242,21 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
     _upstreams.unset(producer)
 
-  //!@
   be report_status(code: ReportStatusCode) =>
-    match code
-    | FinishedAcksStatus =>
-      @printf[I32]("!@ Kafka sink finished ack status\n".cstring())
-    end
-
-  be request_finished_ack(request_id: RequestId, requester_id: StepId,
-    requester: FinishedAckRequester)
-  =>
-    requester.receive_finished_ack(request_id)
-
-  be request_finished_ack_complete(requester_id: StepId,
-    requester: FinishedAckRequester)
-  =>
     None
 
-  be try_finish_request_early(requester_id: StepId) =>
+  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  =>
+    requester.receive_in_flight_ack(request_id)
+
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  =>
+    requester.receive_in_flight_resume_ack(request_id)
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,

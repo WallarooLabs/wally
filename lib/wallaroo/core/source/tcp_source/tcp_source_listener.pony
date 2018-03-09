@@ -213,7 +213,6 @@ actor TCPSourceListener is SourceListener
         _metrics_reporter.clone(), _router_registry)
       // TODO: We need to figure out how to unregister this when the
       // connection dies
-      // @printf[I32]("!@ About to register source from listener!\n".cstring())
       _router_registry.register_source(source, source_id)
       match _router
       | let pr: PartitionRouter =>

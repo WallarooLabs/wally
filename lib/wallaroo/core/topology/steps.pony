@@ -63,7 +63,7 @@ actor Step is (Producer & Consumer)
   var _initialized: Bool = false
   var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
-  var _finished_ack_waiter: FinishedAckWaiter
+  var _in_flight_ack_waiter: InFlightAckWaiter
   let _recovery_replayer: RecoveryReplayer
 
   let _acker_x: Acker = Acker
@@ -91,7 +91,7 @@ actor Step is (Producer & Consumer)
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
     _id = id
-    _finished_ack_waiter = FinishedAckWaiter(_id)
+    _in_flight_ack_waiter = InFlightAckWaiter(_id)
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
@@ -154,8 +154,6 @@ actor Step is (Producer & Consumer)
       end
     end
 
-    // @printf[I32]("!@ step application_created routes: %s\n".cstring(), _routes.size().string().cstring())
-
     _omni_router = omni_router
 
     _initialized = true
@@ -214,8 +212,6 @@ actor Step is (Producer & Consumer)
       end
     end
 
-    // @printf[I32]("!@ step register_routes routes: %s\n".cstring(), _routes.size().string().cstring())
-
   be update_router(router: Router) =>
     _update_router(router)
 
@@ -238,7 +234,14 @@ actor Step is (Producer & Consumer)
       Fail()
     end
 
-    // @printf[I32]("!@ step _update_router routes: %s\n".cstring(), _routes.size().string().cstring())
+  be remove_route_to_consumer(c: Consumer) =>
+    if _routes.contains(c) then
+      try
+        _routes.remove(c)?
+      else
+        Fail()
+      end
+    end
 
   be update_omni_router(omni_router: OmniRouter) =>
     let old_router = _omni_router
@@ -264,7 +267,6 @@ actor Step is (Producer & Consumer)
         _routes(boundary) = new_route
       end
     end
-    // @printf[I32]("!@ step add_boundaries routes: %s\n".cstring(), _routes.size().string().cstring())
 
   be remove_boundary(worker: String) =>
     if _outgoing_boundaries.contains(worker) then
@@ -276,13 +278,7 @@ actor Step is (Producer & Consumer)
       else
         Fail()
       end
-    //!@
-    else
-      // @printf[I32]("!@ !!!!!!!! FAIL CAN'T REMOVE! %s from %s\n".cstring(), worker.cstring(), _id.string().cstring())
-      None
     end
-
-    // @printf[I32]("!@ step remove_boundary routes: %s\n".cstring(), _routes.size().string().cstring())
 
   be remove_route_for(step: Consumer) =>
     try
@@ -291,8 +287,6 @@ actor Step is (Producer & Consumer)
       @printf[I32](("Tried to remove route for step but there was no route " +
         "to remove\n").cstring())
     end
-
-    // @printf[I32]("!@ step remove_route_for routes: %s\n".cstring(), _routes.size().string().cstring())
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
@@ -456,12 +450,8 @@ actor Step is (Producer & Consumer)
     // end
     _upstreams.unset(producer)
 
-  //!@
   be report_status(code: ReportStatusCode) =>
     match code
-    | FinishedAcksStatus =>
-      _finished_ack_waiter.report_status(code)
-    //!@
     | BoundaryCountStatus =>
       var b_count: USize = 0
       for r in _routes.values() do
@@ -469,58 +459,69 @@ actor Step is (Producer & Consumer)
         | let br: BoundaryRoute => b_count = b_count + 1
         end
       end
-      @printf[I32]("!@ Step %s has %s boundaries.\n".cstring(), _id.string().cstring(), b_count.string().cstring())
+      @printf[I32]("Step %s has %s boundaries.\n".cstring(), _id.string().cstring(), b_count.string().cstring())
     end
     for r in _routes.values() do
       r.report_status(code)
     end
 
-  be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId,
-    requester: FinishedAckRequester)
+  be request_in_flight_ack(upstream_request_id: RequestId,
+    requester_id: StepId, requester: InFlightAckRequester)
   =>
     match _step_message_processor
     | let nmp: NormalStepMessageProcessor =>
       _step_message_processor = QueueingStepMessageProcessor(this)
     end
-    // @printf[I32]("!@ request_finished_ack STEP %s, upstream_request_id: %s, requester_id: %s\n".cstring(), _id.string().cstring(), upstream_request_id.string().cstring(), requester_id.string().cstring())
-    if not _finished_ack_waiter.already_added_request(requester_id) then
-      _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
+    if not _in_flight_ack_waiter.already_added_request(requester_id) then
+      _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
         requester)
       if _routes.size() > 0 then
         for r in _routes.values() do
-          let request_id = _finished_ack_waiter.add_consumer_request(
+          let request_id = _in_flight_ack_waiter.add_consumer_request(
             requester_id)
-          r.request_finished_ack(request_id, _id, this)
+          r.request_in_flight_ack(request_id, _id, this)
         end
       else
-        _finished_ack_waiter.try_finish_request_early(requester_id)
+        _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
       end
     else
-      requester.receive_finished_ack(upstream_request_id)
+      requester.receive_in_flight_ack(upstream_request_id)
     end
 
-  be request_finished_ack_complete(requester_id: StepId,
-    requester: FinishedAckRequester)
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
   =>
-    // @printf[I32]("!@ request_finished_ack_complete STEP\n".cstring())
-    match _step_message_processor
-    | let qmp: QueueingStepMessageProcessor =>
-      // Process all queued messages
-      qmp.flush()
+    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
+      request_id, requester_id, requester)
+    then
+      match _step_message_processor
+      | let qmp: QueueingStepMessageProcessor =>
+        // Process all queued messages
+        qmp.flush()
 
-      _finished_ack_waiter.clear()
-      _step_message_processor = NormalStepMessageProcessor(this)
-      for r in _routes.values() do
-        r.request_finished_ack_complete(_id, this)
+        _step_message_processor = NormalStepMessageProcessor(this)
+      end
+      if _routes.size() > 0 then
+        for r in _routes.values() do
+          let new_request_id =
+            _in_flight_ack_waiter.add_consumer_resume_request()
+          r.request_in_flight_resume_ack(in_flight_resume_ack_id,
+            new_request_id, _id, this)
+        end
+      else
+        _in_flight_ack_waiter.try_finish_resume_request_early()
       end
     end
 
-  be try_finish_request_early(requester_id: StepId) =>
-    _finished_ack_waiter.try_finish_request_early(requester_id)
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
+    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
 
-  be receive_finished_ack(request_id: RequestId) =>
-    // @printf[I32]("!@ receive_finished_ack STEP %s\n".cstring(), _id.string().cstring())
-    _finished_ack_waiter.unmark_consumer_request(request_id)
+  be receive_in_flight_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_request(request_id)
+
+  be receive_in_flight_resume_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
   be mute(c: Consumer) =>
     for u in _upstreams.values() do
@@ -563,6 +564,7 @@ actor Step is (Producer & Consumer)
           qmp.messages, _auth)
       end
     end
+    _in_flight_ack_waiter.migrated()
 
   be send_state[K: (Hashable val & Equatable[K] val)](
     boundary: OutgoingBoundary, state_name: String, key: K)
@@ -578,6 +580,7 @@ actor Step is (Producer & Consumer)
           key, qmp.messages, _auth)
       end
     end
+    _in_flight_ack_waiter.migrated()
 
   // Log-rotation
   be snapshot_state() =>
