@@ -177,7 +177,18 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     conn.set_so_rcvbuf(1661)
     conn.expect(_header_size)
 
+  fun ref connected(conn: TCPSource ref) =>
+    Unreachable()
+
   fun ref closed(conn: TCPSource ref) =>
     @printf[I32]("TCPSource connection closed\n".cstring())
+
+  fun ref throttled(conn: TCPSource ref) =>
+    @printf[I32]("TCPSource connection throttled\n".cstring())
+    //SLF: TODO
+
+  fun ref unthrottled(conn: TCPSource ref) =>
+    @printf[I32]("TCPSource connection unthrottled\n".cstring())
+    //SLF: TODO
 
   // TODO: implement connect_failed

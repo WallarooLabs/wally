@@ -47,11 +47,11 @@ interface TCPSourceNotify
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
 
-  fun ref accepted(conn: TCPSource ref) =>
+  fun ref accepted(conn: TCPSource ref)
     """
     Called when a TCPSource is accepted by a TCPSourceListener.
     """
-    None
+    // accepted
 
   fun ref connecting(conn: TCPSource ref, count: U32) =>
     """
@@ -62,11 +62,11 @@ interface TCPSourceNotify
     """
     None
 
-  fun ref connected(conn: TCPSource ref) =>
+  fun ref connected(conn: TCPSource ref)
     """
     Called when we have successfully connected to the server.
     """
-    None
+    // mandatory
 
 
   fun ref connect_failed(conn: TCPSource ref) =>
@@ -99,3 +99,9 @@ interface TCPSourceNotify
     Called when the connection is closed.
     """
     None
+
+  fun ref throttled(conn: TCPSource ref)
+    // mandatory
+
+  fun ref unthrottled(conn: TCPSource ref)
+    // mandatory
