@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "itertools"
 use "../messages"
 use "../mort"
 
@@ -42,13 +43,21 @@ primitive _Quoted
     "\"" + s + "\""
 
 primitive _JsonEncoder
-  fun apply(entries: Array[String] val, json_delimiters: _JsonDelimiters):
+  fun apply(entries: Array[String] val, json_delimiters: _JsonDelimiters,
+    quote_entries: Bool = false):
     String
   =>
     recover
       var s: Array[U8] iso = recover Array[U8] end
       s.>append(json_delimiters()._1)
-       .>append(",".join(entries.values()))
+       .>append(",".join(
+           if quote_entries then
+             Iter[String](entries.values()).map[String](
+               {(s)=> _Quoted(s)})
+           else
+             entries.values()
+           end
+         ))
        .>append(json_delimiters()._2)
       String.from_array(consume s)
     end
@@ -137,7 +146,7 @@ primitive ClusterStatusQueryJsonEncoder
     entries.push(_Quoted("processing_messages") + ":" +
       (not stop_the_world_in_process).string())
     entries.push(_Quoted("worker_names") + ":" + _JsonEncoder(worker_names,
-      _JsonArray))
+      _JsonArray, true))
     entries.push(_Quoted("worker_count") + ":" + worker_count.string())
     _JsonEncoder(consume entries, _JsonMap)
 
@@ -151,7 +160,7 @@ primitive JsonDecoder
         if next_char == ',' then
           items.push(String.from_array(
             str = recover iso Array[U8] end))
-        elseif next_char != ']' then
+        elseif (next_char != ']') and (next_char != '"') then
           str.push(next_char)
         end
       end
@@ -385,4 +394,4 @@ primitive ClusterStatusQueryJsonDecoder
     let worker_count: U64 = p_map("worker_count")?.u64()?
 
     ExternalClusterStatusQueryResponseMsg(worker_count, worker_names,
-      is_processing)
+      is_processing, json)
