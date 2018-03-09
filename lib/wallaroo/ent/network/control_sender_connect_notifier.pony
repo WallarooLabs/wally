@@ -28,6 +28,7 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
     _tcp_conn_wrapper.connected(conn)
     conn.expect(4)
+    //SLF: TODO
     _header = true
     @printf[I32]("ControlSenderConnectNotifier: connected to %s.\n".cstring(),
       _worker_name.cstring())
@@ -45,3 +46,11 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
     @printf[I32]("ControlSenderConnectNotifier (to %s): server closed\n"
       .cstring(), _worker_name.cstring())
     _tcp_conn_wrapper.closed(conn)
+
+  fun ref throttled(conn: TCPConnection ref) =>
+    @printf[I32]("ControlSenderConnectNotifier: throttled.\n".cstring())
+    //SLF: TODO
+
+  fun ref unthrottled(conn: TCPConnection ref) =>
+    @printf[I32]("ControlSenderConnectNotifier: unthrottled.\n".cstring())
+    //SLF: TODO
