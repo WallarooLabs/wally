@@ -13,6 +13,7 @@
 #  permissions and limitations under the License.
 
 
+import argparse
 from enum import IntEnum
 import struct
 import time
@@ -26,6 +27,17 @@ FIXTYPE_MARKET_DATA = 2
 SIDETYPE_BUY = 1
 SIDETYPE_SELL = 2
 
+delay_ms = 0
+
+def delay(ms):
+  if delay_ms == 0:
+    return
+
+  t = time.time()
+  c = 0
+  s = ms / 1000.0
+  while (t + s) > time.time():
+    c = c + 1
 
 def str_to_partition(stringable):
     ret = 0
@@ -39,7 +51,17 @@ def load_valid_symbols():
         return f.read().splitlines()
 
 
+def parse_delay(args):
+    parser = argparse.ArgumentParser(prog='')
+    parser.add_argument('--delay_ms', type=int, default=0)
+    a, _ = parser.parse_known_args(args)
+    global delay_ms
+    delay_ms = a.delay_ms
+
+
 def application_setup(args):
+    parse_delay(args)
+
     input_addrs = wallaroo.tcp_parse_input_addrs(args)
     order_host, order_port = input_addrs[0]
     nbbo_host, nbbo_port = input_addrs[1]
@@ -183,6 +205,7 @@ def symbol_partition_function(data):
 
 @wallaroo.state_computation(name="Check Order")
 def check_order(data, state):
+    delay(delay_ms)
     if state.should_reject_trades:
         ts = int(time.time() * 100000)
         return (OrderResult(data, state.last_bid, state.last_offer, ts), False)
@@ -284,6 +307,7 @@ def market_data_decoder(bs):
 
 @wallaroo.state_computation(name="Update Market Data")
 def update_market_data(data, state):
+    delay(delay_ms)
     offer_bid_difference = data.offer - data.bid
 
     should_reject_trades = ((offer_bid_difference >= 0.05) or
