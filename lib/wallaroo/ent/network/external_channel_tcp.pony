@@ -61,6 +61,7 @@ class ExternalChannelListenNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+    //SLF: TODO
     ExternalChannelConnectNotifier(_worker_name, _auth, _connections,
       _recovery_file_cleaner, _local_topology_initializer)
 
@@ -87,6 +88,7 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
     _local_topology_initializer = local_topology_initializer
 
   fun ref accepted(conn: TCPConnection ref) =>
+    //SLF: TODO
     conn.expect(4)
     _connections.register_disposable(conn)
 
@@ -184,3 +186,11 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref) =>
     @printf[I32]("ExternalChannelConnectNotifier: %s: server closed\n"
       .cstring(), _worker_name.cstring())
+
+  fun ref throttled(conn: TCPConnection ref) =>
+    @printf[I32]("ExternalChannelConnectNotifier: throttled.\n".cstring())
+    //SLF: TODO
+
+  fun ref unthrottled(conn: TCPConnection ref) =>
+    @printf[I32]("ExternalChannelConnectNotifier: unthrottled.\n".cstring())
+    //SLF: TODO
