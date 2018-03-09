@@ -19,6 +19,7 @@ use "files"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/messages"
 use "wallaroo_labs/options"
+use "wallaroo_labs/query"
 
 actor Main
   var _conn: (TCPConnection | None) = None
@@ -31,12 +32,14 @@ actor Main
       var message_type: String = "Print"
       let options = Options(env.args)
       var await_response = false
+      var json = false
 
       options
         .add("external", "e", StringArgument)
         .add("type", "t", StringArgument)
         .add("message", "m", StringArgument)
         .add("help", "h", None)
+        .add("json", "j", None)
 
         for option in options do
           match option
@@ -46,11 +49,13 @@ actor Main
             x_service = x_addr(1)?
           | ("message", let arg: String) => message = arg
           | ("type", let arg: String) => message_type = arg
+          | ("json", None) => json = true
           | ("help", None) =>
             @printf[I32](
               """
               PARAMETERS:
               -----------------------------------------------------------------------------------
+              --json/-j [Output JSON format when avaiable]
               --external/-e [Specifies address to send message to]
               --type/-t [Specifies message type]
                   clean-shutdown | rotate-log | partition-query |
@@ -87,7 +92,7 @@ actor Main
         end
       let tcp_auth = TCPConnectAuth(auth)
       _conn = TCPConnection(tcp_auth, ExternalSenderConnectNotifier(env, auth,
-        msg, await_response), x_host, x_service)
+        msg, await_response, json), x_host, x_service)
     else
       env.err.print("Error sending.")
     end
@@ -98,17 +103,21 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
   let _msg: Array[ByteSeq] val
   let _await_response: Bool
   var _header: Bool = true
+  let _json: Bool
 
   new iso create(env: Env, auth: AmbientAuth, msg: Array[ByteSeq] val,
-    await_response: Bool)
+    await_response: Bool, json: Bool)
   =>
     _env = env
     _auth = auth
     _msg = msg
     _await_response = await_response
+    _json = json
 
   fun ref connected(conn: TCPConnection ref) =>
-    _env.out.print("Connected...")
+    if not _json then
+      _env.out.print("Connected...")
+    end
     conn.writev(_msg)
     if not _await_response then
       conn.dispose()
@@ -133,15 +142,23 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
       try
         match ExternalMsgDecoder(consume data)?
         | let m: ExternalPartitionQueryResponseMsg =>
-          _env.out.print("Partition Distribution:")
+          if not _json then
+            _env.out.print("Partition Distribution:")
+          end
           _env.out.print(m.msg)
           conn.dispose()
         | let m: ExternalClusterStatusQueryResponseMsg =>
-          _env.out.print("Cluster Status:")
-          _env.out.print(m.string())
+          if  _json then
+            _env.out.print(m.json)
+          else
+            _env.out.print("Cluster Status:")
+            _env.out.print(m.string())
+          end
           conn.dispose()
         | let m: ExternalPartitionCountQueryResponseMsg =>
-          _env.out.print("Partition Distribution (counts):")
+          if not _json then
+            _env.out.print("Partition Distribution (counts):")
+          end
           _env.out.print(m.msg)
           conn.dispose()
         else

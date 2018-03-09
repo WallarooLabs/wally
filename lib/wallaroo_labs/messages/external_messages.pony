@@ -323,13 +323,15 @@ class val ExternalClusterStatusQueryResponseMsg is ExternalMsg
   let worker_count: U64
   let worker_names: Array[String] val
   let processing_messages: Bool
+  let json: String
 
   new val create(worker_count': U64, worker_names': Array[String] val,
-    processing_messages': Bool)
+    processing_messages': Bool, json': String)
   =>
     worker_count = worker_count'
     worker_names = worker_names'
     processing_messages = processing_messages'
+    json = json'
 
   fun string(): String =>
     let ws = Array[String]
