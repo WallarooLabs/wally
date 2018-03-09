@@ -48,6 +48,9 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
     spike(conn)
     _letter.connected(conn)
 
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
+    None
+
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     _letter.connect_failed(conn)
 

@@ -883,6 +883,7 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("TCPSink connected\n".cstring())
     conn.set_nodelay(true)
+    //SLF: TODO
     let x = conn.set_so_sndbuf(1777)
     @printf[I32]("TCPSink connected set_so_sndbuf was %d\n".cstring(), x)
 
@@ -905,12 +906,17 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
   fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
     qty
 
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
+    Unreachable()
+
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("TCPSink is experiencing back pressure\n".cstring())
+    //SLF: TODO
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32](("TCPSink is no longer experiencing" +
       " back pressure\n").cstring())
+    //SLF: TODO
 
 
 class PauseBeforeReconnectTCPSink is TimerNotify

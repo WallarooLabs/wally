@@ -97,6 +97,9 @@ class ConnectingNotify is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
@@ -177,6 +180,9 @@ class ConnectedNotify is WallarooOutgoingNetworkActorNotify
     _h.complete_action("connected")
     _h.assert_true(conn is _conn)
 
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
@@ -251,6 +257,9 @@ class ConnectFailedNotify is WallarooOutgoingNetworkActorNotify
     _h.fail()
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
@@ -328,6 +337,9 @@ class ClosedNotify is WallarooOutgoingNetworkActorNotify
     _h.fail()
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
@@ -412,6 +424,9 @@ class SentvNotify is WallarooOutgoingNetworkActorNotify
     _h.fail()
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
@@ -505,6 +520,9 @@ class ReceivedNotify is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
@@ -589,6 +607,9 @@ class ExpectNotify is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
@@ -667,6 +688,9 @@ class ThrottledNotify is WallarooOutgoingNetworkActorNotify
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
@@ -742,6 +766,9 @@ class UnthrottledNotify is WallarooOutgoingNetworkActorNotify
     _h.fail()
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
+    _h.fail()
+
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
     _h.fail()
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>

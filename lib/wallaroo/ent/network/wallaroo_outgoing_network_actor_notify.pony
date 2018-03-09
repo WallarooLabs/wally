@@ -25,6 +25,11 @@ trait WallarooOutgoingNetworkActorNotify
     Called when we have successfully connected to the server.
     """
 
+  fun ref accepted(conn: WallarooOutgoingNetworkActor ref)
+    """
+    Called when we have successfully accepted a connection.
+    """
+
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref)
     """
     Called when we have failed to connect to all possible addresses for the
