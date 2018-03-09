@@ -138,21 +138,21 @@ class TypedRoute[In: Any val] is Route
   fun ref request_ack() =>
     _consumer.request_ack()
 
-  //!@
   fun ref report_status(code: ReportStatusCode) =>
     _consumer.report_status(code)
 
-  fun ref request_finished_ack(request_id: RequestId, requester_id: StepId,
-    requester: FinishedAckRequester)
+  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
   =>
-    // @printf[I32]("!@ request_finished_ack TYPED ROUTE\n".cstring())
-    _consumer.request_finished_ack(request_id, requester_id, requester)
+    _consumer.request_in_flight_ack(request_id, requester_id, requester)
 
-  fun ref request_finished_ack_complete(requester_id: StepId,
-    requester: FinishedAckRequester)
+  fun ref request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
   =>
-    // @printf[I32]("!@ request_finished_ack_complete TYPED ROUTE\n".cstring())
-    _consumer.request_finished_ack_complete(requester_id, requester)
+    _consumer.request_in_flight_resume_ack(in_flight_resume_ack_id, request_id,
+      requester_id, requester)
 
-  fun ref receive_finished_ack(request_id: RequestId) =>
-    _step.receive_finished_ack(request_id)
+  fun ref receive_in_flight_ack(request_id: RequestId) =>
+    _step.receive_in_flight_ack(request_id)

@@ -114,6 +114,7 @@ class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
 
 actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _env: Env
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _notify: KafkaSourceListenerNotify[In]
   var _router: Router
   let _router_registry: RouterRegistry

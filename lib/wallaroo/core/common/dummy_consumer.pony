@@ -31,23 +31,21 @@ actor DummyConsumer is Consumer
   be unregister_producer(producer: Producer) =>
     None
 
-  //!@
   be report_status(code: ReportStatusCode) =>
     None
 
-  be request_finished_ack(request_id: RequestId, requester_id: StepId,
-    producer: FinishedAckRequester)
+  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    producer: InFlightAckRequester)
   =>
-    // @printf[I32]("!@ request_finished_ack DUMMY\n".cstring())
-    producer.receive_finished_ack(request_id)
+    producer.receive_in_flight_ack(request_id)
 
-  be request_finished_ack_complete(requester_id: StepId,
-    producer: FinishedAckRequester)
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
   =>
-    // @printf[I32]("!@ request_finished_ack_complete DUMMY\n".cstring())
     None
 
-  be try_finish_request_early(requester_id: StepId) =>
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,

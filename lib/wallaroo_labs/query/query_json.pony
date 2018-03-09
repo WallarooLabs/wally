@@ -399,13 +399,9 @@ primitive ClusterStatusQueryJsonDecoder
     let worker_count: U64 = p_map("worker_count")?.u64()?
 
     ExternalClusterStatusQueryResponseMsg(worker_count, worker_names,
-<<<<<<< HEAD
       is_processing, json)
-=======
-      is_processing)
 
 primitive SourceIdsQueryJsonDecoder
   fun response(json: String): ExternalSourceIdsQueryResponseMsg =>
     let source_ids = JsonDecoder.string_array(json)
     ExternalSourceIdsQueryResponseMsg(source_ids)
->>>>>>> 34add402... ..

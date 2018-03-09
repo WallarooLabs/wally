@@ -60,7 +60,7 @@ actor Main
               --type/-t [Specifies message type]
                   clean-shutdown | rotate-log | partition-query |
                   partition-count-query | cluster-status-query |
-                  source-ids-query | print
+                  source-ids-query | boundary-count-status | print
               --message/-m [Specifies message contents to send]
                   rotate-log
                       Node name to rotate log files
@@ -91,9 +91,6 @@ actor Main
         | "source-ids-query" =>
           await_response = true
           ExternalMsgEncoder.source_ids_query()
-        //!@
-        | "finished-ack-status" =>
-          ExternalMsgEncoder.report_status("finished-acks-status")
         | "boundary-count-status" =>
           ExternalMsgEncoder.report_status("boundary-count-status")
         else // default to print
