@@ -24,11 +24,13 @@ trait WallarooOutgoingNetworkActorNotify
     """
     Called when we have successfully connected to the server.
     """
+    // mandatory
 
   fun ref accepted(conn: WallarooOutgoingNetworkActor ref)
     """
     Called when we have successfully accepted a connection.
     """
+    // mandatory
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref)
     """
@@ -77,6 +79,7 @@ trait WallarooOutgoingNetworkActorNotify
     the `throttled` notification will result in outgoing data queuing in the
     connection and increasing memory usage.
     """
+    // mandatory
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref)
     """
@@ -84,6 +87,7 @@ trait WallarooOutgoingNetworkActorNotify
     receiving this notification, you should feel free to start making calls to
     `write` and `writev` again.
     """
+    // mandatory
 
   fun ref dispose() =>
     """
