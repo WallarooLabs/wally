@@ -34,6 +34,7 @@ class iso JoiningListenNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+    //SLF: TODO
     JoiningConnectNotifier
 
   fun ref closed(listen: TCPListener ref) =>
@@ -41,6 +42,7 @@ class iso JoiningListenNotifier is TCPListenNotify
 
 class JoiningConnectNotifier is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
+    //SLF: TODO
     None
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
@@ -53,3 +55,11 @@ class JoiningConnectNotifier is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     @printf[I32]("JoiningConnectNotifier: server closed\n".cstring())
+
+  fun ref throttled(conn: TCPConnection ref) =>
+    @printf[I32]("JoiningConnectNotifier: throttled.\n".cstring())
+    //SLF: TODO
+
+  fun ref unthrottled(conn: TCPConnection ref) =>
+    @printf[I32]("JoiningConnectNotifier: unthrottled.\n".cstring())
+    //SLF: TODO
