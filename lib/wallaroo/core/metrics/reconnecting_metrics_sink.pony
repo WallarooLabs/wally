@@ -891,17 +891,15 @@ interface _MetricsSinkNotify
     """
     None
 
-  fun ref connected(conn: MetricsSink ref) =>
+  fun ref connected(conn: MetricsSink ref)
     """
     Called when we have successfully connected to the server.
     """
-    conn.set_nodelay(true)
 
-  fun ref accepted(conn: MetricsSink ref) =>
+  fun ref accepted(conn: MetricsSink ref)
     """
     Called when we have successfully accepted a connection.
     """
-    None
 
   fun ref connect_failed(conn: MetricsSink ref) =>
     """
@@ -956,7 +954,7 @@ interface _MetricsSinkNotify
     """
     None
 
-  fun ref throttled(conn: MetricsSink ref) =>
+  fun ref throttled(conn: MetricsSink ref)
     """
     Called when the connection starts experiencing TCP backpressure. You should
     respond to this by pausing additional calls to `write` and `writev` until
@@ -964,15 +962,13 @@ interface _MetricsSinkNotify
     the `throttled` notification will result in outgoing data queuing in the
     connection and increasing memory usage.
     """
-    None
 
-  fun ref unthrottled(conn: MetricsSink ref) =>
+  fun ref unthrottled(conn: MetricsSink ref)
     """
     Called when the connection stops experiencing TCP backpressure. Upon
     receiving this notification, you should feel free to start making calls to
     `write` and `writev` again.
     """
-    None
 
 class MetricsSinkNotify is _MetricsSinkNotify
   let _name: String
@@ -989,6 +985,8 @@ class MetricsSinkNotify is _MetricsSinkNotify
   fun ref connected(sock: MetricsSink ref) =>
     @printf[I32]("%s outgoing connected\n".cstring(),
       _name.cstring())
+    sock.set_nodelay(true)
+    //SLF: TODO
     sock.set_so_sndbuf(1234)
 		let connect_msg = HubProtocol.connect()
 		let metrics_join_msg = HubProtocol.join_metrics(
@@ -1017,10 +1015,16 @@ class MetricsSinkNotify is _MetricsSinkNotify
   fun ref throttled(sock: MetricsSink ref) =>
     @printf[I32]("%s outgoing throttled\n".cstring(),
       _name.cstring())
+    //SLF: TODO
 
   fun ref unthrottled(sock: MetricsSink ref) =>
     @printf[I32]("%s outgoing no longer throttled\n".cstring(),
       _name.cstring())
+    //SLF: TODO
+
+  fun ref accepted(sock: MetricsSink ref) =>
+    None
+
 
 class _PauseBeforeReconnect is TimerNotify
   let _metrics_sink: ReconnectingMetricsSink
