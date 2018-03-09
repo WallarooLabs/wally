@@ -59,7 +59,7 @@ actor Main
               --external/-e [Specifies address to send message to]
               --type/-t [Specifies message type]
                   clean-shutdown | rotate-log | partition-query |
-                  cluster-status-query | print
+                  partition-count-query | cluster-status-query | print
               --message/-m [Specifies message contents to send]
                   rotate-log
                       Node name to rotate log files
