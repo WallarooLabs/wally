@@ -1,7 +1,0 @@
-// the configure options and settings
-#define Wallaroo_VERSION_MAJOR @WallarooCppApi_VERSION_MAJOR@
-#define Wallaroo_VERSION_MINOR @WallarooCppApi_VERSION_MINOR@
-
-#define CXX_MAKE_FLAGS "@CMAKE_CXX_FLAGS@"
-#define CMAKE_SHARED_LINKER_FLAGS "@CMAKE_SHARED_LINKER_FLAGS@"
-
