@@ -45,7 +45,7 @@ func StateComputationMultiName(computationId uint64) *C.char {
 func StateComputationMultiCompute(computationId uint64, dataId uint64, stateId uint64, stateChanged *uint64, size *uint64) uint64 {
 	computation := GetComponent(computationId, StateComputationTypeId).(StateComputationMulti)
 	data := GetComponent(dataId, DataTypeId).(interface{})
-	state := GetComponent(stateId, DataTypeId).(interface{})
+	state := GetComponent(stateId, StateTypeId).(interface{})
 	res, sc := computation.Compute(data, state)
 	if sc {
 		*stateChanged = 1
