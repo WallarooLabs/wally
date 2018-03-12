@@ -1,6 +1,7 @@
 use "collections"
 use "files"
 use "net"
+use "time"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/math"
 use "wallaroo_labs/options"
@@ -83,14 +84,16 @@ actor Main
           recover val Array[Array[U8] val] end
         end
 
-        let sender = Sender(env.out, env.err, batches)
+        let notifier = Notifier(env.err)
 
         try
-          TCPConnection(env.root as AmbientAuth,
-            consume sender,
+          let tcp = TCPConnection(env.root as AmbientAuth,
+            consume notifier,
             host(0)?,
             host(1)?)
 
+          let sender = Sender(tcp, batches, env.err)
+          sender.start()
         else
           env.err.print("Unable to send")
         end
@@ -105,42 +108,32 @@ actor Main
 
   fun _startup_error(msg: String) =>
     _env.err.print(msg)
-    @exit[None](U8(1))
 
-class Sender is TCPConnectionNotify
-  let _out: OutStream
+   @exit[None](U8(1))
+
+actor Sender
   let _err: OutStream
+  let _tcp: TCPConnection
   let _data_chunks: Array[Array[U8] val] val
   var _data_chunk_index: USize = 0
+  let _timers: Timers = Timers
 
-  new iso create(out: OutStream,
-    err: OutStream,
-    data_chunks: Array[Array[U8] val] val)
+  new create(tcp: TCPConnection,
+    data_chunks: Array[Array[U8] val] val,
+    err: OutStream)
   =>
-    _out = out
-    _err = err
+    _tcp = tcp
     _data_chunks = data_chunks
+    _err = err
 
-  fun ref connected(conn: TCPConnection ref) =>
-    """
-    We've connected! Start blasting data!
-    """
-    _send_chunk(conn)
+  be start() =>
+    let t = Timer(TriggerSend(this), 0, 500)
+    _timers(consume t)
 
-  fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq =>
-    """
-    Queue another send AND send this data by returning it
-    """
-    _send_chunk(conn)
-    data
-
-  fun ref connect_failed(conn: TCPConnection ref) =>
-    _err.print("Unable to connect")
-
-  fun ref _send_chunk(conn: TCPConnection ref) =>
+  be send() =>
     try
       let chunk = _data_chunks(_data_chunk_index)?
-      conn.write(chunk)
+      _tcp.write(chunk)
       _data_chunk_index = _data_chunk_index + 1
       if _data_chunk_index >= _data_chunks.size() then
         _data_chunk_index = 0
@@ -148,6 +141,15 @@ class Sender is TCPConnectionNotify
     else
       _err.print("Bug in sender")
     end
+
+class Notifier is TCPConnectionNotify
+  let _err: OutStream
+
+  new iso create(err: OutStream) =>
+    _err = err
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    _err.print("Unable to connect")
 
 primitive ChunkData
   fun apply(f: File,
@@ -182,3 +184,13 @@ primitive ChunkData
     end
 
     b
+
+class TriggerSend is TimerNotify
+  let _sender: Sender
+
+  new iso create(sender: Sender) =>
+    _sender = sender
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _sender.send()
+    true
