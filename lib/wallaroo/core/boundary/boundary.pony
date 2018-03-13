@@ -38,6 +38,7 @@ use "wallaroo/ent/network"
 use "wallaroo/ent/spike"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/testing"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
@@ -1026,7 +1027,12 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
     conn.set_nodelay(true)
     //SLF: TODO
-    conn.set_so_sndbuf(1881)
+    ifdef "wtest" then
+      try
+        conn.set_so_sndbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "BOUNDARY", "SND").u32()?)
+      end
+    end
     conn.expect(4)
 
   fun ref accepted(conn: WallarooOutgoingNetworkActor ref) =>
