@@ -281,6 +281,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _worker_names_file = worker_names_file
     _cluster_manager = cluster_manager
     _is_joining = is_joining
+    _router_registry.register_local_topology_initializer(this)
 
   be update_topology(t: LocalTopology) =>
     _topology = t
@@ -438,6 +439,21 @@ actor LocalTopologyInitializer is LayoutInitializer
     _outgoing_boundaries = consume bs
     _outgoing_boundary_builders = consume bbs
     _initializables.set(boundary)
+
+  be remove_boundary(leaving_worker: String) =>
+    // Boundaries
+    let bs = recover trn Map[String, OutgoingBoundary] end
+    for (w, b) in _outgoing_boundaries.pairs() do
+      if w != leaving_worker then bs(w) = b end
+    end
+
+    // Boundary builders
+    let bbs = recover trn Map[String, OutgoingBoundaryBuilder] end
+    for (w, b) in _outgoing_boundary_builders.pairs() do
+      if w != leaving_worker then bbs(w) = b end
+    end
+    _outgoing_boundaries = consume bs
+    _outgoing_boundary_builders = consume bbs
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val,
     bbs: Map[String, OutgoingBoundaryBuilder] val)
@@ -1489,12 +1505,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         let runner_builder = subpartition.runner_builder()
         let reporter = MetricsReporter(t.name(), t.worker_name(),
           _metrics_conn)
-        let step = Step(_auth, runner_builder(where event_log = _event_log,
-          auth = _auth), consume reporter, msg.step_id(),
-          runner_builder.route_builder(), _event_log, _recovery_replayer,
-          _outgoing_boundaries)
-        step.receive_state(msg.state())
-        msg.update_router_registry(_router_registry, step)
+        _router_registry.receive_immigrant_step(subpartition, runner_builder,
+          consume reporter, _recovery_replayer, msg)
       else
         Fail()
       end
@@ -1532,6 +1544,20 @@ actor LocalTopologyInitializer is LayoutInitializer
     else
       Fail()
     end
+
+  be source_ids_query(conn: TCPConnection) =>
+    _router_registry.source_ids_query(conn)
+
+  //!@
+  be report_status(code: ReportStatusCode) =>
+    match code
+    | FinishedAcksStatus =>
+      @printf[I32]("!@ LocalTopologyInitializer finished_ack_status\n".cstring())
+    | BoundaryCountStatus =>
+      @printf[I32]("LocalTopologyInitializer knows about %s boundaries\n"
+        .cstring(), _outgoing_boundaries.size().string().cstring())
+    end
+    _router_registry.report_status(code)
 
   be initialize_join_initializables() =>
     _initialize_join_initializables()

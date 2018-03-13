@@ -93,7 +93,7 @@ interface val SourceConfig[In: Any val]
     SourceBuilderBuilder
 
 interface tag Source is (DisposableActor & BoundaryUpdateable &
-  FinishedAckResponder)
+  FinishedAckResponder & StatusReporter)
   be update_router(router: PartitionRouter)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)

@@ -63,6 +63,10 @@ actor EmptySink is Consumer
   be unregister_producer(producer: Producer) =>
     None
 
+  //!@
+  be report_status(code: ReportStatusCode) =>
+    None
+
   be request_finished_ack(request_id: RequestId, requester_id: StepId,
     producer: FinishedAckRequester)
   =>

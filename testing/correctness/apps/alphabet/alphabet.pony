@@ -32,12 +32,19 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
+      //!@
+      var count: USize = 0
       let parts: Array[String] val = recover
         let s = "abcdefghijklmnopqrstuvwxyz"
         let a = Array[String]
         for b in s.values() do
           for c in s.values() do
-            a.push(String.from_array([b ; c]))
+            //!@
+            if count < 10000 then
+              a.push(String.from_array([b ; c]))
+              //!@
+              count = count + 1
+            end
           end
         end
         a.push("!!")

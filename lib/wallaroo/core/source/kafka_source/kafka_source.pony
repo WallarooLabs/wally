@@ -30,7 +30,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
 actor KafkaSource[In: Any val] is (Producer & FinishedAckResponder &
-  KafkaConsumer)
+  StatusReporter & KafkaConsumer)
   let _source_id: StepId
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
@@ -58,7 +58,7 @@ actor KafkaSource[In: Any val] is (Producer & FinishedAckResponder &
   let _partition_id: I32
   let _kc: KafkaClient tag
 
-  new create(listen: KafkaSourceListener[In],
+  new create(source_id: StepId, listen: KafkaSourceListener[In],
     notify: KafkaSourceNotify[In] iso,
     routes: Array[Consumer] val, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
@@ -67,6 +67,7 @@ actor KafkaSource[In: Any val] is (Producer & FinishedAckResponder &
     topic: String, partition_id: I32, kafka_client: KafkaClient tag,
     router_registry: RouterRegistry)
   =>
+    _source_id = source_id
     _topic = topic
     _partition_id = partition_id
     _kc = kafka_client
@@ -80,7 +81,6 @@ actor KafkaSource[In: Any val] is (Producer & FinishedAckResponder &
 
     _route_builder = route_builder
 
-    _source_id = _step_id_gen()
     _finished_ack_waiter = FinishedAckWaiter(_source_id)
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
@@ -222,6 +222,16 @@ actor KafkaSource[In: Any val] is (Producer & FinishedAckResponder &
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id
+
+  //!@
+  be report_status(code: ReportStatusCode) =>
+    match code
+    | FinishedAcksStatus =>
+      _finished_ack_waiter.report_status(code)
+    end
+    for route in _routes.values() do
+      route.report_status(code)
+    end
 
   be request_finished_ack(upstream_request_id: RequestId, requester_id: StepId,
     requester: FinishedAckRequester)
