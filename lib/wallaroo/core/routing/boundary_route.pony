@@ -113,6 +113,10 @@ class BoundaryRoute is Route
   fun ref request_ack() =>
     _consumer.request_ack()
 
+  //!@
+  fun ref report_status(code: ReportStatusCode) =>
+    _consumer.report_status(code)
+
   fun ref request_finished_ack(request_id: RequestId, requester_id: StepId,
     producer: FinishedAckRequester)
   =>

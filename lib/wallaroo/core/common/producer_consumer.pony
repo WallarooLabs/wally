@@ -28,10 +28,14 @@ trait tag FinishedAckRequester
   be try_finish_request_early(requester_id: StepId)
 
 trait tag FinishedAckResponder
+  //!@
   be request_finished_ack(request_id: RequestId, requester_id: StepId,
     requester: FinishedAckRequester)
   be request_finished_ack_complete(requester_id: StepId,
     requester: FinishedAckRequester)
+
+trait tag StatusReporter
+  be report_status(code: ReportStatusCode)
 
 trait tag Producer is (Muteable & Ackable & AckRequester &
   FinishedAckRequester)
@@ -46,7 +50,7 @@ interface tag BoundaryUpdateable
   be remove_boundary(worker: String)
 
 trait tag Consumer is (Runnable & StateReceiver & AckRequester &
-  Initializable & FinishedAckResponder)
+  Initializable & FinishedAckResponder & StatusReporter)
   be register_producer(producer: Producer)
   be unregister_producer(producer: Producer)
 

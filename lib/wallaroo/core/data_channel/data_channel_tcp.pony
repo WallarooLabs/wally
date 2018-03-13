@@ -274,6 +274,9 @@ class DataChannelConnectNotifier is DataChannelNotify
             m.sender.cstring())
         end
         _receiver.request_finished_ack(m.request_id, m.requester_id)
+      //!@
+      | let m: ReportStatusMsg =>
+        _receiver.report_status(m.code)
       | let m: RequestFinishedAckCompleteMsg =>
         ifdef "trace" then
           @printf[I32]("Received RequestFinishedAckCompleteMsg from %s\n"
@@ -316,6 +319,9 @@ trait _DataReceiverWrapper
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  //!@
+  fun report_status(code: ReportStatusCode)
+
   fun request_finished_ack(request_id: RequestId, requester_id: StepId)
   fun request_finished_ack_complete(requester_id: StepId)
 
@@ -334,6 +340,10 @@ class _InitDataReceiver is _DataReceiverWrapper
     Fail()
 
   fun upstream_replay_finished() =>
+    Fail()
+
+  //!@
+  fun report_status(code: ReportStatusCode) =>
     Fail()
 
   fun request_finished_ack(request_id: RequestId, requester_id: StepId) =>
@@ -363,6 +373,10 @@ class _DataReceiver is _DataReceiverWrapper
   =>
     data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
+
+  //!@
+  fun report_status(code: ReportStatusCode) =>
+    data_receiver.report_status(code)
 
   fun request_finished_ack(request_id: RequestId, requester_id: StepId) =>
     data_receiver.request_finished_ack(request_id, requester_id)

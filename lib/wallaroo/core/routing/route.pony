@@ -41,6 +41,9 @@ trait Route
     metric_name: String, worker_ingress_ts: U64)
 
   fun ref request_ack()
+
+  //!@
+  fun ref report_status(code: ReportStatusCode)
   fun ref request_finished_ack(request_id: RequestId, requester_id: StepId,
     requester: FinishedAckRequester)
   fun ref request_finished_ack_complete(requester_id: StepId,
@@ -114,6 +117,10 @@ class EmptyRoute is Route
   =>
     Fail()
     true
+
+  //!@
+  fun ref report_status(code: ReportStatusCode) =>
+    Fail()
 
   fun ref request_finished_ack(request_id: RequestId, requester_id: StepId,
     producer: FinishedAckRequester)

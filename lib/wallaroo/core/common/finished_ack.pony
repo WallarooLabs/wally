@@ -88,7 +88,7 @@ class FinishedAckWaiter
       match upstream_requester'
       | let far: FinishedAckRequester => far
       else
-        InitialFinishedAckRequester(_step_id)
+        EmptyFinishedAckRequester
       end
 
     // If _upstream_request_ids contains the requester_id, then we're
@@ -147,16 +147,21 @@ class FinishedAckWaiter
 
   fun ref unmark_consumer_request(request_id: RequestId) =>
     try
+      // @printf[I32]("!@ unmark_consumer_request 1\n".cstring())
       let requester_id = _downstream_request_ids(request_id)?
       // @printf[I32]("!@ received ack for request_id %s (associated with requester %s). (reported from %s)\n".cstring(), request_id.string().cstring(), requester_id.string().cstring(), _step_id.string().cstring())
+      // @printf[I32]("!@ unmark_consumer_request 2\n".cstring())
       let id_set = _pending_acks(requester_id)?
       ifdef debug then
         Invariant(id_set.contains(request_id))
       end
       id_set.unset(request_id)
+      // @printf[I32]("!@ unmark_consumer_request 3\n".cstring())
       _downstream_request_ids.remove(request_id)?
+      // @printf[I32]("!@ unmark_consumer_request COMPLETE\n".cstring())
       _check_send_run(requester_id)
     else
+      @printf[I32]("!@ About to fail on %s\n".cstring(), _step_id.string().cstring())
       Fail()
     end
 
@@ -165,13 +170,37 @@ class FinishedAckWaiter
     _check_send_run(requester_id)
 
   fun ref clear() =>
+    // @printf[I32]("!@ finished_ack CLEAR on %s\n".cstring(), _step_id.string().cstring())
     _pending_acks.clear()
+    _downstream_request_ids.clear()
     _upstream_request_ids.clear()
     _upstream_requesters.clear()
+    _custom_actions.clear()
+
+  //!@
+  fun report_status(code: ReportStatusCode) =>
+    match code
+    | FinishedAcksStatus =>
+      var pending: USize = 0
+      var requester_id: StepId = 0
+      for (r_id, pa) in _pending_acks.pairs() do
+        if pa.size() > 0 then
+          requester_id = r_id
+          pending = pending + 1
+        end
+      end
+      // @printf[I32]("!@ waiting at %s on %s pending ack groups, for requester ids:\n".cstring(), _step_id.string().cstring(), pending.string().cstring())
+      // if pending == 1 then
+        // @printf[I32]("!@ %s waiting for one for requester id %s\n".cstring(), _step_id.string().cstring(), requester_id.string().cstring())
+      // end
+      // for p in _pending_acks.keys() do
+      //   @printf[I32]("!@ %s (from %s)\n".cstring(), p.string().cstring(), _step_id.string().cstring())
+      // end
+    end
 
   fun ref _check_send_run(requester_id: StepId) =>
     try
-      @printf[I32]("!@ _pending_acks size: %s for requester_id %s (reported from %s). Listing pending acks:\n".cstring(), _pending_acks(requester_id)?.size().string().cstring(), requester_id.string().cstring(), _step_id.string().cstring())
+      // @printf[I32]("!@ _pending_acks size: %s for requester_id %s (reported from %s). Listing pending acks:\n".cstring(), _pending_acks(requester_id)?.size().string().cstring(), requester_id.string().cstring(), _step_id.string().cstring())
       // for pending_ack in _pending_acks(requester_id)?.values() do
       //   @printf[I32]("!@ -- %s\n".cstring(), pending_ack.string().cstring())
       // end

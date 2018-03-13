@@ -242,6 +242,13 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
     _upstreams.unset(producer)
 
+  //!@
+  be report_status(code: ReportStatusCode) =>
+    match code
+    | FinishedAcksStatus =>
+      @printf[I32]("!@ Kafka sink finished ack status\n".cstring())
+    end
+
   be request_finished_ack(request_id: RequestId, requester_id: StepId,
     requester: FinishedAckRequester)
   =>

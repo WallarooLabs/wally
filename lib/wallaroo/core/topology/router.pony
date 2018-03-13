@@ -306,6 +306,7 @@ trait val OmniRouter is Equatable[OmniRouter]
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, U64)
 
   fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter
+  fun val remove_boundary(w: String): OmniRouter
 
   fun val update_route_to_proxy(id: U128,
     pa: ProxyAddress): OmniRouter
@@ -338,6 +339,9 @@ class val EmptyOmniRouter is OmniRouter
   fun val add_boundary(w: String,
     boundary: OutgoingBoundary): OmniRouter
   =>
+    this
+
+  fun val remove_boundary(w: String): OmniRouter =>
     this
 
   fun val update_route_to_proxy(id: U128, pa: ProxyAddress):
@@ -542,6 +546,16 @@ class val StepIdRouter is OmniRouter
       new_outgoing_boundaries(k) = v
     end
     new_outgoing_boundaries(w) = boundary
+    StepIdRouter(_worker_name, _data_routes, _step_map,
+      consume new_outgoing_boundaries, _stateless_partitions)
+
+  fun val remove_boundary(w: String): OmniRouter =>
+    // TODO: Using persistent maps for our fields would make this more
+    // efficient
+    let new_outgoing_boundaries = recover trn Map[String, OutgoingBoundary] end
+    for (k, v) in _outgoing_boundaries.pairs() do
+      if k != w then new_outgoing_boundaries(k) = v end
+    end
     StepIdRouter(_worker_name, _data_routes, _step_map,
       consume new_outgoing_boundaries, _stateless_partitions)
 
@@ -879,6 +893,12 @@ class val DataRouter is Equatable[DataRouter]
       target.receive_state(s)
     else
       Fail()
+    end
+
+  //!@
+  fun report_status(code: ReportStatusCode) =>
+    for consumer in _data_routes.values() do
+      consumer.report_status(code)
     end
 
   fun request_finished_ack(requester_id: StepId, requester: DataReceiver,

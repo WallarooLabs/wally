@@ -151,6 +151,9 @@ actor OutgoingBoundary is Consumer
   var _reconnect_pause: U64 = 10_000_000_000
   let _timers: Timers = Timers
 
+  //!@
+  var _finished_ack_status: Bool = false
+
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
@@ -446,10 +449,22 @@ actor OutgoingBoundary is Consumer
 
     _upstreams.unset(producer)
 
+  //!@
+  be report_status(code: ReportStatusCode) =>
+    if not _finished_ack_status then
+      _finished_ack_status = true
+      _finished_ack_waiter.report_status(code)
+      try
+        _writev(ChannelMsgEncoder.report_status(code, _auth)?)
+      else
+        Fail()
+      end
+    end
+
   be request_finished_ack(upstream_request_id: RequestId,
     requester_id: StepId, upstream_requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack BOUNDARY %s, requester_id: %s, upstream_request_id: %s\n".cstring(), _step_id.string().cstring(), requester_id.string().cstring(), upstream_request_id.string().cstring())
+    // @printf[I32]("!@ request_finished_ack BOUNDARY %s, requester_id: %s, upstream_request_id: %s\n".cstring(), _step_id.string().cstring(), requester_id.string().cstring(), upstream_request_id.string().cstring())
 
     // !@
     // if not _finished_ack_waiter.pending_request() then
@@ -472,6 +487,7 @@ actor OutgoingBoundary is Consumer
     producer: FinishedAckRequester)
   =>
     // @printf[I32]("!@ request_finished_ack_complete BOUNDARY\n".cstring())
+    _finished_ack_waiter.clear()
     try
       _writev(ChannelMsgEncoder.request_finished_ack_complete(_worker_name,
         requester_id, _auth)?)
@@ -479,11 +495,14 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
+    //!@
+    _finished_ack_status = false
+
   be try_finish_request_early(requester_id: StepId) =>
     _finished_ack_waiter.try_finish_request_early(requester_id)
 
   be receive_finished_ack(request_id: RequestId) =>
-    // @printf[I32]("!@ receive_finished_ack BOUNDARY\n".cstring())
+    // @printf[I32]("!@ receive_finished_ack BOUNDARY %s\n".cstring(), _step_id.string().cstring())
     _finished_ack_waiter.unmark_consumer_request(request_id)
 
   //
