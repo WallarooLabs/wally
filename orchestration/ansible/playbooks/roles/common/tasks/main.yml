@@ -200,6 +200,31 @@
     creates: /src/pony-stable/bin
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
+- name: download go-1.9.4
+  get_url:
+     url: https://dl.google.com/go/go1.9.4.linux-amd64.tar.gz
+     dest: /tmp/go1.9.4.linux-amd64.tar.gz
+     checksum: sha256:15b0937615809f87321a457bb1265f946f9f6e736c563d6c5e0bd2c22e44f779
+     mode: 0755
+  register: get_url_result
+  until: get_url_result | succeeded
+  retries: 5
+  delay: 5
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: Extract go1.9.4.linux-amd64.tar.gz into /usr/local
+  unarchive:
+    src: /tmp/go1.9.4.linux-amd64.tar.gz
+    dest: /usr/local
+    copy: no
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: Add /usr/local/go/bin dir to system-wide $PATH.
+  copy:
+    dest: /etc/profile.d/go-1.9.4-path.sh
+    content: 'PATH=$PATH:/usr/local/go/bin'
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
 - name: create cpu shield
   script: create_cpu_shield.sh {{ system_cpus if system_cpus is defined else "" }} > /create_cpu_shield.out
   when: ('vagrant' != '{{ ansible_ssh_user }}')
@@ -207,4 +232,3 @@
 - name: apply kernel tweaks
   script: kerneltweaks.sh > /kerneltweaks.out
   when: ('vagrant' != '{{ ansible_ssh_user }}')
-
