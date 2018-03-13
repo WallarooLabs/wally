@@ -50,7 +50,7 @@ include $(rules_mk_path)
 ifeq ($(autoscale),on)
 autoscale_tests:
 	cd $(AUTOSCALE_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose --exitfirst autoscale_tests.py
+	python2 -m pytest --color=yes --tb=native --verbose --exitfirst autoscale_tests.py $(pytest_exp)
 else
 autoscale_tests:
 	$(QUIET)printf "autoscale_tests not run.\nRun make with 'autoscale=on' to run this test.\n"

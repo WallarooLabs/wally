@@ -50,7 +50,7 @@ include $(rules_mk_path)
 ifeq ($(resilience),on)
 log_rotation_tests:
 	cd $(LOG_ROTATION_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose log_rotation.py
+	python2 -m pytest --color=yes --tb=native --verbose log_rotation.py $(pytest_exp)
 else
 log_rotation_tests:
 	$(QUIET)printf "log_rotation_tests not run.\nRun make with 'resilience=on' to run this test.\n"
