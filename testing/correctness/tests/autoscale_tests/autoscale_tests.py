@@ -25,7 +25,7 @@ from _autoscale_tests import autoscale_sequence
 CMD_PONY = 'alphabet'
 CMD_PYTHON = 'machida --application-module alphabet'
 
-CYCLES=1
+CYCLES=4
 
 
 def test_autoscale_pony_grow_by_1():
