@@ -32,6 +32,7 @@ use "collections"
 use "time"
 use "files"
 use "wallaroo_labs/bytes"
+use "wallaroo_labs/testing"
 use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -289,13 +290,23 @@ class DataChannelConnectNotifier is DataChannelNotify
     @printf[I32]("accepted data channel connection\n".cstring())
     conn.set_nodelay(true)
     //SLF: TODO
-    conn.set_so_rcvbuf(1919)
+    ifdef "wtest" then
+      try
+        conn.set_so_rcvbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "DATA_CHANNEL", "RCV").u32()?)
+      end
+    end
     conn.expect(4)
 
   fun ref connected(sock: DataChannel ref) =>
     @printf[I32]("incoming connected on data channel\n".cstring())
     //SLF: TODO
-    sock.set_so_sndbuf(1991)
+    ifdef "wtest" then
+      try
+        sock.set_so_sndbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "DATA_CHANNEL", "SND").u32()?)
+      end
+    end
 
   fun ref closed(conn: DataChannel ref) =>
     @printf[I32]("DataChannelConnectNotifier: server closed\n".cstring())

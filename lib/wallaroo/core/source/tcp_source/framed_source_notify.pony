@@ -24,6 +24,7 @@ use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/testing"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
@@ -174,7 +175,12 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun ref accepted(conn: TCPSource ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
     //SLF: TODO
-    conn.set_so_rcvbuf(1661)
+    ifdef "wtest" then
+      try
+        conn.set_so_rcvbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "TCP_SOURCE", "RCV").u32()?)
+      end
+    end
     conn.expect(_header_size)
 
   fun ref connected(conn: TCPSource ref) =>

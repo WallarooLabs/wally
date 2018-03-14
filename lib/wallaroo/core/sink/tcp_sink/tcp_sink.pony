@@ -37,6 +37,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/testing"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
@@ -884,8 +885,12 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
     @printf[I32]("TCPSink connected\n".cstring())
     conn.set_nodelay(true)
     //SLF: TODO
-    let x = conn.set_so_sndbuf(1777)
-    @printf[I32]("TCPSink connected set_so_sndbuf was %d\n".cstring(), x)
+    ifdef "wtest" then
+      try
+        conn.set_so_sndbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "TCP_SINK", "SND").u32()?)
+      end
+    end
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("TCPSink connection closed\n".cstring())

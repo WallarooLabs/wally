@@ -11,6 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "net"
+use "wallaroo_labs/testing"
 
 class ControlSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
@@ -27,8 +28,20 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
 
   fun ref connected(conn: TCPConnection ref) =>
     _tcp_conn_wrapper.connected(conn)
-    conn.expect(4)
     //SLF: TODO
+    /**** Uncomment when TCPConnection.set_so_recvbuf() is available.
+    ifdef "wtest" then
+      try
+        conn.set_so_rcvbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "CONTROL_SENDER", "RCV").u32()?)
+      end
+      try
+        conn.set_so_sndbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "CONTROL_SENDER", "SND").u32()?)
+      end
+    end
+    ****/
+    conn.expect(4)
     _header = true
     @printf[I32]("ControlSenderConnectNotifier: connected to %s.\n".cstring(),
       _worker_name.cstring())

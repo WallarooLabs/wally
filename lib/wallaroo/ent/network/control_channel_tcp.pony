@@ -16,6 +16,7 @@ use "time"
 use "files"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/hub"
+use "wallaroo_labs/testing"
 use "wallaroo"
 use "wallaroo/core/common"
 use "wallaroo/ent/recovery"
@@ -151,6 +152,18 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     _connections.register_disposable(conn)
     //SLF: TODO
+    /**** Uncomment when TCPConnection.set_so_recvbuf() is available.
+    ifdef "wtest" then
+      try
+        conn.set_so_rcvbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "CONTROL_CHANNEL", "RCV").u32()?)
+      end
+      try
+        conn.set_so_sndbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "CONTROL_CHANNEL", "SND").u32()?)
+      end
+    end
+    ****/
     conn.expect(4)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
@@ -376,6 +389,18 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
     @printf[I32]("ControlChannelConnectNotifier: connected.\n".cstring())
     //SLF: TODO
+    /**** Uncomment when TCPConnection.set_so_recvbuf() is available.
+    ifdef "wtest" then
+      try
+        conn.set_so_rcvbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "CONTROL_CHANNEL", "RCV").u32()?)
+      end
+      try
+        conn.set_so_sndbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "CONTROL_CHANNEL", "SND").u32()?)
+      end
+    end
+    ****/
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     @printf[I32]("ControlChannelConnectNotifier: connection failed!\n"

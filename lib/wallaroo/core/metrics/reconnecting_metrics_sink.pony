@@ -34,6 +34,7 @@ use "time"
 use "wallaroo/ent/network"
 use "wallaroo_labs/hub"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/testing"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -991,7 +992,12 @@ class MetricsSinkNotify is _MetricsSinkNotify
       _name.cstring())
     sock.set_nodelay(true)
     //SLF: TODO
-    sock.set_so_sndbuf(1234)
+    ifdef "wtest" then
+      try
+        sock.set_so_sndbuf(EnvironmentVar.get3(
+          "WT_BUFSIZ", "METRICS", "SND").u32()?)
+      end
+    end
 		let connect_msg = HubProtocol.connect()
 		let metrics_join_msg = HubProtocol.join_metrics(
 			"metrics:" + _application_name,
