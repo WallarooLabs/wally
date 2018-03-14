@@ -19,6 +19,9 @@ Copyright 2017 The Wallaroo Authors.
 primitive EnvironmentVar
 
   fun get(k: String, default: String = ""): String ref =>
+    """
+    Wrapper around FFI call to getenv(3) with default string.
+    """
     let ptr = @getenv[Pointer[U8]](k.cstring())
 
     if ptr.is_null() then
@@ -29,6 +32,16 @@ primitive EnvironmentVar
 
   fun get2(p1: String, p2: String,
     join: String = "_", default: String = ""): String ref =>
+    """
+    Wrapper around FFI call to getenv(3) with quasi-hierarchical
+    variable naming scheme.  An example call of
+    get2("TEST", "FOO" where join = "_") will return the
+    value of the first environment variable in the following list:
+      1. TEST_FOO
+      2. TEST
+
+    If none are found, then the default string is returned.
+    """
     let not_found: String = not_found_val()
     let k = p1 + join + p2
 
@@ -46,6 +59,17 @@ primitive EnvironmentVar
 
   fun get3(p1: String, p2: String, p3: String,
     join: String = "_", default: String = ""): String ref =>
+    """
+    Wrapper around FFI call to getenv(3) with quasi-hierarchical
+    variable naming scheme.  An example call of
+    get2("TEST", "FOO", "BAR" where join = "_") will return the
+    value of the first environment variable in the following list:
+      1. TEST_FOO_BAR
+      2. TEST_FOO
+      3. TEST
+
+    If none are found, then the default string is returned.
+    """
     let not_found: String = not_found_val()
     let k = p1 + join + p2 + join + p3
 
