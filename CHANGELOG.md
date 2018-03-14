@@ -7,6 +7,7 @@ All notable changes to Wallaroo will be documented in this file.
 ### Fixed
 
 - Go API: Fixed bug in state computation that return multiple results
+- Kafka Client: Update to pony-kafka release 0.3.4 for bugfix regarding partial messages
 
 ## [0.4.0] - 2018-01-12
 
