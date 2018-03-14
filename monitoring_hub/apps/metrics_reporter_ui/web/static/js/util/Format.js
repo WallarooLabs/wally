@@ -27,6 +27,8 @@ function formatThroughput(thr) {
         return "0k";
     } else if (thr == "-") {
         return thr;
+    } else if (thr < 1000) {
+        return thr;
     } else if (thr > 10000) {
         return cleanTrailing(thr/1000, 0) + "k";
     } else if (thr >= 1000000) {
