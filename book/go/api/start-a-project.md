@@ -29,7 +29,7 @@ Once you've done that, you can run the following commands to create the `bundle.
 ```bash
 stable add local $WALLAROO_HOME/lib
 stable add local $WALLAROO_HOME/go_api/pony
-stable add github WallarooLabs/pony-kafka --tag=0.3.0
+stable add github WallarooLabs/pony-kafka --tag=0.3.4
 stable add local lib
 ```
 
@@ -49,7 +49,7 @@ The contents of the `bundle.json` file will look something like this:
         {
             "type": "github",
             "repo": "WallarooLabs/pony-kafka",
-            "tag": "0.3.0"
+            "tag": "0.3.4"
         },
         {
             "type": "local",
