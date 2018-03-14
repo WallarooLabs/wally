@@ -562,7 +562,12 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
-    let wrapper_creation_start_ts = Time.nanos()
+    let wrapper_creation_start_ts =
+      ifdef "detailed_metrics" then
+        Time.nanos()
+      else
+        0
+      end
     (let is_finished, let last_ts) =
       match data
       | let input: In =>
@@ -581,10 +586,15 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
           .cstring())
         (true, latest_ts)
       end
-    let wrapper_creation_end_ts = Time.nanos()
-    metrics_reporter.step_metric(metric_name, _name, metrics_id,
-      wrapper_creation_start_ts, wrapper_creation_end_ts
-      where prefix = "Pre:")
+    ifdef "detailed-metrics" then
+      ifdef debug then
+        Invariant(wrapper_creation_start_ts != 0)
+      end
+      let wrapper_creation_end_ts = Time.nanos()
+      metrics_reporter.step_metric(metric_name, _name, metrics_id,
+        wrapper_creation_start_ts, wrapper_creation_end_ts
+        where prefix = "Pre:")
+    end
     (is_finished, last_ts)
 
   fun name(): String => _name
