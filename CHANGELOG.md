@@ -2,6 +2,10 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
+## [0.4.1] - 2018-01-12
+
+- Go API: Fixed bug in state computation that return multiple results
+
 ## [0.4.0] - 2018-01-12
 
 ### Fixed
