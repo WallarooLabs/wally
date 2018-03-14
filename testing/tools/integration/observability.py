@@ -159,8 +159,9 @@ class ObservabilityNotifier(StoppableThread):
             # or timeout.
             if time.time() - started > self.timeout:
                 self.error = ObservabilityTimeoutError(
-                    "Observability test timed out with the following tests"
-                    " still failing:\n{}".format("\n".join((
+                    "Observability test timed out after {} seconds with the"
+                    " following tests"
+                    " still failing:\n{}".format(self.timeout, "\n".join((
                         "    {}: {}({})".format(
                             t[1], type(err).__name__,
                             str(err))

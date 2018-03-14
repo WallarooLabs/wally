@@ -274,13 +274,7 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
 
     batch_size = 10
     interval = 0.05
-    msgs_per_sec = int(batch_size/interval)
-    base_time = 10  # Seconds
-    cycle_time = 10  # seconds
-    expect_time = base_time + cycle_time * cycles  # seconds
-    expect = expect_time * msgs_per_sec
-    sender_timeout = expect_time + 10  # seconds
-    join_timeout = 200
+    sender_timeout = 30 # Counted from when Sender is stopped
     runner_join_timeout = 30
 
     res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
@@ -295,15 +289,14 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             sink = Sink(host)
             metrics = Metrics(host)
             lowercase2 = [a + b for a in lowercase for b in lowercase]
-            char_gen = cycle(lowercase2)
-            chars = [next(char_gen) for i in range(expect)]
-            expected = Counter(chars)
+            char_cycle = cycle(lowercase2)
+            expected = Counter()
+            def count_sent(s):
+                expected[s] += 1
 
-            reader = Reader(iter_generator(chars,
-                                            lambda s: pack('>2sI', s, 1)))
-
-            await_values = [pack('>I2sQ', 10, c, v) for c, v in
-                            expected.items()]
+            reader = Reader(iter_generator(
+                items=char_cycle, to_string=lambda s: pack('>2sI', s, 1),
+                on_next=count_sent))
 
             # Start sink and metrics, and get their connection info
             sink.start()
@@ -486,7 +479,10 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                       [r.name for r in left]))
                         raise err
 
-            # wait until sender completes (~10 seconds)
+            # Test is done, so stop sender
+            sender.stop()
+
+            # wait until sender sends out its final batch and exits
             sender.join(sender_timeout)
             if sender.error:
                 raise sender.error
@@ -495,8 +491,11 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                 raise TimeoutError('Sender did not complete in the expected '
                                    'period')
 
+            print('Sender sent {} messages'.format(sum(expected.values())))
 
             # Use Sink value to determine when to stop runners and sink
+            await_values = [pack('>I2sQ', 10, c, v) for c, v in
+                            expected.items()]
             stopper = SinkAwaitValue(sink, await_values, 30)
             stopper.start()
             stopper.join()
