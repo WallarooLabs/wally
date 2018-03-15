@@ -31,6 +31,13 @@ All notable changes to Wallaroo will be documented in this file.
 - Clean up external message protocol ([PR #2032](https://github.com/wallaroolabs/wallaroo/pull/2032))
 - Remove "name()" from StateBuilder interface ([PR #1988](https://github.com/wallaroolabs/wallaroo/pull/1988))
 
+## [0.4.1] - 2018-03-14
+
+### Fixed
+
+- Go API: Fixed bug in state computation that return multiple results
+- Kafka Client: Update to pony-kafka release 0.3.4 for bugfix regarding partial messages
+
 ## [0.4.0] - 2018-01-12
 
 ### Fixed
