@@ -2,7 +2,7 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [0.4.0] - 2018-03-14
+## [0.4.1] - 2018-03-14
 
 ### Fixed
 
