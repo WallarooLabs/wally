@@ -32,19 +32,20 @@ use "wallaroo/core/topology"
 
 
 primitive TCPFramedSourceNotifyBuilder[In: Any val]
-  fun apply(pipeline_name: String, env: Env, auth: AmbientAuth,
-    handler: FramedSourceHandler[In] val,
+  fun apply(source_id: StepId, pipeline_name: String, env: Env,
+    auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
     pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
     SourceNotify iso^
   =>
-    TCPFramedSourceNotify[In](pipeline_name, env, auth, handler,
+    TCPFramedSourceNotify[In](source_id, pipeline_name, env, auth, handler,
       runner_builder, router, consume metrics_reporter, event_log,
       target_router, pre_state_target_ids)
 
 class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
+  let _source_id: StepId
   let _env: Env
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
   var _header: Bool = true
@@ -57,13 +58,14 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
-  new iso create(pipeline_name: String, env: Env, auth: AmbientAuth,
-    handler: FramedSourceHandler[In] val,
+  new iso create(source_id: StepId, pipeline_name: String, env: Env,
+    auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
     pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
   =>
+    _source_id = source_id
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
     _env = env
@@ -77,12 +79,12 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun routes(): Array[Consumer] val =>
     _router.routes()
 
-  fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
+  fun ref received(source: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         let payload_size: USize = _handler.payload_length(consume data)?
 
-        conn.expect(payload_size)
+        source.expect(payload_size)
         _header = false
       else
         Fail()
@@ -120,7 +122,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
               " source\n").cstring())
           end
           _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-            conn, _router, _omni_router, _msg_id_gen(), None,
+            _source_id, source, _router, _omni_router, _msg_id_gen(), None,
             decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
         else
           @printf[I32](("Unable to decode message at " + _pipeline_name +
@@ -146,7 +148,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
         _metrics_reporter.worker_metric(_pipeline_name, time_spent)
       end
 
-      conn.expect(_header_size)
+      source.expect(_header_size)
       _header = true
 
       ifdef linux then
@@ -171,11 +173,11 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
       end
     end
 
-  fun ref accepted(conn: TCPSource ref) =>
+  fun ref accepted(source: TCPSource ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
-    conn.expect(_header_size)
+    source.expect(_header_size)
 
-  fun ref closed(conn: TCPSource ref) =>
+  fun ref closed(source: TCPSource ref) =>
     @printf[I32]("TCPSource connection closed\n".cstring())
 
   // TODO: implement connect_failed

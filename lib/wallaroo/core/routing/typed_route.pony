@@ -60,8 +60,9 @@ class TypedRoute[In: Any val] is Route
     _route.dispose()
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("--Rcvd msg at Route (%s)\n".cstring(),
@@ -76,8 +77,8 @@ class TypedRoute[In: Any val] is Route
         end
       end
 
-      _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
-        msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+      _send_message_on_route(metric_name, pipeline_time_spent, input, cfp_id,
+        cfp, msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
       true
     else
       Fail()
@@ -94,8 +95,9 @@ class TypedRoute[In: Any val] is Route
     true
 
   fun ref _send_message_on_route(metric_name: String, pipeline_time_spent: U64,
-    input: In, cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    input: In, cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
@@ -117,6 +119,7 @@ class TypedRoute[In: Any val] is Route
     _consumer.run[In](metric_name,
       pipeline_time_spent,
       input,
+      cfp_id,
       cfp,
       msg_uid,
       frac_ids,
@@ -149,10 +152,10 @@ class TypedRoute[In: Any val] is Route
   fun ref request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
     _consumer.request_in_flight_resume_ack(in_flight_resume_ack_id, request_id,
-      requester_id, requester)
+      requester_id, requester, leaving_workers)
 
   fun ref receive_in_flight_ack(request_id: RequestId) =>
     _step.receive_in_flight_ack(request_id)

@@ -33,7 +33,7 @@ trait tag InFlightAckResponder
     requester: InFlightAckRequester)
   be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
 
 trait tag StatusReporter
   be report_status(code: ReportStatusCode)
@@ -58,12 +58,12 @@ trait tag Consumer is (Runnable & StateReceiver & AckRequester &
 
 trait tag Runnable
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId,
+    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 

@@ -15,7 +15,9 @@ use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 
 interface DataReceiversSubscriber
@@ -35,6 +37,8 @@ actor DataReceivers
     DataRouter(recover Map[U128, Consumer] end)
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
+  var _router_registry: (RouterRegistry | None) = None
+
   new create(auth: AmbientAuth, connections: Connections, worker_name: String,
     is_recovering: Bool = false)
   =>
@@ -44,6 +48,9 @@ actor DataReceivers
     if not is_recovering then
       _initialized = true
     end
+
+  be set_router_registry(rr: RouterRegistry) =>
+    _router_registry = rr
 
   be subscribe(sub: DataReceiversSubscriber tag) =>
     _subscribers.set(sub)
@@ -69,6 +76,12 @@ actor DataReceivers
       else
         let new_dr = DataReceiver(_auth, _worker_name, sender_name,
           _initialized)
+        match _router_registry
+        | let rr: RouterRegistry =>
+          rr.register_data_receiver(sender_name, new_dr)
+        else
+          Fail()
+        end
         new_dr.update_router(_data_router)
         _data_receivers(boundary_id) = new_dr
         _connections.register_disposable(new_dr)

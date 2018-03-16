@@ -109,7 +109,9 @@ actor RouterRegistry is InFlightAckRequester
     _migration_target_ack_list.create()
 
   // For keeping track of leaving workers during an autoscale shrink
-  let _leaving_workers: _StringSet = _leaving_workers.create()
+  let _leaving_workers_waiting_list: _StringSet =
+    _leaving_workers_waiting_list.create()
+  var _leaving_workers: Array[String] val = recover Array[String] end
   // Used as a proxy for RouterRegistry when muting and unmuting sources
   // and data channel.
   // TODO: Probably change mute()/unmute() interface so we don't need this
@@ -136,6 +138,7 @@ actor RouterRegistry is InFlightAckRequester
     _connections.register_disposable(this)
     _id = (digestof this).u128()
     _in_flight_ack_waiter = InFlightAckWaiter(_id)
+    _data_receivers.set_router_registry(this)
 
   fun _worker_count(): USize =>
     _outgoing_boundaries.size() + 1
@@ -182,6 +185,13 @@ actor RouterRegistry is InFlightAckRequester
     if not _stop_the_world_in_process and _application_ready_to_work then
       source.unmute(_dummy_consumer)
     end
+    match _omni_router
+    | let omnr: OmniRouter =>
+      _omni_router = omnr.add_source(source_id, source)
+    else
+      Fail()
+    end
+    _distribute_omni_router()
     _connections.register_disposable(source)
 
   be register_source_listener(source_listener: SourceListener) =>
@@ -343,6 +353,15 @@ actor RouterRegistry is InFlightAckRequester
       source.add_boundary_builders(new_boundary_builders_sendable)
     end
 
+  be register_data_receiver(worker: String, dr: DataReceiver) =>
+    match _omni_router
+    | let omnr: OmniRouter =>
+      _omni_router = omnr.add_data_receiver(worker, dr)
+      _distribute_omni_router()
+    else
+      Fail()
+    end
+
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
 
@@ -396,12 +415,14 @@ actor RouterRegistry is InFlightAckRequester
     end
     _distribute_omni_router()
 
-  fun ref _distribute_boundary_removal(worker: String) =>
+  fun ref _remove_worker_from_omni_router(worker: String) =>
     match _omni_router
     | let omnr: OmniRouter =>
-      _omni_router = omnr.remove_boundary(worker)
+      _omni_router = omnr.remove_boundary(worker).remove_data_receiver(worker)
     end
 
+  fun ref _distribute_boundary_removal(worker: String) =>
+    _remove_worker_from_omni_router(worker)
     _distribute_omni_router()
 
     for subs in _partition_router_subs.values() do
@@ -738,9 +759,12 @@ actor RouterRegistry is InFlightAckRequester
     if _initiated_stop_the_world then
       let in_flight_resume_ack_id = _in_flight_ack_waiter
         .initiate_resume_request(ResumeTheWorldAction(this))
-      _request_in_flight_resume_acks(in_flight_resume_ack_id)
-      _connections.request_in_flight_acks_complete(in_flight_resume_ack_id,
-        _id, this)
+      _request_in_flight_resume_acks(in_flight_resume_ack_id,
+        _leaving_workers)
+      _connections.request_in_flight_resume_acks(in_flight_resume_ack_id,
+        _id, _leaving_workers, this)
+      // We are done with this round of leaving workers
+      _leaving_workers = recover Array[String] end
     end
 
   fun ref initiate_resume_the_world() =>
@@ -866,12 +890,13 @@ actor RouterRegistry is InFlightAckRequester
       _stopped_worker_waiting_list.unset(originating_worker)
       if (_stopped_worker_waiting_list.size() == 0) then
         if (_migration_target_ack_list.size() == 0) and
-          (_leaving_workers.size() == 0)
+          (_leaving_workers_waiting_list.size() == 0)
         then
           _try_resume_the_world()
         else
           // We should only unmute ourselves once _migration_target_ack_list is
-          // empty for grow and _leaving_workers is empty for shrink
+          // empty for grow and _leaving_workers_waiting_list is empty for
+          // shrink
           Fail()
         end
       end
@@ -886,6 +911,9 @@ actor RouterRegistry is InFlightAckRequester
     for source in _sources.values() do
       source.report_status(code)
     end
+    for boundary in _outgoing_boundaries.values() do
+      boundary.report_status(code)
+    end
 
   be remote_request_in_flight_ack(originating_worker: String,
     upstream_request_id: RequestId, upstream_requester_id: StepId)
@@ -895,14 +923,15 @@ actor RouterRegistry is InFlightAckRequester
 
   be remote_request_in_flight_resume_ack(originating_worker: String,
     in_flight_resume_ack_id: InFlightResumeAckId, request_id: RequestId,
-    requester_id: StepId)
+    requester_id: StepId, leaving_workers: Array[String] val)
   =>
     if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
       request_id, requester_id, EmptyInFlightAckRequester,
       AckFinishedCompleteAction(_auth, _worker_name, originating_worker,
         request_id, _connections))
     then
-      _request_in_flight_resume_acks(in_flight_resume_ack_id)
+      _request_in_flight_resume_acks(in_flight_resume_ack_id,
+        leaving_workers)
     end
 
   be process_migrating_target_ack(target: String) =>
@@ -974,19 +1003,20 @@ actor RouterRegistry is InFlightAckRequester
       _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
     end
 
-  fun ref _request_in_flight_resume_acks(in_flight_resume_ack_id:
-    InFlightResumeAckId)
+  fun ref _request_in_flight_resume_acks(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    leaving_workers: Array[String] val)
   =>
     if _has_local_target() then
       // Request for sources
       for source in _sources.values() do
         let request_id = _in_flight_ack_waiter.add_consumer_resume_request()
         source.request_in_flight_resume_ack(in_flight_resume_ack_id,
-          request_id, _id, this)
+          request_id, _id, this, leaving_workers)
       end
       // Request for local steps and sinks
       _data_router.request_in_flight_resume_ack(in_flight_resume_ack_id,
-        _id, this, _in_flight_ack_waiter)
+        _id, this, _in_flight_ack_waiter, leaving_workers)
     else
       _in_flight_ack_waiter.try_finish_resume_request_early()
     end
@@ -1172,8 +1202,11 @@ actor RouterRegistry is InFlightAckRequester
   fun ref _prepare_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val)
   =>
+    for w in leaving_workers.values() do
+      _remove_worker_from_omni_router(w)
+    end
     ifdef debug then
-      Invariant(_leaving_workers.size() == 0)
+      Invariant(_leaving_workers_waiting_list.size() == 0)
     end
     if not _stop_the_world_in_process then
       _stop_the_world_in_process = true
@@ -1181,7 +1214,7 @@ actor RouterRegistry is InFlightAckRequester
     end
 
     for w in leaving_workers.values() do
-      _leaving_workers.set(w)
+      _leaving_workers_waiting_list.set(w)
     end
     for (p_id, router) in _stateless_partition_routers.pairs() do
       let new_router = router.calculate_shrink(remaining_workers)
@@ -1198,6 +1231,7 @@ actor RouterRegistry is InFlightAckRequester
     """
     @printf[I32]("Beginning process of leaving cluster.\n".cstring())
     _leaving_in_process = true
+    _leaving_workers = leaving_workers
     if _partition_routers.size() == 0 then
       //no steps have been migrated
       @printf[I32](("No partitions to migrate.\n").cstring())
@@ -1248,10 +1282,10 @@ actor RouterRegistry is InFlightAckRequester
     _distribute_boundary_builders()
     if not _leaving_in_process then
       ifdef debug then
-        Invariant(_leaving_workers.size() > 0)
+        Invariant(_leaving_workers_waiting_list.size() > 0)
       end
-      _leaving_workers.unset(worker)
-      if _leaving_workers.size() == 0 then
+      _leaving_workers_waiting_list.unset(worker)
+      if _leaving_workers_waiting_list.size() == 0 then
         _connections.request_cluster_unmute()
         _unmute_request(_worker_name)
       end

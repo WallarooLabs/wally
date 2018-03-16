@@ -282,7 +282,7 @@ class DataChannelConnectNotifier is DataChannelNotify
             .cstring(), m.sender.cstring())
         end
         _receiver.request_in_flight_resume_ack(m.in_flight_resume_ack_id,
-          m.request_id, m.requester_id)
+          m.request_id, m.requester_id, m.leaving_workers)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
           .cstring())
@@ -322,8 +322,10 @@ trait _DataReceiverWrapper
   fun report_status(code: ReportStatusCode)
 
   fun request_in_flight_ack(request_id: RequestId, requester_id: StepId)
-  fun request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId)
+  fun request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    leaving_workers: Array[String] val)
 
 class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
@@ -348,8 +350,10 @@ class _InitDataReceiver is _DataReceiverWrapper
   fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
     Fail()
 
-  fun request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId)
+  fun request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    leaving_workers: Array[String] val)
   =>
     Fail()
 
@@ -380,8 +384,10 @@ class _DataReceiver is _DataReceiverWrapper
   fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
     data_receiver.request_in_flight_ack(request_id, requester_id)
 
-  fun request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId)
+  fun request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    leaving_workers: Array[String] val)
   =>
     data_receiver.request_in_flight_resume_ack(in_flight_resume_ack_id,
-      request_id, requester_id)
+      request_id, requester_id, leaving_workers)

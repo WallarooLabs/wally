@@ -22,21 +22,21 @@ use "wallaroo/core/topology"
 
 trait StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
-  fun ref flush()
+  fun ref flush(omni_router: OmniRouter)
 
 class EmptyStepMessageProcessor is StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
 
-  fun ref flush() =>
+  fun ref flush(omni_router: OmniRouter) =>
     Fail()
 
 class NormalStepMessageProcessor is StepMessageProcessor
@@ -46,15 +46,15 @@ class NormalStepMessageProcessor is StepMessageProcessor
     step = s
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    step.process_message[D](metric_name, pipeline_time_spent, data, i_producer,
-      msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id,
-      worker_ingress_ts)
+    step.process_message[D](metric_name, pipeline_time_spent, data,
+      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+      latest_ts, metrics_id, worker_ingress_ts)
 
-  fun ref flush() =>
+  fun ref flush(omni_router: OmniRouter) =>
     ifdef debug then
       @printf[I32]("Flushing NormalStepMessageProcessor does nothing.\n"
         .cstring())
@@ -74,29 +74,30 @@ class QueueingStepMessageProcessor is StepMessageProcessor
     end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    @printf[I32]("!@ QUEUING MSG\n".cstring())
     let msg = TypedQueuedStepMessage[D](metric_name, pipeline_time_spent, data,
-      i_producer, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
+      i_producer_id, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
       metrics_id, worker_ingress_ts)
     messages.push(msg)
 
-  fun ref flush() =>
+  fun ref flush(omni_router: OmniRouter) =>
     for msg in messages.values() do
-      msg.run(step)
+      msg.run(step, omni_router)
     end
     messages = Array[QueuedStepMessage]
 
 trait val QueuedStepMessage
-  fun run(step: Step ref)
+  fun run(step: Step ref, omni_router: OmniRouter)
 
 class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
   let metric_name: String
   let pipeline_time_spent: U64
   let data: D
-  let i_producer: Producer
+  let i_producer_id: StepId
   let msg_uid: MsgId
   let frac_ids: FractionalMessageId
   let i_seq_id: SeqId
@@ -106,14 +107,14 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
   let worker_ingress_ts: U64
 
   new val create(metric_name': String, pipeline_time_spent': U64,
-    data': D, i_producer': Producer, msg_uid': MsgId,
+    data': D, i_producer_id': StepId, msg_uid': MsgId,
     frac_ids': FractionalMessageId, i_seq_id': SeqId, i_route_id': RouteId,
     latest_ts': U64, metrics_id': U16, worker_ingress_ts': U64)
   =>
     metric_name = metric_name'
     pipeline_time_spent = pipeline_time_spent'
     data = data'
-    i_producer = i_producer'
+    i_producer_id = i_producer_id'
     msg_uid = msg_uid'
     frac_ids = frac_ids'
     i_seq_id = i_seq_id'
@@ -122,7 +123,12 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
     metrics_id = metrics_id'
     worker_ingress_ts = worker_ingress_ts'
 
-  fun run(step: Step ref) =>
-    step.run[D](metric_name, pipeline_time_spent, data, i_producer,
-      msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id,
-      worker_ingress_ts)
+  fun run(step: Step ref, omni_router: OmniRouter) =>
+    try
+      let i_producer = omni_router.producer_for(i_producer_id)?
+      step.run[D](metric_name, pipeline_time_spent, data, i_producer_id,
+        i_producer, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
+        metrics_id, worker_ingress_ts)
+    else
+      Fail()
+    end
