@@ -312,8 +312,10 @@ actor Connections is Cluster
       router_registry.try_finish_in_flight_request_early(requester_id)
     end
 
-  be request_in_flight_acks_complete(in_flight_resume_ack_id: InFlightResumeAckId,
-    requester_id: StepId, router_registry: RouterRegistry,
+  be request_in_flight_resume_acks(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    requester_id: StepId, leaving_workers: Array[String] val,
+    router_registry: RouterRegistry,
     exclusions: Array[String] val = recover Array[String] end)
   =>
     let id_gen = RequestIdGenerator
@@ -330,7 +332,8 @@ actor Connections is Cluster
           request_ids.push(next_request_id)
           let in_flight_resume_ack_request_msg =
             ChannelMsgEncoder.request_in_flight_resume_ack(_worker_name,
-              in_flight_resume_ack_id, next_request_id, requester_id, _auth)?
+              in_flight_resume_ack_id, next_request_id, requester_id,
+              leaving_workers, _auth)?
           ch.writev(in_flight_resume_ack_request_msg)
           sent_request_msg = true
         end
@@ -367,7 +370,7 @@ actor Connections is Cluster
         _worker_name, _metrics_conn)
       let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
         consume reporter, host, service, _spike_config)
-      let boundary = builder.build_and_initialize(boundary_id,
+      let boundary = builder.build_and_initialize(boundary_id, target,
         local_topology_initializer)
       _register_disposable(boundary)
       local_topology_initializer.add_boundary_to_joining_worker(target,
@@ -621,7 +624,7 @@ actor Connections is Cluster
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
-    let outgoing_boundary = boundary_builder(_step_id_gen())
+    let outgoing_boundary = boundary_builder(_step_id_gen(), target_name)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
@@ -634,7 +637,7 @@ actor Connections is Cluster
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
     let outgoing_boundary =
-      boundary_builder.build_and_initialize(_step_id_gen(), li)
+      boundary_builder.build_and_initialize(_step_id_gen(), target_name, li)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary

@@ -93,6 +93,9 @@ actor Main
           ExternalMsgEncoder.source_ids_query()
         | "boundary-count-status" =>
           ExternalMsgEncoder.report_status("boundary-count-status")
+        //!@
+        | "boundary-status" =>
+          ExternalMsgEncoder.report_status("boundary-status")
         else // default to print
           ExternalMsgEncoder.print_message(message)
         end

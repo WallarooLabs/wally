@@ -269,6 +269,9 @@ actor Step is (Producer & Consumer)
     end
 
   be remove_boundary(worker: String) =>
+    _remove_boundary(worker)
+
+  fun ref _remove_boundary(worker: String) =>
     if _outgoing_boundaries.contains(worker) then
       try
         let boundary = _outgoing_boundaries(worker)?
@@ -289,21 +292,22 @@ actor Step is (Producer & Consumer)
     end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId,
+    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
     _step_message_processor.run[D](metric_name, pipeline_time_spent, data,
-      i_producer, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+      latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_incoming_message()
 
@@ -327,7 +331,7 @@ actor Step is (Producer & Consumer)
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
-      pipeline_time_spent, data, this, _router, _omni_router,
+      pipeline_time_spent, data, _id, this, _router, _omni_router,
       msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
       _metrics_reporter)
 
@@ -368,15 +372,15 @@ actor Step is (Producer & Consumer)
     MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if not _is_duplicate(msg_uid, frac_ids) then
       _deduplication_list.push((msg_uid, frac_ids))
 
-      process_message[D](metric_name, pipeline_time_spent, data, i_producer,
-        msg_uid, frac_ids, i_seq_id, i_route_id,
+      process_message[D](metric_name, pipeline_time_spent, data, i_producer_id,
+        i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts)
     else
       ifdef "trace" then
@@ -490,15 +494,18 @@ actor Step is (Producer & Consumer)
 
   be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
     if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
       request_id, requester_id, requester)
     then
+      for w in leaving_workers.values() do
+        _remove_boundary(w)
+      end
       match _step_message_processor
       | let qmp: QueueingStepMessageProcessor =>
         // Process all queued messages
-        qmp.flush()
+        qmp.flush(_omni_router)
 
         _step_message_processor = NormalStepMessageProcessor(this)
       end
@@ -507,7 +514,7 @@ actor Step is (Producer & Consumer)
           let new_request_id =
             _in_flight_ack_waiter.add_consumer_resume_request()
           r.request_in_flight_resume_ack(in_flight_resume_ack_id,
-            new_request_id, _id, this)
+            new_request_id, _id, this, leaving_workers)
         end
       else
         _in_flight_ack_waiter.try_finish_resume_request_early()

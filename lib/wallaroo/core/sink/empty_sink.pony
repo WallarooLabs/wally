@@ -27,8 +27,8 @@ use "wallaroo_labs/mort"
 
 actor EmptySink is Consumer
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    seq_id: SeqId, route_id: RouteId,
+    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
@@ -37,8 +37,8 @@ actor EmptySink is Consumer
     None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    incoming_seq_id: SeqId, route_id: RouteId,
+    data: D, producer_id: StepId, producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     None
@@ -73,7 +73,7 @@ actor EmptySink is Consumer
 
   be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
     None
 

@@ -42,10 +42,9 @@ interface SourceNotify
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
 
 interface val SourceNotifyBuilder[In: Any val, SH: SourceHandler[In] val]
-  fun apply(pipeline_name: String, env: Env, auth: AmbientAuth,
-    handler: SH,
-    runner_builder: RunnerBuilder, router: Router,
-    metrics_reporter: MetricsReporter iso, event_log: EventLog,
+  fun apply(source_id: StepId, pipeline_name: String, env: Env,
+    auth: AmbientAuth, handler: SH, runner_builder: RunnerBuilder,
+    router: Router, metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
     pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
     SourceNotify iso^

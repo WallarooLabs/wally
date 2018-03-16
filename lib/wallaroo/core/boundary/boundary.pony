@@ -72,20 +72,20 @@ class val OutgoingBoundaryBuilder
     _service = s
     _spike_config = spike_config
 
-  fun apply(step_id: StepId): OutgoingBoundary =>
-    let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
-      _host, _service where spike_config = _spike_config)
+  fun apply(step_id: StepId, target_worker: String): OutgoingBoundary =>
+    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
+      _reporter.clone(), _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary
 
-  fun build_and_initialize(step_id: StepId,
+  fun build_and_initialize(step_id: StepId, target_worker: String,
     layout_initializer: LayoutInitializer): OutgoingBoundary
   =>
     """
     Called when creating a boundary post cluster initialization
     """
-    let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
-      _host, _service where spike_config = _spike_config)
+    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
+      _reporter.clone(), _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary.quick_initialize(layout_initializer)
     boundary
@@ -135,6 +135,7 @@ actor OutgoingBoundary is Consumer
   var _replaying: Bool = false
   let _auth: AmbientAuth
   let _worker_name: String
+  let _target_worker: String
   var _step_id: StepId = 0
   let _host: String
   let _service: String
@@ -151,7 +152,10 @@ actor OutgoingBoundary is Consumer
   var _reconnect_pause: U64 = 10_000_000_000
   let _timers: Timers = Timers
 
-  new create(auth: AmbientAuth, worker_name: String,
+  //!@
+  var _boundary_status: Bool = false
+
+  new create(auth: AmbientAuth, worker_name: String, target_worker: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
     spike_config:(SpikeConfig | None) = None)
@@ -174,6 +178,7 @@ actor OutgoingBoundary is Consumer
     end
 
     _worker_name = worker_name
+    _target_worker = target_worker
     _host = host
     _service = service
     _from = from
@@ -280,16 +285,16 @@ actor OutgoingBoundary is Consumer
     _in_flight_ack_waiter = InFlightAckWaiter(_step_id)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    seq_id: SeqId, route_id: RouteId,
+    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Run should never be called on an OutgoingBoundary
     Fail()
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    incoming_seq_id: SeqId, route_id: RouteId,
+    data: D, producer_id: StepId, producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Should never be called on an OutgoingBoundary
@@ -447,12 +452,20 @@ actor OutgoingBoundary is Consumer
     _upstreams.unset(producer)
 
   be report_status(code: ReportStatusCode) =>
-    _in_flight_ack_waiter.report_status(code)
-    try
-      _writev(ChannelMsgEncoder.report_status(code, _auth)?)
-    else
-      Fail()
+    if not _boundary_status then
+      //!@
+      match code
+      | BoundaryStatus =>
+        @printf[I32]("!@ BoundaryStatus: Boundary to %s id: %s\n".cstring(), _target_worker.cstring(), _step_id.string().cstring())
+      end
+      _in_flight_ack_waiter.report_status(code)
+      try
+        _writev(ChannelMsgEncoder.report_status(code, _auth)?)
+      else
+        Fail()
+      end
     end
+    _boundary_status = true
 
   be request_in_flight_ack(upstream_request_id: RequestId,
     requester_id: StepId, upstream_requester: InFlightAckRequester)
@@ -474,7 +487,7 @@ actor OutgoingBoundary is Consumer
 
   be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
     if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
       request_id, requester_id, requester)
@@ -483,7 +496,8 @@ actor OutgoingBoundary is Consumer
         let new_request_id =
           _in_flight_ack_waiter.add_consumer_resume_request()
         _writev(ChannelMsgEncoder.request_in_flight_resume_ack(_worker_name,
-          in_flight_resume_ack_id, new_request_id, _step_id, _auth)?)
+          in_flight_resume_ack_id, new_request_id, _step_id,
+          leaving_workers, _auth)?)
       else
         Fail()
       end

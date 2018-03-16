@@ -325,10 +325,11 @@ primitive ChannelMsgEncoder
 
   fun request_in_flight_resume_ack(sender: String,
     in_flight_resume_ack_id: InFlightResumeAckId, request_id: RequestId,
-    requester_id: StepId, auth: AmbientAuth): Array[ByteSeq] val ?
+    requester_id: StepId, leaving_workers: Array[String] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(RequestInFlightResumeAckMsg(sender, in_flight_resume_ack_id,
-      request_id, requester_id), auth)?
+      request_id, requester_id, leaving_workers), auth)?
 
   fun in_flight_ack(sender: String, request_id: RequestId, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -635,13 +636,13 @@ trait val DeliveryMsg is ChannelMsg
   fun target_id(): StepId
   fun sender_name(): String
   fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): Bool
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): Bool
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   fun input(): Any val
   fun metric_name(): String
   fun msg_uid(): MsgId
@@ -676,21 +677,21 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun sender_name(): String => _sender_name
 
   fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): Bool
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
-    target_step.run[D](_metric_name, pipeline_time_spent, _data, producer,
-      _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+    target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+      producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
     false
 
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): Bool
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
-    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, producer,
-      _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
-      worker_ingress_ts)
+    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
+      metrics_id, worker_ingress_ts)
     false
 
 class val JoinClusterMsg is ChannelMsg
@@ -846,14 +847,18 @@ class val RequestInFlightResumeAckMsg is ChannelMsg
   let in_flight_resume_ack_id: InFlightResumeAckId
   let request_id: RequestId
   let requester_id: StepId
+  let leaving_workers: Array[String] val
 
-  new val create(sender': String, in_flight_resume_ack_id': InFlightResumeAckId,
-    request_id': RequestId, requester_id': StepId)
+  new val create(sender': String,
+    in_flight_resume_ack_id': InFlightResumeAckId,
+    request_id': RequestId, requester_id': StepId,
+    leaving_workers': Array[String] val)
   =>
     sender = sender'
     in_flight_resume_ack_id = in_flight_resume_ack_id'
     request_id = request_id'
     requester_id = requester_id'
+    leaving_workers = leaving_workers'
 
 class val ResumeTheWorldMsg is ChannelMsg
   let sender: String

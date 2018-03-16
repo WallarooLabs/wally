@@ -129,7 +129,8 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let new_boundary =
-          builder.build_and_initialize(_step_id_gen(), _layout_initializer)
+          builder.build_and_initialize(_step_id_gen(), target_worker_name,
+            _layout_initializer)
         router_registry.register_disposable(new_boundary)
         _outgoing_boundaries(target_worker_name) = new_boundary
       end
@@ -206,7 +207,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let boundary = builder.build_and_initialize(_step_id_gen(),
-          _layout_initializer)
+          target_worker_name, _layout_initializer)
         _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
         _routes(boundary) =
@@ -216,6 +217,9 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     _notify.update_boundaries(_outgoing_boundaries)
 
   be remove_boundary(worker: String) =>
+    _remove_boundary(worker)
+
+  fun ref _remove_boundary(worker: String) =>
     if _outgoing_boundaries.contains(worker) then
       try
         let boundary = _outgoing_boundaries(worker)?
@@ -310,8 +314,8 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       route.report_status(code)
     end
 
-  be request_in_flight_ack(upstream_request_id: RequestId, requester_id: StepId,
-    upstream_requester: InFlightAckRequester)
+  be request_in_flight_ack(upstream_request_id: RequestId,
+    requester_id: StepId, upstream_requester: InFlightAckRequester)
   =>
     if not _in_flight_ack_waiter.already_added_request(requester_id) then
       _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
@@ -331,17 +335,20 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
   be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
     if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
       request_id, requester_id, requester)
     then
+      for w in leaving_workers.values() do
+        _remove_boundary(w)
+      end
       if _routes.size() > 0 then
         for route in _routes.values() do
           let new_request_id =
             _in_flight_ack_waiter.add_consumer_resume_request()
           route.request_in_flight_resume_ack(in_flight_resume_ack_id,
-            new_request_id, _source_id, this)
+            new_request_id, _source_id, this, leaving_workers)
         end
       else
         _in_flight_ack_waiter.try_finish_resume_request_early()

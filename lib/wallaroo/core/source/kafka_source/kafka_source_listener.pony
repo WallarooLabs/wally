@@ -209,10 +209,10 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
             | let kc: KafkaClient tag =>
               let source_id = _step_id_gen()
               let source = KafkaSource[In](source_id, this,
-                _notify.build_source(_env)?, _router.routes(), _route_builder,
-                _outgoing_boundary_builders, _layout_initializer,
-                _metrics_reporter.clone(), topic, part_id, kc,
-                _router_registry)
+                _notify.build_source(source_id, _env)?, _router.routes(),
+                _route_builder, _outgoing_boundary_builders,
+                _layout_initializer, _metrics_reporter.clone(), topic, part_id,
+                kc, _router_registry)
               partitions_sources(part_id) = source
               _router_registry.register_source(source, source_id)
               match _router

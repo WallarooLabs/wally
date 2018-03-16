@@ -39,7 +39,7 @@ interface Runner
   // and a U64 indicating the last timestamp for calculating the duration of
   // the computation
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer: Producer ref, router: Router,
+    data: D, producer_id: StepId, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -447,7 +447,7 @@ class ComputationRunner[In: Any val, Out: Any val]
     _next = consume next
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer: Producer ref, router: Router,
+    data: D, producer_id: StepId, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -473,8 +473,8 @@ class ComputationRunner[In: Any val, Out: Any val]
         match result
         | None => (true, computation_end)
         | let output: Out =>
-          _next.run[Out](metric_name, pipeline_time_spent, output, producer,
-            router, omni_router,
+          _next.run[Out](metric_name, pipeline_time_spent, output, producer_id,
+            producer, router, omni_router,
             i_msg_uid, frac_ids,
             computation_end, new_metrics_id, worker_ingress_ts,
             metrics_reporter)
@@ -500,7 +500,7 @@ class ComputationRunner[In: Any val, Out: Any val]
             end
 
             (let f, let ts) = _next.run[Out](metric_name,
-              pipeline_time_spent, output, producer,
+              pipeline_time_spent, output, producer_id, producer,
               router, omni_router,
               i_msg_uid, o_frac_ids,
               computation_end, new_metrics_id, worker_ingress_ts,
@@ -556,7 +556,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
     _state_name = state_name'
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer: Producer ref, router: Router,
+    data: D, producer_id: StepId, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -577,7 +577,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
             StateComputationWrapper[In, Out, S](input, _state_comp,
               _target_ids)
           shared_state_router.route[StateComputationWrapper[In, Out, S]](
-            metric_name, pipeline_time_spent, processor, producer,
+            metric_name, pipeline_time_spent, processor, producer_id, producer,
             i_msg_uid, frac_ids, latest_ts, metrics_id + 1,
             worker_ingress_ts)
         end
@@ -650,7 +650,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
     end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer: Producer ref, router: Router,
+    data: D, producer_id: StepId, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -667,7 +667,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
         end
 
       let result = sp(_state, _state_change_repository, omni_router,
-        metric_name, pipeline_time_spent, producer,
+        metric_name, pipeline_time_spent, producer_id, producer,
         i_msg_uid, frac_ids, latest_ts, new_metrics_id, worker_ingress_ts)
       let is_finished = result._1
       let state_change = result._2
@@ -753,8 +753,8 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
     end
 
 class iso RouterRunner
-  fun ref run[Out: Any val](metric_name: String, pipeline_time_spent: U64,
-    output: Out, producer: Producer ref, router: Router,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, producer_id: StepId, producer: Producer ref, router: Router,
     omni_router: OmniRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -762,8 +762,9 @@ class iso RouterRunner
   =>
     match router
     | let r: Router =>
-      r.route[Out](metric_name, pipeline_time_spent, output, producer,
-        i_msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+      r.route[D](metric_name, pipeline_time_spent, data, producer_id,
+        producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
+        worker_ingress_ts)
     end
 
   fun name(): String => "Router runner"

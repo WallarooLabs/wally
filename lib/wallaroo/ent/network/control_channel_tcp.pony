@@ -359,7 +359,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           m.request_id, m.requester_id)
       | let m: RequestInFlightResumeAckMsg =>
         _router_registry.remote_request_in_flight_resume_ack(m.sender,
-          m.in_flight_resume_ack_id, m.request_id, m.requester_id)
+          m.in_flight_resume_ack_id, m.request_id, m.requester_id,
+          m.leaving_workers)
       | let m: InFlightAckMsg =>
         ifdef "trace" then
           @printf[I32]("Received InFlightAckMsg from %s\n".cstring(),
