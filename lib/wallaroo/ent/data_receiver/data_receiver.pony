@@ -26,6 +26,7 @@ use "wallaroo/core/topology"
 
 
 actor DataReceiver is Producer
+  let _id: StepId
   let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
@@ -59,6 +60,7 @@ actor DataReceiver is Producer
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     initialized: Bool = false)
   =>
+    _id = StepIdGenerator()
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
@@ -142,6 +144,12 @@ actor DataReceiver is Producer
     None
 
   be report_status(code: ReportStatusCode) =>
+    //!@
+    match code
+    | BoundaryStatus =>
+      @printf[I32]("!@ BoundaryStatus: DataReceiver from %s id: %s\n".cstring(), _sender_name.cstring(), _id.string().cstring())
+    end
+    _in_flight_ack_waiter.report_status(code)
     _router.report_status(code)
 
   be request_in_flight_ack(upstream_request_id: RequestId, requester_id: StepId)
@@ -160,14 +168,15 @@ actor DataReceiver is Producer
     end
 
   be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    upstream_request_id: RequestId, requester_id: StepId)
+    upstream_request_id: RequestId, requester_id: StepId,
+    leaving_workers: Array[String] val)
   =>
     if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
       upstream_request_id, requester_id, EmptyInFlightAckRequester,
       _WriteFinishedCompleteAck(this, upstream_request_id))
     then
       _router.request_in_flight_resume_ack(in_flight_resume_ack_id,
-        requester_id, this, _in_flight_ack_waiter)
+        requester_id, this, _in_flight_ack_waiter, leaving_workers)
     end
 
   be try_finish_in_flight_request_early(requester_id: StepId) =>
@@ -255,7 +264,7 @@ actor DataReceiver is Producer
     if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
-      _router.route(d, pipeline_time_spent, this, seq_id, latest_ts,
+      _router.route(d, pipeline_time_spent, _id, this, seq_id, latest_ts,
         metrics_id, worker_ingress_ts)
       _maybe_ack()
     end
@@ -274,8 +283,8 @@ actor DataReceiver is Producer
   =>
     if seq_id > _last_id_seen then
       _last_id_seen = seq_id
-      _router.replay_route(r, pipeline_time_spent, this, seq_id, latest_ts,
-        metrics_id, worker_ingress_ts)
+      _router.replay_route(r, pipeline_time_spent, _id, this, seq_id,
+        latest_ts, metrics_id, worker_ingress_ts)
     end
 
   fun ref _maybe_ack() =>

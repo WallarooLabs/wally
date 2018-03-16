@@ -1341,7 +1341,9 @@ actor LocalTopologyInitializer is LayoutInitializer
           data_routes(k) = v
         end
 
-        let data_router = DataRouter(consume data_routes)
+        let sendable_data_routes = consume val data_routes
+
+        let data_router = DataRouter(sendable_data_routes)
         _router_registry.set_data_router(data_router)
 
         if not _is_initializer then
@@ -1376,8 +1378,10 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         let omni_router = StepIdRouter(_worker_name,
-          consume built_stateless_steps, t.step_map(), _outgoing_boundaries,
-          consume stateless_partition_routers_trn)
+          sendable_data_routes, t.step_map(), _outgoing_boundaries,
+          consume stateless_partition_routers_trn,
+          recover Map[StepId, Source] end,
+          recover Map[String, DataReceiver] end)
         _router_registry.set_omni_router(omni_router)
 
         _omni_router = omni_router

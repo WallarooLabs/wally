@@ -32,8 +32,9 @@ trait Route
   // Return false to indicate queue is full and if producer is a Source, it
   // should mute
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,
@@ -48,7 +49,7 @@ trait Route
   fun ref request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
   fun ref receive_in_flight_ack(request_id: RequestId)
 
 trait RouteLogic
@@ -105,8 +106,9 @@ class EmptyRoute is Route
   fun ref request_ack() => None
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     Fail()
     true
@@ -130,7 +132,7 @@ class EmptyRoute is Route
   fun ref request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
     Fail()
 

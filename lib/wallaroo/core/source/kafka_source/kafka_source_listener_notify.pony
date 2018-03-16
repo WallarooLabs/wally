@@ -36,9 +36,11 @@ class KafkaSourceListenerNotify[In: Any val]
     _target_router = target_router
     _auth = auth
 
-  fun ref build_source(env: Env): KafkaSourceNotify[In] iso^ ? =>
+  fun ref build_source(source_id: StepId, env: Env):
+    KafkaSourceNotify[In] iso^ ?
+  =>
     try
-      _source_builder(_event_log, _auth, _target_router, env) as
+      _source_builder(source_id, _event_log, _auth, _target_router, env) as
         KafkaSourceNotify[In] iso^
     else
       @printf[I32](

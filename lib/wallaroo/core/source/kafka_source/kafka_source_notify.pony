@@ -28,19 +28,20 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
 primitive KafkaSourceNotifyBuilder[In: Any val]
-  fun apply(pipeline_name: String, env: Env, auth: AmbientAuth,
-    handler: SourceHandler[In] val,
+  fun apply(source_id: StepId, pipeline_name: String, env: Env,
+    auth: AmbientAuth, handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
     pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
     SourceNotify iso^
   =>
-    KafkaSourceNotify[In](pipeline_name, env, auth, handler, runner_builder,
-      router, consume metrics_reporter, event_log, target_router,
-      pre_state_target_ids)
+    KafkaSourceNotify[In](source_id, pipeline_name, env, auth, handler,
+      runner_builder, router, consume metrics_reporter, event_log,
+      target_router, pre_state_target_ids)
 
 class KafkaSourceNotify[In: Any val]
+  let _source_id: StepId
   let _env: Env
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
   let _pipeline_name: String
@@ -51,13 +52,14 @@ class KafkaSourceNotify[In: Any val]
   let _omni_router: OmniRouter = EmptyOmniRouter
   let _metrics_reporter: MetricsReporter
 
-  new iso create(pipeline_name: String, env: Env, auth: AmbientAuth,
-    handler: SourceHandler[In] val,
+  new iso create(source_id: StepId, pipeline_name: String, env: Env,
+    auth: AmbientAuth, handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
     pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
   =>
+    _source_id = source_id
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
     _env = env
@@ -70,7 +72,7 @@ class KafkaSourceNotify[In: Any val]
   fun routes(): Array[Consumer] val =>
     _router.routes()
 
-  fun ref received(src: KafkaSource[In] ref, kafka_msg_value: Array[U8] iso,
+  fun ref received(source: KafkaSource[In] ref, kafka_msg_value: Array[U8] iso,
     kafka_msg_key: (Array[U8] val | None),
     kafka_msg_metadata: KafkaMessageMetadata val,
     network_received_timestamp: U64)
@@ -95,7 +97,7 @@ class KafkaSourceNotify[In: Any val]
 
     (let is_finished, let last_ts) =
       try
-        src.next_sequence_id()
+        source.next_sequence_id()
         let decoded =
           try
             _handler.decode(consume data)?
@@ -116,7 +118,7 @@ class KafkaSourceNotify[In: Any val]
             " source\n").cstring())
         end
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          src, _router, _omni_router, _msg_id_gen(), None,
+          _source_id, source, _router, _omni_router, _msg_id_gen(), None,
           decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
       else
         @printf[I32](("Unable to decode message at " + _pipeline_name +

@@ -21,6 +21,7 @@ use "ponytest"
 use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/source"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -151,11 +152,15 @@ class iso _TestOmniRouterEquality is UnitTest
 
     var base_router: OmniRouter = StepIdRouter("w1",
       consume base_data_routes, consume base_step_map,
-      consume base_boundaries, consume base_stateless_partitions)
+      consume base_boundaries, consume base_stateless_partitions,
+      recover Map[StepId, Source] end,
+      recover Map[String, DataReceiver] end)
 
     let target_router: OmniRouter = StepIdRouter("w1",
       consume target_data_routes, consume target_step_map,
-      consume target_boundaries, consume target_stateless_partitions)
+      consume target_boundaries, consume target_stateless_partitions,
+      recover Map[StepId, Source] end,
+      recover Map[String, DataReceiver] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
@@ -279,7 +284,7 @@ primitive _StepGenerator
 
 primitive _BoundaryGenerator
   fun apply(worker_name: String, auth: AmbientAuth): OutgoingBoundary =>
-    OutgoingBoundary(auth, worker_name,
+    OutgoingBoundary(auth, worker_name, "",
       MetricsReporter("", "", _NullMetricsSink), "", "")
 
 primitive _RouterRegistryGenerator

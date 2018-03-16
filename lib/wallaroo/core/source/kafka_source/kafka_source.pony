@@ -85,7 +85,8 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       let new_boundary =
-        builder.build_and_initialize(_step_id_gen(), _layout_initializer)
+        builder.build_and_initialize(_step_id_gen(), target_worker_name,
+          _layout_initializer)
       router_registry.register_disposable(new_boundary)
       _outgoing_boundaries(target_worker_name) = new_boundary
     end
@@ -154,7 +155,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let boundary = builder.build_and_initialize(_step_id_gen(),
-          _layout_initializer)
+          target_worker_name, _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
         _routes(boundary) =
@@ -266,7 +267,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
   be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
   =>
     if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
       request_id, requester_id, requester)
@@ -275,7 +276,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
         let new_request_id =
           _in_flight_ack_waiter.add_consumer_resume_request()
         route.request_in_flight_resume_ack(in_flight_resume_ack_id,
-          new_request_id, _source_id, this)
+          new_request_id, _source_id, this, leaving_workers)
       end
     end
 
