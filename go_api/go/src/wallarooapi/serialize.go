@@ -7,7 +7,6 @@ import "C"
 import (
 	"encoding/binary"
 	"fmt"
-	"sync"
 	"unsafe"
 )
 
@@ -24,7 +23,7 @@ func makeSerializedDicts() []*SerializedDict {
 var serializedDicts = makeSerializedDicts()
 
 func NewSerializedDict() *SerializedDict {
-	return &SerializedDict {sync.RWMutex{}, make(map[uint64] []byte)}
+	return &SerializedDict{0, NewConcurrentMap()}
 }
 
 var Serialize func(interface{}) []byte = func(c interface{}) []byte {
@@ -38,26 +37,23 @@ var Deserialize func([]byte) interface{} = func([]byte) interface{} {
 }
 
 type SerializedDict struct {
-	mu sync.RWMutex
-	buffers map[uint64] []byte
+	id uint64
+	buffermaps ConcurrentMap
 }
 
 func (sd *SerializedDict) add(id uint64, buffer []byte) {
-	sd.mu.Lock()
-	defer sd.mu.Unlock()
-	sd.buffers[id] = buffer
+	sd.buffermaps.Store(id, buffer)
+
 }
 
 func (sd *SerializedDict) get(id uint64) []byte {
-	sd.mu.RLock()
-	defer sd.mu.RUnlock()
-	return sd.buffers[id]
+	result, _ := sd.buffermaps.Load(id)
+	buff := result.([]byte)
+	return buff
 }
 
 func (sd *SerializedDict) remove(id uint64) {
-	sd.mu.Lock()
-	defer sd.mu.Unlock()
-	delete(sd.buffers, id)
+	sd.buffermaps.Delete(id)
 }
 
 //export ComponentSerializeGetSpaceWrapper
