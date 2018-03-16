@@ -20,8 +20,6 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     [log_name: log_name, interval_key: interval_key, pipeline_key: pipeline_key,
      aggregate_interval: aggregate_interval, app_name: app_name,
      category: category, msg_timestamp: msg_timestamp] = args
-    msg_log_name = message_log_name(app_name, category, pipeline_key, interval_key)
-    stats_msg_log_name = stats_message_log_name(app_name, category, pipeline_key, interval_key)
     bins_type = Application.get_env(:metrics_reporter_ui, :bins_type)
     bins = if bins_type == "demo" do
       ["10", "12", "14", "16", "18", "20", "22", "24", "26", "28", "30", "64"]
@@ -33,12 +31,12 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     send(self(), :calculate_and_publish_latency_percentage_bins_msgs)
     {:ok, %{
       log_name: log_name, interval_key: interval_key, aggregate_interval: aggregate_interval, bins: bins, all_bins: all_bins,
-      category: category, pipeline_key: pipeline_key, msg_log_name: msg_log_name, stats_msg_log_name: stats_msg_log_name,
+      category: category, pipeline_key: pipeline_key,
       time_diff: time_diff, start_time: msg_timestamp, app_name: app_name}}
   end
 
   def handle_info(:calculate_and_publish_latency_percentage_bins_msgs, state) do
-    %{log_name: log_name, msg_log_name: msg_log_name, interval_key: interval_key, stats_msg_log_name: stats_msg_log_name,
+    %{log_name: log_name, interval_key: interval_key,
     pipeline_key: pipeline_key, aggregate_interval: aggregate_interval, category: category, bins: bins, all_bins: all_bins,
     time_diff: time_diff, start_time: _start_time, app_name: app_name} = state
     :timer.sleep(2500)
@@ -56,22 +54,12 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
 
     latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(latency_bins_list, bins)
     latency_percentage_bins_msg = generate_latency_percentage_bins_msg(latency_percentage_bins_data, app_name, pipeline_key, current_time)
-    {:ok, latency_percentage_bins_msg} = store_latest_latency_percentage_bins_msg(msg_log_name, latency_percentage_bins_msg)
     broadcast_latest_latency_percentage_bins_msg(category, app_name, pipeline_key, interval_key, latency_percentage_bins_msg)
 
     latency_bins_percentile_stats_msg = generate_latency_bins_percentile_stats_msg(latency_bins_percentile_data, app_name, pipeline_key, current_time)
-    {:ok, ^latency_bins_percentile_stats_msg} = store_latest_latency_bins_percentile_stats_msg(stats_msg_log_name, latency_bins_percentile_stats_msg)
     broadcast_latest_latency_bins_percentile_stats_msg(category, app_name, pipeline_key, interval_key, latency_bins_percentile_stats_msg)
     send(self(), :calculate_and_publish_latency_percentage_bins_msgs)
     {:noreply, state}
-  end
-
-  defp message_log_name(app_name, category, pipeline_key, interval_key) do
-    "app_name:" <> app_name <> "::category:" <> category <> "::cat-name:" <> pipeline_key <> "::latency-percentage-bins:" <> interval_key
-  end
-
-  defp stats_message_log_name(app_name, category, pipeline_key, interval_key) do
-    "app_name:" <> app_name <> "::category:" <> category <> "::cat-name:" <> pipeline_key <> "::latency-percentile-bin-stats:" <> interval_key
   end
 
   defp generate_worker_name(log_name, interval_key) do
@@ -93,12 +81,6 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     "time" => time_now, "latency_stats" => latency_bins_percentile_data}
   end
 
-  def store_latest_latency_bins_percentile_stats_msg(msg_log_name, stats_msg) do
-    :ok = MessageLog.Supervisor.lookup_or_create msg_log_name
-    {:ok, ^stats_msg} = MessageLog.log_message(msg_log_name, stats_msg)
-  end
-
-
   defp broadcast_latest_latency_percentage_bins_msg(category, app_name, pipeline_key, interval_key, latency_percentage_bins_msg) do
     topic = MonitoringHubUtils.Helpers.create_channel_name(category, app_name, pipeline_key)
     event = "latency-percentage-bins:" <> interval_key
@@ -109,11 +91,6 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     topic = MonitoringHubUtils.Helpers.create_channel_name(category, app_name, pipeline_key)
     event = "latency-percentile-bin-stats:" <> interval_key
     MetricsReporterUI.Endpoint.broadcast! topic, event, stats_msg
-  end
-
-  defp store_latest_latency_percentage_bins_msg(msg_log_name, latency_percentage_bins_msg) do
-    :ok = MessageLog.Supervisor.lookup_or_create(msg_log_name)
-    {:ok, ^latency_percentage_bins_msg} = MessageLog.log_message(msg_log_name, latency_percentage_bins_msg)
   end
 
   defp generate_empty_latency_percentage_bins_msg(timestamp, app_name, pipeline_key) do
