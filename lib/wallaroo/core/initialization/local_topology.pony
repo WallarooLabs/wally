@@ -1518,6 +1518,9 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
+  be ack_migration_batch_complete(sender: String) =>
+    _router_registry.ack_migration_batch_complete(sender)
+
   be shrinkable_query(conn: TCPConnection) =>
     let available = recover iso Array[String] end
     match _topology

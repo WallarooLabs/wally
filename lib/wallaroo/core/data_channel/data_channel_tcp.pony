@@ -232,9 +232,11 @@ class DataChannelConnectNotifier is DataChannelNotify
         ifdef "trace" then
           @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
         end
-        // Go through router_registry to make sure pending messages on
-        // registry are processed first
-        _router_registry.ack_migration_batch_complete(m.sender_name)
+        // Go through layout_initializer and router_registry to make sure
+        // pending messages on registry are processed first. That's because
+        // the current message path for receiving immigrant steps is
+        // layout_initializer then router_registry.
+        _layout_initializer.ack_migration_batch_complete(m.sender_name)
       | let aw: AckWatermarkMsg =>
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
