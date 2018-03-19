@@ -104,7 +104,7 @@ class ObservabilityNotifier(StoppableThread):
     """
     __base_name__ = 'ObservabilityNotifier'
 
-    def __init__(self, query_func, tests, timeout=240, period=2):
+    def __init__(self, query_func, tests, timeout=30, period=2):
         """
         - `query_func` is an argument-free function to query an observability
         statys. You can use `functools.partial` to create it.

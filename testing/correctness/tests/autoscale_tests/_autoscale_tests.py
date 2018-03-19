@@ -383,6 +383,7 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                        control_port, external_port, data_port, res_dir,
                                        joiners, *joiner_ports[i])
                             joined.append(runners[-1])
+                        time.sleep(1)
 
                         # Verify cluster is paused
                         #obs = ObservabilityNotifier(query_func_cluster_status,
@@ -394,7 +395,7 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
 
                         # Verify cluster has resumed processing
                         obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_processing)
+                            test_cluster_is_processing, timeout=120)
                         obs.start()
                         obs.join()
                         if obs.error:
