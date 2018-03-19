@@ -7,6 +7,7 @@ endif
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
+
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
 # `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
@@ -15,46 +16,46 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := true
 
 # `true`/`false` to enable/disable generate final file build target using ponyc command for the pony build target so
 # it can be overridden manually
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
 
 # `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
 # otherwise targets only get created if there are elixir sources (*.exs) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_EXS_TARGET := true
 
 # `true`/`false` to enable/disable generate docker related targets (build/push) for a Dockerfile in this directory
 # otherwise targets only get created if there is a Dockerfile in this directory
-$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 
 # `true`/`false` to enable/disable recursing into Makefiles of subdirectories if they exist
 # (and by recursion every makefile in the tree that is referenced)
-$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
-AUTOSCALE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-CUSTOM_PATH += :$(EXTERNAL_SENDER_PATH):$(TESTING_ALPHABET_PATH):$(TESTING_ALPHABET27_PATH):$(CLUSTER_SHRINKER_PATH)
-CUSTOM_PYTHONPATH += $(TESTING_ALPHABET_PYTHON_PATH):$(TESTING_ALPHABET_PYTHON27_PATH)
 
-build-testing-correctness-tests-autoscale_tests: build-testing-correctness-apps-alphabet
-build-testing-correctness-tests-autoscale_tests: build-testing-correctness-apps-alphabet27
-build-testing-correctness-tests-autoscale_tests: build-machida
-build-testing-correctness-tests-autoscale_tests: build-testing-tools-external_sender
-build-testing-correctness-tests-autoscale_tests: build-utils-cluster_shrinker
-integration-tests-testing-correctness-tests-autoscale_tests: build-testing-correctness-tests-autoscale_tests
-integration-tests-testing-correctness-tests-autoscale_tests: autoscale_tests
+TESTING_ALPHABET27_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
-ifeq ($(autoscale),on)
-autoscale_tests:
-	cd $(AUTOSCALE_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose --exitfirst autoscale_tests.py $(pytest_exp)
-else
-autoscale_tests:
-	$(QUIET)printf "autoscale_tests not run.\nRun make with 'autoscale=on' to run this test.\n"
-endif
+integration-tests-testing-correctness-apps-alphabet27: testing_alphabet27_test
 
+testing_alphabet27_test:
+	cd $(TESTING_ALPHABET27_PATH) && \
+	integration_test \
+	  --framed-file-sender input.msg \
+	  --framed-file-sender input.msg \
+	  --framed-file-sender input.msg \
+	  --framed-file-sender input.msg \
+		--validation-cmd 'python validate.py --expected output.json --repetitions 4 --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command './alphabet27' \
+		--workers 10 \
+		--sink-expect 4000
+
+# end of prevent rules from being evaluated/included multiple times
 endif
