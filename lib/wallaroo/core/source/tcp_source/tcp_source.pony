@@ -82,6 +82,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   var _closed: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   var _read_buf: Array[U8] iso
+  var _read_buf_offset: USize = 0
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
   var _read_len: USize = 0
@@ -595,11 +596,11 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
         end
 
         // Read as much data as possible.
-        _read_buf_size(sum)
+        //_read_buf_size(sum)
         let len = @pony_os_recv[USize](
           _event,
-          _read_buf.cpointer().usize() + _read_len,
-          _read_buf.size() - _read_len) ?
+          _read_buf.cpointer(_read_buf_offset),
+          _read_buf.size() - _read_buf_offset) ?
 
         match len
         | 0 =>
@@ -611,38 +612,55 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
           @pony_asio_event_resubscribe_read(_event)
           _reading = false
           return
-        | _next_size =>
+        | (_read_buf.size() - _read_buf_offset) =>
           // Increase the read buffer size.
           _next_size = _max_size.min(_next_size * 2)
         end
 
-        _read_len = _read_len + len
+        //_read_len = _read_len + len
+        _read_buf_offset = _read_buf_offset + len
 
-        if _read_len >= _expect then
-          reads = reads + 1
+        if (_expect == 0) and (_read_buf_offset > 0) then
           let data = _read_buf = recover Array[U8] end
           data.truncate(_read_len)
           _read_len = 0
 
-          let carry_on = _notify.received(this, consume data)
-          if _muted then
-            _reading = false
-            return
-          end
-          if not carry_on then
+          if not _notify.received(this, consume data) then
+            _read_buf_size(1)
             _read_again()
-            _reading = false
             return
+          else
+            _read_buf_size(1)
+          end
+        else
+          while _read_buf_offset >= _expect do
+            _read_len = _read_len + _expect
+            //@printf[I32]("_read_buf size is %d of %d\n".cstring(), _read_buf.size(), _read_buf.space())
+            let x = _read_buf = recover Array[U8] end
+            //@printf[I32]("chopping at %d\n".cstring(), _expect)
+            (let data, _read_buf) = (consume x).chop(_expect)
+            _read_buf_offset = _read_buf_offset - _expect
+            //@printf[I32]("_read_buf size is %d of %d\n".cstring(), _read_buf.size(), _read_buf.space())
+            //@printf[I32]("_read_buf_offset: %d\n".cstring(), _read_buf_offset)
+
+            if not _notify.received(this, consume data) then
+              //@printf[I32]("BUF SIZE A call point\n".cstring())
+              _read_buf_size(1)
+              _read_again()
+              return
+            end
           end
 
-          sum = sum + len
+          //@printf[I32]("BUF SIZE B call point\n".cstring())
+          _read_buf_size(1)
+        end
 
-          if (sum >= _max_size) or (reads >= max_reads) then
-            // If we've read _max_size, yield and read again later.
-            _read_again()
-            _reading = false
-            return
-          end
+        sum = sum + len
+
+        if (sum >= _max_size) or (reads >= max_reads)then
+          // If we've read _max_size, yield and read again later.
+          _read_again()
+          return
         end
       end
     else
@@ -664,17 +682,29 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     """
     Resize the read buffer.
     """
-    let size = if _expect != 0 then
-      _expect
+    if _expect == 0 then
+      _read_buf.undefined(_next_size)
     else
-      if (_next_size + less) <= _max_size then
-        _next_size
-      else
-        _next_size.min(_max_size - less)
+      // i want to know that the space in buffer
+      // is less than expect
+      //@printf[I32]("Buffer sizing: o- %d, s- %d\n".cstring(),
+      //  _read_buf_offset, _read_buf.space())
+      let rba = _read_buf.size() - _read_buf_offset
+      if _expect > _read_buf.size() then
+        //@printf[I32]("HERE %d %d %d %d %d\n".cstring(), _expect, rba, _read_buf.size(), _read_buf.space(), _read_buf_offset)
+        let data = _read_buf = recover Array[U8] end
+        _read_buf.undefined(_next_size)
+        for i in Range(0, _read_buf_offset) do
+          try
+            _read_buf.update(i, data(i)?)?
+          else
+            @printf[I32]("BAD BAD BAD\n".cstring())
+          end
+        end
+
+        _read_buf_offset = data.size()
       end
     end
-
-    _read_buf.undefined(size)
 
   fun ref _mute() =>
     ifdef debug then
