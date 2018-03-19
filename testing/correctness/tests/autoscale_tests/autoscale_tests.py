@@ -22,8 +22,10 @@ set_logging(name='autoscale_tests', level=INFO2,
 from _autoscale_tests import autoscale_sequence
 
 
-CMD_PONY = 'alphabet'
-CMD_PYTHON = 'machida --application-module alphabet'
+#CMD_PONY = 'alphabet'
+#CMD_PYTHON = 'machida --application-module alphabet'
+CMD_PONY = 'alphabet27'
+CMD_PYTHON = 'machida --application-module alphabet27'
 
 CYCLES=4
 
