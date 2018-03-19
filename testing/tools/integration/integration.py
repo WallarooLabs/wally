@@ -101,6 +101,15 @@ class SingleSocketReceiver(StoppableThread):
         else:
             self.name = self.__base_name__
 
+    def try_recv(self, bs):
+        """
+        Try to to run `sock.recv(bs)` and return None if error
+        """
+        try:
+            return self.sock.recv(bs)
+        except:
+            return None
+
     def append(self, bs):
         if self.mode == 'framed':
             self.accumulator.append(bs)
@@ -116,7 +125,7 @@ class SingleSocketReceiver(StoppableThread):
     def run_newlines(self):
         data = []
         while not self.stopped():
-            buf = self.sock.recv(1024)
+            buf = self.try_recv(1024)
             if not buf:
                 self.stop()
                 if data:
@@ -147,12 +156,12 @@ class SingleSocketReceiver(StoppableThread):
 
     def run_framed(self):
         while not self.stopped():
-            header = self.sock.recv(self.header_length)
+            header = self.try_recv(self.header_length)
             if not header:
                 self.stop()
                 continue
             expect = struct.unpack(self.header_fmt, header)[0]
-            data = self.sock.recv(expect)
+            data = self.try_recv(expect)
             if not data:
                 self.stop()
             else:
