@@ -60,7 +60,7 @@ class AutoscaleTimeoutError(AutoscaleTestError):
     pass
 
 
-fmt = '>I2sQ'
+fmt = '>IsQ'
 def decode(bs):
     return unpack(fmt, bs)[1:3]
 
@@ -247,6 +247,11 @@ def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
         if hasattr(err, 'as_error'):
             print("Autoscale Sequence test had the following the error "
                   "message:\n{}".format(err.as_error))
+        #if hasattr(err, 'runners'):
+        #    if not isinstance(err, PipelineTestError):
+        #        outputs = runners_output_format(err.runners)
+        #        print("Autoscale Sequence test runners had the following "
+        #              "output:\n===\n{}".format(outputs))
         raise err
 
 
@@ -288,14 +293,14 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             # Create sink, metrics, reader, sender
             sink = Sink(host)
             metrics = Metrics(host)
-            lowercase2 = [a + b for a in lowercase for b in lowercase]
-            char_cycle = cycle(lowercase2)
+            #lowercase2 = [a+b for a in lowercase for b in lowercase]
+            char_cycle = cycle(lowercase)
             expected = Counter()
             def count_sent(s):
                 expected[s] += 1
 
             reader = Reader(iter_generator(
-                items=char_cycle, to_string=lambda s: pack('>2sI', s, 1),
+                items=char_cycle, to_string=lambda s: pack('>sI', s, 1),
                 on_next=count_sent))
 
             # Start sink and metrics, and get their connection info
@@ -380,12 +385,12 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                             joined.append(runners[-1])
 
                         # Verify cluster is paused
-                        obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_not_processing)
-                        obs.start()
-                        obs.join()
-                        if obs.error:
-                            raise obs.error
+                        #obs = ObservabilityNotifier(query_func_cluster_status,
+                        #    test_cluster_is_not_processing)
+                        #obs.start()
+                        #obs.join()
+                        #if obs.error:
+                        #    raise obs.error
 
                         # Verify cluster has resumed processing
                         obs = ObservabilityNotifier(query_func_cluster_status,
@@ -479,6 +484,8 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                       [r.name for r in left]))
                         raise err
 
+                    time.sleep(1)
+
             # Test is done, so stop sender
             sender.stop()
 
@@ -494,7 +501,7 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             print('Sender sent {} messages'.format(sum(expected.values())))
 
             # Use Sink value to determine when to stop runners and sink
-            await_values = [pack('>I2sQ', 10, c, v) for c, v in
+            await_values = [pack('>IsQ', 9, c, v) for c, v in
                             expected.items()]
             stopper = SinkAwaitValue(sink, await_values, 30)
             stopper.start()
@@ -552,4 +559,6 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
     except Exception as err:
         if not hasattr(err, 'as_steps'):
             err.as_steps = steps
+        if not hasattr(err, 'runners'):
+            err.runners = runners
         raise err
