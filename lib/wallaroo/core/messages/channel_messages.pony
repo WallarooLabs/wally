@@ -295,7 +295,7 @@ primitive ChannelMsgEncoder
     _encode(ReplayBoundaryCountMsg(sender, count), auth)?
 
   fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, worker_name: String, key: K, state_name: String,
+    id: StepId, worker_name: String, key: K, state_name: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -305,6 +305,16 @@ primitive ChannelMsgEncoder
     """
     _encode(KeyedAnnounceNewStatefulStepMsg[K](id, worker_name, key,
       state_name), auth)?
+
+  fun announce_new_source(worker_name: String, id: StepId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    This message is sent to notify another worker that a new source
+    has been created on this worker and that routers should be
+    updated.
+    """
+    _encode(AnnounceNewSourceMsg(worker_name, id), auth)?
 
   fun rotate_log_files(auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(RotateLogFilesMsg, auth)?
@@ -793,7 +803,7 @@ class val KeyedAnnounceNewStatefulStepMsg[
   let _key: K
   let _state_name: String
 
-  new val create(id: U128, worker: String, k: K, s_name: String) =>
+  new val create(id: StepId, worker: String, k: K, s_name: String) =>
     _step_id = id
     _worker_name = worker
     _key = k
@@ -802,6 +812,18 @@ class val KeyedAnnounceNewStatefulStepMsg[
   fun update_registry(r: RouterRegistry) =>
     r.add_state_proxy[K](_step_id, ProxyAddress(_worker_name, _step_id), _key,
       _state_name)
+
+class val AnnounceNewSourceMsg is ChannelMsg
+  """
+  This message is sent to notify another worker that a new source has
+  been created on this worker and that routers should be updated.
+  """
+  let sender: String
+  let source_id: StepId
+
+  new val create(sender': String, id: StepId) =>
+    sender = sender'
+    source_id = id
 
 primitive RotateLogFilesMsg is ChannelMsg
   """
