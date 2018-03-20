@@ -44,7 +44,7 @@ from functools import partial
 from itertools import cycle
 import re
 from string import lowercase
-from struct import pack, unpack
+from struct import calcsize, pack, unpack
 import tempfile
 import time
 
@@ -60,7 +60,7 @@ class AutoscaleTimeoutError(AutoscaleTestError):
     pass
 
 
-fmt = '>IsQ'
+fmt = '>I2sQ'
 def decode(bs):
     return unpack(fmt, bs)[1:3]
 
@@ -96,6 +96,7 @@ def send_shrink_cmd(host, port, names=[], count=1):
     except AssertionError:
         raise AssertionError('External shrink trigger failed with '
                              'the error:\n{}'.format(stdout))
+    return stdout
 
 
 def phase_validate_output(runners, sink, expected):
@@ -162,6 +163,18 @@ def compact_sign(ops):
         else:
             new.append(o)
     return new
+
+
+def lowest_point(ops):
+    l = None
+    p = 0
+    for o in ops:
+        p += o
+        if l is None:
+            l  = p
+        if p < l:
+            l = p
+    return l
 
 
 def inverted(d):
@@ -265,9 +278,9 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
     # If no initial workers value is given, determine the minimum number
     # required at the start so that the cluster never goes below 1 worker.
     # If a number is given, then verify it is sufficient.
-    bottom = min(min(compact_sign(ops*cycles)), sum(ops*cycles))
-    if bottom < 1:
-        min_workers = abs(bottom) + 1
+    lowest = lowest_point(ops*cycles)
+    if lowest < 1:
+        min_workers = abs(lowest) + 1
     else:
         min_workers = 1
     if isinstance(initial, int):
@@ -275,7 +288,6 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
         workers = initial
     else:
         workers = min_workers
-
 
     batch_size = 10
     interval = 0.05
@@ -293,14 +305,14 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             # Create sink, metrics, reader, sender
             sink = Sink(host)
             metrics = Metrics(host)
-            #lowercase2 = [a+b for a in lowercase for b in lowercase]
-            char_cycle = cycle(lowercase)
+            lowercase2 = [a+b for a in lowercase for b in lowercase]
+            char_cycle = cycle(lowercase2)
             expected = Counter()
             def count_sent(s):
                 expected[s] += 1
 
             reader = Reader(iter_generator(
-                items=char_cycle, to_string=lambda s: pack('>sI', s, 1),
+                items=char_cycle, to_string=lambda s: pack('>2sI', s, 1),
                 on_next=count_sent))
 
             # Start sink and metrics, and get their connection info
@@ -435,19 +447,22 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                                     .format(joiners, len(left)))
 
                         # Send the shrink command
-                        send_shrink_cmd(host, external_port, names=[r.name for r in left])
+                        resp = send_shrink_cmd(host, external_port, names=[r.name for r in left])
+                        print("Sent a shrink command for {}".format([r.name for r in left]))
+                        print("Response was: {}".format(resp))
+                        time.sleep(1)
 
                         # Verify cluster is paused
-                        obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_not_processing)
-                        obs.start()
-                        obs.join()
-                        if obs.error:
-                            raise obs.error
+                        #obs = ObservabilityNotifier(query_func_cluster_status,
+                        #    test_cluster_is_not_processing)
+                        #obs.start()
+                        #obs.join()
+                        #if obs.error:
+                        #    raise obs.error
 
                         # Verify cluster has resumed processing
                         obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_processing)
+                            test_cluster_is_processing, timeout=30)
                         obs.start()
                         obs.join()
                         if obs.error:
@@ -502,8 +517,12 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             print('Sender sent {} messages'.format(sum(expected.values())))
 
             # Use Sink value to determine when to stop runners and sink
-            await_values = [pack('>IsQ', 9, c, v) for c, v in
+            pack677 = '>I2sQ'
+            pack27 = '>IsQ'
+            await_values = [pack(pack677, calcsize(pack677)-4, c, v) for c, v in
                             expected.items()]
+            #await_values = [pack(pack27, calcsize(pack27)-4, c, v) for c, v in
+            #                expected.items()]
             stopper = SinkAwaitValue(sink, await_values, 30)
             stopper.start()
             stopper.join()
