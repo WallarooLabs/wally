@@ -14,7 +14,6 @@
 
 
 import argparse
-from enum import IntEnum
 import struct
 import time
 import wallaroo
