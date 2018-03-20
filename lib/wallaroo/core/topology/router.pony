@@ -698,9 +698,6 @@ class val StepIdRouter is OmniRouter
     else
       match _sources(step_id)?
       | let p: Producer => p
-      | let pa: ProxyAddress =>
-        let worker = pa.worker
-        _data_receivers(worker)?
       else
         error
       end
