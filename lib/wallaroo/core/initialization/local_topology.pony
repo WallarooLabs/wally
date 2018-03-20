@@ -1380,7 +1380,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         let omni_router = StepIdRouter(_worker_name,
           sendable_data_routes, t.step_map(), _outgoing_boundaries,
           consume stateless_partition_routers_trn,
-          recover Map[StepId, Source] end,
+          recover Map[StepId, (ProxyAddress | Source)] end,
           recover Map[String, DataReceiver] end)
         _router_registry.set_omni_router(omni_router)
 

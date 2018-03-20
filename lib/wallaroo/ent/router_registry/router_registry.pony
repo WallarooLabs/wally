@@ -193,6 +193,17 @@ actor RouterRegistry is InFlightAckRequester
     end
     _distribute_omni_router()
     _connections.register_disposable(source)
+    _connections.notify_cluster_of_new_source(source_id)
+
+  be register_remote_source(sender: String, source_id: StepId) =>
+    match _omni_router
+    | let omnr: OmniRouter =>
+      _omni_router = omnr.add_source(source_id, ProxyAddress(sender,
+        source_id))
+    else
+      Fail()
+    end
+    _distribute_omni_router()
 
   be register_source_listener(source_listener: SourceListener) =>
     _source_listeners.set(source_listener)

@@ -241,7 +241,7 @@ actor Connections is Cluster
     end
 
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, key: K, state_name: String, exclusions: Array[String] val =
+    id: StepId, key: K, state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
   =>
     try
@@ -258,6 +258,15 @@ actor Connections is Cluster
       for producer in exclusions.values() do
         _control_conns(producer)?.writev(migration_complete_msg)
       end
+    else
+      Fail()
+    end
+
+  be notify_cluster_of_new_source(id: StepId) =>
+    try
+      let msg = ChannelMsgEncoder.announce_new_source(_worker_name, id,
+        _auth)?
+      _send_control_to_cluster(msg)
     else
       Fail()
     end

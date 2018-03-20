@@ -261,7 +261,7 @@ trait val OmniRouter is Equatable[OmniRouter]
   fun val remove_boundary(w: String): OmniRouter
   fun val add_data_receiver(w: String, dr: DataReceiver): OmniRouter
   fun val remove_data_receiver(w: String): OmniRouter
-  fun val add_source(source_id: StepId, s: Source): OmniRouter
+  fun val add_source(source_id: StepId, s: (ProxyAddress | Source)): OmniRouter
   fun val remove_source(source_id: StepId): OmniRouter
 
   fun val update_route_to_proxy(id: U128,
@@ -311,7 +311,8 @@ class val EmptyOmniRouter is OmniRouter
   fun val remove_data_receiver(w: String): OmniRouter =>
     this
 
-  fun val add_source(source_id: StepId, s: Source): OmniRouter =>
+  fun val add_source(source_id: StepId, s: (ProxyAddress | Source)): OmniRouter
+  =>
     this
 
   fun val remove_source(source_id: StepId): OmniRouter =>
@@ -360,7 +361,7 @@ class val StepIdRouter is OmniRouter
   let _worker_name: String
   let _data_routes: Map[StepId, Consumer] val
   let _step_map: Map[StepId, (ProxyAddress | StepId)] val
-  let _sources: Map[StepId, Source] val
+  let _sources: Map[StepId, (ProxyAddress | Source)] val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _stateless_partitions: Map[U128, StatelessPartitionRouter] val
   let _data_receivers: Map[String, DataReceiver] val
@@ -370,7 +371,7 @@ class val StepIdRouter is OmniRouter
     step_map: Map[StepId, (ProxyAddress | StepId)] val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     stateless_partitions: Map[U128, StatelessPartitionRouter] val,
-    sources: Map[StepId, Source] val,
+    sources: Map[StepId, (ProxyAddress | Source)] val,
     data_receivers: Map[String, DataReceiver] val)
   =>
     _worker_name = worker_name
@@ -573,10 +574,11 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, _stateless_partitions, _sources,
       consume new_data_receivers)
 
-  fun val add_source(source_id: StepId, s: Source): OmniRouter =>
+  fun val add_source(source_id: StepId, s: (ProxyAddress | Source)): OmniRouter
+  =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
-    let new_sources = recover trn Map[StepId, Source] end
+    let new_sources = recover trn Map[StepId, (ProxyAddress | Source)] end
     for (k, v) in _sources.pairs() do
       new_sources(k) = v
     end
@@ -588,7 +590,7 @@ class val StepIdRouter is OmniRouter
   fun val remove_source(source_id: StepId): OmniRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
-    let new_sources = recover trn Map[StepId, Source] end
+    let new_sources = recover trn Map[StepId, (ProxyAddress | Source)] end
     for (k, v) in _sources.pairs() do
       if k != source_id then new_sources(k) = v end
     end
@@ -694,7 +696,14 @@ class val StepIdRouter is OmniRouter
         _data_receivers(worker)?
       end
     else
-      _sources(step_id)? as Producer
+      match _sources(step_id)?
+      | let p: Producer => p
+      | let pa: ProxyAddress =>
+        let worker = pa.worker
+        _data_receivers(worker)?
+      else
+        error
+      end
     end
 
   fun data_receiver_for(worker: String): DataReceiver ? =>
@@ -714,7 +723,17 @@ class val StepIdRouter is OmniRouter
         new_step_map(k) = proxy_address
       end
     end
-    StepIdRouterBlueprint(consume new_step_map)
+    let new_source_map = recover trn Map[StepId, ProxyAddress] end
+    for (s_id, v) in _sources.pairs() do
+      match v
+      | let pa: ProxyAddress =>
+        new_source_map(s_id) = pa
+      | let source: Source =>
+        let proxy_address = ProxyAddress(_worker_name, s_id)
+        new_source_map(s_id) = proxy_address
+      end
+    end
+    StepIdRouterBlueprint(consume new_step_map, consume new_source_map)
 
   fun eq(that: box->OmniRouter): Bool =>
     match that
@@ -745,9 +764,13 @@ class val EmptyOmniRouterBlueprint is OmniRouterBlueprint
 
 class val StepIdRouterBlueprint is OmniRouterBlueprint
   let _step_map: Map[StepId, ProxyAddress] val
+  let _source_map: Map[StepId, ProxyAddress] val
 
-  new val create(step_map: Map[StepId, ProxyAddress] val) =>
+  new val create(step_map: Map[StepId, ProxyAddress] val,
+    source_map: Map[StepId, ProxyAddress] val)
+  =>
     _step_map = step_map
+    _source_map = source_map
 
   fun build_router(worker_name: String,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
@@ -767,12 +790,15 @@ class val StepIdRouterBlueprint is OmniRouterBlueprint
         new_step_map(k) = v
       end
     end
+    let new_source_map = recover trn Map[StepId, (ProxyAddress | Source)] end
+    for (k, v) in _source_map.pairs() do
+      new_source_map(k) = v
+    end
 
     StepIdRouter(worker_name, consume data_routes,
       consume new_step_map, outgoing_boundaries,
       recover Map[U128, StatelessPartitionRouter] end,
-      recover Map[StepId, Source] end,
-      recover Map[String, DataReceiver] end)
+      consume new_source_map, recover Map[String, DataReceiver] end)
 
 class val DataRouter is Equatable[DataRouter]
   let _data_routes: Map[U128, Consumer] val

@@ -295,6 +295,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
       | let m: AnnounceNewStatefulStepMsg =>
         m.update_registry(_router_registry)
+      | let m: AnnounceNewSourceMsg =>
+        _router_registry.register_remote_source(m.sender, m.source_id)
       | let m: StepMigrationCompleteMsg =>
         _router_registry.step_migration_complete(m.step_id)
       | let m: JoiningWorkerInitializedMsg =>
