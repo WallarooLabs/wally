@@ -52,7 +52,7 @@ def ok_encoder(_):
 
 class DreamData(object):
     __slots__ = ('sheep')
-    def __init__(self, last_bid=0.0, last_offer=0.0, should_reject_trades=True):
+    def __init__(self):
         self.sheep = 0
 
 
@@ -87,11 +87,11 @@ def parse_delay(args):
     delay_ms = a.delay_ms
 
 def delay(ms):
-  if ms == 0:
-    return
-  t = time.time()
-  c = 0
-  s = ms / 1000.0
-  while (t + s) > time.time():
-    c = c + 1
+    if ms == 0:
+        return
+    t = time.time()
+    c = 0
+    s = ms / 1000.0
+    while (t + s) > time.time():
+        c = c + 1
 
