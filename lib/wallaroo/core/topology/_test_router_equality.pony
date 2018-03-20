@@ -153,13 +153,13 @@ class iso _TestOmniRouterEquality is UnitTest
     var base_router: OmniRouter = StepIdRouter("w1",
       consume base_data_routes, consume base_step_map,
       consume base_boundaries, consume base_stateless_partitions,
-      recover Map[StepId, Source] end,
+      recover Map[StepId, (ProxyAddress | Source)] end,
       recover Map[String, DataReceiver] end)
 
     let target_router: OmniRouter = StepIdRouter("w1",
       consume target_data_routes, consume target_step_map,
       consume target_boundaries, consume target_stateless_partitions,
-      recover Map[StepId, Source] end,
+      recover Map[StepId, (ProxyAddress | Source)] end,
       recover Map[String, DataReceiver] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
