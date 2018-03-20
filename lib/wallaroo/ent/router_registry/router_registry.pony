@@ -431,10 +431,10 @@ actor RouterRegistry is InFlightAckRequester
     | let omnr: OmniRouter =>
       _omni_router = omnr.remove_boundary(worker).remove_data_receiver(worker)
     end
+    _distribute_omni_router()
 
   fun ref _distribute_boundary_removal(worker: String) =>
     _remove_worker_from_omni_router(worker)
-    _distribute_omni_router()
 
     for subs in _partition_router_subs.values() do
       for sub in subs.values() do
@@ -768,6 +768,10 @@ actor RouterRegistry is InFlightAckRequester
 
   fun ref _try_resume_the_world() =>
     if _initiated_stop_the_world then
+      // Since we don't need all steps to be up to date on the OmniRouter
+      // during migrations, we wait on the worker that initiated stop the
+      // world to distribute it until here to avoid unnecessary messaging.
+      _distribute_omni_router()
       let in_flight_resume_ack_id = _in_flight_ack_waiter
         .initiate_resume_request(ResumeTheWorldAction(this))
       _request_in_flight_resume_acks(in_flight_resume_ack_id,
@@ -941,6 +945,12 @@ actor RouterRegistry is InFlightAckRequester
       AckFinishedCompleteAction(_auth, _worker_name, originating_worker,
         request_id, _connections))
     then
+      // We need to ensure that all steps have the correct OmniRouter before
+      // we can propagate the in_flight_resume request. On the workers that
+      // did not initiate stop the world, we wait to distribute the OmniRouter
+      // until this point since we don't need it to be up-to-date everywhere
+      // during migration.
+      _distribute_omni_router()
       _request_in_flight_resume_acks(in_flight_resume_ack_id,
         leaving_workers)
     end
@@ -1371,11 +1381,7 @@ actor RouterRegistry is InFlightAckRequester
     match _omni_router
     | let o: OmniRouter =>
       let new_omni_router = o.update_route_to_proxy(id, proxy_address)
-      for step in _omni_router_steps.values() do
-        step.update_omni_router(new_omni_router)
-      end
       _omni_router = new_omni_router
-      _distribute_omni_router()
     else
       Fail()
     end
@@ -1418,7 +1424,6 @@ actor RouterRegistry is InFlightAckRequester
         _register_omni_router_step(step)
         _data_router = _data_router.add_route(id, step)
         _distribute_data_router()
-        _distribute_omni_router()
         let partition_router =
           _partition_routers(state_name)?.update_route[K](key, step)?
         _distribute_partition_router(partition_router)
@@ -1460,7 +1465,6 @@ actor RouterRegistry is InFlightAckRequester
     match _omni_router
     | let o: OmniRouter =>
       _omni_router = o.update_route_to_step(id, target)
-      _distribute_omni_router()
     else
       Fail()
     end

@@ -124,11 +124,12 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
     worker_ingress_ts = worker_ingress_ts'
 
   fun run(step: Step ref, omni_router: OmniRouter) =>
-    try
-      let i_producer = omni_router.producer_for(i_producer_id)?
-      step.run[D](metric_name, pipeline_time_spent, data, i_producer_id,
-        i_producer, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
-        metrics_id, worker_ingress_ts)
-    else
-      Fail()
-    end
+    let i_producer =
+      try
+        omni_router.producer_for(i_producer_id)?
+      else
+        DummyProducer
+      end
+    step.run[D](metric_name, pipeline_time_spent, data, i_producer_id,
+      i_producer, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
+      metrics_id, worker_ingress_ts)
