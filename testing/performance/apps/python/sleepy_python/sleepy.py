@@ -50,12 +50,6 @@ def ok_encoder(_):
     return "ok"
 
 
-class DreamData(object):
-    __slots__ = ('sheep')
-    def __init__(self):
-        self.sheep = 0
-
-
 @wallaroo.computation(name="Forward nonce partition")
 def process_nonce(partition):
     return partition
@@ -67,6 +61,12 @@ def busy_sleep(data, state):
     state.sheep += 1
     if state.sheep % 1000 == 0:
         return data
+
+
+class DreamData(object):
+    __slots__ = ('sheep')
+    def __init__(self):
+        self.sheep = 0
 
 
 # Pick 60 because it has a lot of convenient factors
@@ -94,4 +94,3 @@ def delay(ms):
     s = ms / 1000.0
     while (t + s) > time.time():
         c = c + 1
-
