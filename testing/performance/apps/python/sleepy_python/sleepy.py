@@ -25,6 +25,7 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     nonce_source = wallaroo.TCPSourceConfig(in_host, in_port, nonce_decoder)
+    ok_sink = wallaroo.TCPSinkConfig(out_host, out_port, ok_encoder)
     ab = wallaroo.ApplicationBuilder("sleepy-python")
     ab.new_pipeline("Counting Sheep", nonce_source)
     ab.to(process_nonce)
@@ -32,7 +33,7 @@ def application_setup(args):
             busy_sleep, DreamData, "dream-data",
             partition_function, partitions
         )
-    ab.to_sink(out_host, out_port, ok_encoder)
+    ab.to_sink(ok_sink)
     return ab.build()
 
 
