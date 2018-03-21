@@ -380,11 +380,19 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             # Perform autoscale cycles
             for cyc in range(cycles):
                 for joiners in ops:
+                    # Verify cluster is processing before proceeding
+                    obs = ObservabilityNotifier(query_func_cluster_status,
+                        test_cluster_is_processing, timeout=30)
+                    obs.start()
+                    obs.join()
+                    if obs.error:
+                        raise obs.error
+                    # get partition data before autoscale operation begins
                     pre_partitions = query_func_partitions()
                     steps.append(joiners)
                     joined = []
                     left = []
-                    if joiners > 0:
+                    if joiners > 0:  # autoscale: grow
                         # create a new worker and have it join
                         new_ports = get_port_values(num=(joiners * 2), host=host,
                                                     base_port=25000)
@@ -395,15 +403,6 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                        control_port, external_port, data_port, res_dir,
                                        joiners, *joiner_ports[i])
                             joined.append(runners[-1])
-                        time.sleep(1)
-
-                        # Verify cluster is paused
-                        #obs = ObservabilityNotifier(query_func_cluster_status,
-                        #    test_cluster_is_not_processing)
-                        #obs.start()
-                        #obs.join()
-                        #if obs.error:
-                        #    raise obs.error
 
                         # Verify cluster has resumed processing
                         obs = ObservabilityNotifier(query_func_cluster_status,
@@ -430,8 +429,7 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                         if obs.error:
                             raise obs.error
 
-
-                    elif joiners < 0:  # joiners < 0, e.g. leavers!
+                    elif joiners < 0:  # autoscale: shrink
                         # choose the most recent, still-alive runners to leave
                         leavers = abs(joiners)
                         idx = 1
@@ -450,19 +448,10 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                         resp = send_shrink_cmd(host, external_port, names=[r.name for r in left])
                         print("Sent a shrink command for {}".format([r.name for r in left]))
                         print("Response was: {}".format(resp))
-                        time.sleep(1)
-
-                        # Verify cluster is paused
-                        #obs = ObservabilityNotifier(query_func_cluster_status,
-                        #    test_cluster_is_not_processing)
-                        #obs.start()
-                        #obs.join()
-                        #if obs.error:
-                        #    raise obs.error
 
                         # Verify cluster has resumed processing
                         obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_processing, timeout=30)
+                            test_cluster_is_processing, timeout=120)
                         obs.start()
                         obs.join()
                         if obs.error:
@@ -500,6 +489,8 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                       [r.name for r in left]))
                         raise err
 
+                    # Wait a second before the next operation, allowing some
+                    # more data to go through the system
                     time.sleep(1)
 
             # Test is done, so stop sender
