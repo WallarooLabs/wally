@@ -584,8 +584,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     ourself a resume message and stop reading, to avoid starving other actors.
     """
     try
-      var max_reads: U8 = 50
-      var reads: U8 = 0
       var sum: USize = 0
       _reading = true
 
@@ -595,72 +593,64 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
           return
         end
 
-        // Read as much data as possible.
-        //_read_buf_size(sum)
-        let len = @pony_os_recv[USize](
-          _event,
-          _read_buf.cpointer(_read_buf_offset),
-          _read_buf.size() - _read_buf_offset) ?
-
-        match len
-        | 0 =>
-          // Would block, try again later.
-          // this is safe because asio thread isn't currently subscribed
-          // for a read event so will not be writing to the readable flag
-          @pony_asio_event_set_readable[None](_event, false)
-          _readable = false
-          @pony_asio_event_resubscribe_read(_event)
-          _reading = false
-          return
-        | (_read_buf.size() - _read_buf_offset) =>
-          // Increase the read buffer size.
-          _next_size = _max_size.min(_next_size * 2)
-        end
-
-        //_read_len = _read_len + len
-        _read_buf_offset = _read_buf_offset + len
-
-        if (_expect == 0) and (_read_buf_offset > 0) then
-          let data = _read_buf = recover Array[U8] end
-          data.truncate(_read_len)
-          _read_len = 0
-
-          if not _notify.received(this, consume data) then
-            _read_buf_size(1)
-            _read_again()
-            return
-          else
-            _read_buf_size(1)
-          end
-        else
-          while _read_buf_offset >= _expect do
-            _read_len = _read_len + _expect
-            //@printf[I32]("_read_buf size is %d of %d\n".cstring(), _read_buf.size(), _read_buf.space())
-            let x = _read_buf = recover Array[U8] end
-            //@printf[I32]("chopping at %d\n".cstring(), _expect)
-            (let data, _read_buf) = (consume x).chop(_expect)
-            _read_buf_offset = _read_buf_offset - _expect
-            //@printf[I32]("_read_buf size is %d of %d\n".cstring(), _read_buf.size(), _read_buf.space())
-            //@printf[I32]("_read_buf_offset: %d\n".cstring(), _read_buf_offset)
+        if _read_buf_offset > _expect then
+          if (_expect == 0) and (_read_buf_offset > 0) then
+            let data = _read_buf = recover Array[U8] end
+            data.truncate(_read_buf_offset)
+            _read_buf_offset = 0
 
             if not _notify.received(this, consume data) then
-              //@printf[I32]("BUF SIZE A call point\n".cstring())
-              _read_buf_size(1)
+              _read_buf_size()
               _read_again()
               return
+            else
+              _read_buf_size()
             end
+          else
+            while _read_buf_offset >= _expect do
+              let x = _read_buf = recover Array[U8] end
+              (let data, _read_buf) = (consume x).chop(_expect)
+              _read_buf_offset = _read_buf_offset - _expect
+
+              if not _notify.received(this, consume data) then
+                _read_buf_size()
+                _read_again()
+                return
+              end
+            end
+
+            _read_buf_size()
           end
 
-          //@printf[I32]("BUF SIZE B call point\n".cstring())
-          _read_buf_size(1)
-        end
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            return
+          end
+        else
+          // Read as much data as possible.
+          let len = @pony_os_recv[USize](
+            _event,
+            _read_buf.cpointer(_read_buf_offset),
+            _read_buf.space() - _read_buf_offset) ?
 
-        sum = sum + len
+          match len
+          | 0 =>
+            // Would block, try again later.
+            // this is safe because asio thread isn't currently subscribed
+            // for a read event so will not be writing to the readable flag
+            @pony_asio_event_set_readable[None](_event, false)
+            _readable = false
+            @pony_asio_event_resubscribe_read(_event)
+            _reading = false
+            return
+          | (_read_buf.space() - _read_buf_offset) =>
+            // Increase the read buffer size.
+            _next_size = _max_size.min(_next_size * 2)
+          end
 
-        if (sum >= _max_size) or (reads >= max_reads)then
-          // If we've read _max_size, yield and read again later.
-          _read_again()
-          return
+          _read_buf_offset = _read_buf_offset + len
+          sum = sum + len
         end
       end
     else
@@ -675,34 +665,25 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     """
     Resume reading.
     """
-
     _pending_reads()
 
-  fun ref _read_buf_size(less: USize) =>
+  fun ref _read_buf_size() =>
     """
     Resize the read buffer.
     """
     if _expect == 0 then
       _read_buf.undefined(_next_size)
     else
-      // i want to know that the space in buffer
-      // is less than expect
-      //@printf[I32]("Buffer sizing: o- %d, s- %d\n".cstring(),
-      //  _read_buf_offset, _read_buf.space())
-      let rba = _read_buf.size() - _read_buf_offset
-      if _expect > _read_buf.size() then
-        //@printf[I32]("HERE %d %d %d %d %d\n".cstring(), _expect, rba, _read_buf.size(), _read_buf.space(), _read_buf_offset)
+      if _expect > _read_buf_offset then
         let data = _read_buf = recover Array[U8] end
         _read_buf.undefined(_next_size)
         for i in Range(0, _read_buf_offset) do
           try
             _read_buf.update(i, data(i)?)?
           else
-            @printf[I32]("BAD BAD BAD\n".cstring())
+            Fail()
           end
         end
-
-        _read_buf_offset = data.size()
       end
     end
 
