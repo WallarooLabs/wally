@@ -123,6 +123,7 @@ arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
 ponyc_tag ?= wallaroolabs-$(strip $(latest_ponyc_tag))-release## tag for ponyc docker to use
 ponyc_runner ?= wallaroolabs/ponyc## ponyc docker image to use
+pytest_exp ?= ## Additional args to pass pytests run with make test
 debug ?= false## Use ponyc debug option (-d)
 debug_arg :=# Final argument string for debug option
 spike ?= false## Enable compile-time network fault injection

@@ -49,7 +49,7 @@ include $(rules_mk_path)
 ifeq ($(resilience),on)
 recovery_tests:
 	cd $(RECOVERY_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose recovery.py
+	python2 -m pytest --color=yes --tb=native --verbose recovery.py $(pytest_exp)
 else
 recovery_tests:
 	$(QUIET)printf "recovery_tests not run.\nRun make with 'resilience=on' to run this test.\n"

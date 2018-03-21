@@ -28,10 +28,6 @@ import tempfile
 import threading
 import time
 
-from metrics_parser import (MetricsData,
-                            MetricsParser,
-                            MetricsParseError)
-
 
 INFO2 = logging.INFO + 1
 logging.addLevelName(INFO2, 'INFO2')
@@ -62,7 +58,6 @@ class ExpectationError(StopError):
 
 class PipelineTestError(Exception):
     pass
-
 
 
 # Integration helper classes
@@ -106,6 +101,15 @@ class SingleSocketReceiver(StoppableThread):
         else:
             self.name = self.__base_name__
 
+    def try_recv(self, bs):
+        """
+        Try to to run `sock.recv(bs)` and return None if error
+        """
+        try:
+            return self.sock.recv(bs)
+        except:
+            return None
+
     def append(self, bs):
         if self.mode == 'framed':
             self.accumulator.append(bs)
@@ -121,7 +125,7 @@ class SingleSocketReceiver(StoppableThread):
     def run_newlines(self):
         data = []
         while not self.stopped():
-            buf = self.sock.recv(1024)
+            buf = self.try_recv(1024)
             if not buf:
                 self.stop()
                 if data:
@@ -152,12 +156,12 @@ class SingleSocketReceiver(StoppableThread):
 
     def run_framed(self):
         while not self.stopped():
-            header = self.sock.recv(self.header_length)
+            header = self.try_recv(self.header_length)
             if not header:
                 self.stop()
                 continue
             expect = struct.unpack(self.header_fmt, header)[0]
-            data = self.sock.recv(expect)
+            data = self.try_recv(expect)
             if not data:
                 self.stop()
             else:
@@ -557,6 +561,10 @@ class Sender(StoppableThread):
         if not self.batch:
             self.stop()
 
+    def stop(self):
+        logging.log(INFO2, "Sender received stop instruction.")
+        super(Sender, self).stop()
+
 
 def sequence_generator(stop=1000, start=0, header_fmt='>I'):
     """
@@ -573,7 +581,8 @@ def sequence_generator(stop=1000, start=0, header_fmt='>I'):
         yield struct.pack('>Q', x)
 
 
-def iter_generator(items, to_string=lambda s: str(s), header_fmt='>I'):
+def iter_generator(items, to_string=lambda s: str(s), header_fmt='>I',
+                   on_next=None):
     """
     Generate a sequence of length encoded binary records from an iterator.
 
@@ -584,12 +593,14 @@ def iter_generator(items, to_string=lambda s: str(s), header_fmt='>I'):
     `struct.pack`
     """
     for val in items:
+        if on_next:
+            on_next(val)
         strung = to_string(val)
         yield struct.pack(header_fmt, len(strung))
         yield strung
 
 
-def files_generator(files, mode='framed', header_fmt='>I'):
+def files_generator(files, mode='framed', header_fmt='>I', on_next=None):
     """
     Generate a sequence of binary data stubs from a set of files.
 
@@ -607,15 +618,19 @@ def files_generator(files, mode='framed', header_fmt='>I'):
     for path in files:
         if mode == 'newlines':
             for l in newline_file_generator(path):
+                if on_next:
+                    on_next(l)
                 yield l
         elif mode == 'framed':
             for l in framed_file_generator(path, header_fmt):
+                if on_next:
+                    on_next(l)
                 yield l
         else:
             raise ValueError("`mode` must be either 'framed' or 'newlines'")
 
 
-def newline_file_generator(filepath, header_fmt='>I'):
+def newline_file_generator(filepath, header_fmt='>I', on_next=None):
     """
     Generate length-encoded strings from a newline-delimited file.
     """
@@ -626,11 +641,13 @@ def newline_file_generator(filepath, header_fmt='>I'):
         while f.tell() < fin:
             o = f.readline().strip('\n')
             if o:
+                if on_next:
+                    on_next(o)
                 yield struct.pack(header_fmt, len(o))
                 yield o
 
 
-def framed_file_generator(filepath, header_fmt='>I'):
+def framed_file_generator(filepath, header_fmt='>I', on_next=None):
     """
     Generate length encoded records from a length-framed binary file.
     """
@@ -644,6 +661,8 @@ def framed_file_generator(filepath, header_fmt='>I'):
             body = f.read(expect)
             if not body:
                 break
+            if on_next:
+                on_next(header + body)
             yield header
             yield body
 
@@ -980,7 +999,6 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
         join_block=CONTROL_CMD.format(host=host, control_port=control_port),
         alt_block=alt_block if alt_func(x) else '',
         spike_block=spike_block)
-    logging.log(51, 'initializer command is :\n{}'.format(cmd))
     runners.append(Runner(cmd_string=cmd, name='initializer'))
     for x in range(1, workers):
         if x in spikes:

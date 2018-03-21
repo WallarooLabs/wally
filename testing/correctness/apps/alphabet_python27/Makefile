@@ -7,6 +7,7 @@ endif
 ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
 $(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
 
+
 # The following are control variables that determine what logic from `rules.mk` is enabled
 
 # `true`/`false` to enable/disable the actual unit test command so it can be overridden (the targets are still created)
@@ -34,26 +35,28 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
-LOG_ROTATION_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
-CUSTOM_PYTHONPATH += $(SEQUENCE_WINDOW_PYTHON_PATH)
-
-build-testing-correctness-tests-log_rotation: build-testing-correctness-apps-sequence_window
-build-testing-correctness-tests-log_rotation: build-testing-tools-external_sender
-build-testing-correctness-tests-log_rotation: build-machida
-integration-tests-testing-correctness-tests-log_rotation: build-testing-correctness-tests-log_rotation
-integration-tests-testing-correctness-tests-log_rotation: log_rotation_tests
+TESTING_ALPHABET_PYTHON27_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
-ifeq ($(resilience),on)
-log_rotation_tests:
-	cd $(LOG_ROTATION_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose log_rotation.py $(pytest_exp)
-else
-log_rotation_tests:
-	$(QUIET)printf "log_rotation_tests not run.\nRun make with 'resilience=on' to run this test.\n"
-endif
+build-testing-correctness-apps-alphabet27_python: build-machida
+integration-tests-testing-correctness-apps-alphabet_python27: build-testing-correctness-apps-alphabet_python27
+integration-tests-testing-correctness-apps-alphabet_python27: testing_alphabet_python27_test
+
+testing_alphabet_python27_test:
+	cd $(TESTING_ALPHABET_PYTHON27_PATH) && \
+	integration_test \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--validation-cmd 'python validate.py --expected output.json --repetitions 4 --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida --application-module alphabet27' \
+		--workers 1 \
+		--sink-expect 4000
 
 endif
