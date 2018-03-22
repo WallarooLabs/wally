@@ -1399,12 +1399,17 @@ actor RouterRegistry is InFlightAckRequester
 
     match _event_log
     | let event_log: EventLog =>
-      let step = Step(_auth, runner_builder(where event_log = event_log,
-        auth = _auth), consume reporter, msg.step_id(),
-        runner_builder.route_builder(), event_log, recovery_replayer,
-        consume outgoing_boundaries)
-      step.receive_state(msg.state())
-      msg.update_router_registry(this, step)
+      match _omni_router
+      | let omnr: OmniRouter =>
+        let step = Step(_auth, runner_builder(where event_log = event_log,
+          auth = _auth), consume reporter, msg.step_id(),
+          runner_builder.route_builder(), event_log, recovery_replayer,
+          consume outgoing_boundaries where omni_router = omnr)
+        step.receive_state(msg.state())
+        msg.update_router_registry(this, step)
+      else
+        Fail()
+      end
     else
       Fail()
     end

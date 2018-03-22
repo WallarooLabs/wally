@@ -50,6 +50,9 @@ actor DummyProducer is Producer
   fun ref _acker(): Acker =>
     Acker
 
+  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
+    None
+
   fun ref flush(low_watermark: SeqId) =>
     None
 

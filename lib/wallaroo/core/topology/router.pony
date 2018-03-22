@@ -798,22 +798,22 @@ class val StepIdRouterBlueprint is OmniRouterBlueprint
       consume new_source_map, recover Map[String, DataReceiver] end)
 
 class val DataRouter is Equatable[DataRouter]
-  let _data_routes: Map[U128, Consumer] val
-  let _target_ids_to_route_ids: Map[U128, RouteId] val
-  let _route_ids_to_target_ids: Map[RouteId, U128] val
+  let _data_routes: Map[StepId, Consumer] val
+  let _target_ids_to_route_ids: Map[StepId, RouteId] val
+  let _route_ids_to_target_ids: Map[RouteId, StepId] val
 
-  new val create(data_routes: Map[U128, Consumer] val =
-      recover Map[U128, Consumer] end)
+  new val create(data_routes: Map[StepId, Consumer] val =
+      recover Map[StepId, Consumer] end)
   =>
     _data_routes = data_routes
     var route_id: RouteId = 0
-    let keys: Array[U128] = keys.create()
-    let tid_map = recover trn Map[U128, RouteId] end
-    let rid_map = recover trn Map[RouteId, U128] end
+    let keys: Array[StepId] = keys.create()
+    let tid_map = recover trn Map[StepId, RouteId] end
+    let rid_map = recover trn Map[RouteId, StepId] end
     for step_id in _data_routes.keys() do
       keys.push(step_id)
     end
-    for key in Sort[Array[U128], U128](keys).values() do
+    for key in Sort[Array[StepId], StepId](keys).values() do
       route_id = route_id + 1
       tid_map(key) = route_id
     end
@@ -823,9 +823,9 @@ class val DataRouter is Equatable[DataRouter]
     _target_ids_to_route_ids = consume tid_map
     _route_ids_to_target_ids = consume rid_map
 
-  new val with_route_ids(data_routes: Map[U128, Consumer] val,
-    target_ids_to_route_ids: Map[U128, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, U128] val)
+  new val with_route_ids(data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, StepId] val)
   =>
     _data_routes = data_routes
     _target_ids_to_route_ids = target_ids_to_route_ids
@@ -926,31 +926,31 @@ class val DataRouter is Equatable[DataRouter]
   fun remove_route(id: U128): DataRouter =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
-    let new_data_routes = recover trn Map[U128, Consumer] end
+    let new_data_routes = recover trn Map[StepId, Consumer] end
     for (k, v) in _data_routes.pairs() do
       if k != id then new_data_routes(k) = v end
     end
-    let new_tid_map = recover trn Map[U128, RouteId] end
+    let new_tid_map = recover trn Map[StepId, RouteId] end
     for (k, v) in _target_ids_to_route_ids.pairs() do
       if k != id then new_tid_map(k) = v end
     end
-    let new_rid_map = recover trn Map[RouteId, U128] end
+    let new_rid_map = recover trn Map[RouteId, StepId] end
     for (k, v) in _route_ids_to_target_ids.pairs() do
       if v != id then new_rid_map(k) = v end
     end
     DataRouter.with_route_ids(consume new_data_routes,
       consume new_tid_map, consume new_rid_map)
 
-  fun add_route(id: U128, target: Consumer): DataRouter =>
+  fun add_route(id: StepId, target: Consumer): DataRouter =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
-    let new_data_routes = recover trn Map[U128, Consumer] end
+    let new_data_routes = recover trn Map[StepId, Consumer] end
     for (k, v) in _data_routes.pairs() do
       new_data_routes(k) = v
     end
     new_data_routes(id) = target
 
-    let new_tid_map = recover trn Map[U128, RouteId] end
+    let new_tid_map = recover trn Map[StepId, RouteId] end
     var highest_route_id: RouteId = 0
     for (k, v) in _target_ids_to_route_ids.pairs() do
       new_tid_map(k) = v
@@ -959,7 +959,7 @@ class val DataRouter is Equatable[DataRouter]
     let new_route_id = highest_route_id + 1
     new_tid_map(id) = new_route_id
 
-    let new_rid_map = recover trn Map[RouteId, U128] end
+    let new_rid_map = recover trn Map[RouteId, StepId] end
     for (k, v) in _route_ids_to_target_ids.pairs() do
       new_rid_map(k) = v
     end
@@ -987,7 +987,7 @@ class val DataRouter is Equatable[DataRouter]
       // MapEquality[RouteId, U128](_route_ids_to_target_ids,
       //   that._route_ids_to_target_ids)
 
-  fun migrate_state(target_id: U128, s: ByteSeq val) =>
+  fun migrate_state(target_id: StepId, s: ByteSeq val) =>
     try
       let target = _data_routes(target_id)?
       target.receive_state(s)
