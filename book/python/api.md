@@ -78,14 +78,14 @@ This is necessary if you intend to add another pipeline.
 
 Add a stateless computation _function_ to the current pipeline.
 
-Note that this method takes a _function_ decorated by `@computation`. See [Computation](#computation).
+Note that this method takes a _function_ decorated by `@wallaroo.computation`. See [Computation](#computation).
 
 ##### `to_parallel(computation_f)`
 
 Add a stateless computation _function_ to the current pipeline.
 Creates one copy of the computation per worker in the cluster allowing you to parallelize stateless work.
 
-Note that this method takes a _function_, decorated by `@computation`. See [Computation](#computation).
+Note that this method takes a _function_, decorated by `@wallaroo.computation`. See [Computation](#computation).
 
 ##### `to_stateful(computation, state_class, state_name)`
 
@@ -141,7 +141,7 @@ Return the complete list of topology tuples. This is the topology structure Wall
 
 A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. A stateless computation has _no side effects_.
 
-A `computation` class must be wrapped by the `@computation(name)` decorator, which takes the name of the computation as an argument.
+A `computation` class must be wrapped by the `@wallaroo.computation(name="computation name")` decorator, which takes the name of the computation as an argument.
 
 ##### `compute(data)`
 
@@ -156,7 +156,7 @@ Use `data` to perform a computation and return a series of new outputs. `data` i
 A Computation that doubles an integer, or returns 0 if its input was not an int:
 
 ```python
-@computation("double")
+@wallaroo.computation(name="double")
 def compute(data):
     if isinstance(data, int):
         return data*2
@@ -167,7 +167,7 @@ def compute(data):
 A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, we filter (drop) the message by returning `None`.
 
 ```python
-@computation_multi("doubledouble"):
+@wallaroo.computation_multi(name="doubledouble"):
 def compute_multi(data):
     if isinstance(data, int):
         return [data, data*2]
@@ -187,15 +187,15 @@ Partition Keys must correctly support the `__eq__` (`==`) and `__hash__` operato
 
 ### PartitionFunction
 
-A partition function class must be wrapped in the `@partition_function` decorator and return the appropriate [Key](#key) for `data`.
+A partition function class must be wrapped in the `@wallaroo.partition` decorator and return the appropriate [Key](#key) for `data`.
 
 #### Example PartitionFunction
 
 An example that partitions words for a word count based on their first character, and buckets all other cases to the empty string key:
 
 ```python
-@partition_function
-def partition(self, data):
+@wallaroo.partition
+def partition(data):
     try:
         return data[0].lower() if data[0].isalpha() else ''
     except:
@@ -206,9 +206,9 @@ def partition(self, data):
 
 The TCP Sink Encoder is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out over a TCP connection.
 
-Your function must be decorated with `@encoder`.
+Your function must be decorated with `@wallaroo.encoder`.
 
-##### `encode(data)`
+##### `encoder(data)`
 
 Return a `bytes` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes`, and what information to keep or discard.
 
@@ -218,7 +218,7 @@ A complete `TCPSinkEncoder` example that takes a list of integers and encodes it
 
 ```python
 @encoder
-def encode(self, data):
+def encoder(data):
     fmt = '>H{}'.format('L'*len(data))
     return struct.pack(fmt, len(data), *data)
 ```
@@ -229,13 +229,13 @@ The TCP Source Decoder is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input connection.
 2. Converting those bytes into an object that the rest of the application can process.
 
-Your function must be decorated with `@decoder(header_length, fmt)`.
+Your function must be decorated with `@wallaroo.decoder(header_length=header_length, length_fmt="length_fmt")`.
 
 ##### `header_length`
 
 An integer representing the number of bytes from the beginning of an incoming message to return to the function that reads the payload length.
 
-##### `fmt`
+##### `length_fmt`
 
 A format string that represents how the message header is encoded. A common encoding used in Wallaroo is a big-endian 32-bit unsigned integer, which can be decoded with the [struct module's](https://docs.python.org/2/library/struct.html) help:
 
@@ -243,7 +243,7 @@ A format string that represents how the message header is encoded. A common enco
 struct.unpack('>L', bs)
 ```
 
-##### `decode(bs)`
+##### `decoder(bs)`
 
 Return a python a python object of the type the next step in the pipeline expects.
 
@@ -254,8 +254,8 @@ Return a python a python object of the type the next step in the pipeline expect
 A complete TCPSourceDecoder example that decodes messages with a 32-bit unsigned integer _payload\_length_ and a character followed by a 32-bit unsigned int in its _payload_:
 
 ```python
-@decoder(header_length=4, length_fmt=">L")
-def decode(self, bs):
+@wallaroo.decoder(header_length=4, length_fmt=">L")
+def decoder(bs):
     return struct.unpack('>1sL', bs)
 ```
 
@@ -265,15 +265,15 @@ The Kafka Sink Encoder is responsible for taking the output of the last computat
 
 To do this, create an encoder function, in the same way you would for a TCP Sink Encoder, but Return a tuple of `(bytes, key)` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes` and `key`, and what information to keep or discard.
 
-Your encoder function must be decorated with `@encoder`.
+Your encoder function must be decorated with `@wallaroo.encoder`.
 
 #### Example KafkaSinkEncoder
 
 A complete `KafkaSinkEncoder` example that takes a word and sends it to the partition corresponding to the first letter of the word:
 
 ```python
-@encoder
-def encode(self, data):
+@wallaroo.encoder
+def encoder(data):
     word = data[:]
     letter_key = data[0]
     return (word, letter_key)
@@ -283,21 +283,21 @@ def encode(self, data):
 
 The Kafka Source Decoder is responsible for converting bytes into an object that the rest of the application can process. To do this, create a decoder function, in the same way you would for a TCP Source Decoder.
 
-##### `decode(data)`
+##### `decoder(data)`
 
 Return Python object of the type the next step in the pipeline expects.
 
 `data` is a `bytes` object representing the incoming Kafka message, and it is up to the developer to translate that into a Python object.
 
-Your decoder function must be decorated with `@decoder`.
+Your decoder function must be decorated with `@wallaroo.decoder`.
 
 #### Example Kafka Source Decoder
 
 A complete Kafka Source Decoder example that decodes messages with a 32-bit unsigned int in its _payload_:
 
 ```python
-@decoder(header_length=4, length_fmt=">L")
-def decode(self, bs):
+@wallaroo.decoder(header_length=4, length_fmt=">L")
+def decoder(bs):
     return struct.unpack('>1sL', bs)
 ```
 
@@ -339,7 +339,7 @@ A state computation is similar to a [Computation](#computation), except that it 
 
 In order to provide resilience, Wallaroo needs to keep track of state changes, or side effects, and it does so by making `state` an explicit object that is given as input to any StateComputation step.
 
-Similarly to a Computation, a StateComputation class must be wrapped in the `@state_computation` decorator.
+Similarly to a Computation, a StateComputation class must be wrapped in the `@wallaroo.state_computation` decorator.
 
 ##### `compute(data, state)`
 
@@ -354,15 +354,15 @@ Why wouldn't we always return `True`? There are two answers:
 
 ##### `compute_multi(data, state)`
 
-Same as `compute` but the first element of the return tuple is a list of messages to send on to our next step. Allows taking a single input message and creating multiple outputs. Each item in the list will arrive individually at the next step; i.e. not as a list. Wrap this function in `@state_computation_multi`.
+Same as `compute` but the first element of the return tuple is a list of messages to send on to our next step. Allows taking a single input message and creating multiple outputs. Each item in the list will arrive individually at the next step; i.e. not as a list. Wrap this function in `@wallaroo.computation_multi`.
 
 #### Example StateComputation
 
 An example StateComputation that keeps track of the maximum integer value it has seen so far:
 
 ```python
-@state_computation(name='max'):
-def compute(self, data, state):
+@wallaroo.state_computation(name='max'):
+def compute(data, state):
     try:
         state.update(data)
     except TypeError:
