@@ -649,20 +649,11 @@ actor RouterRegistry is InFlightAckRequester
     log file rotation, followed by snapshotting of all states on the worker
     to the new file, before unmuting upstream and resuming processing.
     """
-    // TODO: Use this when we switch to in flight acking algo
-    // _initiated_stop_the_world = true
+    _initiated_stop_the_world = true
     _stop_the_world_in_process = true
-    _stop_all_local()
     _stop_the_world_for_log_rotation()
 
-    //TODO: Replace this with in flight acking algo
-    let timers = Timers
-    let timer = Timer(PauseBeforeLogRotationNotify(this),
-    _stop_the_world_pause)
-    timers(consume timer)
-
-    //TODO: Use in flight acking algo for log rotation
-    // _request_in_flight_acks(LogRotationAction(this))
+    _initiate_request_in_flight_acks(LogRotationAction(this))
 
   be begin_log_rotation() =>
     """
@@ -686,7 +677,6 @@ actor RouterRegistry is InFlightAckRequester
     Called when rotation has completed and we should resume processing
     """
     _connections.request_cluster_unmute()
-    _resume_the_world(_worker_name)
     _unmute_request(_worker_name)
 
   fun ref _stop_the_world_for_log_rotation() =>
@@ -1590,17 +1580,6 @@ class LogRotationAction is CustomAction
 
   fun ref apply() =>
     _registry.begin_log_rotation()
-
-// TODO: Replace this by using in flight acking algo for log rotation
-class PauseBeforeLogRotationNotify is TimerNotify
-   let _registry: RouterRegistry
-
-   new iso create(registry: RouterRegistry) =>
-     _registry = registry
-
-  fun ref apply(timer: Timer, count: U64): Bool =>
-    _registry.begin_log_rotation()
-    false
 
 // TODO: Replace using this with the badly named SetIs once we address a bug
 // in SetIs where unsetting doesn't reduce set size for type SetIs[String].
