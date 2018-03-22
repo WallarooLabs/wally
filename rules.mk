@@ -256,11 +256,11 @@ define PONYC
     $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) env $(PONYCC) $(ponyc_arch_args) \
     $(debug_arg) $(spike_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
-    $(PONYCFLAGS) $(target_cpu_arg) --features=-avx512f . $(if $(filter $(ponyc_docker_args),docker),$(quote))
+    $(PONYCFLAGS) $(EXTRA_PONYCFLAGS) $(target_cpu_arg) --features=-avx512f . $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && echo "$@: $(abspath $(1))/bundle.json" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
   $(QUIET)cd $(1) && $(ponyc_docker_args) $(PONYSTABLE) env $(PONYCC) $(ponyc_arch_args) \
     $(debug_arg) $(spike_arg) $(autoscale_arg) $(clustering_arg) $(resilience_arg) \
-    $(PONYCFLAGS) $(target_cpu_arg) --features=-avx512f . --pass import --files $(if $(filter \
+    $(PONYCFLAGS) $(EXTRA_PONYCFLAGS) $(target_cpu_arg) --features=-avx512f . --pass import --files $(if $(filter \
     $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_wallaroo_dir).*.pony" \
     | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \
     >> $(notdir $(abspath $(1:%/=%))).d
