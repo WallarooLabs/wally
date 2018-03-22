@@ -303,7 +303,7 @@ def decode(self, bs):
 
 ### State
 
-State is an object that is passed to the [StateComputation's](#statecomputation) `compute` method. It is a plain Python object and can be as simple or as complex as you would like. The class definition must be wrapped in the `@state` decorator.
+State is an object that is passed to the [StateComputation's](#statecomputation) `compute` method. It is a plain Python object and can be as simple or as complex as you would like.
 
 A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
 
@@ -316,7 +316,6 @@ An `AlphabetCounts` keeps a count for how many times each letter in the English 
 ```python
 import copy
 
-@state
 AlphabetCounts(objects):
     def __init__(self, initial_counts):
         self.data = dict(initial_counts)
