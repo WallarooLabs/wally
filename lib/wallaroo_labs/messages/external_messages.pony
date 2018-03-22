@@ -23,21 +23,22 @@ use "../query"
 use "../../wallaroo/core/common"
 use "../../wallaroo/core/topology"
 
-primitive _Print                                fun apply(): U16 => 1
-primitive _RotateLog                            fun apply(): U16 => 2
-primitive _CleanShutdown                        fun apply(): U16 => 3
-primitive _ShrinkRequest                        fun apply(): U16 => 4
-primitive _ShrinkQueryResponse                  fun apply(): U16 => 5
-primitive _ShrinkErrorResponse                  fun apply(): U16 => 6
-primitive _PartitionQuery                       fun apply(): U16 => 7
-primitive _PartitionQueryResponse               fun apply(): U16 => 8
-primitive _ClusterStatusQuery                   fun apply(): U16 => 9
-primitive _ClusterStatusQueryResponse           fun apply(): U16 => 10
-primitive _PartitionCountQuery                  fun apply(): U16 => 11
-primitive _PartitionCountQueryResponse          fun apply(): U16 => 12
-primitive _SourceIdsQuery                       fun apply(): U16 => 13
-primitive _SourceIdsQueryResponse               fun apply(): U16 => 14
-primitive _ReportStatus                         fun apply(): U16 => 15
+primitive _Print                                    fun apply(): U16 => 1
+primitive _RotateLog                                fun apply(): U16 => 2
+primitive _CleanShutdown                            fun apply(): U16 => 3
+primitive _ShrinkRequest                            fun apply(): U16 => 4
+primitive _ShrinkQueryResponse                      fun apply(): U16 => 5
+primitive _ShrinkErrorResponse                      fun apply(): U16 => 6
+primitive _PartitionQuery                           fun apply(): U16 => 7
+primitive _PartitionQueryResponse                   fun apply(): U16 => 8
+primitive _ClusterStatusQuery                       fun apply(): U16 => 9
+primitive _ClusterStatusQueryResponse               fun apply(): U16 => 10
+primitive _ClusterStatusQueryResponseNotInitialized fun apply(): U16 => 11
+primitive _PartitionCountQuery                      fun apply(): U16 => 12
+primitive _PartitionCountQueryResponse              fun apply(): U16 => 13
+primitive _SourceIdsQuery                           fun apply(): U16 => 14
+primitive _SourceIdsQueryResponse                   fun apply(): U16 => 15
+primitive _ReportStatus                             fun apply(): U16 => 16
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -104,6 +105,11 @@ primitive ExternalMsgEncoder
     in a stop the world phase)?
     """
     _encode(_ClusterStatusQuery(), "", wb)
+
+  fun cluster_status_query_reponse_not_initialized(wb: Writer = Writer):
+    Array[ByteSeq] val
+  =>
+    _encode(_ClusterStatusQueryResponseNotInitialized(), "", wb)
 
   fun cluster_status_query_response(worker_count: USize,
     worker_names: Array[String] val, stop_the_world_in_process: Bool,
@@ -198,6 +204,8 @@ primitive ExternalMsgDecoder
       ExternalClusterStatusQueryMsg
     | (_ClusterStatusQueryResponse(), let s: String) =>
       ClusterStatusQueryJsonDecoder.response(s)?
+    | (_ClusterStatusQueryResponseNotInitialized(), let s: String) =>
+      ExternalClusterStatusQueryResponseNotInitializedMsg
     | (_PartitionCountQuery(), let s: String) =>
       ExternalPartitionCountQueryMsg
     | (_PartitionCountQueryResponse(), let s: String) =>
@@ -343,6 +351,12 @@ class val ExternalPartitionQueryResponseMsg is ExternalMsg
     msg = m
 
 primitive ExternalClusterStatusQueryMsg is ExternalMsg
+
+class val ExternalClusterStatusQueryResponseNotInitializedMsg is ExternalMsg
+  let json: String = "{\"processing_messages\": false}"
+
+  fun string(): String =>
+    "Processing messages: false"
 
 class val ExternalClusterStatusQueryResponseMsg is ExternalMsg
   let worker_count: U64

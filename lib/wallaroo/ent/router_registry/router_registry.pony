@@ -623,6 +623,10 @@ actor RouterRegistry is InFlightAckRequester
       _partition_routers, _stateless_partition_routers)
     conn.writev(msg)
 
+  be cluster_status_query_not_initialized(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.cluster_status_query_reponse_not_initialized()
+    conn.writev(msg)
+
   be cluster_status_query(worker_names: Array[String] val,
     conn: TCPConnection)
   =>

@@ -156,6 +156,15 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
           end
           _env.out.print(m.msg)
           conn.dispose()
+        | let m: ExternalClusterStatusQueryResponseNotInitializedMsg =>
+          if _json then
+            _env.out.print(m.json)
+          else
+            _env.out.print("Cluster Status:")
+            _env.out.print("Cluster not yet initialized")
+            _env.out.print(m.string())
+          end
+          conn.dispose()
         | let m: ExternalClusterStatusQueryResponseMsg =>
           if  _json then
             _env.out.print(m.json)
