@@ -18,6 +18,7 @@ from __future__ import print_function
 from integration import (add_runner,
                          clean_resilience_path,
                          cluster_status_query,
+                         CrashedWorkerError,
                          ex_validate,
                          get_port_values,
                          iter_generator,
@@ -42,6 +43,7 @@ from integration import (add_runner,
 from collections import Counter
 from functools import partial
 from itertools import cycle
+import logging
 import re
 from string import lowercase
 from struct import calcsize, pack, unpack
@@ -198,6 +200,31 @@ def inverted(d):
 
 
 # Observability Validation Test Functions
+def get_crashed_runners(runners):
+    """
+    Get a list of crashed runners, if any exist.
+    """
+    return filter(lambda r: r.poll(), runners)
+
+
+def test_crashed_workers(runners):
+    """
+    Test if there are any crashed workers and raise an error if yes
+    """
+    crashed = get_crashed_runners(runners)
+    if crashed:
+        raise CrashedWorkerError("Some workers have crashed.")
+
+
+def test_worker_count(count, status):
+    """
+    Test that there `count` workers are reported as active in the
+    cluster status query response
+    """
+    assert(len(status['worker_names']) == count)
+    assert(status['worker_count'] == count)
+
+
 def test_all_workers_have_partitions(partitions):
     """
     Test that all workers have partitions
@@ -260,15 +287,17 @@ def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
         if hasattr(err, 'as_error'):
             print("Autoscale Sequence test had the following the error "
                   "message:\n{}".format(err.as_error))
-        #if hasattr(err, 'runners'):
-        #    if not isinstance(err, PipelineTestError):
-        #        outputs = runners_output_format(err.runners)
-        #        print("Autoscale Sequence test runners had the following "
-        #              "output:\n===\n{}".format(outputs))
-        raise err
+        if hasattr(err, 'runners'):
+            if not isinstance(err, PipelineTestError):
+                outputs = runners_output_format(err.runners,
+                        from_tail=5, filter_fn=lambda r: r.poll() != 0)
+                print("Some autoscale Sequence runners exited badly. "
+                      "They had the following "
+                      "output tails:\n===\n{}".format(outputs))
+        raise
 
 
-def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
+def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
     host = '127.0.0.1'
     sources = 1
 
@@ -278,16 +307,20 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
     # If no initial workers value is given, determine the minimum number
     # required at the start so that the cluster never goes below 1 worker.
     # If a number is given, then verify it is sufficient.
-    lowest = lowest_point(ops*cycles)
-    if lowest < 1:
-        min_workers = abs(lowest) + 1
-    else:
-        min_workers = 1
-    if isinstance(initial, int):
-        assert(initial >= min_workers)
+    if ops:
+        lowest = lowest_point(ops*cycles)
+        if lowest < 1:
+            min_workers = abs(lowest) + 1
+        else:
+            min_workers = 1
+        if isinstance(initial, int):
+            assert(initial >= min_workers)
+            workers = initial
+        else:
+            workers = min_workers
+    else:  # Test is only for setup using initial workers
+        assert(initial > 0)
         workers = initial
-    else:
-        workers = min_workers
 
     batch_size = 10
     interval = 0.05
@@ -347,24 +380,27 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                           metrics_port, control_port, external_port, data_port,
                           res_dir, workers, worker_ports)
 
-            # Wait for first runner (initializer) to report application ready
-            runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
-            runner_ready_checker.start()
-            runner_ready_checker.join()
-            if runner_ready_checker.error:
-                raise runner_ready_checker.error
-
-            # Verify all workers start with partitions
-            obs = ObservabilityNotifier(query_func_partitions,
-                test_all_workers_have_partitions)
+            # Verify cluster is processing messages
+            obs = ObservabilityNotifier(query_func_cluster_status,
+                test_cluster_is_processing)
             obs.start()
             obs.join()
             if obs.error:
                 raise obs.error
 
-            # Verify cluster is processing messages
+            # Verify that `workers` workers are active
+            # Create a partial function
+            partial_test_worker_count = partial(test_worker_count, workers)
             obs = ObservabilityNotifier(query_func_cluster_status,
-                test_cluster_is_processing)
+                partial_test_worker_count)
+            obs.start()
+            obs.join()
+            if obs.error:
+                raise obs.error
+
+            # Verify all workers start with partitions
+            obs = ObservabilityNotifier(query_func_partitions,
+                test_all_workers_have_partitions)
             obs.start()
             obs.join()
             if obs.error:
@@ -387,6 +423,10 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                     obs.join()
                     if obs.error:
                         raise obs.error
+
+                    # Test for crashed workers
+                    test_crashed_workers(runners)
+
                     # get partition data before autoscale operation begins
                     pre_partitions = query_func_partitions()
                     steps.append(joiners)
@@ -477,6 +517,9 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                     else:  # Handle the 0 case as a noop
                         continue
 
+                    # Test for crashed workers
+                    test_crashed_workers(runners)
+
                     # Validate autoscale via partition query
                     try:
                         partitions = partitions_query(host, external_port)
@@ -487,11 +530,14 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                         print('error validating {} have joined and {} have left'
                               .format([r.name for r in joined],
                                       [r.name for r in left]))
-                        raise err
+                        raise
 
                     # Wait a second before the next operation, allowing some
                     # more data to go through the system
                     time.sleep(1)
+
+            # Test for crashed workers
+            test_crashed_workers(runners)
 
             # Test is done, so stop sender
             sender.stop()
@@ -525,6 +571,9 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             # stop application workers
             for r in runners:
                 r.stop()
+
+            # Test for crashed workers
+            test_crashed_workers(runners)
 
             # Stop sink
             sink.stop()
@@ -572,4 +621,4 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             err.as_steps = steps
         if not hasattr(err, 'runners'):
             err.runners = runners
-        raise err
+        raise

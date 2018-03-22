@@ -60,6 +60,10 @@ class PipelineTestError(Exception):
     pass
 
 
+class CrashedWorkerError(PipelineTestError):
+    pass
+
+
 # Integration helper classes
 class StoppableThread(threading.Thread):
     """
@@ -244,7 +248,7 @@ class TCPReceiver(StoppableThread):
                 cl.start()
         except Exception as err:
             self.err = err
-            raise err
+            raise
 
     def stop(self):
         super(TCPReceiver, self).stop()
@@ -724,7 +728,7 @@ class Runner(threading.Thread):
         except Exception as err:
             self.error = err
             logging.warn("{}: Stopped running!".format(self.name))
-            raise err
+            raise
 
     def stop(self):
         try:
@@ -856,13 +860,22 @@ class RunnerChecker(StoppableThread):
                     break
 
 
-def runners_output_format(runners):
+def runners_output_format(runners, from_tail=0, filter_fn=lambda r: True):
     """
     Format runners' STDOUTs for printing or for inclusion in an error
+    - `runners` is a list of Runner instances
+    - `from_tail` is the number of lines to keep from the tail of each
+      runner's log. The default is to keep the entire log.
+    - `filter_fn` is a function to apply to each runner to determine
+      whether or not to include its output in the log. The function
+      should return `True` if the runner's output is to be included.
+      Default is to keep all outputs.
     """
-    outputs = [(r.name, r.get_output()) for r in runners]
+    outputs = [(r.name, '\n'.join(r.get_output().splitlines()[-from_tail:]))
+               for r in runners if filter_fn(r)]
     return '\n===\n'.join(('--- {0} ->\n\n{1}\n\n--- {0} <-'
-                           .format(*t) for t in outputs))
+                           .format(t[0], t[1])
+                           for t in outputs))
 
 
 def ex_validate(cmd):
@@ -1265,8 +1278,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             except PipelineTestError as err:
                 # terminate runners, prepare to retry
                 for r in runners:
-                    r.stop()
-                raise err
+                    r.kill()
                 runners = []
                 runners_err = err
         else:
@@ -1381,7 +1393,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         except Exception as err:
             print 'runner output'
             print stdout
-            raise err
+            raise
 
         if validate_file:
             validation_files = validate_file.split(',')
