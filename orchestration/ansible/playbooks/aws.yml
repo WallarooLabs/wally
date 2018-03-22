@@ -10,11 +10,17 @@
     become: yes
   - name: gather facts
     action: setup
+  - name: create variable
+    set_fact:
+      extra_grub_args: 'tsc=reliable skew_tick=y pci=pcie_bus_perf pcie_aspm=off pcie_port_pm=off rcupdate.rcu_normal=1 rcutree.kthread_prio=50 workqueue.power_efficient=0 idle=nomwait audit=0 nosoftlockup=0 nohz_full=1-{{ ((ansible_processor_vcpus/2)-1) | int }} rcu_nocbs=1-{{ ((ansible_processor_vcpus/2)-1) | int }} rcu_nocb_poll transparent_hugepage=never workqueue.watchdog_thresh=0 clocksource=tsc intel_idle.max_cstate=1 maxcpus={{ ((ansible_processor_vcpus/2)+1) | int }} nr_cpus={{ ((ansible_processor_vcpus/2)+1) | int }} possible_cpus={{ ((ansible_processor_vcpus/2)+1) | int }} {{ "isolcpus=1-" + (((ansible_processor_vcpus/2)-1) | int) | string if system_cpus is defined and isolcpus is defined and isolcpus == "true" else "" }}'
+  - name: prep for changing boot param
+    shell: sed -i -e '/^GRUB_CMDLINE_LINUX_DEFAULT=".* {{ extra_grub_args }}"/! s/\(^GRUB_CMDLINE_LINUX_DEFAULT=".*\) tsc=reliable.*"/\1"/' /etc/default/grub.d/50-cloudimg-settings.cfg
+    become: yes
   - name: set tsc reliable, max c-state and max cpus as boot param
     lineinfile:
       dest: /etc/default/grub.d/50-cloudimg-settings.cfg
-      regexp: '(^GRUB_CMDLINE_LINUX_DEFAULT="(\s*(?!tsc)[\w=/\-\.]+)*\s*)"\s*$'
-      line: '\1 tsc=reliable skew_tick=y pci=pcie_bus_perf pcie_aspm=off pcie_port_pm=off rcupdate.rcu_normal=1 rcutree.kthread_prio=50 workqueue.power_efficient=0 idle=nomwait audit=0 nosoftlockup=0 nohz_full=1-{{ ((ansible_processor_vcpus/2)-1) | int }} rcu_nocbs=1-{{ ((ansible_processor_vcpus/2)-1) | int }} rcu_nocb_poll transparent_hugepage=never workqueue.watchdog_thresh=0 clocksource=tsc intel_idle.max_cstate=1 maxcpus={{ ((ansible_processor_vcpus/2)+1) | int }} nr_cpus={{ ((ansible_processor_vcpus/2)+1) | int }} possible_cpus={{ ((ansible_processor_vcpus/2)+1) | int }} {{ "isolcpus=1-" + (((ansible_processor_vcpus/2)-1) | int) | string if system_cpus is defined and isolcpus is defined and isolcpus == "true" else "" }}"'
+      regexp: '(^GRUB_CMDLINE_LINUX_DEFAULT="[^"]*)(?<!{{ extra_grub_args }})"$'
+      line: '\1 {{ extra_grub_args }}"'
       backrefs: true
       state: present
       backup: true
