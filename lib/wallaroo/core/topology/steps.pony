@@ -221,12 +221,16 @@ actor Step is (Producer & Consumer)
       _router = router
       for outdated_consumer in old_router.routes_not_in(_router).values() do
         let outdated_route = _routes(outdated_consumer)?
-        _acker_x.remove_route(outdated_route)
+        ifdef "resilience" then
+          _acker_x.remove_route(outdated_route)
+        end
       end
       for consumer in _router.routes().values() do
         if not _routes.contains(consumer) then
           let new_route = _route_builder(this, consumer, _metrics_reporter)
-          _acker_x.add_route(new_route)
+          ifdef "resilience" then
+            _acker_x.add_route(new_route)
+          end
           _routes(consumer) = new_route
         end
       end
@@ -250,7 +254,9 @@ actor Step is (Producer & Consumer)
     do
       try
         let outdated_route = _routes(outdated_consumer)?
-        _acker_x.remove_route(outdated_route)
+        ifdef "resilience" then
+          _acker_x.remove_route(outdated_route)
+        end
       end
     end
     _add_boundaries(omni_router.boundaries())
@@ -263,7 +269,9 @@ actor Step is (Producer & Consumer)
       if not _outgoing_boundaries.contains(worker) then
         _outgoing_boundaries(worker) = boundary
         let new_route = _route_builder(this, boundary, _metrics_reporter)
-        _acker_x.add_route(new_route)
+        ifdef "resilience" then
+          _acker_x.add_route(new_route)
+        end
         _routes(boundary) = new_route
       end
     end
@@ -365,6 +373,25 @@ actor Step is (Producer & Consumer)
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id_generator.latest_for_run()
+
+  fun ref filter_queued_msg(i_producer: Producer, i_route_id: RouteId,
+    i_seq_id: SeqId)
+  =>
+    """
+    When we're in queuing mode, we currently immediately ack all messages that
+    are queued. This can lead to lost messages if there is a worker failure
+    immediately after a stop the world phase. This is a stopgap before we
+    update the watermarking algorithm to migrate watermark information for
+    migrated queued messages during step migration.
+    TODO: Replace this strategy with a strategy for migrating watermark info
+    for migrated queued messages during step migration.
+    """
+    _seq_id_generator.new_incoming_message()
+    ifdef "resilience" then
+      _acker_x.filtered(this, current_sequence_id())
+      _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_producer,
+        i_route_id, i_seq_id)
+    end
 
   ///////////
   // RECOVERY
