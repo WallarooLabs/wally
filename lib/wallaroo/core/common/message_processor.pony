@@ -83,6 +83,7 @@ class QueueingStepMessageProcessor is StepMessageProcessor
       i_producer_id, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
       metrics_id, worker_ingress_ts)
     messages.push(msg)
+    step.filter_queued_msg(i_producer, i_route_id, i_seq_id)
 
   fun ref flush(omni_router: OmniRouter) =>
     for msg in messages.values() do
@@ -124,12 +125,17 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
     worker_ingress_ts = worker_ingress_ts'
 
   fun run(step: Step ref, omni_router: OmniRouter) =>
-    let i_producer =
-      try
-        omni_router.producer_for(i_producer_id)?
-      else
-        DummyProducer
-      end
+    // TODO: When we develop a strategy for migrating watermark information for
+    // migrated queued messages, then we should look up the correct producer
+    // that we'll use to send acks to for the case when our upstream is no
+    // longer on the same worker.
+    let i_producer =  DummyProducer
+    // let i_producer =
+    //   try
+    //     omni_router.producer_for(i_producer_id)?
+    //   else
+    //     DummyProducer
+    //   end
     step.run[D](metric_name, pipeline_time_spent, data, i_producer_id,
       i_producer, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
       metrics_id, worker_ingress_ts)
