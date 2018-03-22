@@ -564,6 +564,9 @@ class Sender(StoppableThread):
     def stop(self):
         logging.log(INFO2, "Sender received stop instruction.")
         super(Sender, self).stop()
+        if self.batch:
+            logging.warn("Sender stopped, but send buffer size is {}"
+                         .format(len(self.batch)))
 
 
 def sequence_generator(stop=1000, start=0, header_fmt='>I'):
