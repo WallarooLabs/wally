@@ -66,6 +66,7 @@ Alternatively, for a CLI style integration tester, you may use the
 
 from integration import (add_runner,
                          clean_resilience_path,
+                         CrashedWorkerError,
                          ex_validate,
                          files_generator,
                          get_port_values,
