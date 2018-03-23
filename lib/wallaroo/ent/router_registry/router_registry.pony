@@ -381,6 +381,12 @@ actor RouterRegistry is InFlightAckRequester
       for step in _omni_router_steps.values() do
         step.update_omni_router(_omni_router as OmniRouter)
       end
+      match _local_topology_initializer
+      | let lti: LocalTopologyInitializer =>
+        lti.update_omni_router(_omni_router as OmniRouter)
+      else
+        Fail()
+      end
     else
       Fail()
     end
@@ -431,6 +437,7 @@ actor RouterRegistry is InFlightAckRequester
     | let omnr: OmniRouter =>
       _omni_router = omnr.remove_boundary(worker).remove_data_receiver(worker)
     end
+
     _distribute_omni_router()
 
   fun ref _distribute_boundary_removal(worker: String) =>
@@ -493,7 +500,7 @@ actor RouterRegistry is InFlightAckRequester
     let obs = consume val obs_trn
     for (s, b) in partition_blueprints.pairs() do
       let next_router = b.build_router(_worker_name, obs, _auth)
-      _distribute_partition_router(next_router)
+       _distribute_partition_router(next_router)
       _partition_routers(s) = next_router
     end
 
@@ -1268,11 +1275,13 @@ actor RouterRegistry is InFlightAckRequester
       try
         let boundary = _outgoing_boundaries(w)?
         rws_trn.push((w, boundary))
-      else
-        Fail()
+      //!@
+      // else
+      //   Fail()
       end
     end
     let rws = consume val rws_trn
+    if rws.size() == 0 then Fail() end
 
     @printf[I32]("Migrating all partitions to %d remaining workers\n"
       .cstring(), remaining_workers.size())

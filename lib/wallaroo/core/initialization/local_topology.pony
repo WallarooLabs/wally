@@ -527,6 +527,9 @@ actor LocalTopologyInitializer is LayoutInitializer
     _stateless_partition_router_blueprints = spr_blueprints
     _omni_router_blueprint = omr_blueprint
 
+  be update_omni_router(omni_router: OmniRouter) =>
+    _omni_router_blueprint = omni_router.blueprint()
+
   be recover_and_initialize(ws: Array[String] val,
     cluster_initializer: (ClusterInitializer | None) = None)
   =>

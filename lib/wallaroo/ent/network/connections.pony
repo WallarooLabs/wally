@@ -235,6 +235,9 @@ actor Connections is Cluster
       d.dispose()
       (_, let c) = _control_conns.remove(worker)?
       c.dispose()
+      _control_addrs.remove(worker)?
+      _data_addrs.remove(worker)?
+      _data_conn_builders.remove(worker)?
     else
       @printf[I32]("Couldn't find worker %s for disconnection\n".cstring(),
         worker.cstring())
