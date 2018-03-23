@@ -226,27 +226,29 @@ actor OutgoingBoundary is Consumer
     """
     Called when initializing as part of a new worker joining a running cluster.
     """
-    try
-      _initializer = initializer
-      _reported_initialized = true
-      _reported_ready_to_work = true
-      _connect_count = @pony_os_connect_tcp[U32](this,
-        _host.cstring(), _service.cstring(),
-        _from.cstring())
-      _notify_connecting()
+    if not _reported_initialized then
+      try
+        _initializer = initializer
+        _reported_initialized = true
+        _reported_ready_to_work = true
+        _connect_count = @pony_os_connect_tcp[U32](this,
+          _host.cstring(), _service.cstring(),
+          _from.cstring())
+        _notify_connecting()
 
-      @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" +
-        _service + "\n").cstring())
+        @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" +
+          _service + "\n").cstring())
 
-      if _step_id == 0 then
+        if _step_id == 0 then
+          Fail()
+        end
+
+        let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
+          _step_id, _auth)?
+        _writev(connect_msg)
+      else
         Fail()
       end
-
-      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
-        _auth)?
-      _writev(connect_msg)
-    else
-      Fail()
     end
 
   be reconnect() =>

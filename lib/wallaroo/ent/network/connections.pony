@@ -243,6 +243,29 @@ actor Connections is Cluster
         worker.cstring())
     end
 
+  be notify_joining_workers_of_joining_addresses(joining_workers:
+    Array[String] val)
+  =>
+    for w1 in joining_workers.values() do
+      let others_control = recover iso Map[String, (String, String)] end
+      let others_data = recover iso Map[String, (String, String)] end
+      for w2 in joining_workers.values() do
+        try
+          if w1 != w2 then others_control(w2) = _control_addrs(w2)? end
+          if w1 != w2 then others_data(w2) = _data_addrs(w2)? end
+        else
+          Fail()
+        end
+      end
+      try
+        let msg = ChannelMsgEncoder.announce_connections(
+          consume others_control, consume others_data, _auth)?
+        _send_control(w1, msg)
+      else
+        Fail()
+      end
+    end
+
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: StepId, key: K, state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
