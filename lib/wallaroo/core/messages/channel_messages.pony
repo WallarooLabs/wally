@@ -294,6 +294,12 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayBoundaryCountMsg(sender, count), auth)?
 
+  fun announce_connections(control_addrs: Map[String, (String, String)] val,
+    data_addrs: Map[String, (String, String)] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(AnnounceConnectionsMsg(control_addrs, data_addrs), auth)?
+
   fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: StepId, worker_name: String, key: K, state_name: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -788,6 +794,16 @@ class val LeavingWorkerDoneMigratingMsg is ChannelMsg
   new val create(name: String)
   =>
     worker_name = name
+
+class val AnnounceConnectionsMsg is ChannelMsg
+  let control_addrs: Map[String, (String, String)] val
+  let data_addrs: Map[String, (String, String)] val
+
+  new val create(c_addrs: Map[String, (String, String)] val,
+    d_addrs: Map[String, (String, String)] val)
+  =>
+    control_addrs = c_addrs
+    data_addrs = d_addrs
 
 trait val AnnounceNewStatefulStepMsg is ChannelMsg
   fun update_registry(r: RouterRegistry)

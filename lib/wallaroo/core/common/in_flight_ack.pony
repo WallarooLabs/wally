@@ -36,8 +36,8 @@ actor InitialInFlightAckRequester is InFlightAckRequester
     ifdef debug then
       @printf[I32](("Received in flight ack at InitialInFlightAckRequester. " +
         "This indicates the originator of a chain of in flight ack requests " +
-        "has received the final ack. Request id received: %s.\n").cstring(),
-        request_id.string().cstring())
+        "has received the final ack. Request id received: %s. Reported from %s\n").cstring(),
+        request_id.string().cstring(), _step_id.string().cstring())
     end
     None
 
