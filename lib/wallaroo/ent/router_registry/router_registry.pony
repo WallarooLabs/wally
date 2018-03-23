@@ -722,6 +722,7 @@ actor RouterRegistry is InFlightAckRequester
         nws.push(w)
       end
       let new_workers = consume val nws
+      _connections.notify_joining_workers_of_joining_addresses(new_workers)
       try
         let msg =
           ChannelMsgEncoder.initiate_join_migration(new_workers, _auth)?
@@ -1275,9 +1276,8 @@ actor RouterRegistry is InFlightAckRequester
       try
         let boundary = _outgoing_boundaries(w)?
         rws_trn.push((w, boundary))
-      //!@
-      // else
-      //   Fail()
+      else
+        Fail()
       end
     end
     let rws = consume val rws_trn

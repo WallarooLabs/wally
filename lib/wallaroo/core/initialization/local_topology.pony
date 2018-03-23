@@ -289,14 +289,23 @@ actor LocalTopologyInitializer is LayoutInitializer
   be add_joining_worker(w: String, joining_host: String,
     control_addr: (String, String), data_addr: (String, String))
   =>
-    _add_worker_name(w)
-    _connections.create_control_connection(w, joining_host, control_addr._2)
-    _connections.create_data_connection_to_joining_worker(w, joining_host,
-      data_addr._2, this)
-    let new_boundary_id = _step_id_gen()
-    _connections.create_boundary_to_joining_worker(w, new_boundary_id, this)
-    @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
-      w.cstring())
+    match _topology
+    | let t: LocalTopology =>
+      if not ArrayHelpers[String].contains[String](t.worker_names, w) then
+        _add_worker_name(w)
+        _connections.create_control_connection(w, joining_host,
+          control_addr._2)
+        _connections.create_data_connection_to_joining_worker(w, joining_host,
+          data_addr._2, this)
+        let new_boundary_id = _step_id_gen()
+        _connections.create_boundary_to_joining_worker(w, new_boundary_id,
+          this)
+        @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
+          w.cstring())
+      end
+    else
+      Fail()
+    end
 
   be initiate_shrink(target_workers: Array[String] val, shrink_count: U64,
     conn: TCPConnection)

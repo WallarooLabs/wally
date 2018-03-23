@@ -293,6 +293,22 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         end
+      | let m: AnnounceConnectionsMsg =>
+        for w in m.control_addrs.keys() do
+          try
+            let host = m.control_addrs(w)?._1
+            let control_addr = m.control_addrs(w)?
+            let data_addr = m.data_addrs(w)?
+            match _layout_initializer
+            | let lti: LocalTopologyInitializer =>
+              lti.add_joining_worker(w, host, control_addr, data_addr)
+            else
+              Fail()
+            end
+          else
+            Fail()
+          end
+        end
       | let m: AnnounceNewStatefulStepMsg =>
         m.update_registry(_router_registry)
       | let m: AnnounceNewSourceMsg =>

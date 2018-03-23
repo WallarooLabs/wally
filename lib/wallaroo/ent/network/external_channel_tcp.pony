@@ -205,5 +205,5 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
       _worker_name.cstring())
 
   fun ref closed(conn: TCPConnection ref) =>
-    @printf[I32]("ExternalChannelConnectNotifier: %s: server closed\n"
+    @printf[I32]("ExternalChannelConnectNotifier (%s): server closed\n"
       .cstring(), _worker_name.cstring())
