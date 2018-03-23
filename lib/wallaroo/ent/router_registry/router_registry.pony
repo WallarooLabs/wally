@@ -47,6 +47,8 @@ actor RouterRegistry is InFlightAckRequester
     _partition_routers.create()
   let _stateless_partition_routers: Map[U128, StatelessPartitionRouter] =
     _stateless_partition_routers.create()
+  let _data_receiver_map: Map[String, DataReceiver] =
+    _data_receiver_map.create()
 
   var _local_topology_initializer: (LocalTopologyInitializer | None) = None
 
@@ -72,7 +74,7 @@ actor RouterRegistry is InFlightAckRequester
   //
   ////////////////
 
-  let _sources: SetIs[Source] = _sources.create()
+  let _sources: Map[StepId, Source] = _sources.create()
   let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
   // Map from Source digestof value to source id
   let _source_ids: Map[U64, StepId] = _source_ids.create()
@@ -165,7 +167,20 @@ actor RouterRegistry is InFlightAckRequester
     _stateless_partition_routers(partition_id) = pr
 
   be set_omni_router(o: OmniRouter) =>
-    _omni_router = o
+    _set_omni_router(o)
+
+  fun ref _set_omni_router(o: OmniRouter) =>
+    var omn = o
+    for (w, dr) in _data_receiver_map.pairs() do
+      omn = o.add_data_receiver(w, dr)
+    end
+    for (w, ob) in _outgoing_boundaries.pairs() do
+      omn = o.add_boundary(w, ob)
+    end
+    for (s_id, s) in _sources.pairs() do
+      omn = o.add_source(s_id, s)
+    end
+    _omni_router = omn
 
   be set_event_log(e: EventLog) =>
     _event_log = e
@@ -180,7 +195,7 @@ actor RouterRegistry is InFlightAckRequester
     _connections.register_disposable(d)
 
   be register_source(source: Source, source_id: StepId) =>
-    _sources.set(source)
+    _sources(source_id) = source
     _source_ids(digestof source) = source_id
     if not _stop_the_world_in_process and _application_ready_to_work then
       source.unmute(_dummy_consumer)
@@ -365,12 +380,11 @@ actor RouterRegistry is InFlightAckRequester
     end
 
   be register_data_receiver(worker: String, dr: DataReceiver) =>
+    _data_receiver_map(worker) = dr
     match _omni_router
     | let omnr: OmniRouter =>
       _omni_router = omnr.add_data_receiver(worker, dr)
       _distribute_omni_router()
-    else
-      Fail()
     end
 
   fun _distribute_data_router() =>
@@ -432,6 +446,15 @@ actor RouterRegistry is InFlightAckRequester
     end
     _distribute_omni_router()
 
+  fun ref _remove_worker(worker: String) =>
+    try
+      _data_receiver_map.remove(worker)?
+    else
+      Fail()
+    end
+    _remove_worker_from_omni_router(worker)
+    _distribute_boundary_removal(worker)
+
   fun ref _remove_worker_from_omni_router(worker: String) =>
     match _omni_router
     | let omnr: OmniRouter =>
@@ -441,8 +464,6 @@ actor RouterRegistry is InFlightAckRequester
     _distribute_omni_router()
 
   fun ref _distribute_boundary_removal(worker: String) =>
-    _remove_worker_from_omni_router(worker)
-
     for subs in _partition_router_subs.values() do
       for sub in subs.values() do
         match sub
@@ -530,7 +551,7 @@ actor RouterRegistry is InFlightAckRequester
     let obs = consume val obs_trn
     let new_omni_router = omni_router_blueprint.build_router(_worker_name,
       obs, local_sinks)
-    _omni_router = new_omni_router
+    _set_omni_router(new_omni_router)
     lti.set_omni_router(new_omni_router)
     lti.initialize_join_initializables()
 
@@ -1296,7 +1317,7 @@ actor RouterRegistry is InFlightAckRequester
   be disconnect_from_leaving_worker(worker: String) =>
     _connections.disconnect_from(worker)
     try
-      _distribute_boundary_removal(worker)
+      _remove_worker(worker)
       _outgoing_boundaries.remove(worker)?
       _outgoing_boundaries_builders.remove(worker)?
     else
@@ -1383,8 +1404,7 @@ actor RouterRegistry is InFlightAckRequester
   =>
     match _omni_router
     | let o: OmniRouter =>
-      let new_omni_router = o.update_route_to_proxy(id, proxy_address)
-      _omni_router = new_omni_router
+      _omni_router = o.update_route_to_proxy(id, proxy_address)
     else
       Fail()
     end
