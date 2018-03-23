@@ -450,6 +450,9 @@ actor OutgoingBoundary is Consumer
     requester_id: StepId, upstream_requester: FinishedAckRequester)
   =>
     @printf[I32]("!@ request_finished_ack BOUNDARY %s, requester_id: %s, upstream_request_id: %s\n".cstring(), _step_id.string().cstring(), requester_id.string().cstring(), upstream_request_id.string().cstring())
+
+    // !@
+    // if not _finished_ack_waiter.pending_request() then
     if not _finished_ack_waiter.already_added_request(requester_id) then
       try
         _finished_ack_waiter.add_new_request(requester_id, upstream_request_id,
@@ -468,7 +471,7 @@ actor OutgoingBoundary is Consumer
   be request_finished_ack_complete(requester_id: StepId,
     producer: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack_complete BOUNDARY\n".cstring())
+    // @printf[I32]("!@ request_finished_ack_complete BOUNDARY\n".cstring())
     try
       _writev(ChannelMsgEncoder.request_finished_ack_complete(_worker_name,
         requester_id, _auth)?)
@@ -480,7 +483,7 @@ actor OutgoingBoundary is Consumer
     _finished_ack_waiter.try_finish_request_early(requester_id)
 
   be receive_finished_ack(request_id: RequestId) =>
-    @printf[I32]("!@ receive_finished_ack BOUNDARY\n".cstring())
+    // @printf[I32]("!@ receive_finished_ack BOUNDARY\n".cstring())
     _finished_ack_waiter.unmark_consumer_request(request_id)
 
   //
@@ -1013,13 +1016,11 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
       ifdef "trace" then
         @printf[I32]("Rcvd msg at OutgoingBoundary\n".cstring())
       end
-      @printf[I32]("!@ Recvd msg at OutgoingBoundary\n".cstring())
       match ChannelMsgDecoder(consume data, _auth)
       | let ac: AckDataConnectMsg =>
-        //!@
-        // ifdef "trace" then
+        ifdef "trace" then
           @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
-        // end
+        end
         conn.receive_connect_ack(ac.last_id_seen)
       | let dd: DataDisconnectMsg =>
         //!@
@@ -1034,14 +1035,15 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         conn.receive_connect_ack(sn.last_id_seen)
         conn.start_normal_sending()
       | let aw: AckWatermarkMsg =>
-        //!@
-        // ifdef "trace" then
+        ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
-        // end
+        end
         conn.receive_ack(aw.seq_id)
       | let fa: FinishedAckMsg =>
-        @printf[I32]("Received FinishedAckMsg from %s\n".cstring(),
-          fa.sender.cstring())
+        ifdef "trace" then
+          @printf[I32]("Received FinishedAckMsg from %s\n".cstring(),
+            fa.sender.cstring())
+        end
         _outgoing_boundary.receive_finished_ack(fa.request_id)
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +

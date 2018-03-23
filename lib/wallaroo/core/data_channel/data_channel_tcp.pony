@@ -269,12 +269,16 @@ class DataChannelConnectNotifier is DataChannelNotify
       | let m: SpinUpLocalTopologyMsg =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
       | let m: RequestFinishedAckMsg =>
-        @printf[I32]("Received RequestFinishedAckMsg from %s\n".cstring(),
-          m.sender.cstring())
+        ifdef "trace" then
+          @printf[I32]("Received RequestFinishedAckMsg from %s\n".cstring(),
+            m.sender.cstring())
+        end
         _receiver.request_finished_ack(m.request_id, m.requester_id)
       | let m: RequestFinishedAckCompleteMsg =>
-        @printf[I32]("Received RequestFinishedAckCompleteMsg from %s\n"
-          .cstring(), m.sender.cstring())
+        ifdef "trace" then
+          @printf[I32]("Received RequestFinishedAckCompleteMsg from %s\n"
+            .cstring(), m.sender.cstring())
+        end
         _receiver.request_finished_ack_complete(m.requester_id)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
