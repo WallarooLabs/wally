@@ -37,11 +37,11 @@ apt-get install -y build-essential \
   ponyc=0.21.0-4301.acd811b \
   python-dev
 
-## switch to default ubuntu user
-su - ubuntu
+## switch to default vagrant user
+su - vagrant
 
 ## clone Wallaroo and build various Wallaroo tools
-pushd /home/ubuntu
+pushd /home/vagrant
 mkdir wallaroo-tutorial
 pushd wallaroo-tutorial || exit
 
@@ -55,6 +55,6 @@ popd
 
 make build-giles-all build-utils-all
 
-## allow ubuntu user access to everything
-pushd /home/ubuntu
-chown -R ubuntu:ubuntu wallaroo-tutorial
+## allow vagrant user access to everything
+pushd /home/vagrant
+chown -R vagrant:vagrant wallaroo-tutorial
