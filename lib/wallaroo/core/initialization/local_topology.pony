@@ -602,6 +602,22 @@ actor LocalTopologyInitializer is LayoutInitializer
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
     recovering: Bool = false)
   =>
+    if _topology_initialized then
+      ifdef debug then
+        // Currently, recovery in a single worker cluster is a special case.
+        // We do not need to recover connections to other workers, so we
+        // initialize immediately in Startup. However, we eventually trigger
+        // code in connections.pony where initialize() is called again. For
+        // now, this code simply returns in that scenario to avoid double
+        // initialization.
+        Invariant(
+          try (_topology as LocalTopology).worker_names.size() == 1
+          else false end
+        )
+      end
+      return
+    end
+
     _recovering = recovering
 
     if _is_joining then

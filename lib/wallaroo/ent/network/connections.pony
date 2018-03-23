@@ -348,7 +348,7 @@ actor Connections is Cluster
     // TODO: This should be somewhere else. It's not clear why updating
     // boundaries should trigger initialization, but this is the point
     // at which initialization is possible for a joining or recovering
-    // worker
+    // worker in a multiworker cluster.
     if _is_joining or recovering then
       layout_initializer.initialize(where recovering = recovering)
     end
