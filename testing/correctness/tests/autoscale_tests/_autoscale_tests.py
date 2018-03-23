@@ -296,7 +296,6 @@ def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                       "output tails:\n===\n{}".format(outputs))
         raise
 
-
 def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
     host = '127.0.0.1'
     sources = 1
@@ -615,7 +614,6 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                                         "\n===\n{}"
                                         .format(alive_names, runner_join_timeout,
                                                 outputs))
-
     except Exception as err:
         if not hasattr(err, 'as_steps'):
             err.as_steps = steps
