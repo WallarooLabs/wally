@@ -70,6 +70,7 @@ actor Startup
   var _connections: (Connections | None) = None
 
   let _join_disposables: SetIs[DisposableActor] = _join_disposables.create()
+  var _is_joining: Bool = false
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -103,6 +104,7 @@ actor Startup
     try
       let auth = _env.root as AmbientAuth
       _startup_options = WallarooConfig.wallaroo_args(_env.args)?
+      _is_joining = _startup_options.is_joining
 
       (_external_host, _external_service) =
         match _startup_options.x_arg
@@ -131,7 +133,7 @@ actor Startup
           _startup_options.log_rotation.string() + "|||\n").cstring())
       end
 
-      if _startup_options.is_joining then
+      if _is_joining then
         @printf[I32]("New worker preparing to join cluster\n".cstring())
       else
         match _startup_options.worker_count
@@ -150,7 +152,7 @@ actor Startup
         end
       end
 
-      if _startup_options.is_joining then
+      if _is_joining then
         if _startup_options.worker_name == "" then
           @printf[I32](("You must specify a name for the worker " +
             "via the -n parameter.\n").cstring())
@@ -179,6 +181,10 @@ actor Startup
 
   be initialize() =>
     try
+      if _is_joining then
+        Fail()
+      end
+
       let auth = _env.root as AmbientAuth
       _set_recovery_file_names(auth)
 
@@ -300,7 +306,7 @@ actor Startup
         _startup_options.c_host, _startup_options.c_service,
         _startup_options.d_host, _startup_options.d_service,
         metrics_conn, m_addr(0)?, m_addr(1)?, _startup_options.is_initializer,
-        _connection_addresses_file, _startup_options.is_joining,
+        _connection_addresses_file, _is_joining,
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
@@ -408,16 +414,6 @@ actor Startup
           ci.start()
         end
       end
-
-      if _startup_options.is_joining then
-        // Dispose of temporary listener
-        match _joining_listener
-        | let tcp_l: TCPListener =>
-          tcp_l.dispose()
-        else
-          Fail()
-        end
-      end
     else
       StartupHelp()
     end
@@ -470,7 +466,7 @@ actor Startup
         auth, c_host, c_service, d_host, d_service,
         metrics_conn, m.metrics_host, m.metrics_service,
         _startup_options.is_initializer,
-        _connection_addresses_file, _startup_options.is_joining,
+        _connection_addresses_file, _is_joining,
         _startup_options.spike_config, event_log,
         _startup_options.log_rotation where recovery_file_cleaner = this)
       _connections = connections
@@ -501,7 +497,7 @@ actor Startup
           _startup_options.is_initializer, data_receivers,
           event_log, recovery, recovery_replayer,
           _local_topology_file, _data_channel_file, _worker_names_file
-          where is_joining = _startup_options.is_joining)
+          where is_joining = true)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -586,6 +582,7 @@ actor Startup
     else
       Fail()
     end
+    _is_joining = false
 
     initialize()
 
