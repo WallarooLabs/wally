@@ -95,3 +95,19 @@ $HOME/wallaroo-tutorial/wallaroo/machida/build/machida --application-module cels
   --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1 \
   --ponynoblock
 ```
+
+Please be aware that you'll still need to setup a source and sink as well. We include a toolkit named Giles to assist in this. To learn more you can look at [Giles Receiver](/book/wallaroo-tools/giles-receiver.md) and [Giles Sender](/book/wallaroo-tools/giles-sender.md) for more detailed instructions on building and running Giles.
+
+To run a sink for our example with Giles, run
+
+```bash
+$HOME/wallaroo-tutorial/wallaroo/giles/receiver/receiver --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock
+```
+
+or if you prefer to log the output into a file, you may use the netcat utility like so
+
+```bash
+nc -l 127.0.0.1 5555 > output
+```
+
+The contents of your pipeline's decoder will be added to a file named output in the directory from which this is run.
