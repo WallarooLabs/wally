@@ -15,11 +15,11 @@ The recommended way to create your topology structure is by using the [Applicati
 * [Computation](#computation)
 * [Data](#data)
 * [Key](#key)
-* [PartitionFunction](#partitionfunction)
-* [TCPSinkEncoder](#tcp-sink-encoder)
-* [TCPSourceDecoder](#tcp-source-decoder)
-* [KafkaSinkEncoder](#kafka-sink-encoder)
-* [KafkaSourceDecoder](#kafka-source-decoder)
+* [Partition](#partition)
+* [TCP Sink Encoder](#tcp-sink-encoder)
+* [TCP Source Decoder](#tcp-source-decoder)
+* [Kafka Sink Encoder](#kafka-sink-encoder)
+* [Kafka Source Decoder](#kafka-source-decoder)
 * [State](#state)
 * [StateComputation](#statecomputation)
 * [TCPSourceConfig](#tcpsourceconfig)
@@ -44,7 +44,6 @@ def application_setup(args):
                     wallaroo.TCPSourceConfig(in_host, in_port, decoder))
     ab.to(computation)
     ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
-    ab.done()
     return ab.build()
 ```
 
@@ -78,14 +77,14 @@ This is necessary if you intend to add another pipeline.
 
 Add a stateless computation _function_ to the current pipeline.
 
-Note that this method takes a _function_ decorated by `@wallaroo.computation`. See [Computation](#computation).
+Note that this method takes a _function_ decorated with the `@wallaroo.computation` decorator. See [Computation](#computation).
 
 ##### `to_parallel(computation_f)`
 
 Add a stateless computation _function_ to the current pipeline.
 Creates one copy of the computation per worker in the cluster allowing you to parallelize stateless work.
 
-Note that this method takes a _function_, decorated by `@wallaroo.computation`. See [Computation](#computation).
+Note that this method takes a _function_, decorated with the `@wallaroo.computation` decorator. See [Computation](#computation).
 
 ##### `to_stateful(computation, state_class, state_name)`
 
@@ -107,7 +106,7 @@ Add a partitioned state computation to the current pipeline.
 
 `state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
 
-`partition_function` must be a [PartitionFunction](#partitionfunction).
+`partition_function` must be a [Partition](#partition).
 
 `partition_keys` must be a list of objects where all of the objects can be hashed with the `hash` function and be checked for equality with other objects.
 
@@ -121,7 +120,7 @@ Add a partitioned state computation to the current pipeline.
 
 `state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
 
-`partition_function` must be a [PartitionFunction](#partitionfunction).
+`partition_function` must be a [Partition](#partition).
 
 `partition_keys` must be a list of non-negative `int`.
 
@@ -141,7 +140,7 @@ Return the complete list of topology tuples. This is the topology structure Wall
 
 A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. A stateless computation has _no side effects_.
 
-A `computation` class must be wrapped by the `@wallaroo.computation(name="computation name")` decorator, which takes the name of the computation as an argument.
+A `computation` function must be decorated with the `@wallaroo.computation(name="computation name")` decorator, which takes the name of the computation as an argument.
 
 ##### `compute(data)`
 
@@ -185,11 +184,11 @@ It is important to ensure that data returned is always immutable or unique to av
 
 Partition Keys must correctly support the `__eq__` (`==`) and `__hash__` operators. Some built-in types, such as strings and numbers, already support these out of the box. If you are defining your own types, however, you must also implement the `__eq__` and `__hash__` methods.
 
-### PartitionFunction
+### Partition
 
-A partition function class must be wrapped in the `@wallaroo.partition` decorator and return the appropriate [Key](#key) for `data`.
+A partition function must be decorated with the `@wallaroo.partition` decorator and return the appropriate [Key](#key) for `data`.
 
-#### Example PartitionFunction
+#### Example Partition
 
 An example that partitions words for a word count based on their first character, and buckets all other cases to the empty string key:
 
@@ -212,12 +211,12 @@ Your function must be decorated with `@wallaroo.encoder`.
 
 Return a `bytes` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes`, and what information to keep or discard.
 
-#### Example TCPSinkEncoder
+#### Example encoder for a TCPSinkConfig
 
-A complete `TCPSinkEncoder` example that takes a list of integers and encodes it to a sequence of big-endian longs preceded by a big-endian short representing the number of integers in the list:
+A complete `TCPSinkConfig` encoder example that takes a list of integers and encodes it to a sequence of big-endian longs preceded by a big-endian short representing the number of integers in the list:
 
 ```python
-@encoder
+@wallaroo.encoder
 def encoder(data):
     fmt = '>H{}'.format('L'*len(data))
     return struct.pack(fmt, len(data), *data)
@@ -229,7 +228,9 @@ The TCP Source Decoder is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input connection.
 2. Converting those bytes into an object that the rest of the application can process.
 
-Your function must be decorated with `@wallaroo.decoder(header_length=header_length, length_fmt="length_fmt")`.
+Your function must be decorated with `@wallaroo.decoder(header_length=4, length_fmt=">I")`.
+
+*NOTE:* The arguments supplied to the above decorator are examples and you should replace them with the proper values needed by your decoder function.
 
 ##### `header_length`
 
@@ -240,7 +241,7 @@ An integer representing the number of bytes from the beginning of an incoming me
 A format string that represents how the message header is encoded. A common encoding used in Wallaroo is a big-endian 32-bit unsigned integer, which can be decoded with the [struct module's](https://docs.python.org/2/library/struct.html) help:
 
 ```python
-struct.unpack('>L', bs)
+struct.unpack(">I", bs)
 ```
 
 ##### `decoder(bs)`
@@ -249,12 +250,12 @@ Return a python a python object of the type the next step in the pipeline expect
 
 `bs` is a `bytes` of the length returned by [payload_length](#payload-length(bs)), and it is up to the developer to translate that into a python object.
 
-#### Example TCPSourceDecoder
+#### Example decoder for a TCPSourceConfig
 
-A complete TCPSourceDecoder example that decodes messages with a 32-bit unsigned integer _payload\_length_ and a character followed by a 32-bit unsigned int in its _payload_:
+A complete `TCPSourceConfig` decoder example that decodes messages with a 32-bit unsigned integer _payload\_length_ and a character followed by a 32-bit unsigned int in its _payload_:
 
 ```python
-@wallaroo.decoder(header_length=4, length_fmt=">L")
+@wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     return struct.unpack('>1sL', bs)
 ```
@@ -267,9 +268,9 @@ To do this, create an encoder function, in the same way you would for a TCP Sink
 
 Your encoder function must be decorated with `@wallaroo.encoder`.
 
-#### Example KafkaSinkEncoder
+#### Example encoder for a KafkaSinkConfig
 
-A complete `KafkaSinkEncoder` example that takes a word and sends it to the partition corresponding to the first letter of the word:
+A complete `KafkaSinkConfig` encoder example that takes a word and sends it to the partition corresponding to the first letter of the word:
 
 ```python
 @wallaroo.encoder
@@ -291,12 +292,12 @@ Return Python object of the type the next step in the pipeline expects.
 
 Your decoder function must be decorated with `@wallaroo.decoder`.
 
-#### Example Kafka Source Decoder
+#### Example decoder for a KafkaSourceConfig
 
-A complete Kafka Source Decoder example that decodes messages with a 32-bit unsigned int in its _payload_:
+A complete `KafkaSourceConfig` decoder example that decodes messages with a 32-bit unsigned int in its _payload_:
 
 ```python
-@wallaroo.decoder(header_length=4, length_fmt=">L")
+@wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     return struct.unpack('>1sL', bs)
 ```
@@ -339,7 +340,7 @@ A state computation is similar to a [Computation](#computation), except that it 
 
 In order to provide resilience, Wallaroo needs to keep track of state changes, or side effects, and it does so by making `state` an explicit object that is given as input to any StateComputation step.
 
-Similarly to a Computation, a StateComputation class must be wrapped in the `@wallaroo.state_computation` decorator.
+Similarly to a Computation, a StateComputation function must be decorated with the `@wallaroo.state_computation` decorator.
 
 ##### `compute(data, state)`
 
