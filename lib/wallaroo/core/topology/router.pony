@@ -59,13 +59,14 @@ class val EmptyRouter is Router
   fun request_finished_ack(request_id: RequestId, requester_id: StepId,
     requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack EmptyRouter\n".cstring())
+    // @printf[I32]("!@ request_finished_ack EmptyRouter\n".cstring())
     requester.receive_finished_ack(request_id)
 
   fun request_finished_ack_complete(requester_id: StepId,
     requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack_complete EmptyRouter\n".cstring())
+    // @printf[I32]("!@ request_finished_ack_complete EmptyRouter\n".cstring())
+    None
 
 class val DirectRouter is Router
   let _target: Consumer
@@ -112,13 +113,13 @@ class val DirectRouter is Router
   fun request_finished_ack(request_id: RequestId, requester_id: StepId,
     requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack DirectRouter\n".cstring())
+    // @printf[I32]("!@ request_finished_ack DirectRouter\n".cstring())
     _target.request_finished_ack(request_id, requester_id, requester)
 
   fun request_finished_ack_complete(requester_id: StepId,
     requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack_complete DirectRouter\n".cstring())
+    // @printf[I32]("!@ request_finished_ack_complete DirectRouter\n".cstring())
     _target.request_finished_ack_complete(requester_id, requester)
 
 class val MultiRouter is Router
@@ -191,7 +192,6 @@ class val MultiRouter is Router
   fun request_finished_ack(request_id: RequestId, requester_id: StepId,
     requester: FinishedAckRequester)
   =>
-    // !@ TODO: Handle this correctly for multi sink
     for router in _routers.values() do
       router.request_finished_ack(request_id, requester_id, requester)
     end
@@ -288,13 +288,13 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
   fun request_finished_ack(request_id: RequestId, requester_id: StepId,
     producer: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack ProxyRouter\n".cstring())
+    // @printf[I32]("!@ request_finished_ack ProxyRouter\n".cstring())
     _target.request_finished_ack(request_id, requester_id, producer)
 
   fun request_finished_ack_complete(requester_id: StepId,
     requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack_complete ProxyRouter\n".cstring())
+    // @printf[I32]("!@ request_finished_ack_complete ProxyRouter\n".cstring())
     _target.request_finished_ack_complete(requester_id, requester)
 
 // An OmniRouter is a router that can route a message to any Consumer in the
@@ -884,7 +884,7 @@ class val DataRouter is Equatable[DataRouter]
   fun request_finished_ack(requester_id: StepId, requester: DataReceiver,
     finished_ack_waiter: FinishedAckWaiter)
   =>
-    @printf[I32]("!@ request_finished_ack DataRouter\n".cstring())
+    // @printf[I32]("!@ request_finished_ack DataRouter: %s\n".cstring(), requester_id.string().cstring())
     ifdef "trace" then
       @printf[I32]("Finished ack requested at DataRouter\n".cstring())
     end

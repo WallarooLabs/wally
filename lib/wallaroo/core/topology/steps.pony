@@ -248,7 +248,8 @@ actor Step is (Producer & Consumer)
       end
     //!@
     else
-      @printf[I32]("!@ !!!!!!!! FAIL CAN'T REMOVE! %s from %s\n".cstring(), worker.cstring(), _id.string().cstring())
+      // @printf[I32]("!@ !!!!!!!! FAIL CAN'T REMOVE! %s from %s\n".cstring(), worker.cstring(), _id.string().cstring())
+      None
     end
 
   be remove_route_for(step: Consumer) =>
@@ -448,11 +449,13 @@ actor Step is (Producer & Consumer)
   be request_finished_ack_complete(requester_id: StepId,
     requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack_complete STEP\n".cstring())
+    // @printf[I32]("!@ request_finished_ack_complete STEP\n".cstring())
     match _step_message_processor
     | let qmp: QueueingStepMessageProcessor =>
       // Process all queued messages
       qmp.flush()
+
+      _finished_ack_waiter.clear()
       _step_message_processor = NormalStepMessageProcessor(this)
       for r in _routes.values() do
         r.request_finished_ack_complete(_id, this)

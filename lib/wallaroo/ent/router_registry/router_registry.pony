@@ -701,6 +701,10 @@ actor RouterRegistry is FinishedAckRequester
     """
     Migration is complete and we're ready to resume message processing
     """
+    _finished_ack_waiter.clear()
+    for source in _sources.values() do
+      source.request_finished_ack_complete(_id, this)
+    end
     _connections.request_finished_acks_complete(_id, this)
     _resume_all_local()
     _stop_the_world_in_process = false
@@ -833,8 +837,7 @@ actor RouterRegistry is FinishedAckRequester
 
     if _sources.size() > 0 then
       for source in _sources.values() do
-        @printf[I32]("!@ -- Stopping world for source %s\n".cstring(),
-          (digestof source).string().cstring())
+        // @printf[I32]("!@ -- Stopping world for source %s\n".cstring(), (digestof source).string().cstring())
         let request_id =
           _finished_ack_waiter.add_consumer_request(upstream_requester_id)
         source.request_finished_ack(request_id, _id, this)
@@ -872,7 +875,7 @@ actor RouterRegistry is FinishedAckRequester
     """
     Get finished acks from all sources
     """
-    @printf[I32]("!@ _request_finished_acks REGISTRY %s\n".cstring(), _id.string().cstring())
+    // @printf[I32]("!@ _request_finished_acks REGISTRY %s\n".cstring(), _id.string().cstring())
     _finished_ack_waiter.initiate_request(_id, custom_action)
     _connections.request_finished_acks(_id, this, excluded_workers)
 
@@ -899,8 +902,7 @@ actor RouterRegistry is FinishedAckRequester
     _finished_ack_waiter.try_finish_request_early(requester_id)
 
   be receive_finished_ack(request_id: RequestId) =>
-    @printf[I32]("!@ receive_finished_ack REGISTRY for %s\n".cstring(),
-      request_id.string().cstring())
+    // @printf[I32]("!@ receive_finished_ack REGISTRY for %s\n".cstring(), request_id.string().cstring())
     _finished_ack_waiter.unmark_consumer_request(request_id)
 
   fun _stop_all_local() =>
@@ -1071,6 +1073,7 @@ actor RouterRegistry is FinishedAckRequester
     This should only be called on a worker designated to leave the cluster
     as part of shrink to fit.
     """
+    @printf[I32]("Beginning process of leaving cluster.\n".cstring())
     _leaving_in_process = true
     if _partition_routers.size() == 0 then
       //no steps have been migrated
@@ -1298,6 +1301,12 @@ class LeavingMigrationAction is CustomAction
 
   fun ref apply() =>
     try
+      @printf[I32]("!@ LeavingMigrationAction... Leaving:\n".cstring())
+      //!@
+      for w in _leaving_workers.values() do
+        @printf[I32]("!@ -!- %s\n".cstring(), w.cstring())
+      end
+
       let msg = ChannelMsgEncoder.begin_leaving_migration(_remaining_workers,
         _leaving_workers, _auth)?
       for w in _leaving_workers.values() do

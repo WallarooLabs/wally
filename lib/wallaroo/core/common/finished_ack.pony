@@ -45,6 +45,13 @@ actor InitialFinishedAckRequester is FinishedAckRequester
   be try_finish_request_early(requester_id: StepId) =>
     None
 
+actor EmptyFinishedAckRequester is FinishedAckRequester
+  be receive_finished_ack(request_id: RequestId) =>
+    None
+
+  be try_finish_request_early(requester_id: StepId) =>
+    None
+
 class FinishedAckWaiter
   // This will be 0 for data receivers, router registry, and boundaries
   let _step_id: StepId
@@ -134,10 +141,14 @@ class FinishedAckWaiter
   fun already_added_request(requester_id: StepId): Bool =>
     _upstream_request_ids.contains(requester_id)
 
+  // !@
+  fun pending_request(): Bool =>
+    _upstream_request_ids.size() > 0
+
   fun ref unmark_consumer_request(request_id: RequestId) =>
     try
       let requester_id = _downstream_request_ids(request_id)?
-      @printf[I32]("!@ received ack for request_id %s (associated with requester %s). (reported from %s)\n".cstring(), request_id.string().cstring(), requester_id.string().cstring(), _step_id.string().cstring())
+      // @printf[I32]("!@ received ack for request_id %s (associated with requester %s). (reported from %s)\n".cstring(), request_id.string().cstring(), requester_id.string().cstring(), _step_id.string().cstring())
       let id_set = _pending_acks(requester_id)?
       ifdef debug then
         Invariant(id_set.contains(request_id))
@@ -150,15 +161,20 @@ class FinishedAckWaiter
     end
 
   fun ref try_finish_request_early(requester_id: StepId) =>
-    @printf[I32]("!@ try_finish_request_early\n".cstring())
+    // @printf[I32]("!@ try_finish_request_early\n".cstring())
     _check_send_run(requester_id)
+
+  fun ref clear() =>
+    _pending_acks.clear()
+    _upstream_request_ids.clear()
+    _upstream_requesters.clear()
 
   fun ref _check_send_run(requester_id: StepId) =>
     try
       @printf[I32]("!@ _pending_acks size: %s for requester_id %s (reported from %s). Listing pending acks:\n".cstring(), _pending_acks(requester_id)?.size().string().cstring(), requester_id.string().cstring(), _step_id.string().cstring())
-      for pending_ack in _pending_acks(requester_id)?.values() do
-        @printf[I32]("!@ -- %s\n".cstring(), pending_ack.string().cstring())
-      end
+      // for pending_ack in _pending_acks(requester_id)?.values() do
+      //   @printf[I32]("!@ -- %s\n".cstring(), pending_ack.string().cstring())
+      // end
       if _pending_acks(requester_id)?.size() == 0 then
         let upstream_request_id = _upstream_request_ids(requester_id)?
         _upstream_requesters(requester_id)?
@@ -168,10 +184,11 @@ class FinishedAckWaiter
           _custom_actions.remove(requester_id)?
         end
 
-        // Clean up
-        _pending_acks.remove(requester_id)?
-        _upstream_request_ids.remove(requester_id)?
-        _upstream_requesters.remove(requester_id)?
+        //!@
+        // // Clean up
+        // _pending_acks.remove(requester_id)?
+        // _upstream_request_ids.remove(requester_id)?
+        // _upstream_requesters.remove(requester_id)?
 
       end
     else

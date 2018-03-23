@@ -362,8 +362,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _router_registry.remote_request_finished_ack_complete(m.sender,
           m.requester_id)
       | let m: FinishedAckMsg =>
-        @printf[I32]("Received FinishedAckMsg from %s\n".cstring(),
-          m.sender.cstring())
+        ifdef "trace" then
+          @printf[I32]("Received FinishedAckMsg from %s\n".cstring(),
+            m.sender.cstring())
+        end
         _router_registry.receive_finished_ack(m.request_id)
       | let m: RotateLogFilesMsg =>
         @printf[I32]("Control Ch: Received Rotate Log Files request\n"
