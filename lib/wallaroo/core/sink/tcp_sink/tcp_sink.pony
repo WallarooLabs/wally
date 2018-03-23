@@ -308,7 +308,8 @@ actor TCPSink is Consumer
   be request_finished_ack_complete(requester_id: StepId,
     requester: FinishedAckRequester)
   =>
-    @printf[I32]("!@ request_finished_ack_complete TCPSink\n".cstring())
+    // @printf[I32]("!@ request_finished_ack_complete TCPSink\n".cstring())
+    None
 
   be try_finish_request_early(requester_id: StepId) =>
     None
