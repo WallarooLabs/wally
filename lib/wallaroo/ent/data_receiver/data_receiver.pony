@@ -26,6 +26,7 @@ use "wallaroo/core/topology"
 
 
 actor DataReceiver is Producer
+  let _id: StepId
   let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
@@ -54,9 +55,12 @@ actor DataReceiver is Producer
   var _processing_phase: _DataReceiverProcessingPhase =
     _DataReceiverNotProcessingPhase
 
+  var _in_flight_ack_waiter: InFlightAckWaiter = InFlightAckWaiter
+
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     initialized: Bool = false)
   =>
+    _id = StepIdGenerator()
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
@@ -139,6 +143,75 @@ actor DataReceiver is Producer
     """This is not a real Producer, so it doesn't write any State"""
     None
 
+  be report_status(code: ReportStatusCode) =>
+    //!@
+    match code
+    | BoundaryStatus =>
+      @printf[I32]("!@ BoundaryStatus: DataReceiver from %s id: %s\n".cstring(), _sender_name.cstring(), _id.string().cstring())
+    end
+    _in_flight_ack_waiter.report_status(code)
+    _router.report_status(code)
+
+  be request_in_flight_ack(upstream_request_id: RequestId, requester_id: StepId)
+  =>
+    if not _in_flight_ack_waiter.already_added_request(requester_id) then
+      _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
+        EmptyInFlightAckRequester, _WriteInFlightAck(this,
+          upstream_request_id))
+      let requested = _router.request_in_flight_ack(requester_id, this,
+        _in_flight_ack_waiter)
+      if not requested then
+        _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
+      end
+    else
+      write_in_flight_ack(upstream_request_id)
+    end
+
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    upstream_request_id: RequestId, requester_id: StepId,
+    leaving_workers: Array[String] val)
+  =>
+    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
+      upstream_request_id, requester_id, EmptyInFlightAckRequester,
+      _WriteFinishedCompleteAck(this, upstream_request_id))
+    then
+      _router.request_in_flight_resume_ack(in_flight_resume_ack_id,
+        requester_id, this, _in_flight_ack_waiter, leaving_workers)
+    end
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
+    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
+
+  be receive_in_flight_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_request(request_id)
+
+  be receive_in_flight_resume_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
+
+  be write_in_flight_ack(upstream_request_id: RequestId) =>
+    _write_in_flight_ack(upstream_request_id)
+
+  fun ref _write_in_flight_ack(upstream_request_id: RequestId) =>
+    try
+      let ack_msg = ChannelMsgEncoder.in_flight_ack(_worker_name,
+        upstream_request_id, _auth)?
+      _write_on_conn(ack_msg)
+    else
+      Fail()
+    end
+
+  be write_in_flight_resume_ack(upstream_request_id: RequestId) =>
+    _write_in_flight_resume_ack(upstream_request_id)
+
+  fun ref _write_in_flight_resume_ack(upstream_request_id: RequestId) =>
+    try
+      let ack_msg = ChannelMsgEncoder.in_flight_resume_ack(_worker_name,
+        upstream_request_id, _auth)?
+      _write_on_conn(ack_msg)
+    else
+      Fail()
+    end
+
   //////////////
   // ORIGIN (resilience)
   fun ref _acker(): Acker =>
@@ -177,6 +250,10 @@ actor DataReceiver is Producer
       _watermarker.add_route(id)
     end
 
+  be remove_route_to_consumer(c: Consumer) =>
+    // DataReceiver doesn't have its own routes
+    None
+
   be received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -187,7 +264,7 @@ actor DataReceiver is Producer
     if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
-      _router.route(d, pipeline_time_spent, this, seq_id, latest_ts,
+      _router.route(d, pipeline_time_spent, _id, this, seq_id, latest_ts,
         metrics_id, worker_ingress_ts)
       _maybe_ack()
     end
@@ -206,8 +283,8 @@ actor DataReceiver is Producer
   =>
     if seq_id > _last_id_seen then
       _last_id_seen = seq_id
-      _router.replay_route(r, pipeline_time_spent, this, seq_id, latest_ts,
-        metrics_id, worker_ingress_ts)
+      _router.replay_route(r, pipeline_time_spent, _id, this, seq_id,
+        latest_ts, metrics_id, worker_ingress_ts)
     end
 
   fun ref _maybe_ack() =>
@@ -312,3 +389,25 @@ class _RequestAck is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _d.request_ack()
     true
+
+class _WriteInFlightAck is CustomAction
+  let _data_receiver: DataReceiver
+  let _request_id: RequestId
+
+  new iso create(data_receiver: DataReceiver, request_id: RequestId) =>
+    _data_receiver = data_receiver
+    _request_id = request_id
+
+  fun ref apply() =>
+    _data_receiver.write_in_flight_ack(_request_id)
+
+class _WriteFinishedCompleteAck is CustomAction
+  let _data_receiver: DataReceiver
+  let _request_id: RequestId
+
+  new iso create(data_receiver: DataReceiver, request_id: RequestId) =>
+    _data_receiver = data_receiver
+    _request_id = request_id
+
+  fun ref apply() =>
+    _data_receiver.write_in_flight_resume_ack(_request_id)

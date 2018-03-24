@@ -294,8 +294,14 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayBoundaryCountMsg(sender, count), auth)?
 
+  fun announce_connections(control_addrs: Map[String, (String, String)] val,
+    data_addrs: Map[String, (String, String)] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(AnnounceConnectionsMsg(control_addrs, data_addrs), auth)?
+
   fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, worker_name: String, key: K, state_name: String,
+    id: StepId, worker_name: String, key: K, state_name: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -306,12 +312,54 @@ primitive ChannelMsgEncoder
     _encode(KeyedAnnounceNewStatefulStepMsg[K](id, worker_name, key,
       state_name), auth)?
 
+  fun announce_new_source(worker_name: String, id: StepId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    This message is sent to notify another worker that a new source
+    has been created on this worker and that routers should be
+    updated.
+    """
+    _encode(AnnounceNewSourceMsg(worker_name, id), auth)?
+
   fun rotate_log_files(auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(RotateLogFilesMsg, auth)?
 
   fun clean_shutdown(auth: AmbientAuth, msg: String = ""): Array[ByteSeq] val ?
   =>
     _encode(CleanShutdownMsg(msg), auth)?
+
+  fun report_status(code: ReportStatusCode, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(ReportStatusMsg(code), auth)?
+
+  fun request_in_flight_ack(sender: String, request_id: RequestId,
+    requester_id: StepId, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(RequestInFlightAckMsg(sender, request_id, requester_id), auth)?
+
+  fun request_in_flight_resume_ack(sender: String,
+    in_flight_resume_ack_id: InFlightResumeAckId, request_id: RequestId,
+    requester_id: StepId, leaving_workers: Array[String] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(RequestInFlightResumeAckMsg(sender, in_flight_resume_ack_id,
+      request_id, requester_id, leaving_workers), auth)?
+
+  fun in_flight_ack(sender: String, request_id: RequestId, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(InFlightAckMsg(sender, request_id), auth)?
+
+  fun in_flight_resume_ack(sender: String, request_id: RequestId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(FinishedCompleteAckMsg(sender, request_id), auth)?
+
+  fun resume_the_world(sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ResumeTheWorldMsg(sender), auth)?
 
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
@@ -449,7 +497,8 @@ trait val StepMigrationMsg is ChannelMsg
   fun step_id(): U128
   fun state(): ByteSeq val
   fun worker(): String
-  fun update_router_registry(router_registry: RouterRegistry, target: Consumer)
+  fun update_router_registry(router_registry: RouterRegistry ref,
+    target: Consumer)
 
 class val KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
   StepMigrationMsg
@@ -472,7 +521,8 @@ class val KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
   fun step_id(): U128 => _step_id
   fun state(): ByteSeq val => _state
   fun worker(): String => _worker
-  fun update_router_registry(router_registry: RouterRegistry, target: Consumer)
+  fun update_router_registry(router_registry: RouterRegistry ref,
+    target: Consumer)
   =>
     router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
       _state_name, _worker)
@@ -602,16 +652,16 @@ trait val DeliveryMsg is ChannelMsg
   fun target_id(): StepId
   fun sender_name(): String
   fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): Bool
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): Bool
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   fun input(): Any val
   fun metric_name(): String
-  fun msg_uid(): U128
+  fun msg_uid(): MsgId
 
 class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_id: StepId
@@ -629,7 +679,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
 
   new val create(t_id: StepId, from: String,
     m_data: D, m_name: String, proxy_address: ProxyAddress,
-    msg_uid': U128, frac_ids': FractionalMessageId)
+    msg_uid': MsgId, frac_ids': FractionalMessageId)
   =>
     _target_id = t_id
     _sender_name = from
@@ -643,21 +693,21 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun sender_name(): String => _sender_name
 
   fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): Bool
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
-    target_step.run[D](_metric_name, pipeline_time_spent, _data, producer,
-      _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+    target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+      producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
     false
 
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): Bool
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
-    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, producer,
-      _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
-      worker_ingress_ts)
+    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
+      metrics_id, worker_ingress_ts)
     false
 
 class val JoinClusterMsg is ChannelMsg
@@ -745,6 +795,16 @@ class val LeavingWorkerDoneMigratingMsg is ChannelMsg
   =>
     worker_name = name
 
+class val AnnounceConnectionsMsg is ChannelMsg
+  let control_addrs: Map[String, (String, String)] val
+  let data_addrs: Map[String, (String, String)] val
+
+  new val create(c_addrs: Map[String, (String, String)] val,
+    d_addrs: Map[String, (String, String)] val)
+  =>
+    control_addrs = c_addrs
+    data_addrs = d_addrs
+
 trait val AnnounceNewStatefulStepMsg is ChannelMsg
   fun update_registry(r: RouterRegistry)
 
@@ -759,7 +819,7 @@ class val KeyedAnnounceNewStatefulStepMsg[
   let _key: K
   let _state_name: String
 
-  new val create(id: U128, worker: String, k: K, s_name: String) =>
+  new val create(id: StepId, worker: String, k: K, s_name: String) =>
     _step_id = id
     _worker_name = worker
     _key = k
@@ -768,6 +828,18 @@ class val KeyedAnnounceNewStatefulStepMsg[
   fun update_registry(r: RouterRegistry) =>
     r.add_state_proxy[K](_step_id, ProxyAddress(_worker_name, _step_id), _key,
       _state_name)
+
+class val AnnounceNewSourceMsg is ChannelMsg
+  """
+  This message is sent to notify another worker that a new source has
+  been created on this worker and that routers should be updated.
+  """
+  let sender: String
+  let source_id: StepId
+
+  new val create(sender': String, id: StepId) =>
+    sender = sender'
+    source_id = id
 
 primitive RotateLogFilesMsg is ChannelMsg
   """
@@ -779,3 +851,61 @@ class val CleanShutdownMsg is ChannelMsg
 
   new val create(m: String) =>
     msg = m
+
+class val InFlightAckMsg is ChannelMsg
+  let sender: String
+  let request_id: RequestId
+
+  new val create(sender': String, request_id': RequestId) =>
+    sender = sender'
+    request_id = request_id'
+
+class val FinishedCompleteAckMsg is ChannelMsg
+  let sender: String
+  let request_id: RequestId
+
+  new val create(sender': String, request_id': RequestId) =>
+    sender = sender'
+    request_id = request_id'
+
+class val RequestInFlightAckMsg is ChannelMsg
+  let sender: String
+  let request_id: RequestId
+  let requester_id: StepId
+
+  new val create(sender': String, request_id': RequestId,
+    requester_id': StepId)
+  =>
+    sender = sender'
+    request_id = request_id'
+    requester_id = requester_id'
+
+class val RequestInFlightResumeAckMsg is ChannelMsg
+  let sender: String
+  let in_flight_resume_ack_id: InFlightResumeAckId
+  let request_id: RequestId
+  let requester_id: StepId
+  let leaving_workers: Array[String] val
+
+  new val create(sender': String,
+    in_flight_resume_ack_id': InFlightResumeAckId,
+    request_id': RequestId, requester_id': StepId,
+    leaving_workers': Array[String] val)
+  =>
+    sender = sender'
+    in_flight_resume_ack_id = in_flight_resume_ack_id'
+    request_id = request_id'
+    requester_id = requester_id'
+    leaving_workers = leaving_workers'
+
+class val ResumeTheWorldMsg is ChannelMsg
+  let sender: String
+
+  new val create(sender': String) =>
+    sender = sender'
+
+class val ReportStatusMsg is ChannelMsg
+  let code: ReportStatusCode
+
+  new val create(c: ReportStatusCode) =>
+    code = c

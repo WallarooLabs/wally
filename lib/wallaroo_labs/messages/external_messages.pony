@@ -20,20 +20,25 @@ use "buffered"
 use "collections"
 use "net"
 use "../query"
+use "../../wallaroo/core/common"
 use "../../wallaroo/core/topology"
 
-primitive _Print                                fun apply(): U16 => 1
-primitive _RotateLog                            fun apply(): U16 => 2
-primitive _CleanShutdown                        fun apply(): U16 => 3
-primitive _ShrinkRequest                        fun apply(): U16 => 4
-primitive _ShrinkQueryResponse                  fun apply(): U16 => 5
-primitive _ShrinkErrorResponse                  fun apply(): U16 => 6
-primitive _PartitionQuery                       fun apply(): U16 => 7
-primitive _PartitionQueryResponse               fun apply(): U16 => 8
-primitive _ClusterStatusQuery                   fun apply(): U16 => 9
-primitive _ClusterStatusQueryResponse           fun apply(): U16 => 10
-primitive _PartitionCountQuery                  fun apply(): U16 => 11
-primitive _PartitionCountQueryResponse          fun apply(): U16 => 12
+primitive _Print                                    fun apply(): U16 => 1
+primitive _RotateLog                                fun apply(): U16 => 2
+primitive _CleanShutdown                            fun apply(): U16 => 3
+primitive _ShrinkRequest                            fun apply(): U16 => 4
+primitive _ShrinkQueryResponse                      fun apply(): U16 => 5
+primitive _ShrinkErrorResponse                      fun apply(): U16 => 6
+primitive _PartitionQuery                           fun apply(): U16 => 7
+primitive _PartitionQueryResponse                   fun apply(): U16 => 8
+primitive _ClusterStatusQuery                       fun apply(): U16 => 9
+primitive _ClusterStatusQueryResponse               fun apply(): U16 => 10
+primitive _ClusterStatusQueryResponseNotInitialized fun apply(): U16 => 11
+primitive _PartitionCountQuery                      fun apply(): U16 => 12
+primitive _PartitionCountQueryResponse              fun apply(): U16 => 13
+primitive _SourceIdsQuery                           fun apply(): U16 => 14
+primitive _SourceIdsQueryResponse                   fun apply(): U16 => 15
+primitive _ReportStatus                             fun apply(): U16 => 16
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -101,6 +106,11 @@ primitive ExternalMsgEncoder
     """
     _encode(_ClusterStatusQuery(), "", wb)
 
+  fun cluster_status_query_reponse_not_initialized(wb: Writer = Writer):
+    Array[ByteSeq] val
+  =>
+    _encode(_ClusterStatusQueryResponseNotInitialized(), "", wb)
+
   fun cluster_status_query_response(worker_count: USize,
     worker_names: Array[String] val, stop_the_world_in_process: Bool,
     wb: Writer = Writer): Array[ByteSeq] val
@@ -124,6 +134,18 @@ primitive ExternalMsgEncoder
     let pqr = PartitionQueryEncoder.state_and_stateless_by_count(digest_map)
     _encode(_PartitionCountQueryResponse(), pqr, wb)
 
+  fun source_ids_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    A message requesting the ids of all sources in the cluster
+    """
+    _encode(_SourceIdsQuery(), "", wb)
+
+  fun source_ids_query_response(source_ids: Array[String] val,
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let sis = SourceIdsQueryEncoder.response(source_ids)
+    _encode(_SourceIdsQueryResponse(), sis, wb)
+
   fun _partition_digest(state_routers: Map[String,
     PartitionRouter], stateless_routers: Map[U128, StatelessPartitionRouter]):
     Map[String, Map[String, Map[String, Array[String] val] val] val]
@@ -145,6 +167,9 @@ primitive ExternalMsgEncoder
     digest_map("state_partitions") = consume state_ps
     digest_map("stateless_partitions") = consume stateless_ps
     digest_map
+
+  fun report_status(code: String, wb: Writer = Writer): Array[ByteSeq] val =>
+    _encode(_ReportStatus(), code, wb)
 
 primitive ExternalMsgDecoder
   fun apply(data: Array[U8] val): ExternalMsg val ? =>
@@ -179,10 +204,18 @@ primitive ExternalMsgDecoder
       ExternalClusterStatusQueryMsg
     | (_ClusterStatusQueryResponse(), let s: String) =>
       ClusterStatusQueryJsonDecoder.response(s)?
+    | (_ClusterStatusQueryResponseNotInitialized(), let s: String) =>
+      ExternalClusterStatusQueryResponseNotInitializedMsg
     | (_PartitionCountQuery(), let s: String) =>
       ExternalPartitionCountQueryMsg
     | (_PartitionCountQueryResponse(), let s: String) =>
       ExternalPartitionCountQueryResponseMsg(s)
+    | (_SourceIdsQuery(), let s: String) =>
+      ExternalSourceIdsQueryMsg
+    | (_SourceIdsQueryResponse(), let s: String) =>
+      SourceIdsQueryJsonDecoder.response(s)
+    | (_ReportStatus(), let s: String) =>
+      ExternalReportStatusMsg(s)
     else
       error
     end
@@ -319,6 +352,12 @@ class val ExternalPartitionQueryResponseMsg is ExternalMsg
 
 primitive ExternalClusterStatusQueryMsg is ExternalMsg
 
+class val ExternalClusterStatusQueryResponseNotInitializedMsg is ExternalMsg
+  let json: String = "{\"processing_messages\": false}"
+
+  fun string(): String =>
+    "Processing messages: false"
+
 class val ExternalClusterStatusQueryResponseMsg is ExternalMsg
   let worker_count: U64
   let worker_names: Array[String] val
@@ -354,3 +393,18 @@ class val ExternalPartitionCountQueryResponseMsg is ExternalMsg
 
   new val create(m: String) =>
     msg = m
+
+primitive ExternalSourceIdsQueryMsg is ExternalMsg
+
+class val ExternalSourceIdsQueryResponseMsg is ExternalMsg
+  let source_ids: Array[String] val
+
+  new val create(m: Array[String] val) =>
+    source_ids = m
+
+class val ExternalReportStatusMsg is ExternalMsg
+  let code: String
+
+  new val create(c: String) =>
+    code = c
+

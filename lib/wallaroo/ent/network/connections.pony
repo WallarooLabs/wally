@@ -235,13 +235,39 @@ actor Connections is Cluster
       d.dispose()
       (_, let c) = _control_conns.remove(worker)?
       c.dispose()
+      _control_addrs.remove(worker)?
+      _data_addrs.remove(worker)?
+      _data_conn_builders.remove(worker)?
     else
       @printf[I32]("Couldn't find worker %s for disconnection\n".cstring(),
         worker.cstring())
     end
 
+  be notify_joining_workers_of_joining_addresses(joining_workers:
+    Array[String] val)
+  =>
+    for w1 in joining_workers.values() do
+      let others_control = recover iso Map[String, (String, String)] end
+      let others_data = recover iso Map[String, (String, String)] end
+      for w2 in joining_workers.values() do
+        try
+          if w1 != w2 then others_control(w2) = _control_addrs(w2)? end
+          if w1 != w2 then others_data(w2) = _data_addrs(w2)? end
+        else
+          Fail()
+        end
+      end
+      try
+        let msg = ChannelMsgEncoder.announce_connections(
+          consume others_control, consume others_data, _auth)?
+        _send_control(w1, msg)
+      else
+        Fail()
+      end
+    end
+
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, key: K, state_name: String, exclusions: Array[String] val =
+    id: StepId, key: K, state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
   =>
     try
@@ -262,6 +288,15 @@ actor Connections is Cluster
       Fail()
     end
 
+  be notify_cluster_of_new_source(id: StepId) =>
+    try
+      let msg = ChannelMsgEncoder.announce_new_source(_worker_name, id,
+        _auth)?
+      _send_control_to_cluster(msg)
+    else
+      Fail()
+    end
+
   be stop_the_world(exclusions: Array[String] val = recover Array[String] end)
   =>
     try
@@ -276,8 +311,76 @@ actor Connections is Cluster
           ch.writev(mute_request_msg)
         end
       end
-   else
+    else
       Fail()
+    end
+
+  be request_in_flight_acks(requester_id: StepId,
+    router_registry: RouterRegistry,
+    exclusions: Array[String] val = recover Array[String] end)
+  =>
+    let id_gen = RequestIdGenerator
+    let request_ids = recover Array[RequestId] end
+    var sent_request_msg = false
+    try
+      for (target, ch) in _control_conns.pairs() do
+        if
+          (target != _worker_name) and
+          (not exclusions.contains(target,
+            {(a: String, b: String): Bool => a == b}))
+        then
+          let next_request_id = id_gen()
+          request_ids.push(next_request_id)
+          let in_flight_ack_request_msg =
+            ChannelMsgEncoder.request_in_flight_ack(_worker_name,
+              next_request_id, requester_id, _auth)?
+          ch.writev(in_flight_ack_request_msg)
+          sent_request_msg = true
+        end
+      end
+    else
+      Fail()
+    end
+    if sent_request_msg then
+      router_registry.add_connection_request_ids(consume request_ids)
+    else
+      router_registry.try_finish_in_flight_request_early(requester_id)
+    end
+
+  be request_in_flight_resume_acks(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    requester_id: StepId, leaving_workers: Array[String] val,
+    router_registry: RouterRegistry,
+    exclusions: Array[String] val = recover Array[String] end)
+  =>
+    let id_gen = RequestIdGenerator
+    let request_ids = recover Array[RequestId] end
+    var sent_request_msg = false
+    try
+      for (target, ch) in _control_conns.pairs() do
+        if
+          (target != _worker_name) and
+          (not exclusions.contains(target,
+            {(a: String, b: String): Bool => a == b}))
+        then
+          let next_request_id = id_gen()
+          request_ids.push(next_request_id)
+          let in_flight_resume_ack_request_msg =
+            ChannelMsgEncoder.request_in_flight_resume_ack(_worker_name,
+              in_flight_resume_ack_id, next_request_id, requester_id,
+              leaving_workers, _auth)?
+          ch.writev(in_flight_resume_ack_request_msg)
+          sent_request_msg = true
+        end
+      end
+    else
+      Fail()
+    end
+    if sent_request_msg then
+      router_registry.add_connection_request_ids_for_complete(
+        consume request_ids)
+    else
+      router_registry.try_finish_resume_request_early()
     end
 
   be request_cluster_unmute() =>
@@ -302,7 +405,7 @@ actor Connections is Cluster
         _worker_name, _metrics_conn)
       let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
         consume reporter, host, service, _spike_config)
-      let boundary = builder.build_and_initialize(boundary_id,
+      let boundary = builder.build_and_initialize(boundary_id, target,
         local_topology_initializer)
       _register_disposable(boundary)
       local_topology_initializer.add_boundary_to_joining_worker(target,
@@ -517,9 +620,13 @@ actor Connections is Cluster
     _control_addrs(target_name) = (host, service)
     let tcp_conn_wrapper =
       if _control_conns.contains(target_name) then
-        try _control_conns(target_name)? else Fail(); ControlConnection end
+        try
+          _control_conns(target_name)?
+        else
+          Fail(); ControlConnection(this)
+        end
       else
-        ControlConnection
+        ControlConnection(this)
       end
     _control_conns(target_name) = tcp_conn_wrapper
     _register_disposable(tcp_conn_wrapper)
@@ -552,7 +659,7 @@ actor Connections is Cluster
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
-    let outgoing_boundary = boundary_builder(_step_id_gen())
+    let outgoing_boundary = boundary_builder(_step_id_gen(), target_name)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
@@ -565,7 +672,7 @@ actor Connections is Cluster
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
     let outgoing_boundary =
-      boundary_builder.build_and_initialize(_step_id_gen(), li)
+      boundary_builder.build_and_initialize(_step_id_gen(), target_name, li)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary

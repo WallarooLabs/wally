@@ -61,8 +61,9 @@ class BoundaryRoute is Route
     None
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     // Run should never be called on a BoundaryRoute
     Fail()
@@ -112,3 +113,22 @@ class BoundaryRoute is Route
 
   fun ref request_ack() =>
     _consumer.request_ack()
+
+  fun ref report_status(code: ReportStatusCode) =>
+    _consumer.report_status(code)
+
+  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    producer: InFlightAckRequester)
+  =>
+    _consumer.request_in_flight_ack(request_id, requester_id, producer)
+
+  fun ref request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  =>
+    _consumer.request_in_flight_resume_ack(in_flight_resume_ack_id, request_id,
+      requester_id, requester, leaving_workers)
+
+  fun ref receive_in_flight_ack(request_id: RequestId) =>
+    _step.receive_in_flight_ack(request_id)

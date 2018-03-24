@@ -31,15 +31,32 @@ actor DummyConsumer is Consumer
   be unregister_producer(producer: Producer) =>
     None
 
+  be report_status(code: ReportStatusCode) =>
+    None
+
+  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    producer: InFlightAckRequester)
+  =>
+    producer.receive_in_flight_ack(request_id)
+
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  =>
+    None
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
+    None
+
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId,
+    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>

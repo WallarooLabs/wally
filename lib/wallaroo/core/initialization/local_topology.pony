@@ -281,6 +281,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _worker_names_file = worker_names_file
     _cluster_manager = cluster_manager
     _is_joining = is_joining
+    _router_registry.register_local_topology_initializer(this)
 
   be update_topology(t: LocalTopology) =>
     _topology = t
@@ -288,14 +289,23 @@ actor LocalTopologyInitializer is LayoutInitializer
   be add_joining_worker(w: String, joining_host: String,
     control_addr: (String, String), data_addr: (String, String))
   =>
-    _add_worker_name(w)
-    _connections.create_control_connection(w, joining_host, control_addr._2)
-    _connections.create_data_connection_to_joining_worker(w, joining_host,
-      data_addr._2, this)
-    let new_boundary_id = _step_id_gen()
-    _connections.create_boundary_to_joining_worker(w, new_boundary_id, this)
-    @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
-      w.cstring())
+    match _topology
+    | let t: LocalTopology =>
+      if not ArrayHelpers[String].contains[String](t.worker_names, w) then
+        _add_worker_name(w)
+        _connections.create_control_connection(w, joining_host,
+          control_addr._2)
+        _connections.create_data_connection_to_joining_worker(w, joining_host,
+          data_addr._2, this)
+        let new_boundary_id = _step_id_gen()
+        _connections.create_boundary_to_joining_worker(w, new_boundary_id,
+          this)
+        @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
+          w.cstring())
+      end
+    else
+      Fail()
+    end
 
   be initiate_shrink(target_workers: Array[String] val, shrink_count: U64,
     conn: TCPConnection)
@@ -439,6 +449,21 @@ actor LocalTopologyInitializer is LayoutInitializer
     _outgoing_boundary_builders = consume bbs
     _initializables.set(boundary)
 
+  be remove_boundary(leaving_worker: String) =>
+    // Boundaries
+    let bs = recover trn Map[String, OutgoingBoundary] end
+    for (w, b) in _outgoing_boundaries.pairs() do
+      if w != leaving_worker then bs(w) = b end
+    end
+
+    // Boundary builders
+    let bbs = recover trn Map[String, OutgoingBoundaryBuilder] end
+    for (w, b) in _outgoing_boundary_builders.pairs() do
+      if w != leaving_worker then bbs(w) = b end
+    end
+    _outgoing_boundaries = consume bs
+    _outgoing_boundary_builders = consume bbs
+
   be update_boundaries(bs: Map[String, OutgoingBoundary] val,
     bbs: Map[String, OutgoingBoundaryBuilder] val)
   =>
@@ -510,6 +535,9 @@ actor LocalTopologyInitializer is LayoutInitializer
     _partition_router_blueprints = pr_blueprints
     _stateless_partition_router_blueprints = spr_blueprints
     _omni_router_blueprint = omr_blueprint
+
+  be update_omni_router(omni_router: OmniRouter) =>
+    _omni_router_blueprint = omni_router.blueprint()
 
   be recover_and_initialize(ws: Array[String] val,
     cluster_initializer: (ClusterInitializer | None) = None)
@@ -1325,7 +1353,9 @@ actor LocalTopologyInitializer is LayoutInitializer
           data_routes(k) = v
         end
 
-        let data_router = DataRouter(consume data_routes)
+        let sendable_data_routes = consume val data_routes
+
+        let data_router = DataRouter(sendable_data_routes)
         _router_registry.set_data_router(data_router)
 
         if not _is_initializer then
@@ -1360,8 +1390,10 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         let omni_router = StepIdRouter(_worker_name,
-          consume built_stateless_steps, t.step_map(), _outgoing_boundaries,
-          consume stateless_partition_routers_trn)
+          sendable_data_routes, t.step_map(), _outgoing_boundaries,
+          consume stateless_partition_routers_trn,
+          recover Map[StepId, (ProxyAddress | Source)] end,
+          recover Map[String, DataReceiver] end)
         _router_registry.set_omni_router(omni_router)
 
         _omni_router = omni_router
@@ -1505,18 +1537,17 @@ actor LocalTopologyInitializer is LayoutInitializer
         let runner_builder = subpartition.runner_builder()
         let reporter = MetricsReporter(t.name(), t.worker_name(),
           _metrics_conn)
-        let step = Step(runner_builder(where event_log = _event_log,
-          auth = _auth), consume reporter, msg.step_id(),
-          runner_builder.route_builder(), _event_log, _recovery_replayer,
-          _outgoing_boundaries)
-        step.receive_state(msg.state())
-        msg.update_router_registry(_router_registry, step)
+        _router_registry.receive_immigrant_step(subpartition, runner_builder,
+          consume reporter, _recovery_replayer, msg)
       else
         Fail()
       end
     else
       Fail()
     end
+
+  be ack_migration_batch_complete(sender: String) =>
+    _router_registry.ack_migration_batch_complete(sender)
 
   be shrinkable_query(conn: TCPConnection) =>
     let available = recover iso Array[String] end
@@ -1542,12 +1573,27 @@ actor LocalTopologyInitializer is LayoutInitializer
     _router_registry.partition_count_query(conn)
 
   be cluster_status_query(conn: TCPConnection) =>
-    match _topology
-    | let t: LocalTopology =>
-      _router_registry.cluster_status_query(t.worker_names, conn)
+    if not _topology_initialized then
+      _router_registry.cluster_status_query_not_initialized(conn)
     else
-      Fail()
+      match _topology
+      | let t: LocalTopology =>
+        _router_registry.cluster_status_query(t.worker_names, conn)
+      else
+        Fail()
+      end
     end
+
+  be source_ids_query(conn: TCPConnection) =>
+    _router_registry.source_ids_query(conn)
+
+  be report_status(code: ReportStatusCode) =>
+    match code
+    | BoundaryCountStatus =>
+      @printf[I32]("LocalTopologyInitializer knows about %s boundaries\n"
+        .cstring(), _outgoing_boundaries.size().string().cstring())
+    end
+    _router_registry.report_status(code)
 
   be initialize_join_initializables() =>
     _initialize_join_initializables()

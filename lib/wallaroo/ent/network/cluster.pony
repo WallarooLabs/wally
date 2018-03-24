@@ -13,6 +13,8 @@ the License. You may obtain a copy of the License at
 use "collections"
 use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
+use "wallaroo/core/common"
+use "wallaroo/ent/router_registry"
 
 // TODO: Figure out if there's a compilation order making Fail() appear like
 // it hasn't been declared and then replace None with Fail() in these defaults
@@ -41,6 +43,11 @@ trait tag Cluster
     recover Array[String] end)
 
   be stop_the_world(exclusions: Array[String] val) =>
+    None
+
+  be request_in_flight_acks(requester_id: StepId,
+    router_registry: RouterRegistry, exclusions: Array[String] val)
+  =>
     None
 
   be request_cluster_unmute() =>

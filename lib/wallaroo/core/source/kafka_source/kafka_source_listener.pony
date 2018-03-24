@@ -53,6 +53,7 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
       _auth)
 
 class val KafkaSourceListenerBuilder[In: Any val]
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _source_builder: SourceBuilder
   let _router: Router
   let _router_registry: RouterRegistry
@@ -113,6 +114,7 @@ class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
 
 actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _env: Env
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _notify: KafkaSourceListenerNotify[In]
   var _router: Router
   let _router_registry: RouterRegistry
@@ -205,12 +207,14 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
           try
             match _kc
             | let kc: KafkaClient tag =>
-              let source = KafkaSource[In](this, _notify.build_source(_env)?,
-                _router.routes(), _route_builder, _outgoing_boundary_builders,
+              let source_id = _step_id_gen()
+              let source = KafkaSource[In](source_id, this,
+                _notify.build_source(source_id, _env)?, _router.routes(),
+                _route_builder, _outgoing_boundary_builders,
                 _layout_initializer, _metrics_reporter.clone(), topic, part_id,
                 kc, _router_registry)
               partitions_sources(part_id) = source
-              _router_registry.register_source(source)
+              _router_registry.register_source(source, source_id)
               match _router
               | let pr: PartitionRouter =>
                 _router_registry.register_partition_router_subscriber(pr.state_name(), source)

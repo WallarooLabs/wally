@@ -232,9 +232,11 @@ class DataChannelConnectNotifier is DataChannelNotify
         ifdef "trace" then
           @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
         end
-        // Go through router_registry to make sure pending messages on
-        // registry are processed first
-        _router_registry.ack_migration_batch_complete(m.sender_name)
+        // Go through layout_initializer and router_registry to make sure
+        // pending messages on registry are processed first. That's because
+        // the current message path for receiving immigrant steps is
+        // layout_initializer then router_registry.
+        _layout_initializer.ack_migration_batch_complete(m.sender_name)
       | let aw: AckWatermarkMsg =>
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
@@ -268,6 +270,21 @@ class DataChannelConnectNotifier is DataChannelNotify
           c.boundary_id)
       | let m: SpinUpLocalTopologyMsg =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
+      | let m: RequestInFlightAckMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received RequestInFlightAckMsg from %s\n".cstring(),
+            m.sender.cstring())
+        end
+        _receiver.request_in_flight_ack(m.request_id, m.requester_id)
+      | let m: ReportStatusMsg =>
+        _receiver.report_status(m.code)
+      | let m: RequestInFlightResumeAckMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received RequestInFlightResumeAckMsg from %s\n"
+            .cstring(), m.sender.cstring())
+        end
+        _receiver.request_in_flight_resume_ack(m.in_flight_resume_ack_id,
+          m.request_id, m.requester_id, m.leaving_workers)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
           .cstring())
@@ -304,6 +321,13 @@ trait _DataReceiverWrapper
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun report_status(code: ReportStatusCode)
+
+  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId)
+  fun request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    leaving_workers: Array[String] val)
 
 class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
@@ -320,6 +344,19 @@ class _InitDataReceiver is _DataReceiverWrapper
     Fail()
 
   fun upstream_replay_finished() =>
+    Fail()
+
+  fun report_status(code: ReportStatusCode) =>
+    Fail()
+
+  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
+    Fail()
+
+  fun request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    leaving_workers: Array[String] val)
+  =>
     Fail()
 
 class _DataReceiver is _DataReceiverWrapper
@@ -342,3 +379,17 @@ class _DataReceiver is _DataReceiverWrapper
   =>
     data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
+
+  fun report_status(code: ReportStatusCode) =>
+    data_receiver.report_status(code)
+
+  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
+    data_receiver.request_in_flight_ack(request_id, requester_id)
+
+  fun request_in_flight_resume_ack(
+    in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    leaving_workers: Array[String] val)
+  =>
+    data_receiver.request_in_flight_resume_ack(in_flight_resume_ack_id,
+      request_id, requester_id, leaving_workers)

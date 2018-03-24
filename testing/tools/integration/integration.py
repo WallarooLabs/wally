@@ -28,10 +28,6 @@ import tempfile
 import threading
 import time
 
-from metrics_parser import (MetricsData,
-                            MetricsParser,
-                            MetricsParseError)
-
 
 INFO2 = logging.INFO + 1
 logging.addLevelName(INFO2, 'INFO2')
@@ -63,6 +59,9 @@ class ExpectationError(StopError):
 class PipelineTestError(Exception):
     pass
 
+
+class CrashedWorkerError(PipelineTestError):
+    pass
 
 
 # Integration helper classes
@@ -106,6 +105,15 @@ class SingleSocketReceiver(StoppableThread):
         else:
             self.name = self.__base_name__
 
+    def try_recv(self, bs):
+        """
+        Try to to run `sock.recv(bs)` and return None if error
+        """
+        try:
+            return self.sock.recv(bs)
+        except:
+            return None
+
     def append(self, bs):
         if self.mode == 'framed':
             self.accumulator.append(bs)
@@ -121,7 +129,7 @@ class SingleSocketReceiver(StoppableThread):
     def run_newlines(self):
         data = []
         while not self.stopped():
-            buf = self.sock.recv(1024)
+            buf = self.try_recv(1024)
             if not buf:
                 self.stop()
                 if data:
@@ -152,12 +160,12 @@ class SingleSocketReceiver(StoppableThread):
 
     def run_framed(self):
         while not self.stopped():
-            header = self.sock.recv(self.header_length)
+            header = self.try_recv(self.header_length)
             if not header:
                 self.stop()
                 continue
             expect = struct.unpack(self.header_fmt, header)[0]
-            data = self.sock.recv(expect)
+            data = self.try_recv(expect)
             if not data:
                 self.stop()
             else:
@@ -240,7 +248,7 @@ class TCPReceiver(StoppableThread):
                 cl.start()
         except Exception as err:
             self.err = err
-            raise err
+            raise
 
     def stop(self):
         super(TCPReceiver, self).stop()
@@ -557,6 +565,13 @@ class Sender(StoppableThread):
         if not self.batch:
             self.stop()
 
+    def stop(self):
+        logging.log(INFO2, "Sender received stop instruction.")
+        super(Sender, self).stop()
+        if self.batch:
+            logging.warn("Sender stopped, but send buffer size is {}"
+                         .format(len(self.batch)))
+
 
 def sequence_generator(stop=1000, start=0, header_fmt='>I'):
     """
@@ -573,7 +588,8 @@ def sequence_generator(stop=1000, start=0, header_fmt='>I'):
         yield struct.pack('>Q', x)
 
 
-def iter_generator(items, to_string=lambda s: str(s), header_fmt='>I'):
+def iter_generator(items, to_string=lambda s: str(s), header_fmt='>I',
+                   on_next=None):
     """
     Generate a sequence of length encoded binary records from an iterator.
 
@@ -584,12 +600,14 @@ def iter_generator(items, to_string=lambda s: str(s), header_fmt='>I'):
     `struct.pack`
     """
     for val in items:
+        if on_next:
+            on_next(val)
         strung = to_string(val)
         yield struct.pack(header_fmt, len(strung))
         yield strung
 
 
-def files_generator(files, mode='framed', header_fmt='>I'):
+def files_generator(files, mode='framed', header_fmt='>I', on_next=None):
     """
     Generate a sequence of binary data stubs from a set of files.
 
@@ -607,15 +625,19 @@ def files_generator(files, mode='framed', header_fmt='>I'):
     for path in files:
         if mode == 'newlines':
             for l in newline_file_generator(path):
+                if on_next:
+                    on_next(l)
                 yield l
         elif mode == 'framed':
             for l in framed_file_generator(path, header_fmt):
+                if on_next:
+                    on_next(l)
                 yield l
         else:
             raise ValueError("`mode` must be either 'framed' or 'newlines'")
 
 
-def newline_file_generator(filepath, header_fmt='>I'):
+def newline_file_generator(filepath, header_fmt='>I', on_next=None):
     """
     Generate length-encoded strings from a newline-delimited file.
     """
@@ -626,11 +648,13 @@ def newline_file_generator(filepath, header_fmt='>I'):
         while f.tell() < fin:
             o = f.readline().strip('\n')
             if o:
+                if on_next:
+                    on_next(o)
                 yield struct.pack(header_fmt, len(o))
                 yield o
 
 
-def framed_file_generator(filepath, header_fmt='>I'):
+def framed_file_generator(filepath, header_fmt='>I', on_next=None):
     """
     Generate length encoded records from a length-framed binary file.
     """
@@ -644,6 +668,8 @@ def framed_file_generator(filepath, header_fmt='>I'):
             body = f.read(expect)
             if not body:
                 break
+            if on_next:
+                on_next(header + body)
             yield header
             yield body
 
@@ -702,7 +728,7 @@ class Runner(threading.Thread):
         except Exception as err:
             self.error = err
             logging.warn("{}: Stopped running!".format(self.name))
-            raise err
+            raise
 
     def stop(self):
         try:
@@ -834,13 +860,22 @@ class RunnerChecker(StoppableThread):
                     break
 
 
-def runners_output_format(runners):
+def runners_output_format(runners, from_tail=0, filter_fn=lambda r: True):
     """
     Format runners' STDOUTs for printing or for inclusion in an error
+    - `runners` is a list of Runner instances
+    - `from_tail` is the number of lines to keep from the tail of each
+      runner's log. The default is to keep the entire log.
+    - `filter_fn` is a function to apply to each runner to determine
+      whether or not to include its output in the log. The function
+      should return `True` if the runner's output is to be included.
+      Default is to keep all outputs.
     """
-    outputs = [(r.name, r.get_output()) for r in runners]
+    outputs = [(r.name, '\n'.join(r.get_output().splitlines()[-from_tail:]))
+               for r in runners if filter_fn(r)]
     return '\n===\n'.join(('--- {0} ->\n\n{1}\n\n--- {0} <-'
-                           .format(*t) for t in outputs))
+                           .format(t[0], t[1])
+                           for t in outputs))
 
 
 def ex_validate(cmd):
@@ -980,7 +1015,6 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
         join_block=CONTROL_CMD.format(host=host, control_port=control_port),
         alt_block=alt_block if alt_func(x) else '',
         spike_block=spike_block)
-    logging.log(51, 'initializer command is :\n{}'.format(cmd))
     runners.append(Runner(cmd_string=cmd, name='initializer'))
     for x in range(1, workers):
         if x in spikes:
@@ -1244,8 +1278,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             except PipelineTestError as err:
                 # terminate runners, prepare to retry
                 for r in runners:
-                    r.stop()
-                raise err
+                    r.kill()
                 runners = []
                 runners_err = err
         else:
@@ -1360,7 +1393,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         except Exception as err:
             print 'runner output'
             print stdout
-            raise err
+            raise
 
         if validate_file:
             validation_files = validate_file.split(',')

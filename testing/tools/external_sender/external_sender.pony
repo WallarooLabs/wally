@@ -59,7 +59,8 @@ actor Main
               --external/-e [Specifies address to send message to]
               --type/-t [Specifies message type]
                   clean-shutdown | rotate-log | partition-query |
-                  cluster-status-query | print
+                  partition-count-query | cluster-status-query |
+                  source-ids-query | boundary-count-status | print
               --message/-m [Specifies message contents to send]
                   rotate-log
                       Node name to rotate log files
@@ -87,6 +88,14 @@ actor Main
         | "cluster-status-query" =>
           await_response = true
           ExternalMsgEncoder.cluster_status_query()
+        | "source-ids-query" =>
+          await_response = true
+          ExternalMsgEncoder.source_ids_query()
+        | "boundary-count-status" =>
+          ExternalMsgEncoder.report_status("boundary-count-status")
+        //!@
+        | "boundary-status" =>
+          ExternalMsgEncoder.report_status("boundary-status")
         else // default to print
           ExternalMsgEncoder.print_message(message)
         end
@@ -147,6 +156,15 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
           end
           _env.out.print(m.msg)
           conn.dispose()
+        | let m: ExternalClusterStatusQueryResponseNotInitializedMsg =>
+          if _json then
+            _env.out.print(m.json)
+          else
+            _env.out.print("Cluster Status:")
+            _env.out.print("Cluster not yet initialized")
+            _env.out.print(m.string())
+          end
+          conn.dispose()
         | let m: ExternalClusterStatusQueryResponseMsg =>
           if  _json then
             _env.out.print(m.json)
@@ -160,6 +178,12 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
             _env.out.print("Partition Distribution (counts):")
           end
           _env.out.print(m.msg)
+          conn.dispose()
+        | let m: ExternalSourceIdsQueryResponseMsg =>
+          _env.out.print("Source Ids:")
+          for s_id in m.source_ids.values() do
+            _env.out.print(". " + s_id.string())
+          end
           conn.dispose()
         else
           _env.err.print("Received unhandled external message type")

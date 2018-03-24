@@ -25,13 +25,12 @@ class Acker
   let _ack_batch_size: USize
   var _ack_next_time: Bool = false
   let _outgoing_to_incoming: _OutgoingToIncomingMessageTracker
-  let _watermarker: Watermarker
+  let _watermarker: Watermarker = Watermarker
 
   // TODO: Change this to a reasonable value!
   new create(ack_batch_size': USize = 100) =>
     _ack_batch_size = ack_batch_size'
     _outgoing_to_incoming = _OutgoingToIncomingMessageTracker(_ack_batch_size)
-    _watermarker = Watermarker
 
   fun ref add_route(route: Route) =>
     _watermarker.add_route(route.id())

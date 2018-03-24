@@ -29,7 +29,9 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
+actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
+  StatusReporter & KafkaConsumer)
+  let _source_id: StepId
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder
@@ -50,12 +52,13 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
+  var _in_flight_ack_waiter: InFlightAckWaiter
 
   let _topic: String
   let _partition_id: I32
   let _kc: KafkaClient tag
 
-  new create(listen: KafkaSourceListener[In],
+  new create(source_id: StepId, listen: KafkaSourceListener[In],
     notify: KafkaSourceNotify[In] iso,
     routes: Array[Consumer] val, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
@@ -64,6 +67,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     topic: String, partition_id: I32, kafka_client: KafkaClient tag,
     router_registry: RouterRegistry)
   =>
+    _source_id = source_id
     _topic = topic
     _partition_id = partition_id
     _kc = kafka_client
@@ -76,9 +80,13 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     _router_registry = router_registry
 
     _route_builder = route_builder
+
+    _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
+
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       let new_boundary =
-        builder.build_and_initialize(_step_id_gen(), _layout_initializer)
+        builder.build_and_initialize(_step_id_gen(), target_worker_name,
+          _layout_initializer)
       router_registry.register_disposable(new_boundary)
       _outgoing_boundaries(target_worker_name) = new_boundary
     end
@@ -127,6 +135,15 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     end
     _notify.update_router(new_router)
 
+  be remove_route_to_consumer(c: Consumer) =>
+    if _routes.contains(c) then
+      try
+        _routes.remove(c)?
+      else
+        Fail()
+      end
+    end
+
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   =>
@@ -138,7 +155,7 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let boundary = builder.build_and_initialize(_step_id_gen(),
-          _layout_initializer)
+          target_worker_name, _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
         _routes(boundary) =
@@ -215,6 +232,63 @@ actor KafkaSource[In: Any val] is (Producer & KafkaConsumer)
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id
+
+  be report_status(code: ReportStatusCode) =>
+    match code
+    | BoundaryCountStatus =>
+      var b_count: USize = 0
+      for r in _routes.values() do
+        match r
+        | let br: BoundaryRoute => b_count = b_count + 1
+        end
+      end
+      @printf[I32]("KafkaSource %s has %s boundaries.\n".cstring(),
+        _source_id.string().cstring(), b_count.string().cstring())
+    end
+    for route in _routes.values() do
+      route.report_status(code)
+    end
+
+  be request_in_flight_ack(upstream_request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  =>
+    _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
+      requester)
+
+    if _routes.size() > 0 then
+      for route in _routes.values() do
+        let request_id = _in_flight_ack_waiter.add_consumer_request(
+          requester_id)
+        route.request_in_flight_ack(request_id, _source_id, this)
+      end
+    else
+      requester.try_finish_in_flight_request_early(requester_id)
+    end
+
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  =>
+    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
+      request_id, requester_id, requester)
+    then
+      for route in _routes.values() do
+        let new_request_id =
+          _in_flight_ack_waiter.add_consumer_resume_request()
+        route.request_in_flight_resume_ack(in_flight_resume_ack_id,
+          new_request_id, _source_id, this, leaving_workers)
+      end
+    end
+
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
+    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
+
+  be receive_in_flight_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_request(request_id)
+
+  be receive_in_flight_resume_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
   fun ref _mute() =>
     ifdef debug then

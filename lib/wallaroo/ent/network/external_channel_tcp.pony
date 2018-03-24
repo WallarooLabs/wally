@@ -165,6 +165,23 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
               " External Channel\n").cstring())
           end
           _local_topology_initializer.cluster_status_query(conn)
+        | let m: ExternalSourceIdsQueryMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalSourceIdsQueryMsg on " +
+              " External Channel\n").cstring())
+          end
+          _local_topology_initializer.source_ids_query(conn)
+        | let m: ExternalReportStatusMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalReportStatusMsg on " +
+              " External Channel\n").cstring())
+          end
+          try
+            let code = ReportStatusCodeParser(m.code)?
+            _local_topology_initializer.report_status(code)
+          else
+            @printf[I32]("Failed to parse ReportStatusCode\n".cstring())
+          end
         else
           @printf[I32](("Incoming External Message type not handled by " +
             "external channel.\n").cstring())
@@ -188,5 +205,5 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
       _worker_name.cstring())
 
   fun ref closed(conn: TCPConnection ref) =>
-    @printf[I32]("ExternalChannelConnectNotifier: %s: server closed\n"
+    @printf[I32]("ExternalChannelConnectNotifier (%s): server closed\n"
       .cstring(), _worker_name.cstring())

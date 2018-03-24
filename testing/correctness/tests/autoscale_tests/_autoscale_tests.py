@@ -17,11 +17,17 @@ from __future__ import print_function
 # import requisite components for integration test
 from integration import (add_runner,
                          clean_resilience_path,
+                         cluster_status_query,
+                         CrashedWorkerError,
                          ex_validate,
                          get_port_values,
                          iter_generator,
                          Metrics,
                          MetricsData,
+                         ObservabilityNotifier,
+                         partition_counts_query,
+                         partitions_query,
+                         PipelineTestError,
                          Reader,
                          Runner,
                          RunnerChecker,
@@ -35,11 +41,12 @@ from integration import (add_runner,
                          TimeoutError)
 
 from collections import Counter
+from functools import partial
 from itertools import cycle
-import json
+import logging
 import re
 from string import lowercase
-from struct import pack, unpack
+from struct import calcsize, pack, unpack
 import tempfile
 import time
 
@@ -79,22 +86,6 @@ def validate(raw_data, expected):
     assert(data == expected)
 
 
-def query_partitions(host, port):
-    """
-    Query the worker at the given address for its partition routing
-    information.
-    """
-    cmd = ('external_sender --external {}:{} --type partition-query'
-           .format(host, port))
-    success, stdout, retcode, cmd = ex_validate(cmd)
-    try:
-        assert(success)
-    except AssertionError:
-        raise AssertionError('Failed to query partition data with the '
-                             'following error:\n:{}'.format(stdout))
-    return json.loads(stdout.splitlines()[-1])
-
-
 def send_shrink_cmd(host, port, names=[], count=1):
     # Trigger log rotation with external message
     cmd_external_trigger = ('cluster_shrinker --external {}:{} --workers {}'
@@ -107,6 +98,7 @@ def send_shrink_cmd(host, port, names=[], count=1):
     except AssertionError:
         raise AssertionError('External shrink trigger failed with '
                              'the error:\n{}'.format(stdout))
+    return stdout
 
 
 def phase_validate_output(runners, sink, expected):
@@ -122,7 +114,7 @@ def phase_validate_output(runners, sink, expected):
 
 def phase_validate_partitions(runners, partitions, joined=[], left=[]):
     """
-    Use the partition map to determine whether new workers of joined and
+    Use the partition map to determine whether new workers have joined and
     departing workers have left.
     """
     joined_set = set(joined)
@@ -175,6 +167,108 @@ def compact_sign(ops):
     return new
 
 
+def lowest_point(ops):
+    l = None
+    p = 0
+    for o in ops:
+        p += o
+        if l is None:
+            l  = p
+        if p < l:
+            l = p
+    return l
+
+
+def inverted(d):
+    """
+    Invert a partitions query response dict from
+        {stateless_partitions: {step: {worker: [partition ids]}},
+         state_partitions: {step: {worker: [partition ids]}}}
+    to
+        {stateless_partitions: {step: {partition_id: worker}},
+         state_partitions: {step: {partition_id: worker}}}
+    """
+    o = {}
+    for ptype in d:
+        o[ptype] = {}
+        for step in d[ptype]:
+            o[ptype][step] = {}
+            for worker in d[ptype][step]:
+                for pid in d[ptype][step][worker]:
+                    o[ptype][step][pid] = worker
+    return o
+
+
+# Observability Validation Test Functions
+def get_crashed_runners(runners):
+    """
+    Get a list of crashed runners, if any exist.
+    """
+    return filter(lambda r: r.poll(), runners)
+
+
+def test_crashed_workers(runners):
+    """
+    Test if there are any crashed workers and raise an error if yes
+    """
+    crashed = get_crashed_runners(runners)
+    if crashed:
+        raise CrashedWorkerError("Some workers have crashed.")
+
+
+def test_worker_count(count, status):
+    """
+    Test that there `count` workers are reported as active in the
+    cluster status query response
+    """
+    assert(len(status['worker_names']) == count)
+    assert(status['worker_count'] == count)
+
+
+def test_all_workers_have_partitions(partitions):
+    """
+    Test that all workers have partitions
+    """
+    assert(map(len, partitions['state_partitions']['letter-state']
+                    .values()).count(0) == 0)
+
+
+def test_cluster_is_processing(status):
+    """
+    Test that the cluster's 'processing_messages' status is True
+    """
+    assert(status['processing_messages'] is True)
+
+
+def test_cluster_is_not_processing(status):
+    """
+    Test that the cluster's 'processing messages' status is False
+    """
+    assert(status['processing_messages'] is False)
+
+
+def test_migrated_partitions(pre_partitions, workers, partitions):
+    """
+    Test that post-migration partition data matches up to expected data based
+    on pre-migration partition data.
+    """
+    # invert the partitions dicts
+    i_pre = inverted(pre_partitions)
+    i_post = inverted(partitions)
+    for joining in workers.get('joining', {}):
+        for ptype in partitions:
+            for step in partitions[ptype]:
+                for pid in partitions[ptype][step][joining]:
+                    assert(i_pre[ptype][step][pid] != joining)
+    for leaving in workers.get('leaving', {}):
+        for ptype in pre_partitions:
+            for step in pre_partitions[ptype]:
+                for pid in pre_partitions[ptype][step][leaving]:
+                    assert(i_post[ptype][step][pid] != leaving)
+
+
+# Autoscale tests runner functions
+
 def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
     """
     Run an autoscale test for a given command by performing grow and shrink
@@ -193,10 +287,16 @@ def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
         if hasattr(err, 'as_error'):
             print("Autoscale Sequence test had the following the error "
                   "message:\n{}".format(err.as_error))
-        raise err
+        if hasattr(err, 'runners'):
+            if not isinstance(err, PipelineTestError):
+                outputs = runners_output_format(err.runners,
+                        from_tail=5, filter_fn=lambda r: r.poll() != 0)
+                print("Some autoscale Sequence runners exited badly. "
+                      "They had the following "
+                      "output tails:\n===\n{}".format(outputs))
+        raise
 
-
-def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
+def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
     host = '127.0.0.1'
     sources = 1
 
@@ -206,27 +306,24 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
     # If no initial workers value is given, determine the minimum number
     # required at the start so that the cluster never goes below 1 worker.
     # If a number is given, then verify it is sufficient.
-    bottom = min(min(compact_sign(ops*cycles)), sum(ops*cycles))
-    if bottom < 1:
-        min_workers = abs(bottom) + 1
-    else:
-        min_workers = 1
-    if isinstance(initial, int):
-        assert(initial >= min_workers)
+    if ops:
+        lowest = lowest_point(ops*cycles)
+        if lowest < 1:
+            min_workers = abs(lowest) + 1
+        else:
+            min_workers = 1
+        if isinstance(initial, int):
+            assert(initial >= min_workers)
+            workers = initial
+        else:
+            workers = min_workers
+    else:  # Test is only for setup using initial workers
+        assert(initial > 0)
         workers = initial
-    else:
-        workers = min_workers
-
 
     batch_size = 10
     interval = 0.05
-    msgs_per_sec = int(batch_size/interval)
-    base_time = 10  # Seconds
-    cycle_time = 10  # seconds
-    expect_time = base_time + cycle_time * cycles  # seconds
-    expect = expect_time * msgs_per_sec
-    sender_timeout = expect_time + 10  # seconds
-    join_timeout = 200
+    sender_timeout = 30 # Counted from when Sender is stopped
     runner_join_timeout = 30
 
     res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
@@ -240,16 +337,15 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             # Create sink, metrics, reader, sender
             sink = Sink(host)
             metrics = Metrics(host)
-            lowercase2 = [a + b for a in lowercase for b in lowercase]
-            char_gen = cycle(lowercase2)
-            chars = [next(char_gen) for i in range(expect)]
-            expected = Counter(chars)
+            lowercase2 = [a+b for a in lowercase for b in lowercase]
+            char_cycle = cycle(lowercase2)
+            expected = Counter()
+            def count_sent(s):
+                expected[s] += 1
 
-            reader = Reader(iter_generator(chars,
-                                            lambda s: pack('>2sI', s, 1)))
-
-            await_values = [pack('>I2sQ', 10, c, v) for c, v in
-                            expected.items()]
+            reader = Reader(iter_generator(
+                items=char_cycle, to_string=lambda s: pack('>2sI', s, 1),
+                on_next=count_sent))
 
             # Start sink and metrics, and get their connection info
             sink.start()
@@ -270,38 +366,72 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             inputs = ','.join(['{}:{}'.format(host, p) for p in
                                input_ports])
 
+            # Prepare query functions with host and port pre-defined
+            query_func_partitions = partial(partitions_query, host,
+                                            external_port)
+            query_func_partition_counts = partial(partition_counts_query,
+                                                  host, external_port)
+            query_func_cluster_status = partial(cluster_status_query, host,
+                                                external_port)
+
+            # Start the initial runners
             start_runners(runners, command, host, inputs, outputs,
                           metrics_port, control_port, external_port, data_port,
                           res_dir, workers, worker_ports)
 
-            # Wait for first runner (initializer) to report application ready
-            runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
-            runner_ready_checker.start()
-            runner_ready_checker.join()
-            if runner_ready_checker.error:
-                raise runner_ready_checker.error
+            # Verify cluster is processing messages
+            obs = ObservabilityNotifier(query_func_cluster_status,
+                test_cluster_is_processing)
+            obs.start()
+            obs.join()
+            if obs.error:
+                raise obs.error
 
-            # Get initial partition data
-            partitions = query_partitions(host, external_port)
+            # Verify that `workers` workers are active
+            # Create a partial function
+            partial_test_worker_count = partial(test_worker_count, workers)
+            obs = ObservabilityNotifier(query_func_cluster_status,
+                partial_test_worker_count)
+            obs.start()
+            obs.join()
+            if obs.error:
+                raise obs.error
+
             # Verify all workers start with partitions
-            assert(map(len, partitions['state_partitions']['letter-state']
-                            .values()).count(0) == 0)
+            obs = ObservabilityNotifier(query_func_partitions,
+                test_all_workers_have_partitions)
+            obs.start()
+            obs.join()
+            if obs.error:
+                raise obs.error
 
             # start sender
             sender = Sender(host, input_ports[0], reader, batch_size=batch_size,
                             interval=interval)
             sender.start()
-
-            time.sleep(2)
+            # Give the cluster 1 second to build up some state
+            time.sleep(1)
 
             # Perform autoscale cycles
-            start_froms = {r: 0 for r in runners}
             for cyc in range(cycles):
                 for joiners in ops:
+                    # Verify cluster is processing before proceeding
+                    obs = ObservabilityNotifier(query_func_cluster_status,
+                        test_cluster_is_processing, timeout=30)
+                    obs.start()
+                    obs.join()
+                    if obs.error:
+                        raise obs.error
+
+                    # Test for crashed workers
+                    test_crashed_workers(runners)
+
+                    # get partition data before autoscale operation begins
+                    pre_partitions = query_func_partitions()
                     steps.append(joiners)
                     joined = []
                     left = []
-                    if joiners > 0:
+                    if joiners > 0:  # autoscale: grow
                         # create a new worker and have it join
                         new_ports = get_port_values(num=(joiners * 2), host=host,
                                                     base_port=25000)
@@ -312,44 +442,33 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                        control_port, external_port, data_port, res_dir,
                                        joiners, *joiner_ports[i])
                             joined.append(runners[-1])
-                            start_froms[runners[-1]] = 0
 
-                        patterns_i = ([re.escape('***Worker {} attempting to join the '
-                                                 'cluster. Sent necessary information.***'
-                                                 .format(r.name)) for r in joined]
-                                      +
-                                      [re.escape('Migrating partitions to {}'.format(
-                                          r.name)) for r in joined]
-                                      +
-                                      [re.escape('--All new workers have acked migration '
-                                                 'batch complete'),
-                                       re.escape('~~~Resuming message processing.~~~')])
-                        patterns_j = [re.escape('***Successfully joined cluster!***'),
-                                      re.escape('~~~Resuming message processing.~~~')]
+                        # Verify cluster has resumed processing
+                        obs = ObservabilityNotifier(query_func_cluster_status,
+                            test_cluster_is_processing, timeout=120)
+                        obs.start()
+                        obs.join()
+                        if obs.error:
+                            raise obs.error
 
-                        # Wait for runners to complete joining
-                        join_checkers = []
-                        join_checkers.append(RunnerChecker(runners[0], patterns_i,
-                            timeout=join_timeout,
-                            start_from=start_froms[runners[0]]))
-                        for runner in joined:
-                            join_checkers.append(RunnerChecker(runner, patterns_j,
-                                timeout=join_timeout,
-                                start_from=start_froms[runner]))
-                        for jc in join_checkers:
-                            jc.start()
-                        for jc in join_checkers:
-                            jc.join()
-                            if jc.error:
-                                outputs = runners_output_format(runners)
-                                raise AutoscaleTimeoutError(
-                                    "'{}' timed out on JOIN in {} "
-                                    "seconds. The cluster had the following outputs:\n===\n{}"
-                                    .format(jc.runner_name, jc.timeout, outputs),
-                                    as_error=jc.error,
-                                    as_steps=steps)
+                        # Test: all workers have partitions, partitions ids
+                        # for new workers have been migrated from pre-join
+                        # workers
+                        # create list of joining workers
+                        diff_names = {'joining': [r.name for r in joined]}
+                        # Create partial function of the test with the
+                        # data baked in
+                        tmp = partial(test_migrated_partitions, pre_partitions, diff_names)
+                        # Start the test notifier
+                        obs = ObservabilityNotifier(query_func_partitions,
+                            [test_all_workers_have_partitions,
+                             tmp])
+                        obs.start()
+                        obs.join()
+                        if obs.error:
+                            raise obs.error
 
-                    elif joiners < 0:  # joiners < 0, e.g. leavers!
+                    elif joiners < 0:  # autoscale: shrink
                         # choose the most recent, still-alive runners to leave
                         leavers = abs(joiners)
                         idx = 1
@@ -364,118 +483,45 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                                      "workers found!"
                                                     .format(joiners, len(left)))
 
-                        # Create the checkers
-
-                        initializer = [runners[0]]
-                        remaining = [r for r in runners if r.is_alive() and r not
-                            in initializer + left]
-
-                        patterns_i = (
-                            [r'ExternalChannelConnectNotifier: initializer: '
-                             r'server closed',
-                             r'Saving topology!',
-                             r'Saving worker names to file: .*?initializer.'
-                             r'workers'] +
-                            [re.escape(r'LocalTopology._save_worker_names: {}'
-                                       .format(r.name)) for r in
-                                       initializer + remaining] +
-                            [re.escape(r'~~~Initiating shrink~~~'),
-                             re.escape(r'-- Remaining workers:')] +
-                            [re.escape(r'-- -- {}'.format(r.name)) for n in
-                             initializer + remaining] +
-                            [re.escape(r'~~~Stopping message processing for '
-                                       r'leaving workers.~~~'),
-                             re.escape(r'~~~Resuming message processing.~~~')])
-
-
-                        patterns_r = (
-                            [re.escape(r'Control Ch: Received Mute Request from initializer'),
-                             re.escape(r'~~~Stopping message processing for leaving workers.~~~'),
-                             re.escape(r'DataChannelConnectNotifier: server closed'),
-                             re.escape(r'ControlSenderConnectNotifier: server closed'),
-                             re.escape(r'BoundaryNotify: closed'),
-                             re.escape(r'Control Ch: Received Unmute Request from initializer'),
-                             re.escape(r'~~~Resuming message processing.~~~'),
-                             re.escape(r'Shutting down OutgoingBoundary'),
-                             re.escape(r'Shutting down ControlConnection')])
-                        patterns_r_per = [
-                            r'ControlChannelConnectNotifier:{}: server closed']
-
-
-                        patterns_l = (
-                            [re.escape(r'Control Ch: Received Mute Request from {}'
-                                       .format(r.name))
-                             for r in initializer + remaining] +
-                            [re.escape(r'Migrating all partitions to {} remaining '
-                                       r'workers'.format(
-                                           len(initializer + remaining))),
-                             r'\^\^Migrating \d+ steps to {} workers'
-                             .format(len(initializer + remaining))] +
-                            [r'\^\^Migrating step \d+ to outgoing '
-                             r'boundary {}/[0-9a-f]{{12}}'
-                             .format(r.name) for r in initializer + remaining] +
-                            [re.escape(r'--Sending leaving worker done migration msg to cluster'),
-                             re.escape(r'Connections: Finished shutdown procedure.'),
-                             re.escape(r'Shutting down ControlConnection'),
-                             re.escape(r'Shutting down TCPSink'),
-                             re.escape(r'Shutting down DataReceiver'),
-                             re.escape(r'Shutting down ReconnectingMetricsSink'),
-                             re.escape(r'Shutting down OutgoingBoundary'),
-                             re.escape(r'Shutting down Startup...'),
-                             re.escape(r'Shutting down DataChannel'),
-                             re.escape(r'metrics connection closed'),
-                             re.escape(r'TCPSink connection closed'),
-                             re.escape(r'ControlChannelConnectNotifier: server closed')])
-                        patterns_l_per = []
-
-                        left_checkers = []
-
-                        # initializer STDOUT checker
-                        left_checkers.append(RunnerChecker(initializer[0], patterns_i,
-                            timeout=join_timeout,
-                            start_from=start_froms[initializer[0]]))
-
-                        # remaining workers STDOUT checkers
-                        for runner in remaining:
-                            left_checkers.append(RunnerChecker(runner,
-                                patterns_r + [p.format(runner.name) for p in
-                                              patterns_r_per],
-                                timeout=join_timeout,
-                                start_from=start_froms[runner]))
-
-                        # leaving workers STDOUT checkers
-                        for runner in left:
-                            left_checkers.append(RunnerChecker(runner,
-                                patterns_l + [p.format(runner.name) for p in
-                                              patterns_l_per],
-                                timeout=join_timeout,
-                                start_from=start_froms[runner]))
-                        for lc in left_checkers:
-                            lc.start()
-
                         # Send the shrink command
-                        send_shrink_cmd(host, external_port, names=[r.name for r in left])
+                        resp = send_shrink_cmd(host, external_port, names=[r.name for r in left])
+                        print("Sent a shrink command for {}".format([r.name for r in left]))
+                        print("Response was: {}".format(resp))
 
-                        # Wait for output checkers to join
-                        for lc in left_checkers:
-                            lc.join()
-                            if lc.error:
-                                outputs = runners_output_format(runners)
-                                raise AutoscaleTimeoutError(
-                                    "'{}' timed out on SHRINK in {} "
-                                    "seconds. The cluster had the following outputs:\n===\n{}"
-                                    .format(lc.runner_name, lc.timeout, outputs),
-                                    as_error=lc.error,
-                                    as_steps=steps)
+                        # Verify cluster has resumed processing
+                        obs = ObservabilityNotifier(query_func_cluster_status,
+                            test_cluster_is_processing, timeout=120)
+                        obs.start()
+                        obs.join()
+                        if obs.error:
+                            raise obs.error
+
+                        # Test: all workers have partitions, partitions ids
+                        # from departing workers have been migrated to remaining
+                        # workers
+                        # create list of leaving workers
+                        diff_names = {'leaving': [r.name for r in left]}
+                        # Create partial function of the test with the
+                        # data baked in
+                        tmp = partial(test_migrated_partitions, pre_partitions, diff_names)
+                        # Start the test notifier
+                        obs = ObservabilityNotifier(query_func_partitions,
+                            [test_all_workers_have_partitions,
+                             tmp])
+                        obs.start()
+                        obs.join()
+                        if obs.error:
+                            raise obs.error
 
                     else:  # Handle the 0 case as a noop
                         continue
 
-                    start_froms = {r: r.tell() for r in runners}
+                    # Test for crashed workers
+                    test_crashed_workers(runners)
 
                     # Validate autoscale via partition query
                     try:
-                        partitions = query_partitions(host, external_port)
+                        partitions = partitions_query(host, external_port)
                         phase_validate_partitions(runners, partitions,
                                                   joined=[r.name for r in joined],
                                                   left=[r.name for r in left])
@@ -483,9 +529,19 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                         print('error validating {} have joined and {} have left'
                               .format([r.name for r in joined],
                                       [r.name for r in left]))
-                        raise err
+                        raise
 
-            # wait until sender completes (~10 seconds)
+                    # Wait a second before the next operation, allowing some
+                    # more data to go through the system
+                    time.sleep(1)
+
+            # Test for crashed workers
+            test_crashed_workers(runners)
+
+            # Test is done, so stop sender
+            sender.stop()
+
+            # wait until sender sends out its final batch and exits
             sender.join(sender_timeout)
             if sender.error:
                 raise sender.error
@@ -494,8 +550,15 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                 raise TimeoutError('Sender did not complete in the expected '
                                    'period')
 
+            print('Sender sent {} messages'.format(sum(expected.values())))
 
             # Use Sink value to determine when to stop runners and sink
+            pack677 = '>I2sQ'
+            pack27 = '>IsQ'
+            await_values = [pack(pack677, calcsize(pack677)-4, c, v) for c, v in
+                            expected.items()]
+            #await_values = [pack(pack27, calcsize(pack27)-4, c, v) for c, v in
+            #                expected.items()]
             stopper = SinkAwaitValue(sink, await_values, 30)
             stopper.start()
             stopper.join()
@@ -507,6 +570,9 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             # stop application workers
             for r in runners:
                 r.stop()
+
+            # Test for crashed workers
+            test_crashed_workers(runners)
 
             # Stop sink
             sink.stop()
@@ -548,8 +614,9 @@ def _autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                                         "\n===\n{}"
                                         .format(alive_names, runner_join_timeout,
                                                 outputs))
-
     except Exception as err:
         if not hasattr(err, 'as_steps'):
             err.as_steps = steps
-        raise err
+        if not hasattr(err, 'runners'):
+            err.runners = runners
+        raise

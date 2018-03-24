@@ -19,138 +19,69 @@ set_logging(name='autoscale_tests', level=INFO2,
             fmt='%(levelname)s - %(message)s')
 
 
-from _autoscale_tests import *
+from _autoscale_tests import autoscale_sequence
 
 
 CMD_PONY = 'alphabet'
 CMD_PYTHON = 'machida --application-module alphabet'
+#CMD_PONY = 'alphabet27'
+#CMD_PYTHON = 'machida --application-module alphabet27'
 
 CYCLES=1
+APIS = {'pony': CMD_PONY, 'python': CMD_PYTHON}
+
+#
+# Setup Tests
+#
+
+SETUP_TEST_NAME_FMT = 'test_setup_{api}_{size}_workers'
+SIZES = range(10, 51, 10)
 
 
-def test_autoscale_pony_grow_by_1():
-    autoscale_sequence(CMD_PONY, ops=[1], cycles=CYCLES)
+def create_setup_test(api, cmd, workers):
+    """
+    Create a setup test for a given `api` `cmd` with a cluster size `workers`
+    """
+    test_name = SETUP_TEST_NAME_FMT.format(api=api, size=workers)
+    def f():
+        autoscale_sequence(cmd, ops=[], cycles=1, initial=workers)
+    f.func_name = test_name
+    globals()[test_name] = f
+
+# Programmatically create the tests, do the name mangling, and place them
+# in the global scope for pytest to find
+for api, cmd in APIS.items():
+    for workers in SIZES:
+        create_setup_test(api, cmd, workers)
 
 
-#def test_autoscale_pony_grow_by_1_grow_by_many():
-#    autoscale_sequence(CMD_PONY, ops=[1, 4], cycles=CYCLES)
+#
+# Autoscale tests
+#
+
+AUTOSCALE_TEST_NAME_FMT = 'test_autoscale_{api}_{ops}'
+OPS = [1, 4, -1, -4]
+OP_NAMES = {1: 'grow_by_1',
+            4: 'grow_by_many',
+            -1: 'shrink_by_1',
+            -4: 'shrink_by_many'}
 
 
-#def test_autoscale_pony_grow_by_1_shrink_by_1():
-#    autoscale_sequence(CMD_PONY, ops=[1,-1], cycles=CYCLES)
+def create_autoscale_test(api, cmd, seq, cycles, initial=None):
+    ops = '_'.join((OP_NAMES[o] for o in seq))
+    test_name = AUTOSCALE_TEST_NAME_FMT.format(api=api, ops=ops)
+    def f():
+        autoscale_sequence(cmd, ops=seq, cycles=cycles, initial=initial)
+    f.func_name = test_name
+    globals()[test_name] = f
 
 
-#def test_autoscale_pony_grow_by_1_shrink_by_many():
-#    autoscale_sequence(CMD_PONY, ops=[1,-4], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_grow_by_many_grow_by_1():
-#    autoscale_sequence(CMD_PONY, ops=[4,1], cycles=CYCLES)
-#
-#
-def test_autoscale_pony_grow_by_many():
-    autoscale_sequence(CMD_PONY, ops=[4], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_grow_by_many_shrink_by_1():
-#    autoscale_sequence(CMD_PONY, ops=[4,-1], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_grow_by_many_shrink_by_many():
-#    autoscale_sequence(CMD_PONY, ops=[4,-4], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_shrink_by_1_grow_by_1():
-#    autoscale_sequence(CMD_PONY, ops=[-1,1], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_shrink_by_1_grow_by_many():
-#    autoscale_sequence(CMD_PONY, ops=[-1,4], cycles=CYCLES)
-
-
-def test_autoscale_pony_shrink_by_1():
-     autoscale_sequence(CMD_PONY, ops=[-1], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_shrink_by_1_shrink_by_many():
-#    autoscale_sequence(CMD_PONY, ops=[-1,-4], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_shrink_by_many_grow_by_1():
-#    autoscale_sequence(CMD_PONY, ops=[-4,1], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_shrink_by_many_grow_by_many():
-#    autoscale_sequence(CMD_PONY, ops=[-4,4], cycles=CYCLES)
-#
-#
-#def test_autoscale_pony_shrink_by_many_shrink_by_1():
-#    autoscale_sequence(CMD_PONY, ops=[-4,-1], cycles=CYCLES)
-#
-#
-# def test_autoscale_pony_shrink_by_many():
-#     autoscale_sequence(CMD_PONY, ops=[-4], cycles=CYCLES)
-
-
-def test_autoscale_python_grow_by_1():
-    autoscale_sequence(CMD_PYTHON, ops=[1], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_grow_by_1_grow_by_many():
-#    autoscale_sequence(CMD_PYTHON, ops=[1,4], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_grow_by_1_shrink_by_1():
-#    autoscale_sequence(CMD_PYTHON, ops=[1,-1], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_grow_by_1_shrink_by_many():
-#    autoscale_sequence(CMD_PYTHON, ops=[1,-4], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_grow_by_many_grow_by_1():
-#    autoscale_sequence(CMD_PYTHON, ops=[4,1], cycles=CYCLES)
-#
-#
-def test_autoscale_python_grow_by_many():
-    autoscale_sequence(CMD_PYTHON, ops=[4], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_grow_by_many_shrink_by_1():
-#    autoscale_sequence(CMD_PYTHON, ops=[4,-1], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_grow_by_many_shrink_by_many():
-#    autoscale_sequence(CMD_PYTHON, ops=[4,-4], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_shrink_by_1_grow_by_1():
-#    autoscale_sequence(CMD_PYTHON, ops=[-1,1], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_shrink_by_1_grow_by_many():
-#    autoscale_sequence(CMD_PYTHON, ops=[-1,4], cycles=CYCLES)
-#
-#
-# def test_autoscale_python_shrink_by_1():
-#     autoscale_sequence(CMD_PYTHON, ops=[-1], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_shrink_by_1_shrink_by_many():
-#    autoscale_sequence(CMD_PYTHON, ops=[-1,-4], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_shrink_by_many_grow_by_1():
-#    autoscale_sequence(CMD_PYTHON, ops=[-4,1], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_shrink_by_many_grow_by_many():
-#    autoscale_sequence(CMD_PYTHON, ops=[-4,4], cycles=CYCLES)
-#
-#
-#def test_autoscale_python_shrink_by_many_shrink_by_1():
-#    autoscale_sequence(CMD_PYTHON, ops=[-4,-1], cycles=CYCLES)
-#
-#
-# def test_autoscale_python_shrink_by_many():
-#     autoscale_sequence(CMD_PYTHON, ops=[-4], cycles=CYCLES)
+# Programmatically create the tests, do the name mangling, and place them
+# in the global scope for pytest to find
+for api, cmd in APIS.items():
+    for o1 in OPS:
+        for o2 in OPS:
+            if o1 == o2:
+                create_autoscale_test(api, cmd, [o1], CYCLES)
+            else:
+                create_autoscale_test(api, cmd, [o1, o2], CYCLES)

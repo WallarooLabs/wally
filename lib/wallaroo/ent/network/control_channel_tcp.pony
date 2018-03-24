@@ -293,8 +293,26 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         end
+      | let m: AnnounceConnectionsMsg =>
+        for w in m.control_addrs.keys() do
+          try
+            let host = m.control_addrs(w)?._1
+            let control_addr = m.control_addrs(w)?
+            let data_addr = m.data_addrs(w)?
+            match _layout_initializer
+            | let lti: LocalTopologyInitializer =>
+              lti.add_joining_worker(w, host, control_addr, data_addr)
+            else
+              Fail()
+            end
+          else
+            Fail()
+          end
+        end
       | let m: AnnounceNewStatefulStepMsg =>
         m.update_registry(_router_registry)
+      | let m: AnnounceNewSourceMsg =>
+        _router_registry.register_remote_source(m.sender, m.source_id)
       | let m: StepMigrationCompleteMsg =>
         _router_registry.step_migration_complete(m.step_id)
       | let m: JoiningWorkerInitializedMsg =>
@@ -354,6 +372,31 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Control Ch: Received Unmute Request from %s\n".cstring(),
           m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
+      | let m: RequestInFlightAckMsg =>
+        _router_registry.remote_request_in_flight_ack(m.sender,
+          m.request_id, m.requester_id)
+      | let m: RequestInFlightResumeAckMsg =>
+        _router_registry.remote_request_in_flight_resume_ack(m.sender,
+          m.in_flight_resume_ack_id, m.request_id, m.requester_id,
+          m.leaving_workers)
+      | let m: InFlightAckMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received InFlightAckMsg from %s\n".cstring(),
+            m.sender.cstring())
+        end
+        _router_registry.receive_in_flight_ack(m.request_id)
+      | let m: FinishedCompleteAckMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received FinishedCompleteAckMsg from %s\n".cstring(),
+            m.sender.cstring())
+        end
+        _router_registry.receive_in_flight_resume_ack(m.request_id)
+      | let m: ResumeTheWorldMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received ResumeTheWorldMsg from %s\n".cstring(),
+            m.sender.cstring())
+        end
+        _router_registry.resume_the_world(m.sender)
       | let m: RotateLogFilesMsg =>
         @printf[I32]("Control Ch: Received Rotate Log Files request\n"
           .cstring())
@@ -373,6 +416,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     true
 
   fun ref connected(conn: TCPConnection ref) =>
+    _connections.register_disposable(conn)
     @printf[I32]("ControlChannelConnectNotifier: connected.\n".cstring())
 
   fun ref connect_failed(conn: TCPConnection ref) =>

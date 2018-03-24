@@ -21,6 +21,7 @@ use "ponytest"
 use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/source"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -55,9 +56,9 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
     let event_log = EventLog()
     let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
-    let step1 = _StepGenerator(event_log, recovery_replayer)
-    let step2 = _StepGenerator(event_log, recovery_replayer)
-    let step3 = _StepGenerator(event_log, recovery_replayer)
+    let step1 = _StepGenerator(auth, event_log, recovery_replayer)
+    let step2 = _StepGenerator(auth, event_log, recovery_replayer)
+    let step3 = _StepGenerator(auth, event_log, recovery_replayer)
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
 
@@ -112,8 +113,8 @@ class iso _TestOmniRouterEquality is UnitTest
     let event_log = EventLog()
     let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
-    let step1 = _StepGenerator(event_log, recovery_replayer)
-    let step2 = _StepGenerator(event_log, recovery_replayer)
+    let step1 = _StepGenerator(auth, event_log, recovery_replayer)
+    let step2 = _StepGenerator(auth, event_log, recovery_replayer)
 
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
@@ -151,11 +152,15 @@ class iso _TestOmniRouterEquality is UnitTest
 
     var base_router: OmniRouter = StepIdRouter("w1",
       consume base_data_routes, consume base_step_map,
-      consume base_boundaries, consume base_stateless_partitions)
+      consume base_boundaries, consume base_stateless_partitions,
+      recover Map[StepId, (ProxyAddress | Source)] end,
+      recover Map[String, DataReceiver] end)
 
     let target_router: OmniRouter = StepIdRouter("w1",
       consume target_data_routes, consume target_step_map,
-      consume target_boundaries, consume target_stateless_partitions)
+      consume target_boundaries, consume target_stateless_partitions,
+      recover Map[StepId, (ProxyAddress | Source)] end,
+      recover Map[String, DataReceiver] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
@@ -179,8 +184,8 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     let event_log = EventLog()
     let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
-    let step1 = _StepGenerator(event_log, recovery_replayer)
-    let step2 = _StepGenerator(event_log, recovery_replayer)
+    let step1 = _StepGenerator(auth, event_log, recovery_replayer)
+    let step2 = _StepGenerator(auth, event_log, recovery_replayer)
 
     let base_routes = recover trn Map[U128, Consumer] end
     base_routes(1) = step1
@@ -212,8 +217,8 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     let event_log = EventLog()
     let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
-    let step1 = _StepGenerator(event_log, recovery_replayer)
-    let step2 = _StepGenerator(event_log, recovery_replayer)
+    let step1 = _StepGenerator(auth, event_log, recovery_replayer)
+    let step2 = _StepGenerator(auth, event_log, recovery_replayer)
 
     let base_routes = recover trn Map[U128, Consumer] end
     base_routes(1) = step1
@@ -270,14 +275,16 @@ primitive _PartitionFunctionGenerator
     {(s: String): String => s}
 
 primitive _StepGenerator
-  fun apply(event_log: EventLog, recovery_replayer: RecoveryReplayer): Step =>
-    Step(RouterRunner, MetricsReporter("", "", _NullMetricsSink),
+  fun apply(auth: AmbientAuth, event_log: EventLog,
+    recovery_replayer: RecoveryReplayer): Step
+  =>
+    Step(auth, RouterRunner, MetricsReporter("", "", _NullMetricsSink),
       1, BoundaryOnlyRouteBuilder, event_log, recovery_replayer,
       recover Map[String, OutgoingBoundary] end)
 
 primitive _BoundaryGenerator
   fun apply(worker_name: String, auth: AmbientAuth): OutgoingBoundary =>
-    OutgoingBoundary(auth, worker_name,
+    OutgoingBoundary(auth, worker_name, "",
       MetricsReporter("", "", _NullMetricsSink), "", "")
 
 primitive _RouterRegistryGenerator

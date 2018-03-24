@@ -11,13 +11,25 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
+use "serialise"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
+class val ShippedState
+  let state_bytes: ByteSeq val
+  let pending_messages: Array[QueuedStepMessage] val
+
+  new create(state_bytes': ByteSeq val,
+    pending_messages': Array[QueuedStepMessage] val)
+  =>
+    state_bytes = state_bytes'
+    pending_messages = pending_messages'
+
 primitive StepStateMigrator
-  fun receive_state(runner: Runner, state: ByteSeq val) =>
+  fun receive_state(runner: Runner, state: ByteSeq val)
+  =>
     ifdef "trace" then
       @printf[I32]("Received new state\n".cstring())
     end
@@ -28,21 +40,51 @@ primitive StepStateMigrator
       Fail()
     end
 
-  fun send_state_to_neighbour(runner: Runner, neighbour: Step) =>
+  fun send_state_to_neighbour(runner: Runner, neighbour: Step,
+    p_ms: Array[QueuedStepMessage], auth: AmbientAuth)
+  =>
     match runner
     | let r: SerializableStateRunner =>
-      neighbour.receive_state(r.serialize_state())
+      let pending_messages = recover iso Array[QueuedStepMessage] end
+      for m in p_ms.values() do
+        pending_messages.push(m)
+      end
+      let shipped_state = ShippedState(r.serialize_state(),
+        consume pending_messages)
+      let shipped_state_bytes =
+        try
+          Serialised(SerialiseAuth(auth), shipped_state)?
+            .output(OutputSerialisedAuth(auth))
+        else
+          Fail()
+          recover val Array[U8] end
+        end
+      neighbour.receive_state(shipped_state_bytes)
     else
       Fail()
     end
 
   fun send_state[K: (Hashable val & Equatable[K] val)](runner: Runner,
-    id: StepId, boundary: OutgoingBoundary, state_name: String, key: K)
+    id: StepId, boundary: OutgoingBoundary, state_name: String, key: K,
+    p_ms: Array[QueuedStepMessage], auth: AmbientAuth)
   =>
     match runner
     | let r: SerializableStateRunner =>
-      let state: ByteSeq val = r.serialize_state()
-      boundary.migrate_step[K](id, state_name, key, state)
+      let pending_messages = recover iso Array[QueuedStepMessage] end
+      for m in p_ms.values() do
+        pending_messages.push(m)
+      end
+      let shipped_state = ShippedState(r.serialize_state(),
+        consume pending_messages)
+      let shipped_state_bytes =
+        try
+          Serialised(SerialiseAuth(auth), shipped_state)?
+            .output(OutputSerialisedAuth(auth))
+        else
+          Fail()
+          recover val Array[U8] end
+        end
+      boundary.migrate_step[K](id, state_name, key, shipped_state_bytes)
     else
       Fail()
     end

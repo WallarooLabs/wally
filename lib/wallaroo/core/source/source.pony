@@ -27,8 +27,8 @@ use "wallaroo/core/topology"
 
 trait val SourceBuilder
   fun name(): String
-  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router,
-    env: Env): SourceNotify iso^
+  fun apply(source_id: StepId, event_log: EventLog, auth: AmbientAuth,
+    target_router: Router, env: Env): SourceNotify iso^
   fun val update_router(router: Router): SourceBuilder
 
 class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBuilder
@@ -65,12 +65,12 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
 
   fun name(): String => _name
 
-  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router,
-    env: Env): SourceNotify iso^
+  fun apply(source_id: StepId, event_log: EventLog, auth: AmbientAuth,
+    target_router: Router, env: Env): SourceNotify iso^
   =>
-    _source_notify_builder(_name, env, auth, _handler, _runner_builder,
-      _router, _metrics_reporter.clone(), event_log, target_router,
-      _pre_state_target_ids)
+    _source_notify_builder(source_id, _name, env, auth, _handler,
+      _runner_builder, _router, _metrics_reporter.clone(), event_log,
+      target_router, _pre_state_target_ids)
 
   fun val update_router(router: Router): SourceBuilder =>
     BasicSourceBuilder[In, SH](_app_name, _worker_name, _name, _runner_builder,
@@ -92,8 +92,10 @@ interface val SourceConfig[In: Any val]
   fun source_builder(app_name: String, name: String):
     SourceBuilderBuilder
 
-interface tag Source is (DisposableActor & BoundaryUpdateable)
+interface tag Source is (DisposableActor & BoundaryUpdateable &
+  InFlightAckResponder & StatusReporter)
   be update_router(router: PartitionRouter)
+  be remove_route_to_consumer(c: Consumer)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   be reconnect_boundary(target_worker_name: String)

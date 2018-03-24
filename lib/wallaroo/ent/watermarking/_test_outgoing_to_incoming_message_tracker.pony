@@ -412,5 +412,17 @@ actor _TestProducer is Producer
   fun ref update_router(router: Router) =>
     None
 
+  be remove_route_to_consumer(c: Consumer) =>
+    None
+
   be request_ack() =>
+    None
+
+  be receive_in_flight_ack(request_id: RequestId) =>
+    None
+
+  be receive_in_flight_resume_ack(request_id: RequestId) =>
+    None
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
     None

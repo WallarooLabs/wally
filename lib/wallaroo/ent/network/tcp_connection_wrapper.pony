@@ -13,10 +13,15 @@ the License. You may obtain a copy of the License at
 use "net"
 
 actor ControlConnection
+  let _connections: Connections
   var _control_sender: _TCPConnectionControlSender =
     _PreTCPConnectionControlSender
 
+  new create(connections: Connections) =>
+    _connections = connections
+
   be connected(conn: TCPConnection) =>
+    _connections.register_disposable(conn)
     _control_sender.flush(conn)
     _control_sender = _PostTCPConnectionControlSender(conn)
 

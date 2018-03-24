@@ -72,20 +72,20 @@ class val OutgoingBoundaryBuilder
     _service = s
     _spike_config = spike_config
 
-  fun apply(step_id: StepId): OutgoingBoundary =>
-    let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
-      _host, _service where spike_config = _spike_config)
+  fun apply(step_id: StepId, target_worker: String): OutgoingBoundary =>
+    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
+      _reporter.clone(), _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary
 
-  fun build_and_initialize(step_id: StepId,
+  fun build_and_initialize(step_id: StepId, target_worker: String,
     layout_initializer: LayoutInitializer): OutgoingBoundary
   =>
     """
     Called when creating a boundary post cluster initialization
     """
-    let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
-      _host, _service where spike_config = _spike_config)
+    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
+      _reporter.clone(), _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary.quick_initialize(layout_initializer)
     boundary
@@ -103,6 +103,7 @@ actor OutgoingBoundary is Consumer
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
+  var _in_flight_ack_waiter: InFlightAckWaiter = InFlightAckWaiter
 
   // TCP
   var _notify: WallarooOutgoingNetworkActorNotify
@@ -134,6 +135,7 @@ actor OutgoingBoundary is Consumer
   var _replaying: Bool = false
   let _auth: AmbientAuth
   let _worker_name: String
+  let _target_worker: String
   var _step_id: StepId = 0
   let _host: String
   let _service: String
@@ -150,7 +152,10 @@ actor OutgoingBoundary is Consumer
   var _reconnect_pause: U64 = 10_000_000_000
   let _timers: Timers = Timers
 
-  new create(auth: AmbientAuth, worker_name: String,
+  //!@
+  var _boundary_status: Bool = false
+
+  new create(auth: AmbientAuth, worker_name: String, target_worker: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
     spike_config:(SpikeConfig | None) = None)
@@ -173,6 +178,7 @@ actor OutgoingBoundary is Consumer
     end
 
     _worker_name = worker_name
+    _target_worker = target_worker
     _host = host
     _service = service
     _from = from
@@ -220,27 +226,29 @@ actor OutgoingBoundary is Consumer
     """
     Called when initializing as part of a new worker joining a running cluster.
     """
-    try
-      _initializer = initializer
-      _reported_initialized = true
-      _reported_ready_to_work = true
-      _connect_count = @pony_os_connect_tcp[U32](this,
-        _host.cstring(), _service.cstring(),
-        _from.cstring())
-      _notify_connecting()
+    if not _reported_initialized then
+      try
+        _initializer = initializer
+        _reported_initialized = true
+        _reported_ready_to_work = true
+        _connect_count = @pony_os_connect_tcp[U32](this,
+          _host.cstring(), _service.cstring(),
+          _from.cstring())
+        _notify_connecting()
 
-      @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" +
-        _service + "\n").cstring())
+        @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" +
+          _service + "\n").cstring())
 
-      if _step_id == 0 then
+        if _step_id == 0 then
+          Fail()
+        end
+
+        let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
+          _step_id, _auth)?
+        _writev(connect_msg)
+      else
         Fail()
       end
-
-      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
-        _auth)?
-      _writev(connect_msg)
-    else
-      Fail()
     end
 
   be reconnect() =>
@@ -276,18 +284,19 @@ actor OutgoingBoundary is Consumer
 
   be register_step_id(step_id: StepId) =>
     _step_id = step_id
+    _in_flight_ack_waiter = InFlightAckWaiter(_step_id)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    seq_id: SeqId, route_id: RouteId,
+    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Run should never be called on an OutgoingBoundary
     Fail()
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    incoming_seq_id: SeqId, route_id: RouteId,
+    data: D, producer_id: StepId, producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Should never be called on an OutgoingBoundary
@@ -443,6 +452,67 @@ actor OutgoingBoundary is Consumer
     // end
 
     _upstreams.unset(producer)
+
+  be report_status(code: ReportStatusCode) =>
+    if not _boundary_status then
+      //!@
+      match code
+      | BoundaryStatus =>
+        @printf[I32]("!@ BoundaryStatus: Boundary to %s id: %s\n".cstring(), _target_worker.cstring(), _step_id.string().cstring())
+      end
+      _in_flight_ack_waiter.report_status(code)
+      try
+        _writev(ChannelMsgEncoder.report_status(code, _auth)?)
+      else
+        Fail()
+      end
+    end
+    _boundary_status = true
+
+  be request_in_flight_ack(upstream_request_id: RequestId,
+    requester_id: StepId, upstream_requester: InFlightAckRequester)
+  =>
+    if not _in_flight_ack_waiter.already_added_request(requester_id) then
+      try
+        _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
+          upstream_requester)
+        let request_id = _in_flight_ack_waiter.add_consumer_request(
+          requester_id)
+        _writev(ChannelMsgEncoder.request_in_flight_ack(_worker_name,
+          request_id, requester_id, _auth)?)
+      else
+        Fail()
+      end
+    else
+      upstream_requester.receive_in_flight_ack(upstream_request_id)
+    end
+
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  =>
+    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
+      request_id, requester_id, requester)
+    then
+      try
+        let new_request_id =
+          _in_flight_ack_waiter.add_consumer_resume_request()
+        _writev(ChannelMsgEncoder.request_in_flight_resume_ack(_worker_name,
+          in_flight_resume_ack_id, new_request_id, _step_id,
+          leaving_workers, _auth)?)
+      else
+        Fail()
+      end
+    end
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
+    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
+
+  be receive_in_flight_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_request(request_id)
+
+  be receive_in_flight_resume_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
   //
   // TCP
@@ -994,6 +1064,18 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
+      | let fa: InFlightAckMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received InFlightAckMsg from %s\n".cstring(),
+            fa.sender.cstring())
+        end
+        _outgoing_boundary.receive_in_flight_ack(fa.request_id)
+      | let fa: FinishedCompleteAckMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received FinishedCompleteAckMsg from %s\n".cstring(),
+            fa.sender.cstring())
+        end
+        _outgoing_boundary.receive_in_flight_resume_ack(fa.request_id)
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())

@@ -181,8 +181,8 @@ actor TCPSink is Consumer
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId,
+    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     var receive_ts: U64 = 0
@@ -230,15 +230,16 @@ actor TCPSink is Consumer
     None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     //TODO: deduplication like in the Step <- this is pointless if the Sink
     //doesn't have state, because on recovery we won't have a list of "seen
     //messages", which we would normally get from the eventlog.
-    run[D](metric_name, pipeline_time_spent, data, i_producer, msg_uid, frac_ids,
-      i_seq_id, i_route_id, latest_ts, metrics_id, worker_ingress_ts)
+    run[D](metric_name, pipeline_time_spent, data, i_producer_id, i_producer,
+      msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id,
+      worker_ingress_ts)
 
   be update_router(router: Router) =>
     """
@@ -298,6 +299,23 @@ actor TCPSink is Consumer
     end
 
     _upstreams.unset(producer)
+
+  be report_status(code: ReportStatusCode) =>
+    None
+
+  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester)
+  =>
+    requester.receive_in_flight_ack(request_id)
+
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  =>
+    requester.receive_in_flight_resume_ack(request_id)
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
+    None
 
   //
   // TCP

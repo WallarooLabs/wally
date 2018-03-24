@@ -51,13 +51,14 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is Producer
+actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   """
   # TCPSource
 
   ## Future work
   * Switch to requesting credits via promise
   """
+  let _source_id: StepId
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder
@@ -94,9 +95,11 @@ actor TCPSource is Producer
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
+  var _in_flight_ack_waiter: InFlightAckWaiter
 
-  new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
-    routes: Array[Consumer] val, route_builder: RouteBuilder,
+  new _accept(source_id: StepId, listen: TCPSourceListener,
+    notify: TCPSourceNotify iso, routes: Array[Consumer] val,
+    route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     fd: U32, init_size: USize = 64, max_size: USize = 16384,
@@ -105,6 +108,8 @@ actor TCPSource is Producer
     """
     A new connection accepted on a server.
     """
+    _source_id = source_id
+    _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
     _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
@@ -124,7 +129,8 @@ actor TCPSource is Producer
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let new_boundary =
-          builder.build_and_initialize(_step_id_gen(), _layout_initializer)
+          builder.build_and_initialize(_step_id_gen(), target_worker_name,
+            _layout_initializer)
         router_registry.register_disposable(new_boundary)
         _outgoing_boundaries(target_worker_name) = new_boundary
       end
@@ -181,6 +187,15 @@ actor TCPSource is Producer
 
     _notify.update_router(new_router)
 
+  be remove_route_to_consumer(c: Consumer) =>
+    if _routes.contains(c) then
+      try
+        _routes.remove(c)?
+      else
+        Fail()
+      end
+    end
+
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   =>
@@ -192,7 +207,7 @@ actor TCPSource is Producer
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let boundary = builder.build_and_initialize(_step_id_gen(),
-          _layout_initializer)
+          target_worker_name, _layout_initializer)
         _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
         _routes(boundary) =
@@ -202,6 +217,9 @@ actor TCPSource is Producer
     _notify.update_boundaries(_outgoing_boundaries)
 
   be remove_boundary(worker: String) =>
+    _remove_boundary(worker)
+
+  fun ref _remove_boundary(worker: String) =>
     if _outgoing_boundaries.contains(worker) then
       try
         let boundary = _outgoing_boundaries(worker)?
@@ -279,6 +297,72 @@ actor TCPSource is Producer
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id
+
+  be report_status(code: ReportStatusCode) =>
+    match code
+    | BoundaryCountStatus =>
+      var b_count: USize = 0
+      for r in _routes.values() do
+        match r
+        | let br: BoundaryRoute => b_count = b_count + 1
+        end
+      end
+      @printf[I32]("TCPSource %s has %s boundaries.\n".cstring(),
+        _source_id.string().cstring(), b_count.string().cstring())
+    end
+    for route in _routes.values() do
+      route.report_status(code)
+    end
+
+  be request_in_flight_ack(upstream_request_id: RequestId,
+    requester_id: StepId, upstream_requester: InFlightAckRequester)
+  =>
+    if not _in_flight_ack_waiter.already_added_request(requester_id) then
+      _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
+        upstream_requester)
+      if _routes.size() > 0 then
+        for route in _routes.values() do
+          let request_id = _in_flight_ack_waiter.add_consumer_request(
+            requester_id)
+          route.request_in_flight_ack(request_id, _source_id, this)
+        end
+      else
+        upstream_requester.try_finish_in_flight_request_early(requester_id)
+      end
+    else
+      upstream_requester.receive_in_flight_ack(upstream_request_id)
+    end
+
+  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
+    request_id: RequestId, requester_id: StepId,
+    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  =>
+    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
+      request_id, requester_id, requester)
+    then
+      for w in leaving_workers.values() do
+        _remove_boundary(w)
+      end
+      if _routes.size() > 0 then
+        for route in _routes.values() do
+          let new_request_id =
+            _in_flight_ack_waiter.add_consumer_resume_request()
+          route.request_in_flight_resume_ack(in_flight_resume_ack_id,
+            new_request_id, _source_id, this, leaving_workers)
+        end
+      else
+        _in_flight_ack_waiter.try_finish_resume_request_early()
+      end
+    end
+
+  be try_finish_in_flight_request_early(requester_id: StepId) =>
+    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
+
+  be receive_in_flight_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_request(request_id)
+
+  be receive_in_flight_resume_ack(request_id: RequestId) =>
+    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
   //
   // TCP
@@ -429,7 +513,7 @@ actor TCPSource is Producer
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,
-    guessing the next packet length as we go. If we read 4 kb of data, send
+    guessing the next packet length as we go. If we read 5 kb of data, send
     ourself a resume message and stop reading, to avoid starving other actors.
     """
     try

@@ -45,7 +45,7 @@ actor TCPSourceListener is SourceListener
   """
   # TCPSourceListener
   """
-
+  let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _env: Env
   var _router: Router
   let _router_registry: RouterRegistry
@@ -206,13 +206,14 @@ actor TCPSourceListener is SourceListener
     Spawn a new connection.
     """
     try
-      let source = TCPSource._accept(this, _notify_connected()?,
-        _router.routes(), _route_builder, _outgoing_boundary_builders,
-        _layout_initializer, ns, _init_size, _max_size,
-        _metrics_reporter.clone(), _router_registry)
+      let source_id = _step_id_gen()
+      let source = TCPSource._accept(source_id, this,
+        _notify_connected(source_id)?, _router.routes(), _route_builder,
+        _outgoing_boundary_builders, _layout_initializer, ns, _init_size,
+        _max_size, _metrics_reporter.clone(), _router_registry)
       // TODO: We need to figure out how to unregister this when the
       // connection dies
-      _router_registry.register_source(source)
+      _router_registry.register_source(source, source_id)
       match _router
       | let pr: PartitionRouter =>
         _router_registry.register_partition_router_subscriber(pr.state_name(),
@@ -239,9 +240,9 @@ actor TCPSourceListener is SourceListener
       Fail()
     end
 
-  fun ref _notify_connected(): TCPSourceNotify iso^ ? =>
+  fun ref _notify_connected(source_id: StepId): TCPSourceNotify iso^ ? =>
     try
-      _source_builder(_event_log, _auth, _target_router, _env)
+      _source_builder(source_id, _event_log, _auth, _target_router, _env)
         as TCPSourceNotify iso^
     else
       @printf[I32](

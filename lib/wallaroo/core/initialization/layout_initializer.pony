@@ -40,3 +40,5 @@ trait tag LayoutInitializer
   be create_data_channel_listener(ws: Array[String] val,
     host: String, service: String,
     cluster_initializer: (ClusterInitializer | None) = None)
+
+  be ack_migration_batch_complete(sender: String)
