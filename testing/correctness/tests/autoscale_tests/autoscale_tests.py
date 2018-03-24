@@ -27,7 +27,7 @@ CMD_PYTHON = 'machida --application-module alphabet'
 #CMD_PONY = 'alphabet27'
 #CMD_PYTHON = 'machida --application-module alphabet27'
 
-CYCLES=4
+CYCLES=1
 APIS = {'pony': CMD_PONY, 'python': CMD_PYTHON}
 
 #
