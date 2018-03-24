@@ -27,7 +27,7 @@ CMD_PYTHON = 'machida --application-module alphabet'
 #CMD_PONY = 'alphabet27'
 #CMD_PYTHON = 'machida --application-module alphabet27'
 
-CYCLES=4
+CYCLES=1
 APIS = {'pony': CMD_PONY, 'python': CMD_PYTHON}
 
 #
@@ -38,21 +38,21 @@ SETUP_TEST_NAME_FMT = 'test_setup_{api}_{size}_workers'
 SIZES = range(10, 51, 10)
 
 
-def create_setup_test(api, cmd, workers):
-    """
-    Create a setup test for a given `api` `cmd` with a cluster size `workers`
-    """
-    test_name = SETUP_TEST_NAME_FMT.format(api=api, size=workers)
-    def f():
-        autoscale_sequence(cmd, ops=[], cycles=1, initial=workers)
-    f.func_name = test_name
-    globals()[test_name] = f
+# def create_setup_test(api, cmd, workers):
+#     """
+#     Create a setup test for a given `api` `cmd` with a cluster size `workers`
+#     """
+#     test_name = SETUP_TEST_NAME_FMT.format(api=api, size=workers)
+#     def f():
+#         autoscale_sequence(cmd, ops=[], cycles=1, initial=workers)
+#     f.func_name = test_name
+#     globals()[test_name] = f
 
 # Programmatically create the tests, do the name mangling, and place them
 # in the global scope for pytest to find
-for api, cmd in APIS.items():
-    for workers in SIZES:
-        create_setup_test(api, cmd, workers)
+# for api, cmd in APIS.items():
+#     for workers in SIZES:
+#         create_setup_test(api, cmd, workers)
 
 
 #
