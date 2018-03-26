@@ -293,7 +293,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     ifdef "wtest" then
       try
         conn.set_so_rcvbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "DATA_CHANNEL", "RCV").u32()?)
+          "W_BUFSIZ", "DATA_CHANNEL", "RCV").u32()?)
       end
     end
     conn.expect(4)
@@ -304,7 +304,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     ifdef "wtest" then
       try
         sock.set_so_sndbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "DATA_CHANNEL", "SND").u32()?)
+          "W_BUFSIZ", "DATA_CHANNEL", "SND").u32()?)
       end
     end
 

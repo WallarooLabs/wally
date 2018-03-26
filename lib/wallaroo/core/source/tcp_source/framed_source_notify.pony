@@ -178,7 +178,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     ifdef "wtest" then
       try
         conn.set_so_rcvbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "TCP_SOURCE", "RCV").u32()?)
+          "W_BUFSIZ", "TCP_SOURCE", "RCV").u32()?)
       end
     end
     conn.expect(_header_size)

@@ -1030,7 +1030,7 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
     ifdef "wtest" then
       try
         conn.set_so_sndbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "BOUNDARY", "SND").u32()?)
+          "W_BUFSIZ", "BOUNDARY", "SND").u32()?)
       end
     end
     conn.expect(4)

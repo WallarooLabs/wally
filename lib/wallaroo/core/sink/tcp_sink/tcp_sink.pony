@@ -888,7 +888,7 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
     ifdef "wtest" then
       try
         conn.set_so_sndbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "TCP_SINK", "SND").u32()?)
+          "W_BUFSIZ", "TCP_SINK", "SND").u32()?)
       end
     end
 

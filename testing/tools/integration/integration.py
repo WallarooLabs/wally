@@ -46,6 +46,13 @@ def set_logging(name='', level=logging.INFO, fmt=DEFAULT_LOG_FMT):
     stream_handler.setFormatter(logging.root.formatter)
     logging.root.addHandler(stream_handler)
 
+def getenv3(first, second, third):
+    r = os.getenv(first + '_' + second + '_' + third)
+    if r is None:
+        r = os.getenv(first + '_' + second)
+        if r is None:
+            r = os.getenv(first)
+    return r
 
 # Error classes
 class StopError(Exception):
@@ -227,6 +234,13 @@ class TCPReceiver(StoppableThread):
             self.event.set()
             while not self.stopped():
                 (clientsocket, address) = self.sock.accept()
+                r = getenv3("INT_BUFSIZ", self.__base_name__.upper(), "RCV")
+                if r != None:
+                    bytes = int(r)
+                    logging.debug("Calling setsockopt(..., SO_RCVBUF, %d) for %s", bytes, self.__base_name__)
+                    clientsocket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, bytes)
+                else:
+                    logging.debug("Skipping setsockopt(..., SO_RCVBUF,...) for %s", self.__base_name__)
                 cl = SingleSocketReceiver(clientsocket, self.data, self.mode,
                                           self.header_fmt,
                                           name='{}-{}'.format(

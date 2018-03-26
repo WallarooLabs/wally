@@ -156,11 +156,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     ifdef "wtest" then
       try
         conn.set_so_rcvbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "CONTROL_CHANNEL", "RCV").u32()?)
+          "W_BUFSIZ", "CONTROL_CHANNEL", "RCV").u32()?)
       end
       try
         conn.set_so_sndbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "CONTROL_CHANNEL", "SND").u32()?)
+          "W_BUFSIZ", "CONTROL_CHANNEL", "SND").u32()?)
       end
     end
     ****/
@@ -393,11 +393,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     ifdef "wtest" then
       try
         conn.set_so_rcvbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "CONTROL_CHANNEL", "RCV").u32()?)
+          "W_BUFSIZ", "CONTROL_CHANNEL", "RCV").u32()?)
       end
       try
         conn.set_so_sndbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "CONTROL_CHANNEL", "SND").u32()?)
+          "W_BUFSIZ", "CONTROL_CHANNEL", "SND").u32()?)
       end
     end
     ****/

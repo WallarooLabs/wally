@@ -995,7 +995,7 @@ class MetricsSinkNotify is _MetricsSinkNotify
     ifdef "wtest" then
       try
         sock.set_so_sndbuf(EnvironmentVar.get3(
-          "WT_BUFSIZ", "METRICS", "SND").u32()?)
+          "W_BUFSIZ", "METRICS", "SND").u32()?)
       end
     end
 		let connect_msg = HubProtocol.connect()
