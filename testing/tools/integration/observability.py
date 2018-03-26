@@ -160,15 +160,15 @@ class ObservabilityNotifier(StoppableThread):
             try:
                 query_result = self.query_func()
             except Exception as err:
-                self.error = ObservabilityQueryError(
-                    "Query function '{}' has experienced an error:\n{}({})"
-                    .format(self.query_func_name, type(err).__name__,
-                            str(err)))
                 # sleep and retry but only if timeout hasn't elapsed
                 if (time.time() - started) <= self.timeout:
                     time.sleep(self.period)
                     continue
                 else:  # Timeout has elapsed, return this error!
+                    self.error = ObservabilityQueryError(
+                        "Query function '{}' has experienced an error:\n{}({})"
+                        .format(self.query_func_name, type(err).__name__,
+                                str(err)))
                     self.stop()
                     break
 
