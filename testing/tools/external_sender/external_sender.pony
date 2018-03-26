@@ -202,4 +202,5 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     _env.err.print("Failed to connect")
+    _env.exitcode(1)
     conn.dispose()

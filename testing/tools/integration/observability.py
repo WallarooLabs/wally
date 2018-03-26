@@ -15,6 +15,7 @@
 
 from copy import deepcopy
 import json
+import logging
 import time
 from types import FunctionType
 from functools import partial
@@ -29,6 +30,10 @@ class ObservabilityTimeoutError(TimeoutError):
 
 
 class ObservabilityQueryError(Exception):
+    pass
+
+
+class ObservabilityResponseError(Exception):
     pass
 
 
@@ -60,7 +65,14 @@ def partitions_query(host, port):
     information.
     """
     stdout = external_sender_query(host, port, 'partition-query')
-    return json.loads(stdout)
+    try:
+        return json.loads(stdout)
+    except Exception as err:
+        e = ObservabilityResponseError("Failed to deserialize observability"
+                                      " response:\n{!r}".format(stdout))
+        logging.error(e)
+        raise
+
 
 
 def cluster_status_query(host, port):
@@ -68,7 +80,13 @@ def cluster_status_query(host, port):
     Query the worker at the given address for its cluster status information.
     """
     stdout = external_sender_query(host, port, 'cluster-status')
-    return json.loads(stdout)
+    try:
+        return json.loads(stdout)
+    except Exception as err:
+        e = ObservabilityResponseError("Failed to deserialize observability"
+                                      " response:\n{!r}".format(stdout))
+        logging.error(e)
+        raise
 
 
 def partition_counts_query(host, port):
@@ -77,7 +95,13 @@ def partition_counts_query(host, port):
     information.
     """
     stdout = external_sender_query(host, port, 'partition-counts')
-    return json.loads(stdout)
+    try:
+        return json.loads(stdout)
+    except Exception as err:
+        e = ObservabilityResponseError("Failed to deserialize observability"
+                                      " response:\n{!r}".format(stdout))
+        logging.error(e)
+        raise
 
 
 def get_func_name(f):
@@ -140,8 +164,14 @@ class ObservabilityNotifier(StoppableThread):
                     "Query function '{}' has experienced an error:\n{}({})"
                     .format(self.query_func_name, type(err).__name__,
                             str(err)))
-                self.stop()
-                break
+                # sleep and retry but only if timeout hasn't elapsed
+                if (time.time() - started) <= self.timeout:
+                    time.sleep(self.period)
+                    continue
+                else:  # Timeout has elapsed, return this error!
+                    self.stop()
+                    break
+
             # Run tests, collect results
             errors = {}
             for t in self.tests:
