@@ -70,11 +70,9 @@ wallaroo_unit_tests:
 machida_build: $(MACHIDA_BUILD)/machida
 
 -include $(MACHIDA_PATH)/machida.d
+$(MACHIDA_BUILD)/machida: EXTRA_PONYCFLAGS= --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD)
 $(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a
-	$(eval original_PONYCFLAGS := $(PONYCFLAGS))
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS) --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD))
 	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
-	$(eval PONYCFLAGS := $(original_PONYCFLAGS))
 
 $(MACHIDA_BUILD)/libpython-wallaroo.a: $(MACHIDA_BUILD)/python-wallaroo.o
 	$(QUIET)ar rvs $(MACHIDA_BUILD)/libpython-wallaroo.a $(MACHIDA_BUILD)/python-wallaroo.o
