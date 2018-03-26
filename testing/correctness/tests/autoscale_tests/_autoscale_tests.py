@@ -288,7 +288,7 @@ def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
             print("Autoscale Sequence test had the following the error "
                   "message:\n{}".format(err.as_error))
         if hasattr(err, 'runners'):
-            if not isinstance(err, PipelineTestError):
+            if filter(lambda r: r.poll() != 0, err.runners):
                 outputs = runners_output_format(err.runners,
                         from_tail=5, filter_fn=lambda r: r.poll() != 0)
                 print("Some autoscale Sequence runners exited badly. "

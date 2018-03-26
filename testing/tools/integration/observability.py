@@ -55,7 +55,7 @@ def external_sender_query(host, port, query_type):
         assert(success)
     except AssertionError:
         raise AssertionError("Failed to query cluster for '{}' with the "
-                             "following error:\n:{}".format(t, stdout))
+                             "following error:\n{}".format(t, stdout))
     return stdout
 
 
