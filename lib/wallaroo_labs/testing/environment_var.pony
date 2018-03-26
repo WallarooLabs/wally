@@ -62,7 +62,7 @@ primitive EnvironmentVar
     """
     Wrapper around FFI call to getenv(3) with quasi-hierarchical
     variable naming scheme.  An example call of
-    get2("TEST", "FOO", "BAR" where join = "_") will return the
+    get3("TEST", "FOO", "BAR" where join = "_") will return the
     value of the first environment variable in the following list:
       1. TEST_FOO_BAR
       2. TEST_FOO
