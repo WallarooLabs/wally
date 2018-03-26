@@ -101,6 +101,7 @@ from metrics_parser import (MetricsData,
 
 from observability import (cluster_status_query,
                            ObservabilityNotifier,
+                           ObservabilityResponseError,
                            ObservabilityTimeoutError,
                            partition_counts_query,
                            partitions_query)
