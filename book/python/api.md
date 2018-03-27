@@ -4,7 +4,7 @@ The Wallaroo Python API allows developers to create Wallaroo applications in Pyt
 
 ## Overview
 
-In order to create a Wallaroo application in Python, developers need to create functions and classes that provide the required interfaces for each step in their pipeline, and then connect them together in a topology structure that is returned by the entry-point function `application_setup`.
+In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each step in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function `application_setup`.
 
 The recommended way to create your topology structure is by using the [ApplicationBuilder](#wallarooapplicationbuilder) in the `wallaroo` module.
 
@@ -13,24 +13,26 @@ The recommended way to create your topology structure is by using the [Applicati
 * [Application Setup](#application-setup)
 * [ApplicationBuilder](#applicationbuilder)
 * [Computation](#computation)
+* [State](#state)
+* [StateComputation](#statecomputation)
 * [Data](#data)
 * [Key](#key)
 * [Partition](#partition)
-* [TCP Sink Encoder](#tcp-sink-encoder)
-* [TCP Source Decoder](#tcp-source-decoder)
-* [Kafka Sink Encoder](#kafka-sink-encoder)
-* [Kafka Source Decoder](#kafka-source-decoder)
-* [State](#state)
-* [StateComputation](#statecomputation)
-* [TCPSourceConfig](#tcpsourceconfig)
-* [TCPSinkConfig](#tcpsinkconfig)
+* [Sink](#sink)
+* [TCPSink](#tcpsink)
+* [KafkaSink](#kafkasink)
+* [Sink Encoder](#sink-encoder)
+* [Source](#source)
+* [TCPSource](#tcpsource)
+* [KafkaSource](#kafkasource)
+* [Source Decoder](#source-decoder)
 * [Inter-worker serialization](#inter-worker-serialization)
 
 ### Application Setup
 
-After Machida has loaded a Wallaroo Python application module, it executes its entry point function, `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. Therefore, any Wallaroo Python application must provide this function.
+After Machida loads a Wallaroo Python application module, it executes its entry point function, `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. A Wallaroo Python application must provide this function.
 
-The `wallaroo` module provides an [ApplicationBuilder](#wallarooapplicationbuilder) that facilitates the creation of this data structure. When `ApplicationBuilder` is used, a topology can be built using its methods, and then its structure can be returned by calling `ApplicationBuilder.build()`.
+The `wallaroo` module provides an [ApplicationBuilder](#wallarooapplicationbuilder) that facilitates the creation of this data structure. When `ApplicationBuilder` is used, a topology can be built using its methods and its structure can be returned by calling `ApplicationBuilder.build()`.
 
 For a simple application with a decoder, computation, and encoder, this function may look like
 
@@ -63,7 +65,11 @@ Create a new application with the name `name`.
 
 ##### `new_pipeline(name, source_config)`
 
-Create a new pipeline with the name `name` and a source config object.
+Create a new pipeline.
+
+`name` must be a string.
+
+`source_config` must be [SourceConfig](#sourceconfig).
 
 If you're adding more than one pipeline, make sure to call `done()` before creating another pipeline.
 
@@ -73,18 +79,18 @@ Close the current pipeline object.
 
 This is necessary if you intend to add another pipeline.
 
-##### `to(computation_f)`
+##### `to(computation)`
 
 Add a stateless computation _function_ to the current pipeline.
 
-Note that this method takes a _function_ decorated with the `@wallaroo.computation` decorator. See [Computation](#computation).
+`computation` must be a [Computation](#computation).
 
-##### `to_parallel(computation_f)`
+##### `to_parallel(computation)`
 
 Add a stateless computation _function_ to the current pipeline.
 Creates one copy of the computation per worker in the cluster allowing you to parallelize stateless work.
 
-Note that this method takes a _function_, decorated with the `@wallaroo.computation` decorator. See [Computation](#computation).
+`computation` must be a [Computation](#computation).
 
 ##### `to_stateful(computation, state_class, state_name)`
 
@@ -94,7 +100,7 @@ Add a state computation _function_, along with a [State](#state) _class_ and `st
 
 `state_class` must be a [State](#state).
 
-`state_name` must be a str. `state_name` is the name of the state object that we will run state computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and, in this way, acts as a sort of namespace.
+`state_name` must be a str. `state_name` is the name of the state object that we will run state computations against. You can share the object across pipelines by using the same name. Using different names for different partitions keeps them separate, acting as a namespace.
 
 ##### `to_state_partition(computation, state, state_partition_name, partition_function, partition_keys)`
 
@@ -104,7 +110,7 @@ Add a partitioned state computation to the current pipeline.
 
 `state` must be [State](#state).
 
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions keeps them separate acting as a namespace.
 
 `partition_function` must be a [Partition](#partition).
 
@@ -118,7 +124,7 @@ Add a partitioned state computation to the current pipeline.
 
 `state` must be [State](#state).
 
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and, in this way, acts as a sort of namespace.
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions keeps them separate acting as a namespace.
 
 `partition_function` must be a [Partition](#partition).
 
@@ -126,11 +132,17 @@ Add a partitioned state computation to the current pipeline.
 
 ##### `to_sink(sink_config)`
 
-Add a sink to the end of a pipeline. `sink_config` must be an instance of a sink configuration.
+Add a sink to the end of a pipeline.
+
+`sink_config` must be a [SinkConfig](#sinkconfig).
 
 ##### `to_sinks(sink_configs)`
 
-Add multiple sink to the end of a pipeline. `sink_configs` must be a list of sink configuration instances. Currently, the same pipeline output is sent via all sinks.
+Add multiple sinks to the end of a pipeline.
+
+`sink_configs` must be a list of [SinkConfig](#sinkconfig).
+
+At the moment, the same pipeline output is sent via all sinks. The ability to determine what output should be sent to which sinks will be added in a future version of Wallaroo.
 
 ##### `build()`
 
@@ -140,175 +152,59 @@ Return the complete list of topology tuples. This is the topology structure Wall
 
 A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. A stateless computation has _no side effects_.
 
-A `computation` function must be decorated with the `@wallaroo.computation(name="computation name")` decorator, which takes the name of the computation as an argument.
+A `computation` function must be decorated with one of the `@wallaroo.computation` or `@wallaroo.computation_multi` decorators, which take the name of the computation as their only argument.
 
-##### `compute(data)`
+##### `@wallaroo.computation(name)`
 
-Use `data` to perform a computation and return a new output. `data` is the python object the previous step in the pipeline returned.
+Create a Wallaroo Computation from a function that takes `data` as its only argument and returns a single output.
 
-##### `compute_multi(data)`
+`name` is the name of the computation in the pipeline, and must be unique.
 
-Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects. Each item in the list will arrive individually at the next step, i.e. not as a list.
+`data` will be the output of the previous function in the pipeline.
 
-#### Example Computations
+###### Example
 
 A Computation that doubles an integer, or returns 0 if its input was not an int:
 
 ```python
-@wallaroo.computation(name="double")
-def compute(data):
+@wallaroo.computation(name="Double or Zero")
+def double_or_zero(data):
     if isinstance(data, int):
         return data*2
     else
         return 0
 ```
 
-A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, we filter (drop) the message by returning `None`.
+##### `@wallaroo.computation_multi(name)`
+
+Create a Wallaroo Computation from a function that takes `data` as its only argument and returns a multiple outputs (as a list).
+
+`name` is the name of the computation in the pipeline, and must be unique.
+
+`data` will be the output of the previous function in the pipeline.
+
+The output must be a list of items or `None`. Each item in the list will arrive individually at the next step, i.e. not as a list.
+
+###### Example
+
+A Computation that returns both its input integer and double that value. If the incoming data isn't an integer, it filters (drops) the message by returning `None`.
 
 ```python
-@wallaroo.computation_multi(name="doubledouble"):
-def compute_multi(data):
+@wallaroo.computation_multi(name="Identity and Double"):
+def identity_and_double(data):
     if isinstance(data, int):
         return [data, data*2]
     else
         return None
 ```
 
-### Data
-
-Data is the object that is passed to a [Computation](#computation)'s and a [StateComputation](#statecomputation)'s method. It is a plain Python object and can be as simple or as complex as you would like it to be.
-
-It is important to ensure that data returned is always immutable or unique to avoid any unexpected behavior due to the asynchronous execution nature of Wallaroo.
-
-### Key
-
-Partition Keys must correctly support the `__eq__` (`==`) and `__hash__` operators. Some built-in types, such as strings and numbers, already support these out of the box. If you are defining your own types, however, you must also implement the `__eq__` and `__hash__` methods.
-
-### Partition
-
-A partition function must be decorated with the `@wallaroo.partition` decorator and return the appropriate [Key](#key) for `data`.
-
-#### Example Partition
-
-An example that partitions words for a word count based on their first character, and buckets all other cases to the empty string key:
-
-```python
-@wallaroo.partition
-def partition(data):
-    try:
-        return data[0].lower() if data[0].isalpha() else ''
-    except:
-        return ''
-```
-
-### TCP Sink Encoder
-
-The TCP Sink Encoder is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out over a TCP connection.
-
-Your function must be decorated with `@wallaroo.encoder`.
-
-##### `encoder(data)`
-
-Return a `bytes` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes`, and what information to keep or discard.
-
-#### Example encoder for a TCPSinkConfig
-
-A complete `TCPSinkConfig` encoder example that takes a list of integers and encodes it to a sequence of big-endian longs preceded by a big-endian short representing the number of integers in the list:
-
-```python
-@wallaroo.encoder
-def encoder(data):
-    fmt = '>H{}'.format('L'*len(data))
-    return struct.pack(fmt, len(data), *data)
-```
-
-### TCP Source Decoder
-
-The TCP Source Decoder is responsible for two tasks:
-1. Telling Wallaroo _how many bytes to read_ from its input connection.
-2. Converting those bytes into an object that the rest of the application can process.
-
-Your function must be decorated with `@wallaroo.decoder(header_length=4, length_fmt=">I")`.
-
-*NOTE:* The arguments supplied to the above decorator are examples and you should replace them with the proper values needed by your decoder function.
-
-##### `header_length`
-
-An integer representing the number of bytes from the beginning of an incoming message to return to the function that reads the payload length.
-
-##### `length_fmt`
-
-A format string that represents how the message header is encoded. A common encoding used in Wallaroo is a big-endian 32-bit unsigned integer, which can be decoded with the [struct module's](https://docs.python.org/2/library/struct.html) help:
-
-```python
-struct.unpack(">I", bs)
-```
-
-##### `decoder(bs)`
-
-Return a python a python object of the type the next step in the pipeline expects.
-
-`bs` is a `bytes` of the length returned by [payload_length](#payload-length(bs)), and it is up to the developer to translate that into a python object.
-
-#### Example decoder for a TCPSourceConfig
-
-A complete `TCPSourceConfig` decoder example that decodes messages with a 32-bit unsigned integer _payload\_length_ and a character followed by a 32-bit unsigned int in its _payload_:
-
-```python
-@wallaroo.decoder(header_length=4, length_fmt=">I")
-def decoder(bs):
-    return struct.unpack('>1sL', bs)
-```
-
-### Kafka Sink Encoder
-
-The Kafka Sink Encoder is responsible for taking the output of the last computation in a pipeline and converting it into a `bytes` for Wallaroo to send out to a Kafka sink, along with a `key` or `None`.
-
-To do this, create an encoder function, in the same way you would for a TCP Sink Encoder, but Return a tuple of `(bytes, key)` that can be sent over the network. It is up to the developer to determine how to translate `data` into a `bytes` and `key`, and what information to keep or discard.
-
-Your encoder function must be decorated with `@wallaroo.encoder`.
-
-#### Example encoder for a KafkaSinkConfig
-
-A complete `KafkaSinkConfig` encoder example that takes a word and sends it to the partition corresponding to the first letter of the word:
-
-```python
-@wallaroo.encoder
-def encoder(data):
-    word = data[:]
-    letter_key = data[0]
-    return (word, letter_key)
-```
-
-### Kafka Source Decoder
-
-The Kafka Source Decoder is responsible for converting bytes into an object that the rest of the application can process. To do this, create a decoder function, in the same way you would for a TCP Source Decoder.
-
-##### `decoder(data)`
-
-Return Python object of the type the next step in the pipeline expects.
-
-`data` is a `bytes` object representing the incoming Kafka message, and it is up to the developer to translate that into a Python object.
-
-Your decoder function must be decorated with `@wallaroo.decoder`.
-
-#### Example decoder for a KafkaSourceConfig
-
-A complete `KafkaSourceConfig` decoder example that decodes messages with a 32-bit unsigned int in its _payload_:
-
-```python
-@wallaroo.decoder(header_length=4, length_fmt=">I")
-def decoder(bs):
-    return struct.unpack('>1sL', bs)
-```
-
 ### State
 
-State is an object that is passed to the [StateComputation's](#statecomputation) `compute` method. It is a plain Python object and can be as simple or as complex as you would like.
+State is an object that is passed to the [StateComputation](#statecomputation) function. It is a plain Python object and can be as simple or as complex as you would like.
 
 A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
 
-In either case, it is up to the developer to provide a side-effect safe value for the Computation to return!
+In either case, it is up to the developer to provide a side-effect safe value for the computations to return!
 
 #### Example State
 
@@ -342,46 +238,251 @@ In order to provide resilience, Wallaroo needs to keep track of state changes, o
 
 Similarly to a Computation, a StateComputation function must be decorated with the `@wallaroo.state_computation` decorator.
 
-##### `compute(data, state)`
+A `state_computation` function must be decorated with one of the `@wallaroo.state_computation` or `@wallaroo.state_computation_multi` decorators, which take the name of the computation as their only argument.
 
-`data` is anything that was returned by the previous step in the pipeline, and `state` is the [State](#state) that was defined for this step in the pipeline definition.
+#### `@wallaroo.state_computation(name)`
 
-Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. Returning `None` will stop processing that message and no messages will be sent to the next step. The second element is a boolean value instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
+Create a Wallaroo StateComputation from a function that takes `data` and `state` as its arguments and returns a tuple of `(output, save_state`).
 
-Why wouldn't we always return `True`? There are two answers:
+`name` is the name of the computation in the pipeline, and must be unique.
 
-1. Your state computation might not have updated the state, in which case saving its state for recovery is wasteful.
-2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a trade-off that can be made between performance and safety.
+`data` is the output of the previous step in the pipeline.
 
-##### `compute_multi(data, state)`
+`output` is the output data of the function (and will become the next step's input data). If `output` is `None`, no message will be delivered to the next step in the pipeline as a result of this iteration of the StateComputation.
 
-Same as `compute` but the first element of the return tuple is a list of messages to send on to our next step. Allows taking a single input message and creating multiple outputs. Each item in the list will arrive individually at the next step; i.e. not as a list. Wrap this function in `@wallaroo.computation_multi`.
+`save_state` is a boolean indicating whether Wallaroo should persist the new state. This is useful if your application has infrequent but large state changes, where it would be beneficial to programmatically control when Wallaroo _persists_ a new state to its recovery logs.
 
-#### Example StateComputation
+##### Example
 
-An example StateComputation that keeps track of the maximum integer value it has seen so far:
+An example StateComputation that keeps track of the maximum integer value it has seen so far, and only persists the state if a new max has been set.
 
 ```python
-@wallaroo.state_computation(name='max'):
-def compute(data, state):
-    try:
-        state.update(data)
-    except TypeError:
-        pass
-    return (state.get_max(), True)
+@wallaroo.state_computation(name='Compute Max'):
+def compute_max(data, state):
+    before = state.get_max()
+    state.update(data)
+    out = state.get_max()
+    return (out, True if out > before else False)
 ```
 
-### TCPSourceConfig
+#### `@wallaroo.state_computation_multi(name)`
 
-A `TCPSourceConfig` object specifies the host, port, and encoder to use for a TCP source connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `new_pipeline`.
+Create a Wallaroo StateComputation from a function that takes `data` and `state` as its arguments and returns a tuple of `(outputs, save_state`).
 
-The `decoder` argument must decorated as described in [TCP Source Decoder](#tcp-source-decoder).
+`name` is the name of the computation in the pipeline, and must be unique.
 
-### TCPSinkConfig
+`data` is the output of the previous step in the pipeline.
 
-A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `to_sink` or as a member of the list passed to `to_sinks`.
+`outputs` is a list of output data of the function or `None`. Each item in the list will arrive at the next step in the pipeline as an individual message. If `outputs` is `None`, no messages will be delivered to the next step in the pipeline as a result of this iteration of the StateComputation.
 
-The `encoder` argument must decorated as described in [TCP Source Encoder](#tcp-source-encoder).
+`save_state` is a boolean indicating whether Wallaroo should persist the new state. This is useful if your application has infrequent but large state changes, where it would be beneficial to programmatically control when Wallaroo _persists_ a new state to its recovery logs.
+
+##### Example
+
+An example StateComputation that keeps track of the longest sentence it has seen so far, and outputs the words in each sentence as individual words to be counted in a subsequent `word_count` step.
+
+```python
+@wallaroo.state_computation(name='Longest Sentence and Split Words'):
+def longest_sentence_and_split_words(data, state):
+    before = state.longest()
+    longest = 0
+    outputs = []
+    for sentence in data.strip().split('.'):
+        words = sentence.split(' ')
+        longest = max(longest, len(words))
+        outputs.extend(words)
+    # only update if there's a longer sentence!
+    if longest > before:
+        state.update(data)
+    return (outputs, True longest > before else False)
+```
+
+### Data
+
+Data is the object that is passed to [Computation](#computation)s and [StateComputation](#statecomputation)s. It is a plain Python object and can be as simple or as complex as you would like it to be.
+
+It is important to ensure that data returned is always immutable or unique to avoid any unexpected behavior due to the asynchronous execution nature of Wallaroo.
+
+### Key
+
+Partition Keys must correctly support the `__eq__` (`==`) and `__hash__` operators. Some built-in types, such as strings and numbers, already support these out of the box. If you are defining your own types, however, you must also implement the `__eq__` and `__hash__` methods.
+
+### Partition
+
+A partition function must be decorated with the `@wallaroo.partition` decorator and return the appropriate [Key](#key) for `data`.
+
+#### Example Partition
+
+An example that partitions words for a word count based on their first character, and buckets all other cases to the empty string key:
+
+```python
+@wallaroo.partition
+def partition(data):
+    try:
+        return data[0].lower() if data[0].isalpha() else ''
+    except:
+        return ''
+```
+
+### Sink
+
+Wallaroo currently supports two types of sinks: [TCPSink](#tcpsink), [KafkaSink](#kafkasink).
+
+#### TCPSink
+
+A `TCPSink` is used to send output to an external system using TCP.
+
+The `wallaroo.TCPSinkConfig` class is used to define the properties of the `TCPSink`, which will be created by Wallaroo as part of the pipeline initialization process.
+
+A `wallaroo.TCPSinkConfig` may be passed on its own to [to_sink](#to_sinksink_config) or as part of a list to [to_sinks](#to_sinkssink_configs).
+
+##### `wallaroo.TCPSinkConfig(host, port, encoder)`
+
+The class used to define the properties of a Wallaroo TCPSink.
+
+`host` is a string representing the host address.
+
+`port` is a string representing the port number.
+
+`encoder` is a [Sink Encoder](#sink-encoder) that returns `bytes`.
+
+#### KafkaSink
+
+A `KafkaSink` is used to send output to an external Kafka cluster.
+
+The `wallaroo.KafkaSinkConfig` class is used to define the properties of the `KafkaSink`, which will be created by Wallaroo as part of the pipeline initialization process.
+
+##### `wallaroo.KafkaSinkConfig(topic, brokers, log_level, max_produce_buffer_ms, max_message_size, encoder)`
+
+The class used to define the properties of a Wallaroo KafkaSink.
+
+`topic` is a string.
+
+`brokers` is a list of `(host, port)` pairs of strings.
+
+`log_level` is one of the strings `Fine`, `Info`, `Warn`, `Error`.
+
+`max_produce_buffer_ms` is an integer representing the `max_produce_buffer` value in milliseconds. The default value is `0`.
+
+`max_message_size` is the maximum kafka message buffer size in bytes. The default vlaue is `100000`.
+
+`encoder` is a [Sink Encoder](#sink-encoder) that returns `(bytes, key)`, where `key` may be a string or `None`.
+
+#### Sink Encoder
+
+The Sink Encoder is responsible for taking the output of the last computation in a pipeline and converting it into the data type that is accepted by the Sink.
+
+To define a sink encoder, use the `@wallaroo.encoder` decorator to decorate a function that takes `data` and returns the correct data type for the sink.
+
+It is up to the developer to determine how to translate `data` into the output data, and what information to keep or discard.
+
+#### `@wallaroo.encoder`
+
+The decorator used to define [sink encoders](#sink-encoder).
+
+##### Example encoder for a TCPSink
+
+A complete [TCPSink](#tcpsink) encoder example that takes a list of integers and encodes it to a sequence of big-endian longs preceded by a big-endian short representing the number of integers in the list:
+
+```python
+@wallaroo.encoder
+def tcp_encoder(data):
+    fmt = '>H{}'.format('L'*len(data))
+    return struct.pack(fmt, len(data), *data)
+```
+
+##### Example encoder for a Kafka Sink
+
+A complete `KafkaSink` encoder example that takes a word and sends it to the partition corresponding to the first letter of the word:
+
+```python
+@wallaroo.encoder
+def kafka_encoder(data):
+    word = data[:]
+    letter_key = data[0]
+    return (word, letter_key)
+```
+
+### Source
+
+Wallaroo currently supports two types of soruces: [TCPSource](#tcpsource), [KafkaSource](#kafkasource).
+
+#### TCPSource
+
+The TCP Source receives data from an external TCP connection and decodes it into the data type that the first computation in its pipeline expects.
+
+The `wallaroo.TCPSourceConfig` class is used to define the properties of the TCP Source, which will be created by Wallaroo as part of the pipeline initialization process.
+
+An instance of `TCPSourceConfig` is a required argument of [new_pipeline](#new_pipelinename-source_config).
+
+##### `wallaroo.TCPSourceConfig(host, port, decoder)`
+
+The class used to define the properties of a Wallaroo TCPSource.
+
+`host` is a string representing the host address.
+
+`port` is a string representing the port number.
+
+`decoder` is a [Source decoder](#source-decoder).
+
+#### KafkaSource
+
+A `KafkaSource` is used to get input from an external Kafka cluster.
+
+The `wallaroo.KafkaSourceConfig` class is used to define the properties of the `KafkaSource`, which will be created by Wallaroo as part of the pipeline initialization process.
+
+An instance of `KafkaSourceConfig` is a required argument of [new_pipeline](#new_pipelinename-source_config).
+
+##### `wallaroo.KafkaSourceConfig(topic, brokers, log_level, decoder)`
+
+The class used to define the properties of a Wallaroo KafkaSink.
+
+`topic` is a string.
+
+`brokers` is a list of `(host, port)` pairs of strings.
+
+`log_level` is one of the strings `Fine`, `Info`, `Warn`, `Error`.
+
+`decoder` is a [Source Decoder](#source-decoder).
+
+#### Source Decoder
+
+The Source Decoder is responsible for two tasks:
+
+1. Telling Wallaroo _how many bytes to read_ from its input source.
+2. Converting those bytes into an object that the rest of the application can process.
+
+To define a source decoder, use the [@wallaroo.decoder](#@wallaroo.decoder) decorator to decorate a function that takes `bytes` and returns the correct data type for the next step in the pipeline.
+
+It is up to the developer to determine how to translate `bytes` into the next step's input data type, and what information to keep or discard.
+
+#### `@wallaroo.decoder(header_length, length_fmt)`
+
+The decorator used to define [source decoders](#source-decoder).
+
+`header_length` is the integer number of bytes to read for the header. The default value is 4.
+
+`length_fmt` is the [struct.unpack format string](https://docs.python.org/2/library/struct.html#format-strings) to use when unpacking the header into an integer. This value is then used to determine how many bytes should be read for the `bytes` argument that will be passed to the decorated function. The default value is `">I"`.
+
+##### Example decoder for a TCPSource
+
+A complete `TCPSource` decoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bit unsigned int in its _payload_:
+
+```python
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def decoder(bs):
+    return struct.unpack('>1sL', bs)
+```
+
+#### Example decoder for a KafkaSource
+
+A complete `KafkaSource` decoder example that decodes messages with a 32-bit unsigned int in its _payload_:
+
+```python
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def decoder(bs):
+    return struct.unpack('>1sL', bs)
+```
 
 ### Inter-worker serialization
 
