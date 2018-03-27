@@ -41,8 +41,8 @@ CUSTOM_PYTHONPATH += $(SEQUENCE_WINDOW_PYTHON_PATH)
 build-testing-correctness-tests-log_rotation: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests-log_rotation: build-testing-tools-external_sender
 build-testing-correctness-tests-log_rotation: build-machida
-integration-tests-testing-correctness-tests-log_rotation: build-testing-correctness-tests-log_rotation
-integration-tests-testing-correctness-tests-log_rotation: log_rotation_tests
+#integration-tests-testing-correctness-tests-log_rotation: build-testing-correctness-tests-log_rotation
+#integration-tests-testing-correctness-tests-log_rotation: log_rotation_tests
 
 # standard rules generation makefile
 include $(rules_mk_path)
