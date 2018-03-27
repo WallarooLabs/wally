@@ -6,7 +6,7 @@ The Wallaroo Python API allows developers to create Wallaroo applications in Pyt
 
 In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each step in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function `application_setup`.
 
-The recommended way to create your topology structure is by using the [ApplicationBuilder](#wallarooapplicationbuilder) in the `wallaroo` module.
+The recommended way to create your topology structure is by using the [ApplicationBuilder](#applicationbuilder) in the `wallaroo` module.
 
 ## Table of Contents
 
