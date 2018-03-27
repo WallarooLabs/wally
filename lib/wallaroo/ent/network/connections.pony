@@ -105,6 +105,13 @@ actor Connections is Cluster
   fun ref _register_disposable(d: DisposableActor) =>
     _disposables.set(d)
 
+  be unregister_disposable(d: DisposableActor) =>
+    _unregister_disposable(d)
+
+  fun ref _unregister_disposable(d: DisposableActor) =>
+    @printf[I32]("connections: unregister_disposable\n".cstring())
+    _disposables.unset(d)
+
   be make_and_register_recoverable_listener(auth: TCPListenerAuth,
     notifier: TCPListenNotify iso,
     recovery_addr_file: FilePath val,

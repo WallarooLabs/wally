@@ -166,6 +166,10 @@ actor RouterRegistry
     end
     _connections.register_disposable(source)
 
+  be unregister_source(source: Source) =>
+    _sources.unset(source)
+    _connections.unregister_disposable(source)
+
   be register_source_listener(source_listener: SourceListener) =>
     _source_listeners.set(source_listener)
     _connections.register_disposable(source_listener)

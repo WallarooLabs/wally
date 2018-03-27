@@ -419,6 +419,13 @@ actor OutgoingBoundary is Consumer
     to be sent but any writes that arrive after this will be
     silently discarded and not acknowleged.
     """
+    @printf[I32]("OutgoingBoundary dispose\n".cstring())
+
+    if _queue.size() > 0 then
+      dispose()
+      return
+    end
+
     @printf[I32]("Shutting down OutgoingBoundary\n".cstring())
     _no_more_reconnect = true
     _timers.dispose()
