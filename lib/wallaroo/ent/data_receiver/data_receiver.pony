@@ -144,11 +144,6 @@ actor DataReceiver is Producer
     None
 
   be report_status(code: ReportStatusCode) =>
-    //!@
-    match code
-    | BoundaryStatus =>
-      @printf[I32]("!@ BoundaryStatus: DataReceiver from %s id: %s\n".cstring(), _sender_name.cstring(), _id.string().cstring())
-    end
     _in_flight_ack_waiter.report_status(code)
     _router.report_status(code)
 

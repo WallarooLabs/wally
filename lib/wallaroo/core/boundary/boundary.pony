@@ -152,9 +152,6 @@ actor OutgoingBoundary is Consumer
   var _reconnect_pause: U64 = 10_000_000_000
   let _timers: Timers = Timers
 
-  //!@
-  var _boundary_status: Bool = false
-
   new create(auth: AmbientAuth, worker_name: String, target_worker: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
@@ -454,20 +451,12 @@ actor OutgoingBoundary is Consumer
     _upstreams.unset(producer)
 
   be report_status(code: ReportStatusCode) =>
-    if not _boundary_status then
-      //!@
-      match code
-      | BoundaryStatus =>
-        @printf[I32]("!@ BoundaryStatus: Boundary to %s id: %s\n".cstring(), _target_worker.cstring(), _step_id.string().cstring())
-      end
-      _in_flight_ack_waiter.report_status(code)
-      try
-        _writev(ChannelMsgEncoder.report_status(code, _auth)?)
-      else
-        Fail()
-      end
+    _in_flight_ack_waiter.report_status(code)
+    try
+      _writev(ChannelMsgEncoder.report_status(code, _auth)?)
+    else
+      Fail()
     end
-    _boundary_status = true
 
   be request_in_flight_ack(upstream_request_id: RequestId,
     requester_id: StepId, upstream_requester: InFlightAckRequester)

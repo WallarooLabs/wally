@@ -78,7 +78,6 @@ class QueueingStepMessageProcessor is StepMessageProcessor
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    @printf[I32]("!@ QUEUING MSG\n".cstring())
     let msg = TypedQueuedStepMessage[D](metric_name, pipeline_time_spent, data,
       i_producer_id, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
       metrics_id, worker_ingress_ts)
