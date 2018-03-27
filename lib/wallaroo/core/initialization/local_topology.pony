@@ -1097,7 +1097,12 @@ actor LocalTopologyInitializer is LayoutInitializer
                     DirectRouter(sink)
                   end
 
-                data_routes(next_id) = sink
+                // Don't add to data_routes unless it's a local sink
+                match sink
+                | let ob: OutgoingBoundary => None
+                else
+                  data_routes(next_id) = sink
+                end
                 built_routers(next_id) = sink_router
               end
             | let pre_stateless_data: PreStatelessData =>
@@ -1477,7 +1482,13 @@ actor LocalTopologyInitializer is LayoutInitializer
                   DirectRouter(sink)
                 end
 
-              data_routes(next_id) = sink
+              // Don't add to data routes unless it's a local sink
+              match sink
+              | let ob: OutgoingBoundary => None
+              else
+                data_routes(next_id) = sink
+              end
+
               built_routers(next_id) = sink_router
             end
           else
