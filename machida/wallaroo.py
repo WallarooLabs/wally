@@ -215,7 +215,7 @@ class KafkaSourceConfig(object):
     def __init__(self, topic, brokers, log_level, decoder):
         """
         topic: string
-        brokers: list of (string, int) tuples with values (HOST, PORT)
+        brokers: list of (string, string) tuples with values (HOST, PORT)
         log_level: string of "Fine", "Info", "Warn", or "Error"
         decoder: decoder
         """
