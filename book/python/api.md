@@ -69,7 +69,7 @@ Create a new pipeline.
 
 `name` must be a string.
 
-`source_config` must be [SourceConfig](#sourceconfig).
+`source_config` must be one of the [SourceConfig](#source) classes.
 
 If you're adding more than one pipeline, make sure to call `done()` before creating another pipeline.
 
@@ -134,13 +134,13 @@ Add a partitioned state computation to the current pipeline.
 
 Add a sink to the end of a pipeline.
 
-`sink_config` must be a [SinkConfig](#sinkconfig).
+`sink_config` must be one of the [SinkConfig](#sink) classes.
 
 ##### `to_sinks(sink_configs)`
 
 Add multiple sinks to the end of a pipeline.
 
-`sink_configs` must be a list of [SinkConfig](#sinkconfig).
+`sink_config` must be a list of [SinkConfig](#sink) classes.
 
 At the moment, the same pipeline output is sent via all sinks. The ability to determine what output should be sent to which sinks will be added in a future version of Wallaroo.
 
