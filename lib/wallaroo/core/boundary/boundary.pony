@@ -934,7 +934,7 @@ actor OutgoingBoundary is Consumer
 
   fun ref _unmute_upstreams() =>
     ifdef debug then
-      @printf[I32]("BACKPRESSURE tcp_sink: Backpressure.release by %s:%s\n".cstring(),
+      @printf[I32]("BACKPRESSURE boundary: Backpressure.release by %s:%s\n".cstring(),
         _host.cstring(), _service.cstring())
     end
     Backpressure.release(_auth)
