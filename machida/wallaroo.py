@@ -17,7 +17,7 @@ import argparse
 from functools import wraps
 import pickle
 import struct
-
+import inspect
 
 def serialize(o):
     return pickle.dumps(o)
@@ -84,11 +84,143 @@ class ApplicationBuilder(object):
         return self
 
     def build(self):
+        self._validate_actions()
         return self._actions
+
+    def _validate_actions(self):
+        self._steps = {}
+        self._pipelines = {}
+        self._states = {}
+        last_action = None
+        has_sink = False
+        # Ensure that we don't add steps unless we are in an unclosed pipeline
+        expect_steps = False
+
+        for action in self._actions:
+            if action[0][0:2] == "to" and not expect_steps:
+                if last_action == "to_sink":
+                    raise WallarooParameterError(
+                        "Unable to add a computation step after a sink. "
+                        "Please declare a new pipeline first.")
+                else:
+                    raise WallarooParameterError(
+                        "Please declare a new pipeline before adding "
+                        "computation steps.")
+
+            if action[0] == "new_pipeline":
+                self._validate_unique_pipeline_name(action[1], action[2])
+                expect_steps = True
+            if action[0] == "to_state_partition_u64":
+                self._validate_unique_step_name(action[1])
+                self._validate_state(action[2], action[3], action[5])
+                self._validate_u64_partition_labels(action[5])
+                self._validate_partition_function(action[4])
+            elif action[0] == "to_state_partition":
+                self._validate_unique_step_name(action[1])
+                self._validate_state(action[2], action[3], action[5])
+                self._validate_unique_partition_labels(action[5])
+                self._validate_partition_function(action[4])
+            elif action[0] == "to_stateful":
+                self._validate_unique_step_name(action[1])
+                self._validate_state(action[2], action[3])
+            elif action[0] == "to_parallel" or action[0] == "to":
+                self._validate_unique_step_name(action[1])
+            elif action[0] == "to_sink":
+                has_sink = True
+                expect_steps = False
+
+            last_action = action[0]
+
+        # After checking all of our actions, we should have seen at least one
+        # pipeline terminated with a sink.
+        if not has_sink:
+            raise WallarooParameterError(
+                "At least one pipeline must define a sink")
+
+    def _validate_unique_step_name(self, computation):
+        if computation.name in self._steps:
+            raise WallarooParameterError((
+                "A computation named {0} is defined more than once. "
+                "Please use unique names for your steps."
+                ).format(repr(computation.name)))
+        else:
+            self._steps[computation.name] = computation
+
+    def _validate_unique_pipeline_name(self, pipeline, source_config):
+        if pipeline in self._pipelines:
+            raise WallarooParameterError((
+                "A computation named {0} is defined more than once. "
+                "Please use unique names for your steps."
+                ).format(repr(computation.name)))
+        else:
+            self._pipelines[pipeline] = source_config
+
+    def _validate_state(self, ctor, name, partitions = None):
+        if name in self._states:
+            (other_ctor, other_partitions) = self._states[name]
+            if other_ctor.state_cls != ctor.state_cls:
+                raise WallarooParameterError((
+                    "A state with the name {0} has already been defined with "
+                    "an different type {1}, instead of {2}."
+                    ).format(repr(name), other_ctor.state_cls, ctor.state_cls))
+            if other_partitions != partitions:
+                raise WallarooParameterError((
+                    "A state with the name {0} has already been defined with "
+                    "an different paritioning scheme {1}, instead of {2}."
+                    ).format(repr(name), repr(other_partitions), repr(partitions)))
+        else:
+            self._states[name] = (ctor, partitions)
+
+    def _validate_u64_partition_labels(self, partitions):
+        for p in partitions:
+            if type(p) != int or p < 0:
+                raise WallarooParameterError((
+                    "{0} is an invalid partition label. to_state_partition_u64 "
+                    "requires non-negative integers for all labels."
+                    ).format(p))
+        self._validate_unique_partition_labels(partitions)
+
+    def _validate_unique_partition_labels(self, partitions):
+        if type(partitions) != list:
+            raise WallarooParameterError(
+                "Partitions lists should be of type list. Got a {0} instead."
+                .format(type(partitions)))
+        if len(set(partitions)) != len(partitions):
+            raise WallarooParameterError(
+                "Partition labels should be uniquely identified via equality "
+                "and support hashing. You might have duplicates or objects "
+                "which can't be used as keys in a dict.")
+
+    def _validate_partition_function(self, partition_function):
+        if not getattr(partition_function, "partition", None):
+            raise WallarooParameterError(
+                "Partition function is missing partition method. "
+                "Did you forget to use the @wallaroo.partition_function "
+                "decorator?")
+
+
+def _validate_arity_compatability(obj, arity):
+    """
+    To assist in proper API use, it's convenient to fail fast with erros as
+    soon as possible. We use this function to check things we decorate for
+    compatibility with our desired number of arguments.
+    """
+    if not callable(obj):
+        raise WallarooParameterError(
+            "Expected a callable object but got a {0}".format(obj))
+    spec = inspect.getargspec(obj)
+    upper_bound = len(spec.args)
+    lower_bound = upper_bound - (len(spec.defaults) if spec.defaults else 0)
+    if arity > upper_bound or arity < lower_bound:
+        raise WallarooParameterError((
+            "Incompatible function arity, your function must allow {0} "
+            "arguments."
+            ).format(arity))
 
 
 def computation(name):
     def wrapped(computation_function):
+        _validate_arity_compatability(computation_function, 1)
         @wraps(computation_function)
         class C:
             def name(self):
@@ -103,6 +235,7 @@ def computation(name):
 
 def state_computation(name):
     def wrapped(computation_function):
+        _validate_arity_compatability(computation_function, 2)
         @wraps(computation_function)
         class C:
             def name(self):
@@ -117,6 +250,7 @@ def state_computation(name):
 
 def computation_multi(name):
     def wrapped(computation_function):
+        _validate_arity_compatability(computation_function, 1)
         @wraps(computation_function)
         class C:
             def name(self):
@@ -131,6 +265,7 @@ def computation_multi(name):
 
 def state_computation_multi(name):
     def wrapped(computation_function):
+        _validate_arity_compatability(computation_function, 2)
         @wraps(computation_function)
         class C:
             def name(self):
@@ -156,6 +291,7 @@ class StateBuilder(object):
 
 
 def partition(fn):
+    _validate_arity_compatability(fn, 1)
     @wraps(fn)
     class C:
         def partition(self, data):
@@ -167,6 +303,7 @@ def partition(fn):
 
 def decoder(header_length, length_fmt):
     def wrapped(decoder_function):
+        _validate_arity_compatability(decoder_function, 1)
         @wraps(decoder_function)
         class C:
             def header_length(self):
@@ -182,6 +319,7 @@ def decoder(header_length, length_fmt):
 
 
 def encoder(encoder_function):
+    _validate_arity_compatability(encoder_function, 1)
     @wraps(encoder_function)
     class C:
         def encode(self, data):
