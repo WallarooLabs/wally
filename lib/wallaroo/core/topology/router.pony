@@ -1109,58 +1109,51 @@ class val LocalPartitionRouter[In: Any val,
       @printf[I32]("Rcvd msg at PartitionRouter\n".cstring())
     end
     match data
-    // TODO: Using an untyped input wrapper that returns an Any val might
-    // cause perf slowdowns and should be reevaluated.
-    | let iw: InputWrapper val =>
-      match iw.input()
-      | let input: In =>
-        let key = _partition_function(input)
-        try
-          match _partition_routes(key)?
-          | let s: Step =>
-            let might_be_route = producer.route_to(s)
-            match might_be_route
-            | let r: Route =>
-              ifdef "trace" then
-                @printf[I32]("PartitionRouter found Route\n".cstring())
-              end
-              r.run[D](metric_name, pipeline_time_spent,
-                data, producer_id, producer, i_msg_uid, frac_ids,
-                latest_ts, metrics_id, worker_ingress_ts)
-              (false, latest_ts)
-            else
-              // TODO: What do we do if we get None?
-              Fail()
-              (true, latest_ts)
+    | let iw: InputWrapper[In] val =>
+      let input = iw.input()
+      let key = _partition_function(input)
+      try
+        match _partition_routes(key)?
+        | let s: Step =>
+          let might_be_route = producer.route_to(s)
+          match might_be_route
+          | let r: Route =>
+            ifdef "trace" then
+              @printf[I32]("PartitionRouter found Route\n".cstring())
             end
-          | let p: ProxyRouter =>
-            p.route[D](metric_name, pipeline_time_spent, data, producer_id,
-              producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
-              worker_ingress_ts)
+            r.run[D](metric_name, pipeline_time_spent,
+              data, producer_id, producer, i_msg_uid, frac_ids,
+              latest_ts, metrics_id, worker_ingress_ts)
+            (false, latest_ts)
+          else
+            // TODO: What do we do if we get None?
+            Fail()
+            (true, latest_ts)
           end
-        else
-          ifdef debug then
-            match key
-            | let k: Stringable val =>
-              @printf[I32](("LocalPartitionRouter.route: No entry for " +
-              "key %s\n\n").cstring(), k.string().cstring())
-            else
-              @printf[I32](("LocalPartitionRouter.route: No entry for " +
-              "this key\n\n").cstring())
-            end
-          end
-          (true, latest_ts)
+        | let p: ProxyRouter =>
+          p.route[D](metric_name, pipeline_time_spent, data, producer_id,
+            producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
+            worker_ingress_ts)
         end
       else
-        // InputWrapper doesn't wrap In
         ifdef debug then
-          @printf[I32](("LocalPartitionRouter.route: InputWrapper doesn't " +
-            "contain data of type In\n").cstring())
+          match key
+          | let k: Stringable val =>
+            @printf[I32](("LocalPartitionRouter.route: No entry for " +
+            "key %s\n\n").cstring(), k.string().cstring())
+          else
+            @printf[I32](("LocalPartitionRouter.route: No entry for " +
+            "this key\n\n").cstring())
+          end
         end
-        Fail()
         (true, latest_ts)
       end
     else
+      // InputWrapper doesn't wrap In
+      ifdef debug then
+        @printf[I32](("LocalPartitionRouter.route: InputWrapper doesn't " +
+          "contain data of type In\n").cstring())
+      end
       Fail()
       (true, latest_ts)
     end

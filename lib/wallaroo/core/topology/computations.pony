@@ -59,11 +59,11 @@ trait val StateProcessor[S: State ref] is BasicComputation
     (Bool, (StateChange[S] ref | DirectStateChange | None), U64,
       U64, U64)
 
-trait InputWrapper
-  fun input(): Any val
+trait InputWrapper[In: Any val]
+  fun input(): In
 
 class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
-  is (StateProcessor[S] & InputWrapper)
+  is (StateProcessor[S] & InputWrapper[In])
   let _state_comp: StateComputation[In, Out, S] val
   let _input: In
   let _target_ids: Array[StepId] val
@@ -74,7 +74,7 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
     _input = input'
     _target_ids = target_ids
 
-  fun input(): Any val => _input
+  fun input(): In => _input
 
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter, metric_name: String, pipeline_time_spent: U64,
