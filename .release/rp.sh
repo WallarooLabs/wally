@@ -111,6 +111,11 @@ verify_push() {
   done
 }
 
+tag_and_push() {
+  git tag "$for_version" release
+  git push origin "$for_version"
+}
+
 if [ $# -lt 2 ]; then
   echo "release candidate branch and version arguments required"
 fi
@@ -135,3 +140,4 @@ checkout_and_pull_release_branch
 merge_rc_branch_into_release
 verify_push
 push_release_branch
+tag_and_push
