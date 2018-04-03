@@ -921,6 +921,21 @@ primitive _SourceConfig
       end
 
       TCPSourceConfig[PyData val](decoder, host, port)
+    | "kafka-internal" =>
+      let kafka_source_name = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+      end
+
+      let ksclip = KafkaSourceConfigCLIParser(env.out, kafka_source_name)
+      let ksco = ksclip.parse_options(env.args)?
+
+      let decoder = recover val
+        let d = @PyTuple_GetItem(source_config_tuple, 2)
+        Machida.inc_ref(d)
+        PySourceHandler(d)
+      end
+
+      KafkaSourceConfig[PyData val](consume ksco, (env.root as TCPConnectionAuth), decoder)
     | "kafka" =>
       let ksco = _kafka_config_options(source_config_tuple)
 
@@ -990,6 +1005,21 @@ primitive _SinkConfig
       end
 
       TCPSinkConfig[PyData val](encoder, host, port)
+    | "kafka-internal" =>
+      let kafka_sink_name = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 1)))
+      end
+
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 2)
+      Machida.inc_ref(encoderp)
+      let encoder = recover val
+        PyKafkaEncoder(encoderp)
+      end
+
+      let ksclip = KafkaSinkConfigCLIParser(env.out, kafka_sink_name)
+      let ksco = ksclip.parse_options(env.args)?
+
+      KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
     | "kafka" =>
       let ksco = _kafka_config_options(sink_config_tuple)
 
