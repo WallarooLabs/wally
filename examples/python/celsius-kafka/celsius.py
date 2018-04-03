@@ -19,25 +19,15 @@ import wallaroo
 
 
 def application_setup(args):
-    (in_topic, in_brokers,
-     in_log_level) = wallaroo.kafka_parse_source_options(args)
-
-    (out_topic, out_brokers, out_log_level, out_max_produce_buffer_ms,
-     out_max_message_size) = wallaroo.kafka_parse_sink_options(args)
-
     ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit with Kafka")
 
     ab.new_pipeline("convert",
-                    wallaroo.KafkaSourceConfig(in_topic, in_brokers, in_log_level,
-                                               decoder))
+                    wallaroo.DefaultKafkaSourceCLIParser(decoder))
 
     ab.to(multiply)
     ab.to(add)
 
-    ab.to_sink(wallaroo.KafkaSinkConfig(out_topic, out_brokers, out_log_level,
-                                        out_max_produce_buffer_ms,
-                                        out_max_message_size,
-                                        encoder))
+    ab.to_sink(wallaroo.DefaultKafkaSinkCLIParser(encoder))
     return ab.build()
 
 

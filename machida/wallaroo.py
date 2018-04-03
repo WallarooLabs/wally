@@ -211,37 +211,50 @@ class TCPSinkConfig(object):
         return ("tcp", self._host, self._port, self._encoder)
 
 
-class KafkaSourceConfig(object):
-    def __init__(self, topic, brokers, log_level, decoder):
-        """
-        topic: string
-        brokers: list of (string, string) tuples with values (HOST, PORT)
-        log_level: string of "Fine", "Info", "Warn", or "Error"
-        decoder: decoder
-        """
-        self.topic = topic
-        self.brokers = brokers
-        self.log_level = log_level
+class CustomKafkaSourceCLIParser(object):
+    def __init__(self, args, decoder):
+        (in_topic, in_brokers,
+        in_log_level) = kafka_parse_source_options(args)
+
+        self.topic = in_topic
+        self.brokers = in_brokers
+        self.log_level = in_log_level
         self.decoder = decoder
 
     def to_tuple(self):
         return ("kafka", self.topic, self.brokers, self.log_level, self.decoder)
 
+class CustomKafkaSinkCLIParser(object):
+    def __init__(self, args, encoder):
+        (out_topic, out_brokers, out_log_level, out_max_produce_buffer_ms,
+         out_max_message_size) = kafka_parse_sink_options(args)
 
-class KafkaSinkConfig(object):
-    def __init__(self, topic, brokers, log_level, max_produce_buffer_ms,
-                 max_message_size, encoder):
-        self.topic = topic
-        self.brokers = brokers
-        self.log_level = log_level
-        self.max_produce_buffer_ms = max_produce_buffer_ms
-        self.max_message_size = max_message_size
+        self.topic = out_topic
+        self.brokers = out_brokers
+        self.log_level = out_log_level
+        self.max_produce_buffer_ms = out_max_produce_buffer_ms
+        self.max_message_size = out_max_message_size
         self.encoder = encoder
 
     def to_tuple(self):
         return ("kafka", self.topic, self.brokers, self.log_level,
                 self.max_produce_buffer_ms, self.max_message_size, self.encoder)
 
+class DefaultKafkaSourceCLIParser(object):
+    def __init__(self, decoder, name="kafka_source"):
+        self.decoder = decoder
+        self.name = name
+
+    def to_tuple(self):
+        return ("kafka-internal", self.name, self.decoder)
+
+class DefaultKafkaSinkCLIParser(object):
+    def __init__(self, encoder, name="kafka_sink"):
+        self.encoder = encoder
+        self.name = name
+
+    def to_tuple(self):
+        return ("kafka-internal", self.name, self.encoder)
 
 def tcp_parse_input_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
