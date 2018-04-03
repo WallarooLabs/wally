@@ -43,12 +43,12 @@ extern PyObject *load_module(char *module_name)
   return pModule;
 }
 
-extern PyObject *application_setup(PyObject *pModule, PyObject *args)
+extern PyObject *application_setup(PyObject *pModule, PyObject *args, PyObject *showhelp)
 {
   PyObject *pFunc, *pValue;
 
   pFunc = PyObject_GetAttrString(pModule, "application_setup");
-  pValue = PyObject_CallFunctionObjArgs(pFunc, args, NULL);
+  pValue = PyObject_CallFunctionObjArgs(pFunc, args, showhelp, NULL);
   Py_DECREF(pFunc);
 
   return pValue;

@@ -12,17 +12,61 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-
+import argparse
 import struct
-
 import wallaroo
 
+# commented out because the following break pickle serialization
+#
+#def create_multiply(factor):
+#    def custom_multiply(data):
+#        return data * factor
+#
+#    return custom_multiply
+#
+#def create_add(amount):
+#    def custom_add(data):
+#        return data * amount
+#
+#    return custom_add
 
-def application_setup(args):
+multiplication_factor = 1.8
+add_amount = 32
+
+def application_setup(args, show_help):
+
+    parser = argparse.ArgumentParser(prog='')
+    parser.add_argument('--multiply_factor', type=float, default=1.8, help='the multiplication factor to use (default: %(default)s)')
+    parser.add_argument('--add_amount', type=int, default=32, help='the amount to add (default: %(default)s)')
+
+    if show_help:
+      print "-------------------------------------------------------------------------"
+      print "This application takes the following parameters:"
+      print "-------------------------------------------------------------------------"
+      parser.print_help()
+
+    a, _ = parser.parse_known_args(args)
+
+# commented out because the following break pickle serialization
+#
+#    custom_multiply = wallaroo.computation(name="custom_multiply")(create_multiply(a.multiply_factor))
+#    custom_add = wallaroo.computation(name="custom_add")(create_add(a.add_amount))
+
+    global multiplication_factor
+    global add_amount
+
+    multiplication_factor = a.multiply_factor
+    add_amount = a.add_amount
+
     ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit with Kafka")
 
     ab.new_pipeline("convert",
                     wallaroo.DefaultKafkaSourceCLIParser(decoder))
+
+# commented out because the following break pickle serialization
+#
+#    ab.to(custom_multiply)
+#    ab.to(custom_add)
 
     ab.to(multiply)
     ab.to(add)
@@ -37,14 +81,14 @@ def decoder(bs):
       return 0.0
     return struct.unpack(">f", bs[:4])[0]
 
-@wallaroo.computation(name="multiply by 1.8")
+@wallaroo.computation(name="multiply by factor")
 def multiply(data):
-    return data * 1.8
+    return data * multiplication_factor
 
 
-@wallaroo.computation(name="add 32")
+@wallaroo.computation(name="add amount")
 def add(data):
-    return data + 32
+    return data + add_amount
 
 
 @wallaroo.encoder
