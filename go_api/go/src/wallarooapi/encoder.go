@@ -19,14 +19,15 @@ func EncoderEncode(encoderId uint64, dataId uint64, size *uint64) unsafe.Pointer
 }
 
 type KafkaEncoder interface {
-	Encode(d interface{}) ([]byte, []byte)
+	Encode(d interface{}) ([]byte, []byte, int32)
 }
 
 //export KafkaEncoderEncode
-func KafkaEncoderEncode(encoderId uint64, dataId uint64, value *unsafe.Pointer, valueSize *uint64, key *unsafe.Pointer, keySize *uint64) {
+func KafkaEncoderEncode(encoderId uint64, dataId uint64, value *unsafe.Pointer, valueSize *uint64, key *unsafe.Pointer, keySize *uint64, partitionId *int32) {
 	encoder := GetComponent(encoderId, EncoderTypeId).(KafkaEncoder)
 	data := GetComponent(dataId, DataTypeId)
-	valueRes, keyRes := encoder.Encode(data)
+	valueRes, keyRes, partId := encoder.Encode(data)
+        *partitionId = partId
 	*valueSize = uint64(len(valueRes))
 	*keySize = uint64(len(keyRes))
 	if *valueSize > 0 {
