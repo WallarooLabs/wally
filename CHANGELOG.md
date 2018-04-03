@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Fix busy-loop/scheduler yield bugs in TCPConnection-related classes ([PR #2142](https://github.com/wallaroolabs/wallaroo/pull/2142))
 - Fix errors in Python decorator API documentation ([PR #2124](https://github.com/wallaroolabs/wallaroo/pull/2124))
 - Improve autoscale performance and reliability, and fix related edge case bugs ([PR #2122](https://github.com/wallaroolabs/wallaroo/pull/2122))
 - Fix bug that caused Wallaroo to shut down when connecting a new source after a 3->2 shrink ([PR #2072](https://github.com/wallaroolabs/wallaroo/pull/2072))
