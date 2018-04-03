@@ -173,8 +173,12 @@ SSH into `wallaroo-leader-1`
 Start the Go Market Spread application with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ~/wallaroo/testing/performance/apps/go/market_spread/market_spread --in wallaroo-leader-1:7000,wallaroo-leader-1:7001 --out wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponynoblock --ponythreads=8 --ponypinasio
+cd ~/wallaroo/testing/performance/apps/go/market_spread
+
+sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ./market_spread --in wallaroo-leader-1:7000,wallaroo-leader-1:7001 --out wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponynoblock --ponythreads=8 --ponypinasio
 ```
+
+**Note:** The Initializer needs to be started from the `~/wallaroo/testing/performance/apps/go/market_spread` directory in order to properly load the `symbols.txt` file in order to generate the Symbol partitions.
 
 ### Start Giles Senders
 
@@ -303,15 +307,21 @@ SSH into `wallaroo-leader-1`
 Start the Go Market Spread application Initializer with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ~/wallaroo/testing/performance/apps/go/market_spread/market_spread --in wallaroo-leader-1:7000,wallaroo-leader-1:7001 --out wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 -w 2 --ponynoblock --ponythreads=8 --ponypinasio
+cd ~/wallaroo/testing/performance/apps/go/market_spread
+
+sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ./market_spread --in wallaroo-leader-1:7000,wallaroo-leader-1:7001 --out wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 -w 2 --ponynoblock --ponythreads=8 --ponypinasio
 ```
+
+**Note:** The Initializer needs to be started from the `~/wallaroo/testing/performance/apps/go/market_spread` directory in order to properly load the `symbols.txt` file in order to generate the Symbol partitions.
 
 Start the Go Market Spread application Worker 2 with the following command:
 
 SSH into `wallaroo-follower-3`
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ~/wallaroo/testing/performance/apps/go/market_spread/market_spread --in wallaroo-leader-1:7000,wallaroo-leader-1:7001 --out wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponynoblock --ponythreads=8 --ponypinasio
+cd ~/wallaroo/testing/performance/apps/go/market_spread
+
+sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ./market_spread --in wallaroo-leader-1:7000,wallaroo-leader-1:7001 --out wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponynoblock --ponythreads=8 --ponypinasio
 ```
 
 #### Start Giles Senders
