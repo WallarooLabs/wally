@@ -273,20 +273,13 @@ primitive _SourceConfig
       let decoder_id = source("DecoderId")?.int()?.u64()
       TCPSourceConfig[GoData](GoFramedSourceHandler(decoder_id), host, port)
     | "KafkaSource" =>
-      let topic = source("Topic")?.string()?
+      let kafka_source_name = source("Name")?.string()?
 
-      let brokers = recover trn Array[(String, I32)] end
-      for b in source("Brokers")?.array()?.values() do
-        let host = b("Host")?.string()?
-        let port = b("Port")?.int()?.i32()
-        brokers.push((host, port))
-      end
+      let ksclip = KafkaSourceConfigCLIParser(env.out, kafka_source_name)
+      let ksco = ksclip.parse_options(env.args)?
 
-      let log_level = source("LogLevel")?.string()?
       let decoder_id = source("DecoderId")?.int()?.u64()
-      let brokers_val: Array[(String, I32)] val = consume brokers
-      let ksco = KafkaConfigOptions("Wallaroo Kakfa Source", KafkaConsumeOnly,
-        topic, brokers_val, log_level)
+
       KafkaSourceConfig[GoData](consume ksco, env.root as TCPConnectionAuth,
         GoSourceHandler(decoder_id))
     else
@@ -302,22 +295,13 @@ primitive _SinkConfig
       let encoderId = sink("EncoderId")?.int()?.u64()
       TCPSinkConfig[GoData](GoEncoder(encoderId), host, port)
     | "KafkaSink" =>
-      let topic = sink("Topic")?.string()?
+      let kafka_sink_name = sink("Name")?.string()?
 
-      let brokers = recover trn Array[(String, I32)] end
-      for b in sink("Brokers")?.array()?.values() do
-        let host = b("Host")?.string()?
-        let port = b("Port")?.int()?.i32()
-        brokers.push((host, port))
-      end
-
-      let log_level = sink("LogLevel")?.string()?
-      let max_produce_buffer_ms = sink("MaxProduceBufferMs")?.int()?.u64()
-      let max_message_size = sink("MaxMessageSize")?.int()?.i32()
       let encoder_id = sink("EncoderId")?.int()?.u64()
-      let brokers_val: Array[(String, I32)] val = consume brokers
-      let ksco = KafkaConfigOptions("Wallaroo Kakfa Sink", KafkaProduceOnly,
-        topic, brokers_val, log_level, max_produce_buffer_ms, max_message_size)
+
+      let ksclip = KafkaSinkConfigCLIParser(env.out, kafka_sink_name)
+      let ksco = ksclip.parse_options(env.args)?
+
       KafkaSinkConfig[GoData](GoKafkaEncoder(encoder_id), consume ksco,
         env.root as TCPConnectionAuth)
     else
