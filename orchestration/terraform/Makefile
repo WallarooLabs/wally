@@ -274,10 +274,12 @@ cluster_full_pem := $(shell echo $(cluster_pem))
 
 default: plan
 
+$(provider)_key_name ?= $(region)
+
 terraform-plan: # actual terraform plan command
 	@echo "\033[36m==> Running terraform plan for cluster '$(cluster_name)'\
  in region '$(region)' at provider '$(provider)'...\033[0m"
-	cd $(provider)-cluster && terraform plan -var $(provider)_key_name=$(region) \
+	cd $(provider)-cluster && terraform plan -var $(provider)_key_name=$($(provider)_key_name) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
           project_tag=$(cluster_project_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
@@ -288,7 +290,7 @@ terraform-plan: # actual terraform plan command
 terraform-apply: # actual terraform apply command
 	@echo "\033[36m==> Running terraform apply for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
-	cd $(provider)-cluster && terraform apply -var $(provider)_key_name=$(region) \
+	cd $(provider)-cluster && terraform apply -var $(provider)_key_name=$($(provider)_key_name) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
           project_tag=$(cluster_project_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
@@ -299,7 +301,7 @@ terraform-apply: # actual terraform apply command
 terraform-destroy: # actual terraform destroy command
 	@echo "\033[36m==> Running terraform destroy for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
-	cd $(provider)-cluster && terraform destroy -force -var $(provider)_key_name=$(region) \
+	cd $(provider)-cluster && terraform destroy -force -var $(provider)_key_name=$($(provider)_key_name) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
           project_tag=$(cluster_project_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
