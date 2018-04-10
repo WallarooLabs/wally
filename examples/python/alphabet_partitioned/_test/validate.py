@@ -17,9 +17,9 @@ import argparse
 from json import loads
 from struct import calcsize, unpack
 
-fmt = ">LsQ"
 def decoder(bs):
-    return unpack(fmt, bs)[1:3]
+    parts = [v.strip() for v in bs.split("=>")]
+    return (parts[0], int(parts[1]))
 
 def pre_processor(decoded):
     totals = {}
@@ -35,10 +35,10 @@ parser.add_argument("--expected", type=argparse.FileType("r"),
                           "JSON serialised dict."))
 args = parser.parse_args()
 
-chunk_size = calcsize(fmt)
 decoded = []
 while True:
-    chunk = args.output.read(chunk_size)
+    chunk = args.output.readline()
+    chunk = chunk.strip()
     if not chunk:
         break
     decoded.append(decoder(chunk))

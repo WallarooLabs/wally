@@ -4,16 +4,17 @@
 
 This is an example of a stateless Python application that takes a floating point Celsius value from Kafka and sends out a floating point Fahrenheit value to Kafka.
 
-### Input and Output
+### Input
 
-The inputs and outputs of the "Celsius Kafka" application are binary 32-bit floats. Here's an example message, written as a Python string:
+The inputs of the "Celsius Kafka" application are floats in ascii text. Here's an example message:
 
 ```
-"\x42\x48\x00\x00"
+"1.8"
 ```
 
-`\x42\x48\x00\x00` -- four bytes representing the 32-bit float `50.0`
+### Output
 
+Celius will output messages that are the string representation of the converted Fahrenheit value. Each incoming message will generate a single corresponding output.
 
 ### Processing
 
@@ -109,7 +110,7 @@ To run `kafkacat` to listen to the `test-out` topic via Docker:
 **NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 1.
 
 ```bash
-docker run --rm -it ryane/kafkacat -C -b 127.0.0.1:9092 -t test-out -q > celsius.out
+docker run --rm -it ryane/kafkacat -C -b 127.0.0.1:9092 -t test-out -q
 ```
 
 ### Shell 3: Celsius-kafka
@@ -152,22 +153,6 @@ docker run --rm -it ryane/kafkacat -P -b 127.0.0.1:9092 -t test-in
 ```
 
 Note: You can use `ctrl-d` to exit `kafkacat`
-
-## Reading the Output
-
-The output data will be in the file that `kafkacat` is writing to in shell 1. You can read the output data with the following code:
-
-```python
-import struct
-
-
-with open('celsius.out', 'rb') as f:
-    while True:
-        try:
-            print struct.unpack('>f', f.read(4))
-        except:
-            break
-```
 
 ## Shell 5: Shutdown
 

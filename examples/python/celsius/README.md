@@ -4,9 +4,9 @@
 
 This is an example of a stateless application that takes a floating point Celsius value and sends out a floating point Fahrenheit value.
 
-### Input and Output
+### Input
 
-The inputs and outputs of the "Celsius" application are binary 32-bits float encoded in the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html#framed-message-protocols#source-message-framing-protocol). Here's an example message, written as a Python string:
+The inputs of the "Celsius" application are binary 32-bits float encoded in the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html#framed-message-protocols#source-message-framing-protocol). Here's an example message, written as a Python string:
 
 ```
 "\x00\x00\x00\x04\x42\x48\x00\x00"
@@ -16,13 +16,17 @@ The inputs and outputs of the "Celsius" application are binary 32-bits float enc
 
 `\x42\x48\x00\x00` -- four bytes representing the 32-bit float `50.0`
 
+### Output
+
+Celius will output messages that are the string representation of the converted Fahrenheit value. One entry per line. Each incoming message will generate a single corresponding output.
+
 ### Processing
 
-The `decoder` function creates a float from the value represented by the payload. The float value is then sent to the `multiply` computation where it is multiplied by `1.8`, and the result of that computation is sent to the `add` computation where `32` is added to it. The resulting float is then sent to the `encoder` function, which converts it to an outgoing sequence of bytes.
+The `decoder` function creates a float from the value represented by the payload. The float value is then sent to the `multiply` computation where it is multiplied by `1.8`, and the result of that computation is sent to the `add` computation where `32` is added to it. The resulting float is then sent to the `encoder` function, which converts it to a string representation.
 
 ## Running Celsius
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 You will need five separate shells to run this application. Open each shell and go to the `examples/python/celsius` directory.
 
@@ -56,10 +60,19 @@ docker start mui
 
 ### Shell 2: Data Receiver
 
-Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
+Set `PATH` to refer to the directory that contains the `data_receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-nc -l 127.0.0.1 7002 > celsius.out
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+```
+
+Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
+
+```bash
+data_receiver --ponythreads=1 --ponynoblock \
+  --listen 127.0.0.1:7002
 ```
 
 ### Shell 3: Celsius
@@ -69,7 +82,7 @@ Set `PATH` to refer to the directory that contains the `machida` executable. Set
 **Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 ```
 
@@ -89,7 +102,7 @@ Set `PATH` to refer to the directory that contains the `sender`  executable. Ass
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 Send messages:
@@ -101,22 +114,6 @@ sender --host 127.0.0.1:7010 \
   --ponythreads=1 --ponynoblock
 ```
 
-## Reading the Output
-
-The output data will be in the file that `nc` is writing to in shell 1. You can read the output data with the following code:
-
-```python
-import struct
-
-
-with open('celsius.out', 'rb') as f:
-    while True:
-        try:
-            print struct.unpack('>If', f.read(8))
-        except:
-            break
-```
-
 ## Shell 5: Shutdown
 
 Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
@@ -124,7 +121,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 You can shut down the cluster with this command at any time:
@@ -133,7 +130,7 @@ You can shut down the cluster with this command at any time:
 cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down Giles Sender by pressing `Ctrl-c` from its shell.
+You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their respective shells.
 
 You can shut down the Metrics UI with the following command:
 

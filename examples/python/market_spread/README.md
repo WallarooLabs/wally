@@ -40,22 +40,23 @@ Order messages have the following parts:
 
 ### Output
 
-The output messages use the [source message framing protocol](https://docs.wallaroolabs.com/book/appendix/tcp-decoders-and-encoders.html#framed-message-protocols#source-message-framing-protocol) and have the following parts:
-* *side* -- the side of the order (buy or sell), 1 byte
-* *account* -- the account that placed this order, 32-bit integer
-* *order id* -- the id of the order, 6 byte string
-* *symbol* -- the stock symbol for the order, 4 byte string
-* *order quantity* -- the quantity of shares to be purchased in this order, 64-bit float
-* *price* -- the price of the shares in this order, 64-bit float
-* *bid* -- the bid for the order, 64-bit float
-* *offer* -- the offer for the order, 64-bit float
-* *transact time* -- the time of the transaction, 21 byte string
+The messages are strings terminated with a newline, with the form `side=SIDE, account=ACCOUNT, order_id=ORDER, symbol=SYMBOL, quantity=QUANTITY, price=PRICE, bid=BID, offer=OFFER, timestamp=TIMESTAMP\n` and have the following parts:
+
+* *SIDE* -- the side of the order (buy or sell), 1 byte
+* *ACCOUNT* -- the account that placed this order, 32-bit integer
+* *ORDER* -- the id of the order, 6 byte string
+* *SYMBOL* -- the stock symbol for the order, 4 byte string
+* *QUANTITY* -- the quantity of shares to be purchased in this order, 64-bit float
+* *PRICE* -- the price of the shares in this order, 64-bit float
+* *BID* -- the bid for the order, 64-bit float
+* *OFFER* -- the offer for the order, 64-bit float
+* *TIMESTAMP* -- the time of the transaction, 21 byte string
 
 ### Processing
 
 The NBBO messages are handled by the `market_data_decoder` function, which takes the input bytes and turns them into `MarketDataMessage` objects, which are then sent to the partition function to determine which state partition to forward the message to. At the state partition, the `MarketDataMessage` is passed, along with the `SymbolData` state for that partition, to the `update_market_data` state computation that updates the price information for the stock symbol given by the message.
 
-The Order messages are handled by the `order_decoder` function, which takes the input bytes and turns them into an `Order` object, which is then sent to the partition function to determine the state partition to forward the message to. The Order message is then passed, along with the `SymbolData` state object, to the `check_order` state computation, which will determine whether the order is accepted or rejected. If accepted, the `check_order` state computation will return an `OrderResult` object which is then encoded by the `order_result_encoder` function into output byte strings.
+The Order messages are handled by the `order_decoder` function, which takes the input bytes and turns them into an `Order` object, which is then sent to the partition function to determine the state partition to forward the message to. The Order message is then passed, along with the `SymbolData` state object, to the `check_order` state computation, which will determine whether the order is accepted or rejected. If accepted, the `check_order` state computation will return an `OrderResult` object which is then encoded by the `order_result_encoder` function into output strings.
 
 ## Running Market Spread
 
@@ -93,10 +94,19 @@ docker start mui
 
 ### Shell 2: Data Receiver
 
-Run `nc` to listen for TCP output on `127.0.0.1` port `7002`:
+Set `PATH` to refer to the directory that contains the `data_receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-nc -l 127.0.0.1 7002 > marketspread.out
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+```
+
+Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
+
+```bash
+data_receiver --ponythreads=1 --ponynoblock \
+  --listen 127.0.0.1:7002
 ```
 
 ### Shell 3: Market Spread
@@ -106,7 +116,7 @@ Set `PATH` to refer to the directory that contains the `machida` executable. Set
 **Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 ```
 
@@ -127,7 +137,7 @@ Set `PATH` to refer to the directory that contains the `sender`  executable. Ass
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 First prime the market data state with these initial messages, sent in via Giles Sender:
@@ -161,7 +171,7 @@ Set `PATH` to refer to the directory that contains the `sender`  executable. Ass
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 To send order messages, run this command:
@@ -182,7 +192,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 The sender commands will send data for a long time, so processing never really finishes. When you are ready to shut down the cluster you can run this command:
@@ -191,7 +201,7 @@ The sender commands will send data for a long time, so processing never really f
 cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down the Giles Senders by pressing `Ctrl-c` from their shells.
+You can shut down the Giles Senders and Data Receiver by pressing `Ctrl-c` from their shells.
 
 You can shut down the Metrics UI with the following command:
 

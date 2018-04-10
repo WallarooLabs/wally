@@ -72,4 +72,4 @@ def add_votes(data, state):
 @wallaroo.encoder
 def encoder(data):
     # data is a Votes
-    return struct.pack(">IsQ", 9, data.letter, data.votes)
+    return "%s => %d\n" % (data.letter, data.votes)

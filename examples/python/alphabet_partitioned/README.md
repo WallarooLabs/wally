@@ -34,7 +34,7 @@ The `decoder` creates a `Votes` object with the letter being voted on and the nu
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 You will need six separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
@@ -68,19 +68,19 @@ docker start mui
 
 ### Shell 2: Data Receiver
 
-Set `PATH` to refer to the directory that contains the `receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
+Set `PATH` to refer to the directory that contains the `data_receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/giles/receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
-Run Giles Receiver to listen for TCP output on `127.0.0.1` port `7002`:
+Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
-receiver --ponythreads=1 --ponynoblock \
-  --listen 127.0.0.1:7002 --no-write
+data_receiver --ponythreads=1 --ponynoblock \
+  --listen 127.0.0.1:7002
 ```
 
 ### Shell 3: Alphabet (initializer)
@@ -90,7 +90,7 @@ Set `PATH` to refer to the directory that contains the `machida` executable. Set
 **Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/giles/receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 ```
 
@@ -110,7 +110,7 @@ Set `PATH` to refer to the directory that contains the `machida` executable. Set
 **Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/giles/receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 ```
 
@@ -129,7 +129,7 @@ Set `PATH` to refer to the directory that contains the `sender`  executable. Ass
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/giles/receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 Send messages:
@@ -148,7 +148,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/giles/receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 You can shut down the cluster with this command at any time:
@@ -157,7 +157,7 @@ You can shut down the cluster with this command at any time:
 cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down Giles Sender and Giles Receiver by pressing `Ctrl-c` from their respective shells.
+You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their respective shells.
 
 You can shut down the Metrics UI with the following command:
 
