@@ -56,6 +56,7 @@ market_spread_py_test:
 		--output 'received.txt' \
 		--workers 5 \
 		--sources 2 \
+		--sink-mode newlines \
 		--sink-expect 1000
 
 clean-examples-python-market_spread: market_spread_py_clean

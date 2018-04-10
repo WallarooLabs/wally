@@ -54,6 +54,7 @@ alphabet_py_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command 'machida --application-module alphabet' \
+		--sink-mode newlines \
 		--sink-expect 1000
 
 clean-examples-python-alphabet: alphabet_py_clean

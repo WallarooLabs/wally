@@ -142,18 +142,11 @@ class OrderResult(object):
 
 @wallaroo.encoder
 def order_result_encoder(data):
-    p = struct.pack(">HI6s4sddddQ",
-                    data.order.side,
-                    data.order.account,
-                    data.order.order_id,
-                    data.order.symbol,
-                    data.order.qty,
-                    data.order.price,
-                    data.bid,
-                    data.offer,
-                    data.timestamp)
-    out = struct.pack(">I{}s".format(len(p)), len(p), p)
-    return out
+    return ("side=%s, account=%d, order_id=%s, symbol=%s, quantity=%d, "
+      + "price=%f, bid=%f, offer=%f, timestamp=%s\n") % (
+      data.order.side, data.order.account, data.order.order_id,
+      data.order.symbol, data.order.qty, data.order.price, data.bid,
+      data.offer, data.timestamp)
 
 
 class MarketDataMessage(object):

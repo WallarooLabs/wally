@@ -33,9 +33,10 @@ def application_setup(args):
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
-    if len(bs) < 4:
+    try:
+      return float(bs.decode("utf-8"))
+    except ValueError,e:
       return 0.0
-    return struct.unpack(">f", bs[:4])[0]
 
 @wallaroo.computation(name="multiply by 1.8")
 def multiply(data):
@@ -50,4 +51,4 @@ def add(data):
 @wallaroo.encoder
 def encoder(data):
     # data is a float
-    return (struct.pack(">f", data), None, None)
+    return ("%.6f" % (data), None, None)

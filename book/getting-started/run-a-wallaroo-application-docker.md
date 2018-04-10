@@ -5,13 +5,13 @@ In this section, we're going to run an example Wallaroo application in Docker. B
 There are a few Wallaroo support applications that you'll be interacting with for the first time:
 
 * Our Metrics UI allows you to monitor the performance and health of your applications.
-* Giles receiver is designed to capture TCP output from Wallaroo applications.
+* Data receiver is designed to capture TCP output from Wallaroo applications.
 * Giles sender is used to send test data into Wallaroo applications over TCP.
 * Machida, our program for running Wallaroo Python applications.
 
-You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
+You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
 
-The Metrics UI process will be run in the background. The other three processes \(receiver, sender, and Wallaroo\) will run in the foreground. We recommend that you run each process in a separate terminal.
+The Metrics UI process will be run in the background. The other three processes \(data_receiver, sender, and Wallaroo\) will run in the foreground. We recommend that you run each process in a separate terminal.
 
 NOTE: If you haven't set up Docker to run without root, you will need to use `sudo` with your Docker commands.
 
@@ -83,7 +83,7 @@ If you need to start the UI after stopping it, run:
 metrics_reporter_ui start
 ```
 
-## Shell 3: Giles Receiver
+## Shell 3: Data Receiver
 
 Enter the Wallaroo Docker container:
 
@@ -91,13 +91,13 @@ Enter the Wallaroo Docker container:
 docker exec -it wally env-setup
 ```
 
-We'll use Giles Receiver to listen for data from our Wallaroo application.
+We'll use Data Receiver to listen for data from our Wallaroo application.
 
 ```bash
-receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
+data_receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
 ```
 
-You should see the line `Listening for data` that indicates that Giles receiver is running.
+Data Receiver will start up and receive data without creating any output. By default, it prints received data to standard out, but we are giving it the `--no-write` flag which results in no output.
 
 ## Shell 4: Run the "Celsius to Fahrenheit" Application
 
@@ -113,7 +113,7 @@ First, we'll need to get to the python Celsius example directory with the follow
 cd /src/wallaroo/examples/python/celsius
 ```
 
-Now that we are in the proper directory, and the Metrics UI and Giles receiver are up and running, we can run the application itself by executing the following command:
+Now that we are in the proper directory, and the Metrics UI and Data receiver are up and running, we can run the application itself by executing the following command:
 
 ```bash
 machida --application-module celsius --in 127.0.0.1:7000 \
@@ -187,7 +187,7 @@ You can shut down the cluster with this command at any time:
 cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down Giles Sender and Giles Receiver by pressing Ctrl-c from their respective shells.
+You can shut down Giles Sender and Data Receiver by pressing Ctrl-c from their respective shells.
 
 You can shut down the Metrics UI with the following command:
 

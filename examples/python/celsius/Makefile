@@ -53,6 +53,7 @@ celsius_py_test:
 	  --expected-file _expected.txt \
 		--log-level error \
 		--command 'machida --application-module celsius' \
+		--sink-mode newlines \
 		--sink-expect 100
 
 endif

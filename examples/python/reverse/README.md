@@ -28,7 +28,7 @@ The `decoder` function creates a string from the value represented by the payloa
 
 ## Running Reverse
 
-In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
+In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
 You will need five separate shells to run this application. Open each shell and go to the `examples/python/reverse` directory.
 
@@ -62,10 +62,19 @@ docker start mui
 
 ### Shell 2: Data Receiver
 
-Run `nc` to listen for the output messages:
+Set `PATH` to refer to the directory that contains the `data_receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
+
+**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-nc -l 127.0.0.1 7002
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+```
+
+Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
+
+```bash
+data_receiver --ponythreads=1 --ponynoblock \
+  --listen 127.0.0.1:7002
 ```
 
 ### Shell 3: Reverse
@@ -75,7 +84,7 @@ Set `PATH` to refer to the directory that contains the `machida` executable. Set
 **Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
 ```
 
@@ -95,7 +104,7 @@ Set `PATH` to refer to the directory that contains the `sender`  executable. Ass
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 Send some messages:
@@ -117,7 +126,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
 ```
 
 You can shut down the cluster with this command at any time:
@@ -126,7 +135,7 @@ You can shut down the cluster with this command at any time:
 cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down Giles Sender by pressing `Ctrl-c` from its shell.
+You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their respective shells.
 
 You can shut down the Metrics UI with the following command:
 

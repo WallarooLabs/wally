@@ -48,4 +48,4 @@ def add(data):
 
 @wallaroo.encoder
 def encoder(data):
-    return struct.pack(">If", 4, data)
+    return "%.6f\n" % (data)

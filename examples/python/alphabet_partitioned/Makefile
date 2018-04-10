@@ -55,6 +55,7 @@ alphabet_partitioned_py_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command 'machida --application-module alphabet_partitioned' \
+		--sink-mode newlines \
 		--sink-expect 1000 \
 		--workers 1
 	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
@@ -65,6 +66,7 @@ alphabet_partitioned_py_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command 'machida --application-module alphabet_partitioned' \
+		--sink-mode newlines \
 		--sink-expect 1000 \
 		--workers 2
 	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
@@ -75,6 +77,7 @@ alphabet_partitioned_py_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command 'machida --application-module alphabet_partitioned' \
+		--sink-mode newlines \
 		--sink-expect 1000 \
 		--workers 3
 
