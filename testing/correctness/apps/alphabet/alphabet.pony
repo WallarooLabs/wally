@@ -52,6 +52,8 @@ actor Main
           .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes",
             TCPSourceConfig[Votes val].from_options(VotesDecoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
+            .to[Votes val](DoubleVoteBuilder)
+            .to_parallel[Votes val](HalfVoteBuilder)
             .to_state_partition[Votes val, String, LetterTotal val,
               LetterState](AddVotes, LetterStateBuilder, "letter-state",
               letter_partition where multi_worker = true)
@@ -63,6 +65,26 @@ actor Main
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
+
+primitive DoubleVote
+  fun name(): String => "Double Vote"
+
+  fun apply(v: Votes val): Votes val =>
+    Votes(v.letter, v.count * 2)
+
+primitive DoubleVoteBuilder
+  fun apply(): Computation[Votes val, Votes val] val =>
+    DoubleVote
+
+primitive HalfVote
+  fun name(): String => "Half Vote"
+
+  fun apply(v: Votes val): Votes val =>
+    Votes(v.letter, v.count / 2)
+
+primitive HalfVoteBuilder
+  fun apply(): Computation[Votes val, Votes val] val =>
+    HalfVote
 
 class val LetterStateBuilder
   fun apply(): LetterState => LetterState
