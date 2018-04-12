@@ -28,6 +28,9 @@ class ref Watermarker
         _routes(id) = _AckedOnRoute
     end
 
+  fun contains_route(id: RouteId): Bool =>
+    _routes.contains(id)
+
   fun ref remove_route(id: RouteId) =>
     try
       let old_route = _routes(id)?
@@ -41,6 +44,9 @@ class ref Watermarker
     else
       Fail()
     end
+
+  fun routes_size(): USize =>
+    _routes.size()
 
   fun ref sent(o_route_id: RouteId, o_seq_id: SeqId) =>
     ifdef debug then
