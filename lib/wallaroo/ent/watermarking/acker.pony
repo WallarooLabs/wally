@@ -35,8 +35,14 @@ class Acker
   fun ref add_route(route: Route) =>
     _watermarker.add_route(route.id())
 
+  fun contains_route(route: Route): Bool =>
+    _watermarker.contains_route(route.id())
+
   fun ref remove_route(route: Route) =>
     _watermarker.remove_route(route.id())
+
+  fun routes_size(): USize =>
+    _watermarker.routes_size()
 
   fun ref sent(o_route_id: RouteId, o_seq_id: SeqId) =>
     _watermarker.sent(o_route_id, o_seq_id)

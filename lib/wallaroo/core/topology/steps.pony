@@ -126,7 +126,6 @@ actor Step is (Producer & Consumer)
   //
   // Application startup lifecycle event
   //
-
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
 
@@ -220,9 +219,11 @@ actor Step is (Producer & Consumer)
       let old_router = _router
       _router = router
       for outdated_consumer in old_router.routes_not_in(_router).values() do
-        let outdated_route = _routes(outdated_consumer)?
-        ifdef "resilience" then
-          _acker_x.remove_route(outdated_route)
+        if _routes.contains(outdated_consumer) then
+          let outdated_route = _routes(outdated_consumer)?
+          ifdef "resilience" then
+            _acker_x.remove_route(outdated_route)
+          end
         end
       end
       for consumer in _router.routes().values() do
@@ -241,7 +242,10 @@ actor Step is (Producer & Consumer)
   be remove_route_to_consumer(c: Consumer) =>
     if _routes.contains(c) then
       try
-        _routes.remove(c)?
+        let outdated_route = _routes.remove(c)?._2
+        ifdef "resilience" then
+          _acker_x.remove_route(outdated_route)
+        end
       else
         Fail()
       end
