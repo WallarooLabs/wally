@@ -28,7 +28,7 @@ import (
 )
 
 //export ApplicationSetup
-func ApplicationSetup() *C.char {
+func ApplicationSetup(showHelp bool) *C.char {
   fs := flag.NewFlagSet("wallaroo", flag.ExitOnError)
   inHostsPortsArg := fs.String("in", "", "input host:port list")
   outHostsPortsArg := fs.String("out", "", "output host:port list")

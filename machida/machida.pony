@@ -42,7 +42,7 @@ use @user_deserialization[Pointer[U8] val](bs: Pointer[U8] tag)
 
 use @load_module[ModuleP](module_name: CString)
 
-use @application_setup[Pointer[U8] val](module: ModuleP, args: Pointer[U8] val)
+use @application_setup[Pointer[U8] val](module: ModuleP, args: Pointer[U8] val, show_help: Pointer[U8] val)
 
 use @list_item_count[USize](list: Pointer[U8] val)
 
@@ -100,6 +100,7 @@ use @PyList_GetItem[Pointer[U8] val](l: Pointer[U8] box, i: USize)
 use @PyList_SetItem[I32](l: Pointer[U8] box, i: USize, item: Pointer[U8] box)
 use @PyInt_AsLong[I64](i: Pointer[U8] box)
 use @PyObject_HasAttrString[I32](o: Pointer[U8] box, attr: Pointer[U8] tag)
+use @PyBool_FromLong[Pointer[U8] val](l: I64)
 
 type CString is Pointer[U8] tag
 
@@ -509,18 +510,19 @@ primitive Machida
     end
     r
 
-  fun application_setup(module: ModuleP, args: Array[String] val):
+  fun application_setup(module: ModuleP, args: Array[String] val, show_help: Bool):
     Pointer[U8] val ?
   =>
     let pyargs = Machida.pony_array_string_to_py_list_string(args)
-    let r = @application_setup(module, pyargs)
+    let pyshow_help = Machida.pony_bool_to_py_bool(show_help)
+    let r = @application_setup(module, pyargs, pyshow_help)
     if print_errors() then
       error
     end
     r
 
   fun apply_application_setup(application_setup_data: Pointer[U8] val,
-    env: Env):
+    env: Env, show_help: Bool):
     Application ?
   =>
     let application_setup_item_count = @list_item_count(application_setup_data)
@@ -558,7 +560,7 @@ primitive Machida
 
         let source_config = recover val
           let sct = @PyTuple_GetItem(item, 2)
-          _SourceConfig.from_tuple(sct, env)?
+          _SourceConfig.from_tuple(sct, env, show_help)?
         end
 
         latest = (latest as Application).new_pipeline[PyData val, PyData val](
@@ -661,7 +663,7 @@ primitive Machida
       | "to_sink" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_sink(
-          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env)?)
+          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env, show_help)?)
         sink_idx = sink_idx + 1
         latest
       | "to_sinks" =>
@@ -670,7 +672,7 @@ primitive Machida
         let sink_count = @PyList_Size(list)
         let sinks = Array[SinkConfig[PyData val]]
         for i in Range(0, sink_count) do
-          let sink = _SinkConfig.from_tuple(@PyList_GetItem(list, i), env)?
+          let sink = _SinkConfig.from_tuple(@PyList_GetItem(list, i), env, show_help)?
           sinks.push(sink)
         end
         latest = pb.to_sinks(sinks)
@@ -817,6 +819,14 @@ primitive Machida
 
     consume arr
 
+  fun pony_bool_to_py_bool(b: Bool): Pointer[U8] val
+  =>
+    if b then
+      @PyBool_FromLong(1)
+    else
+      @PyBool_FromLong(0)
+    end
+
   fun pony_array_string_to_py_list_string(args: Array[String] val):
     Pointer[U8] val
   =>
@@ -897,7 +907,7 @@ primitive Machida
     @PyObject_HasAttrString(o, method.cstring()) == 1
 
 primitive _SourceConfig
-  fun from_tuple(source_config_tuple: Pointer[U8] val, env: Env):
+  fun from_tuple(source_config_tuple: Pointer[U8] val, env: Env, show_help: Bool):
     SourceConfig[PyData val] ?
   =>
     let name = recover val
@@ -927,6 +937,12 @@ primitive _SourceConfig
       end
 
       let ksclip = KafkaSourceConfigCLIParser(env.out, kafka_source_name)
+      if show_help then
+        env.out.print("-------------------------------------------------------------------------")
+        env.out.print("Kafka Source '" + kafka_source_name + "' takes the following parameters:")
+        env.out.print("-------------------------------------------------------------------------")
+        ksclip.print_usage()
+      end
       let ksco = ksclip.parse_options(env.args)?
 
       let decoder = recover val
@@ -981,7 +997,7 @@ primitive _SourceConfig
     KafkaConfigOptions("Wallaroo Kafka Source", KafkaConsumeOnly, topic, brokers, log_level)
 
 primitive _SinkConfig
-  fun from_tuple(sink_config_tuple: Pointer[U8] val, env: Env):
+  fun from_tuple(sink_config_tuple: Pointer[U8] val, env: Env, show_help: Bool):
     SinkConfig[PyData val] ?
   =>
     let name = recover val
@@ -1017,6 +1033,12 @@ primitive _SinkConfig
       end
 
       let ksclip = KafkaSinkConfigCLIParser(env.out, kafka_sink_name)
+      if show_help then
+        env.out.print("-------------------------------------------------------------------------")
+        env.out.print("Kafka Sink '" + kafka_sink_name + "' takes the following parameters:")
+        env.out.print("-------------------------------------------------------------------------")
+        ksclip.print_usage()
+      end
       let ksco = ksclip.parse_options(env.args)?
 
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))

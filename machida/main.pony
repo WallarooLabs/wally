@@ -40,6 +40,7 @@ actor Main
 
     try
       var module_name: String = ""
+      var show_help: Bool = false
 
       let options = Options(WallarooConfig.application_args(env.args)?, false)
       options.add("application-module", "", StringArgument)
@@ -47,14 +48,16 @@ actor Main
 
       for option in options do
         match option
-        | ("help", let arg: None) =>
-          MachidaStartupHelp()
-          return
+        | ("help", let arg: None) => show_help = true
         | ("application-module", let arg: String) => module_name = arg
         end
       end
 
       if module_name == "" then
+        if show_help then
+          MachidaStartupHelp()
+          return
+        end
         FatalUserError("You must provide Machida with --application-module\n")
       end
 
@@ -64,10 +67,17 @@ actor Main
         try
           Machida.set_user_serialization_fns(module)
           let application_setup =
-            Machida.application_setup(module, options.remaining())?
+            Machida.application_setup(module, options.remaining(), show_help)?
+
           let application = recover val
-            Machida.apply_application_setup(application_setup, env)?
+            Machida.apply_application_setup(application_setup, env, show_help)?
           end
+
+          if show_help then
+            MachidaStartupHelp()
+            return
+          end
+
           Startup(env, application, module_name)
         else
           @printf[I32]("Something went wrong while building the application\n"

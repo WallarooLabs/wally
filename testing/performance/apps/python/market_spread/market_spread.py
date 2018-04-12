@@ -39,7 +39,7 @@ def load_valid_symbols():
         return f.read().splitlines()
 
 
-def application_setup(args):
+def application_setup(args, show_help):
     input_addrs = wallaroo.tcp_parse_input_addrs(args)
     order_host, order_port = input_addrs[0]
     nbbo_host, nbbo_port = input_addrs[1]

@@ -3,7 +3,7 @@ import struct
 import wallaroo
 
 
-def application_setup(args):
+def application_setup(args, show_help):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 

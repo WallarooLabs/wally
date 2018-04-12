@@ -26,7 +26,13 @@ import (
 )
 
 //export ApplicationSetup
-func ApplicationSetup() *C.char {
+func ApplicationSetup(showHelp bool) *C.char {
+  if showHelp {
+    fmt.Printf("-------------------------------------------------------------------------\n")
+    fmt.Printf("This application takes the following parameters:\n")
+    fmt.Printf("-------------------------------------------------------------------------\n")
+  }
+
   wa.Serialize = Serialize
   wa.Deserialize = Deserialize
 

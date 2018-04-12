@@ -19,15 +19,31 @@ primitive ArgsToCArgs
 actor Main
   new create(env: Env) =>
     try
+      var show_help: Bool = false
+
       let options = Options(WallarooConfig.application_args(env.args)?, false)
+      options.add("help", "h", None)
+
+      for option in options do
+        match option
+        | ("help", let arg: None) => show_help = true
+        end
+      end
+
       let c_args = ArgsToCArgs(options.remaining())
       @WallarooApiSetArgs(c_args.cpointer(), c_args.size().u64())
-      let application_json_string = ApplicationSetup()
+      let application_json_string = ApplicationSetup(show_help)
 
       try
         (let application, let application_name) = recover val
-          BuildApplication.from_json(application_json_string, env)?
+          BuildApplication.from_json(application_json_string, env, show_help)?
         end
+
+        if show_help then
+          StartupHelp()
+          return
+        end
+
         Startup(env, application, application_name)
       else
         @printf[I32]("Couldn't build topology\n".cstring())

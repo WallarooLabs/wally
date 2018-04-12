@@ -3,7 +3,7 @@ use "collections"
 use "lib:wallaroo"
 
 use @free[None](p: Pointer[U8] box)
-use @ApplicationSetup[Pointer[U8] val]()
+use @ApplicationSetup[Pointer[U8] val](show_help: Bool)
 
 use @RemoveComponent[None](cid: U64, ctype: U64)
 
@@ -12,9 +12,9 @@ use @ComponentSerializeWrapper[None](cid: U64, p: Pointer[U8] tag, ctype: U64)
 use @ComponentDeserializeWrapper[U64](p: Pointer[U8] tag, ctype: U64)
 
 primitive ApplicationSetup
-  fun apply(): String =>
+  fun apply(show_help: Bool): String =>
     recover val
-      let cs = @ApplicationSetup()
+      let cs = @ApplicationSetup(show_help)
       let s' = String.copy_cstring(cs)
       @free(cs)
       s'

@@ -151,7 +151,7 @@ class val _Done is _Connection
     steps_map(_from_step_id)?.done()
 
 primitive _ConnectionFactory
-  fun apply(connection_j: JsonEzData, env: Env): _Connection ? =>
+  fun apply(connection_j: JsonEzData, env: Env, show_help: Bool): _Connection ? =>
     let step_id = connection_j("StepId")?.int()?.u64()
     let from_step_id = connection_j("FromStepId")?.int()?.u64()
     match connection_j("Class")?.string()?
@@ -169,13 +169,13 @@ primitive _ConnectionFactory
         state_builder_id, state_name, partition_id)
     | "ToSink" =>
       let sink_j = connection_j("Sink")?
-      let sink = _SinkConfig.from_json_ez_data(sink_j, env)?
+      let sink = _SinkConfig.from_json_ez_data(sink_j, env, show_help)?
       _ToSink(step_id, from_step_id, sink)
     | "ToSinks" =>
       let sinks_j = connection_j("Sinks")?
       let sinks = recover iso Array[SinkConfig[GoData]] end
       for sink_j in sinks_j.array()?.values() do
-        let sink = _SinkConfig.from_json_ez_data(sink_j, env)?
+        let sink = _SinkConfig.from_json_ez_data(sink_j, env, show_help)?
         sinks.push(sink)
       end
       _ToSinks(step_id, from_step_id, consume sinks)
@@ -265,7 +265,7 @@ primitive _Partition
     end
 
 primitive _SourceConfig
-  fun from_json_ez_data(source: JsonEzData, env: Env): SourceConfig[GoData] val ? =>
+  fun from_json_ez_data(source: JsonEzData, env: Env, show_help: Bool): SourceConfig[GoData] val ? =>
     match source("Class")?.string()?
     | "TCPSource" =>
       let host = source("Host")?.string()?
@@ -276,6 +276,12 @@ primitive _SourceConfig
       let kafka_source_name = source("Name")?.string()?
 
       let ksclip = KafkaSourceConfigCLIParser(env.out, kafka_source_name)
+      if show_help then
+        env.out.print("-------------------------------------------------------------------------")
+        env.out.print("Kafka Source '" + kafka_source_name + "' takes the following parameters:")
+        env.out.print("-------------------------------------------------------------------------")
+        ksclip.print_usage()
+      end
       let ksco = ksclip.parse_options(env.args)?
 
       let decoder_id = source("DecoderId")?.int()?.u64()
@@ -287,7 +293,7 @@ primitive _SourceConfig
     end
 
 primitive _SinkConfig
-  fun from_json_ez_data(sink: JsonEzData, env: Env): SinkConfig[GoData] val ? =>
+  fun from_json_ez_data(sink: JsonEzData, env: Env, show_help: Bool): SinkConfig[GoData] val ? =>
     match sink("Class")?.string()?
     | "TCPSink" =>
       let host = sink("Host")?.string()?
@@ -300,6 +306,12 @@ primitive _SinkConfig
       let encoder_id = sink("EncoderId")?.int()?.u64()
 
       let ksclip = KafkaSinkConfigCLIParser(env.out, kafka_sink_name)
+      if show_help then
+        env.out.print("-------------------------------------------------------------------------")
+        env.out.print("Kafka Sink '" + kafka_sink_name + "' takes the following parameters:")
+        env.out.print("-------------------------------------------------------------------------")
+        ksclip.print_usage()
+      end
       let ksco = ksclip.parse_options(env.args)?
 
       KafkaSinkConfig[GoData](GoKafkaEncoder(encoder_id), consume ksco,
@@ -309,7 +321,7 @@ primitive _SinkConfig
     end
 
 primitive BuildApplication
-  fun from_json(json_str: String, env: Env): (Application val, String) ? =>
+  fun from_json(json_str: String, env: Env, show_help: Bool): (Application val, String) ? =>
     try
       let json_doc: JsonDoc = JsonDoc
       json_doc.parse(json_str)?
@@ -323,7 +335,7 @@ primitive BuildApplication
       let pipelines_j = jez()("Pipelines")?
       let pipelines_j_array = pipelines_j.array()?
       for pipeline in pipelines_j_array.values() do
-        let source = _SourceConfig.from_json_ez_data(pipeline("Source")?, env)?
+        let source = _SourceConfig.from_json_ez_data(pipeline("Source")?, env, show_help)?
         let name = pipeline("Name")?.string()?
 
         let components = pipeline("Components")?
@@ -363,7 +375,7 @@ primitive BuildApplication
         let connections = recover trn Array[_Connection] end
 
         for connection_j in connections_array.values() do
-          connections.push(_ConnectionFactory(connection_j, env)?)
+          connections.push(_ConnectionFactory(connection_j, env, show_help)?)
         end
 
         Debug("Read connections")
