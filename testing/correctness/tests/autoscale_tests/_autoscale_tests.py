@@ -255,13 +255,14 @@ def test_migrated_partitions(pre_partitions, workers, partitions):
     # invert the partitions dicts
     i_pre = inverted(pre_partitions)
     i_post = inverted(partitions)
+    keys = ['state_partitions']
     for joining in workers.get('joining', {}):
-        for ptype in partitions:
+        for ptype in keys:
             for step in partitions[ptype]:
                 for pid in partitions[ptype][step][joining]:
                     assert(i_pre[ptype][step][pid] != joining)
     for leaving in workers.get('leaving', {}):
-        for ptype in pre_partitions:
+        for ptype in keys:
             for step in pre_partitions[ptype]:
                 for pid in pre_partitions[ptype][step][leaving]:
                     assert(i_post[ptype][step][pid] != leaving)
