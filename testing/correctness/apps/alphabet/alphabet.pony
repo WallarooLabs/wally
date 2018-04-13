@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "buffered"
 use "collections"
+use "options"
 use "serialise"
 use "wallaroo_labs/bytes"
 use "wallaroo"
@@ -32,6 +33,20 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
+      // Add "--to-parallel" option
+      var to_parallel: Bool = false
+      let options = Options(env.args, false)
+
+      options.add("to-parallel", "", None)
+
+      for option in options do
+        match option
+        | ("to-parallel", None) =>
+          to_parallel = true
+        end
+      end
+
+
       let parts: Array[String] val = recover
         let s = "abcdefghijklmnopqrstuvwxyz"
         let a = Array[String]
@@ -48,18 +63,22 @@ actor Main
         LetterPartitionFunction, parts)
 
       let application = recover val
-        Application("Alphabet Popularity Contest")
-          .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes",
-            TCPSourceConfig[Votes val].from_options(VotesDecoder,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to[Votes val](DoubleVoteBuilder)
-            .to_parallel[Votes val](HalfVoteBuilder)
-            .to_state_partition[Votes val, String, LetterTotal val,
-              LetterState](AddVotes, LetterStateBuilder, "letter-state",
-              letter_partition where multi_worker = true)
-            .to_sink(TCPSinkConfig[LetterTotal val].from_options(
-              LetterTotalEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))
+        let a = Application("Alphabet Popularity Contest")
+        let p = a.new_pipeline[Votes val, LetterTotal val]("Alphabet Votes",
+          TCPSourceConfig[Votes val].from_options(VotesDecoder,
+            TCPSourceConfigCLIParser(env.args)?(0)?))
+        // add `to_parallel` steps based on cmd line arg
+        if to_parallel then
+          p.to[Votes val](DoubleVoteBuilder)
+          p.to_parallel[Votes val](HalfVoteBuilder)
+        end
+        p.to_state_partition[Votes val, String, LetterTotal val,
+          LetterState](AddVotes, LetterStateBuilder, "letter-state",
+            letter_partition where multi_worker = true)
+        p.to_sink(TCPSinkConfig[LetterTotal val].from_options(
+          LetterTotalEncoder,
+          TCPSinkConfigCLIParser(env.args)?(0)?))
+        consume a
       end
       Startup(env, application, "alphabet-contest")
     else
