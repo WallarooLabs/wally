@@ -43,7 +43,9 @@ from integration import (add_runner,
 from collections import Counter
 from functools import partial
 from itertools import cycle
+import json
 import logging
+import os
 import re
 from string import lowercase
 from struct import calcsize, pack, unpack
@@ -295,6 +297,10 @@ def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
                 print("Some autoscale Sequence runners exited badly. "
                       "They had the following "
                       "output tails:\n===\n{}".format(outputs))
+        if hasattr(err, 'query_result') and 'PRINT_QUERY' in os.environ:
+            logging.error("The test error had the following query result"
+                          " attached:\n{}"
+                          .format(json.dumps(err.query_result)))
         raise
 
 def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
