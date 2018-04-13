@@ -627,6 +627,12 @@ actor ApplicationDistributor is Distributor
                 end
 
                 steps(next_id) = worker
+
+                // Since we've assigned a prestate runner, which will be
+                // placed on a non-shrinkable source or step, this worker
+                // can't be shrunk under our current requirements.
+                non_shrinkable.set(worker)
+
               //////////////////////////////////////
               // PARALLELIZED STATELESS COMPUTATIONS
               elseif next_runner_builder.is_stateless_parallel() then
@@ -736,11 +742,12 @@ actor ApplicationDistributor is Distributor
                 end
 
                 steps(next_id) = worker
-              end
 
-              // Since we've assigned at least one runner builder to this
-              // worker, it can't be shrunk under our current requirements.
-              non_shrinkable.set(worker)
+                // Since we've assigned a stateless computation runner, which
+                // will be placed on a non-shrinkable source or step, this
+                // worker can't be shrunk under our current requirements.
+                non_shrinkable.set(worker)
+              end
 
               runner_builder_idx = runner_builder_idx + 1
             end
