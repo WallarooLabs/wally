@@ -41,6 +41,7 @@ TESTING_ALPHABET_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 integration-tests-testing-correctness-apps-alphabet: testing_alphabet_test
+integration-tests-testing-correctness-apps-alphabet: testing_alphabet_test_toparallel
 
 testing_alphabet_test:
 	cd $(TESTING_ALPHABET_PATH) && \
@@ -54,6 +55,21 @@ testing_alphabet_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command './alphabet' \
+		--workers 10 \
+		--sink-expect 4000
+
+testing_alphabet_test_toparallel:
+	cd $(TESTING_ALPHABET_PATH) && \
+	integration_test \
+	  --framed-file-sender input.msg \
+	  --framed-file-sender input.msg \
+	  --framed-file-sender input.msg \
+	  --framed-file-sender input.msg \
+		--validation-cmd 'python validate.py --expected output.json --repetitions 4 --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command './alphabet --to-parallel' \
 		--workers 10 \
 		--sink-expect 4000
 

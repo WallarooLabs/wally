@@ -29,8 +29,9 @@ def application_setup(args):
     ab = wallaroo.ApplicationBuilder("alphabet")
     ab.new_pipeline("alphabet",
                     wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-    ab.to_parallel(double_vote)
-    ab.to(half_vote)
+    if '--to-parallel' in args:
+        ab.to_parallel(double_vote)
+        ab.to(half_vote)
     ab.to_state_partition(add_votes, TotalVotes, "letter-state",
                           partition, letter_partitions)
     ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
