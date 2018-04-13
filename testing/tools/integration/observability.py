@@ -191,8 +191,6 @@ class ObservabilityNotifier(StoppableThread):
             # Else if any result is not True, either wait for next cycle
             # or timeout.
             if time.time() - started > self.timeout:
-                logging.error('failing query response was:\n{}'
-                    .format(json.dumps(query_result)))
                 self.error = ObservabilityTimeoutError(
                     "Observability test timed out after {} seconds with the"
                     " following tests"
@@ -203,6 +201,8 @@ class ObservabilityNotifier(StoppableThread):
                             '\n'.join((
                                 "  -> {}".format(s) for s in tb.splitlines())))
                         for t, (err, tb),in errors.items()))))
+                # Pack the query result into the error object
+                self.error.query_result = query_result
                 self.stop()
                 break
             time.sleep(self.period)
