@@ -19,6 +19,8 @@ import logging
 import time
 from types import FunctionType
 from functools import partial
+import traceback
+import sys
 
 from integration import (ex_validate,
                StoppableThread,
@@ -178,7 +180,8 @@ class ObservabilityNotifier(StoppableThread):
                 try:
                     t_res = t[0](deepcopy(query_result))
                 except Exception as err:
-                    errors[t] = err
+                    tb = traceback.format_exc()
+                    errors[t] = (err, tb)
 
             # If all result are error free, break
             if not errors:
@@ -188,14 +191,18 @@ class ObservabilityNotifier(StoppableThread):
             # Else if any result is not True, either wait for next cycle
             # or timeout.
             if time.time() - started > self.timeout:
+                logging.error('failing query response was:\n{}'
+                    .format(json.dumps(query_result)))
                 self.error = ObservabilityTimeoutError(
                     "Observability test timed out after {} seconds with the"
                     " following tests"
                     " still failing:\n{}".format(self.timeout, "\n".join((
-                        "    {}: {}({})".format(
+                        " - {}: {}({})\n{}".format(
                             t[1], type(err).__name__,
-                            str(err))
-                        for t, err,in errors.items()))))
+                            str(err),
+                            '\n'.join((
+                                "  -> {}".format(s) for s in tb.splitlines())))
+                        for t, (err, tb),in errors.items()))))
                 self.stop()
                 break
             time.sleep(self.period)
