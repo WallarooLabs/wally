@@ -94,9 +94,9 @@ for api, cmd in APIS.items():
 # Note that in these tests, the cluster cannot shrink any of the initial
 # workers, so the ops should never result in shrinking initial workers.
 # So test simple cases only (single op)
-for api, cmd in APIS_TO_PARALLEL.items():
-    for o in OPS:
-        if o > 0:
-            create_autoscale_test(api, cmd, [o], CYCLES)
-        else:
-            create_autoscale_test(api, cmd, [-o, o], CYCLES)
+#for api, cmd in APIS_TO_PARALLEL.items():
+#    for o in OPS:
+#        if o > 0:
+#            create_autoscale_test(api, cmd, [o], CYCLES)
+#        else:
+#            create_autoscale_test(api, cmd, [-o, o], CYCLES)
