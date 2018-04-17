@@ -3,8 +3,8 @@ An umbrella application containing shared utils and different UI components
 
 ## Shared Dependency Installation Guide
 ### Depends on:
-	1. Erlang 18.x
-	2. Elixir 1.2.x
+	1. Erlang 20.x
+	2. Elixir 1.5.2
 	3. Node 4.2.2
 		- Node-Sass
 		- Browserify
@@ -15,7 +15,7 @@ An umbrella application containing shared utils and different UI components
 [Installing Node](https://github.com/creationix/nvm): NVM makes it easiest to install proper version
 
 Installing Hex: run `mix local.hex`
-Installing Node de: run `npm install -g node-sass browserify`
+Installing Node dependencies: run `npm install -g node-sass browserify`
 
 ## Monitoring Hub Dependency Installation Guide
 * run `mix deps.get`
