@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "crypto"
 use "net"
 use "wallaroo_labs/equality"
 use "wallaroo_labs/mort"
@@ -1115,6 +1116,18 @@ class val LocalPartitionRouter[In: Any val,
       match iw.input()
       | let input: In =>
         let key = _partition_function(input)
+        iftype Key <: String then
+          @printf[U32]("got a string\n".cstring())
+          try
+            var hashed_key: U128 = 0
+            for v in Digest.md5().>append(key)?.final().values() do
+              hashed_key = (hashed_key << 8) + v.u128()
+            end
+            @printf[U32]("hashed_key = %llx\n".cstring(), hashed_key)
+          else
+            Fail()
+          end
+        end
         try
           match _partition_routes(key)?
           | let s: Step =>
