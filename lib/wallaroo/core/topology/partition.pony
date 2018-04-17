@@ -62,15 +62,21 @@ interface PartitionAddresses is Equatable[PartitionAddresses]
 
 class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, ProxyAddress] val
+  let _hash_addresses: Map[Key, ProxyAddress] val
 
-  new val create(a: Map[Key, ProxyAddress] val) =>
+  new val create(a: Map[Key, ProxyAddress] val, hash_a: Map[Key, ProxyAddress] val) =>
     _addresses = a
+    _hash_addresses = hash_a
 
   fun apply(k: Any val): (ProxyAddress | None) =>
     match k
     | let key: Key =>
       try
-        _addresses(key)?
+        iftype Key <: String then
+          _hash_addresses(key)?
+        else
+          _addresses(key)?
+        end
       else
         None
       end
@@ -95,7 +101,8 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
     else
       error
     end
-    KeyedPartitionAddresses[Key](consume new_addresses)
+    // TODO: Calculate new hash addresses
+    KeyedPartitionAddresses[Key](consume new_addresses, _hash_addresses)
 
   fun eq(that: box->PartitionAddresses): Bool =>
     match that
@@ -197,6 +204,8 @@ class val KeyedStateSubpartition[PIn: Any val,
   =>
     let routes = recover trn Map[Key, (Step | ProxyRouter)] end
 
+    let hashed_routes = recover val Map[Key, (Step | ProxyRouter)] end
+
     let m = recover trn Map[U128, Step] end
 
     var partition_count: USize = 0
@@ -236,7 +245,7 @@ class val KeyedStateSubpartition[PIn: Any val,
       " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
     LocalPartitionRouter[PIn, Key, S](_state_name, worker_name, consume m,
-      _id_map, consume routes, _partition_function)
+      _id_map, consume routes, hashed_routes, _partition_function)
 
   fun update_key[K: (Hashable val & Equatable[K] val)](k: K,
     pa: ProxyAddress): StateSubpartition ?
