@@ -50,8 +50,8 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
           {[], LatencyStatsCalculator.generate_empty_latency_percentile_bin_stats()}
         throughputs_list ->
           all_latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(throughputs_list, all_bins)
-          cumalative_latency_percentage_bins_data = LatencyStatsCalculator.calculate_cumalative_latency_percentage_bins_data(all_latency_percentage_bins_data)
-          {throughputs_list, LatencyStatsCalculator.calculate_latency_percentile_bin_stats(cumalative_latency_percentage_bins_data)}
+          cumulative_latency_percentage_bins_data = LatencyStatsCalculator.calculate_cumulative_latency_percentage_bins_data(all_latency_percentage_bins_data)
+          {throughputs_list, LatencyStatsCalculator.calculate_latency_percentile_bin_stats(cumulative_latency_percentage_bins_data)}
       end
 
     latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(latency_bins_list, bins)

@@ -7,18 +7,18 @@ defmodule MetricsReporter.LatencyStatsCalculator do
     do_calculate_latency_percentage_bins_data(aggregated_latency_bins_data, expected_latency_bins, total_count)
   end
 
-  def calculate_cumalative_latency_percentage_bins_data(latency_percentage_bins_data) do
+  def calculate_cumulative_latency_percentage_bins_data(latency_percentage_bins_data) do
       sorted_keys = Map.keys(latency_percentage_bins_data)
         |> Enum.sort(&(String.to_integer(&1)< String.to_integer(&2)))
 
-    {_, cumalative_latency_percentage_bins_data} = sorted_keys
-      |> Enum.reduce({0, %{}}, fn key, {cumalative_percentage, cumalative_latency_percentage_bins_data} ->
+    {_, cumulative_latency_percentage_bins_data} = sorted_keys
+      |> Enum.reduce({0, %{}}, fn key, {cumulative_percentage, cumulative_latency_percentage_bins_data} ->
         val = Map.get(latency_percentage_bins_data, key)
-        cumalative_percentage = calculate_cumalative_percentage(val, cumalative_percentage)
-        cumalative_latency_percentage_bins_data = Map.put(cumalative_latency_percentage_bins_data, key, cumalative_percentage)
-        {cumalative_percentage, cumalative_latency_percentage_bins_data}
+        cumulative_percentage = calculate_cumulative_percentage(val, cumulative_percentage)
+        cumulative_latency_percentage_bins_data = Map.put(cumulative_latency_percentage_bins_data, key, cumulative_percentage)
+        {cumulative_percentage, cumulative_latency_percentage_bins_data}
       end)
-      cumalative_latency_percentage_bins_data
+      cumulative_latency_percentage_bins_data
   end
 
   defp aggregate_latency_bins_data(latency_bins_list) do
@@ -38,13 +38,13 @@ defmodule MetricsReporter.LatencyStatsCalculator do
     ["50.0", "95.0", "99.0", "99.9", "99.99"]
   end
 
-  def calculate_latency_percentile_bin_stats(cumalative_latency_percentage_bins_msg) do
-    sorted_bin_keys = Map.keys(cumalative_latency_percentage_bins_msg)
+  def calculate_latency_percentile_bin_stats(cumulative_latency_percentage_bins_msg) do
+    sorted_bin_keys = Map.keys(cumulative_latency_percentage_bins_msg)
       |> Enum.sort(&(String.to_integer(&1)< String.to_integer(&2)))
     _latency_percent_bin_stats = get_percentiles()
       |> Enum.reduce(%{}, fn percentile, percentile_map ->
         bin = Enum.reduce_while(sorted_bin_keys, 0, fn bin, _acc ->
-          percentage_at_bin = cumalative_latency_percentage_bins_msg[bin]
+          percentage_at_bin = cumulative_latency_percentage_bins_msg[bin]
           if String.to_float(percentile) > percentage_at_bin do
             {:cont, Enum.max_by(sorted_bin_keys, fn bin ->
               String.to_integer(bin)
@@ -111,14 +111,14 @@ defmodule MetricsReporter.LatencyStatsCalculator do
     end
   end
 
-  defp calculate_cumalative_percentage(value, cumalative_percentage) do
+  defp calculate_cumulative_percentage(value, cumulative_percentage) do
     cond do
-      (value + cumalative_percentage >= 100) ->
+      (value + cumulative_percentage >= 100) ->
         100
-      (value + cumalative_percentage == 0) ->
+      (value + cumulative_percentage == 0) ->
         0
       true ->
-        Float.round(value + cumalative_percentage, 4)
+        Float.round(value + cumulative_percentage, 4)
     end
   end
 
