@@ -30,7 +30,7 @@ defmodule MetricsReporter.LatencyStatsCalculator do
     0..64 |> Enum.reduce(%{}, fn(pow, map) -> Map.put(map, to_string(pow), 0) end)
   end
 
-  def get_empty_latency_percentage_bins_data(expected_latency_bins) do
+  defp get_empty_latency_percentage_bins_data(expected_latency_bins) do
     Map.new(expected_latency_bins, & {&1, 0})
   end
 
