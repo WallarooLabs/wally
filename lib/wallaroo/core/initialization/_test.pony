@@ -129,7 +129,8 @@ primitive _BaseKeyedPartitionAddressesGenerator
     m("k1") = ProxyAddress("w1", 10)
     m("k2") = ProxyAddress("w2", 20)
     m("k3") = ProxyAddress("w3", 30)
-    KeyedPartitionAddresses[String](consume m)
+    let m': Map[String, ProxyAddress] val = consume m
+    KeyedPartitionAddresses[String](m', m')
 
 primitive _TargetKeyedPartitionAddressesGenerator
   fun apply(): KeyedPartitionAddresses[String] val =>
@@ -137,7 +138,8 @@ primitive _TargetKeyedPartitionAddressesGenerator
     m("k1") = ProxyAddress("w2", 10)
     m("k2") = ProxyAddress("w2", 20)
     m("k3") = ProxyAddress("w3", 30)
-    KeyedPartitionAddresses[String](consume m)
+    let m': Map[String, ProxyAddress] val = consume m
+    KeyedPartitionAddresses[String](m', m')
 
 primitive _IdMapGenerator
   fun apply(): Map[String, U128] val =>
@@ -188,5 +190,3 @@ primitive _BaseWorkerNamesGenerator
 primitive _TargetWorkerNamesGenerator
   fun apply(): Array[String] val =>
     recover ["w1"; "w2"; "w3"; "w4"] end
-
-

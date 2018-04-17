@@ -1074,12 +1074,14 @@ class val LocalPartitionRouter[In: Any val,
   let _local_map: Map[StepId, Step] val
   let _step_ids: Map[Key, StepId] val
   let _partition_routes: Map[Key, (Step | ProxyRouter)] val
+  let _hashed_routes: Map[Key, (Step | ProxyRouter)] val
   let _partition_function: PartitionFunction[In, Key] val
 
   new val create(state_name': String, worker_name: String,
     local_map': Map[StepId, Step] val,
     s_ids: Map[Key, StepId] val,
     partition_routes: Map[Key, (Step | ProxyRouter)] val,
+    hashed_routes: Map[Key, (Step | ProxyRouter)] val,
     partition_function: PartitionFunction[In, Key] val)
   =>
     _state_name = state_name'
@@ -1087,6 +1089,7 @@ class val LocalPartitionRouter[In: Any val,
     _local_map = local_map'
     _step_ids = s_ids
     _partition_routes = partition_routes
+    _hashed_routes = hashed_routes
     _partition_function = partition_function
 
   fun size(): USize =>
@@ -1129,7 +1132,12 @@ class val LocalPartitionRouter[In: Any val,
           end
         end
         try
-          match _partition_routes(key)?
+          let use_routes = iftype Key <: String then
+            _hashed_routes
+          else
+            _partition_routes
+          end
+          match use_routes(key)?
           | let s: Step =>
             let might_be_route = producer.route_to(s)
             match might_be_route
@@ -1182,7 +1190,7 @@ class val LocalPartitionRouter[In: Any val,
     new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter
   =>
     LocalPartitionRouter[NewIn, Key, S](_state_name, _worker_name,
-      _local_map, _step_ids, _partition_routes, new_p_function)
+      _local_map, _step_ids, _partition_routes, _hashed_routes, new_p_function)
 
   fun register_routes(router: Router, route_builder': RouteBuilder) =>
     for r in _partition_routes.values() do
@@ -1224,6 +1232,7 @@ class val LocalPartitionRouter[In: Any val,
       let target_id = _step_ids(key)?
       let new_local_map = recover trn Map[StepId, Step] end
       let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
+      let new_hashed_routes = recover val Map[Key, (Step | ProxyRouter)] end
       match target
       | let step: Step =>
         for (id, s) in _local_map.pairs() do
@@ -1239,7 +1248,7 @@ class val LocalPartitionRouter[In: Any val,
         end
         LocalPartitionRouter[In, Key, S](_state_name, _worker_name,
           consume new_local_map, _step_ids, consume new_partition_routes,
-          _partition_function)
+          new_hashed_routes, _partition_function)
       | let proxy_router: ProxyRouter =>
         for (id, s) in _local_map.pairs() do
           if id != target_id then new_local_map(id) = s end
@@ -1253,7 +1262,7 @@ class val LocalPartitionRouter[In: Any val,
         end
         LocalPartitionRouter[In, Key, S](_state_name, _worker_name,
           consume new_local_map, _step_ids, consume new_partition_routes,
-          _partition_function)
+          new_hashed_routes, _partition_function)
       end
     else
       error
@@ -1263,6 +1272,7 @@ class val LocalPartitionRouter[In: Any val,
     PartitionRouter
   =>
     let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
+    let new_hashed_routes = recover val Map[Key, (Step | ProxyRouter)] end
     for (k, target) in _partition_routes.pairs() do
       match target
       | let pr: ProxyRouter =>
@@ -1272,7 +1282,8 @@ class val LocalPartitionRouter[In: Any val,
       end
     end
     LocalPartitionRouter[In, Key, S](_state_name, _worker_name, _local_map,
-      _step_ids, consume new_partition_routes, _partition_function)
+      _step_ids, consume new_partition_routes, new_hashed_routes,
+      _partition_function)
 
   fun rebalance_steps_grow(
     target_workers: Array[(String, OutgoingBoundary)] val,
@@ -1493,6 +1504,7 @@ class val LocalPartitionRouterBlueprint[In: Any val,
     auth: AmbientAuth): PartitionRouter
   =>
     let partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
+    let hashed_routes = recover val Map[Key, (Step | ProxyRouter)] end
     try
       for (k, pa) in _partition_addresses.pairs() do
         let proxy_router = ProxyRouter(pa.worker,
@@ -1504,7 +1516,8 @@ class val LocalPartitionRouterBlueprint[In: Any val,
     end
     LocalPartitionRouter[In, Key, S](_state_name, worker_name,
       recover val Map[StepId, Step] end,
-      _step_ids, consume partition_routes, _partition_function)
+      _step_ids, consume partition_routes, hashed_routes,
+      _partition_function)
 
 trait val StatelessPartitionRouter is (Router &
   Equatable[StatelessPartitionRouter])

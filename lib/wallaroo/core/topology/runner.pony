@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "buffered"
 use "collections"
+use "crypto"
 use "net"
 use "time"
 use "serialise"
@@ -385,6 +386,11 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
     KeyedPartitionAddresses[Key] val
   =>
     let m = recover trn Map[Key, ProxyAddress] end
+    let hash_partitions = HashPartitions(match workers
+      | let w: String => recover val [w] end
+      | let ws: Array[String] val => ws
+      end)
+    let hash_m = recover trn Map[Key, ProxyAddress] end
 
     match workers
     | let w: String =>
@@ -429,10 +435,20 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
           end
           idx = (idx + 1) % w_count
         end
+
+        iftype Key <: String then
+          for key in ks.values() do
+            try
+              hash_m(key) = ProxyAddress(
+                hash_partitions.get_claimant_by_key(key)?,
+                _step_id_map(key)?)
+            end
+          end
+        end
       end
     end
 
-    KeyedPartitionAddresses[Key](consume m)
+    KeyedPartitionAddresses[Key](consume m, consume hash_m)
 
 class ComputationRunner[In: Any val, Out: Any val]
   let _next: Runner
