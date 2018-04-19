@@ -1,11 +1,11 @@
 use "collections"
 use "crypto"
 
-class HashPartitions
+class val HashPartitions
   let _lower_bounds: Array[U128]
   let _nodes: Map[U128, String] = _nodes.create()
 
-  new create(nodes: Array[String] val) =>
+  new val create(nodes: Array[String] val) =>
     _lower_bounds = Array[U128]
     let count = nodes.size().u128()
     let part_size = U128.max_value() / count
@@ -60,3 +60,6 @@ class HashPartitions
       hashed_key = (hashed_key << 8) + v.u128()
     end
     get_claimant(hashed_key)?
+
+  fun claimants(): Iterator[String] ref =>
+    _nodes.values()
