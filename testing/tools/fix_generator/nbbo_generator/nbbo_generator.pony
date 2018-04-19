@@ -150,7 +150,7 @@ actor NbboFilesGenerator
   be generate_for_sec(sec: U64) =>
     try
       var output_file = File(FilePath(_auth, _output_path)?)
-      let date = Date(_time._1 + sec.i64(), _time._2)
+      let date = PosixDate(_time._1 + sec.i64(), _time._2)
       let utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
       for x in Range[U64](0, _output_msgs_per_sec) do
         output_file = check_output_file_size(output_file)?
