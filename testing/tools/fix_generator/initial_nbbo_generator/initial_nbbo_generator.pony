@@ -122,7 +122,7 @@ actor InitialNbboFileGenerator
     _output_file_path = output_file_path
     _rejected_instruments = rejected_instruments
     _nonrejected_instruments = nonrejected_instruments
-    let date = Date(_time._1, _time._2)
+    let date = PosixDate(_time._1, _time._2)
     _utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
 
   be generate_and_write() =>

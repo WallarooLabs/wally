@@ -1,0 +1,367 @@
+diff --git a/demos/go_word_count/bundle.json b/demos/go_word_count/bundle.json
+index ed1b207..421bdf3 100644
+--- a/demos/go_word_count/bundle.json
++++ b/demos/go_word_count/bundle.json
+@@ -15,7 +15,7 @@
+     {
+       "type": "github",
+       "repo": "WallarooLabs/pony-kafka",
+-      "tag": "db252ef"
++      "tag": "a10e66b"
+     }
+   ]
+ }
+diff --git a/examples/go/alphabet/bundle.json b/examples/go/alphabet/bundle.json
+index aaefeed..fe1c1f9 100644
+--- a/examples/go/alphabet/bundle.json
++++ b/examples/go/alphabet/bundle.json
+@@ -15,7 +15,7 @@
+     {
+       "type": "github",
+       "repo": "WallarooLabs/pony-kafka",
+-      "tag": "db252ef"
++      "tag": "a10e66b"
+     }
+   ]
+ }
+diff --git a/examples/go/celsius/bundle.json b/examples/go/celsius/bundle.json
+index aaefeed..fe1c1f9 100644
+--- a/examples/go/celsius/bundle.json
++++ b/examples/go/celsius/bundle.json
+@@ -15,7 +15,7 @@
+     {
+       "type": "github",
+       "repo": "WallarooLabs/pony-kafka",
+-      "tag": "db252ef"
++      "tag": "a10e66b"
+     }
+   ]
+ }
+diff --git a/examples/go/kafka_reverse/bundle.json b/examples/go/kafka_reverse/bundle.json
+index aaefeed..fe1c1f9 100644
+--- a/examples/go/kafka_reverse/bundle.json
++++ b/examples/go/kafka_reverse/bundle.json
+@@ -15,7 +15,7 @@
+     {
+       "type": "github",
+       "repo": "WallarooLabs/pony-kafka",
+-      "tag": "db252ef"
++      "tag": "a10e66b"
+     }
+   ]
+ }
+diff --git a/examples/go/reverse/bundle.json b/examples/go/reverse/bundle.json
+index aaefeed..fe1c1f9 100644
+--- a/examples/go/reverse/bundle.json
++++ b/examples/go/reverse/bundle.json
+@@ -15,7 +15,7 @@
+     {
+       "type": "github",
+       "repo": "WallarooLabs/pony-kafka",
+-      "tag": "db252ef"
++      "tag": "a10e66b"
+     }
+   ]
+ }
+diff --git a/examples/go/word_count/bundle.json b/examples/go/word_count/bundle.json
+index aaefeed..fe1c1f9 100644
+--- a/examples/go/word_count/bundle.json
++++ b/examples/go/word_count/bundle.json
+@@ -15,7 +15,7 @@
+     {
+       "type": "github",
+       "repo": "WallarooLabs/pony-kafka",
+-      "tag": "db252ef"
++      "tag": "a10e66b"
+     }
+   ]
+ }
+diff --git a/examples/pony/celsius-kafka/bundle.json b/examples/pony/celsius-kafka/bundle.json
+index b23b1a6..25948a1 100644
+--- a/examples/pony/celsius-kafka/bundle.json
++++ b/examples/pony/celsius-kafka/bundle.json
+@@ -5,7 +5,7 @@
+       },
+       { "type": "github",
+         "repo": "WallarooLabs/pony-kafka",
+-        "tag": "db252ef"
++        "tag": "a10e66b"
+       }
+   ]
+ }
+diff --git a/giles/receiver/giles-receiver.pony b/giles/receiver/giles-receiver.pony
+index f0fd771..df1ce7c 100644
+--- a/giles/receiver/giles-receiver.pony
++++ b/giles/receiver/giles-receiver.pony
+@@ -122,11 +122,11 @@ actor Main
+ class ListenerNotify is TCPListenNotify
+   let _coordinator: Coordinator
+   let _store: Store
+-  let _stderr: StdStream
++  let _stderr: OutStream
+   let _no_write: Bool
+ 
+   new iso create(coordinator: Coordinator,
+-    store: Store, stderr: StdStream, no_write: Bool)
++    store: Store, stderr: OutStream, no_write: Bool)
+   =>
+     _coordinator = coordinator
+     _store = store
+@@ -145,13 +145,13 @@ class ListenerNotify is TCPListenNotify
+ class Notify is TCPConnectionNotify
+   let _coordinator: Coordinator
+   let _store: Store
+-  let _stderr: StdStream
++  let _stderr: OutStream
+   var _header: Bool = true
+   let _no_write: Bool
+   var _closed: Bool = false
+ 
+   new iso create(coordinator: Coordinator,
+-    store: Store, stderr: StdStream, no_write: Bool)
++    store: Store, stderr: OutStream, no_write: Bool)
+   =>
+     _coordinator = coordinator
+     _store = store
+diff --git a/go_api/examples/kafka_reverse/bundle.json b/go_api/examples/kafka_reverse/bundle.json
+index ea43528..ca74a3f 100644
+--- a/go_api/examples/kafka_reverse/bundle.json
++++ b/go_api/examples/kafka_reverse/bundle.json
+@@ -15,7 +15,7 @@
+     {
+       "type": "github",
+       "repo": "WallarooLabs/pony-kafka",
+-      "tag": "db252ef"
++      "tag": "a10e66b"
+     }
+   ]
+ }
+diff --git a/go_api/pony/go_api/state_computation.pony b/go_api/pony/go_api/state_computation.pony
+index 1ee6a20..178a20c 100644
+--- a/go_api/pony/go_api/state_computation.pony
++++ b/go_api/pony/go_api/state_computation.pony
+@@ -96,14 +96,12 @@ class val StateComputationMulti is w.StateComputation[GoData, GoData, GoState]
+     | 0 =>
+       (None, state_changed_indicator)
+     else
+-      recover
+-        let results = recover trn Array[GoData](size.usize()) end
+-        for i in Range(0, size.usize()) do
+-          results.push(GoData(@GetMultiResultItem(res, i.u64())))
+-        end
+-        RemoveComponent(res, ComponentType.data())
+-        (consume results, state_changed_indicator)
++      let results = recover trn Array[GoData](size.usize()) end
++      for i in Range(0, size.usize()) do
++        results.push(GoData(@GetMultiResultItem(res, i.u64())))
+       end
++      RemoveComponent(res, ComponentType.data())
++      (consume results, state_changed_indicator)
+     end
+ 
+   fun state_change_builders(): Array[StateChangeBuilder[GoState]] val =>
+diff --git a/lib/wallaroo/core/common/boundary_id.pony b/lib/wallaroo/core/common/boundary_id.pony
+index df85aa1..0b00b39 100644
+--- a/lib/wallaroo/core/common/boundary_id.pony
++++ b/lib/wallaroo/core/common/boundary_id.pony
+@@ -27,5 +27,5 @@ class BoundaryId is Equatable[BoundaryId]
+   fun eq(that: box->BoundaryId): Bool =>
+     (name == that.name) and (step_id == that.step_id)
+ 
+-  fun hash(): U64 =>
++  fun hash(): USize =>
+     name.hash() xor step_id.hash()
+diff --git a/lib/wallaroo/ent/router_registry/router_registry.pony b/lib/wallaroo/ent/router_registry/router_registry.pony
+index ebe05ea..fdd5269 100644
+--- a/lib/wallaroo/ent/router_registry/router_registry.pony
++++ b/lib/wallaroo/ent/router_registry/router_registry.pony
+@@ -77,7 +77,7 @@ actor RouterRegistry is InFlightAckRequester
+   let _sources: Map[StepId, Source] = _sources.create()
+   let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
+   // Map from Source digestof value to source id
+-  let _source_ids: Map[U64, StepId] = _source_ids.create()
++  let _source_ids: Map[USize, StepId] = _source_ids.create()
+   let _data_channel_listeners: SetIs[DataChannelListener] =
+     _data_channel_listeners.create()
+   let _control_channel_listeners: SetIs[TCPListener] =
+diff --git a/machida/bundle.json b/machida/bundle.json
+index 6d64ed8..a7e2228 100644
+--- a/machida/bundle.json
++++ b/machida/bundle.json
+@@ -5,7 +5,7 @@
+       },
+       { "type": "github",
+         "repo": "WallarooLabs/pony-kafka",
+-        "tag": "db252ef"
++        "tag": "a10e66b"
+       }
+   ]
+ }
+diff --git a/machida/machida.pony b/machida/machida.pony
+index 625c650..c993a00 100644
+--- a/machida/machida.pony
++++ b/machida/machida.pony
+@@ -77,7 +77,7 @@ use @partition_function_partition_u64[U64](partition_function: Pointer[U8] val,
+ use @partition_function_partition[Pointer[U8] val](
+   partition_function: Pointer[U8] val, data: Pointer[U8] val)
+ 
+-use @key_hash[U64](key: Pointer[U8] val)
++use @key_hash[USize](key: Pointer[U8] val)
+ use @key_eq[I32](key: Pointer[U8] val, other: Pointer[U8] val)
+ 
+ use @py_bool_check[I32](b: Pointer[U8] box)
+@@ -198,7 +198,7 @@ class PyKey is (Hashable & Equatable[PyKey])
+   fun obj(): Pointer[U8] val =>
+     _key
+ 
+-  fun hash(): U64 =>
++  fun hash(): USize =>
+     Machida.key_hash(obj())
+ 
+   fun eq(other: PyKey box): Bool =>
+@@ -772,7 +772,7 @@ primitive Machida
+ 
+     consume arr
+ 
+-  fun key_hash(key: Pointer[U8] val): U64 =>
++  fun key_hash(key: Pointer[U8] val): USize =>
+     let r = @key_hash(key)
+     print_errors()
+     r
+diff --git a/testing/performance/apps/go/market_spread/bundle.json b/testing/performance/apps/go/market_spread/bundle.json
+index e375b4b..ce398de 100644
+--- a/testing/performance/apps/go/market_spread/bundle.json
++++ b/testing/performance/apps/go/market_spread/bundle.json
+@@ -15,7 +15,7 @@
+     {
+       "type": "github",
+       "repo": "WallarooLabs/pony-kafka",
+-      "tag": "db252ef"
++      "tag": "a10e66b"
+     }
+   ]
+ }
+diff --git a/testing/tools/fix_generator/initial_nbbo_generator/initial_nbbo_generator.pony b/testing/tools/fix_generator/initial_nbbo_generator/initial_nbbo_generator.pony
+index 8a44a3d..291fb50 100644
+--- a/testing/tools/fix_generator/initial_nbbo_generator/initial_nbbo_generator.pony
++++ b/testing/tools/fix_generator/initial_nbbo_generator/initial_nbbo_generator.pony
+@@ -122,7 +122,7 @@ actor InitialNbboFileGenerator
+     _output_file_path = output_file_path
+     _rejected_instruments = rejected_instruments
+     _nonrejected_instruments = nonrejected_instruments
+-    let date = Date(_time._1, _time._2)
++    let date = PosixDate(_time._1, _time._2)
+     _utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
+ 
+   be generate_and_write() =>
+diff --git a/testing/tools/fix_generator/nbbo_generator/nbbo_generator.pony b/testing/tools/fix_generator/nbbo_generator/nbbo_generator.pony
+index d40a9e2..60619e7 100644
+--- a/testing/tools/fix_generator/nbbo_generator/nbbo_generator.pony
++++ b/testing/tools/fix_generator/nbbo_generator/nbbo_generator.pony
+@@ -150,7 +150,7 @@ actor NbboFilesGenerator
+   be generate_for_sec(sec: U64) =>
+     try
+       var output_file = File(FilePath(_auth, _output_path)?)
+-      let date = Date(_time._1 + sec.i64(), _time._2)
++      let date = PosixDate(_time._1 + sec.i64(), _time._2)
+       let utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
+       for x in Range[U64](0, _output_msgs_per_sec) do
+         output_file = check_output_file_size(output_file)?
+diff --git a/testing/tools/fix_generator/orders_generator/order_generator.pony b/testing/tools/fix_generator/orders_generator/order_generator.pony
+index a3f031d..63f6784 100644
+--- a/testing/tools/fix_generator/orders_generator/order_generator.pony
++++ b/testing/tools/fix_generator/orders_generator/order_generator.pony
+@@ -236,7 +236,7 @@ actor OrderFileGenerator
+   let instruments_size = _instruments.size().u64()
+   try
+     var output_file = File(FilePath(_auth, _output_path)?)
+-    let date = Date(_time._1 + sec.i64(), _time._2)
++    let date = PosixDate(_time._1 + sec.i64(), _time._2)
+     let utc_timestamp = date.format("%Y%m%d-%H:%M:%S.000")
+     for x in Range[U64](0, _output_msgs_per_sec) do
+       output_file = check_output_file_size(output_file)?
+diff --git a/testing/tools/merrick/merrick.pony b/testing/tools/merrick/merrick.pony
+index b0b7d69..3dbec8b 100644
+--- a/testing/tools/merrick/merrick.pony
++++ b/testing/tools/merrick/merrick.pony
+@@ -117,13 +117,13 @@ actor Main
+ class FromWallarooListenerNotify is TCPListenNotify
+   let _coordinator: Coordinator
+   let _store: Store
+-  let _stderr: StdStream
++  let _stderr: OutStream
+   let _forward: Bool
+   let _forwarding_actor: (MsgForwarder | None)
+ 
+ 
+   new iso create(coordinator: Coordinator,
+-    store: Store, stderr: StdStream,
++    store: Store, stderr: OutStream,
+     forward: Bool, forwarding_actor: (MsgForwarder | None))
+   =>
+     _coordinator = coordinator
+@@ -148,14 +148,14 @@ class FromWallarooListenerNotify is TCPListenNotify
+ class FromWallarooNotify is TCPConnectionNotify
+   let _coordinator: Coordinator
+   let _store: Store
+-  let _stderr: StdStream
++  let _stderr: OutStream
+   let _forward: Bool
+   let _forwarding_actor: (MsgForwarder | None)
+   var _header: Bool = true
+   var _closed: Bool = false
+ 
+   new iso create(coordinator: Coordinator,
+-    store: Store, stderr: StdStream,
++    store: Store, stderr: OutStream,
+     forward: Bool, forwarding_actor: (MsgForwarder | None))
+   =>
+     _coordinator = coordinator
+diff --git a/utils/data_receiver/data_receiver.pony b/utils/data_receiver/data_receiver.pony
+index 553f58c..6e44b10 100644
+--- a/utils/data_receiver/data_receiver.pony
++++ b/utils/data_receiver/data_receiver.pony
+@@ -73,7 +73,7 @@ actor Main
+       usage(env.out)
+     end
+ 
+-  fun usage(out: StdStream) =>
++  fun usage(out: OutStream) =>
+     out.print(
+       "data_receiver [OPTIONS]\n" +
+       "Required: \n" +
+@@ -87,13 +87,13 @@ actor Main
+       )
+ 
+ class ListenerNotify is TCPListenNotify
+-  let _stdout: StdStream
+-  let _stderr: StdStream
++  let _stdout: OutStream
++  let _stderr: OutStream
+   let _input_mode: InputMode
+   let _output_mode: OutputMode
+ 
+-  new iso create(stdout: StdStream,
+-    stderr: StdStream,
++  new iso create(stdout: OutStream,
++    stderr: OutStream,
+     input_mode: InputMode,
+     output_mode: OutputMode)
+   =>
+@@ -109,13 +109,13 @@ class ListenerNotify is TCPListenNotify
+     ConnectionNotify(_stdout, _stderr, _input_mode, _output_mode)
+ 
+ class ConnectionNotify is TCPConnectionNotify
+-  let _stdout: StdStream
+-  let _stderr: StdStream
++  let _stdout: OutStream
++  let _stderr: OutStream
+   let _input_mode: InputMode
+   let _output_mode: OutputMode
+   var _read_header: Bool = true
+ 
+-  new iso create(so: StdStream, se: StdStream, i: InputMode, o: OutputMode) =>
++  new iso create(so: OutStream, se: OutStream, i: InputMode, o: OutputMode) =>
+     _stdout = so
+     _stderr = se
+     _input_mode = i

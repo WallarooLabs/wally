@@ -77,7 +77,7 @@ use @partition_function_partition_u64[U64](partition_function: Pointer[U8] val,
 use @partition_function_partition[Pointer[U8] val](
   partition_function: Pointer[U8] val, data: Pointer[U8] val)
 
-use @key_hash[U64](key: Pointer[U8] val)
+use @key_hash[USize](key: Pointer[U8] val)
 use @key_eq[I32](key: Pointer[U8] val, other: Pointer[U8] val)
 
 use @py_bool_check[I32](b: Pointer[U8] box)
@@ -201,7 +201,7 @@ class PyKey is (Hashable & Equatable[PyKey])
   fun obj(): Pointer[U8] val =>
     _key
 
-  fun hash(): U64 =>
+  fun hash(): USize =>
     Machida.key_hash(obj())
 
   fun eq(other: PyKey box): Bool =>
@@ -791,7 +791,7 @@ primitive Machida
 
     consume arr
 
-  fun key_hash(key: Pointer[U8] val): U64 =>
+  fun key_hash(key: Pointer[U8] val): USize =>
     let r = @key_hash(key)
     print_errors()
     r
