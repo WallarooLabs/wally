@@ -122,11 +122,11 @@ actor Main
 class ListenerNotify is TCPListenNotify
   let _coordinator: Coordinator
   let _store: Store
-  let _stderr: StdStream
+  let _stderr: OutStream
   let _no_write: Bool
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream, no_write: Bool)
+    store: Store, stderr: OutStream, no_write: Bool)
   =>
     _coordinator = coordinator
     _store = store
@@ -145,13 +145,13 @@ class ListenerNotify is TCPListenNotify
 class Notify is TCPConnectionNotify
   let _coordinator: Coordinator
   let _store: Store
-  let _stderr: StdStream
+  let _stderr: OutStream
   var _header: Bool = true
   let _no_write: Bool
   var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream, no_write: Bool)
+    store: Store, stderr: OutStream, no_write: Bool)
   =>
     _coordinator = coordinator
     _store = store
