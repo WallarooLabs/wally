@@ -18,24 +18,24 @@ func float64FromByteSlice(buff []byte) float64 {
 type Side int
 
 const (
-	BuySide Side = 1
+	BuySide  Side = 1
 	SellSide Side = 2
 )
 
 type MessageType int
 
 const (
-	OrderType MessageType = 1
+	OrderType      MessageType = 1
 	MarketDataType MessageType = 2
 )
 
 type Order struct {
-	Side Side
-	Account uint32
-	OrderId string
-	Symbol string
-	Quantity float64
-	Price float64
+	Side         Side
+	Account      uint32
+	OrderId      string
+	Symbol       string
+	Quantity     float64
+	Price        float64
 	TransactTime string
 }
 
@@ -59,11 +59,11 @@ func (o *Order) GetSymbol() string {
 }
 
 type MarketData struct {
-	Symbol string
+	Symbol       string
 	TransactTime string // 21 bytes
-	BidPrice float64
-	OfferPrice float64
-	Mid float64
+	BidPrice     float64
+	OfferPrice   float64
+	Mid          float64
 }
 
 func NewMarketData(symbol string, transactTime string, bidPrice float64, offerPrice float64, mid float64) *MarketData {

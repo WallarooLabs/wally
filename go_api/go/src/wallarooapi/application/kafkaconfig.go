@@ -10,8 +10,8 @@ func MakeKafkaSourceConfig(name string, decoder wa.Decoder) *KafkaSourceConfig {
 }
 
 type KafkaSourceConfig struct {
-	name string
-	decoder wa.Decoder
+	name      string
+	decoder   wa.Decoder
 	decoderId uint64
 }
 
@@ -33,8 +33,8 @@ func MakeKafkaSinkConfig(name string, encoder wa.KafkaEncoder) *KafkaSinkConfig 
 }
 
 type KafkaSinkConfig struct {
-	name string
-	encoder wa.KafkaEncoder
+	name      string
+	encoder   wa.KafkaEncoder
 	encoderId uint64
 }
 

@@ -15,8 +15,8 @@
 package main
 
 import (
-	"bytes"
 	"C"
+	"bytes"
 	"encoding/binary"
 	"encoding/gob"
 	"flag"
@@ -80,9 +80,9 @@ func LetterPartition() []uint64 {
 	return letterPartition
 }
 
-type WordPartitionFunction struct {}
+type WordPartitionFunction struct{}
 
-func (wpf *WordPartitionFunction) Partition (data interface{}) uint64 {
+func (wpf *WordPartitionFunction) Partition(data interface{}) uint64 {
 	word := data.(*string)
 	firstLetter := (*word)[0]
 	if (firstLetter >= 'a') && (firstLetter <= 'z') {
@@ -91,7 +91,7 @@ func (wpf *WordPartitionFunction) Partition (data interface{}) uint64 {
 	return uint64('!')
 }
 
-type Decoder struct {}
+type Decoder struct{}
 
 func (decoder *Decoder) HeaderLength() uint64 {
 	return 4
@@ -106,7 +106,7 @@ func (decoder *Decoder) Decode(b []byte) interface{} {
 	return &s
 }
 
-type Split struct {}
+type Split struct{}
 
 func (s *Split) Name() string {
 	return "split"
@@ -129,13 +129,13 @@ func (s *Split) Compute(data interface{}) []interface{} {
 	return words
 }
 
-type SplitBuilder struct {}
+type SplitBuilder struct{}
 
 func (sb *SplitBuilder) Build() interface{} {
 	return &Split{}
 }
 
-type CountWord struct {}
+type CountWord struct{}
 
 func (cw *CountWord) Name() string {
 	return "count word"
@@ -149,12 +149,12 @@ func (cw *CountWord) Compute(data interface{}, state interface{}) (interface{}, 
 }
 
 type WordCount struct {
-	Word string
+	Word  string
 	Count uint64
 }
 
 func MakeWordTotals() *WordTotals {
-	return &WordTotals{ make(map[string]uint64) }
+	return &WordTotals{make(map[string]uint64)}
 }
 
 type WordTotals struct {
@@ -173,13 +173,13 @@ func (wordTotals *WordTotals) GetCount(word string) *WordCount {
 	return &WordCount{word, wordTotals.WordTotals[word]}
 }
 
-type WordTotalsBuilder struct {}
+type WordTotalsBuilder struct{}
 
 func (wtb *WordTotalsBuilder) Build() interface{} {
 	return MakeWordTotals()
 }
 
-type Encoder struct {}
+type Encoder struct{}
 
 func (encoder *Encoder) Encode(data interface{}) []byte {
 	word_count := data.(*WordCount)

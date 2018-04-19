@@ -6,9 +6,9 @@ import (
 )
 
 type TCPSourceConfig struct {
-	host string
-	port string
-	decoder wa.Decoder
+	host      string
+	port      string
+	decoder   wa.Decoder
 	decoderId uint64
 }
 
@@ -29,10 +29,10 @@ func (tsc *TCPSourceConfig) SourceConfigRepr() interface{} {
 	return repr.MakeTCPSourceConfig(tsc.host, tsc.port, tsc.decoderId)
 }
 
-type TCPSinkConfig struct  {
-	host string
-	port string
-	encoder wa.Encoder
+type TCPSinkConfig struct {
+	host      string
+	port      string
+	encoder   wa.Encoder
 	encoderId uint64
 }
 

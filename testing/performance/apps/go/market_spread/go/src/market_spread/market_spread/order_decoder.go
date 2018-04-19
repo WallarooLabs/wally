@@ -2,7 +2,7 @@ package market_spread
 
 import "encoding/binary"
 
-type OrderDecoder struct {}
+type OrderDecoder struct{}
 
 func (decoder *OrderDecoder) HeaderLength() uint64 {
 	return 4

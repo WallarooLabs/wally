@@ -1,9 +1,9 @@
 package market_spread
 
 type OrderResult struct {
-	Order *Order
-	Bid float64
-	Offer float64
+	Order     *Order
+	Bid       float64
+	Offer     float64
 	Timestamp uint64
 }
 

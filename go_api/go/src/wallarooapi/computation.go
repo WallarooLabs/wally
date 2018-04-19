@@ -4,7 +4,7 @@ import "C"
 
 type Computation interface {
 	Name() string
-	Compute(data interface{}) interface {}
+	Compute(data interface{}) interface{}
 }
 
 //export ComputationName
@@ -36,7 +36,7 @@ func ComputationBuilderBuild(computationBuilderId uint64) uint64 {
 
 type ComputationMulti interface {
 	Name() string
-	Compute(data interface{}) []interface {}
+	Compute(data interface{}) []interface{}
 }
 
 //export ComputationMultiName

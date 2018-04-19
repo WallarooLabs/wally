@@ -37,7 +37,7 @@ var Deserialize func([]byte) interface{} = func([]byte) interface{} {
 }
 
 type SerializedDict struct {
-	id uint64
+	id         uint64
 	buffermaps ConcurrentMap
 }
 
@@ -91,7 +91,7 @@ func ComponentDeserializeWrapper(buff unsafe.Pointer, componentTypeId uint64) ui
 	sizeBuff := C.GoBytes(buff, 4)
 	payloadSize := binary.BigEndian.Uint32(sizeBuff)
 	// turn the whole buffer into a byte slice, then skip first 4 bytes
-	payloadBuff := C.GoBytes(buff, 4 + C.int(payloadSize))[4:]
+	payloadBuff := C.GoBytes(buff, 4+C.int(payloadSize))[4:]
 	component := Deserialize(payloadBuff)
 	return AddComponent(component, componentTypeId)
 }

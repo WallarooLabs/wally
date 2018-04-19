@@ -9,11 +9,11 @@ func makePipeline(name string, sourceConfig SourceConfig) *pipeline {
 }
 
 type pipeline struct {
-	name string
+	name         string
 	sourceConfig SourceConfig
-	partitions []*Partition
-	components []repr.ComponentRepresentable
-	connections []repr.ConnectionRepresentable
+	partitions   []*Partition
+	components   []repr.ComponentRepresentable
+	connections  []repr.ConnectionRepresentable
 }
 
 func (p *pipeline) newStepId() uint64 {

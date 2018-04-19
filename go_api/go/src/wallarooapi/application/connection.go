@@ -3,7 +3,7 @@ package application
 import "wallarooapi/application/repr"
 
 type Step struct {
-	stepId uint64
+	stepId     uint64
 	fromStepId uint64
 }
 
@@ -26,11 +26,11 @@ func makeToStatePartition(stepId uint64, fromStepId uint64, stateComputationId u
 
 type ToStatePartition struct {
 	*Step
-	stateComputationId uint64
-	stateBuilderId uint64
-	stateName string
+	stateComputationId  uint64
+	stateBuilderId      uint64
+	stateName           string
 	partitionFunctionId uint64
-	partitionId uint64
+	partitionId         uint64
 }
 
 func (tsp *ToStatePartition) Repr() interface{} {

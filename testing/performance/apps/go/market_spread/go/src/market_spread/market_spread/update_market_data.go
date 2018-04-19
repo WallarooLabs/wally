@@ -1,6 +1,6 @@
 package market_spread
 
-type UpdateMarketData struct {}
+type UpdateMarketData struct{}
 
 func (umd *UpdateMarketData) Name() string {
 	return "Update Market Data"

@@ -11,7 +11,7 @@ func MakeApplication(name string) *application {
 }
 
 type application struct {
-	name string
+	name      string
 	pipelines []*pipeline
 }
 
@@ -41,8 +41,8 @@ func makePipelineBuilder(lastStepId uint64, app *application, pipeline *pipeline
 
 type pipelineBuilder struct {
 	lastStepId uint64
-	app *application
-	pipeline *pipeline
+	app        *application
+	pipeline   *pipeline
 }
 
 func (pb *pipelineBuilder) To(computationBuilder wa.ComputationBuilder) *pipelineBuilder {

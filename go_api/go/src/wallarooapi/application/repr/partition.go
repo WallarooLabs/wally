@@ -5,8 +5,8 @@ func MakePartition(partitionFunctionId uint64, partitionListId uint64, partition
 }
 
 type Partition struct {
-	Class string
+	Class               string
 	PartitionFunctionId uint64
-	PartitionListId uint64
-	PartitionId uint64
+	PartitionListId     uint64
+	PartitionId         uint64
 }

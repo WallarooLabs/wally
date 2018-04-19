@@ -4,7 +4,7 @@ import "C"
 
 type StateComputation interface {
 	Name() string
-	Compute(data interface{}, state interface{}) (interface {}, bool)
+	Compute(data interface{}, state interface{}) (interface{}, bool)
 }
 
 //export StateComputationName
@@ -32,7 +32,7 @@ func StateComputationCompute(computationId uint64, dataId uint64, stateId uint64
 
 type StateComputationMulti interface {
 	Name() string
-	Compute(data interface{}, state interface{}) ([]interface {}, bool)
+	Compute(data interface{}, state interface{}) ([]interface{}, bool)
 }
 
 //export StateComputationMultiName
@@ -67,7 +67,7 @@ func StateComputationMultiCompute(computationId uint64, dataId uint64, stateId u
 }
 
 type StateBuilder interface {
-	Build() interface {}
+	Build() interface{}
 }
 
 //export StateBuilderBuild

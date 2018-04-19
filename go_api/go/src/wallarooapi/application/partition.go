@@ -8,7 +8,7 @@ func MakePartition(partitionFunctionId uint64, partitionListId uint64) *Partitio
 
 type Partition struct {
 	partitionFunctionId uint64
-	partitionListId uint64
+	partitionListId     uint64
 }
 
 func (p *Partition) Repr(idx uint64) *repr.Partition {

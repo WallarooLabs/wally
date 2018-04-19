@@ -27,7 +27,7 @@ func KafkaEncoderEncode(encoderId uint64, dataId uint64, value *unsafe.Pointer, 
 	encoder := GetComponent(encoderId, EncoderTypeId).(KafkaEncoder)
 	data := GetComponent(dataId, DataTypeId)
 	valueRes, keyRes, partId := encoder.Encode(data)
-        *partitionId = partId
+	*partitionId = partId
 	*valueSize = uint64(len(valueRes))
 	*keySize = uint64(len(keyRes))
 	if *valueSize > 0 {
