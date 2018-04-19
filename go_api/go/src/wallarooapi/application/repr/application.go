@@ -5,8 +5,8 @@ func MakeApplication(name string) *Application {
 }
 
 type Application struct {
-	Class string
-	Name string
+	Class     string
+	Name      string
 	Pipelines []*Pipeline
 }
 
@@ -19,12 +19,12 @@ func MakePipeline(name string) *Pipeline {
 }
 
 type Pipeline struct {
-	Class string
-	Name string
-	Partitions []*Partition
-	Components []*Component
+	Class       string
+	Name        string
+	Partitions  []*Partition
+	Components  []*Component
 	Connections []interface{}
- 	Source interface{}
+	Source      interface{}
 }
 
 func (p *Pipeline) AddPartition(partition *Partition) {

@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 )
 
-type MarketDataDecoder struct {}
+type MarketDataDecoder struct{}
 
 func (decoder *MarketDataDecoder) HeaderLength() uint64 {
 	return 4

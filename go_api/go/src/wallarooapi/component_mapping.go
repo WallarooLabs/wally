@@ -6,17 +6,17 @@ import (
 )
 
 const (
-	DataTypeId uint64 = 0
-	ComputationTypeId uint64 = 1
+	DataTypeId               uint64 = 0
+	ComputationTypeId        uint64 = 1
 	ComputationBuilderTypeId uint64 = 2
-	StateComputationTypeId uint64 = 3
-	PartitionFunctionTypeId uint64 = 4
-	PartitionListTypeId uint64 = 5
-	EncoderTypeId = 6
-	DecoderTypeId = 7
-	StateTypeId = 8
-	StateBuilderTypeId = 9
-	LastTypeId = 10
+	StateComputationTypeId   uint64 = 3
+	PartitionFunctionTypeId  uint64 = 4
+	PartitionListTypeId      uint64 = 5
+	EncoderTypeId                   = 6
+	DecoderTypeId                   = 7
+	StateTypeId                     = 8
+	StateBuilderTypeId              = 9
+	LastTypeId                      = 10
 )
 
 const numComponentTypes uint64 = LastTypeId
@@ -34,7 +34,7 @@ func makeComponentDicts() []*ComponentDict {
 var componentDicts = makeComponentDicts()
 
 type ComponentDict struct {
-	id uint64
+	id         uint64
 	components ConcurrentMap
 }
 

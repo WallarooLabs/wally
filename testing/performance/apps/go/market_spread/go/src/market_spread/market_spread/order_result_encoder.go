@@ -12,7 +12,7 @@ func byteSliceFromFloat64(f float64) []byte {
 	return buff
 }
 
-type OrderResultEncoder struct {}
+type OrderResultEncoder struct{}
 
 func (ore *OrderResultEncoder) Encode(data interface{}) []byte {
 	messageSize := 56

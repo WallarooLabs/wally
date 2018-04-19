@@ -2,7 +2,7 @@ package wallarooapi
 
 import "C"
 
-type ApplicationBuilder struct {}
+type ApplicationBuilder struct{}
 
 func MakeApplicationBuilder() *ApplicationBuilder {
 	return &ApplicationBuilder{}

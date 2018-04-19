@@ -5,7 +5,7 @@ type ComponentRepresentable interface {
 }
 
 type Component struct {
-	Class string
+	Class       string
 	ComponentId uint64
 }
 
