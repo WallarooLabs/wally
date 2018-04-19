@@ -73,7 +73,7 @@ actor Main
       usage(env.out)
     end
 
-  fun usage(out: StdStream) =>
+  fun usage(out: OutStream) =>
     out.print(
       "data_receiver [OPTIONS]\n" +
       "Required: \n" +
@@ -87,13 +87,13 @@ actor Main
       )
 
 class ListenerNotify is TCPListenNotify
-  let _stdout: StdStream
-  let _stderr: StdStream
+  let _stdout: OutStream
+  let _stderr: OutStream
   let _input_mode: InputMode
   let _output_mode: OutputMode
 
-  new iso create(stdout: StdStream,
-    stderr: StdStream,
+  new iso create(stdout: OutStream,
+    stderr: OutStream,
     input_mode: InputMode,
     output_mode: OutputMode)
   =>
@@ -109,13 +109,13 @@ class ListenerNotify is TCPListenNotify
     ConnectionNotify(_stdout, _stderr, _input_mode, _output_mode)
 
 class ConnectionNotify is TCPConnectionNotify
-  let _stdout: StdStream
-  let _stderr: StdStream
+  let _stdout: OutStream
+  let _stderr: OutStream
   let _input_mode: InputMode
   let _output_mode: OutputMode
   var _read_header: Bool = true
 
-  new iso create(so: StdStream, se: StdStream, i: InputMode, o: OutputMode) =>
+  new iso create(so: OutStream, se: OutStream, i: InputMode, o: OutputMode) =>
     _stdout = so
     _stderr = se
     _input_mode = i
