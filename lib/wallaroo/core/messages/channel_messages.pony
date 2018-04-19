@@ -769,6 +769,54 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
       metrics_id, worker_ingress_ts)
     false
 
+class val ForwardHashedMsg[Key: (Hashable val & Equatable[Key] val),
+  D: Any val] is ReplayableDeliveryMsg
+  let _target_state_name: String
+  let _target_key: Key
+  let _sender_name: String
+  let _data: D
+  let _metric_name: String
+  let _msg_uid: MsgId
+  let _frac_ids: FractionalMessageId
+
+  fun input(): Any val => _data
+  fun metric_name(): String => _metric_name
+  fun msg_uid(): U128 => _msg_uid
+  fun frac_ids(): FractionalMessageId => _frac_ids
+
+  new val create(t_s_n: String, tk: Key, from: String, m_data: D,
+    m_name: String, msg_uid': MsgId, frac_ids': FractionalMessageId)
+  =>
+    _target_state_name = t_s_n
+    _target_key = tk
+    _sender_name = from
+    _data = m_data
+    _metric_name = m_name
+    _msg_uid = msg_uid'
+    _frac_ids = frac_ids'
+
+  // !@ RETURNING 0 IS THE WRONG THING TO DO HERE, WHAT SHOULD WE DO?
+  fun target_id(): StepId => 0
+  fun sender_name(): String => _sender_name
+
+  fun deliver(pipeline_time_spent: U64, target_step: Consumer,
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  =>
+    target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+      producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+      worker_ingress_ts)
+    false
+
+  fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
+    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  =>
+    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
+      metrics_id, worker_ingress_ts)
+    false
+
 class val JoinClusterMsg is ChannelMsg
   """
   This message is sent from a worker requesting to join a running cluster to

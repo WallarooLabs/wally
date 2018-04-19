@@ -80,18 +80,21 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
 
     let base_partition_routes = _BasePartitionRoutesGenerator(event_log, auth,
       step1, boundary2, boundary3)
-    let base_hashed_routes = recover val Map[String, (Step | ProxyRouter)] end
+    // !@ DO SOMETHING CORRECT WITH BASE HASHED NODE ROUTES
+    let base_hashed_node_routes = recover val Map[String, HashedProxyRouter[String]] end
     let target_partition_routes = _TargetPartitionRoutesGenerator(event_log, auth,
       new_proxy_router, boundary2, boundary3)
 
     var base_router: PartitionRouter =
       LocalPartitionRouter[String, String, EmptyState]("s", "w1",
         consume base_local_map, consume base_step_ids, base_partition_routes,
-        base_hashed_routes, _PartitionFunctionGenerator())
+        base_hashed_node_routes, HashPartitions(recover [] end),
+        _PartitionFunctionGenerator())
     var target_router: PartitionRouter =
       LocalPartitionRouter[String, String, EmptyState]("s", "w2",
         consume target_local_map, consume target_step_ids, target_partition_routes,
-        base_hashed_routes, _PartitionFunctionGenerator())
+        base_hashed_node_routes, HashPartitions(recover [] end),
+        _PartitionFunctionGenerator())
     h.assert_eq[Bool](false, base_router == target_router)
 
     base_router = base_router.update_route[String]("k1", new_proxy_router)?
