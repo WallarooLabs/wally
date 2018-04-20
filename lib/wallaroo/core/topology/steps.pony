@@ -55,6 +55,9 @@ actor Step is (Producer & Consumer)
 
   var _step_message_processor: StepMessageProcessor = EmptyStepMessageProcessor
 
+  //!@
+  var _normal_processing_mode: Bool = false
+
   let _routes: MapIs[Consumer, Route] = _routes.create()
   var _upstreams: SetIs[Producer] = _upstreams.create()
 
@@ -122,6 +125,8 @@ actor Step is (Producer & Consumer)
     end
 
     _step_message_processor = NormalStepMessageProcessor(this)
+    //!@
+    _normal_processing_mode = true
 
   //
   // Application startup lifecycle event
@@ -311,15 +316,17 @@ actor Step is (Producer & Consumer)
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
-    match _step_message_processor
-    | let nmp: NormalStepMessageProcessor =>
+    if _normal_processing_mode then
       process_message[D](metric_name, pipeline_time_spent, data,
         i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts)
-    | let qmp: QueueingStepMessageProcessor =>
-      qmp.run[D](metric_name, pipeline_time_spent, data,
-        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
+    else
+      match _step_message_processor
+      | let qmp: QueueingStepMessageProcessor =>
+        qmp.run[D](metric_name, pipeline_time_spent, data,
+          i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+          latest_ts, metrics_id, worker_ingress_ts)
+      end
     end
 
   fun ref process_message[D: Any val](metric_name: String,
@@ -515,6 +522,7 @@ actor Step is (Producer & Consumer)
     match _step_message_processor
     | let nmp: NormalStepMessageProcessor =>
       _step_message_processor = QueueingStepMessageProcessor(this)
+      _normal_processing_mode = false
     end
     if not _in_flight_ack_waiter.already_added_request(requester_id) then
       _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
@@ -548,6 +556,7 @@ actor Step is (Producer & Consumer)
         qmp.flush(_omni_router)
 
         _step_message_processor = NormalStepMessageProcessor(this)
+        _normal_processing_mode = true
       end
       if _routes.size() > 0 then
         for r in _routes.values() do
@@ -590,6 +599,7 @@ actor Step is (Producer & Consumer)
         | let shipped_state: ShippedState =>
           _step_message_processor = QueueingStepMessageProcessor(this,
             shipped_state.pending_messages)
+          _normal_processing_mode = false
           StepStateMigrator.receive_state(_runner, shipped_state.state_bytes)
         else
           Fail()
