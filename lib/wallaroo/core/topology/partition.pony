@@ -201,7 +201,7 @@ class val KeyedStateSubpartition[PIn: Any val,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer]):
+    data_routes: Map[StepId, Consumer]):
     LocalPartitionRouter[PIn, Key, S] val
   =>
     let routes = recover trn Map[Key, (Step | ProxyRouter)] end
