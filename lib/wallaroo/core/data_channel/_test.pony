@@ -83,7 +83,7 @@ class _TestDataChannel is DataChannelListenNotify
         where event_log = event_log)
       let dr = DataReceivers(auth, conns, "worker_name")
       let rr = RouterRegistry(auth, "worker_name", dr, conns,
-        _DummyRecoveryFileCleaner, 1)
+        _DummyRecoveryFileCleaner, 1, false)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
       h.dispose_when_done(conns)
       h.complete_action("server create")

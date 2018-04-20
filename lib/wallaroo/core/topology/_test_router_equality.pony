@@ -290,7 +290,8 @@ primitive _BoundaryGenerator
 primitive _RouterRegistryGenerator
   fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
     RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
-      _ConnectionsGenerator(env, auth), _DummyRecoveryFileCleaner, 0)
+      _ConnectionsGenerator(env, auth), _DummyRecoveryFileCleaner, 0,
+      false)
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>

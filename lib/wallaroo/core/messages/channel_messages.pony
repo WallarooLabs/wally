@@ -264,6 +264,11 @@ primitive ChannelMsgEncoder
     """
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)?
 
+  fun initiate_stop_the_world_for_join_migration(
+    new_workers: Array[String] val, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(InitiateStopTheWorldForJoinMigrationMsg(new_workers), auth)?
+
   fun initiate_join_migration(new_workers: Array[String] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -274,6 +279,13 @@ primitive ChannelMsgEncoder
     migration as well.
     """
     _encode(InitiateJoinMigrationMsg(new_workers), auth)?
+
+  fun autoscale_complete(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    """
+    The autoscale coordinator sends this message to indicate that autoscale is
+    complete.
+    """
+    _encode(AutoscaleCompleteMsg, auth)?
 
   fun leaving_worker_done_migrating(worker_name: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -299,6 +311,23 @@ primitive ChannelMsgEncoder
     Array[ByteSeq] val ?
   =>
     _encode(AnnounceConnectionsMsg(control_addrs, data_addrs), auth)?
+
+  fun announce_joining_workers(sender: String,
+    control_addrs: Map[String, (String, String)] val,
+    data_addrs: Map[String, (String, String)] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(AnnounceJoiningWorkersMsg(sender, control_addrs, data_addrs),
+      auth)?
+
+  fun connected_to_joining_workers(sender: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    Once a non-coordinator in the autoscale protocol connects boundaries to
+    all joining workers, it informs the coordinator.
+    """
+    _encode(ConnectedToJoiningWorkersMsg(sender), auth)?
 
   fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: StepId, worker_name: String, key: K, state_name: String,
@@ -782,11 +811,19 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
     control_addr = c_addr
     data_addr = d_addr
 
+class val InitiateStopTheWorldForJoinMigrationMsg is ChannelMsg
+  let new_workers: Array[String] val
+
+  new val create(ws: Array[String] val) =>
+    new_workers = ws
+
 class val InitiateJoinMigrationMsg is ChannelMsg
   let new_workers: Array[String] val
 
   new val create(ws: Array[String] val) =>
     new_workers = ws
+
+primitive AutoscaleCompleteMsg is ChannelMsg
 
 class val LeavingWorkerDoneMigratingMsg is ChannelMsg
   let worker_name: String
@@ -804,6 +841,25 @@ class val AnnounceConnectionsMsg is ChannelMsg
   =>
     control_addrs = c_addrs
     data_addrs = d_addrs
+
+class val AnnounceJoiningWorkersMsg is ChannelMsg
+  let sender: String
+  let control_addrs: Map[String, (String, String)] val
+  let data_addrs: Map[String, (String, String)] val
+
+  new val create(sender': String,
+    c_addrs: Map[String, (String, String)] val,
+    d_addrs: Map[String, (String, String)] val)
+  =>
+    sender = sender'
+    control_addrs = c_addrs
+    data_addrs = d_addrs
+
+class val ConnectedToJoiningWorkersMsg is ChannelMsg
+  let sender: String
+
+  new val create(sender': String) =>
+    sender = sender'
 
 trait val AnnounceNewStatefulStepMsg is ChannelMsg
   fun update_registry(r: RouterRegistry)

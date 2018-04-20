@@ -233,6 +233,9 @@ class InFlightAckWaiter
     Return true if this is the first time we've seen this in_flight_resume_ack_id.
     """
     ifdef debug then
+      // If a step has already migrated, then it should no longer be part
+      // of the acking protocol. Its upstreams should have already updated
+      // to route messages to the new step.
       Invariant(not _has_migrated)
     end
 

@@ -28,6 +28,11 @@ trait tag Cluster
   be send_control_to_cluster(data: Array[ByteSeq] val) =>
     None
 
+  be send_control_to_cluster_with_exclusions(data: Array[ByteSeq] val,
+    exclusions: Array[String] val)
+  =>
+    None
+
   be send_data(worker: String, data: Array[ByteSeq] val) =>
     None
 
@@ -53,7 +58,7 @@ trait tag Cluster
   be request_cluster_unmute() =>
     None
 
-  be inform_cluster_of_join() =>
+  be inform_contacted_worker_of_join(contacted_worker: String) =>
     None
 
   be inform_worker_of_boundary_count(target_worker: String, count: USize) =>
