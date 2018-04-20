@@ -1,5 +1,6 @@
 use "collections"
 use "crypto"
+use "wallaroo_labs/mort"
 
 class val HashPartitions
   let _lower_bounds: Array[U128]
@@ -51,7 +52,7 @@ class val HashPartitions
         last_idx = last_idx - step
       end
     end
-    // Should be unreachable
+    Unreachable()
     ""
 
   fun get_claimant_by_key(key: ByteSeq): String ? =>
