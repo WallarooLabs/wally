@@ -845,23 +845,18 @@ class val DataRouter is Equatable[DataRouter]
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataRouter\n".cstring())
     end
-    let target_id = d_msg.target_id()
     try
-      let target = _data_routes(target_id)?
       ifdef "trace" then
         @printf[I32]("DataRouter found Step\n".cstring())
       end
-      try
-        let route_id = _target_ids_to_route_ids(target_id)?
-        d_msg.deliver(pipeline_time_spent, target, producer_id, producer,
-          seq_id, route_id, latest_ts, metrics_id, worker_ingress_ts)
-        ifdef "resilience" then
-          producer.bookkeeping(route_id, seq_id)
-        end
-      else
-        // This shouldn't happen. If we have a route, we should have a route
-        // id.
-        Fail()
+      (_, let route_id) = d_msg.deliver(pipeline_time_spent, producer_id, producer,
+        seq_id, latest_ts, metrics_id, worker_ingress_ts,
+        _data_routes,
+        _target_ids_to_route_ids,
+        _route_ids_to_target_ids
+         )?
+      ifdef "resilience" then
+        producer.bookkeeping(route_id, seq_id)
       end
     else
       Fail()
@@ -1123,6 +1118,11 @@ class val LocalPartitionRouter[In: Any val,
       | let input: In =>
         let key = _partition_function(input)
         try
+          // !@ This is slow in the hot path, we shouldn't do something that's
+          // likely to raise an error. We should probably do the hash lookup
+          // first and check which worker handles this key, and if it is the
+          // worker that we're on then we should look it up in
+          // _partition_routes, otherwise send along to the correct worker.
           match _partition_routes(key)?
           | let s: Step =>
             let might_be_route = producer.route_to(s)
@@ -1140,6 +1140,7 @@ class val LocalPartitionRouter[In: Any val,
               Fail()
               (true, latest_ts)
             end
+          // !@ We shouldn't have a proxy router anymore
           | let p: ProxyRouter =>
             p.route[D](metric_name, pipeline_time_spent, data, producer_id,
               producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
@@ -1150,10 +1151,14 @@ class val LocalPartitionRouter[In: Any val,
             iftype Key <: String then
               let node = _hash_partitions.get_claimant_by_key(key)?
               let r = _hashed_node_routes(node)?
-              r.route[D](metric_name, pipeline_time_spent, data, producer_id,
+              let msg = r.build_msg[D](metric_name, pipeline_time_spent, data,
+                key, producer_id, producer, i_msg_uid, frac_ids, latest_ts,
+                metrics_id, worker_ingress_ts)
+              r.route[ForwardHashedMsg[Key, D]](metric_name, pipeline_time_spent, msg, producer_id,
                 producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
                 worker_ingress_ts)
             else
+              Fail()
               error
             end
           else
@@ -1889,6 +1894,20 @@ class val HashedProxyRouter[Key: (Hashable val & Equatable[Key] val)] is
     _target_state_name = target_state_name
     _auth = auth
 
+  fun build_msg[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, key: Key, producer_id: StepId, producer: Producer ref,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64): ForwardHashedMsg[Key, D]
+  =>
+    ForwardHashedMsg[Key, D](
+      _target_state_name,
+      key,
+      _worker_name,
+      data,
+      metric_name,
+      i_msg_uid,
+      frac_ids)
+
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer_id: StepId, producer: Producer ref, i_msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
@@ -1905,17 +1924,13 @@ class val HashedProxyRouter[Key: (Hashable val & Equatable[Key] val)] is
         @printf[I32]("HashedProxyRouter found Route\n".cstring())
       end
 
-      // let delivery_msg = ForwardHashedMsg[Key, D](
-      //   _target_state_name,
-      //   key,
-      //   _worker_name,
-      //   data,
-      //   metric_name,
-      //   i_msg_uid,
-      //   frac_ids)
-
-      // r.forward(delivery_msg, pipeline_time_spent, producer,
-      //   latest_ts, metrics_id, metric_name, worker_ingress_ts)
+      match data
+      | let m: ReplayableDeliveryMsg =>
+        r.forward(m, pipeline_time_spent, producer,
+          latest_ts, metrics_id, metric_name, worker_ingress_ts)
+      else
+        Fail()
+      end
 
       @printf[I32]("!@ GOT A MESSAGE TO ROUTE VIA CONSITENT HASHING\n".cstring())
 

@@ -431,6 +431,8 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
         for key in ks.values() do
           try
             m(key) = ProxyAddress(ws(idx)?, _step_id_map(key)?)
+          else
+            Fail()
           end
           idx = (idx + 1) % w_count
         end
