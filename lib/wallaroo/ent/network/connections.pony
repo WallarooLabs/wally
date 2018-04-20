@@ -21,16 +21,17 @@ use "wallaroo"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/router_registry"
-use "wallaroo/ent/spike"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/spike"
+use "wallaroo_labs/collection_helpers"
+use "wallaroo_labs/mort"
 
 
 actor Connections is Cluster
@@ -194,9 +195,18 @@ actor Connections is Cluster
   be send_control_to_cluster(data: Array[ByteSeq] val) =>
     _send_control_to_cluster(data)
 
-  fun _send_control_to_cluster(data: Array[ByteSeq] val) =>
+  be send_control_to_cluster_with_exclusions(data: Array[ByteSeq] val,
+    exclusions: Array[String] val)
+  =>
+    _send_control_to_cluster(data, exclusions)
+
+  be _send_control_to_cluster(data: Array[ByteSeq] val,
+    exclusions: Array[String] val = recover Array[String] end)
+  =>
     for worker in _control_conns.keys() do
-      _send_control(worker, data)
+      if not ArrayHelpers[String].contains[String](exclusions, worker) then
+        _send_control(worker, data)
+      end
     end
 
   be send_control_to_random(data: Array[ByteSeq] val) =>
@@ -264,6 +274,27 @@ actor Connections is Cluster
       else
         Fail()
       end
+    end
+
+  be notify_current_workers_of_joining_addresses(joining_workers:
+    Array[String] val)
+  =>
+    let joining_control = recover iso Map[String, (String, String)] end
+    let joining_data = recover iso Map[String, (String, String)] end
+    for jw in joining_workers.values() do
+      try
+        joining_control(jw) = _control_addrs(jw)?
+        joining_data(jw) = _data_addrs(jw)?
+      else
+        Fail()
+      end
+    end
+    try
+      let msg = ChannelMsgEncoder.announce_joining_workers(_worker_name,
+        consume joining_control, consume joining_data, _auth)?
+      _send_control_to_cluster(msg where exclusions = joining_workers)
+    else
+      Fail()
     end
 
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
@@ -732,17 +763,20 @@ actor Connections is Cluster
       end
     end
 
-  be inform_cluster_of_join() =>
+  be inform_contacted_worker_of_initialization(contacted_worker: String) =>
     try
       if not _has_registered_my_addrs() then
-        @printf[I32](("Cannot inform cluster of join: my addresses have not " +
-          "yet been registered. Is there something else listening on ports " +
-          "I was assigned?\n").cstring())
+        @printf[I32](("Cannot inform contacted worker of join: my addresses " +
+          "have not yet been registered. Is there something else listening " +
+          "on ports I was assigned?\n").cstring())
         Fail()
       end
+      @printf[I32](("Sending message to contacted worker %s, informing " +
+        "I have completed initialization\n").cstring(),
+        contacted_worker.cstring())
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
         _my_control_addr, _my_data_addr, _auth)?
-      _send_control_to_cluster(msg)
+      _send_control(contacted_worker, msg)
     else
       Fail()
     end

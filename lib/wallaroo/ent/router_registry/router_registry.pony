@@ -24,6 +24,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo/ent/autoscale"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -94,13 +95,11 @@ actor RouterRegistry is InFlightAckRequester
   //////
   // Partition Migration
   //////
+  var _autoscale: (Autoscale | None) = None
 
   var _stop_the_world_in_process: Bool = false
 
   var _leaving_in_process: Bool = false
-  var _joining_worker_count: USize = 0
-  let _initialized_joining_workers: _StringSet =
-    _initialized_joining_workers.create()
   // Steps migrated out and waiting for acknowledgement
   let _step_waiting_list: SetIs[U128] = _step_waiting_list.create()
   // Workers in running cluster that have been stopped for migration
@@ -127,9 +126,14 @@ actor RouterRegistry is InFlightAckRequester
 
   var _initiated_stop_the_world: Bool = false
 
+  // If this is a worker that joined during an autoscale event, then there
+  // is one worker we contacted to join.
+  let _contacted_worker: (String | None)
+
   new create(auth: AmbientAuth, worker_name: String,
     data_receivers: DataReceivers, c: Connections,
-    recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64)
+    recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64,
+    is_joining: Bool, contacted_worker: (String | None) = None)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -141,6 +145,8 @@ actor RouterRegistry is InFlightAckRequester
     _id = (digestof this).u128()
     _in_flight_ack_waiter = InFlightAckWaiter(_id)
     _data_receivers.set_router_registry(this)
+    _contacted_worker = contacted_worker
+    _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining)
 
   fun _worker_count(): USize =>
     _outgoing_boundaries.size() + 1
@@ -229,7 +235,7 @@ actor RouterRegistry is InFlightAckRequester
     if _waiting_to_finish_join and
       (_control_channel_listeners.size() != 0)
     then
-      _inform_cluster_of_join()
+      _inform_contacted_worker_of_initialization()
       _waiting_to_finish_join = false
     end
 
@@ -238,7 +244,7 @@ actor RouterRegistry is InFlightAckRequester
     if _waiting_to_finish_join and
       (_data_channel_listeners.size() != 0)
     then
-      _inform_cluster_of_join()
+      _inform_contacted_worker_of_initialization()
       _waiting_to_finish_join = false
     end
 
@@ -555,73 +561,74 @@ actor RouterRegistry is InFlightAckRequester
     lti.set_omni_router(new_omni_router)
     lti.initialize_join_initializables()
 
-  be inform_joining_worker(conn: TCPConnection, worker: String,
-    worker_count: USize, local_topology: LocalTopology)
+  be worker_join(conn: TCPConnection, worker: String,
+    worker_count: USize, local_topology: LocalTopology,
+    current_worker_count: USize)
   =>
-    if _joining_worker_count == 0 then
-      _joining_worker_count = worker_count
-    end
-    if (_joining_worker_count > 0) and (worker_count != _joining_worker_count)
-    then
-      @printf[I32]("Join error: Joining worker supplied invalid worker count\n"
-        .cstring())
-      let error_msg = "All joining workers must supply the same worker " +
-        "count. Current pending count is " + _joining_worker_count.string() +
-        ". You supplied " + worker_count.string() + "."
-      try
-        let msg = ChannelMsgEncoder.inform_join_error(error_msg, _auth)?
-        conn.writev(msg)
-      else
-        Fail()
-      end
-    elseif worker_count < 1 then
-      @printf[I32](("Join error: Joining worker supplied a worker count " +
-        "less than 1\n").cstring())
-      let error_msg = "Joining worker must supply a worker count greater " +
-        "than 0."
-      try
-        let msg = ChannelMsgEncoder.inform_join_error(error_msg, _auth)?
-        conn.writev(msg)
-      else
-        Fail()
-      end
+    try
+      (_autoscale as Autoscale).worker_join(conn, worker, worker_count,
+        local_topology, current_worker_count)
     else
-      let state_blueprints =
-        recover trn Map[String, PartitionRouterBlueprint] end
-      for (w, r) in _partition_routers.pairs() do
-        state_blueprints(w) = r.blueprint()
-      end
-
-      let stateless_blueprints =
-        recover trn Map[U128, StatelessPartitionRouterBlueprint] end
-      for (id, r) in _stateless_partition_routers.pairs() do
-        stateless_blueprints(id) = r.blueprint()
-      end
-
-      let omni_router_blueprint =
-        match _omni_router
-        | let omr: OmniRouter =>
-          omr.blueprint()
-        else
-          Fail()
-          EmptyOmniRouterBlueprint
-        end
-
-      _connections.inform_joining_worker(conn, worker, local_topology,
-        consume state_blueprints, consume stateless_blueprints,
-        omni_router_blueprint)
+      Fail()
     end
 
-  be inform_cluster_of_join() =>
-    _inform_cluster_of_join()
-
-  fun ref _inform_cluster_of_join() =>
-    if (_data_channel_listeners.size() != 0) and
-       (_control_channel_listeners.size() != 0)
-    then
-      _connections.inform_cluster_of_join()
+  be connect_to_joining_workers(ws: Array[String] val, coordinator: String) =>
+    try
+      (_autoscale as Autoscale).connect_to_joining_workers(ws, coordinator)
     else
-      _waiting_to_finish_join = true
+      Fail()
+    end
+
+  be joining_worker_initialized(worker: String) =>
+    try
+      (_autoscale as Autoscale).joining_worker_initialized(worker)
+    else
+      Fail()
+    end
+
+  fun inform_joining_worker(conn: TCPConnection, worker: String,
+    local_topology: LocalTopology)
+  =>
+    let state_blueprints =
+      recover trn Map[String, PartitionRouterBlueprint] end
+    for (w, r) in _partition_routers.pairs() do
+      state_blueprints(w) = r.blueprint()
+    end
+
+    let stateless_blueprints =
+      recover trn Map[U128, StatelessPartitionRouterBlueprint] end
+    for (id, r) in _stateless_partition_routers.pairs() do
+      stateless_blueprints(id) = r.blueprint()
+    end
+
+    let omni_router_blueprint =
+      match _omni_router
+      | let omr: OmniRouter =>
+        omr.blueprint()
+      else
+        Fail()
+        EmptyOmniRouterBlueprint
+      end
+
+    _connections.inform_joining_worker(conn, worker, local_topology,
+      consume state_blueprints, consume stateless_blueprints,
+      omni_router_blueprint)
+
+  be inform_contacted_worker_of_initialization() =>
+    _inform_contacted_worker_of_initialization()
+
+  fun ref _inform_contacted_worker_of_initialization() =>
+    match _contacted_worker
+    | let cw: String =>
+      if (_data_channel_listeners.size() != 0) and
+         (_control_channel_listeners.size() != 0)
+      then
+        _connections.inform_contacted_worker_of_initialization(cw)
+      else
+        _waiting_to_finish_join = true
+      end
+    else
+      Fail()
     end
 
   be inform_worker_of_boundary_count(target_worker: String) =>
@@ -674,7 +681,7 @@ actor RouterRegistry is InFlightAckRequester
     log file rotation, followed by snapshotting of all states on the worker
     to the new file, before unmuting upstream and resuming processing.
     """
-    _initiated_stop_the_world = true
+    initiate_stop_the_world()
     _stop_the_world_in_process = true
     _stop_the_world_for_log_rotation()
 
@@ -710,44 +717,32 @@ actor RouterRegistry is InFlightAckRequester
   //////////////
   // NEW WORKER PARTITION MIGRATION
   //////////////
-  be joining_worker_initialized(worker: String) =>
-    """
-    When a joining worker has initialized its topology, it contacts all
-    current workers. This behavior is called when that control
-    message is received.
-    """
-    if _joining_worker_count == 0 then
-      ifdef debug then
-        @printf[I32](("Joining worker reported as initialized, but we're " +
-          "not waiting for it. This should mean that either we weren't the " +
-          "worker contacted for the join or we're also joining.\n").cstring())
-      end
-      return
-    end
-    _initialized_joining_workers.set(worker)
-    if _initialized_joining_workers.size() == _joining_worker_count then
-      let nws = recover trn Array[String] end
-      for w in _initialized_joining_workers.values() do
-        nws.push(w)
-      end
-      let new_workers = consume val nws
-      _connections.notify_joining_workers_of_joining_addresses(new_workers)
-      try
-        let msg =
-          ChannelMsgEncoder.initiate_join_migration(new_workers, _auth)?
-        _connections.send_control_to_cluster(msg)
-      else
-        Fail()
-      end
-      // TODO: Where should this line go?
-      _initiated_stop_the_world = true
-
-      _migrate_onto_new_workers(new_workers)
-      _initialized_joining_workers.clear()
-      _joining_worker_count = 0
+  be report_connected_to_joining_worker(connected_worker: String) =>
+    try
+      (_autoscale as Autoscale).worker_connected_to_joining_workers(
+        connected_worker)
+    else
+      Fail()
     end
 
-  be remote_migration_request(new_workers: Array[String] val) =>
+  be remote_stop_the_world_for_join_migration_request(
+    joining_workers: Array[String] val)
+  =>
+    """
+    Only one worker is contacted by all joining workers to indicate that a
+    join is requested. That worker, when it's ready to stop the world in
+    preparation for migration, sends a message to all other current workers,
+    telling them to it's time to stop the world. This behavior is called when
+    that message is received.
+    """
+    try
+      (_autoscale as Autoscale).stop_the_world_for_join_migration_initiated(
+        joining_workers)
+    else
+      Fail()
+    end
+
+  be remote_join_migration_request(joining_workers: Array[String] val) =>
     """
     Only one worker is contacted by all joining workers to indicate that a
     join is requested. That worker, when it's ready to begin step migration,
@@ -755,20 +750,44 @@ actor RouterRegistry is InFlightAckRequester
     migration to the joining workers as well. This behavior is called when
     that message is received.
     """
-    if not ArrayHelpers[String].contains[String](new_workers, _worker_name)
+    if not ArrayHelpers[String].contains[String](joining_workers, _worker_name)
     then
-      _migrate_onto_new_workers(new_workers)
+      try
+        (_autoscale as Autoscale).join_migration_initiated(joining_workers)
+      else
+        Fail()
+      end
+      //!@
+      // begin_join_migration(joining_workers)
     end
 
-  fun ref _migrate_onto_new_workers(new_workers: Array[String] val) =>
+  fun ref initiate_stop_the_world() =>
+    _initiated_stop_the_world = true
+    _stop_the_world_in_process = true
+
+  fun ref initiate_stop_the_world_for_grow_migration(
+    new_workers: Array[String] val)
+  =>
+    initiate_stop_the_world()
+    try
+      let msg = ChannelMsgEncoder.initiate_stop_the_world_for_join_migration(
+        new_workers, _auth)?
+      _connections.send_control_to_cluster_with_exclusions(msg, new_workers)
+    else
+      Fail()
+    end
+    _stop_the_world_for_grow_migration(new_workers)
+    _initiate_request_in_flight_acks(MigrationAction(this, new_workers))
+
+  fun ref stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
     """
-    Called when a new worker joins the cluster and we are ready to start
-    the partition migration process. We first trigger a pause to allow
-    in-flight messages to finish processing.
+    Called when new workers join the cluster and we are ready to start
+    the partition migration process. We first check that all
+    in-flight messages have finished processing.
     """
     _stop_the_world_in_process = true
     _stop_the_world_for_grow_migration(new_workers)
-    _initiate_request_in_flight_acks(MigrationAction(this, new_workers))
+    _initiate_request_in_flight_acks(ReadyForMigrationAction(this))
 
   fun ref _stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
     """
@@ -797,11 +816,28 @@ actor RouterRegistry is InFlightAckRequester
         _id, _leaving_workers, this)
       // We are done with this round of leaving workers
       _leaving_workers = recover Array[String] end
+
+      // TODO: This is not stricly correct, since this will be called when
+      // log rotation completes as well. We are not currently supporting
+      // log rotation. When we reinstate support, we need to distinguish
+      // the completion of different kinds of stop the world events.
+      try
+        (_autoscale as Autoscale).autoscale_complete()
+      else
+        Fail()
+      end
     end
 
   fun ref initiate_resume_the_world() =>
     _resume_all_remote()
     _resume_the_world(_worker_name)
+
+  be autoscale_complete() =>
+    try
+      (_autoscale as Autoscale).autoscale_complete()
+    else
+      Fail()
+    end
 
   be resume_the_world(initiator: String) =>
     """
@@ -815,9 +851,31 @@ actor RouterRegistry is InFlightAckRequester
     _resume_all_local()
     @printf[I32]("~~~Resuming message processing.~~~\n".cstring())
 
-  be begin_migration(target_workers: Array[String] val) =>
+  be ready_for_join_migration() =>
     """
-    Begin partition migration
+    Called by a non-coordinator during autoscale protocol to indicate that
+    we are ready to begin migration when the coordinator is.
+    """
+    try
+      (_autoscale as Autoscale).ready_for_join_migration()
+    else
+      Fail()
+    end
+
+  be initiate_join_migration(target_workers: Array[String] val) =>
+    // Inform other current workers to begin migration
+    try
+      let msg =
+        ChannelMsgEncoder.initiate_join_migration(target_workers, _auth)?
+      _connections.send_control_to_cluster_with_exclusions(msg, target_workers)
+    else
+      Fail()
+    end
+    begin_join_migration(target_workers)
+
+  fun ref begin_join_migration(target_workers: Array[String] val) =>
+    """
+    Begin partition migration to joining workers
     """
     if _partition_routers.size() == 0 then
       //no steps have been migrated
@@ -1210,7 +1268,7 @@ actor RouterRegistry is InFlightAckRequester
         @printf[I32]("-- -- %s\n".cstring(), w.cstring())
       end
       _stop_the_world_in_process = true
-      _initiated_stop_the_world = true
+      initiate_stop_the_world()
       _stop_the_world_for_shrink_migration()
       try
         let msg = ChannelMsgEncoder.prepare_shrink(remaining_workers,
@@ -1240,6 +1298,11 @@ actor RouterRegistry is InFlightAckRequester
   fun ref _prepare_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val)
   =>
+    try
+      (_autoscale as Autoscale).prepare_shrink()
+    else
+      Fail()
+    end
     for w in leaving_workers.values() do
       _remove_worker_from_omni_router(w)
     end
@@ -1268,6 +1331,11 @@ actor RouterRegistry is InFlightAckRequester
     as part of shrink to fit.
     """
     @printf[I32]("Beginning process of leaving cluster.\n".cstring())
+    try
+      (_autoscale as Autoscale).begin_leaving_migration()
+    else
+      Fail()
+    end
     _leaving_in_process = true
     _leaving_workers = leaving_workers
     if _partition_routers.size() == 0 then
@@ -1501,7 +1569,17 @@ class MigrationAction is CustomAction
     _target_workers = target_workers
 
   fun ref apply() =>
-    _registry.begin_migration(_target_workers)
+    _registry.initiate_join_migration(_target_workers)
+
+class ReadyForMigrationAction is CustomAction
+  let _registry: RouterRegistry
+
+  new iso create(registry: RouterRegistry)
+  =>
+    _registry = registry
+
+  fun ref apply() =>
+    _registry.ready_for_join_migration()
 
 class LeavingMigrationAction is CustomAction
   let _auth: AmbientAuth

@@ -286,7 +286,32 @@ actor LocalTopologyInitializer is LayoutInitializer
   be update_topology(t: LocalTopology) =>
     _topology = t
 
+  be connect_to_joining_workers(coordinator: String,
+    control_addrs: Map[String, (String, String)] val,
+    data_addrs: Map[String, (String, String)] val)
+  =>
+    let new_workers = recover iso Array[String] end
+    for w in control_addrs.keys() do new_workers.push(w) end
+    _router_registry.connect_to_joining_workers(consume new_workers,
+      coordinator)
+
+    for w in control_addrs.keys() do
+      try
+        let host = control_addrs(w)?._1
+        let control_addr = control_addrs(w)?
+        let data_addr = data_addrs(w)?
+        _add_joining_worker(w, host, control_addr, data_addr)
+      else
+        Fail()
+      end
+    end
+
   be add_joining_worker(w: String, joining_host: String,
+    control_addr: (String, String), data_addr: (String, String))
+  =>
+    _add_joining_worker(w, joining_host, control_addr, data_addr)
+
+  fun ref _add_joining_worker(w: String, joining_host: String,
     control_addr: (String, String), data_addr: (String, String))
   =>
     match _topology
@@ -1707,7 +1732,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       // Call this on router registry instead of Connections directly
       // to make sure that other messages on registry queues are
       // processed first
-      _router_registry.inform_cluster_of_join()
+      _router_registry.inform_contacted_worker_of_initialization()
     end
     _initialization_lifecycle_complete = true
 
@@ -1750,7 +1775,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
     end
 
-  be inform_joining_worker(conn: TCPConnection, worker_name: String,
+  be worker_join(conn: TCPConnection, worker_name: String,
     worker_count: USize)
   =>
     match _topology
@@ -1768,8 +1793,8 @@ actor LocalTopologyInitializer is LayoutInitializer
           Fail()
         end
       else
-        _router_registry.inform_joining_worker(conn, worker_name, worker_count,
-          t)
+        _router_registry.worker_join(conn, worker_name, worker_count,
+          t, t.worker_names.size())
       end
     else
       Fail()
