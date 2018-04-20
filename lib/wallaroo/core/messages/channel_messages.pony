@@ -710,9 +710,13 @@ class val ReplayMsg is ChannelMsg
 trait val DeliveryMsg is ChannelMsg
   fun target_id(): StepId
   fun sender_name(): String
-  fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun deliver(pipeline_time_spent: U64,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, StepId] val
+  ): (Bool, RouteId) ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
@@ -751,14 +755,25 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun target_id(): StepId => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun deliver(pipeline_time_spent: U64,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, StepId] val
+    ): (Bool, RouteId) ?
   =>
+    let target_step = data_routes(_target_id)?
+    ifdef "trace" then
+      @printf[I32]("DataRouter found Step\n".cstring())
+    end
+
+    let route_id = target_ids_to_route_ids(_target_id)?
+
     target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
       producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
-    false
+    (false, route_id)
 
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
     producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
@@ -799,14 +814,28 @@ class val ForwardHashedMsg[Key: (Hashable val & Equatable[Key] val),
   fun target_id(): StepId => 0
   fun sender_name(): String => _sender_name
 
-  fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun deliver(pipeline_time_spent: U64,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, StepId] val
+    ): (Bool, RouteId) ?
   =>
-    target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
-      producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
-      worker_ingress_ts)
-    false
+    // !@ FIX THIS
+    // let target_step = data_routes(_target_id)?
+    // ifdef "trace" then
+    //   @printf[I32]("DataRouter found Step\n".cstring())
+    // end
+
+    // let route_id = target_ids_to_route_ids(_target_id)?
+
+    // target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+    //   producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+    //   worker_ingress_ts)
+    // (false, route_id)
+
+    error
 
   fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
     producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
