@@ -390,56 +390,94 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
       | let w: String => recover val [w] end
       | let ws: Array[String] val => ws
       end)
+    let workers_to_keys = recover trn Map[String, Array[Key] val] end
 
-    match workers
-    | let w: String =>
-      // With one worker, all the keys go on that worker
-      match _partition.keys()
-      | let wks: Array[WeightedKey[Key]] val =>
-        for wkey in wks.values() do
-          try
-            m(wkey._1) = ProxyAddress(w, _step_id_map(wkey._1)?)
-          end
-        end
-      | let ks: Array[Key] val =>
-        for key in ks.values() do
-          try
-            m(key) = ProxyAddress(w, _step_id_map(key)?)
-          end
-        end
+    let unweighted_keys: Array[Key] val = match _partition.keys()
+    | let ks: Array[Key] val =>
+      ks
+    | let wks: Array[WeightedKey[Key]] val =>
+      let uwk = recover trn Array[Key] end
+      for wkey in wks.values() do
+        uwk.push(wkey._1)
       end
-    | let ws: Array[String] val =>
-      // With multiple workers, we need to determine our distribution of keys
-      let w_count = ws.size()
-      var idx: USize = 0
+      consume uwk
+    end
 
-      match _partition.keys()
-      | let wks: Array[WeightedKey[Key]] val =>
-        // Using weighted keys, we need to create a distribution that
-        // balances the weight across workers
-        try
-          let buckets = Weighted[Key](wks, ws.size())?
-          for worker_idx in Range(0, buckets.size()) do
-            for key in buckets(worker_idx)?.values() do
-              m(key) = ProxyAddress(ws(worker_idx)?, _step_id_map(key)?)
+    iftype Key <: String then
+      try
+        // match _partition.keys()
+        // | let ks: Array[Key] val =>
+          let wtk = Map[String, Array[Key]]
+
+          for key in unweighted_keys.values() do
+            let w = hash_partitions.get_claimant_by_key(key)?
+            wtk.upsert(w, recover trn [key] end,
+              {(x, y) => x.>append(y)})?
+          end
+
+          for (w, ks') in wtk.pairs() do
+            let a = recover trn Array[Key] end
+            for k in ks'.values() do
+              a.push(k)
+            end
+            workers_to_keys(w) = consume a
+          end
+        // end
+      else
+        Unreachable()
+      end
+    else
+      match workers
+      | let w: String =>
+        // With one worker, all the keys go on that worker
+        match _partition.keys()
+        | let wks: Array[WeightedKey[Key]] val =>
+          for wkey in wks.values() do
+            try
+              m(wkey._1) = ProxyAddress(w, _step_id_map(wkey._1)?)
+            end
+          end
+        | let ks: Array[Key] val =>
+          for key in ks.values() do
+            try
+              m(key) = ProxyAddress(w, _step_id_map(key)?)
             end
           end
         end
-      | let ks: Array[Key] val =>
-        // With unweighted keys, we simply distribute the keys equally across
-        // the workers
-        for key in ks.values() do
+      | let ws: Array[String] val =>
+        // With multiple workers, we need to determine our distribution of keys
+        let w_count = ws.size()
+        var idx: USize = 0
+
+        match _partition.keys()
+        | let wks: Array[WeightedKey[Key]] val =>
+          // Using weighted keys, we need to create a distribution that
+          // balances the weight across workers
           try
-            m(key) = ProxyAddress(ws(idx)?, _step_id_map(key)?)
-          else
-            Fail()
+            let buckets = Weighted[Key](wks, ws.size())?
+            for worker_idx in Range(0, buckets.size()) do
+              for key in buckets(worker_idx)?.values() do
+                m(key) = ProxyAddress(ws(worker_idx)?, _step_id_map(key)?)
+              end
+            end
           end
-          idx = (idx + 1) % w_count
+        | let ks: Array[Key] val =>
+          // With unweighted keys, we simply distribute the keys equally across
+          // the workers
+          for key in ks.values() do
+            try
+              m(key) = ProxyAddress(ws(idx)?, _step_id_map(key)?)
+            else
+              Fail()
+            end
+            idx = (idx + 1) % w_count
+          end
         end
       end
     end
 
-    KeyedPartitionAddresses[Key](consume m, hash_partitions)
+    KeyedPartitionAddresses[Key](consume m, hash_partitions,
+      consume workers_to_keys)
 
 class ComputationRunner[In: Any val, Out: Any val]
   let _next: Runner
