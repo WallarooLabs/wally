@@ -63,10 +63,13 @@ interface PartitionAddresses is Equatable[PartitionAddresses]
 class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, ProxyAddress] val
   let _hash_partitions: HashPartitions
+  let _workers_to_keys: Map[String, Array[Key] val] val
 
-  new val create(a: Map[Key, ProxyAddress] val, hp: HashPartitions) =>
+  new val create(a: Map[Key, ProxyAddress] val, hp: HashPartitions,
+    wtk: Map[String, Array[Key] val] val) =>
     _addresses = a
     _hash_partitions = hp
+    _workers_to_keys = wtk
 
   fun apply(k: Any val): (ProxyAddress | None) =>
     match k
@@ -86,6 +89,9 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   fun hash_partitions(): HashPartitions =>
     _hash_partitions
 
+  fun workers_to_keys(): Map[String, Array[Key] val] val =>
+    _workers_to_keys
+
   fun pairs(): Iterator[(Key, ProxyAddress)] => _addresses.pairs()
 
   fun update_key[K: (Hashable val & Equatable[K] val)](key: K,
@@ -103,8 +109,8 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
     else
       error
     end
-    // TODO: Calculate new hash addresses
-    KeyedPartitionAddresses[Key](consume new_addresses, _hash_partitions)
+    // !@ Calculate new hash partitions
+    KeyedPartitionAddresses[Key](consume new_addresses, _hash_partitions, _workers_to_keys)
 
   fun eq(that: box->PartitionAddresses): Bool =>
     match that
@@ -204,31 +210,73 @@ class val KeyedStateSubpartition[PIn: Any val,
     data_routes: Map[StepId, Consumer]):
     LocalPartitionRouter[PIn, Key, S] val
   =>
+    let hashed_node_routes = recover trn Map[String, HashedProxyRouter[Key]] end
+
     let routes = recover trn Map[Key, (Step | ProxyRouter)] end
 
     let m = recover trn Map[U128, Step] end
 
     var partition_count: USize = 0
 
-    for (key, id) in _id_map.pairs() do
-      let proxy_address = _partition_addresses(key)
-      match proxy_address
-      | let pa: ProxyAddress =>
-        if pa.worker == worker_name then
-          let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
-          let next_state_step = Step(auth, _runner_builder(where event_log =
-            event_log, auth=auth),
-            consume reporter, id, _runner_builder.route_builder(),
-              event_log, recovery_replayer, outgoing_boundaries)
+    iftype Key <: String then
+      @printf[I32]("################ _id_map\n".cstring())
+      for (k, i) in _id_map.pairs() do
+        @printf[I32]((k + ", " + i.string() + "\n").cstring())
+      end
 
-          initializables.set(next_state_step)
-          data_routes(id) = next_state_step
-          m(id) = next_state_step
-          routes(key) = next_state_step
-          partition_count = partition_count + 1
+      for c in _partition_addresses.claimants() do
+        if c == worker_name then
+          try
+            let keys = _partition_addresses.workers_to_keys()(c)?
+            for key in keys.values() do
+              try
+                let id = _id_map(key)?
+                let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
+                let next_state_step = Step(auth, _runner_builder(where event_log =
+                  event_log, auth=auth),
+                  consume reporter, id, _runner_builder.route_builder(),
+                    event_log, recovery_replayer, outgoing_boundaries)
+
+                initializables.set(next_state_step)
+                data_routes(id) = next_state_step
+                m(id) = next_state_step
+                routes(key) = next_state_step
+                partition_count = partition_count + 1
+              else
+                @printf[I32](("Missing step id for " + key + "!\n").cstring())
+              end
+            end
+          else
+            @printf[I32](("Could not find keys for " + c + "!\n").cstring())
+            Unreachable()
+          end
         else
-          iftype Key <: String then
-            None
+          try
+            let boundary = outgoing_boundaries(c)?
+            hashed_node_routes(c) = HashedProxyRouter[Key](c, boundary,
+              _state_name, auth)
+          else
+            @printf[I32](("Missing proxy for " + c + "!\n").cstring())
+          end
+        end
+      end
+    else
+      for (key, id) in _id_map.pairs() do
+        let proxy_address = _partition_addresses(key)
+        match proxy_address
+        | let pa: ProxyAddress =>
+          if pa.worker == worker_name then
+            let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
+            let next_state_step = Step(auth, _runner_builder(where event_log =
+              event_log, auth=auth),
+              consume reporter, id, _runner_builder.route_builder(),
+                event_log, recovery_replayer, outgoing_boundaries)
+
+            initializables.set(next_state_step)
+            data_routes(id) = next_state_step
+            m(id) = next_state_step
+            routes(key) = next_state_step
+            partition_count = partition_count + 1
           else
             try
               let boundary = outgoing_boundaries(pa.worker)?
@@ -239,22 +287,8 @@ class val KeyedStateSubpartition[PIn: Any val,
               @printf[I32](("Missing proxy for " + pa.worker + "!\n").cstring())
             end
           end
-        end
-      else
-        @printf[I32]("Missing proxy address!\n".cstring())
-      end
-    end
-
-    let hashed_node_routes = recover trn Map[String, HashedProxyRouter[Key]] end
-
-    for c in _partition_addresses.claimants() do
-      if c != worker_name then
-        try
-          let boundary = outgoing_boundaries(c)?
-          hashed_node_routes(c) = HashedProxyRouter[Key](c, boundary,
-            _state_name, auth)
         else
-          @printf[I32](("Missing proxy for " + c + "!\n").cstring())
+          @printf[I32]("Missing proxy address!\n".cstring())
         end
       end
     end
