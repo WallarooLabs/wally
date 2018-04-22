@@ -1279,8 +1279,10 @@ class val LocalPartitionRouter[In: Any val,
   =>
     let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
     // !@ NEED TO DO SOMETHING WITH new_hashed_routes and new_hashed_partitions
-    let new_hashed_routes = recover val Map[String, HashedProxyRouter[Key]] end
-    let new_hash_partitions = HashPartitions(recover [] end)
+    // let new_hashed_node_routes = recover val Map[String, HashedProxyRouter[Key]] end
+    // let new_hash_partitions = HashPartitions(recover [] end)
+    let new_hashed_node_routes = _hashed_node_routes
+    let new_hash_partitions = _hash_partitions
     for (k, target) in _partition_routes.pairs() do
       match target
       | let pr: ProxyRouter =>
@@ -1290,7 +1292,7 @@ class val LocalPartitionRouter[In: Any val,
       end
     end
     LocalPartitionRouter[In, Key, S](_state_name, _worker_name, _local_map,
-      _step_ids, consume new_partition_routes, new_hashed_routes,
+      _step_ids, consume new_partition_routes, new_hashed_node_routes,
       new_hash_partitions, _partition_function)
 
   fun rebalance_steps_grow(
