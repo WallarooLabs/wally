@@ -1133,6 +1133,9 @@ actor RouterRegistry is InFlightAckRequester
     end
 
   fun _resume_all_remote() =>
+    ifdef debug then
+      @printf[I32]("RouterRegistry send_control_to_cluster(resume_the_world).\n".cstring())
+    end
     try
       let msg = ChannelMsgEncoder.resume_the_world(_worker_name, _auth)?
       _connections.send_control_to_cluster(msg)

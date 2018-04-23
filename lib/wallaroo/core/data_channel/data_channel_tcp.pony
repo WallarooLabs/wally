@@ -175,8 +175,16 @@ class DataChannelConnectNotifier is DataChannelNotify
     the DataChannel corresponding to this notify.
     """
     // State change to our real DataReceiver.
-    _receiver = _DataReceiver(dr)
+    let old_receiver = _receiver = _DataReceiver(dr)
     _receiver.data_connect(sender_boundary_id, conn)
+
+    try
+      //request_id: RequestId, requester_id: StepId
+      let delayed_goop = (old_receiver as _InitDataReceiver).request_in_flight_ack_queue
+      for (request_id, requester_id) in delayed_goop.values() do
+        _receiver.request_in_flight_ack(request_id, requester_id)
+      end
+    end
 
   fun ref received(conn: DataChannel ref, data: Array[U8] iso,
     n: USize): Bool
@@ -321,13 +329,15 @@ trait _DataReceiverWrapper
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   fun report_status(code: ReportStatusCode)
 
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId)
+  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId)
   fun request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
     leaving_workers: Array[String] val)
 
 class _InitDataReceiver is _DataReceiverWrapper
+  let request_in_flight_ack_queue: Array[(RequestId,StepId)] ref = []
+
   fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
     Fail()
 
@@ -347,8 +357,15 @@ class _InitDataReceiver is _DataReceiverWrapper
   fun report_status(code: ReportStatusCode) =>
     Fail()
 
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
-    Fail()
+  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
+    // Originally, this class did nothing.  With the removal of the
+    // artisanal mute protocol, we now can have a race (for example)
+    // during cluster resizing we can get a request for in-flight ack
+    // before we receive the identify_data_receiver(...) message.
+    // 
+    // We do not have an actor tag to send "ourself" a message, so
+    // let's do this the old fashioned way: keep a queue.
+    request_in_flight_ack_queue.push((request_id, requester_id))
 
   fun request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
@@ -381,7 +398,7 @@ class _DataReceiver is _DataReceiverWrapper
   fun report_status(code: ReportStatusCode) =>
     data_receiver.report_status(code)
 
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
+  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
     data_receiver.request_in_flight_ack(request_id, requester_id)
 
   fun request_in_flight_resume_ack(

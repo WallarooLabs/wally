@@ -15,7 +15,7 @@ will say it failed after the operations [2,-1,2,-1,2,-1].
 # set up basic logging
 import logging
 from integration import INFO2, set_logging
-set_logging(name='autoscale_tests', level=INFO2,
+set_logging(name='autoscale_tests', level=logging.DEBUG, #### SLF level=INFO2,
             fmt='%(levelname)s - %(message)s')
 
 
@@ -72,6 +72,7 @@ def create_autoscale_test(api, cmd, seq, cycles, initial=None):
     test_name = AUTOSCALE_TEST_NAME_FMT.format(api=api, ops=ops)
     def f():
         autoscale_sequence(cmd, ops=seq, cycles=cycles, initial=initial)
+        #### raise PipelineTestError("SLF intentional error")
     f.func_name = test_name
     globals()[test_name] = f
 

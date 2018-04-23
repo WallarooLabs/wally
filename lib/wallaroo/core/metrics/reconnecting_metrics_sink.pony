@@ -186,14 +186,12 @@ actor ReconnectingMetricsSink
           worker_name, id, histogram, period, period_ends_at, payload_wb)
         HubProtocol.payload(event, topic, payload_wb.done(), _wb)
       end
-      @printf[I32]("a1,".cstring())
       _writev(_wb.done())
     else
       Fail()
     end
 
   be writev(data: ByteSeqIter) =>
-    @printf[I32]("a2,".cstring())
     _writev(data)
 
   fun ref _writev(data: ByteSeqIter) =>
@@ -215,7 +213,6 @@ actor ReconnectingMetricsSink
           _pending.push((bytes, 0))
         end
 
-        @printf[I32]("a,".cstring())
         _pending_writes()
       end
 
@@ -242,7 +239,6 @@ actor ReconnectingMetricsSink
     Do nothing on windows.
     """
     ifdef not windows then
-        @printf[I32]("b,".cstring())
       _pending_writes()
     end
 
@@ -343,7 +339,6 @@ actor ReconnectingMetricsSink
             _pending_reads()
 
             ifdef not windows then
-        @printf[I32]("c,".cstring())
               if _pending_writes() then
                 //sent all data; release backpressure
                 _release_backpressure()
@@ -377,7 +372,6 @@ actor ReconnectingMetricsSink
             _pending_reads()
 
             ifdef not windows then
-        @printf[I32]("d,".cstring())
               if _pending_writes() then
                 //sent all data; release backpressure
                 _release_backpressure()
@@ -408,7 +402,6 @@ actor ReconnectingMetricsSink
           _writeable = true
           _complete_writes(arg)
             ifdef not windows then
-        @printf[I32]("e,".cstring())
               if _pending_writes() then
                 //sent all data; release backpressure
                 _release_backpressure()
@@ -461,7 +454,6 @@ actor ReconnectingMetricsSink
         _pending_writev.>push(data.cpointer().usize()).>push(data.size())
         _pending_writev_total = _pending_writev_total + data.size()
         _pending.push((data, 0))
-        @printf[I32]("f,".cstring())
         _pending_writes()
       end
     end
@@ -512,7 +504,6 @@ actor ReconnectingMetricsSink
     writeable. On an error, dispose of the connection. Returns whether
     it sent all pending data or not.
     """
-    @printf[I32]("_pw=%d,".cstring(), _pending_writev.size())
     ifdef not windows then
       // TODO: Make writev_batch_size user configurable
       let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
@@ -539,7 +530,6 @@ actor ReconnectingMetricsSink
           // Write as much data as possible.
           var len = @pony_os_writev[USize](_event,
             _pending_writev.cpointer(), num_to_send) ?
-          @printf[I32]("writev=%d,".cstring(), len)
 
           if len < bytes_to_send then
             while len > 0 do
@@ -828,8 +818,6 @@ actor ReconnectingMetricsSink
 
   fun ref _apply_backpressure() =>
     if not _throttled then
-      @printf[I32]("%s outgoing _apply_backpressure\n".cstring(),
-        "yodel".cstring())
       _throttled = true
       _notify.throttled(this)
     end
@@ -843,8 +831,6 @@ actor ReconnectingMetricsSink
 
   fun ref _release_backpressure() =>
     if _throttled then
-      @printf[I32]("%s outgoing _release_backpressure\n".cstring(),
-        "yodel".cstring())
       _throttled = false
       _notify.unthrottled(this)
     end
@@ -932,7 +918,7 @@ interface _MetricsSinkNotify
     the `throttled` notification will result in outgoing data queuing in the
     connection and increasing memory usage.
     """
-    None
+    @printf[I32]("ReconnectingMetricsSink: unthrottled\n".cstring())
 
   fun ref unthrottled(conn: MetricsSink ref) =>
     """
@@ -940,7 +926,7 @@ interface _MetricsSinkNotify
     receiving this notification, you should feel free to start making calls to
     `write` and `writev` again.
     """
-    None
+    @printf[I32]("ReconnectingMetricsSink: unthrottled\n".cstring())
 
 class MetricsSinkNotify is _MetricsSinkNotify
   let _name: String

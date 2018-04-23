@@ -237,8 +237,8 @@ def test_cluster_is_processing(status):
     """
     Test that the cluster's 'processing_messages' status is True
     """
+    print('test_cluster_is_processing: {}'.format(status))
     assert(status['processing_messages'] is True)
-
 
 def test_cluster_is_not_processing(status):
     """
@@ -287,10 +287,15 @@ def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
         if hasattr(err, 'as_error'):
             print("Autoscale Sequence test had the following the error "
                   "message:\n{}".format(err.as_error))
+        outputs = runners_output_format(err.runners,
+                from_tail=555555, filter_fn=lambda r: r.poll() != 0)
+        #print("SLF Some autoscale Sequence runners exited badly. "
+        #      "SLF They had the following "
+        #      "SLF output tails:\n===\n{}SLFDONE\n".format(outputs))
         if hasattr(err, 'runners'):
             if filter(lambda r: r.poll() != 0, err.runners):
                 outputs = runners_output_format(err.runners,
-                        from_tail=5, filter_fn=lambda r: r.poll() != 0)
+                        from_tail=555555, filter_fn=lambda r: r.poll() != 0)
                 print("Some autoscale Sequence runners exited badly. "
                       "They had the following "
                       "output tails:\n===\n{}".format(outputs))
@@ -324,7 +329,7 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
     batch_size = 10
     interval = 0.05
     sender_timeout = 30 # Counted from when Sender is stopped
-    runner_join_timeout = 30
+    runner_join_timeout = 6##SLF 30
 
     res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     setup_resilience_path(res_dir)
@@ -444,8 +449,9 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                             joined.append(runners[-1])
 
                         # Verify cluster has resumed processing
+                        print('TIMEOUT HACK 33 number 1')
                         obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_processing, timeout=120)
+                            test_cluster_is_processing, timeout=33)
                         obs.start()
                         obs.join()
                         if obs.error:
@@ -489,8 +495,9 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                         print("Response was: {}".format(resp))
 
                         # Verify cluster has resumed processing
+                        print('TIMEOUT HACK 33 number 2')
                         obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_processing, timeout=120)
+                            test_cluster_is_processing, timeout=33)
                         obs.start()
                         obs.join()
                         if obs.error:
@@ -598,8 +605,8 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                 if ec != 0:
                     print('Worker {!r} exited with return code {}'
                           .format(r.name, ec))
-                    print('Its last 5 log lines were:')
-                    print('\n'.join(r.get_output().splitlines()[-5:]))
+                    print('Its last 555555 log lines were:')
+                    print('\n'.join(r.get_output().splitlines()[-555555:]))
                     print()
             if alive:
                 alive_names = ', '.join((r.name for r in alive))
@@ -608,7 +615,7 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                     a.kill()
             clean_resilience_path(res_dir)
             if alive:
-                raise PipelineTestError("Runners [{}] failed to exit cleanly after"
+                raise PipelineTestError("Runners [{}] _autoscale_tests.py failed to exit cleanly after"
                                         " {} seconds.\n"
                                         "Runner outputs are attached below:"
                                         "\n===\n{}"

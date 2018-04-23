@@ -1476,7 +1476,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             outputs = runners_output_format(runners)
             for a in alive:
                 a.kill()
-            raise PipelineTestError("Runners [{}] failed to exit cleanly after"
+            raise PipelineTestError("Runners [{}] integration.py failed to exit cleanly after"
                                     " {} seconds.\n"
                                     "Runner outputs are attached below:"
                                     "\n===\n{}"

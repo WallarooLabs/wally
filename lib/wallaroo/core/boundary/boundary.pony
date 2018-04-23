@@ -119,11 +119,13 @@ actor OutgoingBoundary is Consumer
   var _closed: Bool = false
   var _writeable: Bool = false
   var _throttled: Bool = false
+  var _throttle_by_queue: Bool = false
+  var _throttle_by_socket: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   // _pending is used to avoid GC prematurely reaping memory.
   // See Wallaroo commit 75f1c394e for more.  It looks like a write-only
   // data structure, but its use is important until the Pony runtime changes.
-  embed _pending: List[(ByteSeq, USize)] = _pending.create()
+  embed _pending: List[ByteSeq] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
   var _shutdown_peer: Bool = false
@@ -145,6 +147,7 @@ actor OutgoingBoundary is Consumer
   let _service: String
   let _from: String
   let _queue: Array[Array[ByteSeq] val] = _queue.create()
+  let _queue_max_size: USize = 16_384
   var _lowest_queue_id: SeqId = 0
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
@@ -154,7 +157,7 @@ actor OutgoingBoundary is Consumer
   let _terminus_route: TerminusRoute = TerminusRoute
 
   var _reconnect_pause: U64 = 10_000_000_000
-  let _timers: Timers = Timers
+  var _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: String, target_worker: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -169,13 +172,13 @@ actor OutgoingBoundary is Consumer
     ifdef "spike" then
       match spike_config
       | let sc: SpikeConfig =>
-        var notify = recover iso BoundaryNotify(_auth, this) end
+        var notify = recover iso BoundaryNotify(_auth, this, host, service) end
         _notify = SpikeWrapper(consume notify, sc)
       else
-        _notify = BoundaryNotify(_auth, this)
+        _notify = BoundaryNotify(_auth, this, host, service)
       end
     else
-      _notify = BoundaryNotify(_auth, this)
+      _notify = BoundaryNotify(_auth, this, host, service)
     end
 
     _worker_name = worker_name
@@ -360,8 +363,6 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
-    _maybe_mute_or_unmute_upstreams()
-
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 
@@ -379,7 +380,14 @@ actor OutgoingBoundary is Consumer
 
     let flush_count: USize = (seq_id - _lowest_queue_id).usize()
     _queue.remove(0, flush_count)
-    _maybe_mute_or_unmute_upstreams()
+    if (_queue.size() < (_queue_max_size / 2)) and _throttle_by_queue then
+      ifdef debug or "debug_back_pressure" then
+        @printf[I32]("OutgoingBoundary: release _fd %d this px%lx this px%lx _queue.size() %d by %s:%s\n".cstring(),
+          _fd, this, _queue.size(), _host.cstring(), _service.cstring())
+      end
+      _throttle_by_queue = false
+      _release_backpressure()
+    end
     _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
     ifdef "resilience" then
@@ -401,7 +409,6 @@ actor OutgoingBoundary is Consumer
     end
     _connection_initialized = true
     _replaying = false
-    _maybe_mute_or_unmute_upstreams()
 
   fun ref _replay_from(idx: SeqId) =>
     try
@@ -534,10 +541,7 @@ actor OutgoingBoundary is Consumer
             _pending_reads()
 
             ifdef not windows then
-              if _pending_writes() then
-                //sent all data; release backpressure
-                _release_backpressure()
-              end
+              _pending_writes()
             end
           else
             // The connection failed, unsubscribe the event and close.
@@ -549,6 +553,7 @@ actor OutgoingBoundary is Consumer
           @printf[I32]("Reconnection asio event\n".cstring())
           if @pony_os_connected[Bool](fd) then
             // The connection was successful, make it ours.
+@printf[I32]("EVENT-NOTIFY-WHOO B: _fd %d fd %d this px%lx _pending.size() = %d\n".cstring(), _fd, fd, this, _pending.size())
             _fd = fd
             _event = event
 
@@ -583,12 +588,8 @@ actor OutgoingBoundary is Consumer
             end
 
             ifdef not windows then
-              if _pending_writes() then
-                //sent all data; release backpressure
-                _release_backpressure()
-              end
+              _pending_writes()
             end
-            _maybe_mute_or_unmute_upstreams()
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -613,10 +614,7 @@ actor OutgoingBoundary is Consumer
         if AsioEvent.writeable(flags) then
           _writeable = true
           ifdef not windows then
-            if _pending_writes() then
-              //sent all data; release backpressure
-              _release_backpressure()
-            end
+            _pending_writes()
           end
         end
 
@@ -650,6 +648,13 @@ actor OutgoingBoundary is Consumer
     if (_host != "") and (_service != "") and not _no_more_reconnect then
       @printf[I32]("RE-Connecting OutgoingBoundary to %s:%s\n".cstring(),
         _host.cstring(), _service.cstring())
+      // Bug/feature work-around: we need to create a new timer wheel/actor
+      // for each reconnect attempt.  The timer actor sends a message to
+      // us; we are under pressure, so the sender (the timer actor!) will
+      // be muted.  It's very difficult to create exemptions to the
+      // runtime's back-pressure regime: no such exemption exists yet.
+      let old_timers = _timers = Timers
+      old_timers.dispose()
       let timer = Timer(_PauseBeforeReconnect(this), _reconnect_pause)
       _timers(consume timer)
     end
@@ -664,7 +669,7 @@ actor OutgoingBoundary is Consumer
     for bytes in _notify.sentv(this, data).values() do
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
-      _pending.push((bytes, 0))
+      _pending.push(bytes)
       data_size = data_size + bytes.size()
     end
 
@@ -681,7 +686,7 @@ actor OutgoingBoundary is Consumer
     _pending_writev.>push(data.cpointer().usize()).>push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
 
-    _pending.push((data, 0))
+    _pending.push(data)
     _pending_writes()
 
   fun ref _notify_connecting() =>
@@ -751,6 +756,9 @@ actor OutgoingBoundary is Consumer
     _pending_writev_total = 0
     _readable = false
     _writeable = false
+    _throttled = false
+    _throttle_by_queue = false
+    _throttle_by_socket = false
     @pony_asio_event_set_readable[None](_event, false)
     @pony_asio_event_set_writeable[None](_event, false)
 
@@ -865,6 +873,7 @@ actor OutgoingBoundary is Consumer
         // Write as much data as possible.
         var len = @pony_os_writev[USize](_event,
           _pending_writev.cpointer(), num_to_send) ?
+if _fd == 34 then @printf[I32]("boundary: _pending_writes: _fd %d this px%lx bytes_to_send %d len %d\n".cstring(), _fd, this, bytes_to_send, len) end
 
         // keep track of how many bytes we sent
         bytes_sent = bytes_sent + len
@@ -886,14 +895,16 @@ actor OutgoingBoundary is Consumer
               len = 0
             end
           end
-          _apply_backpressure()
+          _throttle_by_socket = true
+          _apply_backpressure(true)
         else
           // sent all data we requested in this batch
           _pending_writev_total = _pending_writev_total - bytes_to_send
           if _pending_writev_total == 0 then
             _pending_writev.clear()
             _pending.clear()
-
+            _throttle_by_socket = false
+            _release_backpressure()
             return true
           else
             for d in Range[USize](0, num_to_send, 1) do
@@ -952,60 +963,54 @@ actor OutgoingBoundary is Consumer
 
   fun ref _add_to_upstream_backup(msg: Array[ByteSeq] val) =>
     _queue.push(msg)
-    _maybe_mute_or_unmute_upstreams()
+    if (_queue.size() > _queue_max_size) and (not _throttle_by_queue) then
+      // TODO if debug wrapper
+      ifdef debug or "debug_back_pressure" then
+        @printf[I32]("OutgoingBoundary: apply _fd %d this px%lx _queue.size() %d by %s:%s\n".cstring(),
+          _fd, this, _queue.size(), _host.cstring(), _service.cstring())
+      end
+      _throttle_by_queue = true
+      _apply_backpressure(false)
+      // We are applying backpressure because of
+      // giant _queue size.  We must receive an ACK
+      // from the remote worker to reduce the size
+      // of queue.  However, we don't know if the
+      // socket is in a state that we'll get an ASIO
+      // event for an ACK that arrives sometime
+      // after now.  So force a read, asynchronously.
+@printf[I32]("SLF paranoia: are we here?\n".cstring())
+      _read_again() // message to self
+    end
 
-  fun ref _apply_backpressure() =>
-    if not _throttled then
+  /*
+  ** TODO/WIP Problem statement: I believe it's possible to be
+  ** both of 1). _queue is too big, and 2). _fd is not writeable.
+  ** #1 can happen if we aren't connected yet to the remote worker
+  ** or if the remote worker is slow to send us acks,
+  ** and #2 can happen if _pending_writev data contains enough big
+  ** hunks of bytes at inconvenient times & places.
+  **
+  ** Thus I believe that we cannot call _notify.throttle/unthrottle
+  ** based on state change of only #1 or only #2.
+  */
+  fun ref _apply_backpressure(caused_by_socket: Bool) =>
+    if (_throttle_by_queue or _throttle_by_socket) and (not _throttled) then
       _throttled = true
       _notify.throttled(this)
     end
-    _writeable = false
-    // this is safe because asio thread isn't currently subscribed
-    // for a write event so will not be writing to the readable flag
-    @pony_asio_event_set_writeable[None](_event, false)
-    @pony_asio_event_resubscribe_write(_event)
-    _maybe_mute_or_unmute_upstreams()
+    if caused_by_socket then
+      _writeable = false
+      // this is safe because asio thread isn't currently subscribed
+      // for a write event so will not be writing to the writeable flag
+      @pony_asio_event_set_writeable[None](_event, false)
+      @pony_asio_event_resubscribe_write(_event)
+    end
 
   fun ref _release_backpressure() =>
-    if _throttled then
+    if (not (_throttle_by_queue or _throttle_by_socket)) and _throttled then
       _throttled = false
       _notify.unthrottled(this)
-      _maybe_mute_or_unmute_upstreams()
     end
-
-  fun ref _maybe_mute_or_unmute_upstreams() =>
-    if _mute_outstanding then
-      if _can_send() then
-        _unmute_upstreams()
-      end
-    else
-      if not _can_send() then
-        _mute_upstreams()
-      end
-    end
-
-  fun ref _mute_upstreams() =>
-    ifdef debug then
-      @printf[I32]("BACKPRESSURE boundary: Backpressure.apply by %s:%s\n".cstring(),
-        _host.cstring(), _service.cstring())
-    end
-    Backpressure.apply(_auth)
-    _mute_outstanding = true
-
-  fun ref _unmute_upstreams() =>
-    ifdef debug then
-      @printf[I32]("BACKPRESSURE boundary: Backpressure.release by %s:%s\n".cstring(),
-        _host.cstring(), _service.cstring())
-    end
-    Backpressure.release(_auth)
-    _mute_outstanding = false
-
-  fun _can_send(): Bool =>
-    _connected and
-      _writeable and
-      not _closed and
-      not _replaying and
-      not _backup_queue_is_overflowing()
 
   fun _backup_queue_is_overflowing(): Bool =>
     _queue.size() >= 16_384
@@ -1014,15 +1019,20 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
   let _outgoing_boundary: OutgoingBoundary tag
+  let _host: String
+  let _service: String
   let _reconnect_closed_delay: U64
   let _reconnect_failed_delay: U64
 
   new create(auth: AmbientAuth, outgoing_boundary: OutgoingBoundary tag,
+    host: String, service: String,
     reconnect_closed_delay: U64 = 100_000_000,
     reconnect_failed_delay: U64 = 10_000_000_000)
     =>
     _auth = auth
     _outgoing_boundary = outgoing_boundary
+    _host = host
+    _service = service
     _reconnect_closed_delay = reconnect_closed_delay
     _reconnect_failed_delay = reconnect_failed_delay
 
@@ -1093,11 +1103,13 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
+    _release_backpressure_in_runtime()
     conn.set_nodelay(true)
     conn.expect(4)
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
+    _apply_backpressure_in_runtime()
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
@@ -1111,10 +1123,26 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
     qty
 
   fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("BoundaryNotify: throttled\n\n".cstring())
+    @printf[I32]("OutgoingBoundary: throttled\n\n".cstring())
+    _apply_backpressure_in_runtime()
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
-    @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
+    @printf[I32]("OutgoingBoundary: unthrottled\n\n".cstring())
+    _release_backpressure_in_runtime()
+
+  fun ref _apply_backpressure_in_runtime() =>
+    ifdef debug or "debug_back_pressure" then
+      @printf[I32]("OutgoingBoundary: back-pressure apply by %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
+    end
+    Backpressure.apply(_auth)
+
+  fun ref _release_backpressure_in_runtime() =>
+    ifdef debug or "debug_back_pressure" then
+      @printf[I32]("OutgoingBoundary: back-pressure release by %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
+    end
+    Backpressure.release(_auth)
 
 class _PauseBeforeReconnect is TimerNotify
   let _ob: OutgoingBoundary

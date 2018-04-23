@@ -280,6 +280,7 @@ actor DataReceiver is Producer
       _last_id_seen = seq_id
       _router.replay_route(r, pipeline_time_spent, _id, this, seq_id,
         latest_ts, metrics_id, worker_ingress_ts)
+      _maybe_ack()
     end
 
   fun ref _maybe_ack() =>
