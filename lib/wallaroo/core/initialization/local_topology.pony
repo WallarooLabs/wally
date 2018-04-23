@@ -87,7 +87,8 @@ class val LocalTopology
     recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer tag]) ?
+    data_routes: Map[U128, Consumer tag],
+    keyed_data_routes: Map[StringKey, Step]) ?
   =>
     let subpartition =
       try
@@ -103,7 +104,7 @@ class val LocalTopology
         .cstring())
       state_map(state_name) = subpartition.build(_app_name, _worker_name,
          metrics_conn, auth, event_log, recovery_replayer, outgoing_boundaries,
-         initializables, data_routes)
+         initializables, data_routes, keyed_data_routes)
     end
 
   fun graph(): Dag[StepInitializer] val => _graph
@@ -740,6 +741,10 @@ actor LocalTopologyInitializer is LayoutInitializer
         // DataRouter for the data channel boundary
         var data_routes = recover trn Map[U128, Consumer] end
 
+        let keyed_data_routes_ref = Map[StringKey, Step]
+
+        var keyed_data_routes = recover trn Map[StringKey, Step] end
+
         // Update the step ids for all OutgoingBoundaries
         if worker_count > 1 then
           _connections.update_boundary_ids(t.proxy_ids())
@@ -862,7 +867,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                     t.update_state_map(builder.state_name(), state_map,
                       _metrics_conn, _event_log, _recovery_replayer, _auth,
                       _outgoing_boundaries, _initializables,
-                      data_routes_ref)?
+                      data_routes_ref, keyed_data_routes_ref)?
                   else
                     @printf[I32]("Failed to update state_map\n".cstring())
                     error
@@ -1212,7 +1217,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   t.update_state_map(source_data.state_name(), state_map,
                     _metrics_conn, _event_log, _recovery_replayer, _auth,
                     _outgoing_boundaries, _initializables,
-                    data_routes_ref)?
+                    data_routes_ref, keyed_data_routes_ref)?
                 else
                   @printf[I32]("Failed to update state map\n".cstring())
                   error
@@ -1340,7 +1345,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 t.update_state_map(psd.state_name(), state_map,
                   _metrics_conn, _event_log, _recovery_replayer, _auth,
                   _outgoing_boundaries, _initializables,
-                  data_routes_ref)?
+                  data_routes_ref, keyed_data_routes_ref)?
               else
                 @printf[I32]("Failed to update state map\n".cstring())
                 error
@@ -1387,7 +1392,11 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         let sendable_data_routes = consume val data_routes
 
-        let data_router = DataRouter(sendable_data_routes)
+        for (k, v) in keyed_data_routes_ref.pairs() do
+          keyed_data_routes(k) = v
+        end
+
+        let data_router = DataRouter(sendable_data_routes, consume keyed_data_routes)
         _router_registry.set_data_router(data_router)
 
         if not _is_initializer then
@@ -1526,7 +1535,9 @@ actor LocalTopologyInitializer is LayoutInitializer
           end
         end
 
-        let data_router = DataRouter(consume data_routes)
+        // !@ Figure out how to pass in the keyed routes here
+        let data_router = DataRouter(consume data_routes,
+          recover Map[StringKey, Step] end)
         _router_registry.set_data_router(data_router)
 
         _router_registry.register_boundaries(_outgoing_boundaries,
