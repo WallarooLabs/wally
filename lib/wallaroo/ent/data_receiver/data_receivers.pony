@@ -34,7 +34,7 @@ actor DataReceivers
   let _data_receivers: Map[BoundaryId, DataReceiver] =
     _data_receivers.create()
   var _data_router: DataRouter =
-    DataRouter(recover Map[U128, Consumer] end)
+    DataRouter(recover Map[U128, Consumer] end, recover Map[StringKey, Step] end)
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
   var _router_registry: (RouterRegistry | None) = None

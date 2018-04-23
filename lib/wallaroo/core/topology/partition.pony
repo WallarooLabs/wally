@@ -171,7 +171,8 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer]): PartitionRouter
+    data_routes: Map[U128, Consumer],
+    keyed_data_routes: Map[StringKey, Step]): PartitionRouter
   fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
     pa: ProxyAddress): StateSubpartition ?
   fun runner_builder(): RunnerBuilder
@@ -207,7 +208,8 @@ class val KeyedStateSubpartition[PIn: Any val,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[StepId, Consumer]):
+    data_routes: Map[StepId, Consumer],
+    keyed_data_routes: Map[StringKey, Step]):
     LocalPartitionRouter[PIn, Key, S] val
   =>
     let hashed_node_routes = recover trn Map[String, HashedProxyRouter[Key]] end
@@ -219,11 +221,6 @@ class val KeyedStateSubpartition[PIn: Any val,
     var partition_count: USize = 0
 
     iftype Key <: String then
-      @printf[I32]("################ _id_map\n".cstring())
-      for (k, i) in _id_map.pairs() do
-        @printf[I32]((k + ", " + i.string() + "\n").cstring())
-      end
-
       for c in _partition_addresses.claimants() do
         if c == worker_name then
           try
@@ -239,6 +236,7 @@ class val KeyedStateSubpartition[PIn: Any val,
 
                 initializables.set(next_state_step)
                 data_routes(id) = next_state_step
+                keyed_data_routes(key) = next_state_step
                 m(id) = next_state_step
                 routes(key) = next_state_step
                 partition_count = partition_count + 1
