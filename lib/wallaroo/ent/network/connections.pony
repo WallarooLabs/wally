@@ -59,6 +59,7 @@ actor Connections is Cluster
   let _spike_config: (SpikeConfig | None)
   let _event_log: EventLog
   let _log_rotation: Bool
+  var _router_registry: (RouterRegistry | None) = None
 
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
@@ -92,6 +93,9 @@ actor Connections is Cluster
     end
 
     _register_disposable(_metrics_conn)
+
+  be set_router_registry(router_registry: RouterRegistry) =>
+    _router_registry = router_registry
 
   be register_my_control_addr(host: String, service: String) =>
     _my_control_addr = (host, service)
@@ -405,11 +409,15 @@ actor Connections is Cluster
         _worker_name, _metrics_conn)
       let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
         consume reporter, host, service, _spike_config)
-      let boundary = builder.build_and_initialize(boundary_id, target,
-        local_topology_initializer)
-      _register_disposable(boundary)
-      local_topology_initializer.add_boundary_to_joining_worker(target,
-        boundary, builder)
+      try
+        let boundary = builder.build_and_initialize(boundary_id, target,
+          local_topology_initializer, _router_registry as RouterRegistry)
+        _register_disposable(boundary)
+        local_topology_initializer.add_boundary_to_joining_worker(target,
+          boundary, builder)
+      else
+        Fail()
+      end
     else
       @printf[I32]("Can't find data address for worker\n".cstring())
       Fail()
@@ -659,10 +667,15 @@ actor Connections is Cluster
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
-    let outgoing_boundary = boundary_builder(_step_id_gen(), target_name)
-    _data_conn_builders(target_name) = boundary_builder
-    _register_disposable(outgoing_boundary)
-    _data_conns(target_name) = outgoing_boundary
+    try
+      let outgoing_boundary = boundary_builder(_step_id_gen(), target_name,
+        _router_registry as RouterRegistry)
+      _data_conn_builders(target_name) = boundary_builder
+      _register_disposable(outgoing_boundary)
+      _data_conns(target_name) = outgoing_boundary
+    else
+      Fail()
+    end
 
   be create_data_connection_to_joining_worker(target_name: String,
     host: String, service: String, li: LayoutInitializer)
@@ -671,16 +684,22 @@ actor Connections is Cluster
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
-    let outgoing_boundary =
-      boundary_builder.build_and_initialize(_step_id_gen(), target_name, li)
-    _data_conn_builders(target_name) = boundary_builder
-    _register_disposable(outgoing_boundary)
-    _data_conns(target_name) = outgoing_boundary
+    try
+      let outgoing_boundary =
+        boundary_builder.build_and_initialize(_step_id_gen(), target_name, li,
+          _router_registry as RouterRegistry)
+      _data_conn_builders(target_name) = boundary_builder
+      _register_disposable(outgoing_boundary)
+      _data_conns(target_name) = outgoing_boundary
+    else
+      Fail()
+    end
 
   be update_boundary_ids(boundary_ids: Map[String, U128] val) =>
     for (worker, boundary) in _data_conns.pairs() do
       try
-        boundary.register_step_id(boundary_ids(worker)?)
+        boundary.register_step_id(boundary_ids(worker)?,
+          _router_registry as RouterRegistry)
       else
         @printf[I32](("Could not register step id for boundary to " + worker +
           "\n").cstring())

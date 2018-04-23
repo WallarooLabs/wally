@@ -1645,7 +1645,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             .cstring())
           _spin_up_source_listeners()
           for i in _initializables.values() do
-            i.application_created(this, o_router)
+            i.application_created(this, o_router, _router_registry)
             match i
             | let s: Step =>
               _router_registry.register_omni_router_step(s)

@@ -115,7 +115,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       let new_boundary =
         builder.build_and_initialize(_step_id_gen(), target_worker_name,
-          _layout_initializer)
+          _layout_initializer, router_registry)
       router_registry.register_disposable(new_boundary)
       _outgoing_boundaries(target_worker_name) = new_boundary
     end
@@ -189,7 +189,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let boundary = builder.build_and_initialize(_step_id_gen(),
-          target_worker_name, _layout_initializer)
+          target_worker_name, _layout_initializer, _router_registry)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
         let new_route = _route_builder(this, boundary, _metrics_reporter)

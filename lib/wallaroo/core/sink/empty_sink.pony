@@ -20,6 +20,7 @@ use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/router_registry"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
@@ -47,7 +48,7 @@ actor EmptySink is Consumer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
+    omni_router: OmniRouter, router_registry: RouterRegistry)
   =>
     initializer.report_initialized(this)
 

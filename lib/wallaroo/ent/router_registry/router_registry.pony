@@ -120,6 +120,10 @@ actor RouterRegistry is InFlightAckRequester
   // TODO: Probably change mute()/unmute() interface so we don't need this
   let _dummy_consumer: DummyConsumer = DummyConsumer
 
+  // Local boundaries & sinks that have requested local_stop_all_local()
+  let _local_stop_all_local_list: Map[StepId,StepId] =
+    _local_stop_all_local_list.create()
+
   var _stop_the_world_pause: U64
 
   var _waiting_to_finish_join: Bool = false
@@ -707,7 +711,7 @@ actor RouterRegistry is InFlightAckRequester
 
   fun ref _stop_the_world_for_log_rotation() =>
     """
-    We currently stop all message processing before perofrming log rotaion.
+    We currently stop all message processing before performing log rotaion.
     """
     @printf[I32]("~~~Stopping message processing for log rotation.~~~\n"
       .cstring())
@@ -927,6 +931,7 @@ actor RouterRegistry is InFlightAckRequester
   fun ref _unmute_request(originating_worker: String) =>
     if _stopped_worker_waiting_list.size() > 0 then
       _stopped_worker_waiting_list.unset(originating_worker)
+      // SLF TODO: also check for 0 size of _local_stop_all_local_list?
       if (_stopped_worker_waiting_list.size() == 0) then
         if (_migration_target_ack_list.size() == 0) and
           (_leaving_workers_waiting_list.size() == 0)
@@ -1094,6 +1099,32 @@ actor RouterRegistry is InFlightAckRequester
   be receive_in_flight_resume_ack(request_id: RequestId) =>
     _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
+  be local_stop_all_local(who: U128) =>
+    if _local_stop_all_local_list.contains(who) then
+      None
+    else
+      ifdef debug or "debug_back_pressure" then
+        @printf[I32]("RouterRegistry: local_stop_all_local: old map size %d who 0x%llx\n".cstring(),
+          _local_stop_all_local_list.size(), who)
+      end
+      if _local_stop_all_local_list.size() == 0 then
+        _stop_all_local()
+      end
+      _local_stop_all_local_list(who) = who
+    end
+
+  be local_resume_all_local(who: U128 val) =>
+    if _local_stop_all_local_list.contains(who) then
+      ifdef debug or "debug_back_pressure" then
+        @printf[I32]("RouterRegistry: local_resume_all_local: old map size %d who 0x%llx\n".cstring(),
+          _local_stop_all_local_list.size(), who)
+      end
+      try _local_stop_all_local_list.remove(who)? end
+      if _local_stop_all_local_list.size() == 0 then
+        _resume_all_local()
+      end
+    end
+
   fun _stop_all_local() =>
     """
     Mute all sources and data channel.
@@ -1103,6 +1134,7 @@ actor RouterRegistry is InFlightAckRequester
     end
     for source in _sources.values() do
       match source
+      // SLF TODO: What about Kafka source?
       | let tcp_source: TCPSource =>
         ifdef debug then
           @printf[I32]("_stop_all_local: stopping ?? source\n".cstring())
@@ -1111,6 +1143,9 @@ actor RouterRegistry is InFlightAckRequester
       else
         @printf[I32]("_stop_all_local: skipping stop ?? source\n".cstring())
       end
+    end
+    for ob in _outgoing_boundaries.values() do
+      @printf[I32]("RouterRegistry: SLF TODO %s %d\n".cstring(), __loc.file().cstring(), __loc.line())
     end
 
   fun _resume_all_local() =>
@@ -1122,6 +1157,7 @@ actor RouterRegistry is InFlightAckRequester
     end
     for source in _sources.values() do
       match source
+      // SLF TODO: What about Kafka source?
       | let tcp_source: TCPSource =>
         ifdef debug then
           @printf[I32]("_resume_all_local: resuming ?? source\n".cstring())
@@ -1130,6 +1166,9 @@ actor RouterRegistry is InFlightAckRequester
       else
         @printf[I32]("_resume_all_local: skipping resume ?? source\n".cstring())
       end
+    end
+    for ob in _outgoing_boundaries.values() do
+      @printf[I32]("RouterRegistry: SLF TODO %s %d\n".cstring(), __loc.file().cstring(), __loc.line())
     end
 
   fun _resume_all_remote() =>

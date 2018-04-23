@@ -179,10 +179,32 @@ class DataChannelConnectNotifier is DataChannelNotify
     _receiver.data_connect(sender_boundary_id, conn)
 
     try
-      //request_id: RequestId, requester_id: StepId
-      let delayed_goop = (old_receiver as _InitDataReceiver).request_in_flight_ack_queue
-      for (request_id, requester_id) in delayed_goop.values() do
-        _receiver.request_in_flight_ack(request_id, requester_id)
+      let delayed_queue = (old_receiver as _InitDataReceiver).delayed_queue
+      for dqv in delayed_queue.values() do
+        match dqv
+        | (1, let sender_step_id: StepId, let cw: _ConnWrapper val, _,_,_,_) =>
+          _receiver.data_connect(sender_step_id, cw.get())
+        | (2, let d: DeliveryMsg, let pipeline_time_spent: U64,
+           let seq_id: U64, let latest_ts: U64, let metrics_id: U16,
+           let worker_ingress_ts: U64) =>
+          _receiver.received(d, pipeline_time_spent, seq_id, latest_ts,
+             metrics_id, worker_ingress_ts)
+        | (3, let r: ReplayableDeliveryMsg, let pipeline_time_spent: U64,
+           let seq_id: U64, let latest_ts: U64, let metrics_id: U16,
+           let worker_ingress_ts: U64) =>
+          _receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
+             metrics_id, worker_ingress_ts)
+        | (4, let code: ReportStatusCode, _,_,_,_,_) =>
+          _receiver.report_status(code)
+        | (5, let request_id: RequestId, let requester_id: StepId,
+           None,None,None,None) =>
+          _receiver.request_in_flight_ack(request_id, requester_id)
+        | (6, let in_flight_resume_ack_id: InFlightResumeAckId,
+           let request_id: RequestId, let requester_id: StepId,
+           let leaving_workers: Array[String] val, _,_) =>
+            _receiver.request_in_flight_resume_ack(in_flight_resume_ack_id,
+              request_id, requester_id, leaving_workers)
+        end
       end
     end
 
@@ -322,40 +344,50 @@ class DataChannelConnectNotifier is DataChannelNotify
     //      create a new connection in OutgoingBoundary
 
 trait _DataReceiverWrapper
-  fun data_connect(sender_step_id: StepId, conn: DataChannel)
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
+  fun ref data_connect(sender_step_id: StepId, conn: DataChannel)
+  fun ref received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+  fun ref replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun report_status(code: ReportStatusCode)
+  fun ref report_status(code: ReportStatusCode)
 
   fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId)
-  fun request_in_flight_resume_ack(
+  fun ref request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
     leaving_workers: Array[String] val)
 
+// delayed_queue's tuple elements are all val, but DataChannel is tag,
+// so wrap up the tag in a val'able object.
+class _ConnWrapper
+  let _conn: DataChannel
+  new create(conn: DataChannel) =>
+    _conn = conn
+
+  fun get(): DataChannel =>
+    _conn
+
 class _InitDataReceiver is _DataReceiverWrapper
-  let request_in_flight_ack_queue: Array[(RequestId,StepId)] ref = []
+  let delayed_queue:
+    Array[(U8 val,Any val,Any val,Any val,Any val,Any val,Any val)] ref = []
 
-  fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
-    Fail()
+  fun ref data_connect(sender_step_id: StepId, conn: DataChannel) =>
+    delayed_queue.push((1, sender_step_id, recover val _ConnWrapper(conn) end,
+      None, None, None, None))
 
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
+  fun ref received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    Fail()
+    delayed_queue.push((2, d, pipeline_time_spent, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts))
 
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+  fun ref replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    Fail()
+    delayed_queue.push((3, r, pipeline_time_spent, seq_id, latest_ts, metrics_id, worker_ingress_ts))
 
-  fun upstream_replay_finished() =>
-    Fail()
-
-  fun report_status(code: ReportStatusCode) =>
-    Fail()
+  fun ref report_status(code: ReportStatusCode) =>
+    delayed_queue.push((4, code, None,None,None,None,None))
 
   fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
     // Originally, this class did nothing.  With the removal of the
@@ -365,14 +397,16 @@ class _InitDataReceiver is _DataReceiverWrapper
     // 
     // We do not have an actor tag to send "ourself" a message, so
     // let's do this the old fashioned way: keep a queue.
-    request_in_flight_ack_queue.push((request_id, requester_id))
+    //delayed_queue.push((DelayedOp6, request_id, requester_id))
+    delayed_queue.push((5, request_id, requester_id,None,None,None,None))
 
-  fun request_in_flight_resume_ack(
+  fun ref request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
     leaving_workers: Array[String] val)
   =>
-    Fail()
+    delayed_queue.push((6, in_flight_resume_ack_id, request_id, requester_id,
+      leaving_workers,None,None))
 
 class _DataReceiver is _DataReceiverWrapper
   let data_receiver: DataReceiver
@@ -380,28 +414,28 @@ class _DataReceiver is _DataReceiverWrapper
   new create(dr: DataReceiver) =>
     data_receiver = dr
 
-  fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
+  fun ref data_connect(sender_step_id: StepId, conn: DataChannel) =>
     data_receiver.data_connect(sender_step_id, conn)
 
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
+  fun ref received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     data_receiver.received(d, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+  fun ref replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
-  fun report_status(code: ReportStatusCode) =>
+  fun ref report_status(code: ReportStatusCode) =>
     data_receiver.report_status(code)
 
   fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
     data_receiver.request_in_flight_ack(request_id, requester_id)
 
-  fun request_in_flight_resume_ack(
+  fun ref request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
     leaving_workers: Array[String] val)

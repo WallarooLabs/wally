@@ -24,6 +24,7 @@ use "pony-kafka/customlogger"
 use "time"
 use "wallaroo/core/common"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -62,7 +63,8 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
   var _ready_to_produce: Bool = false
   var _application_initialized: Bool = false
-
+  var _router_registry: (RouterRegistry | None) = None
+  let _step_id: StepId = StepIdGenerator() // fake ID
   let _topic: String
 
   // Items in tuple are: metric_name, metrics_id, send_ts, worker_ingress_ts,
@@ -210,9 +212,20 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
+    omni_router: OmniRouter, router_registry: RouterRegistry)
   =>
-    _mute_upstreams()
+    _router_registry = router_registry
+    if _step_id == 0 then
+      Fail()
+    end
+    ifdef debug or "debug_back_pressure" then
+      @printf[I32]("KafkaSink: local_stop_all_local(0x%llx)\n".cstring(), _step_id)
+    end
+    try
+      (_router_registry as RouterRegistry).local_stop_all_local(_step_id)
+    else
+      Fail()
+    end
 
     initializer.report_initialized(this)
 
@@ -228,8 +241,16 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       initializer.report_ready_to_work(this)
       _initializer = None
 
+      // SLF TODO: remove _mute_outstanding?
       if _mute_outstanding and not _recovering then
-        _unmute_upstreams()
+        ifdef debug or "debug_back_pressure" then
+          @printf[I32]("OutgoingBoundary: local_resume_all_local(0x%llx)\n".cstring(), _step_id)
+        end
+        try
+          (_router_registry as RouterRegistry).local_resume_all_local(_step_id)
+        else
+          Fail()
+        end
       end
     end
 

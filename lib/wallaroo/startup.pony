@@ -322,6 +322,7 @@ actor Startup
         connections, this, _startup_options.stop_the_world_pause)
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
+      connections.set_router_registry(router_registry)
 
       let recovery_replayer = RecoveryReplayer(auth,
         _startup_options.worker_name, data_receivers, router_registry,
@@ -482,6 +483,7 @@ actor Startup
         connections, this, _startup_options.stop_the_world_pause)
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
+      connections.set_router_registry(router_registry)
 
       let recovery_replayer = RecoveryReplayer(auth,
         _startup_options.worker_name,

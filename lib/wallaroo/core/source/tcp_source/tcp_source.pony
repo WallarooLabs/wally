@@ -136,7 +136,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       if not _outgoing_boundaries.contains(target_worker_name) then
         let new_boundary =
           builder.build_and_initialize(_step_id_gen(), target_worker_name,
-            _layout_initializer)
+            _layout_initializer, _router_registry)
         router_registry.register_disposable(new_boundary)
         _outgoing_boundaries(target_worker_name) = new_boundary
       end
@@ -220,7 +220,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let boundary = builder.build_and_initialize(_step_id_gen(),
-          target_worker_name, _layout_initializer)
+          target_worker_name, _layout_initializer, _router_registry)
         _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
         let new_route = _route_builder(this, boundary, _metrics_reporter)

@@ -31,6 +31,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/rebalancing"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -131,7 +132,7 @@ actor Step is (Producer & Consumer)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
+    omni_router: OmniRouter, router_registry: RouterRegistry)
   =>
     for consumer in _router.routes().values() do
       if not _routes.contains(consumer) then
