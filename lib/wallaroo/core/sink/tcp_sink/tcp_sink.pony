@@ -564,6 +564,8 @@ actor TCPSink is Consumer
     _pending_writev_total = 0
     _readable = false
     _writeable = false
+    _throttled = false
+    _release_backpressure_in_runtime()
     @pony_asio_event_set_readable[None](_event, false)
     @pony_asio_event_set_writeable[None](_event, false)
 
@@ -824,20 +826,23 @@ actor TCPSink is Consumer
       _notify_connecting()
     end
 
+  fun ref _apply_backpressure_in_runtime() =>
+    ifdef debug then
+      @printf[I32]("TCPSink: back-pressure apply by %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
+    end
+    match _env.root
+    | None =>
+      Fail()
+    | let auth: AmbientAuth =>
+      Backpressure.apply(auth)
+    end
+
   fun ref _apply_backpressure() =>
     if not _throttled then
-      ifdef debug then
-        @printf[I32]("BACKPRESSURE tcp_sink: apply by %s:%s\n".cstring(),
-          _host.cstring(), _service.cstring())
-      end
       _throttled = true
+      _apply_backpressure_in_runtime()
       _notify.throttled(this)
-      match _env.root
-      | None =>
-        Fail()
-      | let auth: AmbientAuth =>
-        Backpressure.apply(auth)
-      end
     end
     _writeable = false
     // this is safe because asio thread isn't currently subscribed
@@ -845,20 +850,23 @@ actor TCPSink is Consumer
     @pony_asio_event_set_writeable[None](_event, false)
     @pony_asio_event_resubscribe_write(_event)
 
+  fun ref _release_backpressure_in_runtime() =>
+    ifdef debug then
+      @printf[I32]("TCPsink: back-pressure release by %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
+    end
+    match _env.root
+    | None =>
+      Fail()
+    | let auth: AmbientAuth =>
+      Backpressure.release(auth)
+    end
+
   fun ref _release_backpressure() =>
     if _throttled then
-      ifdef debug then
-        @printf[I32]("BACKPRESSURE tcp_sink: release by %s:%s\n".cstring(),
-          _host.cstring(), _service.cstring())
-      end
       _throttled = false
+      _release_backpressure_in_runtime()
       _notify.unthrottled(this)
-      match _env.root
-      | None =>
-        Fail()
-      | let auth: AmbientAuth =>
-        Backpressure.release(auth)
-      end
     end
 
   fun _can_send(): Bool =>
