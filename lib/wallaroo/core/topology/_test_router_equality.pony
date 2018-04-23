@@ -195,15 +195,18 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     base_routes(1) = step1
     base_routes(2) = step2
 
+    let base_keyed_routes = recover val Map[StringKey, Step] end
+
     let target_routes = recover trn Map[U128, Consumer] end
     target_routes(1) = step1
 
-    var base_router = DataRouter(consume base_routes)
-    let target_router = DataRouter(consume target_routes)
+    var base_router = DataRouter(consume base_routes, base_keyed_routes)
+    let target_router = DataRouter(consume target_routes, base_keyed_routes)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
-    base_router = base_router.remove_route(2)
+    // !@ When we get rid of the general key type then we won't need None here
+    base_router = base_router.remove_keyed_route(2, None)
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -231,12 +234,15 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     target_routes(1) = step1
     target_routes(2) = step2
 
-    var base_router = DataRouter(consume base_routes)
-    let target_router = DataRouter(consume target_routes)
+    let base_keyed_routes = recover val Map[StringKey, Step] end
+
+    var base_router = DataRouter(consume base_routes, base_keyed_routes)
+    let target_router = DataRouter(consume target_routes, base_keyed_routes)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
-    base_router = base_router.add_route(2, step2)
+    // !@ When we get rid of general keys we won't need None here
+    base_router = base_router.add_keyed_route(2, None, step2)
 
     h.assert_eq[Bool](true, base_router == target_router)
 
