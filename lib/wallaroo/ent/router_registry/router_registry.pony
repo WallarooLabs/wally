@@ -42,7 +42,7 @@ actor RouterRegistry is InFlightAckRequester
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
   var _data_router: DataRouter =
-    DataRouter(recover Map[U128, Consumer] end)
+    DataRouter(recover Map[U128, Consumer] end, recover Map[StringKey, Step] end)
   var _pre_state_data: (Array[PreStateData] val | None) = None
   let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()
@@ -1452,7 +1452,8 @@ actor RouterRegistry is InFlightAckRequester
     try
       let moving_step = _data_router.step_for_id(id)?
 
-      let new_data_router = _data_router.remove_route(id)
+      // !@ Figure out how to get the key so we don't have to pass None
+      let new_data_router = _data_router.remove_keyed_route(id, None)
       _data_router = new_data_router
       _distribute_data_router()
     else
@@ -1510,7 +1511,7 @@ actor RouterRegistry is InFlightAckRequester
       match target
       | let step: Step =>
         _register_omni_router_step(step)
-        _data_router = _data_router.add_route(id, step)
+        _data_router = _data_router.add_keyed_route(id, key, step)
         _distribute_data_router()
         let partition_router =
           _partition_routers(state_name)?.update_route[K](key, step)?

@@ -798,15 +798,22 @@ class val StepIdRouterBlueprint is OmniRouterBlueprint
       recover Map[U128, StatelessPartitionRouter] end,
       consume new_source_map, recover Map[String, DataReceiver] end)
 
+type StringKey is String
+
 class val DataRouter is Equatable[DataRouter]
   let _data_routes: Map[StepId, Consumer] val
+  // _keyed_routes contains a subset of the routes in _data_routes.
+  // _keyed_routes keeps track of state step routes, while
+  // _data_routes keeps track of *all* routes.
+  let _keyed_routes: Map[StringKey, Step] val
   let _target_ids_to_route_ids: Map[StepId, RouteId] val
   let _route_ids_to_target_ids: Map[RouteId, StepId] val
 
-  new val create(data_routes: Map[StepId, Consumer] val =
-      recover Map[StepId, Consumer] end)
+  new val create(data_routes: Map[StepId, Consumer] val,
+      keyed_routes: Map[StringKey, Step] val)
   =>
     _data_routes = data_routes
+    _keyed_routes = keyed_routes
     var route_id: RouteId = 0
     let keys: Array[StepId] = keys.create()
     let tid_map = recover trn Map[StepId, RouteId] end
@@ -825,17 +832,19 @@ class val DataRouter is Equatable[DataRouter]
     _route_ids_to_target_ids = consume rid_map
 
   new val with_route_ids(data_routes: Map[StepId, Consumer] val,
+    keyed_routes: Map[StringKey, Step] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val)
   =>
     _data_routes = data_routes
+    _keyed_routes = keyed_routes
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
 
   fun size(): USize =>
     _data_routes.size()
 
-  fun step_for_id(id: U128): Consumer ? =>
+  fun step_for_id(id: StepId): Consumer ? =>
     _data_routes(id)?
 
   fun route(d_msg: DeliveryMsg, pipeline_time_spent: U64, producer_id: StepId,
@@ -917,14 +926,24 @@ class val DataRouter is Equatable[DataRouter]
     for step in _data_routes.values() do
       rs.push(step)
     end
+
     consume rs
 
-  fun remove_route(id: U128): DataRouter =>
+  fun remove_keyed_route(id: StepId, key: Any val): DataRouter =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
     let new_data_routes = recover trn Map[StepId, Consumer] end
     for (k, v) in _data_routes.pairs() do
       if k != id then new_data_routes(k) = v end
+    end
+    let new_keyed_routes = recover trn Map[StringKey, Step] end
+
+    // !@ get rid of this when we make all keys a byte array
+    match key
+    | let string_key: String =>
+      for (k, v) in _keyed_routes.pairs() do
+        if k != string_key then new_keyed_routes(k) = v end
+      end
     end
     let new_tid_map = recover trn Map[StepId, RouteId] end
     for (k, v) in _target_ids_to_route_ids.pairs() do
@@ -935,9 +954,9 @@ class val DataRouter is Equatable[DataRouter]
       if v != id then new_rid_map(k) = v end
     end
     DataRouter.with_route_ids(consume new_data_routes,
-      consume new_tid_map, consume new_rid_map)
+      consume new_keyed_routes, consume new_tid_map, consume new_rid_map)
 
-  fun add_route(id: StepId, target: Consumer): DataRouter =>
+  fun add_keyed_route(id: StepId, key: Any val, target: Step): DataRouter =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
     let new_data_routes = recover trn Map[StepId, Consumer] end
@@ -945,6 +964,15 @@ class val DataRouter is Equatable[DataRouter]
       new_data_routes(k) = v
     end
     new_data_routes(id) = target
+
+    let new_keyed_routes = recover trn Map[StringKey, Step] end
+    match key
+    | let string_key: String =>
+      for (k, v) in _keyed_routes.pairs() do
+        new_keyed_routes(k) = v
+      end
+      new_keyed_routes(string_key) = target
+    end
 
     let new_tid_map = recover trn Map[StepId, RouteId] end
     var highest_route_id: RouteId = 0
@@ -962,7 +990,7 @@ class val DataRouter is Equatable[DataRouter]
     new_rid_map(new_route_id) = id
 
     DataRouter.with_route_ids(consume new_data_routes,
-      consume new_tid_map, consume new_rid_map)
+      consume new_keyed_routes, consume new_tid_map, consume new_rid_map)
 
   fun remove_routes_to_consumer(c: Consumer) =>
     """
