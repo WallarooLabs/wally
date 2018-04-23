@@ -23,6 +23,7 @@ use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
+use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
@@ -198,7 +199,13 @@ actor RouterRegistry is InFlightAckRequester
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
     if not _stop_the_world_in_process and _application_ready_to_work then
-      source.unmute(_dummy_consumer)
+      match source
+      | let tcp_source: TCPSource =>
+        ifdef debug then
+          @printf[I32]("register_source: resuming ?? source\n".cstring())
+        end
+        tcp_source.unmute_source(_dummy_consumer)
+      end
     end
     match _omni_router
     | let omnr: OmniRouter =>
@@ -1095,7 +1102,15 @@ actor RouterRegistry is InFlightAckRequester
       @printf[I32]("RouterRegistry muting any local sources.\n".cstring())
     end
     for source in _sources.values() do
-      source.mute(_dummy_consumer)
+      match source
+      | let tcp_source: TCPSource =>
+        ifdef debug then
+          @printf[I32]("_stop_all_local: stopping ?? source\n".cstring())
+        end
+        tcp_source.mute_source(_dummy_consumer)
+      else
+        @printf[I32]("_stop_all_local: skipping stop ?? source\n".cstring())
+      end
     end
 
   fun _resume_all_local() =>
@@ -1106,7 +1121,15 @@ actor RouterRegistry is InFlightAckRequester
       @printf[I32]("RouterRegistry unmuting any local sources.\n".cstring())
     end
     for source in _sources.values() do
-      source.unmute(_dummy_consumer)
+      match source
+      | let tcp_source: TCPSource =>
+        ifdef debug then
+          @printf[I32]("_resume_all_local: resuming ?? source\n".cstring())
+        end
+        tcp_source.unmute_source(_dummy_consumer)
+      else
+        @printf[I32]("_resume_all_local: skipping resume ?? source\n".cstring())
+      end
     end
 
   fun _resume_all_remote() =>

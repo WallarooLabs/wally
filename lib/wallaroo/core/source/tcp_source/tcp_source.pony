@@ -85,12 +85,13 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
   var _read_len: USize = 0
+  // The source must start muted, or else we might send data downstream
+  // before RouterRegistry has finished setting up the pipeline.
+  // When the pipeline is ready, then RR will call unmute_source().
+  var _muted: Bool = true
   var _reading: Bool = false
   var _shutdown: Bool = false
-  // Start muted. Wait for unmute to begin processing
-  var _muted: Bool = true
   var _expect_read_buf: Reader = Reader
-  let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
   let _router_registry: RouterRegistry
 
@@ -177,8 +178,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     for r in _routes.values() do
       r.application_initialized("TCPSource")
     end
-
-    _mute()
 
   be update_router(router: Router) =>
     let new_router =
@@ -691,16 +690,11 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       _pending_reads()
     end
 
-  be mute(c: Consumer) =>
-    _muted_downstream.set(c)
+  be mute_source(c: Consumer) =>
     _mute()
 
-  be unmute(c: Consumer) =>
-    _muted_downstream.unset(c)
-
-    if _muted_downstream.size() == 0 then
-      _unmute()
-    end
+  be unmute_source(c: Consumer) =>
+    _unmute()
 
   fun ref is_muted(): Bool =>
     _muted

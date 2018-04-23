@@ -299,6 +299,9 @@ actor Connections is Cluster
 
   be stop_the_world(exclusions: Array[String] val = recover Array[String] end)
   =>
+    ifdef debug then
+      @printf[I32]("@BACKPRESSURE: derp, stop_the_world\n".cstring())
+    end
     try
       let mute_request_msg =
         ChannelMsgEncoder.mute_request(_worker_name, _auth)?
@@ -384,7 +387,10 @@ actor Connections is Cluster
     end
 
   be request_cluster_unmute() =>
-    try
+    ifdef debug then
+      @printf[I32]("@BACKPRESSURE: derp, request_cluster_unmute\n".cstring())
+    end
+        try
       let unmute_request_msg = ChannelMsgEncoder.unmute_request(_worker_name,
         _auth)?
       for (target, ch) in _control_conns.pairs() do

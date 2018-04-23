@@ -68,8 +68,11 @@ trait tag Runnable
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
 trait tag Muteable
-  be mute(c: Consumer)
-  be unmute(c: Consumer)
+  be mute(c: Consumer) => // TODO remove
+    None
+
+  be unmute(c: Consumer) => // TODO remove
+    None
 
 trait tag StateReceiver
   be receive_state(state: ByteSeq val)

@@ -75,6 +75,9 @@ actor ReconnectingMetricsSink
   var _service: String
   var _from: String
 
+  // _pending is used to avoid GC prematurely reaping memory.
+  // See Wallaroo commit 75f1c394e for more.  It looks like a write-only
+  // data structure, but its use is important until the Pony runtime changes.
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -87,8 +90,6 @@ actor ReconnectingMetricsSink
 
   var _read_len: USize = 0
   var _expect: USize = 0
-
-  var _muted: Bool = false
 
   var _reconnect_pause: U64
   var _application_name: String
@@ -185,12 +186,14 @@ actor ReconnectingMetricsSink
           worker_name, id, histogram, period, period_ends_at, payload_wb)
         HubProtocol.payload(event, topic, payload_wb.done(), _wb)
       end
+      @printf[I32]("a1,".cstring())
       _writev(_wb.done())
     else
       Fail()
     end
 
   be writev(data: ByteSeqIter) =>
+    @printf[I32]("a2,".cstring())
     _writev(data)
 
   fun ref _writev(data: ByteSeqIter) =>
@@ -198,7 +201,7 @@ actor ReconnectingMetricsSink
     Write a sequence of sequences of bytes.
     """
 
-    if not _closed and _connected then
+    if not _closed and _connected and not _throttled then
       _in_sent = true
 
       ifdef windows then
@@ -212,6 +215,7 @@ actor ReconnectingMetricsSink
           _pending.push((bytes, 0))
         end
 
+        @printf[I32]("a,".cstring())
         _pending_writes()
       end
 
@@ -238,22 +242,19 @@ actor ReconnectingMetricsSink
     Do nothing on windows.
     """
     ifdef not windows then
+        @printf[I32]("b,".cstring())
       _pending_writes()
     end
 
   be mute() =>
     """
-    Temporarily suspend reading off this TCPConnection until such time as
-    `unmute` is called.
+    NOOP.
     """
-    _muted = true
 
   be unmute() =>
     """
-    Start reading off this TCPConnection again after having been muted.
+    NOOP.
     """
-    _muted = false
-    _pending_reads()
 
   be set_notify(notify: MetricsSinkNotify iso) =>
     """
@@ -342,6 +343,7 @@ actor ReconnectingMetricsSink
             _pending_reads()
 
             ifdef not windows then
+        @printf[I32]("c,".cstring())
               if _pending_writes() then
                 //sent all data; release backpressure
                 _release_backpressure()
@@ -375,6 +377,7 @@ actor ReconnectingMetricsSink
             _pending_reads()
 
             ifdef not windows then
+        @printf[I32]("d,".cstring())
               if _pending_writes() then
                 //sent all data; release backpressure
                 _release_backpressure()
@@ -405,6 +408,7 @@ actor ReconnectingMetricsSink
           _writeable = true
           _complete_writes(arg)
             ifdef not windows then
+        @printf[I32]("e,".cstring())
               if _pending_writes() then
                 //sent all data; release backpressure
                 _release_backpressure()
@@ -457,6 +461,7 @@ actor ReconnectingMetricsSink
         _pending_writev.>push(data.cpointer().usize()).>push(data.size())
         _pending_writev_total = _pending_writev_total + data.size()
         _pending.push((data, 0))
+        @printf[I32]("f,".cstring())
         _pending_writes()
       end
     end
@@ -507,6 +512,7 @@ actor ReconnectingMetricsSink
     writeable. On an error, dispose of the connection. Returns whether
     it sent all pending data or not.
     """
+    @printf[I32]("_pw=%d,".cstring(), _pending_writev.size())
     ifdef not windows then
       // TODO: Make writev_batch_size user configurable
       let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
@@ -533,6 +539,7 @@ actor ReconnectingMetricsSink
           // Write as much data as possible.
           var len = @pony_os_writev[USize](_event,
             _pending_writev.cpointer(), num_to_send) ?
+          @printf[I32]("writev=%d,".cstring(), len)
 
           if len < bytes_to_send then
             while len > 0 do
@@ -597,7 +604,7 @@ actor ReconnectingMetricsSink
 
       _read_len = _read_len + len.usize()
 
-      if (not _muted) and (_read_len >= _expect) then
+      if (_read_len >= _expect) then
         let data = _read_buf = recover Array[U8] end
         data.truncate(_read_len)
         _read_len = 0
@@ -637,7 +644,7 @@ actor ReconnectingMetricsSink
 
   fun ref _pending_reads() =>
     """
-    Unless this connection is currently muted, read while data is available,
+    Read while data is available,
     guessing the next packet length as we go. If we read 4 kb of data, send
     ourself a resume message and stop reading, to avoid starving other actors.
     """
@@ -646,10 +653,6 @@ actor ReconnectingMetricsSink
       var received_called: USize = 0
 
       while _readable and not _shutdown_peer do
-        if _muted then
-          return
-        end
-
         // Read as much data as possible.
         let len = @pony_os_recv[USize](
           _event,
@@ -718,20 +721,11 @@ actor ReconnectingMetricsSink
 
   fun ref close() =>
     """
-    Attempt to perform a graceful shutdown. Don't accept new writes. If the
-    connection isn't muted then we won't finish closing until we get a zero
-    length read.  If the connection is muted, perform a hard close and
-    shut down immediately.
+    Attempt to perform a graceful shutdown. Don't accept new writes.
+    We won't finish closing until we get a zero
+    length read.
     """
-    ifdef windows then
-      _close()
-    else
-      if _muted then
-        _hard_close()
-      else
-       _close()
-     end
-    end
+     _close()
 
   fun ref _close() =>
     _closed = true
@@ -834,6 +828,8 @@ actor ReconnectingMetricsSink
 
   fun ref _apply_backpressure() =>
     if not _throttled then
+      @printf[I32]("%s outgoing _apply_backpressure\n".cstring(),
+        "yodel".cstring())
       _throttled = true
       _notify.throttled(this)
     end
@@ -847,6 +843,8 @@ actor ReconnectingMetricsSink
 
   fun ref _release_backpressure() =>
     if _throttled then
+      @printf[I32]("%s outgoing _release_backpressure\n".cstring(),
+        "yodel".cstring())
       _throttled = false
       _notify.unthrottled(this)
     end

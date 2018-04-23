@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "backpressure"
 use "buffered"
 use "collections"
 use "net"
@@ -91,7 +92,6 @@ actor TCPSink is Consumer
 
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
-  var _mute_outstanding: Bool = false
 
   // TCP
   var _notify: WallarooOutgoingNetworkActorNotify
@@ -107,7 +107,10 @@ actor TCPSink is Consumer
   var _writeable: Bool = false
   var _throttled: Bool = false
   var _event: AsioEventID = AsioEvent.none()
-  embed _pending: List[(ByteSeq, USize)] = _pending.create()
+  // _pending is used to avoid GC prematurely reaping memory.
+  // See Wallaroo commit 75f1c394e for more.  It looks like a write-only
+  // data structure, but its use is important until the Pony runtime changes.
+  embed _pending: List[ByteSeq] = _pending.create()
   embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -159,7 +162,6 @@ actor TCPSink is Consumer
     _service = service
     _from = from
     _connect_count = 0
-    _mute_upstreams()
 
   //
   // Application Lifecycle events
@@ -172,7 +174,6 @@ actor TCPSink is Consumer
   be application_created(initializer: LocalTopologyInitializer,
     omni_router: OmniRouter)
   =>
-    _mute_upstreams()
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
@@ -227,8 +228,6 @@ actor TCPSink is Consumer
     else
       Fail()
     end
-
-    _maybe_mute_or_unmute_upstreams()
 
   fun ref _next_tracking_id(i_producer: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)
@@ -337,6 +336,13 @@ actor TCPSink is Consumer
       if AsioEvent.writeable(flags) then
         // A connection has completed.
         var fd = @pony_asio_event_fd(event)
+        ifdef "setsockopt" then
+          @printf[I32]("YO, fd %d setting buf sizes\n".cstring(), fd)
+          @pony_os_rcvbuf[None](fd, I32(1024))
+          @pony_os_sndbuf[None](fd, I32(1024))
+        else
+          @printf[I32]("YO, 'setsockopt' is not defined, skipping.\n".cstring())
+        end
         _connect_count = _connect_count - 1
 
         if not _connected and not _closed then
@@ -369,7 +375,6 @@ actor TCPSink is Consumer
                 _release_backpressure()
               end
             end
-            _maybe_mute_or_unmute_upstreams()
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -403,7 +408,6 @@ actor TCPSink is Consumer
                 //sent all data; release backpressure
                 _release_backpressure()
               end
-              _maybe_mute_or_unmute_upstreams()
             end
           else
             // The connection failed, unsubscribe the event and close.
@@ -461,7 +465,7 @@ actor TCPSink is Consumer
     for bytes in _notify.sentv(this, data).values() do
       _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
-      _pending.push((bytes, 0))
+      _pending.push(bytes)
       data_size = data_size + bytes.size()
     end
 
@@ -471,7 +475,6 @@ actor TCPSink is Consumer
         _pending_tracking.push((data_size, id))
       end
     end
-
     _pending_writes()
 
     _in_sent = false
@@ -490,7 +493,7 @@ actor TCPSink is Consumer
           _pending_tracking.push((data.size(), id))
         end
     end
-    _pending.push((data, 0))
+    _pending.push(data)
     _pending_writes()
 
   fun ref _notify_connecting() =>
@@ -823,45 +826,40 @@ actor TCPSink is Consumer
 
   fun ref _apply_backpressure() =>
     if not _throttled then
+      ifdef debug then
+        @printf[I32]("BACKPRESSURE tcp_sink: apply by %s:%s\n".cstring(),
+          _host.cstring(), _service.cstring())
+      end
       _throttled = true
       _notify.throttled(this)
+      match _env.root
+      | None =>
+        Fail()
+      | let auth: AmbientAuth =>
+        Backpressure.apply(auth)
+      end
     end
     _writeable = false
     // this is safe because asio thread isn't currently subscribed
     // for a write event so will not be writing to the readable flag
     @pony_asio_event_set_writeable[None](_event, false)
     @pony_asio_event_resubscribe_write(_event)
-    _maybe_mute_or_unmute_upstreams()
 
   fun ref _release_backpressure() =>
     if _throttled then
+      ifdef debug then
+        @printf[I32]("BACKPRESSURE tcp_sink: release by %s:%s\n".cstring(),
+          _host.cstring(), _service.cstring())
+      end
       _throttled = false
       _notify.unthrottled(this)
-      _maybe_mute_or_unmute_upstreams()
-    end
-
-  fun ref _maybe_mute_or_unmute_upstreams() =>
-    if _mute_outstanding then
-      if _can_send() then
-        _unmute_upstreams()
-      end
-    else
-      if not _can_send() then
-        _mute_upstreams()
+      match _env.root
+      | None =>
+        Fail()
+      | let auth: AmbientAuth =>
+        Backpressure.release(auth)
       end
     end
-
-  fun ref _mute_upstreams() =>
-    for u in _upstreams.values() do
-      u.mute(this)
-    end
-    _mute_outstanding = true
-
-  fun ref _unmute_upstreams() =>
-    for u in _upstreams.values() do
-      u.unmute(this)
-    end
-    _mute_outstanding = false
 
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable

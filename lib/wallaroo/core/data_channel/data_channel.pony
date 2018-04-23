@@ -59,6 +59,9 @@ actor DataChannel
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
 
+  // _pending is used to avoid GC prematurely reaping memory.
+  // See Wallaroo commit 75f1c394e for more.  It looks like a write-only
+  // data structure, but its use is important until the Pony runtime changes.
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -71,10 +74,6 @@ actor DataChannel
 
   var _read_len: USize = 0
   var _expect: USize = 0
-
-  var _muted: Bool = false
-  let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
-
 
   new create(auth: DataChannelAuth, notify: DataChannelNotify iso,
     host: String, service: String, from: String = "", init_size: USize = 64,
@@ -234,36 +233,15 @@ actor DataChannel
 
   be mute(d: Any tag) =>
     """
-    Temporarily suspend reading off this DataChannel until such time as
-    `unmute` is called.
+    NOOP.
     """
-    _mute(d)
-
-  fun ref _mute(d: Any tag) =>
-    _muted_downstream.set(d)
-    if not _muted then
-      ifdef debug then
-        @printf[I32]("Muting DataChannel\n".cstring())
-      end
-      _muted = true
-    end
+    None
 
   be unmute(d: Any tag) =>
     """
-    Start reading off this DataChannel again after having been muted.
+    NOOP.
     """
-    _unmute(d)
-
-  fun ref _unmute(d: Any tag) =>
-    _muted_downstream.unset(d)
-
-    if _muted_downstream.size() == 0 then
-      ifdef debug then
-        @printf[I32]("Unmuting DataChannel\n".cstring())
-      end
-      _muted = false
-      _pending_reads()
-    end
+    None
 
   be set_notify(notify: DataChannelNotify iso) =>
     """
@@ -584,7 +562,7 @@ actor DataChannel
 
       _read_len = _read_len + len.usize()
 
-      if (not _muted) and (_read_len >= _expect) then
+      if (_read_len >= _expect) then
         let data = _read_buf = recover Array[U8] end
         data.truncate(_read_len)
         _read_len = 0
@@ -623,7 +601,7 @@ actor DataChannel
 
   fun ref _pending_reads() =>
     """
-    Unless this connection is currently muted, read while data is available,
+    Read while data is available,
     guessing the next packet length as we go. If we read 4 kb of data, send
     ourself a resume message and stop reading, to avoid starving other actors.
     """
@@ -633,10 +611,6 @@ actor DataChannel
         var received_called: USize = 0
 
         while _readable and not _shutdown_peer do
-          if _muted then
-            return
-          end
-
           // Read as much data as possible.
           let len = @pony_os_recv[USize](
             _event,

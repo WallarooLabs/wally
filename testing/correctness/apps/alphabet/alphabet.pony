@@ -82,6 +82,7 @@ primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
     if state.letter == " " then state.letter = votes.letter end
     state.count = state.count + votes.count
 
+    @printf[I32]("AddVotes: letter %s (%d) count %d\n".cstring(), state.letter.clone().cstring(), state.letter.size(), state.count)
     (LetterTotal(state.letter, state.count), DirectStateChange)
 
   fun state_change_builders():
@@ -104,6 +105,7 @@ primitive VotesDecoder is FramedSourceHandler[Votes val]
 
 primitive LetterPartitionFunction
   fun apply(votes: Votes val): String =>
+    @printf[I32]("PARTITION: letter %s (%d)\n".cstring(), votes.letter.clone().cstring())
     votes.letter
 
 class Votes

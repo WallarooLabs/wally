@@ -177,7 +177,6 @@ class DataChannelConnectNotifier is DataChannelNotify
     // State change to our real DataReceiver.
     _receiver = _DataReceiver(dr)
     _receiver.data_connect(sender_boundary_id, conn)
-    conn._unmute(this)
 
   fun ref received(conn: DataChannel ref, data: Array[U8] iso,
     n: USize): Bool
@@ -220,7 +219,6 @@ class DataChannelConnectNotifier is DataChannelNotify
         // Before we can begin processing messages on this data channel, we
         // need to determine which DataReceiver we'll be forwarding data
         // messages to.
-        conn._mute(this)
         _data_receivers.request_data_receiver(dc.sender_name,
           dc.sender_boundary_id, conn)
       | let sm: StepMigrationMsg =>

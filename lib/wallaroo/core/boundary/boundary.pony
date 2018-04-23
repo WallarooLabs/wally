@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "backpressure"
 use "buffered"
 use "collections"
 use "net"
@@ -119,6 +120,9 @@ actor OutgoingBoundary is Consumer
   var _writeable: Bool = false
   var _throttled: Bool = false
   var _event: AsioEventID = AsioEvent.none()
+  // _pending is used to avoid GC prematurely reaping memory.
+  // See Wallaroo commit 75f1c394e for more.  It looks like a write-only
+  // data structure, but its use is important until the Pony runtime changes.
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -981,15 +985,19 @@ actor OutgoingBoundary is Consumer
     end
 
   fun ref _mute_upstreams() =>
-    for u in _upstreams.values() do
-      u.mute(this)
+    ifdef debug then
+      @printf[I32]("BACKPRESSURE boundary: Backpressure.apply by %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
     end
+    Backpressure.apply(_auth)
     _mute_outstanding = true
 
   fun ref _unmute_upstreams() =>
-    for u in _upstreams.values() do
-      u.unmute(this)
+    ifdef debug then
+      @printf[I32]("BACKPRESSURE boundary: Backpressure.release by %s:%s\n".cstring(),
+        _host.cstring(), _service.cstring())
     end
+    Backpressure.release(_auth)
     _mute_outstanding = false
 
   fun _can_send(): Bool =>
