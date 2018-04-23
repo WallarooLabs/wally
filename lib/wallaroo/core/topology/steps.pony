@@ -320,13 +320,13 @@ actor Step is (Producer & Consumer)
       process_message[D](metric_name, pipeline_time_spent, data,
         i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts)
-    // else
-    //   match _step_message_processor
-    //   | let qmp: QueueingStepMessageProcessor =>
-    //     qmp.run[D](metric_name, pipeline_time_spent, data,
-    //       i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-    //       latest_ts, metrics_id, worker_ingress_ts)
-    //   end
+    else
+      match _step_message_processor
+      | let qmp: QueueingStepMessageProcessor =>
+        qmp.run[D](metric_name, pipeline_time_spent, data,
+          i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+          latest_ts, metrics_id, worker_ingress_ts)
+      end
     end
 
   fun ref process_message[D: Any val](metric_name: String,
