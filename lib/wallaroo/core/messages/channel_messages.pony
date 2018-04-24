@@ -20,6 +20,7 @@ use "buffered"
 use "serialise"
 use "net"
 use "collections"
+use "wallaroo_labs/mort"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
@@ -716,13 +717,18 @@ trait val DeliveryMsg is ChannelMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: Map[String, Step] val
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val
   ): (Bool, RouteId) ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
-  fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun replay_deliver(pipeline_time_spent: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
   fun input(): Any val
   fun metric_name(): String
   fun msg_uid(): MsgId
@@ -762,8 +768,8 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: Map[String, Step] val
-    ): (Bool, RouteId) ?
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
   =>
     let target_step = data_routes(_target_id)?
     ifdef "trace" then
@@ -777,14 +783,20 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
       worker_ingress_ts)
     (false, route_id)
 
-  fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun replay_deliver(pipeline_time_spent: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
   =>
+    let target_step = data_routes(_target_id)?
+    let route_id = target_ids_to_route_ids(_target_id)?
     target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
       producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
       metrics_id, worker_ingress_ts)
-    false
+    (false, route_id)
 
 class val ForwardHashedMsg[Key: (Hashable val & Equatable[Key] val),
   D: Any val] is ReplayableDeliveryMsg
@@ -822,48 +834,54 @@ class val ForwardHashedMsg[Key: (Hashable val & Equatable[Key] val),
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: Map[String, Step] val
-    ): (Bool, RouteId) ?
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
   =>
-    // !@ FIX THIS
-    // let target_step = data_routes(_target_id)?
-    // ifdef "trace" then
-    //   @printf[I32]("DataRouter found Step\n".cstring())
-    // end
+    ifdef "trace" then
+      @printf[I32]("DataRouter found Step\n".cstring())
+    end
 
-    // iftype Key <: String then
-    //   try
-    //     let target_step = keys_to_routes(_target_key)?
-    //     target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
-    //       producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
-    //       worker_ingress_ts)
-    //     (false, route_id)
-    //   else
-    //     Fail()
-    //     error
-    //   end
-    // else
-    //   Fail()
-    //   error
-    // end
+    iftype Key <: String then
+      try
+        let target_step = keys_to_routes(_target_key)?
+        let route_id = keys_to_route_ids(_target_key)?
+        target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+          producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+          worker_ingress_ts)
+        (false, route_id)
+      else
+        Fail()
+        error
+      end
+    else
+      Fail()
+      error
+    end
 
-    // let route_id = target_ids_to_route_ids(_target_id)?
-
-    // target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
-    //   producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
-    //   worker_ingress_ts)
-    // (false, route_id)
-
-    error
-
-  fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun replay_deliver(pipeline_time_spent: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
   =>
-    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
-      metrics_id, worker_ingress_ts)
-    false
+    iftype Key <: String then
+      try
+        let target_step = keys_to_routes(_target_key)?
+        let route_id = keys_to_route_ids(_target_key)?
+        target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
+        producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
+        metrics_id, worker_ingress_ts)
+        (false, route_id)
+      else
+        Fail()
+        error
+      end
+    else
+      Fail()
+      error
+    end
 
 class val JoinClusterMsg is ChannelMsg
   """
