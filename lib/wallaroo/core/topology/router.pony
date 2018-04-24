@@ -238,6 +238,7 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
         this
       end
     else
+      Fail()
       this
     end
 
@@ -862,7 +863,8 @@ class val DataRouter is Equatable[DataRouter]
         seq_id, latest_ts, metrics_id, worker_ingress_ts,
         _data_routes,
         _target_ids_to_route_ids,
-        _route_ids_to_target_ids
+        _route_ids_to_target_ids,
+        _keyed_routes
          )?
       ifdef "resilience" then
         producer.bookkeeping(route_id, seq_id)
@@ -1307,9 +1309,7 @@ class val LocalPartitionRouter[In: Any val,
   =>
     let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
     // !@ NEED TO DO SOMETHING WITH new_hashed_routes and new_hashed_partitions
-    // let new_hashed_node_routes = recover val Map[String, HashedProxyRouter[Key]] end
-    // let new_hash_partitions = HashPartitions(recover [] end)
-    let new_hashed_node_routes = _hashed_node_routes
+    let new_hashed_node_routes = recover trn Map[String, HashedProxyRouter[Key]] end
     let new_hash_partitions = _hash_partitions
     for (k, target) in _partition_routes.pairs() do
       match target
@@ -1319,8 +1319,13 @@ class val LocalPartitionRouter[In: Any val,
         new_partition_routes(k) = target
       end
     end
+
+    for (k, hpr) in _hashed_node_routes.pairs() do
+      new_hashed_node_routes(k) = hpr.update_boundary(ob)
+    end
+
     LocalPartitionRouter[In, Key, S](_state_name, _worker_name, _local_map,
-      _step_ids, consume new_partition_routes, new_hashed_node_routes,
+      _step_ids, consume new_partition_routes, consume new_hashed_node_routes,
       new_hash_partitions, _partition_function)
 
   fun rebalance_steps_grow(
@@ -1991,6 +1996,21 @@ class val HashedProxyRouter[Key: (Hashable val & Equatable[Key] val)] is
       recover Array[Consumer] end
     else
       recover [_target] end
+    end
+
+  fun val update_boundary(ob: box->Map[String, OutgoingBoundary]):
+    HashedProxyRouter[Key]
+  =>
+    try
+      let new_target = ob(_worker_name)?
+      if new_target isnt _target then
+        HashedProxyRouter[Key](_worker_name, new_target, _target_state_name, _auth)
+      else
+        this
+      end
+    else
+      Fail()
+      this
     end
 
   fun eq(that: box->HashedProxyRouter[Key]): Bool =>
