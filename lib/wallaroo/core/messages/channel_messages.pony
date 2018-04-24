@@ -109,6 +109,24 @@ primitive ChannelMsgEncoder
     """
     _encode(PrepareShrinkMsg(remaining_workers, leaving_workers), auth)?
 
+  fun leaving_migration_ack_request(sender: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    When a leaving worker migrates all its steps, it requests acks from all
+    remaining workers.
+    """
+    _encode(LeavingMigrationAckRequestMsg(sender), auth)?
+
+  fun leaving_migration_ack(sender: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    A remaining worker sends this to ack that a leaving workers has finished
+    migrating.
+    """
+    _encode(LeavingMigrationAckMsg(sender), auth)?
+
   fun mute_request(originating_worker: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -616,6 +634,18 @@ class val PrepareShrinkMsg is ChannelMsg
   =>
     remaining_workers = remaining_workers'
     leaving_workers = leaving_workers'
+
+class val LeavingMigrationAckRequestMsg is ChannelMsg
+  let sender: String
+
+  new val create(sender': String) =>
+    sender = sender'
+
+class val LeavingMigrationAckMsg is ChannelMsg
+  let sender: String
+
+  new val create(sender': String) =>
+    sender = sender'
 
 class val AckWatermarkMsg is ChannelMsg
   let sender_name: String
