@@ -715,7 +715,8 @@ trait val DeliveryMsg is ChannelMsg
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, StepId] val
+    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    keys_to_routes: Map[String, Step] val
   ): (Bool, RouteId) ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
@@ -760,7 +761,8 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, StepId] val
+    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    keys_to_routes: Map[String, Step] val
     ): (Bool, RouteId) ?
   =>
     let target_step = data_routes(_target_id)?
@@ -819,13 +821,30 @@ class val ForwardHashedMsg[Key: (Hashable val & Equatable[Key] val),
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, StepId] val
+    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    keys_to_routes: Map[String, Step] val
     ): (Bool, RouteId) ?
   =>
     // !@ FIX THIS
     // let target_step = data_routes(_target_id)?
     // ifdef "trace" then
     //   @printf[I32]("DataRouter found Step\n".cstring())
+    // end
+
+    // iftype Key <: String then
+    //   try
+    //     let target_step = keys_to_routes(_target_key)?
+    //     target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+    //       producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+    //       worker_ingress_ts)
+    //     (false, route_id)
+    //   else
+    //     Fail()
+    //     error
+    //   end
+    // else
+    //   Fail()
+    //   error
     // end
 
     // let route_id = target_ids_to_route_ids(_target_id)?
