@@ -809,12 +809,14 @@ class val DataRouter is Equatable[DataRouter]
   let _keyed_routes: Map[StringKey, Step] val
   let _target_ids_to_route_ids: Map[StepId, RouteId] val
   let _route_ids_to_target_ids: Map[RouteId, StepId] val
+  let _keys_to_route_ids: Map[StringKey, RouteId] val
 
   new val create(data_routes: Map[StepId, Consumer] val,
       keyed_routes: Map[StringKey, Step] val)
   =>
     _data_routes = data_routes
     _keyed_routes = keyed_routes
+
     var route_id: RouteId = 0
     let keys: Array[StepId] = keys.create()
     let tid_map = recover trn Map[StepId, RouteId] end
@@ -822,15 +824,36 @@ class val DataRouter is Equatable[DataRouter]
     for step_id in _data_routes.keys() do
       keys.push(step_id)
     end
+    let consumers_ordered_by_route_id: Array[Consumer] =
+      consumers_ordered_by_route_id.create()
     for key in Sort[Array[StepId], StepId](keys).values() do
       route_id = route_id + 1
       tid_map(key) = route_id
+      try
+        consumers_ordered_by_route_id.push(data_routes(key)?)
+      else
+        Fail()
+      end
     end
     for (t_id, r_id) in tid_map.pairs() do
       rid_map(r_id) = t_id
     end
     _target_ids_to_route_ids = consume tid_map
     _route_ids_to_target_ids = consume rid_map
+
+    // !@ This seems like a really bad way to build this map, but it works for
+    // now.
+    let keys_to_route_ids = recover trn Map[StringKey, RouteId] end
+    for (k, s) in keyed_routes.pairs() do
+      try
+        let r_id = consumers_ordered_by_route_id.find(s)?.u64()
+        keys_to_route_ids(k) = r_id
+      else
+        Fail()
+      end
+    end
+
+    _keys_to_route_ids = consume keys_to_route_ids
 
   new val with_route_ids(data_routes: Map[StepId, Consumer] val,
     keyed_routes: Map[StringKey, Step] val,
@@ -841,6 +864,9 @@ class val DataRouter is Equatable[DataRouter]
     _keyed_routes = keyed_routes
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
+
+    // !@ need to recalculate _key_to_route_id
+    _keys_to_route_ids = recover Map[StringKey, RouteId] end
 
   fun size(): USize =>
     _data_routes.size()
@@ -864,7 +890,8 @@ class val DataRouter is Equatable[DataRouter]
         _data_routes,
         _target_ids_to_route_ids,
         _route_ids_to_target_ids,
-        _keyed_routes
+        _keyed_routes,
+        _keys_to_route_ids
          )?
       ifdef "resilience" then
         producer.bookkeeping(route_id, seq_id)
@@ -878,12 +905,11 @@ class val DataRouter is Equatable[DataRouter]
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     try
-      let target_id = r_msg.target_id()
-      let route_id = _target_ids_to_route_ids(target_id)?
       //TODO: create and deliver envelope
-      r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id)?,
-        producer_id, producer, seq_id, route_id, latest_ts, metrics_id,
-        worker_ingress_ts)
+      (_, let route_id) = r_msg.replay_deliver(pipeline_time_spent,
+        _data_routes, _target_ids_to_route_ids,
+        producer_id, producer, seq_id, latest_ts, metrics_id,
+        worker_ingress_ts, _keyed_routes, _keys_to_route_ids)?
       ifdef "resilience" then
         producer.bookkeeping(route_id, seq_id)
       end
