@@ -99,20 +99,17 @@ actor RouterRegistry is InFlightAckRequester
 
   var _stop_the_world_in_process: Bool = false
 
-  var _leaving_in_process: Bool = false
+  // TODO: Add management of pending steps to Autoscale protocol class
   // Steps migrated out and waiting for acknowledgement
   let _step_waiting_list: SetIs[U128] = _step_waiting_list.create()
-  // Workers in running cluster that have been stopped for migration
+
+  // Workers in running cluster that have been stopped for stop the world
   let _stopped_worker_waiting_list: _StringSet =
     _stopped_worker_waiting_list.create()
-  // Migration targets that have not yet acked migration batch complete
-  let _migration_target_ack_list: _StringSet =
-    _migration_target_ack_list.create()
 
-  // For keeping track of leaving workers during an autoscale shrink
-  let _leaving_workers_waiting_list: _StringSet =
-    _leaving_workers_waiting_list.create()
+  // TODO: Move management of this list to Autoscale class
   var _leaving_workers: Array[String] val = recover Array[String] end
+
   // Used as a proxy for RouterRegistry when muting and unmuting sources
   // and data channel.
   // TODO: Probably change mute()/unmute() interface so we don't need this
@@ -757,8 +754,6 @@ actor RouterRegistry is InFlightAckRequester
       else
         Fail()
       end
-      //!@
-      // begin_join_migration(joining_workers)
     end
 
   fun ref initiate_stop_the_world() =>
@@ -796,9 +791,6 @@ actor RouterRegistry is InFlightAckRequester
     """
     @printf[I32]("~~~Stopping message processing for state migration.~~~\n"
       .cstring())
-    for w in new_workers.values() do
-      _migration_target_ack_list.set(w)
-    end
     _mute_request(_worker_name)
     _connections.stop_the_world(new_workers)
 
@@ -923,38 +915,22 @@ actor RouterRegistry is InFlightAckRequester
     """
     _step_waiting_list.unset(step_id)
     if (_step_waiting_list.size() == 0) then
-      if _leaving_in_process then
-        _send_leaving_worker_done_migrating()
-        _recovery_file_cleaner.clean_recovery_files()
-      else
-        _send_migration_batch_complete()
-      end
-    end
-
-  fun _send_migration_batch_complete() =>
-    """
-    Inform migration target that the entire migration batch has been sent.
-    """
-    @printf[I32]("--Sending migration batch complete msg to new workers\n"
-      .cstring())
-    for target in _migration_target_ack_list.values() do
       try
-        _outgoing_boundaries(target)?.send_migration_batch_complete()
+        (_autoscale as Autoscale).all_step_migration_complete()
       else
         Fail()
       end
     end
 
-  fun _send_leaving_worker_done_migrating() =>
+  fun ref clean_shutdown() =>
+    _recovery_file_cleaner.clean_recovery_files()
+
+  fun send_migration_batch_complete_msg(target: String) =>
     """
     Inform migration target that the entire migration batch has been sent.
     """
-    @printf[I32]("--Sending leaving worker done migration msg to cluster\n"
-      .cstring())
     try
-      let msg = ChannelMsgEncoder.leaving_worker_done_migrating(_worker_name,
-        _auth)?
-      _connections.send_control_to_cluster(msg)
+      _outgoing_boundaries(target)?.send_migration_batch_complete()
     else
       Fail()
     end
@@ -979,16 +955,7 @@ actor RouterRegistry is InFlightAckRequester
     if _stopped_worker_waiting_list.size() > 0 then
       _stopped_worker_waiting_list.unset(originating_worker)
       if (_stopped_worker_waiting_list.size() == 0) then
-        if (_migration_target_ack_list.size() == 0) and
-          (_leaving_workers_waiting_list.size() == 0)
-        then
-          _try_resume_the_world()
-        else
-          // We should only unmute ourselves once _migration_target_ack_list is
-          // empty for grow and _leaving_workers_waiting_list is empty for
-          // shrink
-          Fail()
-        end
+        _try_resume_the_world()
       end
     end
 
@@ -1037,14 +1004,15 @@ actor RouterRegistry is InFlightAckRequester
     """
     @printf[I32]("--Processing migration batch complete ack from %s\n"
       .cstring(), target.cstring())
-    _migration_target_ack_list.unset(target)
-
-    if _migration_target_ack_list.size() == 0 then
-      @printf[I32]("--All new workers have acked migration batch complete\n"
-        .cstring(), target.cstring())
-      _connections.request_cluster_unmute()
-      _unmute_request(_worker_name)
+    try
+      (_autoscale as Autoscale).receive_join_migration_ack(target)
+    else
+      Fail()
     end
+
+  fun ref all_join_migration_acks_received() =>
+    _connections.request_cluster_unmute()
+    _unmute_request(_worker_name)
 
   fun ref _initiate_request_in_flight_acks(custom_action: CustomAction,
     excluded_workers: Array[String] val = recover Array[String] end)
@@ -1177,7 +1145,11 @@ actor RouterRegistry is InFlightAckRequester
 
   fun ref try_to_resume_processing_immediately() =>
     if _step_waiting_list.size() == 0 then
-      _send_migration_batch_complete()
+      try
+        (_autoscale as Autoscale).all_step_migration_complete()
+      else
+        Fail()
+      end
     end
 
   be ack_migration_batch_complete(sender_name: String) =>
@@ -1244,6 +1216,12 @@ actor RouterRegistry is InFlightAckRequester
     This should only be called on the worker contacted via an external
     message to initiate a shrink.
     """
+    try
+      (_autoscale as Autoscale).initiate_shrink(remaining_workers,
+        leaving_workers)
+    else
+      Fail()
+    end
     if ArrayHelpers[String].contains[String](leaving_workers, _worker_name)
     then
       // Since we're one of the leaving workers, we're handing off
@@ -1293,30 +1271,26 @@ actor RouterRegistry is InFlightAckRequester
     shrink. This behavior is called in response to receiving that message
     from the contacted worker.
     """
+    try
+      (_autoscale as Autoscale).prepare_shrink(remaining_workers,
+        leaving_workers)
+    else
+      Fail()
+    end
     _prepare_shrink(remaining_workers, leaving_workers)
 
   fun ref _prepare_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val)
   =>
-    try
-      (_autoscale as Autoscale).prepare_shrink()
-    else
-      Fail()
-    end
     for w in leaving_workers.values() do
       _remove_worker_from_omni_router(w)
     end
-    ifdef debug then
-      Invariant(_leaving_workers_waiting_list.size() == 0)
-    end
+
     if not _stop_the_world_in_process then
       _stop_the_world_in_process = true
       _stop_the_world_for_shrink_migration()
     end
 
-    for w in leaving_workers.values() do
-      _leaving_workers_waiting_list.set(w)
-    end
     for (p_id, router) in _stateless_partition_routers.pairs() do
       let new_router = router.calculate_shrink(remaining_workers)
       _distribute_stateless_partition_router(new_router)
@@ -1332,16 +1306,20 @@ actor RouterRegistry is InFlightAckRequester
     """
     @printf[I32]("Beginning process of leaving cluster.\n".cstring())
     try
-      (_autoscale as Autoscale).begin_leaving_migration()
+      (_autoscale as Autoscale).begin_leaving_migration(remaining_workers)
     else
       Fail()
     end
-    _leaving_in_process = true
+
     _leaving_workers = leaving_workers
     if _partition_routers.size() == 0 then
       //no steps have been migrated
       @printf[I32](("No partitions to migrate.\n").cstring())
-      _send_leaving_worker_done_migrating()
+      try
+        (_autoscale as Autoscale).all_step_migration_complete()
+      else
+        Fail()
+      end
       return
     end
 
@@ -1387,16 +1365,36 @@ actor RouterRegistry is InFlightAckRequester
     end
 
     _distribute_boundary_builders()
-    if not _leaving_in_process then
-      ifdef debug then
-        Invariant(_leaving_workers_waiting_list.size() > 0)
-      end
-      _leaving_workers_waiting_list.unset(worker)
-      if _leaving_workers_waiting_list.size() == 0 then
-        _connections.request_cluster_unmute()
-        _unmute_request(_worker_name)
-      end
+
+    try
+      (_autoscale as Autoscale).leaving_worker_finished_migration(worker)
+    else
+      Fail()
     end
+
+  fun ref send_leaving_migration_ack_request(
+    remaining_workers: Array[String] val)
+  =>
+    try
+      let msg = ChannelMsgEncoder.leaving_migration_ack_request(_worker_name,
+        _auth)?
+      for w in remaining_workers.values() do
+        _connections.send_control(w, msg)
+      end
+    else
+      Fail()
+    end
+
+  be receive_leaving_migration_ack(worker: String) =>
+    try
+      (_autoscale as Autoscale).receive_leaving_migration_ack(worker)
+    else
+      Fail()
+    end
+
+  fun ref all_leaving_workers_finished() =>
+    _connections.request_cluster_unmute()
+    _unmute_request(_worker_name)
 
   /////
   // Step moved off this worker or new step added to another worker
@@ -1682,9 +1680,10 @@ class LogRotationAction is CustomAction
   fun ref apply() =>
     _registry.begin_log_rotation()
 
+
+/////////////////////////////////////////////////////////////////////////////
 // TODO: Replace using this with the badly named SetIs once we address a bug
 // in SetIs where unsetting doesn't reduce set size for type SetIs[String].
-// This bug does not exist on the latest Pony compiler, only our fork.
 class _StringSet
   let _map: Map[String, String] = _map.create()
 

@@ -28,7 +28,7 @@ use "wallaroo/core/topology"
 
 class ControlChannelListenNotifier is TCPListenNotify
   let _auth: AmbientAuth
-  let _name: String
+  let _worker_name: String
   var _host: String = ""
   var _service: String = ""
   var _d_host: String
@@ -44,7 +44,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _event_log: EventLog
   let _recovery_file_cleaner: RecoveryFileCleaner
 
-  new iso create(name: String, auth: AmbientAuth,
+  new iso create(worker_name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     initializer: (ClusterInitializer | None) = None,
     layout_initializer: LayoutInitializer, recovery: Recovery,
@@ -53,7 +53,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner)
   =>
     _auth = auth
-    _name = name
+    _worker_name = worker_name
     _d_host = data_host
     _d_service = data_service
     _is_initializer = is_initializer
@@ -81,7 +81,7 @@ class ControlChannelListenNotifier is TCPListenNotify
         @printf[I32]("Recovery file exists for control channel\n".cstring())
       end
 
-      let message = ChannelMsgEncoder.identify_control_port(_name,
+      let message = ChannelMsgEncoder.identify_control_port(_worker_name,
         _service, _auth)?
       _connections.send_control_to_cluster(message)
 
@@ -91,31 +91,31 @@ class ControlChannelListenNotifier is TCPListenNotify
       f.sync()
       f.dispose()
 
-      @printf[I32]((_name + " control: listening on " + _host + ":" + _service
-        + "\n").cstring())
+      @printf[I32]((_worker_name + " control: listening on " + _host + ":" +
+        _service + "\n").cstring())
     else
-      @printf[I32]((_name + " control: couldn't get local address\n")
+      @printf[I32]((_worker_name + " control: couldn't get local address\n")
         .cstring())
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    @printf[I32]((_name + " control: unable to listen on (%s:%s)\n").cstring(),
-      _host.cstring(), _service.cstring())
+    @printf[I32]((_worker_name + " control: unable to listen on (%s:%s)\n")
+      .cstring(), _host.cstring(), _service.cstring())
     Fail()
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    ControlChannelConnectNotifier(_name, _auth, _connections,
+    ControlChannelConnectNotifier(_worker_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
       _router_registry, _d_host, _d_service, _event_log,
       _recovery_file_cleaner)
 
   fun ref closed(listen: TCPListener ref) =>
-    @printf[I32]((_name + " control: listener closed\n").cstring())
+    @printf[I32]((_worker_name + " control: listener closed\n").cstring())
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
-  let _name: String
+  let _worker_name: String
   let _connections: Connections
   let _initializer: (ClusterInitializer | None)
   let _layout_initializer: LayoutInitializer
@@ -128,7 +128,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _recovery_file_cleaner: RecoveryFileCleaner
   var _header: Bool = true
 
-  new iso create(name: String, auth: AmbientAuth,
+  new iso create(worker_name: String, auth: AmbientAuth,
     connections: Connections, initializer: (ClusterInitializer | None),
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
@@ -136,7 +136,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     recovery_file_cleaner: RecoveryFileCleaner)
   =>
     _auth = auth
-    _name = name
+    _worker_name = worker_name
     _connections = connections
     _initializer = initializer
     _layout_initializer = layout_initializer
@@ -349,8 +349,20 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _router_registry.remote_join_migration_request(m.new_workers)
       | let m: AutoscaleCompleteMsg =>
         _router_registry.autoscale_complete()
-      | let m: LeavingWorkerDoneMigratingMsg =>
-        _router_registry.disconnect_from_leaving_worker(m.worker_name)
+      | let m: LeavingMigrationAckRequestMsg =>
+        try
+          // We're acking immediately here, but in the future we may need
+          // to take other steps first, plugging this directly into the
+          // Autoscale protocol.
+          let ack_msg = ChannelMsgEncoder.leaving_migration_ack(_worker_name,
+            _auth)?
+          _connections.send_control(m.sender, ack_msg)
+        else
+          Fail()
+        end
+        _router_registry.disconnect_from_leaving_worker(m.sender)
+      | let m: LeavingMigrationAckMsg =>
+        _router_registry.receive_leaving_migration_ack(m.sender)
       | let m: AckMigrationBatchCompleteMsg =>
         ifdef "trace" then
           @printf[I32](("Received AckMigrationBatchCompleteMsg on Control " +
