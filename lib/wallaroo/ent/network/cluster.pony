@@ -39,12 +39,8 @@ trait tag Cluster
   be send_data_to_cluster(data: Array[ByteSeq] val) =>
     None
 
-  // You must implement this because of a type issue:
-  //   "type parameter constraint (Hashable val & Equatable[K val] val) is not
-  //    a supertype of (Hashable val & Equatable[K val] val)"
-  // TODO: Address this ponyc issue
-  be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, key: K, state_name: String, exclusions: Array[String] val =
+  be notify_cluster_of_new_stateful_step(id: StepId, key: Key,
+    state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
 
   be stop_the_world(exclusions: Array[String] val) =>

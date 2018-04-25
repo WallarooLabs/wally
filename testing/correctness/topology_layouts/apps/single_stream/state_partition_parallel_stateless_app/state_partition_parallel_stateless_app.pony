@@ -40,15 +40,15 @@ actor Main
 
       // This is basically the same as applying mod 2 before a double
       // computation
-      let mod3partition = Partition[U64, U64](
-        Mod3PartitionFunction, recover [0; 1; 2] end)
+      let mod3partition = Partition[U64](
+        Mod3PartitionFunction, recover ["0"; "1"; "2"] end)
 
       let application = recover val
         Application("single_stream-state_partition_parallel_stateless_app")
           .new_pipeline[U64, U64]("U64 CountAndMax DoubleCountMax",
             TCPSourceConfig[U64].from_options(U64Decoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_state_partition[U64, U64, CountMax, CountAndMax](
+            .to_state_partition[U64, CountMax, CountAndMax](
               UpdateCountAndMax, CountAndMaxBuilder,
               "count-and-max",
               mod3partition where multi_worker = true)

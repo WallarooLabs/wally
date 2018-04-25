@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "buffered"
 use "serialise"
 use "wallaroo_labs/mort"
+use "wallaroo/core/common"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 
@@ -70,8 +71,8 @@ primitive Mod6PartitionFunction
     input % 6
 
 primitive Mod3PartitionFunction
-  fun apply(input: U64): U64 =>
-    input % 3
+  fun apply(input: U64): Key =>
+    (input % 3).string()
 
 primitive Mod6CountMaxPartitionFunction
   fun apply(cm: CountMax): U64 =>

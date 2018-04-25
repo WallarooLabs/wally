@@ -606,17 +606,15 @@ actor Step is (Producer & Consumer)
     end
     _in_flight_ack_waiter.migrated()
 
-  be send_state[K: (Hashable val & Equatable[K] val)](
-    boundary: OutgoingBoundary, state_name: String, key: K)
-  =>
+  be send_state(boundary: OutgoingBoundary, state_name: String, key: Key) =>
     ifdef "autoscale" then
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
         // TODO: Should this be possible?
-        StepStateMigrator.send_state[K](_runner, _id, boundary, state_name,
+        StepStateMigrator.send_state(_runner, _id, boundary, state_name,
           key, Array[QueuedStepMessage], _auth)
       | let qmp: QueueingStepMessageProcessor =>
-        StepStateMigrator.send_state[K](_runner, _id, boundary, state_name,
+        StepStateMigrator.send_state(_runner, _id, boundary, state_name,
           key, qmp.messages, _auth)
       end
     end
