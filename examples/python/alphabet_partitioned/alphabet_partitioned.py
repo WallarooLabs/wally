@@ -12,6 +12,14 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+"""
+This is an example application that takes "votes" for different letters of the
+alphabet and keeps a running total of the votes received for each letter. For
+each incoming message, it sends out a message with the total votes for that
+letter. It uses state partitioning to distribute the votes so that they can be
+processed in parallel; the letter serves as the partitioning key, so, for
+example, all votes for the letter "A" are handled by the same partition.
+"""
 
 import string
 import struct

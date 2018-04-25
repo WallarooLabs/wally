@@ -12,6 +12,13 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+"""
+This is an example application that takes "votes" for different letters of
+the alphabet and keeps a running total of the votes received for each
+letter. For each incoming message, it sends out a message with the total
+votes for that letter. The total number of votes for each letter are stored
+together in a single state object.
+"""
 
 import struct
 

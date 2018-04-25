@@ -12,6 +12,10 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+"""
+This is an example application that receives strings as input and outputs the
+reversed strings.
+"""
 
 import struct
 

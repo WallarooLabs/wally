@@ -12,6 +12,10 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+"""
+This is an example of a stateless application that takes a floating point
+Celsius value and sends out a floating point Fahrenheit value.
+"""
 
 import struct
 
