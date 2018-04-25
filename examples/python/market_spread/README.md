@@ -6,8 +6,8 @@ Market Spread is an application designed to run alongside a trading system. Its 
 
 When we break the application down into its key components we get:
 
-- A stream of market data which we refer to as the “Market Stream”
-- A stream of trades which we refer to as the “Order Stream”
+- A stream of market data which we refer to as the "Market Stream"
+- A stream of trades which we refer to as the "Order Stream"
 - State in the form of latest market conditions for various stock symbols
 - A calculation to possibly withdraw the trade based on state for that stock symbol
 
