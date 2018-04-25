@@ -88,7 +88,7 @@ class val LocalTopology
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer tag],
-    keyed_data_routes: Map[StringKey, Step]) ?
+    keyed_data_routes: Map[Key, Step]) ?
   =>
     let subpartition =
       try
@@ -122,11 +122,10 @@ class val LocalTopology
 
   fun proxy_ids(): Map[String, U128] val => _proxy_ids
 
-  fun update_proxy_address_for_state_key[Key: (Hashable val &
-    Equatable[Key] val)](
-    state_name: String, key: Key, pa: ProxyAddress): LocalTopology ?
+  fun update_proxy_address_for_state_key(state_name: String, key: Key,
+    pa: ProxyAddress): LocalTopology ?
   =>
-    let new_subpartition = _state_builders(state_name)?.update_key[Key](key, pa)?
+    let new_subpartition = _state_builders(state_name)?.update_key(key, pa)?
     let new_state_builders = recover trn Map[String, StateSubpartition] end
     for (k, v) in _state_builders.pairs() do
       new_state_builders(k) = v
@@ -741,9 +740,9 @@ actor LocalTopologyInitializer is LayoutInitializer
         // DataRouter for the data channel boundary
         var data_routes = recover trn Map[U128, Consumer] end
 
-        let keyed_data_routes_ref = Map[StringKey, Step]
+        let keyed_data_routes_ref = Map[Key, Step]
 
-        var keyed_data_routes = recover trn Map[StringKey, Step] end
+        var keyed_data_routes = recover trn Map[Key, Step] end
 
         // Update the step ids for all OutgoingBoundaries
         if worker_count > 1 then
@@ -1535,9 +1534,11 @@ actor LocalTopologyInitializer is LayoutInitializer
           end
         end
 
-        // !@ Figure out how to pass in the keyed routes here
+        // We have not yet been assigned any keys by the cluster at this
+        // stage, so we use an empty map to represent that.
         let data_router = DataRouter(consume data_routes,
-          recover Map[StringKey, Step] end)
+          recover Map[Key, Step] end)
+
         _router_registry.set_data_router(data_router)
 
         _router_registry.register_boundaries(_outgoing_boundaries,
@@ -1565,12 +1566,11 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  be update_state_step_entry[Key: (Hashable val & Equatable[Key] val)](
-    state_name: String, key: Key, pa: ProxyAddress) =>
+  be update_state_step_entry(state_name: String, key: Key, pa: ProxyAddress) =>
     try
       match _topology
       | let t: LocalTopology =>
-        _topology = t.update_proxy_address_for_state_key[Key](state_name,
+        _topology = t.update_proxy_address_for_state_key(state_name,
           key, pa)?
         // TODO: We should find a way to batch changes before writing out.
         _save_local_topology()

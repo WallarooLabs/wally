@@ -55,7 +55,7 @@ actor RecoveryReplayer
   let _cluster: Cluster
   var _recovery: (Recovery | None) = None
 
-  var _reconnected_boundaries: Map[String, SetIs[U128]] =
+  var _reconnected_boundaries: Map[String, SetIs[StepId]] =
     _reconnected_boundaries.create()
 
   new create(auth: AmbientAuth, worker_name: String,
@@ -95,7 +95,7 @@ actor RecoveryReplayer
       Fail()
     end
 
-  be add_boundary_replay_complete(worker: String, boundary_id: U128) =>
+  be add_boundary_replay_complete(worker: String, boundary_id: StepId) =>
     try
       _replay_phase.add_boundary_replay_complete(worker, boundary_id)?
     else
@@ -154,7 +154,7 @@ actor RecoveryReplayer
   fun ref _boundary_reconnected(worker: String, boundary_step_id: StepId) =>
     try
       if not _reconnected_boundaries.contains(worker) then
-        _reconnected_boundaries(worker) = SetIs[U128]
+        _reconnected_boundaries(worker) = SetIs[StepId]
       end
       _reconnected_boundaries(worker)?.set(boundary_step_id)
     else
@@ -162,7 +162,7 @@ actor RecoveryReplayer
     end
 
   fun ref _wait_for_reconnections(expected_boundaries: Map[String, USize] box,
-    reconnected_boundaries: Map[String, SetIs[U128]])
+    reconnected_boundaries: Map[String, SetIs[StepId]])
   =>
     @printf[I32]("|~~ - - Replay Phase 2: Wait for Reconnections - - ~~|\n"
       .cstring())
@@ -203,7 +203,7 @@ interface _RecoveryReplayer
   """
   fun ref _boundary_reconnected(worker: String, boundary_step_id: StepId)
   fun ref _wait_for_reconnections(expected_boundaries: Map[String, USize] box,
-    reconnected_boundaries: Map[String, SetIs[U128]])
+    reconnected_boundaries: Map[String, SetIs[StepId]])
   fun ref _start_replay_phase(expected_boundaries: Map[String, USize] box)
   fun ref _end_replay_phase()
   fun ref _clear_deduplication_lists()
@@ -212,9 +212,9 @@ trait _ReplayPhase
   fun name(): String
   fun ref add_expected_boundary_count(worker: String, count: USize) ? =>
     error
-  fun ref add_reconnected_boundary(worker: String, boundary_id: U128) ? =>
+  fun ref add_reconnected_boundary(worker: String, boundary_id: StepId) ? =>
     error
-  fun ref add_boundary_replay_complete(worker: String, boundary_id: U128) ? =>
+  fun ref add_boundary_replay_complete(worker: String, boundary_id: StepId) ? =>
     error
 
 class _EmptyReplayPhase is _ReplayPhase
@@ -239,10 +239,10 @@ class _ReadyForNormalProcessing is _ReplayPhase
 
   fun name(): String => "Not Recovery Replaying Phase"
 
-  fun ref add_reconnected_boundary(worker: String, boundary_id: U128) =>
+  fun ref add_reconnected_boundary(worker: String, boundary_id: StepId) =>
     None
 
-  fun ref add_boundary_replay_complete(worker: String, boundary_id: U128) =>
+  fun ref add_boundary_replay_complete(worker: String, boundary_id: StepId) =>
     // If we experience a replay outside recovery, then we can immediately
     // clear deduplication lists when it's complete
     _replayer._clear_deduplication_lists()
@@ -250,11 +250,11 @@ class _ReadyForNormalProcessing is _ReplayPhase
 class _WaitingForBoundaryCounts is _ReplayPhase
   let _expected_workers: SetIs[String]
   let _expected_boundaries: Map[String, USize] = _expected_boundaries.create()
-  var _reconnected_boundaries: Map[String, SetIs[U128]]
+  var _reconnected_boundaries: Map[String, SetIs[StepId]]
   let _replayer: _RecoveryReplayer ref
 
   new create(expected_workers: SetIs[String],
-    reconnected_boundaries: Map[String, SetIs[U128]],
+    reconnected_boundaries: Map[String, SetIs[StepId]],
     replayer: _RecoveryReplayer ref)
   =>
     _expected_workers = expected_workers
@@ -280,16 +280,16 @@ class _WaitingForBoundaryCounts is _ReplayPhase
         _reconnected_boundaries)
     end
 
-  fun ref add_reconnected_boundary(worker: String, boundary_id: U128) ? =>
+  fun ref add_reconnected_boundary(worker: String, boundary_id: StepId) ? =>
     _reconnected_boundaries(worker)?.set(boundary_id)
 
 class _WaitForReconnections is _ReplayPhase
   let _expected_boundaries: Map[String, USize] box
-  var _reconnected_boundaries: Map[String, SetIs[U128]]
+  var _reconnected_boundaries: Map[String, SetIs[StepId]]
   let _replayer: _RecoveryReplayer ref
 
   new create(expected_boundaries: Map[String, USize] box,
-    reconnected_boundaries: Map[String, SetIs[U128]],
+    reconnected_boundaries: Map[String, SetIs[StepId]],
     replayer: _RecoveryReplayer ref)
   =>
     _expected_boundaries = expected_boundaries
@@ -301,18 +301,19 @@ class _WaitForReconnections is _ReplayPhase
 
   fun name(): String => "Wait for Reconnections Phase"
 
-  fun ref add_reconnected_boundary(worker: String, boundary_id: U128) ? =>
+  fun ref add_reconnected_boundary(worker: String, boundary_id: StepId) ? =>
     _reconnected_boundaries(worker)?.set(boundary_id)
     if _all_boundaries_reconnected() then
       _replayer._start_replay_phase(_expected_boundaries)
     end
 
   fun _all_boundaries_reconnected(): Bool =>
-    CheckCounts[String, U128](_expected_boundaries, _reconnected_boundaries)
+    CheckCounts[StepId](_expected_boundaries, _reconnected_boundaries)
 
 class _Replay is _ReplayPhase
   let _expected_boundaries: Map[String, USize] box
-  var _replay_completes: Map[String, SetIs[U128]] = _replay_completes.create()
+  var _replay_completes: Map[String, SetIs[StepId]] =
+    _replay_completes.create()
   let _replayer: _RecoveryReplayer ref
   let _data_receivers: DataReceivers
 
@@ -321,14 +322,14 @@ class _Replay is _ReplayPhase
   =>
     _expected_boundaries = expected_boundaries
     for w in _expected_boundaries.keys() do
-      _replay_completes(w) = SetIs[U128]
+      _replay_completes(w) = SetIs[StepId]
     end
     _replayer = replayer
     _data_receivers = data_receivers
 
   fun name(): String => "Replay Phase"
 
-  fun ref add_boundary_replay_complete(worker: String, boundary_id: U128) ? =>
+  fun ref add_boundary_replay_complete(worker: String, boundary_id: StepId) ? =>
     _replay_completes(worker)?.set(boundary_id)
     if _all_replays_complete(_replay_completes) then
       _data_receivers.start_normal_message_processing()
@@ -338,10 +339,9 @@ class _Replay is _ReplayPhase
   fun _all_replays_complete(replay_completes: Map[String, SetIs[U128]]):
     Bool
   =>
-    CheckCounts[String, U128](_expected_boundaries, _replay_completes)
+    CheckCounts[StepId](_expected_boundaries, _replay_completes)
 
-primitive CheckCounts[Key: (Hashable #read & Equatable[Key] #read),
-  Counted]
+primitive CheckCounts[Counted]
   fun apply(expected_counts: Map[Key, USize] box,
     counted: Map[Key, SetIs[Counted]] box): Bool
   =>

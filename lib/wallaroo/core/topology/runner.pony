@@ -224,20 +224,19 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
 
 class val PreStateRunnerBuilder[In: Any val, Out: Any val,
-  PIn: Any val, Key: (Hashable val & Equatable[Key] val), S: State ref] is
-    RunnerBuilder
+  PIn: Any val, S: State ref] is RunnerBuilder
   let _state_comp: StateComputation[In, Out, S] val
   let _state_name: String
   let _route_builder: RouteBuilder
-  let _partition_function: PartitionFunction[PIn, Key] val
+  let _partition_function: PartitionFunction[PIn] val
   let _forward_route_builder: RouteBuilder
   let _in_route_builder: (RouteBuilder | None)
-  let _id: U128
+  let _id: StepId
   let _is_multi: Bool
 
   new val create(state_comp: StateComputation[In, Out, S] val,
     state_name': String,
-    partition_function': PartitionFunction[PIn, Key] val,
+    partition_function': PartitionFunction[PIn] val,
     route_builder': RouteBuilder,
     forward_route_builder': RouteBuilder,
     in_route_builder': (RouteBuilder | None) = None,
@@ -274,7 +273,7 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun clone_router_and_set_input_type(r: Router): Router
   =>
     match r
-    | let p: AugmentablePartitionRouter[Key] val =>
+    | let p: AugmentablePartitionRouter val =>
       p.clone_and_set_input_type[PIn](_partition_function)
     else
       r
@@ -328,20 +327,20 @@ trait val PartitionBuilder
   fun state_name(): String
   fun is_multi(): Bool
 
-class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
-  Key: (Hashable val & Equatable[Key])] is (PartitionBuilder & RunnerBuilder)
+class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
+  (PartitionBuilder & RunnerBuilder)
   let _pipeline_name: String
   let _state_name: String
   let _state_runner_builder: StateRunnerBuilder[S] val
   let _step_id_map: Map[Key, U128] val
-  let _partition: Partition[PIn, Key] val
+  let _partition: Partition[PIn] val
   let _route_builder: RouteBuilder
   let _forward_route_builder: RouteBuilder
   let _id: U128
   let _multi_worker: Bool
 
   new val create(pipeline_name: String, state_name': String,
-    step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val,
+    step_id_map': Map[Key, U128] val, partition': Partition[PIn] val,
     state_runner_builder: StateRunnerBuilder[S] val,
     route_builder': RouteBuilder,
     forward_route_builder': RouteBuilder, id': U128 = 0,
@@ -378,105 +377,46 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
   fun state_subpartition(workers: (String | Array[String] val)):
     StateSubpartition
   =>
-    KeyedStateSubpartition[PIn, Key, S](_state_name,
+    KeyedStateSubpartition[PIn, S](_state_name,
       partition_addresses(workers), _step_id_map, _state_runner_builder,
       _partition.function(), _pipeline_name)
 
   fun partition_addresses(workers: (String | Array[String] val)):
-    KeyedPartitionAddresses[Key] val
+    KeyedPartitionAddresses val
   =>
-    let m = recover trn Map[Key, ProxyAddress] end
+    let wtk = Map[String, Array[Key]]
+
     let hash_partitions = HashPartitions(match workers
-      | let w: String => recover val [w] end
-      | let ws: Array[String] val => ws
+      | let w: String =>
+        wtk(w) = Array[Key]
+        recover val [w] end
+      | let ws: Array[String] val =>
+        for w in ws.values() do
+          wtk(w) = Array[Key]
+        end
+        ws
       end)
     let workers_to_keys = recover trn Map[String, Array[Key] val] end
 
-    let unweighted_keys: Array[Key] val = match _partition.keys()
-    | let ks: Array[Key] val =>
-      ks
-    | let wks: Array[WeightedKey[Key]] val =>
-      let uwk = recover trn Array[Key] end
-      for wkey in wks.values() do
-        uwk.push(wkey._1)
+    try
+      for key in _partition.keys().values() do
+        let w = hash_partitions.get_claimant_by_key(key)?
+        wtk.upsert(w, recover trn [key] end,
+          {(x, y) => x.>append(y)})?
       end
-      consume uwk
-    end
 
-    iftype Key <: String then
-      try
-        // match _partition.keys()
-        // | let ks: Array[Key] val =>
-          let wtk = Map[String, Array[Key]]
-
-          for key in unweighted_keys.values() do
-            let w = hash_partitions.get_claimant_by_key(key)?
-            wtk.upsert(w, recover trn [key] end,
-              {(x, y) => x.>append(y)})?
-          end
-
-          for (w, ks') in wtk.pairs() do
-            let a = recover trn Array[Key] end
-            for k in ks'.values() do
-              a.push(k)
-            end
-            workers_to_keys(w) = consume a
-          end
-        // end
-      else
-        Unreachable()
+      for (w, ks') in wtk.pairs() do
+        let a = recover trn Array[Key] end
+        for k in ks'.values() do
+          a.push(k)
+        end
+        workers_to_keys(w) = consume a
       end
     else
-      match workers
-      | let w: String =>
-        // With one worker, all the keys go on that worker
-        match _partition.keys()
-        | let wks: Array[WeightedKey[Key]] val =>
-          for wkey in wks.values() do
-            try
-              m(wkey._1) = ProxyAddress(w, _step_id_map(wkey._1)?)
-            end
-          end
-        | let ks: Array[Key] val =>
-          for key in ks.values() do
-            try
-              m(key) = ProxyAddress(w, _step_id_map(key)?)
-            end
-          end
-        end
-      | let ws: Array[String] val =>
-        // With multiple workers, we need to determine our distribution of keys
-        let w_count = ws.size()
-        var idx: USize = 0
-
-        match _partition.keys()
-        | let wks: Array[WeightedKey[Key]] val =>
-          // Using weighted keys, we need to create a distribution that
-          // balances the weight across workers
-          try
-            let buckets = Weighted[Key](wks, ws.size())?
-            for worker_idx in Range(0, buckets.size()) do
-              for key in buckets(worker_idx)?.values() do
-                m(key) = ProxyAddress(ws(worker_idx)?, _step_id_map(key)?)
-              end
-            end
-          end
-        | let ks: Array[Key] val =>
-          // With unweighted keys, we simply distribute the keys equally across
-          // the workers
-          for key in ks.values() do
-            try
-              m(key) = ProxyAddress(ws(idx)?, _step_id_map(key)?)
-            else
-              Fail()
-            end
-            idx = (idx + 1) % w_count
-          end
-        end
-      end
+      Unreachable()
     end
 
-    KeyedPartitionAddresses[Key](consume m, hash_partitions,
+    KeyedPartitionAddresses(hash_partitions,
       consume workers_to_keys)
 
 class ComputationRunner[In: Any val, Out: Any val]

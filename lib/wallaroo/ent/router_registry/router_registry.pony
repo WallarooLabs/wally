@@ -42,7 +42,7 @@ actor RouterRegistry is InFlightAckRequester
   let _connections: Connections
   let _recovery_file_cleaner: RecoveryFileCleaner
   var _data_router: DataRouter =
-    DataRouter(recover Map[U128, Consumer] end, recover Map[StringKey, Step] end)
+    DataRouter(recover Map[StepId, Consumer] end, recover Map[Key, Step] end)
   var _pre_state_data: (Array[PreStateData] val | None) = None
   let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()
@@ -1418,16 +1418,15 @@ actor RouterRegistry is InFlightAckRequester
   /////
   // Step moved off this worker or new step added to another worker
   /////
-  fun ref move_stateful_step_to_proxy[K: (Hashable val & Equatable[K] val)](
-    id: U128, step: Step, proxy_address: ProxyAddress, key: K,
-    state_name: String)
+  fun ref move_stateful_step_to_proxy(id: StepId, step: Step,
+    proxy_address: ProxyAddress, key: Key, state_name: String)
   =>
     """
     Called when a stateful step has been migrated off this worker to another
     worker
     """
     _remove_all_routes_to_step(step)
-    _add_state_proxy_to_partition_router[K](proxy_address, key, state_name)
+    _add_state_proxy_to_partition_router(proxy_address, key, state_name)
     _move_step_to_proxy(id, proxy_address)
 
   fun ref _remove_all_routes_to_step(step: Step) =>
@@ -1443,36 +1442,35 @@ actor RouterRegistry is InFlightAckRequester
     _remove_step_from_data_router(id)
     _add_proxy_to_omni_router(id, proxy_address)
 
-  be add_state_proxy[K: (Hashable val & Equatable[K] val)](id: U128,
-    proxy_address: ProxyAddress, key: K, state_name: String)
+  be add_state_proxy(id: StepId, proxy_address: ProxyAddress, key: Key,
+    state_name: String)
   =>
     """
     Called when a stateful step has been added to another worker
     """
-    _add_state_proxy_to_partition_router[K](proxy_address, key, state_name)
+    _add_state_proxy_to_partition_router(proxy_address, key, state_name)
     _add_proxy_to_omni_router(id, proxy_address)
 
-  fun ref _add_state_proxy_to_partition_router[
-    K: (Hashable val & Equatable[K] val)](proxy_address: ProxyAddress,
-    key: K, state_name: String)
+  fun ref _add_state_proxy_to_partition_router(proxy_address: ProxyAddress,
+    key: Key, state_name: String)
   =>
     try
       let proxy_router = ProxyRouter(_worker_name,
         _outgoing_boundaries(proxy_address.worker)?, proxy_address, _auth)
       let partition_router =
-        _partition_routers(state_name)?.update_route[K](key, proxy_router)?
+        _partition_routers(state_name)?.update_route(key, proxy_router)?
       _partition_routers(state_name) = partition_router
       _distribute_partition_router(partition_router)
     else
       Fail()
     end
 
-  fun ref _remove_step_from_data_router(id: U128) =>
+  fun ref _remove_step_from_data_router(id: StepId) =>
     try
       let moving_step = _data_router.step_for_id(id)?
 
-      // !@ Figure out how to get the key so we don't have to pass None
-      let new_data_router = _data_router.remove_keyed_route(id, None)
+      // !@ Update to get actual key instead of this placeholder
+      let new_data_router = _data_router.remove_keyed_route(id, "Key")
       _data_router = new_data_router
       _distribute_data_router()
     else
@@ -1518,9 +1516,8 @@ actor RouterRegistry is InFlightAckRequester
       Fail()
     end
 
-  fun ref move_proxy_to_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, target: Consumer, key: K, state_name: String,
-    source_worker: String)
+  fun ref move_proxy_to_stateful_step(id: U128, target: Consumer, key: Key,
+    state_name: String, source_worker: String)
   =>
     """
     Called when a stateful step has been migrated to this worker from another
@@ -1533,7 +1530,7 @@ actor RouterRegistry is InFlightAckRequester
         _data_router = _data_router.add_keyed_route(id, key, step)
         _distribute_data_router()
         let partition_router =
-          _partition_routers(state_name)?.update_route[K](key, step)?
+          _partition_routers(state_name)?.update_route(key, step)?
         _distribute_partition_router(partition_router)
         // Add routes to state computation targets to state step
         match _pre_state_data
@@ -1561,7 +1558,7 @@ actor RouterRegistry is InFlightAckRequester
       Fail()
     end
     _move_proxy_to_step(id, target, source_worker)
-    _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name,
+    _connections.notify_cluster_of_new_stateful_step(id, key, state_name,
       recover [source_worker] end)
 
   fun ref _move_proxy_to_step(id: U128, target: Consumer,

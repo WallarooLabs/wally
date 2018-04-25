@@ -189,21 +189,21 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     // special case of partitioned state with one partition. This works but is
     // a bit confusing when reading the code.
     let step_id_gen = StepIdGenerator
-    let single_step_partition = Partition[Last, U8](
-      SingleStepPartitionFunction[Last], recover [0] end)
-    let step_id_map = recover trn Map[U8, StepId] end
+    let single_step_partition = Partition[Last](
+      SingleStepPartitionFunction[Last], recover ["key"] end)
+    let step_id_map = recover trn Map[Key, StepId] end
 
-    step_id_map(0) = step_id_gen()
+    step_id_map("key") = step_id_gen()
 
 
-    let next_builder = PreStateRunnerBuilder[Last, Next, Last, U8, S](
+    let next_builder = PreStateRunnerBuilder[Last, Next, Last, S](
       s_comp, state_name, SingleStepPartitionFunction[Last],
       TypedRouteBuilder[StateProcessor[S]],
       TypedRouteBuilder[Next])
 
     _p.add_runner_builder(next_builder)
 
-    let state_builder = PartitionedStateRunnerBuilder[Last, S, U8](_p.name(),
+    let state_builder = PartitionedStateRunnerBuilder[Last, S](_p.name(),
       state_name, consume step_id_map, single_step_partition,
       StateRunnerBuilder[S](s_initializer, state_name,
         s_comp.state_change_builders()),
@@ -214,43 +214,35 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     PipelineBuilder[In, Out, Next](_a, _p)
 
-  fun ref to_state_partition[PIn: Any val,
-    Key: (Hashable val & Equatable[Key]), Next: Any val = PIn,
+  fun ref to_state_partition[PIn: Any val, Next: Any val = PIn,
     S: State ref](
       s_comp: StateComputation[Last, Next, S] val,
       s_initializer: StateBuilder[S],
       state_name: String,
-      partition: Partition[PIn, Key],
+      partition: Partition[PIn],
       multi_worker: Bool = false): PipelineBuilder[In, Out, Next]
   =>
     let step_id_gen = StepIdGenerator
     let step_id_map = recover trn Map[Key, U128] end
 
-    match partition.keys()
-    | let wks: Array[WeightedKey[Key]] val =>
-      for wkey in wks.values() do
-        step_id_map(wkey._1) = step_id_gen()
-      end
-    | let ks: Array[Key] val =>
-      for key in ks.values() do
-        step_id_map(key) = step_id_gen()
-      end
+    for key in partition.keys().values() do
+      step_id_map(key) = step_id_gen()
     end
 
-    let next_builder = PreStateRunnerBuilder[Last, Next, PIn, Key, S](
+    let next_builder = PreStateRunnerBuilder[Last, Next, PIn, S](
       s_comp, state_name, partition.function(),
       TypedRouteBuilder[StateProcessor[S]],
       TypedRouteBuilder[Next] where multi_worker = multi_worker)
 
     _p.add_runner_builder(next_builder)
 
-    let state_builder = PartitionedStateRunnerBuilder[PIn, S,
-      Key](_p.name(), state_name, consume step_id_map, partition,
-        StateRunnerBuilder[S](s_initializer, state_name,
-          s_comp.state_change_builders()),
-        TypedRouteBuilder[StateProcessor[S]],
-        TypedRouteBuilder[Next]
-        where multi_worker = multi_worker)
+    let state_builder = PartitionedStateRunnerBuilder[PIn, S](_p.name(),
+      state_name, consume step_id_map, partition,
+      StateRunnerBuilder[S](s_initializer, state_name,
+        s_comp.state_change_builders()),
+      TypedRouteBuilder[StateProcessor[S]],
+      TypedRouteBuilder[Next]
+      where multi_worker = multi_worker)
 
     _a.add_state_builder(state_name, state_builder)
 

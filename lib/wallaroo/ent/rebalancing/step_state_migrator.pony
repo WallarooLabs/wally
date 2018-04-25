@@ -64,9 +64,9 @@ primitive StepStateMigrator
       Fail()
     end
 
-  fun send_state[K: (Hashable val & Equatable[K] val)](runner: Runner,
-    id: StepId, boundary: OutgoingBoundary, state_name: String, key: K,
-    p_ms: Array[QueuedStepMessage], auth: AmbientAuth)
+  fun send_state(runner: Runner, id: StepId, boundary: OutgoingBoundary,
+    state_name: String, key: Key, p_ms: Array[QueuedStepMessage],
+    auth: AmbientAuth)
   =>
     match runner
     | let r: SerializableStateRunner =>
@@ -84,7 +84,7 @@ primitive StepStateMigrator
           Fail()
           recover val Array[U8] end
         end
-      boundary.migrate_step[K](id, state_name, key, shipped_state_bytes)
+      boundary.migrate_step(id, state_name, key, shipped_state_bytes)
     else
       Fail()
     end
