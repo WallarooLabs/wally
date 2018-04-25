@@ -81,23 +81,24 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
     let base_partition_routes = _BasePartitionRoutesGenerator(event_log, auth,
       step1, boundary2, boundary3)
     // !@ DO SOMETHING CORRECT WITH BASE HASHED NODE ROUTES
-    let base_hashed_node_routes = recover val Map[String, HashedProxyRouter[String]] end
+    let base_hashed_node_routes = recover val Map[String, HashedProxyRouter]
+      end
     let target_partition_routes = _TargetPartitionRoutesGenerator(event_log, auth,
       new_proxy_router, boundary2, boundary3)
 
     var base_router: PartitionRouter =
-      LocalPartitionRouter[String, String, EmptyState]("s", "w1",
+      LocalPartitionRouter[String, EmptyState]("s", "w1",
         consume base_local_map, consume base_step_ids, base_partition_routes,
         base_hashed_node_routes, HashPartitions(recover [] end),
         _PartitionFunctionGenerator())
     var target_router: PartitionRouter =
-      LocalPartitionRouter[String, String, EmptyState]("s", "w2",
+      LocalPartitionRouter[String, EmptyState]("s", "w2",
         consume target_local_map, consume target_step_ids, target_partition_routes,
         base_hashed_node_routes, HashPartitions(recover [] end),
         _PartitionFunctionGenerator())
     h.assert_eq[Bool](false, base_router == target_router)
 
-    base_router = base_router.update_route[String]("k1", new_proxy_router)?
+    base_router = base_router.update_route("k1", new_proxy_router)?
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -195,7 +196,7 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     base_routes(1) = step1
     base_routes(2) = step2
 
-    let base_keyed_routes = recover val Map[StringKey, Step] end
+    let base_keyed_routes = recover val Map[Key, Step] end
 
     let target_routes = recover trn Map[U128, Consumer] end
     target_routes(1) = step1
@@ -205,8 +206,8 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
 
     h.assert_eq[Bool](false, base_router == target_router)
 
-    // !@ When we get rid of the general key type then we won't need None here
-    base_router = base_router.remove_keyed_route(2, None)
+    // !@ Update test to use key
+    base_router = base_router.remove_keyed_route(2, "Key")
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -234,15 +235,15 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     target_routes(1) = step1
     target_routes(2) = step2
 
-    let base_keyed_routes = recover val Map[StringKey, Step] end
+    let base_keyed_routes = recover val Map[Key, Step] end
 
     var base_router = DataRouter(consume base_routes, base_keyed_routes)
     let target_router = DataRouter(consume target_routes, base_keyed_routes)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
-    // !@ When we get rid of general keys we won't need None here
-    base_router = base_router.add_keyed_route(2, None, step2)
+    // !@ Update test to use key
+    base_router = base_router.add_keyed_route(2, "Key", step2)
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -281,7 +282,7 @@ primitive _StepIdsGenerator
     recover Map[String, U128] end
 
 primitive _PartitionFunctionGenerator
-  fun apply(): PartitionFunction[String, String] val =>
+  fun apply(): PartitionFunction[String] val =>
     {(s: String): String => s}
 
 primitive _StepGenerator
@@ -324,8 +325,8 @@ primitive _StatelessPartitionGenerator
       recover Map[U64, (Step | ProxyRouter)] end, 1)
 
 actor _Cluster is Cluster
-  be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, key: K, state_name: String, exclusions: Array[String] val =
+  be notify_cluster_of_new_stateful_step(id: StepId, key: Key,
+    state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
   =>
     None
