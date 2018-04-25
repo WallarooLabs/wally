@@ -12,6 +12,11 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+"""
+This is an example of a stateless Python application that takes a floating
+point Celsius value from Kafka and sends out a floating point Fahrenheit value
+to Kafka.
+"""
 
 import struct
 
