@@ -49,11 +49,11 @@ primitive ChannelMsgEncoder
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)?
 
-  fun migrate_step[K: (Hashable val & Equatable[K] val)](step_id: StepId,
-    state_name: String, key: K, state: ByteSeq val, worker: String,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun migrate_step(step_id: StepId, state_name: String, key: Key,
+    state: ByteSeq val, worker: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
-    _encode(KeyedStepMigrationMsg[K](step_id, state_name, key, state, worker),
+    _encode(KeyedStepMigrationMsg(step_id, state_name, key, state, worker),
       auth)?
 
   fun migration_batch_complete(sender: String,
@@ -348,16 +348,15 @@ primitive ChannelMsgEncoder
     """
     _encode(ConnectedToJoiningWorkersMsg(sender), auth)?
 
-  fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: StepId, worker_name: String, key: K, state_name: String,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun announce_new_stateful_step(id: StepId, worker_name: String, key: Key,
+    state_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     This message is sent to notify another worker that a new stateful step
     has been created on this worker and that partition routers should be
     updated.
     """
-    _encode(KeyedAnnounceNewStatefulStepMsg[K](id, worker_name, key,
+    _encode(KeyedAnnounceNewStatefulStepMsg(id, worker_name, key,
       state_name), auth)?
 
   fun announce_new_source(worker_name: String, id: StepId,
@@ -548,15 +547,14 @@ trait val StepMigrationMsg is ChannelMsg
   fun update_router_registry(router_registry: RouterRegistry ref,
     target: Consumer)
 
-class val KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
-  StepMigrationMsg
+class val KeyedStepMigrationMsg is StepMigrationMsg
   let _state_name: String
-  let _key: K
+  let _key: Key
   let _step_id: StepId
   let _state: ByteSeq val
   let _worker: String
 
-  new val create(step_id': U128, state_name': String, key': K,
+  new val create(step_id': U128, state_name': String, key': Key,
     state': ByteSeq val, worker': String)
   =>
     _state_name = state_name'
@@ -572,7 +570,7 @@ class val KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
   fun update_router_registry(router_registry: RouterRegistry ref,
     target: Consumer)
   =>
-    router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
+    router_registry.move_proxy_to_stateful_step(_step_id, target, _key,
       _state_name, _worker)
 
 class val MigrationBatchCompleteMsg is ChannelMsg
@@ -798,8 +796,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
       metrics_id, worker_ingress_ts)
     (false, route_id)
 
-class val ForwardHashedMsg[Key: (Hashable val & Equatable[Key] val),
-  D: Any val] is ReplayableDeliveryMsg
+class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_state_name: String
   let _target_key: Key
   let _sender_name: String
@@ -841,18 +838,13 @@ class val ForwardHashedMsg[Key: (Hashable val & Equatable[Key] val),
       @printf[I32]("DataRouter found Step\n".cstring())
     end
 
-    iftype Key <: String then
-      try
-        let target_step = keys_to_routes(_target_key)?
-        let route_id = keys_to_route_ids(_target_key)?
-        target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
-          producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
-          worker_ingress_ts)
-        (false, route_id)
-      else
-        Fail()
-        error
-      end
+    try
+      let target_step = keys_to_routes(_target_key)?
+      let route_id = keys_to_route_ids(_target_key)?
+      target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+        producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+        worker_ingress_ts)
+      (false, route_id)
     else
       Fail()
       error
@@ -866,18 +858,13 @@ class val ForwardHashedMsg[Key: (Hashable val & Equatable[Key] val),
     keys_to_routes: Map[String, Step] val,
     keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
   =>
-    iftype Key <: String then
-      try
-        let target_step = keys_to_routes(_target_key)?
-        let route_id = keys_to_route_ids(_target_key)?
-        target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
-        producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
-        metrics_id, worker_ingress_ts)
-        (false, route_id)
-      else
-        Fail()
-        error
-      end
+    try
+      let target_step = keys_to_routes(_target_key)?
+      let route_id = keys_to_route_ids(_target_key)?
+      target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
+      metrics_id, worker_ingress_ts)
+      (false, route_id)
     else
       Fail()
       error
@@ -1008,25 +995,24 @@ class val ConnectedToJoiningWorkersMsg is ChannelMsg
 trait val AnnounceNewStatefulStepMsg is ChannelMsg
   fun update_registry(r: RouterRegistry)
 
-class val KeyedAnnounceNewStatefulStepMsg[
-  K: (Hashable val & Equatable[K] val)] is AnnounceNewStatefulStepMsg
+class val KeyedAnnounceNewStatefulStepMsg is AnnounceNewStatefulStepMsg
   """
   This message is sent to notify another worker that a new stateful step has
   been created on this worker and that partition routers should be updated.
   """
   let _step_id: StepId
   let _worker_name: String
-  let _key: K
+  let _key: Key
   let _state_name: String
 
-  new val create(id: StepId, worker: String, k: K, s_name: String) =>
+  new val create(id: StepId, worker: String, k: Key, s_name: String) =>
     _step_id = id
     _worker_name = worker
     _key = k
     _state_name = s_name
 
   fun update_registry(r: RouterRegistry) =>
-    r.add_state_proxy[K](_step_id, ProxyAddress(_worker_name, _step_id), _key,
+    r.add_state_proxy(_step_id, ProxyAddress(_worker_name, _step_id), _key,
       _state_name)
 
 class val AnnounceNewSourceMsg is ChannelMsg
