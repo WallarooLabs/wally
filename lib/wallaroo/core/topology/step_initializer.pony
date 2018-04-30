@@ -181,7 +181,7 @@ class val EgressBuilder
   fun clone_router_and_set_input_type(r: Router,
     dr: (Router | None) = None): Router => r
 
-  fun target_address(): (ProxyAddress | PartitionAddresses val | None) =>
+  fun target_address(): (ProxyAddress | KeyDistribution | None) =>
     _proxy_addr
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,

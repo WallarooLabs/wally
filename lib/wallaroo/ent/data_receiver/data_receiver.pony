@@ -32,7 +32,8 @@ actor DataReceiver is Producer
   var _sender_name: String
   var _sender_step_id: StepId = 0
   var _router: DataRouter =
-    DataRouter(recover Map[StepId, Consumer] end, recover Map[Key, Step] end)
+    DataRouter(recover Map[StepId, Consumer] end, recover Map[Key, Step] end,
+      recover Map[Key, StepId] end)
   var _last_id_seen: SeqId = 0
   var _last_id_acked: SeqId = 0
   var _connected: Bool = false

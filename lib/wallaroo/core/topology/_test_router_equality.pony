@@ -62,9 +62,9 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
 
-    let base_local_map = recover trn Map[U128, Step] end
-    base_local_map(1) = step1
-    let target_local_map: Map[U128, Step] val = recover Map[U128, Step] end
+    let base_local_map = recover trn Map[Key, Step] end
+    base_local_map("k1") = step1
+    let target_local_map: Map[Key, Step] val = recover Map[Key, Step] end
 
     let base_step_ids = recover trn Map[String, U128] end
     base_step_ids("k1") = 1
@@ -78,22 +78,24 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
     let new_proxy_router = ProxyRouter("w1", boundary2,
       ProxyAddress("w2", 1), auth)
 
+    //!@ remove this
     let base_partition_routes = _BasePartitionRoutesGenerator(event_log, auth,
       step1, boundary2, boundary3)
     // !@ DO SOMETHING CORRECT WITH BASE HASHED NODE ROUTES
     let base_hashed_node_routes = recover val Map[String, HashedProxyRouter]
       end
+      //!@ remove this
     let target_partition_routes = _TargetPartitionRoutesGenerator(event_log, auth,
       new_proxy_router, boundary2, boundary3)
 
     var base_router: PartitionRouter =
       LocalPartitionRouter[String, EmptyState]("s", "w1",
-        consume base_local_map, consume base_step_ids, base_partition_routes,
+        consume base_local_map, consume base_step_ids,
         base_hashed_node_routes, HashPartitions(recover [] end),
         _PartitionFunctionGenerator())
     var target_router: PartitionRouter =
       LocalPartitionRouter[String, EmptyState]("s", "w2",
-        consume target_local_map, consume target_step_ids, target_partition_routes,
+        consume target_local_map, consume target_step_ids,
         base_hashed_node_routes, HashPartitions(recover [] end),
         _PartitionFunctionGenerator())
     h.assert_eq[Bool](false, base_router == target_router)
@@ -201,8 +203,10 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     let target_routes = recover trn Map[U128, Consumer] end
     target_routes(1) = step1
 
-    var base_router = DataRouter(consume base_routes, base_keyed_routes)
-    let target_router = DataRouter(consume target_routes, base_keyed_routes)
+    var base_router = DataRouter(consume base_routes, base_keyed_routes,
+      recover Map[Key, StepId] end)
+    let target_router = DataRouter(consume target_routes, base_keyed_routes,
+      recover Map[Key, StepId] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
@@ -237,8 +241,10 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
 
     let base_keyed_routes = recover val Map[Key, Step] end
 
-    var base_router = DataRouter(consume base_routes, base_keyed_routes)
-    let target_router = DataRouter(consume target_routes, base_keyed_routes)
+    var base_router = DataRouter(consume base_routes, base_keyed_routes,
+      recover Map[Key, StepId] end)
+    let target_router = DataRouter(consume target_routes, base_keyed_routes,
+      recover Map[Key, StepId] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
