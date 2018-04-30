@@ -112,7 +112,7 @@ primitive _BaseStateSubpartitionGenerator
     StateSubpartition
   =>
     KeyedStateSubpartition[String, EmptyState]("s",
-      _BaseKeyedPartitionAddressesGenerator(), _IdMapGenerator(),
+      _BaseKeyDistributionGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 
 primitive _TargetStateSubpartitionGenerator
@@ -120,29 +120,31 @@ primitive _TargetStateSubpartitionGenerator
     StateSubpartition
   =>
     KeyedStateSubpartition[String, EmptyState]("s",
-      _TargetKeyedPartitionAddressesGenerator(), _IdMapGenerator(),
+      _TargetKeyDistributionGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 
-primitive _BaseKeyedPartitionAddressesGenerator
-  fun apply(): KeyedPartitionAddresses val =>
+primitive _BaseKeyDistributionGenerator
+  fun apply(): KeyDistribution val =>
     //!@ remove m
     let m = recover trn Map[String, ProxyAddress] end
     m("k1") = ProxyAddress("w1", 10)
     m("k2") = ProxyAddress("w2", 20)
     m("k3") = ProxyAddress("w3", 30)
     let m': Map[String, ProxyAddress] val = consume m
-    KeyedPartitionAddresses(HashPartitions(recover [] end),
+
+    KeyDistribution(HashPartitions(recover [] end),
       recover Map[String, Array[String] val] end)
 
-primitive _TargetKeyedPartitionAddressesGenerator
-  fun apply(): KeyedPartitionAddresses val =>
+primitive _TargetKeyDistributionGenerator
+  fun apply(): KeyDistribution val =>
     //!@ remove m
     let m = recover trn Map[String, ProxyAddress] end
     m("k1") = ProxyAddress("w2", 10)
     m("k2") = ProxyAddress("w2", 20)
     m("k3") = ProxyAddress("w3", 30)
     let m': Map[String, ProxyAddress] val = consume m
-    KeyedPartitionAddresses(HashPartitions(recover [] end),
+
+    KeyDistribution(HashPartitions(recover [] end),
       recover Map[String, Array[String] val] end)
 
 primitive _IdMapGenerator

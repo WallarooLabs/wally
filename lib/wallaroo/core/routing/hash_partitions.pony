@@ -1,8 +1,9 @@
 use "collections"
 use "crypto"
+use "wallaroo_labs/equality"
 use "wallaroo_labs/mort"
 
-class val HashPartitions
+class val HashPartitions is Equatable[HashPartitions]
   let _lower_bounds: Array[U128]
   let _nodes: Map[U128, String] = _nodes.create()
 
@@ -20,7 +21,6 @@ class val HashPartitions
       end
       next_lower_bound = next_lower_bound + part_size
   end
-
 
   fun get_claimant(hash: U128): String ? =>
     var next_to_last_idx: USize = _lower_bounds.size() - 1
@@ -64,3 +64,9 @@ class val HashPartitions
 
   fun claimants(): Iterator[String] ref =>
     _nodes.values()
+
+  fun eq(that: box->HashPartitions): Bool =>
+    ArrayEquality[U128](_lower_bounds, that._lower_bounds) and
+      MapEquality[U128, String](_nodes, that._nodes)
+
+  fun ne(that: box->HashPartitions): Bool => not eq(that)

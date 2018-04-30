@@ -322,8 +322,8 @@ trait val PartitionBuilder
   // are called at different times
   fun state_subpartition(workers: (String | Array[String] val)):
     StateSubpartition
-  fun partition_addresses(workers: (String | Array[String] val)):
-    PartitionAddresses val
+  fun key_distribution(workers: (String | Array[String] val)):
+    KeyDistribution
   fun state_name(): String
   fun is_multi(): Bool
 
@@ -378,11 +378,11 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
     StateSubpartition
   =>
     KeyedStateSubpartition[PIn, S](_state_name,
-      partition_addresses(workers), _step_id_map, _state_runner_builder,
+      key_distribution(workers), _step_id_map, _state_runner_builder,
       _partition.function(), _pipeline_name)
 
-  fun partition_addresses(workers: (String | Array[String] val)):
-    KeyedPartitionAddresses val
+  fun key_distribution(workers: (String | Array[String] val)):
+    KeyDistribution
   =>
     let wtk = Map[String, Array[Key]]
 
@@ -416,8 +416,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
       Unreachable()
     end
 
-    KeyedPartitionAddresses(hash_partitions,
-      consume workers_to_keys)
+    KeyDistribution(hash_partitions, consume workers_to_keys)
 
 class ComputationRunner[In: Any val, Out: Any val]
   let _next: Runner
