@@ -1557,7 +1557,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.register_boundaries(_outgoing_boundaries,
           _outgoing_boundary_builders)
 
-        _connections.create_routers_from_blueprints(
+        _connections.create_routers_from_blueprints(t.worker_names,
           _partition_router_blueprints,
           _stateless_partition_router_blueprints, _omni_router_blueprint,
           consume local_sinks, _router_registry, this)
@@ -1569,7 +1569,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         @printf[I32](("\n|^|^|^|Finished Initializing Joining Worker Local " +
           "Topology|^|^|^|\n").cstring())
-        @printf[I32]("---------------------------------------------------------\n".cstring())
+        @printf[I32](("-----------------------------------------------------" +
+          "----\n").cstring())
 
         @printf[I32]("***Successfully joined cluster!***\n".cstring())
       else

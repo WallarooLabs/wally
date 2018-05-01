@@ -212,9 +212,12 @@ class Autoscale
   fun ref receive_join_migration_ack(worker: String) =>
     _phase.receive_join_migration_ack(worker)
 
-  fun ref all_join_migration_acks_received(is_coordinator: Bool) =>
+  fun ref all_join_migration_acks_received(joining_workers: Array[String] val,
+    is_coordinator: Bool)
+  =>
     _phase = _WaitingForResumeTheWorld(this, _auth, is_coordinator)
-    _router_registry.all_join_migration_acks_received()
+    _router_registry.all_join_migration_acks_received(joining_workers,
+      is_coordinator)
 
   fun ref initiate_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val)
@@ -232,10 +235,10 @@ class Autoscale
   fun ref leaving_worker_finished_migration(worker: String) =>
     _phase.leaving_worker_finished_migration(worker)
 
-  fun ref all_leaving_workers_finished() =>
+  fun ref all_leaving_workers_finished(leaving_workers: Array[String] val) =>
     _phase = _WaitingForResumeTheWorld(this, _auth
       where is_coordinator = false)
-    _router_registry.all_leaving_workers_finished()
+    _router_registry.all_leaving_workers_finished(leaving_workers)
 
   fun ref autoscale_complete() =>
     _phase.autoscale_complete()
@@ -604,6 +607,7 @@ class _WaitingForJoinMigrationAcks is AutoscalePhase
   let _autoscale: Autoscale ref
   let _auth: AmbientAuth
   let _is_coordinator: Bool
+  let _joining_workers: Array[String] val
   let _migration_target_ack_list: _StringSet =
     _migration_target_ack_list.create()
 
@@ -615,6 +619,7 @@ class _WaitingForJoinMigrationAcks is AutoscalePhase
     _autoscale = autoscale
     _auth = auth
     _is_coordinator = is_coordinator
+    _joining_workers = joining_workers
     for w in joining_workers.values() do
       _migration_target_ack_list.set(w)
     end
@@ -626,7 +631,8 @@ class _WaitingForJoinMigrationAcks is AutoscalePhase
     if _migration_target_ack_list.size() == 0 then
       @printf[I32]("--All new workers have acked migration batch complete\n"
         .cstring())
-      _autoscale.all_join_migration_acks_received(_is_coordinator)
+      _autoscale.all_join_migration_acks_received(_joining_workers,
+        _is_coordinator)
     end
 
 class _JoiningWorker is AutoscalePhase
@@ -693,7 +699,7 @@ class _InitiatingShrink is AutoscalePhase
     end
     _leaving_workers_waiting_list.unset(worker)
     if _leaving_workers_waiting_list.size() == 0 then
-      _autoscale.all_leaving_workers_finished()
+      _autoscale.all_leaving_workers_finished(_leaving_workers)
     end
 
 class _ShrinkInProgress is AutoscalePhase
@@ -722,7 +728,7 @@ class _ShrinkInProgress is AutoscalePhase
     end
     _leaving_workers_waiting_list.unset(worker)
     if _leaving_workers_waiting_list.size() == 0 then
-      _autoscale.all_leaving_workers_finished()
+      _autoscale.all_leaving_workers_finished(_leaving_workers)
     end
 
 class _WaitingForLeavingMigration is AutoscalePhase
