@@ -4,85 +4,20 @@ set -o errexit
 set -o nounset
 export DEBIAN_FRONTEND=noninteractive
 
-export INSTALL_PONYC_FROM="bintray"
-export LLVM_VERSION="3.9.1"
-export LLVM_CONFIG="llvm-config-3.9"
-export CC1="gcc-5"
-export CXX="g++-5"
+export PONYC_VERSION="0.21.0-4301.acd811b"
 export OTP_VERSION="1:20.1-1"
 export ELIXIR_VERSION="1.5.2-1"
 export GO_VERSION="1.9.4"
 
-install_llvm() {
-  echo "** Downloading and installing LLVM ${LLVM_VERSION}"
-
-  pushd /tmp
-  wget "http://llvm.org/releases/${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-debian8.tar.xz"
-  tar -xf clang+llvm*
-  pushd clang+llvm* && sudo mkdir /tmp/llvm && sudo cp -r ./* /tmp/llvm/
-  sudo ln -s "/tmp/llvm/bin/llvm-config" "/usr/local/bin/${LLVM_CONFIG}"
-  popd
-  popd
-
-  echo "** LLVM ${LLVM_VERSION} installed"
-}
-
-install_pcre() {
-  echo "** Downloading and building PCRE2..."
-
-  pushd /tmp
-  wget "ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2"
-  tar -xjf pcre2-10.21.tar.bz2
-  pushd pcre2-10.21 && ./configure --prefix=/usr && make && sudo make install
-  popd
-  popd
-
-  echo "** PRCE2 installed"
-}
-
-install_cpuset() {
-  # if cpuset isn't installed, we get warning messages that dirty up
-  # the travis output logs
-  echo "** Installing cpuset"
-
-  sudo apt-get -fy install cpuset
-
-  echo "** cpuset installed"
-}
 
 install_ponyc() {
-  echo "** Installing ponyc from ${INSTALL_PONYC_FROM}"
+  echo "** Installing latest ponyc ${PONYC_VERSION} from bintray"
 
-  case "$INSTALL_PONYC_FROM" in
-    "bintray")
-      echo "Installing latest ponyc release from bintray"
-      sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "8756 C4F7 65C9 AC3C B6B8  5D62 379C E192 D401 AB61"
-      echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list.d/pony-language.list
-      sudo apt-get update
+  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "8756 C4F7 65C9 AC3C B6B8  5D62 379C E192 D401 AB61"
+  echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list.d/pony-language.list
+  sudo apt-get update
 
-      sudo apt-get -V install ponyc
-    ;;
-
-    "source")
-      echo "Installing ponyc dependencies"
-      install_llvm
-      install_pcre
-      echo "Installing ponyc from source"
-      pushd /tmp
-      git clone https://github.com/ponylang/ponyc.git
-      pushd ponyc
-      git checkout $PONYC_VERSION
-      make CC=$CC1 CXX=$CXX1
-      sudo make install
-      popd
-      popd
-    ;;
-
-    *)
-      echo "ERROR: unrecognized source to install ponyc from ${INSTALL_PONYC_FROM}"
-      exit 1
-    ;;
-  esac
+  sudo apt-get -V install ponyc=$PONYC_VERSION
 
   echo "** ponyc installed"
 }
@@ -106,6 +41,11 @@ install_kafka_compression_libraries() {
   echo "** Compression libraries needed for Kafka support installed"
 }
 
+install_required_libraries() {
+  echo "** Installing additional libraries required for Wallaroo support"
+  sudo apt-get install -y libz-dev libssl-dev
+}
+
 install_monitoring_hub_dependencies() {
   echo "** Installing monitoring hub dependencies"
 
@@ -121,61 +61,62 @@ install_monitoring_hub_dependencies() {
     erlang-ssl=$OTP_VERSION erlang-mnesia=$OTP_VERSION erlang-runtime-tools=$OTP_VERSION \
     erlang-inets=$OTP_VERSION elixir=$ELIXIR_VERSION
 
+  mkdir /home/ubuntu/.nvm
+  curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | NVM_DIR="/home/ubuntu/.nvm" PROFILE="ubuntu" bash
+  NVM_DIR="/home/ubuntu/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+  nvm install node
+  nvm alias default node
+
   echo "** Monitoring hub dependencies installed"
 }
 
 install_python_dependencies() {
   echo "** Installing python dependencies"
   echo "Installing python"
-  apt-get install -y python-dev
+  sudo apt-get install -y python-dev
   echo "Installing build-essential"
-  apt-get install -y build-essential
+  sudo apt-get install -y build-essential
   echo "Installing pip"
-  apt-get install -y python-pip
+  sudo apt-get install -y python-pip
   echo "Installing pytest"
-  sudo python -m pip install pytest==3.2.2
+  sudo -H python -m pip install pytest==3.2.2
   echo "Install enum"
-  sudo python -m pip install --upgrade pip enum34
+  sudo -H python -m pip install --upgrade pip enum34
 
   echo "** Python dependencies installed"
 }
 
 install_gitbook_dependencies() {
-  # we need nodejs & npm
-  sudo apt-get update
-  sudo apt-get install -y nodejs npm
-  # we need to symlink node
-  ln -s /usr/bin/nodejs /usr/bin/node
   # install gitbook
   npm install gitbook-cli -g
   # install any required plugins - this checks book.json for plugin list
   gitbook install
   # for uploading generated docs to repo
-  sudo python -m pip install ghp-import
+  sudo -H python -m pip install ghp-import
 }
 
 install_docker() {
   ## docker ce repo setup
-  apt-get update
-  apt-get install \
+  sudo apt-get update
+  sudo apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
     software-properties-common
 
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 
-  add-apt-repository \
+  sudo add-apt-repository \
      "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
      $(lsb_release -cs) \
      stable"
 
-  apt-get update
-  apt-get install -y docker-ce
+  sudo apt-get update
+  sudo apt-get install -y docker-ce
 
   ## give docker access to non-root users ubuntu
   sudo usermod -aG docker ubuntu
-  newgrp docker
 }
 
 install_go() {
@@ -192,28 +133,57 @@ install_go() {
   echo "** Go ${GO_VERSION} installed"
 }
 
+install_changelog_tool() {
+  git clone https://github.com/ponylang/changelog-tool
+  cd changelog-tool
+  make
+  sudo make install
+}
+
+install_other() {
+  echo "** Installing other required tooling..."
+  sudo apt-get install jq
+}
+
+
+confirm_git_ssh() {
+  echo "** Confirming ssh connection to git...."
+  ssh -T git@github.com -o StrictHostKeyChecking=no || true
+  echo "** Git SSH successful!"
+}
+
+clone_and_report() {
+  echo "** Cloning Wallaroo repo"
+  git clone git@github.com:WallarooLabs/wallaroo.git
+  curl -v -H "Accept: application/json" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        -d "{\"date\":\"$(date)\",\"source\":\"vagrant\",\"count\":1}" \
+        https://hooks.zapier.com/hooks/catch/175929/f4hnh4/
+
+  echo "** Wallaroo repo cloned"
+}
+
 echo "----- Installing dependencies"
 
-install_cpuset
 install_ponyc
 install_pony_stable
 install_kafka_compression_libraries
+install_required_libraries
 install_monitoring_hub_dependencies
 install_python_dependencies
 install_gitbook_dependencies
 install_docker
 install_go
+install_other
+install_changelog_tool
 
 echo "----- Dependencies installed"
 
-## switch to default ubuntu user
-su - ubuntu
+## confirming git ssh
+confirm_git_ssh
 
 ## clone Wallaroo
 pushd /home/ubuntu
-git clone https://github.com/WallarooLabs/wallaroo
+clone_and_report
 pushd wallaroo || exit
-
-## allow ubuntu user access to everything
-pushd /home/ubuntu
-chown -R ubuntu:ubuntu wallaroo

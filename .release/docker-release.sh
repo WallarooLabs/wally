@@ -43,10 +43,11 @@ verify_version() {
   fi
 }
 
-verify_commit() {
-  if [[ $(git log --format='%H' HEAD -n1) != *"$commit"* ]]
+verify_commit_on_branch() {
+  echo "Verfying commit $commit is on branch: $BRANCH..."
+  if ! git branch --contains $commit | grep $BRANCH
   then
-    echo "Expected commit: $commit but currently on commit: $(git log --format='%H' HEAD -n1)"
+    echo "Commit $commit is not on branch: $BRANCH"
     exit 1
   fi
 }
@@ -73,6 +74,11 @@ verify_no_local_changes() {
   fi
 }
 
+checkout_to_commit() {
+  echo "Checking out to commit: $commit ..."
+  git checkout $commit
+}
+
 set_docker_image_names() {
   ## Sets Wallaroo Docker repo host to Bintray repo
   wallaroo_docker_repo_host=wallaroo-labs-docker-wallaroolabs.bintray.io
@@ -86,7 +92,7 @@ set_docker_image_names() {
 
 build_metrics_ui_image() {
   ## Check to see if image exists prior to building
-  if [[ "$(docker images -q $metrics_ui_docker_image_path 2> /dev/null)" != "" ]]; then
+  if [[ "$(docker images -q $metrics_ui_docker_image_path 2> /dev/null)" == "" ]]; then
     ## Build Metrics UI if not already built
     make release-monitoring_hub-apps-metrics_reporter_ui
     ## Build Metrics UI Docker image
@@ -101,13 +107,13 @@ build_metrics_ui_image() {
 
 build_wallaroo_image() {
   ## Check to see if image exists prior to building
-  if [[ "$(docker images -q $wallaroo_docker_image_path 2> /dev/null)" != "" ]]; then
+  if [[ "$(docker images -q $wallaroo_docker_image_path 2> /dev/null)" == "" ]]; then
     ## Build Metrics UI if not already built
     make release-monitoring_hub-apps-metrics_reporter_ui
     ## Build Wallaroo Docker image
     docker build -t $wallaroo_docker_image_path .
   else
-    echo "Docker image: wallaroo_docker_image_path already exists locally, skipping build step..."
+    echo "Docker image: $wallaroo_docker_image_path already exists locally, skipping build step..."
   fi
 }
 
@@ -157,9 +163,11 @@ commit=$2
 verify_args
 verify_wallaroo_dir
 verify_version
-verify_commit
 verify_branch
+verify_commit_on_branch
+checkout_to_commit
 verify_no_local_changes
+set_docker_image_names
 build_metrics_ui_image
 build_wallaroo_image
 push_docker_images

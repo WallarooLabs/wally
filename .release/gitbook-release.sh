@@ -4,9 +4,9 @@ set -o errexit
 set -o nounset
 
 verify_args() {
-  ## Verifies that the docker release is being run for the provided args for
+  ## Verifies that the gitbook release is being run for the provided args for
   ## version and commit
-  echo "Creating docker releases for version $for_version with commit $commit"
+  echo "Creating gitbook for version $for_version with commit $commit"
   while true; do
     read -rp "Is this correct (y/n)?" yn
     case $yn in
@@ -36,13 +36,27 @@ verify_branch() {
   elif [[ "$BRANCH" == *"release-"* ]]
   then
     remote_branch=rc
-    ui_version=$(< VERSION)
+    ui_version=$(git describe --tags --always)
     docker_version=$(git describe --tags --always)
     docker_url="dev\/wallaroo:$docker_version"
   else
     echo "No remote repo to push book to. Exiting"
     exit 0
   fi
+}
+
+verify_commit_on_branch() {
+  echo "Verfying commit $commit is on branch: $BRANCH..."
+  if ! git branch --contains $commit | grep $BRANCH
+  then
+    echo "Commit $commit is not on branch: $BRANCH"
+    exit 1
+  fi
+}
+
+checkout_to_commit() {
+
+  git checkout $commit
 }
 
 update_versions_in_gitbook() {
@@ -56,6 +70,10 @@ update_versions_in_gitbook() {
   find book -name '*.md' -exec sed -i -- "s/{{ docker_version_url }}/$docker_url/g" {} \;
 }
 
+install_gitbook_deps() {
+  echo "Installing Gitbook deps..."
+  gitbook install
+}
 build_book() {
   echo "Building book..."
   gitbook build
@@ -67,7 +85,7 @@ upload_book() {
   pushd _book
 
   # git magic. without all this, our ghp-import command won't work
-  git remote add doc-site "https://$DOCUMENTATION_REPO_TOKEN@github.com/wallaroolabs/docs.wallaroolabs.com"
+  git remote add doc-site "git@github.com:wallaroolabs/docs.wallaroolabs.com.git"
   git fetch doc-site
   git reset doc-site/$remote_branch
 
@@ -82,15 +100,19 @@ upload_book() {
   popd
 }
 
-if [ $# -lt 1 ]; then
-  echo "documentation repo token argument required"
+if [ $# -lt 2 ]; then
+  echo "version and commit arguments required"
 fi
 
 set -eu
-DOCUMENTATION_REPO_TOKEN=$1
+for_version=$1
+commit=$2
 
 verify_args
 verify_branch
+verify_commit_on_branch
+checkout_to_commit
 update_versions_in_gitbook
+install_gitbook_deps
 build_book
 upload_book

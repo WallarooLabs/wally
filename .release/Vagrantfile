@@ -1,6 +1,24 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+# Verify vagrant-docker-plugin is installed
+unless Vagrant.has_plugin?("vagrant-docker-login")
+  system("vagrant plugin install vagrant-docker-login")
+  puts "Dependencies installed, please try the command again."
+  exit
+end
+
+def provisioned?(vm_name='default', provider='virtualbox')
+  File.exist?(".vagrant/machines/#{vm_name}/#{provider}/action_provision")
+end
+
+unless provisioned? && (ARGV[0] != "up")
+  unless ENV["DOCKER_USERNAME"] && ENV["DOCKER_PASSWORD"] && ENV["DOCKER_SERVER"]
+    puts "Set your DOCKER_USERNAME, DOCKER_PASSWORD, and DOCKER_SERVER environment variable."
+    exit
+  end
+end
+
 # All Vagrant configuration is done below. The "2" in Vagrant.configure
 # configures the configuration version (we support older styles for
 # backwards compatibility). Please don't change it unless you know what
@@ -13,7 +31,11 @@ Vagrant.configure("2") do |config|
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://atlas.hashicorp.com/search.
   config.vm.box = "ubuntu/xenial64"
-  config.vm.provision :shell, path: "bootstrap.sh"
+  config.vm.provision :shell, privileged: false, path: "bootstrap.sh"
+  config.vm.provision "file", source: "~/.gitconfig", destination: "/home/ubuntu/.gitconfig"
+  config.ssh.forward_agent = true
+
+  config.vm.provision :docker_login
 
 
   # Disable automatic box update checking. If you disable this, then

@@ -42,14 +42,6 @@ check_for_local_only_changes() {
   fi
 }
 
-verify_version() {
-  ## Verifies that the provided version matches the version in the VERSION file
-  if [[ $(< VERSION) != $for_version ]]; then
-    echo "Version provided: $for_version does not match version in VERSION file: $(< VERSION)."
-    exit 1
-  fi
-}
-
 verify_changelog() {
   changelog_verify_result=$(changelog-tool verify CHANGELOG.md)
   if [[ $changelog_verify_result != *"CHANGELOG.md is a valid changelog"* ]]
@@ -57,6 +49,18 @@ verify_changelog() {
     echo "CHANGELOG is not valid, make sure it is valid prior to running this script."
     exit 1
   fi
+}
+
+
+update_version() {
+  echo "$version" > VERSION
+  echo "VERSION set to $version"
+}
+
+commit_version_update() {
+  # commit VERSION update
+  git add VERSION
+  git commit -m "Update version for $version release"
 }
 
 update_version_in_changelog() {
@@ -98,6 +102,7 @@ push_release_branch() {
   ## Push `release` branch
   git push origin/release
 }
+
 verify_push() {
   printf "Local changes to your repo have been made."
   printf "Would you like to commit and push to your origin repo (y/n)? "
@@ -116,6 +121,14 @@ tag_and_push() {
   git push origin "$for_version"
 }
 
+release_gitbook() {
+  .release/gitbookrelease.sh
+}
+
+release_docker_images() {
+  .release/docker-release.sh
+}
+
 if [ $# -lt 2 ]; then
   echo "release candidate branch and version arguments required"
 fi
@@ -130,8 +143,9 @@ verify_args
 verify_branch
 check_for_uncommited_changes
 check_for_local_only_changes
-verify_version
 verify_changelog
+update_version
+commit_version_update
 update_version_in_changelog
 commit_changelog_update
 verify_push

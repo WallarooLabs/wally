@@ -8,8 +8,8 @@ To learn more about our release process, see [RELEASE.md].
 
 In order to build and push the Wallaroo Documentation Gitbook, you absolutely must have:
 
-* The documentation repo token with access to the `wallaroolabs/docs.wallaroolabs.com` Github repository
 * Vagrant installed
+* Provisioned the Wallaroo Release Vagrant box as described in [PROVISION_VAGRANT.md](PROVISION_VAGRANT.md).
 
 ## Building and pushing Wallaroo Documentation Gitbook
 
@@ -60,13 +60,13 @@ From within the Wallaroo Vagrant box run the following:
 
 ```bash
 cd /users/ubuntu/wallaroo
-bash .release/gitbook-release.sh DOCUMENTATION_REPO_TOKEN
+bash .release/gitbook-release.sh VERSION COMMIT
 ```
 
-So, for example, if your documentation repo token is `0xa0ece74981af`, you'd run:
+So, for example, if your version is release-0.4.0 and your commit is `0xa0ece`, you'd run:
 
 ```bash
-bash .release/gitbook-release.sh 0xa0ece74981af
+bash .release/gitbook-release.sh release-0.4.0 0xa0ece
 ```
 
 This will then build and push the Wallaroo Documentation Gitbook to the `wallaroolabs/docs.wallaroolabs.com` Github repository.

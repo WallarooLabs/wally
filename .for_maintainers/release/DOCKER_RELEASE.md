@@ -8,9 +8,8 @@ To learn more about our release process, see [RELEASE.md].
 
 In order to release the Docker images, you absolutely must have:
 
-* A Bintray account
-* A Bintray API key with access to the `wallaroolabs` Docker repository
 * Vagrant installed
+* Provisioned the Wallaroo Release Vagrant box as described in [PROVISION_VAGRANT.md](PROVISION_VAGRANT.md).
 
 ## Releasing the Docker images
 
@@ -54,16 +53,6 @@ cd ~/wallaroo
 git checkout origin/release-0.4.0
 git pull
 ```
-
-### Log into Bintray's Docker repository
-
-From within the Wallaroo Vagrant box, you'll want to log in to the Bintray Docker repository using the following command:
-
-```bash
-docker login -u <YOUR_USER> -p <API_KEY> wallaroo-labs-docker-wallaroolabs.bintray.io
-```
-
-Please note that you MUST be a member of the `wallaroo-labs/wallaroolabs` Bintray Docker repository in order to have publish access. If you need access, contact @seanTallen or @JONBRWN before continuing.
 
 ### Releasing the Wallaroo and Metrics UI images
 
