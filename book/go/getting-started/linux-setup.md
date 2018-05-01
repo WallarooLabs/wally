@@ -1,6 +1,6 @@
 # Setting Up Your Ubuntu Environment for Wallaroo
 
-These instructions have been tested for Ubuntu Trusty and Xenial releases.
+These instructions have been tested for Ubuntu Artful, Trusty, and Xenial releases.
 
 There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
@@ -120,7 +120,7 @@ sudo apt-get -V install pony-stable
 
 Wallaroo's Kakfa support requires `libsnappy` and `liblz` to be installed.
 
-### Xenial Ubuntu:
+### Artful and Xenial Ubuntu:
 
 ```bash
 sudo apt-get install -y libsnappy-dev liblz4-dev
@@ -165,12 +165,24 @@ Giles Sender is used to supply data to Wallaroo applications over TCP, and Data 
 
 The Cluster Shutdown tool is used to instruct the cluster to shutdown cleanly, clearing away any resilience and recovery files it may have created.
 
-To compile all three, run
+Change to the root Wallaroo directory:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/
-make build-giles-all build-utils-cluster_shutdown-all \
-  build-utils-data_receiver-all
+```
+
+### Compiling Giles Sender, Receiver, and the Cluster Shutdown tool on Artful
+
+Due to ponyc's dependence on PIC on Artful Ubuntu, all applications must be compiled with the `PONYCFLAGS="--pic"` flag, like so:
+
+```bash
+make build-giles-all build-utils-cluster_shutdown-all PONYCFLAGS="--pic"
+```
+
+### Compiling Giles Sender, Receiver, and the Cluster Shutdown tool on Trusty and Xenial
+
+```bash
+make build-giles-all build-utils-cluster_shutdown-all
 ```
 
 ## Register
