@@ -1,6 +1,8 @@
 # Choosing an Installation Option for Wallaroo
 
-We currently provide two different ways for a user to install Wallaroo: [Installing with Docker](/book/getting-started/docker-setup.md) and installing from source on [Linux](/book/getting-started/linux-setup.md). If you are unsure about which solution is right for you, we wanted to provide a breakdown of each approach.
+For MacOS and Windows users, currently the only installation option for Wallaroo is [Installing with Docker](/book/getting-started/docker-setup.md).
+
+For Linux users, we currently provide two different ways for a user to install Wallaroo: [Installing with Docker](/book/getting-started/docker-setup.md) and [Installing from Source](/book/getting-started/linux-setup.md). If you are unsure about which solution is right for you, we wanted to provide a breakdown of each approach.
 
 ## Installing with Docker
 
