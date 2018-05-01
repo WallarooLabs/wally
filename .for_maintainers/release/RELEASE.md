@@ -4,11 +4,17 @@ This document is aimed at members of the Wallaroo team who might be cutting a re
 
 This document does not cover testing that might need to occur during the release process beyond noting where in the process it should be done.
 
+## Prerequisites
+
+Prior to starting the release process, it is expected that you have successfully provisioned the Wallaroo Vagrant Release box. This process is documented in the [PROVISION_VAGRANT.md](PROVISION_VAGRANT.md) file. Once provisioned, you may continue.
+
 ## Release process overview
 
 Our release process features a few primary steps
 
 * Creation of a release candidate branch
+* Building and releasing the Wallaroo and Metrics UI RC Docker images on Bintray
+* Building and pushing RC Documentation Gitbook
 * Testing of the release candidate
 * Promoting of a release candidate to a release
 * Building and releasing the Wallaroo and Metrics UI Docker images on Bintray

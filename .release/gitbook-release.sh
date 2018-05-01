@@ -4,9 +4,9 @@ set -o errexit
 set -o nounset
 
 verify_args() {
-  ## Verifies that the docker release is being run for the provided args for
+  ## Verifies that the gitbook release is being run for the provided args for
   ## version and commit
-  echo "Creating docker releases for version $for_version with commit $commit"
+  echo "Creating gitbook for version $for_version with commit $commit"
   while true; do
     read -rp "Is this correct (y/n)?" yn
     case $yn in
@@ -67,7 +67,7 @@ upload_book() {
   pushd _book
 
   # git magic. without all this, our ghp-import command won't work
-  git remote add doc-site "https://$DOCUMENTATION_REPO_TOKEN@github.com/wallaroolabs/docs.wallaroolabs.com"
+  git remote add doc-site "git@github.com:wallaroolabs/docs.wallaroolabs.com.git"
   git fetch doc-site
   git reset doc-site/$remote_branch
 
@@ -87,7 +87,6 @@ if [ $# -lt 1 ]; then
 fi
 
 set -eu
-DOCUMENTATION_REPO_TOKEN=$1
 
 verify_args
 verify_branch

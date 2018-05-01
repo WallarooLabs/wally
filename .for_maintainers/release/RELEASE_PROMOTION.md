@@ -26,13 +26,13 @@ Please note that the release script was written with the assumption that you are
 Promoting a release candidate to a release is a simple process. Run a script with the correct arguments and you are done. The release promotion script is run as:
 
 ```bash
-bash .release/rp.sh RELEASE_CANDIDATE_BRANCH RELEASE_VERSION
+bash .release/release.sh RELEASE_CANDIDATE_BRANCH RELEASE_VERSION
 ```
 
 So, for example, if you are releasing from branch `release-0.4.0`, with version `0.4.0` then your command would be:
 
 ```bash
-bash .release/rp.sh release-0.4.1 0.4.1
+bash .release/release.sh release-0.4.1 0.4.1
 ```
 
 The script will make changes on in your local Wallaroo repo and will prompt you before pushing them back to GitHub.
