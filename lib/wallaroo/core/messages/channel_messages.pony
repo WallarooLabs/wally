@@ -339,6 +339,20 @@ primitive ChannelMsgEncoder
     _encode(AnnounceJoiningWorkersMsg(sender, control_addrs, data_addrs),
       auth)?
 
+  fun announce_hash_partitions_grow(sender: String,
+    joining_workers: Array[String] val,
+    hash_partitions: Map[String, HashPartitions] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    Once migration is complete, the coordinator of a grow autoscale event
+    informs all joining workers of all hash partitions. We include the joining
+    workers list to make it more straightforward for the recipients to update
+    the HashProxyRouters in their PartitionRouters.
+    """
+    _encode(AnnounceHashPartitionsGrowMsg(sender, joining_workers,
+      hash_partitions), auth)?
+
   fun connected_to_joining_workers(sender: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -981,6 +995,18 @@ class val AnnounceJoiningWorkersMsg is ChannelMsg
     sender = sender'
     control_addrs = c_addrs
     data_addrs = d_addrs
+
+class val AnnounceHashPartitionsGrowMsg is ChannelMsg
+  let sender: String
+  let joining_workers: Array[String] val
+  let hash_partitions: Map[String, HashPartitions] val
+
+  new val create(sender': String, joining_workers': Array[String] val,
+    hash_partitions': Map[String, HashPartitions] val)
+  =>
+    sender = sender'
+    joining_workers = joining_workers'
+    hash_partitions = hash_partitions'
 
 class val ConnectedToJoiningWorkersMsg is ChannelMsg
   let sender: String

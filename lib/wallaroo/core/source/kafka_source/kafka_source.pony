@@ -34,6 +34,7 @@ use "wallaroo/core/topology"
 actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   StatusReporter & KafkaConsumer)
   let _source_id: StepId
+  let _auth: AmbientAuth
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder
@@ -77,9 +78,10 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
 
-  new create(source_id: StepId, name: String, listen: KafkaSourceListener[In],
-    notify: KafkaSourceNotify[In] iso, event_log: EventLog,
-    routes: Array[Consumer] val, route_builder: RouteBuilder,
+  new create(source_id: StepId, auth: AmbientAuth, name: String,
+    listen: KafkaSourceListener[In], notify: KafkaSourceNotify[In] iso,
+    event_log: EventLog, routes: Array[Consumer] val,
+    route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
@@ -88,6 +90,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     recovering: Bool)
   =>
     _source_id = source_id
+    _auth = auth
     _topic = topic
     _partition_id = partition_id
     _kc = kafka_client
@@ -153,7 +156,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     let new_router =
       match router
       | let pr: PartitionRouter =>
-        pr.update_boundaries(_outgoing_boundaries)
+        pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else

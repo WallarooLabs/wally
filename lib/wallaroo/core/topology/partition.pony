@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "files"
 use "net"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -69,8 +70,38 @@ class val KeyDistribution is Equatable[KeyDistribution]
     _workers_to_keys
 
   fun update_key(key: Key, pa: ProxyAddress): KeyDistribution val =>
-    // !@ Calculate new hash partitions
-    KeyDistribution(_hash_partitions, _workers_to_keys)
+    let new_workers_to_keys = recover trn Map[String, Array[Key] val] end
+
+    var old_key_target = ""
+    for (w, ks) in _workers_to_keys.pairs() do
+      new_workers_to_keys(w) = ks
+      if ArrayHelpers[Key].contains[Key](ks, key) then
+        old_key_target = w
+      end
+    end
+
+    try
+      if old_key_target != "" then
+        let old_target_keys = _workers_to_keys(old_key_target)?
+        let new_keys = recover trn Array[Key] end
+        for k in old_target_keys.values() do
+          if k != key then new_keys.push(k) end
+        end
+        new_workers_to_keys(old_key_target) = consume new_keys
+      end
+
+      let new_key_target = pa.worker
+      let new_keys_for_new_target = recover trn Array[Key] end
+      for k in _workers_to_keys(new_key_target)?.values() do
+        new_keys_for_new_target.push(k)
+      end
+      new_keys_for_new_target.push(key)
+      new_workers_to_keys(new_key_target) = consume new_keys_for_new_target
+    else
+      Fail()
+    end
+
+    KeyDistribution(_hash_partitions, consume new_workers_to_keys)
 
   fun eq(that: box->KeyDistribution): Bool =>
     _hash_partitions == that._hash_partitions

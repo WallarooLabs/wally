@@ -317,6 +317,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
+      | let m: AnnounceHashPartitionsGrowMsg =>
+        _router_registry.update_partition_routers_after_grow(m.joining_workers,
+          m.hash_partitions)
       | let m: ConnectedToJoiningWorkersMsg =>
         _router_registry.report_connected_to_joining_worker(m.sender)
       | let m: AnnounceNewStatefulStepMsg =>
