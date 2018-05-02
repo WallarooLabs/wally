@@ -21,13 +21,25 @@ Since Wallaroo is a distributed application, its components need to run separate
 
 ## Shell 1: Start the Wallaroo Docker container
 
-```bash
+{% codetabs name="UNIX Bash", type="bash" -%}
 docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-src:/src/wallaroo \
 -v /tmp/wallaroo-docker/python-virtualenv:/src/python-virtualenv \
 --name wally \
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
-```
+{%- language name="Windows Powershell", type="bash" -%}
+docker run --rm -it --privileged -p 4000:4000 `
+-v c:/wallaroo-docker/wallaroo-src:/src/wallaroo `
+-v c:/wallaroo-docker/python-virtualenv:/src/python-virtualenv `
+--name wally `
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
+{%- language name="Windows Command Prompt", type="bash" -%}
+docker run --rm -it --privileged -p 4000:4000 ^
+-v c:/wallaroo-docker/wallaroo-src:/src/wallaroo ^
+-v c:/wallaroo-docker/python-virtualenv:/src/python-virtualenv ^
+--name wally ^
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
+{%- endcodetabs %}
 
 ### Breaking down the Docker command
 
