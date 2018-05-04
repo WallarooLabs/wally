@@ -196,8 +196,37 @@ class FramedGenAction(argparse.Action):
 
 class CSVStringAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        """Split the string and store the list as expected-csv"""
-        setattr(namespace, self.dest, values.split(','))
+        """
+        Split the string and store the list as expected-csv
+        Permit 2 cases;
+        1 value: assume type is string
+        2 values: csv: {0}, type name: {1}
+
+        Types allowed are:
+        'string', 'int', 'float'
+        """
+        if not isinstance(values, list):
+            values = [values]
+        if len(values) == 1:
+            setattr(namespace, self.dest, values[0].split(','))
+        elif len(values) == 2:
+            if values[1] == 'string':
+                setattr(namespace, self.dest, values[0].split(','))
+            elif values[1] == 'int':
+                setattr(namespace, self.dest, map(int, values[0].split(',')))
+            elif values[1] == 'float':
+                setattr(namespace, self.dest, map(float, values[0].split(',')))
+            else:
+                msg = ('Argument "{f}" requires 1 or 2 arguments specifying '
+                       'a comma-delimited list of values [, type name (one of'
+                       ' "int", "float", "string").')
+                raise argparse.ArgumentTypeError(msg)
+
+        else:
+            msg = ('Argument "{f}" requires 1 or 2 arguments specifying '
+                   'a comma-delimited list of values [, type name (one of'
+                   ' "int", "float", "string").')
+            raise argparse.ArgumentTypeError(msg)
 
 
 SpikeConfig = namedtuple('SpikeConfig', ['probability', 'margin', 'seed'])
@@ -347,12 +376,13 @@ def CLI():
                       metavar=('index', 'probability', 'margin', 'seed'),
                       help=("Spike the connection on the specified worker"))
 
-    # Expected data foir validation
+    # Expected data for validation
     exp_group = parser.add_mutually_exclusive_group()
     exp_group.add_argument('--expected-file', help=("The path to a file "
                            "containing binary data to compare against the "
                            "output."))
     exp_group.add_argument('--expected-csv', dest='expected_val',
+                           nargs='+',
                            help=("A comma delimited list of"
                            " of values to compare against the output data."),
                            action=CSVStringAction)
