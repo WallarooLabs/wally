@@ -6,6 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Filter `None` values in machida compute_multi results ([PR #2179](https://github.com/wallaroolabs/wallaroo/pull/2179))
 - Fix busy-loop/scheduler yield bugs in TCPConnection-related classes ([PR #2142](https://github.com/wallaroolabs/wallaroo/pull/2142))
 - Fix errors in Python decorator API documentation ([PR #2124](https://github.com/wallaroolabs/wallaroo/pull/2124))
 - Improve autoscale performance and reliability, and fix related edge case bugs ([PR #2122](https://github.com/wallaroolabs/wallaroo/pull/2122))
