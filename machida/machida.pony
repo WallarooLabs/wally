@@ -803,19 +803,25 @@ primitive Machida
 
     consume arr
 
-  fun py_list_int_to_pony_array_pydata(py_array: Pointer[U8] val):
-    Array[PyData val] val
+  fun py_list_to_filtered_pony_array_pydata(py_array: Pointer[U8] val):
+    (Array[PyData val] val | None)
   =>
     let size = @PyList_Size(py_array)
     let arr = recover iso Array[PyData val](size) end
 
     for i in Range(0, size) do
       let obj = @PyList_GetItem(py_array, i)
-      Machida.inc_ref(obj)
-      arr.push(recover val PyData(obj) end)
+      if not Machida.is_py_none(obj) then
+        Machida.inc_ref(obj)
+        arr.push(recover val PyData(obj) end)
+      end
     end
-
-    consume arr
+    if arr.size() == 0 then
+      None
+    else
+      arr.compact()
+      consume arr
+    end
 
   fun pony_array_string_to_py_list_string(args: Array[String] val):
     Pointer[U8] val
@@ -874,13 +880,13 @@ primitive Machida
     @py_decref(o)
 
   fun process_computation_results(data: Pointer[U8] val, multi: Bool):
-    (PyData val | Array[PyData val] val)
+    (PyData val | Array[PyData val] val | None)
   =>
     if not multi then
       recover val PyData(data) end
     else
       if @py_list_check(data) == 1 then
-        let out = Machida.py_list_int_to_pony_array_pydata(data)
+        let out = Machida.py_list_to_filtered_pony_array_pydata(data)
         Machida.dec_ref(data)
         out
       else
