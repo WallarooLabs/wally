@@ -63,9 +63,3 @@ jobs:
       script: bash travis/integration-tests.sh
       env:
         - INTEGRATION_TESTS=t
-    - stage: deploy
-      if: type != pull_request AND ( branch = release OR branch =~ ^release-(\d).(\d).(\d)$ )
-      script: /bin/bash travis/docker_release.sh
-    - stage: gitbook
-      if: type != pull_request AND ( branch = release OR branch = master OR branch =~ ^release-(\d).(\d).(\d)$ )
-      script: /bin/bash travis/build-gitbook.sh
