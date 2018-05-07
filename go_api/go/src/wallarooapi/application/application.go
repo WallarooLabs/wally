@@ -57,7 +57,7 @@ func (pb *pipelineBuilder) ToMulti(computationBuilder wa.ComputationMultiBuilder
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 
-func (pb *pipelineBuilder) ToStatePartition(stateComputation wa.StateComputation, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64) *pipelineBuilder {
+func (pb *pipelineBuilder) ToStatePartition(stateComputation wa.StateComputation, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []string) *pipelineBuilder {
 	computationId := wa.AddComponent(stateComputation, wa.StateComputationTypeId)
 	stateBuilderId := wa.AddComponent(stateBuilder, wa.StateBuilderTypeId)
 	partitionFunctionId := wa.AddComponent(partitionFunction, wa.PartitionFunctionTypeId)
@@ -66,7 +66,7 @@ func (pb *pipelineBuilder) ToStatePartition(stateComputation wa.StateComputation
 	return makePipelineBuilder(newStepId, pb.app, pb.pipeline)
 }
 
-func (pb *pipelineBuilder) ToStatePartitionMulti(stateComputation wa.StateComputationMulti, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []uint64) *pipelineBuilder {
+func (pb *pipelineBuilder) ToStatePartitionMulti(stateComputation wa.StateComputationMulti, stateBuilder wa.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []string) *pipelineBuilder {
 	computationId := wa.AddComponent(stateComputation, wa.StateComputationTypeId)
 	stateBuilderId := wa.AddComponent(stateBuilder, wa.StateBuilderTypeId)
 	partitionFunctionId := wa.AddComponent(partitionFunction, wa.PartitionFunctionTypeId)
