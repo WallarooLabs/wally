@@ -140,7 +140,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   var _recovering: Bool
   let _rb: Reader = Reader
 
-  new create(env: Env, auth: AmbientAuth, source_builder: SourceBuilder,
+  new create(env: Env, source_builder: SourceBuilder,
     router: Router, router_registry: RouterRegistry,
     route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
