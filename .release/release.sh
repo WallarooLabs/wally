@@ -55,6 +55,8 @@ verify_changelog() {
 update_version() {
   echo "$version" > VERSION
   echo "VERSION set to $version"
+  echo "Replacing Wallaroo version in Vagrant bootstrap.sh with $version"
+  find vagrant -name "bootstrap.sh" -exec sed -i -- "/WALLAROO_VERSION/ s/=\"[^\"][^\"]*\"/=\"$version\"/" {} \;
 }
 
 commit_version_update() {
