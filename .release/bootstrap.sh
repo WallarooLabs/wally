@@ -142,7 +142,7 @@ install_changelog_tool() {
 
 install_other() {
   echo "** Installing other required tooling..."
-  sudo apt-get install jq
+  sudo apt-get install -y jq
 }
 
 

@@ -100,6 +100,14 @@ upload_book() {
   popd
 }
 
+git_clean() {
+  echo "Cleaning repo..."
+  git clean -fd
+  git remote rm doc-site
+  echo "Checking out to $BRANCH"
+  git checkout $BRANCH
+}
+
 if [ $# -lt 2 ]; then
   echo "version and commit arguments required"
 fi
@@ -116,3 +124,4 @@ update_versions_in_gitbook
 install_gitbook_deps
 build_book
 upload_book
+git_clean
