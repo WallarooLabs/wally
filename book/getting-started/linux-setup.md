@@ -24,6 +24,24 @@ If you do not already have Git installed, install it:
 sudo apt-get install git
 ```
 
+## Set up Environment for the Wallaroo Tutorial
+
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
+
+```bash
+cd ~/
+mkdir ~/wallaroo-tutorial
+cd ~/wallaroo-tutorial
+```
+
+This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
+
+```bash
+git clone https://github.com/WallarooLabs/wallaroo
+cd wallaroo
+git checkout {{ book.wallaroo_version }}
+```
+
 ## Install make
 
 ```bash
@@ -140,24 +158,6 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 
 ```bash
 sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ metrics_ui_version }}
-```
-
-## Set up Environment for the Wallaroo Tutorial
-
-If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
-
-```bash
-cd ~/
-mkdir ~/wallaroo-tutorial
-cd ~/wallaroo-tutorial
-```
-
-This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
-
-```bash
-git clone https://github.com/WallarooLabs/wallaroo
-cd wallaroo
-git checkout {{ book.wallaroo_version }}
 ```
 
 ## Compiling Machida
