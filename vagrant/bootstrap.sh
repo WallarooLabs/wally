@@ -116,7 +116,7 @@ clone_and_build_wallaroo() {
 
 add_metrics_ui_to_path() {
 	sudo mkdir /usr/local/metrics_reporter_ui
-	chown -R vagrant:vagrant /usr/local/metrics_reporter_ui
+	sudo chown -R vagrant:vagrant /usr/local/metrics_reporter_ui
 	mv /home/vagrant/wallaroo-tutorial/wallaroo/monitoring_hub/apps/metrics_reporter_ui/_build/prod/rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz /tmp/metrics_reporter_ui.tar.gz
 	tar -xvf /tmp/metrics_reporter_ui.tar.gz -C /usr/local/metrics_reporter_ui
 
