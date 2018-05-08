@@ -8,6 +8,33 @@ There are a few applications/tools which are required to be installed before you
 
 In order to compile the Wallaroo example applications, your system will need to have approximately 6 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
 
+
+## Installing git
+
+If you do not already have Git installed, install it:
+
+```bash
+sudo apt-get install git
+```
+
+## Set up Environment for the Wallaroo Tutorial
+
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
+
+```bash
+cd ~/
+mkdir ~/wallaroo-tutorial
+cd ~/wallaroo-tutorial
+```
+
+This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
+
+```bash
+git clone https://github.com/WallarooLabs/wallaroo
+cd wallaroo
+git checkout {{ book.wallaroo_version }}
+```
+
 ## Install Go
 
 You'll need a Go 1.9.x compiler. You can get one from the [Go website](https://golang.org/doc/install).
@@ -18,14 +45,6 @@ Ensuring you'll have the latest available packages:
 
 ```bash
 sudo apt-get update
-```
-
-## Installing git
-
-If you do not already have Git installed, install it:
-
-```bash
-sudo apt-get install git
 ```
 
 ## Install make
@@ -140,23 +159,6 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ metrics_ui_version }}
 ```
 
-## Set up Environment for the Wallaroo Tutorial
-
-If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
-
-```bash
-cd ~/
-mkdir ~/wallaroo-tutorial
-cd ~/wallaroo-tutorial
-```
-
-This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
-
-```bash
-git clone https://github.com/WallarooLabs/wallaroo
-cd wallaroo
-git checkout {{ book.wallaroo_version }}
-```
 ## Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool
 
 Giles Sender is used to supply data to Wallaroo applications over TCP, and Data Receiver is used as a fast TCP Sink that can write the messages it receives to STDOUT. The two together are useful when developing and testing applications that use TCP Sources and a TCP Sink.
