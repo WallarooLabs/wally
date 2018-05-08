@@ -60,7 +60,9 @@ Download links for the appropriate installer or package for each supported OS ca
 
 ## Provision the Vagrant Box
 
-The provisioning process will install the required libraries and dependencies required to compile Wallaroo and its support tools. It will also compile Wallaroo and its support tools for you. Due to this, the provisioning process takes roughly 10-15 minutes. It should be noted that this is a one time setup as long as you don't destroy the Vagrant Box.
+Provisioning should take about 10 to 15 minutes. When it finishes, you will have a complete Wallaroo development environment. You won’t have to go through the provisioning process again unless you destroy the Wallaroo environment by running `vagrant destroy`.
+
+To provision, run the following commands:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/vagrant
