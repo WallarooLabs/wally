@@ -60,22 +60,12 @@ install_monitoring_hub_dependencies() {
     erlang-ssl=$OTP_VERSION erlang-mnesia=$OTP_VERSION erlang-runtime-tools=$OTP_VERSION \
     erlang-inets=$OTP_VERSION elixir=$ELIXIR_VERSION
 
-  # installing node + npm
-#   sudo -u ubuntu bash <<'EOF'
-#   echo "Who Am I In"
-#   whoami
-  # curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
-  # sudo apt-get install -y nodejs
-
-  mkdir /home/ubuntu/.nvm
-  curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | NVM_DIR="/home/ubuntu/.nvm" PROFILE="ubuntu" bash
-  NVM_DIR="/home/ubuntu/.nvm"
+  mkdir /home/vagrant/.nvm
+  curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | NVM_DIR="/home/vagrant/.nvm" PROFILE="vagrant" bash
+  NVM_DIR="/home/vagrant/.nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
   nvm install node
   nvm alias default node
-# EOF
-#   echo "Wha Am I Out"
-#   whoami
 
   echo "** Monitoring hub dependencies installed"
 }
@@ -109,7 +99,7 @@ install_go() {
 }
 
 clone_and_build_wallaroo() {
-	pushd /home/ubuntu
+	pushd /home/vagrant
 	mkdir wallaroo-tutorial
 	pushd wallaroo-tutorial || exit
 
@@ -126,11 +116,11 @@ clone_and_build_wallaroo() {
 
 add_metrics_ui_to_path() {
 	sudo mkdir /usr/local/metrics_reporter_ui
-	chown -R ubuntu:ubuntu /usr/local/metrics_reporter_ui
-	mv /home/ubuntu/wallaroo-tutorial/wallaroo/monitoring_hub/apps/metrics_reporter_ui/_build/prod/rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz /tmp/metrics_reporter_ui.tar.gz
+	chown -R vagrant:vagrant /usr/local/metrics_reporter_ui
+	mv /home/vagrant/wallaroo-tutorial/wallaroo/monitoring_hub/apps/metrics_reporter_ui/_build/prod/rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz /tmp/metrics_reporter_ui.tar.gz
 	tar -xvf /tmp/metrics_reporter_ui.tar.gz -C /usr/local/metrics_reporter_ui
 
-	echo "PATH=/usr/local/metrics_reporter_ui/bin:$PATH" >> /home/ubuntu/.bashrc
+	echo "PATH=/usr/local/metrics_reporter_ui/bin:$PATH" >> /home/vagrant/.bashrc
 }
 
 
@@ -152,6 +142,6 @@ clone_and_build_wallaroo
 ## add Metrics UI to PATH
 add_metrics_ui_to_path
 
-## allow ubuntu user access to everything
-pushd /home/ubuntu
-chown -R ubuntu:ubuntu wallaroo-tutorial
+## allow vagrant user access to everything
+pushd /home/vagrant
+chown -R vagrant:vagrant wallaroo-tutorial

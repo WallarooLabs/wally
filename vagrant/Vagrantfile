@@ -14,6 +14,7 @@ Vagrant.configure("2") do |config|
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://atlas.hashicorp.com/search.
   config.vm.box = "ubuntu/xenial64"
+  config.vm.box_version = "20180504.0.0"
   config.vm.provision :shell, privileged: false, path: "bootstrap.sh"
 
   config.vm.provider "virtualbox" do |v|
