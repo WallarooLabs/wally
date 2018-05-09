@@ -93,20 +93,20 @@ use "window_codecs"
 actor Main
   new create(env: Env) =>
     try
-      let part_ar: Array[(U64, USize)] val = recover
-        let pa = Array[(U64, USize)]
-        pa.push((0,0))
-        pa.push((1,1))
+      let part_ar: Array[Key] val = recover
+        let pa = Array[Key]
+        pa.push("0")
+        pa.push("1")
         consume pa
       end
-      let partition = Partition[U64, U64](WindowPartitionFunction, part_ar)
+      let partition = Partition[U64](WindowPartitionFunction, part_ar)
 
       let application = recover val
         Application("Sequence Window Printer")
           .new_pipeline[U64 val, String val]("Sequence Window",
             TCPSourceConfig[U64 val].from_options(U64FramedHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-          .to_state_partition[U64 val, U64 val, String val,
+          .to_state_partition[U64 val, String val,
             WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
               partition where multi_worker = true)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
@@ -118,9 +118,9 @@ actor Main
     end
 
 primitive WindowPartitionFunction
-  fun apply(u: U64 val): U64 =>
+  fun apply(u: U64 val): Key =>
     // Always use the same partition
-    u % 2
+    (u % 2).string()
 
 class val WindowStateBuilder
   fun apply(): WindowState => WindowState
