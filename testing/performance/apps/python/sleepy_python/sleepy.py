@@ -95,10 +95,10 @@ class TuplePartitioner(object):
         assignment).
         """
         self.slot = slot
-        self.partitions = list(xrange(0, size))
+        self.partitions = [str(x) for x in xrange(0, size)]
 
     def partition(self, tuple):
-        return self.partitions[tuple[self.slot] % len(self.partitions)]
+        return str(self.partitions[tuple[self.slot] % len(self.partitions)])
 
 
 # Set by --delay_ms argument

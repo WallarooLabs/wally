@@ -41,8 +41,8 @@ actor Main
 
       // This is basically the same as applying mod 2 before a double
       // computation
-      let mod6partition = Partition[U64, U64](
-        Mod6PartitionFunction, recover [0; 2; 4] end)
+      let mod6partition = Partition[U64](
+        Mod6PartitionFunction, recover ["0"; "2"; "4"] end)
 
       let application = recover val
         Application("single_stream-parallel_stateless_state_partition_parallel_stateless_app")
@@ -50,7 +50,7 @@ actor Main
             TCPSourceConfig[U64].from_options(U64Decoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_parallel[U64]({(): Double => Double})
-            .to_state_partition[U64, U64, CountMax, CountAndMax](
+            .to_state_partition[U64, CountMax, CountAndMax](
               UpdateCountAndMax, CountAndMaxBuilder,
               "count-and-max",
               mod6partition where multi_worker = true)

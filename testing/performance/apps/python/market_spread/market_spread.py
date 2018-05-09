@@ -27,13 +27,6 @@ SIDETYPE_BUY = 1
 SIDETYPE_SELL = 2
 
 
-def str_to_partition(stringable):
-    ret = 0
-    for x in range(0, len(stringable)):
-        ret += ord(stringable[x]) << (x * 8)
-    return ret
-
-
 def load_valid_symbols():
     with open("symbols.txt", "rb") as f:
         return f.read().splitlines()
@@ -46,14 +39,13 @@ def application_setup(args):
 
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    symbol_partitions = [str_to_partition(x.rjust(4)) for x in
-                         load_valid_symbols()]
+    symbol_partitions = [x.rjust(4) for x in load_valid_symbols()]
 
     ab = wallaroo.ApplicationBuilder("market-spread")
     ab.new_pipeline(
             "Orders",
             wallaroo.TCPSourceConfig(order_host, order_port, order_decoder)
-        ).to_state_partition_u64(
+        ).to_state_partition(
             check_order, SymbolData, "symbol-data",
             symbol_partition_function, symbol_partitions
         ).to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
@@ -62,7 +54,7 @@ def application_setup(args):
             "Market Data",
             wallaroo.TCPSourceConfig(nbbo_host, nbbo_port,
                                      market_data_decoder)
-        ).to_state_partition_u64(
+        ).to_state_partition(
             update_market_data, SymbolData, "symbol-data",
             symbol_partition_function, symbol_partitions
         ).done()
@@ -178,7 +170,7 @@ class SymbolData(object):
 
 @wallaroo.partition
 def symbol_partition_function(data):
-    return str_to_partition(data.symbol)
+    return data.symbol
 
 
 @wallaroo.state_computation(name="Check Order")
