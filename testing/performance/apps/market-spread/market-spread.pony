@@ -79,6 +79,7 @@ use "wallaroo_labs/options"
 use "wallaroo_labs/time"
 use "wallaroo"
 use "wallaroo_labs/mort"
+use "wallaroo/core/common"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
@@ -103,10 +104,10 @@ actor Main
         end
       end
       let symbol_data_partition = if symbols_file_path is None then
-          Partition[Symboly val, String](
+          Partition[Symboly val](
             SymbolPartitionFunction, LegalSymbols.symbols)
         else
-          Partition[Symboly val, String](
+          Partition[Symboly val](
             SymbolPartitionFunction,
             PartitionFileReader(symbols_file_path as String,
               env.root as AmbientAuth))
@@ -127,7 +128,7 @@ actor Main
             TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
-            .to_state_partition[Symboly val, String,
+            .to_state_partition[Symboly val,
               (OrderResult val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
@@ -138,7 +139,7 @@ actor Main
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(1)?))
-            .to_state_partition[Symboly val, String, None,
+            .to_state_partition[Symboly val, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
             .done()
@@ -307,7 +308,7 @@ primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
     end
 
 primitive SymbolPartitionFunction
-  fun apply(input: Symboly val): String =>
+  fun apply(input: Symboly val): Key =>
     input.symbol()
 
 class OrderResult
