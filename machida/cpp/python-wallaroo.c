@@ -157,10 +157,7 @@ extern PyObject *computation_compute(PyObject *computation, PyObject *data,
   pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
   Py_DECREF(pFunc);
 
-  if (pValue != Py_None)
-    return pValue;
-  else
-    return NULL;
+  return pValue;
 }
 
 extern PyObject *sink_encoder_encode(PyObject *sink_encoder, PyObject *data)
@@ -238,7 +235,9 @@ extern long partition_function_partition_u64(PyObject *partition_function, PyObj
   Py_DECREF(pFunc);
 
   long rtn = PyInt_AsLong(pValue);
-  Py_DECREF(pValue);
+  if (pValue != NULL) {
+    Py_DECREF(pValue);
+  }
   return rtn;
 }
 

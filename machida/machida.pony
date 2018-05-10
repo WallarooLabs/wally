@@ -157,7 +157,10 @@ class PyStateBuilder
     Machida.get_name(_state_builder)
 
   fun apply(): PyState =>
-    PyState(@state_builder_build_state(_state_builder))
+    let py_state = @state_builder_build_state(_state_builder)
+    Machida.print_errors()
+    if py_state.is_null() then Fail() end
+    PyState(py_state)
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_state_builder)
@@ -329,7 +332,7 @@ class PyComputation is Computation[PyData val, PyData val]
     let r: Pointer[U8] val =
       Machida.computation_compute(_computation, input.obj(), _is_multi)
 
-    if not r.is_null() then
+    if not Machida.is_py_none(r) then
       Machida.process_computation_results(r, _is_multi)
     else
       None
@@ -409,14 +412,21 @@ class PyTCPEncoder is TCPSinkEncoder[PyData val]
 
   fun apply(data: PyData val, wb: Writer): Array[ByteSeq] val =>
     let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
-    if not byte_buffer.is_null() and not Machida.is_py_none(byte_buffer) then
-      let arr = recover val
-        // create a temporary Array[U8] wrapper for the C array, then clone it
-        Array[U8].from_cpointer(@PyString_AsString(byte_buffer),
-          @PyString_Size(byte_buffer)).clone()
+    if not Machida.is_py_none(byte_buffer) then
+      let byte_string = @PyString_AsString(byte_buffer)
+
+      if not byte_string.is_null() then
+        let arr = recover val
+          // create a temporary Array[U8] wrapper for the C array, then clone it
+          Array[U8].from_cpointer(@PyString_AsString(byte_buffer),
+            @PyString_Size(byte_buffer)).clone()
+        end
+        Machida.dec_ref(byte_buffer)
+        wb.write(arr)
+      else
+        Machida.print_errors()
+        Fail()
       end
-      Machida.dec_ref(byte_buffer)
-      wb.write(arr)
     end
     wb.done()
 
@@ -698,6 +708,7 @@ primitive Machida
   =>
     let r = @source_decoder_decode(source_decoder, data, size)
     print_errors()
+    if r.is_null() then Fail() end
     r
 
   fun sink_encoder_encode(sink_encoder: Pointer[U8] val, data: Pointer[U8] val):
@@ -705,6 +716,7 @@ primitive Machida
   =>
     let r = @sink_encoder_encode(sink_encoder, data)
     print_errors()
+    if r.is_null() then Fail() end
     r
 
   fun computation_compute(computation: Pointer[U8] val, data: Pointer[U8] val,
@@ -713,6 +725,7 @@ primitive Machida
     let method = if multi then "compute_multi" else "compute" end
     let r = @computation_compute(computation, data, method.cstring())
     print_errors()
+    if r.is_null() then Fail() end
     r
 
   fun stateful_computation_compute(computation: Pointer[U8] val,
@@ -722,7 +735,10 @@ primitive Machida
     let method = if multi then "compute_multi" else "compute" end
     let r =
       @stateful_computation_compute(computation, data, state, method.cstring())
+
     print_errors()
+    if r.is_null() then Fail() end
+
     let msg = @PyTuple_GetItem(r, 0)
     let persist = @PyTuple_GetItem(r, 1)
 
@@ -739,7 +755,10 @@ primitive Machida
     data: Pointer[U8] val): U64
   =>
     let r = @partition_function_partition_u64(partition_function, data)
-    print_errors()
+    if err_occurred() and (r == -1) then
+      print_errors()
+      Fail()
+    end
     r
 
   fun py_list_int_to_pony_array_u64(py_array: Pointer[U8] val):
@@ -771,6 +790,7 @@ primitive Machida
   =>
     let r = @partition_function_partition(partition_function, data)
     print_errors()
+    if r.is_null() then Fail() end
     r
 
   fun py_list_int_to_pony_array_pykey(py_array: Pointer[U8] val):
