@@ -54,13 +54,6 @@ class ApplicationBuilder(object):
                               state_name))
         return self
 
-    def to_state_partition_u64(self, computation, state_class, state_name,
-                               partition_function, partition_keys):
-        self._actions.append(("to_state_partition_u64", computation,
-                              StateBuilder(state_name, state_class),
-                              state_name, partition_function, partition_keys))
-        return self
-
     def to_state_partition(self, computation, state_class, state_name,
                            partition_function, partition_keys):
         self._actions.append(("to_state_partition", computation,
