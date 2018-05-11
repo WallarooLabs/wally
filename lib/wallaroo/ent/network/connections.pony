@@ -297,12 +297,12 @@ actor Connections is Cluster
       Fail()
     end
 
-  be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: StepId, key: K, state_name: String, exclusions: Array[String] val =
+  be notify_cluster_of_new_stateful_step(id: StepId, key: Key,
+    state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
   =>
     try
-      let new_step_msg = ChannelMsgEncoder.announce_new_stateful_step[K](id,
+      let new_step_msg = ChannelMsgEncoder.announce_new_stateful_step(id,
         _worker_name, key, state_name, _auth)?
       for (target, ch) in _control_conns.pairs() do
         // Only send to workers that don't already know about this step
@@ -572,7 +572,7 @@ actor Connections is Cluster
       boundary.quick_initialize(li)
     end
 
-  be create_routers_from_blueprints(
+  be create_routers_from_blueprints(workers: Array[String] val,
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
     omr_blueprint: OmniRouterBlueprint, local_sinks: Map[StepId, Consumer] val,
@@ -585,7 +585,7 @@ actor Connections is Cluster
     // We must create the omni_router first
     router_registry.create_omni_router_from_blueprint(omr_blueprint,
       local_sinks, lti)
-    router_registry.create_partition_routers_from_blueprints(
+    router_registry.create_partition_routers_from_blueprints(workers,
       pr_blueprints)
     router_registry.create_stateless_partition_routers_from_blueprints(
       spr_blueprints)

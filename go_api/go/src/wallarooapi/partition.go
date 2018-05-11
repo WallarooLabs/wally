@@ -6,25 +6,27 @@ import (
 )
 
 type PartitionFunction interface {
-	Partition(data interface{}) uint64
+	Partition(data interface{}) string
 }
 
-//export PartitionFunctionU64Partition
-func PartitionFunctionU64Partition(partitionFunctionId uint64, dataId uint64) uint64 {
+//export PartitionFunctionPartition
+func PartitionFunctionPartition(partitionFunctionId uint64, dataId uint64) *C.char {
 	partitionFunction := GetComponent(partitionFunctionId, PartitionFunctionTypeId).(PartitionFunction)
 	data := GetComponent(dataId, DataTypeId).(interface{})
-	return partitionFunction.Partition(data)
+	s := partitionFunction.Partition(data)
+	return C.CString(s)
 }
 
-//export PartitionListU64GetSize
-func PartitionListU64GetSize(partitionListId uint64) uint64 {
+//export PartitionListGetSize
+func PartitionListGetSize(partitionListId uint64) uint64 {
 	fmt.Printf("partitionListId = %d\n", partitionListId)
-	partitionList := GetComponent(partitionListId, PartitionListTypeId).([]uint64)
+	partitionList := GetComponent(partitionListId, PartitionListTypeId).([]string)
 	return uint64(len(partitionList))
 }
 
-//export PartitionListU64GetItem
-func PartitionListU64GetItem(partitionListId uint64, idx uint64) uint64 {
-	partitionList := GetComponent(partitionListId, PartitionListTypeId).([]uint64)
-	return partitionList[idx]
+//export PartitionListGetItem
+func PartitionListGetItem(partitionListId uint64, idx uint64) *C.char {
+	partitionList := GetComponent(partitionListId, PartitionListTypeId).([]string)
+	s := partitionList[idx]
+	return C.CString(s)
 }

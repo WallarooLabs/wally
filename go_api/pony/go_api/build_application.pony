@@ -199,10 +199,10 @@ class _StepInfo
 
   fun ref to_state_partition(
     computation: (StateComputation | StateComputationMulti),
-    state_builder: StateBuilder, name: String, partition: w.Partition[GoData, U64]):
+    state_builder: StateBuilder, name: String, partition: w.Partition[GoData]):
     PipelineBuilder[GoData, GoData, GoData]
   =>
-    _pipeline_builder.to_state_partition[GoData, U64, GoData, GoState](
+    _pipeline_builder.to_state_partition[GoData, GoData, GoState](
       computation, state_builder, name, partition)
 
   fun ref to_sink(sink_config: SinkConfig[GoData]) =>
@@ -219,14 +219,14 @@ class val _PipelineInfo
   let source_config: SourceConfig[GoData] val
   let computation_builders_map: Map[U64, String] val
   let state_computations_map: Map[U64, String] val
-  let partitions_map: Map[U64, w.Partition[GoData, U64]] val
+  let partitions_map: Map[U64, w.Partition[GoData]] val
   let connections: Array[_Connection] val
 
   new val create(name': String,
     source_config': SourceConfig[GoData] val,
     computation_builders_map': Map[U64, String] val,
     state_computations_map': Map[U64, String] val,
-    partitions_map': Map[U64, w.Partition[GoData, U64]] val,
+    partitions_map': Map[U64, w.Partition[GoData]] val,
     connections': Array[_Connection] val)
   =>
     name = name'
@@ -250,7 +250,7 @@ class val _PipelineInfo
     end
 
 primitive _Partition
-  fun from_json_ez_data(partition_j: JsonEzData): w.Partition[GoData, U64] ? =>
+  fun from_json_ez_data(partition_j: JsonEzData): w.Partition[GoData] ? =>
     let clz = partition_j("Class")?.string()?
     let pfid = partition_j("PartitionFunctionId")?.int()?.u64()
     let plid = partition_j("PartitionListId")?.int()?.u64()
@@ -258,8 +258,8 @@ primitive _Partition
 
     match clz
     | "PartitionU64" =>
-      w.Partition[GoData, U64](
-        PartitionFunctionU64(pfid), PartitionListU64(plid))
+      w.Partition[GoData](
+        PartitionFunction(pfid), PartitionList(plid))
     else
       error
     end
@@ -348,7 +348,7 @@ primitive BuildApplication
         let partitions_array = partitions.array()?
 
         let partitions_map =
-          recover trn Map[U64, w.Partition[GoData, U64]] end
+          recover trn Map[U64, w.Partition[GoData]] end
 
         for partition_json in partitions_array.values() do
           let pid = partition_json("PartitionId")?.int()?.u64()

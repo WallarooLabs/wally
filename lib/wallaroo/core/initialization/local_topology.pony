@@ -87,7 +87,9 @@ class val LocalTopology
     recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer tag]) ?
+    data_routes: Map[U128, Consumer tag],
+    keyed_data_routes: Map[Key, Step],
+    keyed_step_ids: Map[Key, StepId]) ?
   =>
     let subpartition =
       try
@@ -103,7 +105,7 @@ class val LocalTopology
         .cstring())
       state_map(state_name) = subpartition.build(_app_name, _worker_name,
          metrics_conn, auth, event_log, recovery_replayer, outgoing_boundaries,
-         initializables, data_routes)
+         initializables, data_routes, keyed_data_routes, keyed_step_ids)
     end
 
   fun graph(): Dag[StepInitializer] val => _graph
@@ -121,11 +123,10 @@ class val LocalTopology
 
   fun proxy_ids(): Map[String, U128] val => _proxy_ids
 
-  fun update_proxy_address_for_state_key[Key: (Hashable val &
-    Equatable[Key] val)](
-    state_name: String, key: Key, pa: ProxyAddress): LocalTopology ?
+  fun update_proxy_address_for_state_key(state_name: String, key: Key,
+    pa: ProxyAddress): LocalTopology ?
   =>
-    let new_subpartition = _state_builders(state_name)?.update_key[Key](key, pa)?
+    let new_subpartition = _state_builders(state_name)?.update_key(key, pa)?
     let new_state_builders = recover trn Map[String, StateSubpartition] end
     for (k, v) in _state_builders.pairs() do
       new_state_builders(k) = v
@@ -740,6 +741,14 @@ actor LocalTopologyInitializer is LayoutInitializer
         // DataRouter for the data channel boundary
         var data_routes = recover trn Map[U128, Consumer] end
 
+        let keyed_data_routes_ref = Map[Key, Step]
+
+        var keyed_data_routes = recover trn Map[Key, Step] end
+
+        let keyed_step_ids_ref = Map[Key, StepId]
+
+        var keyed_step_ids = recover trn Map[Key, StepId] end
+
         // Update the step ids for all OutgoingBoundaries
         if worker_count > 1 then
           _connections.update_boundary_ids(t.proxy_ids())
@@ -862,7 +871,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                     t.update_state_map(builder.state_name(), state_map,
                       _metrics_conn, _event_log, _recovery_replayer, _auth,
                       _outgoing_boundaries, _initializables,
-                      data_routes_ref)?
+                      data_routes_ref, keyed_data_routes_ref,
+                      keyed_step_ids_ref)?
                   else
                     @printf[I32]("Failed to update state_map\n".cstring())
                     error
@@ -1212,7 +1222,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                   t.update_state_map(source_data.state_name(), state_map,
                     _metrics_conn, _event_log, _recovery_replayer, _auth,
                     _outgoing_boundaries, _initializables,
-                    data_routes_ref)?
+                    data_routes_ref, keyed_data_routes_ref,
+                    keyed_step_ids_ref)?
                 else
                   @printf[I32]("Failed to update state map\n".cstring())
                   error
@@ -1340,7 +1351,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 t.update_state_map(psd.state_name(), state_map,
                   _metrics_conn, _event_log, _recovery_replayer, _auth,
                   _outgoing_boundaries, _initializables,
-                  data_routes_ref)?
+                  data_routes_ref, keyed_data_routes_ref,
+                  keyed_step_ids_ref)?
               else
                 @printf[I32]("Failed to update state map\n".cstring())
                 error
@@ -1387,7 +1399,16 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         let sendable_data_routes = consume val data_routes
 
-        let data_router = DataRouter(sendable_data_routes)
+        for (k, v) in keyed_data_routes_ref.pairs() do
+          keyed_data_routes(k) = v
+        end
+
+        for (k, v) in keyed_step_ids_ref.pairs() do
+          keyed_step_ids(k) = v
+        end
+
+        let data_router = DataRouter(sendable_data_routes,
+          consume keyed_data_routes, consume keyed_step_ids)
         _router_registry.set_data_router(data_router)
 
         if not _is_initializer then
@@ -1526,13 +1547,17 @@ actor LocalTopologyInitializer is LayoutInitializer
           end
         end
 
-        let data_router = DataRouter(consume data_routes)
+        // We have not yet been assigned any keys by the cluster at this
+        // stage, so we use an empty map to represent that.
+        let data_router = DataRouter(consume data_routes,
+          recover Map[Key, Step] end, recover Map[Key, StepId] end)
+
         _router_registry.set_data_router(data_router)
 
         _router_registry.register_boundaries(_outgoing_boundaries,
           _outgoing_boundary_builders)
 
-        _connections.create_routers_from_blueprints(
+        _connections.create_routers_from_blueprints(t.worker_names,
           _partition_router_blueprints,
           _stateless_partition_router_blueprints, _omni_router_blueprint,
           consume local_sinks, _router_registry, this)
@@ -1544,7 +1569,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         @printf[I32](("\n|^|^|^|Finished Initializing Joining Worker Local " +
           "Topology|^|^|^|\n").cstring())
-        @printf[I32]("---------------------------------------------------------\n".cstring())
+        @printf[I32](("-----------------------------------------------------" +
+          "----\n").cstring())
 
         @printf[I32]("***Successfully joined cluster!***\n".cstring())
       else
@@ -1554,12 +1580,11 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  be update_state_step_entry[Key: (Hashable val & Equatable[Key] val)](
-    state_name: String, key: Key, pa: ProxyAddress) =>
+  be update_state_step_entry(state_name: String, key: Key, pa: ProxyAddress) =>
     try
       match _topology
       | let t: LocalTopology =>
-        _topology = t.update_proxy_address_for_state_key[Key](state_name,
+        _topology = t.update_proxy_address_for_state_key(state_name,
           key, pa)?
         // TODO: We should find a way to batch changes before writing out.
         _save_local_topology()

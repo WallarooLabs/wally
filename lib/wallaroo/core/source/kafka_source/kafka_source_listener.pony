@@ -120,6 +120,7 @@ class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
 
 actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _env: Env
+  let _auth: AmbientAuth
   let _pipeline_name: String
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _notify: KafkaSourceListenerNotify[In]
@@ -139,8 +140,9 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   var _recovering: Bool
   let _rb: Reader = Reader
 
-  new create(env: Env, source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry, route_builder: RouteBuilder,
+  new create(env: Env, source_builder: SourceBuilder,
+    router: Router, router_registry: RouterRegistry,
+    route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
@@ -150,6 +152,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   =>
     _pipeline_name = pipeline_name
     _env = env
+    _auth = auth
     _event_log = event_log
     _notify = KafkaSourceListenerNotify[In](source_builder, event_log, auth,
       target_router)
@@ -231,7 +234,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
 
               let source_id = try _rb.u128_le()? else Fail(); 0 end
 
-              let source = KafkaSource[In](source_id, name, this,
+              let source = KafkaSource[In](source_id, _auth, name, this,
                 _notify.build_source(source_id, _env)?, _event_log,
                 _router.routes(), _route_builder, _outgoing_boundary_builders,
                 _layout_initializer, _metrics_reporter.clone(), topic, part_id,

@@ -71,9 +71,6 @@ use @source_decoder_decode[Pointer[U8] val](source_decoder: Pointer[U8] val,
 use @sink_encoder_encode[Pointer[U8] val](sink_encoder: Pointer[U8] val,
   data: Pointer[U8] val)
 
-use @partition_function_partition_u64[U64](partition_function: Pointer[U8] val,
-  data: Pointer[U8] val)
-
 use @partition_function_partition[Pointer[U8] val](
   partition_function: Pointer[U8] val, data: Pointer[U8] val)
 
@@ -168,64 +165,28 @@ class PyStateBuilder
   fun _final() =>
     Machida.dec_ref(_state_builder)
 
-class PyPartitionFunctionU64
-  var _partition_function: Pointer[U8] val
-
-  new create(partition_function: Pointer[U8] val) =>
-    _partition_function = partition_function
-
-  fun apply(data: PyData val): U64 =>
-    Machida.partition_function_partition_u64(_partition_function, data.obj())
-
-  fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_partition_function)
-
-  fun _serialise(bytes: Pointer[U8] tag) =>
-    Machida.user_serialization(_partition_function, bytes)
-
-  fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _partition_function = recover Machida.user_deserialization(bytes) end
-
-  fun _final() =>
-    Machida.dec_ref(_partition_function)
-
-class PyKey is (Hashable & Equatable[PyKey])
-  var _key: Pointer[U8] val
-
-  new create(key: Pointer[U8] val) =>
-    _key = key
-
-  fun obj(): Pointer[U8] val =>
-    _key
-
-  fun hash(): U64 =>
-    Machida.key_hash(obj())
-
-  fun eq(other: PyKey box): Bool =>
-    Machida.key_eq(obj(), other.obj())
-
-  fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_key)
-
-  fun _serialise(bytes: Pointer[U8] tag) =>
-    Machida.user_serialization(_key, bytes)
-
-  fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _key = recover Machida.user_deserialization(bytes) end
-
-  fun _final() =>
-    Machida.dec_ref(_key)
-
 class PyPartitionFunction
   var _partition_function: Pointer[U8] val
 
   new create(partition_function: Pointer[U8] val) =>
     _partition_function = partition_function
 
-  fun apply(data: PyData val): PyKey val =>
+  fun apply(data: PyData val): String =>
     recover
-      PyKey(Machida.partition_function_partition(_partition_function,
-        data.obj()))
+      let ps = Machida.partition_function_partition(_partition_function,
+        data.obj())
+      Machida.print_errors()
+
+      if ps.is_null() then
+        @printf[I32]("Error in partition function".cstring())
+        Fail()
+      end
+
+      let ret = String.copy_cstring(@PyString_AsString(ps))
+
+      Machida.dec_ref(ps)
+
+      ret
     end
 
   fun _serialise_space(): USize =>
@@ -596,37 +557,6 @@ primitive Machida
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_stateful[PyData val, PyState](state_computation,
           state_builder, state_name)
-      | "to_state_partition_u64" =>
-        let state_computationp = @PyTuple_GetItem(item, 1)
-        Machida.inc_ref(state_computationp)
-        let state_computation = recover val
-          PyStateComputation(state_computationp)
-        end
-
-        let state_builderp = @PyTuple_GetItem(item, 2)
-        Machida.inc_ref(state_builderp)
-        let state_builder = recover val
-          PyStateBuilder(state_builderp)
-        end
-
-        let state_name = recover val
-          String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(item, 3)))
-        end
-
-        let partition_functionp = @PyTuple_GetItem(item, 4)
-        Machida.inc_ref(partition_functionp)
-        let partition_function = recover val
-          PyPartitionFunctionU64(partition_functionp)
-        end
-
-        let partition_values = Machida.py_list_int_to_pony_array_u64(
-          @PyTuple_GetItem(item, 5))
-
-        let partition = Partition[PyData val, U64](partition_function,
-          partition_values)
-        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.to_state_partition[PyData val, U64, PyData val, PyState](
-          state_computation, state_builder, state_name, partition)
       | "to_state_partition" =>
         let state_computationp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(state_computationp)
@@ -650,13 +580,13 @@ primitive Machida
           PyPartitionFunction(partition_functionp)
         end
 
-        let partition_values = Machida.py_list_int_to_pony_array_pykey(
+        let partition_values = Machida.py_list_to_pony_array_string(
           @PyTuple_GetItem(item, 5))
 
-        let partition = Partition[PyData val, PyKey val](partition_function,
+        let partition = Partition[PyData val](partition_function,
           partition_values)
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.to_state_partition[PyData val, PyKey val, PyData val, PyState](
+        latest = pb.to_state_partition[PyData val, PyData val, PyState](
           state_computation, state_builder, state_name, partition)
       | "to_sink" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
@@ -751,27 +681,6 @@ primitive Machida
 
     rt
 
-  fun partition_function_partition_u64(partition_function: Pointer[U8] val,
-    data: Pointer[U8] val): U64
-  =>
-    let r = @partition_function_partition_u64(partition_function, data)
-    print_errors()
-    r
-
-  fun py_list_int_to_pony_array_u64(py_array: Pointer[U8] val):
-    Array[U64] val
-  =>
-    let size = @PyList_Size(py_array)
-    let arr = recover iso Array[U64](size) end
-
-    for i in Range(0, size) do
-      let obj = @PyList_GetItem(py_array, i)
-      let v = @PyInt_AsLong(obj)
-      arr.push(v.u64())
-    end
-
-    consume arr
-
   fun key_hash(key: Pointer[U8] val): U64 =>
     let r = @key_hash(key)
     print_errors()
@@ -789,16 +698,17 @@ primitive Machida
     print_errors()
     r
 
-  fun py_list_int_to_pony_array_pykey(py_array: Pointer[U8] val):
-    Array[PyKey val] val
+  fun py_list_to_pony_array_string(py_array: Pointer[U8] val):
+    Array[String] val
   =>
     let size = @PyList_Size(py_array)
-    let arr = recover iso Array[PyKey val](size) end
+    let arr = recover iso Array[String](size) end
 
     for i in Range(0, size) do
-      let obj = @PyList_GetItem(py_array, i)
-      Machida.inc_ref(obj)
-      arr.push(recover val PyKey(obj) end)
+      let ps = @PyList_GetItem(py_array, i)
+      arr.push(recover
+        String.copy_cstring(@PyString_AsString(ps))
+      end)
     end
 
     consume arr

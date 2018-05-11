@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "buffered"
 use "serialise"
 use "wallaroo_labs/mort"
+use "wallaroo/core/common"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 
@@ -58,28 +59,28 @@ class U64CounterStateChangeBuilder is StateChangeBuilder[U64Counter]
     U64CounterStateChange(id)
 
 primitive PowersOfTwoPartitionFunction
-  fun apply(input: U64): U64 =>
-    input.next_pow2()
+  fun apply(input: U64): Key =>
+    (input.next_pow2()).string()
 
 primitive PowersOfTwoPartitionFunction2
-  fun apply(input: U64): U64 =>
-    input.next_pow2()
+  fun apply(input: U64): Key =>
+    (input.next_pow2()).string()
 
 primitive Mod6PartitionFunction
-  fun apply(input: U64): U64 =>
-    input % 6
+  fun apply(input: U64): Key =>
+    (input % 6).string()
 
 primitive Mod3PartitionFunction
-  fun apply(input: U64): U64 =>
-    input % 3
+  fun apply(input: U64): Key =>
+    (input % 3).string()
 
 primitive Mod6CountMaxPartitionFunction
-  fun apply(cm: CountMax): U64 =>
-    cm.max.u64() % 6
+  fun apply(cm: CountMax): Key =>
+    (cm.max.u64() % 6).string()
 
 primitive CountMaxMod6PartitionFunction
-  fun apply(input: CountMax): U64 =>
-    input.max % 6
+  fun apply(input: CountMax): Key =>
+    (input.max % 6).string()
 
 primitive UpdateU64Counter is StateComputation[U64, U64, U64Counter]
   fun name(): String => "Update U64 Counter"

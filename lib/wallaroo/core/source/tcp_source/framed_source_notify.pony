@@ -47,6 +47,7 @@ primitive TCPFramedSourceNotifyBuilder[In: Any val]
 class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _source_id: StepId
   let _env: Env
+  let _auth: AmbientAuth
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
   var _header: Bool = true
   let _pipeline_name: String
@@ -69,6 +70,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
     _env = env
+    _auth = auth
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
       target_router, pre_state_target_ids)
@@ -164,7 +166,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
     match _router
     | let p_router: PartitionRouter =>
-      _router = p_router.update_boundaries(obs)
+      _router = p_router.update_boundaries(_auth, obs)
     else
       ifdef "trace" then
         @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +

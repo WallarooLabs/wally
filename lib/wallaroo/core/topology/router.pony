@@ -17,7 +17,9 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "crypto"
 use "net"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/equality"
 use "wallaroo_labs/mort"
 use "wallaroo/core/boundary"
@@ -237,6 +239,7 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
         this
       end
     else
+      Fail()
       this
     end
 
@@ -799,42 +802,70 @@ class val StepIdRouterBlueprint is OmniRouterBlueprint
 
 class val DataRouter is Equatable[DataRouter]
   let _data_routes: Map[StepId, Consumer] val
+  // _keyed_routes contains a subset of the routes in _data_routes.
+  // _keyed_routes keeps track of state step routes, while
+  // _data_routes keeps track of *all* routes.
+  let _keyed_routes: Map[Key, Step] val
+  let _keyed_step_ids: Map[Key, StepId] val
   let _target_ids_to_route_ids: Map[StepId, RouteId] val
   let _route_ids_to_target_ids: Map[RouteId, StepId] val
+  let _keys_to_route_ids: Map[Key, RouteId] val
 
-  new val create(data_routes: Map[StepId, Consumer] val =
-      recover Map[StepId, Consumer] end)
+  new val create(data_routes: Map[StepId, Consumer] val,
+    keyed_routes: Map[Key, Step] val, keyed_step_ids: Map[Key, StepId] val)
   =>
     _data_routes = data_routes
+    _keyed_routes = keyed_routes
+    _keyed_step_ids = keyed_step_ids
+
     var route_id: RouteId = 0
-    let keys: Array[StepId] = keys.create()
+    let ids: Array[StepId] = ids.create()
     let tid_map = recover trn Map[StepId, RouteId] end
     let rid_map = recover trn Map[RouteId, StepId] end
+
     for step_id in _data_routes.keys() do
-      keys.push(step_id)
+      ids.push(step_id)
     end
-    for key in Sort[Array[StepId], StepId](keys).values() do
+    for id in Sort[Array[StepId], StepId](ids).values() do
       route_id = route_id + 1
-      tid_map(key) = route_id
+      tid_map(id) = route_id
     end
     for (t_id, r_id) in tid_map.pairs() do
       rid_map(r_id) = t_id
     end
+
     _target_ids_to_route_ids = consume tid_map
     _route_ids_to_target_ids = consume rid_map
 
+    let kid_map = recover trn Map[Key, RouteId] end
+    for (k, s_id) in _keyed_step_ids.pairs() do
+      try
+        let r_id = _target_ids_to_route_ids(s_id)?
+        kid_map(k) = r_id
+      else
+        Fail()
+      end
+    end
+    _keys_to_route_ids = consume kid_map
+
   new val with_route_ids(data_routes: Map[StepId, Consumer] val,
+    keyed_routes: Map[Key, Step] val,
+    keyed_step_ids: Map[Key, StepId] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, StepId] val)
+    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    keys_to_route_ids: Map[Key, RouteId] val)
   =>
     _data_routes = data_routes
+    _keyed_routes = keyed_routes
+    _keyed_step_ids = keyed_step_ids
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
+    _keys_to_route_ids = keys_to_route_ids
 
   fun size(): USize =>
     _data_routes.size()
 
-  fun step_for_id(id: U128): Consumer ? =>
+  fun step_for_id(id: StepId): Consumer ? =>
     _data_routes(id)?
 
   fun route(d_msg: DeliveryMsg, pipeline_time_spent: U64, producer_id: StepId,
@@ -844,23 +875,20 @@ class val DataRouter is Equatable[DataRouter]
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataRouter\n".cstring())
     end
-    let target_id = d_msg.target_id()
     try
-      let target = _data_routes(target_id)?
       ifdef "trace" then
         @printf[I32]("DataRouter found Step\n".cstring())
       end
-      try
-        let route_id = _target_ids_to_route_ids(target_id)?
-        d_msg.deliver(pipeline_time_spent, target, producer_id, producer,
-          seq_id, route_id, latest_ts, metrics_id, worker_ingress_ts)
-        ifdef "resilience" then
-          producer.bookkeeping(route_id, seq_id)
-        end
-      else
-        // This shouldn't happen. If we have a route, we should have a route
-        // id.
-        Fail()
+      let route_id = d_msg.deliver(pipeline_time_spent, producer_id, producer,
+        seq_id, latest_ts, metrics_id, worker_ingress_ts,
+        _data_routes,
+        _target_ids_to_route_ids,
+        _route_ids_to_target_ids,
+        _keyed_routes,
+        _keys_to_route_ids
+         )?
+      ifdef "resilience" then
+        producer.bookkeeping(route_id, seq_id)
       end
     else
       Fail()
@@ -871,12 +899,10 @@ class val DataRouter is Equatable[DataRouter]
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     try
-      let target_id = r_msg.target_id()
-      let route_id = _target_ids_to_route_ids(target_id)?
-      //TODO: create and deliver envelope
-      r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id)?,
-        producer_id, producer, seq_id, route_id, latest_ts, metrics_id,
-        worker_ingress_ts)
+      let route_id = r_msg.replay_deliver(pipeline_time_spent,
+        _data_routes, _target_ids_to_route_ids,
+        producer_id, producer, seq_id, latest_ts, metrics_id,
+        worker_ingress_ts, _keyed_routes, _keys_to_route_ids)?
       ifdef "resilience" then
         producer.bookkeeping(route_id, seq_id)
       end
@@ -921,15 +947,31 @@ class val DataRouter is Equatable[DataRouter]
     for step in _data_routes.values() do
       rs.push(step)
     end
+
     consume rs
 
-  fun remove_route(id: U128): DataRouter =>
+  fun remove_keyed_route(id: StepId, key: Key): DataRouter =>
+    ifdef debug then
+      Invariant(_data_routes.contains(id) and _keyed_routes.contains(key))
+    end
+
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
     let new_data_routes = recover trn Map[StepId, Consumer] end
     for (k, v) in _data_routes.pairs() do
       if k != id then new_data_routes(k) = v end
     end
+    let new_keyed_routes = recover trn Map[Key, Step] end
+
+    for (k, v) in _keyed_routes.pairs() do
+      if k != key then new_keyed_routes(k) = v end
+    end
+
+    let new_keyed_step_ids = recover trn Map[Key, StepId] end
+    for (k, v) in _keyed_step_ids.pairs() do
+      if k != key then new_keyed_step_ids(k) = v end
+    end
+
     let new_tid_map = recover trn Map[StepId, RouteId] end
     for (k, v) in _target_ids_to_route_ids.pairs() do
       if k != id then new_tid_map(k) = v end
@@ -938,10 +980,15 @@ class val DataRouter is Equatable[DataRouter]
     for (k, v) in _route_ids_to_target_ids.pairs() do
       if v != id then new_rid_map(k) = v end
     end
+    let new_kid_map = recover trn Map[Key, RouteId] end
+    for (k, v) in _keys_to_route_ids.pairs() do
+      if k != key then new_kid_map(k) = v end
+    end
     DataRouter.with_route_ids(consume new_data_routes,
-      consume new_tid_map, consume new_rid_map)
+      consume new_keyed_routes, consume new_keyed_step_ids,
+      consume new_tid_map, consume new_rid_map, consume new_kid_map)
 
-  fun add_route(id: StepId, target: Consumer): DataRouter =>
+  fun add_keyed_route(id: StepId, key: Key, target: Step): DataRouter =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
     let new_data_routes = recover trn Map[StepId, Consumer] end
@@ -949,6 +996,19 @@ class val DataRouter is Equatable[DataRouter]
       new_data_routes(k) = v
     end
     new_data_routes(id) = target
+
+    let new_keyed_routes = recover trn Map[Key, Step] end
+
+    for (k, v) in _keyed_routes.pairs() do
+      new_keyed_routes(k) = v
+    end
+    new_keyed_routes(key) = target
+
+    let new_keyed_step_ids = recover trn Map[Key, StepId] end
+    for (k, v) in _keyed_step_ids.pairs() do
+      new_keyed_step_ids(k) = v
+    end
+    new_keyed_step_ids(key) = id
 
     let new_tid_map = recover trn Map[StepId, RouteId] end
     var highest_route_id: RouteId = 0
@@ -965,8 +1025,15 @@ class val DataRouter is Equatable[DataRouter]
     end
     new_rid_map(new_route_id) = id
 
+    let new_kid_map = recover trn Map[Key, RouteId] end
+    for (k, v) in _keys_to_route_ids.pairs() do
+      new_kid_map(k) = v
+    end
+    new_kid_map(key) = new_route_id
+
     DataRouter.with_route_ids(consume new_data_routes,
-      consume new_tid_map, consume new_rid_map)
+      consume new_keyed_routes, consume new_keyed_step_ids,
+      consume new_tid_map, consume new_rid_map, consume new_kid_map)
 
   fun remove_routes_to_consumer(c: Consumer) =>
     """
@@ -1039,60 +1106,61 @@ class val DataRouter is Equatable[DataRouter]
 
 trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun state_name(): String
-  fun local_map(): Map[StepId, Step] val
   fun register_routes(router: Router, route_builder': RouteBuilder)
-  fun update_route[K: (Hashable val & Equatable[K] val)](
-    raw_k: K, target: (Step | ProxyRouter)): PartitionRouter ?
-  fun rebalance_steps_grow(
+  fun update_route(step_id: StepId, key: Key, step: Step): PartitionRouter ?
+  fun rebalance_steps_grow(auth: AmbientAuth,
     target_workers: Array[(String, OutgoingBoundary)] val,
-    worker_count: USize, state_name': String,
-    router_registry: RouterRegistry ref)
+    router_registry: RouterRegistry ref): PartitionRouter
   fun rebalance_steps_shrink(
     target_workers: Array[(String, OutgoingBoundary)] val,
-    state_name': String, router_registry: RouterRegistry ref)
-  // Total number of steps in partition
-  fun size(): USize
+    leaving_workers: Array[String] val,
+    router_registry: RouterRegistry ref)
+  fun recalculate_hash_partitions_for_join(auth: AmbientAuth,
+    joining_workers: Array[String] val,
+    outgoing_boundaries: Map[String, OutgoingBoundary]): PartitionRouter
+  fun recalculate_hash_partitions_for_shrink(
+    leaving_workers: Array[String] val): PartitionRouter
+  fun hash_partitions(): HashPartitions
+  fun update_hash_partitions(hp: HashPartitions): PartitionRouter
   // Number of local steps in partition
   fun local_size(): USize
-  fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
-    PartitionRouter
+  fun update_boundaries(auth: AmbientAuth,
+    ob: box->Map[String, OutgoingBoundary]): PartitionRouter
   fun blueprint(): PartitionRouterBlueprint
   fun distribution_digest(): Map[String, Array[String] val] val
   fun route_builder(): RouteBuilder
 
-trait val AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)]
-  is PartitionRouter
+trait val AugmentablePartitionRouter is PartitionRouter
   fun clone_and_set_input_type[NewIn: Any val](
-    new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter
+    new_p_function: PartitionFunction[NewIn] val): PartitionRouter
 
-class val LocalPartitionRouter[In: Any val,
-  Key: (Hashable val & Equatable[Key] val), S: State ref]
-  is AugmentablePartitionRouter[Key]
+class val LocalPartitionRouter[In: Any val, S: State ref]
+  is AugmentablePartitionRouter
   let _state_name: String
   let _worker_name: String
-  let _local_map: Map[StepId, Step] val
+  let _local_routes: Map[Key, Step] val
   let _step_ids: Map[Key, StepId] val
-  let _partition_routes: Map[Key, (Step | ProxyRouter)] val
-  let _partition_function: PartitionFunction[In, Key] val
+  let _hashed_node_routes: Map[String, HashedProxyRouter] val
+  let _hash_partitions: HashPartitions
+  let _partition_function: PartitionFunction[In] val
 
   new val create(state_name': String, worker_name: String,
-    local_map': Map[StepId, Step] val,
+    local_routes': Map[Key, Step] val,
     s_ids: Map[Key, StepId] val,
-    partition_routes: Map[Key, (Step | ProxyRouter)] val,
-    partition_function: PartitionFunction[In, Key] val)
+    hashed_node_routes: Map[String, HashedProxyRouter] val,
+    hash_partitions': HashPartitions,
+    partition_function: PartitionFunction[In] val)
   =>
     _state_name = state_name'
     _worker_name = worker_name
-    _local_map = local_map'
+    _local_routes = local_routes'
     _step_ids = s_ids
-    _partition_routes = partition_routes
+    _hashed_node_routes = hashed_node_routes
+    _hash_partitions = hash_partitions'
     _partition_function = partition_function
 
-  fun size(): USize =>
-    _partition_routes.size()
-
   fun local_size(): USize =>
-    _local_map.size()
+    _local_routes.size()
 
   fun state_name(): String =>
     _state_name
@@ -1115,9 +1183,20 @@ class val LocalPartitionRouter[In: Any val,
       match iw.input()
       | let input: In =>
         let key = _partition_function(input)
-        try
-          match _partition_routes(key)?
-          | let s: Step =>
+        let worker =
+          try
+            _hash_partitions.get_claimant_by_key(key)?
+          else
+            //!@ We should be creating new steps for unseen keys now
+            ifdef debug then
+              @printf[I32](("LocalPartitionRouter.route: No entry for " +
+              "key %s\n\n").cstring(), key.string().cstring())
+            end
+            return (true, latest_ts)
+          end
+        if worker == _worker_name then
+          try
+            let s = _local_routes(key)?
             let might_be_route = producer.route_to(s)
             match might_be_route
             | let r: Route =>
@@ -1133,23 +1212,26 @@ class val LocalPartitionRouter[In: Any val,
               Fail()
               (true, latest_ts)
             end
-          | let p: ProxyRouter =>
-            p.route[D](metric_name, pipeline_time_spent, data, producer_id,
-              producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
-              worker_ingress_ts)
+          else
+            // We should always have a local route if we know the key
+            // already and we claim it.
+            Fail()
+            (true, latest_ts)
           end
         else
-          ifdef debug then
-            match key
-            | let k: Stringable val =>
-              @printf[I32](("LocalPartitionRouter.route: No entry for " +
-              "key %s\n\n").cstring(), k.string().cstring())
-            else
-              @printf[I32](("LocalPartitionRouter.route: No entry for " +
-              "this key\n\n").cstring())
-            end
+          try
+            let r = _hashed_node_routes(worker)?
+            let msg = r.build_msg[D](metric_name, pipeline_time_spent, data,
+              key, producer_id, producer, i_msg_uid, frac_ids, latest_ts,
+              metrics_id, worker_ingress_ts)
+            r.route[ForwardHashedMsg[D]](metric_name, pipeline_time_spent, msg,
+              producer_id, producer, i_msg_uid, frac_ids, latest_ts,
+              metrics_id, worker_ingress_ts)
+          else
+            // We should have a route to any claimant we know about
+            Fail()
+            (true, latest_ts)
           end
-          (true, latest_ts)
         end
       else
         // InputWrapper doesn't wrap In
@@ -1166,27 +1248,22 @@ class val LocalPartitionRouter[In: Any val,
     end
 
   fun clone_and_set_input_type[NewIn: Any val](
-    new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter
+    new_p_function: PartitionFunction[NewIn] val): PartitionRouter
   =>
-    LocalPartitionRouter[NewIn, Key, S](_state_name, _worker_name,
-      _local_map, _step_ids, _partition_routes, new_p_function)
+    LocalPartitionRouter[NewIn, S](_state_name, _worker_name,
+      _local_routes, _step_ids, _hashed_node_routes, _hash_partitions,
+      new_p_function)
 
   fun register_routes(router: Router, route_builder': RouteBuilder) =>
-    for r in _partition_routes.values() do
-      match r
-      | let step: Step =>
-        step.register_routes(router, route_builder')
-      end
+    for step in _local_routes.values() do
+      step.register_routes(router, route_builder')
     end
 
   fun routes(): Array[Consumer] val =>
     let cs = recover trn Array[Consumer] end
 
-    for s in _partition_routes.values() do
-      match s
-      | let step: Step =>
-        cs.push(step)
-      end
+    for step in _local_routes.values() do
+      cs.push(step)
     end
 
     consume cs
@@ -1199,146 +1276,235 @@ class val LocalPartitionRouter[In: Any val,
     end
     consume diff
 
-  fun local_map(): Map[StepId, Step] val => _local_map
-
-  fun update_route[K: (Hashable val & Equatable[K] val)](
-    raw_k: K, target: (Step | ProxyRouter)): PartitionRouter ?
+  fun update_route(step_id: StepId, key: Key, step: Step): PartitionRouter
   =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
-    match raw_k
-    | let key: Key =>
-      let target_id = _step_ids(key)?
-      let new_local_map = recover trn Map[StepId, Step] end
-      let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
-      match target
-      | let step: Step =>
-        for (id, s) in _local_map.pairs() do
-          new_local_map(id) = s
-        end
-        new_local_map(target_id) = step
-        for (k, t) in _partition_routes.pairs() do
-          if k == key then
-            new_partition_routes(k) = target
-          else
-            new_partition_routes(k) = t
-          end
-        end
-        LocalPartitionRouter[In, Key, S](_state_name, _worker_name,
-          consume new_local_map, _step_ids, consume new_partition_routes,
-          _partition_function)
-      | let proxy_router: ProxyRouter =>
-        for (id, s) in _local_map.pairs() do
-          if id != target_id then new_local_map(id) = s end
-        end
-        for (k, t) in _partition_routes.pairs() do
-          if k == key then
-            new_partition_routes(k) = target
-          else
-            new_partition_routes(k) = t
-          end
-        end
-        LocalPartitionRouter[In, Key, S](_state_name, _worker_name,
-          consume new_local_map, _step_ids, consume new_partition_routes,
-          _partition_function)
-      end
-    else
-      error
+    let new_local_routes = recover trn Map[Key, Step] end
+    let new_local_step_ids = recover trn Map[Key, StepId] end
+
+    for (k, s) in _local_routes.pairs() do
+      new_local_routes(k) = s
+    end
+    new_local_routes(key) = step
+
+    for (k, s_id) in _step_ids.pairs() do
+      new_local_step_ids(k) = s_id
+    end
+    new_local_step_ids(key) = step_id
+
+    LocalPartitionRouter[In, S](_state_name, _worker_name,
+      consume new_local_routes, consume new_local_step_ids,
+      _hashed_node_routes, _hash_partitions, _partition_function)
+
+  fun update_boundaries(auth: AmbientAuth,
+    ob: box->Map[String, OutgoingBoundary]): PartitionRouter
+  =>
+    let new_hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
+
+    for (w, hpr) in _hashed_node_routes.pairs() do
+      new_hashed_node_routes(w) = hpr
+    end
+    for (w, b) in ob.pairs() do
+      new_hashed_node_routes(w) = HashedProxyRouter(w, b, _state_name, auth)
     end
 
-  fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
-    PartitionRouter
+    LocalPartitionRouter[In, S](_state_name, _worker_name, _local_routes,
+      _step_ids, consume new_hashed_node_routes, _hash_partitions,
+      _partition_function)
+
+  fun recalculate_hash_partitions_for_join(auth: AmbientAuth,
+    joining_workers: Array[String] val,
+    outgoing_boundaries: Map[String, OutgoingBoundary]): PartitionRouter
   =>
-    let new_partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
-    for (k, target) in _partition_routes.pairs() do
-      match target
-      | let pr: ProxyRouter =>
-        new_partition_routes(k) = pr.update_boundary(ob)
+    let new_hash_partitions =
+      try
+        _hash_partitions.add_claimants(joining_workers)?
       else
-        new_partition_routes(k) = target
+        Fail()
+        _hash_partitions
+      end
+    let new_hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
+    for (w, pr) in _hashed_node_routes.pairs() do
+      new_hashed_node_routes(w) = pr
+    end
+    for w in joining_workers.values() do
+      try
+        let b = outgoing_boundaries(w)?
+        new_hashed_node_routes(w) = HashedProxyRouter(w, b, _state_name, auth)
+      else
+        Fail()
       end
     end
-    LocalPartitionRouter[In, Key, S](_state_name, _worker_name, _local_map,
-      _step_ids, consume new_partition_routes, _partition_function)
 
-  fun rebalance_steps_grow(
+    LocalPartitionRouter[In, S](_state_name, _worker_name, _local_routes,
+      _step_ids, consume new_hashed_node_routes, new_hash_partitions,
+      _partition_function)
+
+  fun recalculate_hash_partitions_for_shrink(
+    leaving_workers: Array[String] val): PartitionRouter
+  =>
+    let new_hash_partitions =
+      try
+        _hash_partitions.remove_claimants(leaving_workers)?
+      else
+        Fail()
+        _hash_partitions
+      end
+    let new_hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
+    for (w, pr) in _hashed_node_routes.pairs() do
+      if not ArrayHelpers[String].contains[String](leaving_workers, w) then
+        new_hashed_node_routes(w) = pr
+      end
+    end
+
+    LocalPartitionRouter[In, S](_state_name, _worker_name, _local_routes,
+      _step_ids, consume new_hashed_node_routes, new_hash_partitions,
+      _partition_function)
+
+  fun hash_partitions(): HashPartitions =>
+    _hash_partitions
+
+  fun update_hash_partitions(hp: HashPartitions): PartitionRouter =>
+    LocalPartitionRouter[In, S](_state_name, _worker_name, _local_routes,
+      _step_ids, _hashed_node_routes, hp, _partition_function)
+
+  fun rebalance_steps_grow(auth: AmbientAuth,
     target_workers: Array[(String, OutgoingBoundary)] val,
-    worker_count: USize, state_name': String,
-    router_registry: RouterRegistry ref)
+    router_registry: RouterRegistry ref): LocalPartitionRouter[In, S]
   =>
-    let joining_worker_count = target_workers.size()
-    let former_worker_count = worker_count - joining_worker_count
-    (let total_to_send, let to_send_counts) =
-      PartitionRebalancer.step_counts_to_send(size(), _local_map.size(),
-        former_worker_count, joining_worker_count)
+    let new_workers_trn = recover trn Array[String] end
+    let new_boundaries = Map[String, OutgoingBoundary]
+    let keys_to_move = Array[Key]
+    let keys_to_move_by_worker = Map[String, Array[Key]]
+    for (w, b) in target_workers.values() do
+      new_workers_trn.push(w)
+      new_boundaries(w) = b
+      keys_to_move_by_worker(w) = Array[Key]
+    end
+    let new_workers = consume val new_workers_trn
 
-    let steps_to_migrate' = steps_to_migrate(total_to_send, to_send_counts,
-      target_workers)
+    let new_hash_partitions =
+      try
+        _hash_partitions.add_claimants(new_workers)?
+      else
+        Fail()
+        _hash_partitions
+      end
 
-    migrate_steps(state_name', router_registry, steps_to_migrate',
-      target_workers.size())
-
-  fun rebalance_steps_shrink(
-    target_workers: Array[(String, OutgoingBoundary)] val,
-    state_name': String,
-    router_registry: RouterRegistry ref)
-  =>
-    let total_to_send = _local_map.size()
-    let to_send_counts =
-      PartitionRebalancer.step_counts_to_send_on_leaving(total_to_send,
-        target_workers.size())
-
-    let steps_to_migrate' = steps_to_migrate(total_to_send, to_send_counts,
-      target_workers)
-
-    migrate_steps(state_name', router_registry, steps_to_migrate',
-      target_workers.size())
-
-  fun steps_to_migrate(total_to_send: USize, to_send_counts: Array[USize] val,
-    target_workers: Array[(String, OutgoingBoundary)] val):
-    Array[(String, OutgoingBoundary, Key, U128, Step)]
-  =>
-    let steps_to_migrate' = Array[(String, OutgoingBoundary, Key, U128, Step)]
-    var left_to_send = total_to_send
-
+    // Determine the steps we need to migrate
     try
-      var worker_idx: USize = 0
-      var left_to_send_to_worker: USize =
-        try to_send_counts(worker_idx)? else Fail(); 0 end
-      if left_to_send > 0 then
-        for (key, target) in _partition_routes.pairs() do
-          if left_to_send == 0 then break end
-          if left_to_send_to_worker == 0 then
-            worker_idx = worker_idx + 1
-            left_to_send_to_worker =
-              try to_send_counts(worker_idx)? else Fail(); 0 end
-          end
-          match target
-          | let s: Step =>
-            let step_id = _step_ids(key)?
-            (let next_worker, let next_boundary) = target_workers(worker_idx)?
-            steps_to_migrate'.push((next_worker, next_boundary, key, step_id,
-              s))
-            left_to_send = left_to_send - 1
-            left_to_send_to_worker = left_to_send_to_worker - 1
+      for k in _local_routes.keys() do
+        let c = new_hash_partitions.get_claimant_by_key(k)?
+        if ArrayHelpers[String].contains[String](new_workers, c) then
+          try
+            keys_to_move.push(k)
+            keys_to_move_by_worker(c)?.push(k)
+          else
+            Fail()
           end
         end
-        if left_to_send > 0 then Fail() end
-      else
-        // There is nothing to send over.
-        None
-      end
-      ifdef debug then
-        Invariant(left_to_send == 0)
       end
     else
       Fail()
     end
-    steps_to_migrate'
+    let steps_to_migrate = Array[(String, OutgoingBoundary, Key, StepId, Step)]
+    for (w, ks) in keys_to_move_by_worker.pairs() do
+      for k in ks.values() do
+        try
+          let boundary = new_boundaries(w)?
+          let step_id = _step_ids(k)?
+          let step = _local_routes(k)?
+          steps_to_migrate.push((w, boundary, k, step_id, step))
+        else
+          Fail()
+        end
+      end
+    end
 
-  fun migrate_steps(state_name': String,
-    router_registry: RouterRegistry ref,
-    steps_to_migrate': Array[(String, OutgoingBoundary, Key, U128, Step)],
+    // Update routes and step ids for the new PartitionRouter we will return
+    let new_local_routes = recover trn Map[Key, Step] end
+    let new_step_ids = recover trn Map[Key, StepId] end
+    let new_hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
+    for (k, s) in _local_routes.pairs() do
+      if not keys_to_move.contains(k) then
+        new_local_routes(k) = s
+      end
+    end
+    for (k, s_id) in _step_ids.pairs() do
+      if not keys_to_move.contains(k) then
+        new_step_ids(k) = s_id
+      end
+    end
+    for (w, pr) in _hashed_node_routes.pairs() do
+      new_hashed_node_routes(w) = pr
+    end
+    for (w, b) in new_boundaries.pairs() do
+      new_hashed_node_routes(w) = HashedProxyRouter(w, b, _state_name, auth)
+    end
+
+    // Actually initiate migration of steps
+    migrate_steps(router_registry, steps_to_migrate, target_workers.size())
+
+    // Return the new PartitionRouter
+    LocalPartitionRouter[In, S](_state_name, _worker_name,
+      consume new_local_routes, consume new_step_ids,
+      consume new_hashed_node_routes, new_hash_partitions, _partition_function)
+
+  fun rebalance_steps_shrink(
+    target_workers: Array[(String, OutgoingBoundary)] val,
+    leaving_workers: Array[String] val,
+    router_registry: RouterRegistry ref)
+  =>
+    let remaining_workers_trn = recover trn Array[String] end
+    let remaining_boundaries = Map[String, OutgoingBoundary]
+    let keys_to_move = Map[String, Array[Key]]
+    for (w, b) in target_workers.values() do
+      remaining_workers_trn.push(w)
+      remaining_boundaries(w) = b
+      keys_to_move(w) = Array[Key]
+    end
+    let remaining_workers = consume val remaining_workers_trn
+
+    let new_hash_partitions =
+      try
+        _hash_partitions.remove_claimants(leaving_workers)?
+      else
+        Fail()
+        _hash_partitions
+      end
+
+    try
+      for k in _local_routes.keys() do
+        let c = new_hash_partitions.get_claimant_by_key(k)?
+        if ArrayHelpers[String].contains[String](remaining_workers, c) then
+          try
+            keys_to_move(c)?.push(k)
+          else
+            Fail()
+          end
+        end
+      end
+    else
+      Fail()
+    end
+    let steps_to_migrate = Array[(String, OutgoingBoundary, Key, StepId, Step)]
+    for (w, ks) in keys_to_move.pairs() do
+      for k in ks.values() do
+        try
+          let boundary = remaining_boundaries(w)?
+          let step_id = _step_ids(k)?
+          let step = _local_routes(k)?
+          steps_to_migrate.push((w, boundary, k, step_id, step))
+        else
+          Fail()
+        end
+      end
+    end
+    migrate_steps(router_registry, steps_to_migrate, target_workers.size())
+
+  fun migrate_steps(router_registry: RouterRegistry ref,
+    steps_to_migrate': Array[(String, OutgoingBoundary, Key, StepId, Step)],
     target_worker_count: USize)
   =>
     if (steps_to_migrate'.size() == 0) then
@@ -1352,61 +1518,51 @@ class val LocalPartitionRouter[In: Any val,
       in steps_to_migrate'.values()
     do
       router_registry.add_to_step_waiting_list(step_id)
-      step.send_state[Key](boundary, state_name', key)
-      router_registry.move_stateful_step_to_proxy[Key](step_id, step,
-        ProxyAddress(target_worker, step_id), key, state_name')
+      step.send_state(boundary, _state_name, key)
+      router_registry.move_stateful_step_to_proxy(step_id, step,
+        ProxyAddress(target_worker, step_id), key, _state_name)
       @printf[I32](
-        "^^Migrating step %s to outgoing boundary %s/%lx\n".cstring(),
-        step_id.string().cstring(), target_worker.cstring(), boundary)
+        "^^Migrating step %s for key %s to outgoing boundary %s/%lx\n"
+          .cstring(), step_id.string().cstring(), key.cstring(),
+          target_worker.cstring(), boundary)
     end
 
   fun blueprint(): PartitionRouterBlueprint =>
-    let partition_addresses = recover trn Map[Key, ProxyAddress] end
-    try
-      for (k, v) in _partition_routes.pairs() do
-        match v
-        | let s: Step =>
-          let pr = ProxyAddress(_worker_name, _step_ids(k)?)
-          partition_addresses(k) = pr
-        | let pr: ProxyRouter =>
-          partition_addresses(k) = pr.proxy_address()
-        end
-      end
-    else
-      Fail()
-    end
-
-    LocalPartitionRouterBlueprint[In, Key, S](_state_name, _step_ids,
-      consume partition_addresses, _partition_function)
+    LocalPartitionRouterBlueprint[In, S](_state_name, _step_ids,
+      _hash_partitions, _partition_function)
 
   fun distribution_digest(): Map[String, Array[String] val] val =>
     // Return a map of form {worker_name: step_ids_as_strings}
     let digest = recover iso Map[String, Array[String] val] end
     // First for this worker
     let a = recover iso Array[String] end
-    for id in _local_map.keys() do
+    for id in _step_ids.values() do
       a.push(id.string())
     end
     digest(_worker_name) = consume a
+
     // Now the other workers
+    //!@ Others needs to be filled in another way. We don't know about
+    // ProxyRouters anymore.  We need this distribution digest for partition
+    // queries, which are used in autoscale tests.
     let others = Map[String, Array[String]]
-    try
-      for target in _partition_routes.values() do
-        match target
-        | let pr: ProxyRouter =>
-          let pa = pr.proxy_address()
-          if others.contains(pa.worker) then
-            others(pa.worker)?.push(pa.step_id.string())
-          else
-            let next = Array[String]
-            next.push(pa.step_id.string())
-            others(pa.worker) = next
-          end
-        end
-      end
-    else
-      Fail()
-    end
+    // try
+    //   for target in _local_routes.values() do
+    //     match target
+    //     | let pr: ProxyRouter =>
+    //       let pa = pr.proxy_address()
+    //       if others.contains(pa.worker) then
+    //         others(pa.worker)?.push(pa.step_id.string())
+    //       else
+    //         let next = Array[String]
+    //         next.push(pa.step_id.string())
+    //         others(pa.worker) = next
+    //       end
+    //     end
+    //   end
+    // else
+    //   Fail()
+    // end
     for (k, v) in others.pairs() do
       let next = recover iso Array[String] end
       for id in v.values() do
@@ -1418,80 +1574,66 @@ class val LocalPartitionRouter[In: Any val,
 
   fun eq(that: box->PartitionRouter): Bool =>
     match that
-    | let o: box->LocalPartitionRouter[In, Key, S] =>
-      MapTagEquality[StepId, Step](_local_map, o._local_map) and
+    | let o: box->LocalPartitionRouter[In, S] =>
+      MapTagEquality[Key, Step](_local_routes, o._local_routes) and
         MapEquality[Key, StepId](_step_ids, o._step_ids) and
-        _partition_routes_eq(o._partition_routes) and
+        (_hash_partitions == o._hash_partitions) and
         (_partition_function is o._partition_function)
     else
       false
     end
 
-  fun _partition_routes_eq(
-    opr: Map[Key, (Step | ProxyRouter)] val): Bool
-  =>
-    try
-      // These equality checks depend on the identity of Step or ProxyRouter
-      // val which means we don't expect them to be created independently
-      if _partition_routes.size() != opr.size() then return false end
-      for (k, v) in _partition_routes.pairs() do
-        match v
-        | let s: Step =>
-          if opr(k)? isnt v then return false end
-        | let pr: ProxyRouter =>
-          match opr(k)?
-          | let pr2: ProxyRouter =>
-            pr == pr2
-          else
-            false
-          end
-        end
-      end
-      true
-    else
-      false
-    end
-
 trait val PartitionRouterBlueprint
-  fun build_router(worker_name: String,
+  fun build_router(worker_name: String, workers: Array[String] val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     auth: AmbientAuth): PartitionRouter
 
-class val LocalPartitionRouterBlueprint[In: Any val,
-  Key: (Hashable val & Equatable[Key] val), S: State ref]
+class val LocalPartitionRouterBlueprint[In: Any val, S: State ref]
   is PartitionRouterBlueprint
   let _state_name: String
   let _step_ids: Map[Key, StepId] val
-  let _partition_addresses: Map[Key, ProxyAddress] val
-  let _partition_function: PartitionFunction[In, Key] val
+  let _hash_partitions: HashPartitions
+  let _partition_function: PartitionFunction[In] val
 
   new val create(state_name: String,
-    s_ids: Map[Key, StepId] val,
-    partition_addresses: Map[Key, ProxyAddress] val,
-    partition_function: PartitionFunction[In, Key] val)
+    s_ids: Map[Key, StepId] val, hash_partitions: HashPartitions,
+    partition_function: PartitionFunction[In] val)
   =>
     _state_name = state_name
     _step_ids = s_ids
-    _partition_addresses = partition_addresses
+    _hash_partitions = hash_partitions
     _partition_function = partition_function
 
-  fun build_router(worker_name: String,
+  fun build_router(worker_name: String, workers: Array[String] val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     auth: AmbientAuth): PartitionRouter
   =>
-    let partition_routes = recover trn Map[Key, (Step | ProxyRouter)] end
-    try
-      for (k, pa) in _partition_addresses.pairs() do
-        let proxy_router = ProxyRouter(pa.worker,
-          outgoing_boundaries(pa.worker)?, pa, auth)
-        partition_routes(k) = proxy_router
-      end
-    else
-      Fail()
+    let hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
+    for (w, b) in outgoing_boundaries.pairs() do
+      hashed_node_routes(w) = HashedProxyRouter(worker_name, b, _state_name,
+        auth)
     end
-    LocalPartitionRouter[In, Key, S](_state_name, worker_name,
-      recover val Map[StepId, Step] end,
-      _step_ids, consume partition_routes, _partition_function)
+    let current_workers = Array[String]
+    let joining_workers = recover trn Array[String] end
+    for c in _hash_partitions.claimants() do
+      current_workers.push(c)
+    end
+    for w in workers.values() do
+      if not ArrayHelpers[String].contains[String](current_workers, w) then
+        joining_workers.push(w)
+      end
+    end
+    let new_hash_partitions =
+      try
+        _hash_partitions.add_claimants(consume joining_workers)?
+      else
+        Fail()
+        _hash_partitions
+      end
+
+    LocalPartitionRouter[In, S](_state_name, worker_name,
+      recover val Map[Key, Step] end, _step_ids, consume hashed_node_routes,
+      new_hash_partitions, _partition_function)
 
 trait val StatelessPartitionRouter is (Router &
   Equatable[StatelessPartitionRouter])
@@ -1842,3 +1984,90 @@ class val LocalStatelessPartitionRouterBlueprint
     end
     LocalStatelessPartitionRouter(_partition_id, worker_name, _step_ids,
       consume partition_routes, _steps_per_worker)
+
+class val HashedProxyRouter is (Router & Equatable[HashedProxyRouter])
+  let _worker_name: String
+  let _target: OutgoingBoundary
+  let _target_state_name: String
+  let _auth: AmbientAuth
+
+  new val create(worker_name: String, target: OutgoingBoundary,
+    target_state_name: String, auth: AmbientAuth)
+  =>
+    _worker_name = worker_name
+    _target = target
+    _target_state_name = target_state_name
+    _auth = auth
+
+  fun build_msg[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, key: Key, producer_id: StepId, producer: Producer ref,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64): ForwardHashedMsg[D]
+  =>
+    ForwardHashedMsg[D](
+      _target_state_name,
+      key,
+      _worker_name,
+      data,
+      metric_name,
+      i_msg_uid,
+      frac_ids)
+
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
+    producer_id: StepId, producer: Producer ref, i_msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64): (Bool, U64)
+  =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at HashedProxyRouter\n".cstring())
+    end
+
+    let might_be_route = producer.route_to(_target)
+    match might_be_route
+    | let r: Route =>
+      ifdef "trace" then
+        @printf[I32]("HashedProxyRouter found Route\n".cstring())
+      end
+
+      match data
+      | let m: ReplayableDeliveryMsg =>
+        r.forward(m, pipeline_time_spent, producer,
+          latest_ts, metrics_id, metric_name, worker_ingress_ts)
+      else
+        Fail()
+      end
+
+      (false, latest_ts)
+    else
+      Fail()
+      (true, latest_ts)
+    end
+
+  fun routes(): Array[Consumer] val =>
+    recover [_target] end
+
+  fun routes_not_in(router: Router): Array[Consumer] val =>
+    if router.routes().contains(_target) then
+      recover Array[Consumer] end
+    else
+      recover [_target] end
+    end
+
+  fun val update_boundary(ob: box->Map[String, OutgoingBoundary]):
+    HashedProxyRouter
+  =>
+    try
+      let new_target = ob(_worker_name)?
+      if new_target isnt _target then
+        HashedProxyRouter(_worker_name, new_target, _target_state_name, _auth)
+      else
+        this
+      end
+    else
+      Fail()
+      this
+    end
+
+  fun eq(that: box->HashedProxyRouter): Bool =>
+    (_worker_name == that._worker_name) and
+      (_target is that._target)
