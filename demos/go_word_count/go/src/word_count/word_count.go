@@ -70,7 +70,7 @@ func LetterPartition() []string {
 	letterPartition := make([]string, 27)
 
 	for i := 0; i < 26; i++ {
-		letterPartition[i] = string([]byte(byte(i + 'a')))
+		letterPartition[i] = string([]byte{byte(i + 'a')})
 	}
 
 	letterPartition[26] = "!"
