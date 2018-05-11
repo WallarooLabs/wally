@@ -68,27 +68,27 @@ func hostsPortsToList(hostsPorts string) [][]string {
 	return hostsPortsList
 }
 
-func LetterPartition() []uint64 {
-	letterPartition := make([]uint64, 27)
+func LetterPartition() []string {
+	letterPartition := make([]string, 27)
 
 	for i := 0; i < 26; i++ {
-		letterPartition[i] = uint64(i + 'a')
+		letterPartition[i] = string([]byte{byte(i + 'a')})
 	}
 
-	letterPartition[26] = '!'
+	letterPartition[26] = "!"
 
 	return letterPartition
 }
 
 type WordPartitionFunction struct{}
 
-func (wpf *WordPartitionFunction) Partition(data interface{}) uint64 {
+func (wpf *WordPartitionFunction) Partition(data interface{}) string {
 	word := data.(*string)
 	firstLetter := (*word)[0]
 	if (firstLetter >= 'a') && (firstLetter <= 'z') {
-		return uint64(firstLetter)
+		return string(firstLetter)
 	}
-	return uint64('!')
+	return "!"
 }
 
 type Decoder struct{}
