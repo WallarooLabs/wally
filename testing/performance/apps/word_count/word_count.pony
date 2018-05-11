@@ -27,6 +27,7 @@ use "serialise"
 use "wallaroo_labs/bytes"
 use "wallaroo"
 use "wallaroo_labs/mort"
+use "wallaroo/core/common"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
@@ -37,7 +38,7 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      let word_totals_partition = Partition[String, String](
+      let word_totals_partition = Partition[String](
         WordPartitionFunction, PartitionFileReader("letters.txt",
           env.root as AmbientAuth))
 
@@ -47,7 +48,7 @@ actor Main
             TCPSourceConfig[String].from_options(StringFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_parallel[String](SplitBuilder)
-            .to_state_partition[String, String, RunningTotal, WordTotals](
+            .to_state_partition[String, RunningTotal, WordTotals](
               AddCount, WordTotalsBuilder, "word-totals",
               word_totals_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[RunningTotal].from_options(
@@ -174,7 +175,7 @@ primitive StringFrameHandler is FramedSourceHandler[String]
     String.from_array(data)
 
 primitive WordPartitionFunction
-  fun apply(input: String): String =>
+  fun apply(input: String): Key =>
     try
       let first = input(0)?
       if (first >= 'a') and (first <= 'z') then

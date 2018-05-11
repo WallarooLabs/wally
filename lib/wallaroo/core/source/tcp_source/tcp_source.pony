@@ -60,6 +60,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   * Switch to requesting credits via promise
   """
   let _source_id: StepId
+  let _auth: AmbientAuth
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder
@@ -101,7 +102,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
   var _in_flight_ack_waiter: InFlightAckWaiter
 
-  new _accept(source_id: StepId, listen: TCPSourceListener,
+  new _accept(source_id: StepId, auth: AmbientAuth, listen: TCPSourceListener,
     notify: TCPSourceNotify iso, event_log: EventLog,
     routes: Array[Consumer] val, route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
@@ -113,6 +114,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     A new connection accepted on a server.
     """
     _source_id = source_id
+    _auth = auth
     _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter
@@ -184,7 +186,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     let new_router =
       match router
       | let pr: PartitionRouter =>
-        pr.update_boundaries(_outgoing_boundaries)
+        pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else

@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "files"
 use "net"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -31,101 +32,96 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
 
-type WeightedKey[Key: (Hashable val & Equatable[Key])] is
-  (Key, USize)
+class val Partition[In: Any val]
+  let _function: PartitionFunction[In] val
+  let _keys: Array[Key] val
 
-class val Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
-  let _function: PartitionFunction[In, Key] val
-  let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
-
-  new val create(f: PartitionFunction[In, Key] val,
-    ks: (Array[WeightedKey[Key]] val | Array[Key] val))
+  new val create(f: PartitionFunction[In] val,
+    ks: Array[Key] val)
   =>
     _function = f
     _keys = ks
 
-  fun function(): PartitionFunction[In, Key] val => _function
-  fun keys(): (Array[WeightedKey[Key]] val | Array[Key] val) => _keys
+  fun function(): PartitionFunction[In] val => _function
+  fun keys(): Array[Key] val => _keys
 
-interface PartitionFunction[In: Any val, Key:
-  (Hashable val & Equatable[Key] val)]
+interface PartitionFunction[In: Any val]
   fun apply(input: In): Key
 
 primitive SingleStepPartitionFunction[In: Any val] is
-  PartitionFunction[In, U8]
-  fun apply(input: In): U8 => 0
+  PartitionFunction[In]
+  fun apply(input: In): String => "key"
 
-interface PartitionAddresses is Equatable[PartitionAddresses]
-  fun apply(key: Any val): (ProxyAddress | None)
-  fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
-    pa: ProxyAddress): PartitionAddresses val ?
+class val KeyDistribution is Equatable[KeyDistribution]
+  let _hash_partitions: HashPartitions
+  let _workers_to_keys: Map[String, Array[Key] val] val
 
-class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
-  let _addresses: Map[Key, ProxyAddress] val
+  new val create(hp: HashPartitions, wtk: Map[String, Array[Key] val] val) =>
+    _hash_partitions = hp
+    _workers_to_keys = wtk
 
-  new val create(a: Map[Key, ProxyAddress] val) =>
-    _addresses = a
+  fun claimants(): Iterator[String] =>
+    _hash_partitions.claimants()
 
-  fun apply(k: Any val): (ProxyAddress | None) =>
-    match k
-    | let key: Key =>
-      try
-        _addresses(key)?
-      else
-        None
+  fun hash_partitions(): HashPartitions =>
+    _hash_partitions
+
+  fun workers_to_keys(): Map[String, Array[Key] val] val =>
+    _workers_to_keys
+
+  fun update_key(key: Key, pa: ProxyAddress): KeyDistribution val =>
+    let new_workers_to_keys = recover trn Map[String, Array[Key] val] end
+
+    var old_key_target = ""
+    for (w, ks) in _workers_to_keys.pairs() do
+      new_workers_to_keys(w) = ks
+      if ArrayHelpers[Key].contains[Key](ks, key) then
+        old_key_target = w
       end
+    end
+
+    try
+      if old_key_target != "" then
+        let old_target_keys = _workers_to_keys(old_key_target)?
+        let new_keys = recover trn Array[Key] end
+        for k in old_target_keys.values() do
+          if k != key then new_keys.push(k) end
+        end
+        new_workers_to_keys(old_key_target) = consume new_keys
+      end
+
+      let new_key_target = pa.worker
+      let new_keys_for_new_target = recover trn Array[Key] end
+      for k in _workers_to_keys(new_key_target)?.values() do
+        new_keys_for_new_target.push(k)
+      end
+      new_keys_for_new_target.push(key)
+      new_workers_to_keys(new_key_target) = consume new_keys_for_new_target
     else
-      None
+      Fail()
     end
 
-  fun pairs(): Iterator[(Key, ProxyAddress)] => _addresses.pairs()
+    KeyDistribution(_hash_partitions, consume new_workers_to_keys)
 
-  fun update_key[K: (Hashable val & Equatable[K] val)](key: K,
-    pa: ProxyAddress): PartitionAddresses val ?
-  =>
-    let new_addresses = recover trn Map[Key, ProxyAddress] end
-    // TODO: This would be much more efficient with a persistent map, since
-    // we wouldn't have to copy everything to make a small change.
-    for (k, v) in _addresses.pairs() do
-      new_addresses(k) = v
-    end
-    match key
-    | let new_key: Key =>
-      new_addresses(new_key) = pa
-    else
-      error
-    end
-    KeyedPartitionAddresses[Key](consume new_addresses)
+  fun eq(that: box->KeyDistribution): Bool =>
+    _hash_partitions == that._hash_partitions
 
-  fun eq(that: box->PartitionAddresses): Bool =>
-    match that
-    | let that_keyed: box->KeyedPartitionAddresses[Key] =>
-      MapEquality[Key, ProxyAddress](_addresses, that_keyed._addresses)
-    else
-      false
-    end
-
-  fun ne(that: box->PartitionAddresses): Bool => not eq(that)
+  fun ne(that: box->KeyDistribution): Bool => not eq(that)
 
 interface StateAddresses
-  fun apply(key: Any val): (Step tag | ProxyRouter | None)
+  fun apply(key: Key): (Step tag | ProxyRouter | None)
   fun register_routes(router: Router, route_builder: RouteBuilder)
   fun steps(): Array[Consumer] val
 
-class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
+class KeyedStateAddresses
   let _addresses: Map[Key, (Step | ProxyRouter)] val
 
   new val create(a: Map[Key, (Step | ProxyRouter)] val) =>
     _addresses = a
 
-  fun apply(k: Any val): (Step | ProxyRouter | None) =>
-    match k
-    | let key: Key =>
-      try
-        _addresses(key)?
-      else
-        None
-      end
+  fun apply(key: Key): (Step | ProxyRouter | None) =>
+    try
+      _addresses(key)?
     else
       None
     end
@@ -156,28 +152,29 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer]): PartitionRouter
-  fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
-    pa: ProxyAddress): StateSubpartition ?
+    data_routes: Map[U128, Consumer],
+    keyed_data_routes: Map[Key, Step],
+    keyed_step_ids: Map[Key, StepId]): PartitionRouter
+  fun update_key(key: Key, pa: ProxyAddress): StateSubpartition ?
   fun runner_builder(): RunnerBuilder
 
-class val KeyedStateSubpartition[PIn: Any val,
-  Key: (Hashable val & Equatable[Key] val), S: State ref] is StateSubpartition
+class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
+  StateSubpartition
   let _state_name: String
-  let _partition_addresses: KeyedPartitionAddresses[Key] val
+  let _key_distribution: KeyDistribution
   let _id_map: Map[Key, U128] val
-  let _partition_function: PartitionFunction[PIn, Key] val
+  let _partition_function: PartitionFunction[PIn] val
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
 
   new val create(state_name': String,
-    partition_addresses': KeyedPartitionAddresses[Key] val,
+    key_distribution': KeyDistribution,
     id_map': Map[Key, U128] val, runner_builder': RunnerBuilder,
-    partition_function': PartitionFunction[PIn, Key] val,
+    partition_function': PartitionFunction[PIn] val,
     pipeline_name': String)
   =>
     _state_name = state_name'
-    _partition_addresses = partition_addresses'
+    _key_distribution = key_distribution'
     _id_map = id_map'
     _partition_function = partition_function'
     _pipeline_name = pipeline_name'
@@ -192,75 +189,76 @@ class val KeyedStateSubpartition[PIn: Any val,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer]):
-    LocalPartitionRouter[PIn, Key, S] val
+    data_routes: Map[StepId, Consumer],
+    keyed_data_routes: Map[Key, Step],
+    keyed_step_ids: Map[Key, StepId]):
+    LocalPartitionRouter[PIn, S] val
   =>
-    let routes = recover trn Map[Key, (Step | ProxyRouter)] end
+    let hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
 
-    let m = recover trn Map[U128, Step] end
+    let m = recover trn Map[Key, Step] end
 
     var partition_count: USize = 0
 
-    for (key, id) in _id_map.pairs() do
-      let proxy_address = _partition_addresses(key)
-      match proxy_address
-      | let pa: ProxyAddress =>
-        if pa.worker == worker_name then
-          let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
-          let next_state_step = Step(auth, _runner_builder(where event_log =
-            event_log, auth=auth),
-            consume reporter, id, _runner_builder.route_builder(),
-              event_log, recovery_replayer, outgoing_boundaries)
+    for c in _key_distribution.claimants() do
+      if c == worker_name then
+        try
+          let keys = _key_distribution.workers_to_keys()(c)?
+          for key in keys.values() do
+            try
+              let id = _id_map(key)?
+              let reporter = MetricsReporter(app_name, worker_name,
+                metrics_conn)
+              let next_state_step = Step(auth, _runner_builder(
+                where event_log = event_log, auth = auth),
+                consume reporter, id, _runner_builder.route_builder(),
+                  event_log, recovery_replayer, outgoing_boundaries)
 
-          initializables.set(next_state_step)
-          data_routes(id) = next_state_step
-          m(id) = next_state_step
-          routes(key) = next_state_step
-          partition_count = partition_count + 1
-        else
-          try
-            let boundary = outgoing_boundaries(pa.worker)?
-
-            routes(key) = ProxyRouter(worker_name, boundary,
-              pa, auth)
-          else
-            @printf[I32](("Missing proxy for " + pa.worker + "!\n").cstring())
+              initializables.set(next_state_step)
+              data_routes(id) = next_state_step
+              keyed_data_routes(key) = next_state_step
+              keyed_step_ids(key) = id
+              m(key) = next_state_step
+              partition_count = partition_count + 1
+            else
+              @printf[I32](("Missing step id for " + key + "!\n").cstring())
+            end
           end
+        else
+          @printf[I32](("Could not find keys for %s!\n").cstring(),
+            c.cstring())
+          Fail()
         end
       else
-        @printf[I32]("Missing proxy address!\n".cstring())
+        try
+          let boundary = outgoing_boundaries(c)?
+          hashed_node_routes(c) = HashedProxyRouter(c, boundary,
+            _state_name, auth)
+        else
+          @printf[I32](("Missing proxy for " + c + "!\n").cstring())
+        end
       end
     end
 
     @printf[I32](("Spinning up " + partition_count.string() +
       " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
-    LocalPartitionRouter[PIn, Key, S](_state_name, worker_name, consume m,
-      _id_map, consume routes, _partition_function)
+    LocalPartitionRouter[PIn, S](_state_name, worker_name, consume m,
+      _id_map, consume hashed_node_routes,
+      _key_distribution.hash_partitions(), _partition_function)
 
-  fun update_key[K: (Hashable val & Equatable[K] val)](k: K,
-    pa: ProxyAddress): StateSubpartition ?
-  =>
-    match k
-    | let key: Key =>
-      match _partition_addresses.update_key[Key](key, pa)?
-      | let kpa: KeyedPartitionAddresses[Key] val =>
-        KeyedStateSubpartition[PIn, Key, S](_state_name, kpa, _id_map,
-          _runner_builder, _partition_function, _pipeline_name)
-      else
-        error
-      end
-    else
-      error
-    end
+  fun update_key(key: Key, pa: ProxyAddress): StateSubpartition =>
+    let kpa = _key_distribution.update_key(key, pa)
+    KeyedStateSubpartition[PIn, S](_state_name, kpa, _id_map,
+      _runner_builder, _partition_function, _pipeline_name)
 
   fun eq(that: box->StateSubpartition): Bool =>
     match that
-    | let kss: box->KeyedStateSubpartition[PIn, Key, S] =>
+    | let kss: box->KeyedStateSubpartition[PIn, S] =>
       // ASSUMPTION: Add RunnerBuilder equality check assumes that
       // runner builder would not change over time, which currently
       // is true.
-      (_partition_addresses == kss._partition_addresses) and
+      (_key_distribution == kss._key_distribution) and
         (MapEquality[Key, U128](_id_map, kss._id_map)) and
         (_partition_function is kss._partition_function) and
         (_pipeline_name == kss._pipeline_name) and
@@ -272,10 +270,8 @@ class val KeyedStateSubpartition[PIn: Any val,
   fun ne(that: box->StateSubpartition): Bool => not eq(that)
 
 primitive PartitionFileReader
-  fun apply(filename: String, auth: AmbientAuth):
-    Array[WeightedKey[String]] val
-  =>
-    let keys = recover trn Array[WeightedKey[String]] end
+  fun apply(filename: String, auth: AmbientAuth): Array[Key] val =>
+    let keys = recover trn Array[Key] end
 
     try
       let file = File(FilePath(auth, filename)?)
@@ -283,8 +279,9 @@ primitive PartitionFileReader
         let els = line.split(",")
         match els.size()
         | 0 => None
-        | 1 => keys.push((els(0)?, 1))
-        | 2 => keys.push((els(0)?, els(1)?.usize()?))
+        | 1 => keys.push(els(0)?)
+        // TODO: Remove this, since we no longer support weighted keys
+        | 2 => keys.push(els(0)?)
         else
           error
         end
@@ -292,8 +289,7 @@ primitive PartitionFileReader
       file.dispose()
     else
       @printf[I32](("ERROR: Problem reading partition file. Each line must " +
-        "have a key string and, optionally, a weight (separated by a " +
-        "comma)\n").cstring())
+        "have a key string\n").cstring())
     end
 
     consume keys

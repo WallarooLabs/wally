@@ -95,16 +95,16 @@ func (rvtb *RunningVotesTotalBuilder) Build() interface{} {
 
 type LetterPartitionFunction struct{}
 
-func (lpf *LetterPartitionFunction) Partition(data interface{}) uint64 {
+func (lpf *LetterPartitionFunction) Partition(data interface{}) string {
 	lav := data.(*LetterAndVotes)
-	return uint64(lav.Letter)
+	return string([]byte{lav.Letter})
 }
 
-func MakeLetterPartitions() []uint64 {
-	letterPartition := make([]uint64, 26)
+func MakeLetterPartitions() []string {
+	letterPartition := make([]string, 26)
 
 	for i := 0; i < 26; i++ {
-		letterPartition[i] = uint64(i + 'a')
+		letterPartition[i] = string([]byte{byte(i + 'a')})
 	}
 
 	return letterPartition

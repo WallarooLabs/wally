@@ -259,11 +259,11 @@ actor OutgoingBoundary is Consumer
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
       + "\n").cstring())
 
-  be migrate_step[K: (Hashable val & Equatable[K] val)](step_id: StepId,
-    state_name: String, key: K, state: ByteSeq val)
+  be migrate_step(step_id: StepId, state_name: String, key: Key,
+    state: ByteSeq val)
   =>
     try
-      let outgoing_msg = ChannelMsgEncoder.migrate_step[K](step_id,
+      let outgoing_msg = ChannelMsgEncoder.migrate_step(step_id,
         state_name, key, state, _worker_name, _auth)?
       _writev(outgoing_msg)
     else

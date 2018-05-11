@@ -20,6 +20,7 @@ use "buffered"
 use "serialise"
 use "net"
 use "collections"
+use "wallaroo_labs/mort"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
@@ -48,11 +49,11 @@ primitive ChannelMsgEncoder
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)?
 
-  fun migrate_step[K: (Hashable val & Equatable[K] val)](step_id: StepId,
-    state_name: String, key: K, state: ByteSeq val, worker: String,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun migrate_step(step_id: StepId, state_name: String, key: Key,
+    state: ByteSeq val, worker: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
-    _encode(KeyedStepMigrationMsg[K](step_id, state_name, key, state, worker),
+    _encode(KeyedStepMigrationMsg(step_id, state_name, key, state, worker),
       auth)?
 
   fun migration_batch_complete(sender: String,
@@ -338,6 +339,20 @@ primitive ChannelMsgEncoder
     _encode(AnnounceJoiningWorkersMsg(sender, control_addrs, data_addrs),
       auth)?
 
+  fun announce_hash_partitions_grow(sender: String,
+    joining_workers: Array[String] val,
+    hash_partitions: Map[String, HashPartitions] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    Once migration is complete, the coordinator of a grow autoscale event
+    informs all joining workers of all hash partitions. We include the joining
+    workers list to make it more straightforward for the recipients to update
+    the HashProxyRouters in their PartitionRouters.
+    """
+    _encode(AnnounceHashPartitionsGrowMsg(sender, joining_workers,
+      hash_partitions), auth)?
+
   fun connected_to_joining_workers(sender: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -347,16 +362,15 @@ primitive ChannelMsgEncoder
     """
     _encode(ConnectedToJoiningWorkersMsg(sender), auth)?
 
-  fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: StepId, worker_name: String, key: K, state_name: String,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun announce_new_stateful_step(id: StepId, worker_name: String, key: Key,
+    state_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     This message is sent to notify another worker that a new stateful step
     has been created on this worker and that partition routers should be
     updated.
     """
-    _encode(KeyedAnnounceNewStatefulStepMsg[K](id, worker_name, key,
+    _encode(AnnounceNewStatefulStepMsg(id, worker_name, key,
       state_name), auth)?
 
   fun announce_new_source(worker_name: String, id: StepId,
@@ -547,15 +561,14 @@ trait val StepMigrationMsg is ChannelMsg
   fun update_router_registry(router_registry: RouterRegistry ref,
     target: Consumer)
 
-class val KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
-  StepMigrationMsg
+class val KeyedStepMigrationMsg is StepMigrationMsg
   let _state_name: String
-  let _key: K
+  let _key: Key
   let _step_id: StepId
   let _state: ByteSeq val
   let _worker: String
 
-  new val create(step_id': U128, state_name': String, key': K,
+  new val create(step_id': U128, state_name': String, key': Key,
     state': ByteSeq val, worker': String)
   =>
     _state_name = state_name'
@@ -571,7 +584,7 @@ class val KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
   fun update_router_registry(router_registry: RouterRegistry ref,
     target: Consumer)
   =>
-    router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
+    router_registry.move_proxy_to_stateful_step(_step_id, target, _key,
       _state_name, _worker)
 
 class val MigrationBatchCompleteMsg is ChannelMsg
@@ -708,16 +721,25 @@ class val ReplayMsg is ChannelMsg
 
 
 trait val DeliveryMsg is ChannelMsg
-  fun target_id(): StepId
   fun sender_name(): String
-  fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun deliver(pipeline_time_spent: U64,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val
+  ): RouteId ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
-  fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun replay_deliver(pipeline_time_spent: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
   fun input(): Any val
   fun metric_name(): String
   fun msg_uid(): MsgId
@@ -748,26 +770,115 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     _msg_uid = msg_uid'
     _frac_ids = frac_ids'
 
-  fun target_id(): StepId => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun deliver(pipeline_time_spent: U64,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
   =>
+    let target_step = data_routes(_target_id)?
+    ifdef "trace" then
+      @printf[I32]("DataRouter found Step\n".cstring())
+    end
+
+    let route_id = target_ids_to_route_ids(_target_id)?
+
     target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
       producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
-    false
+    route_id
 
-  fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
-    producer_id: StepId, producer: Producer, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun replay_deliver(pipeline_time_spent: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
   =>
+    let target_step = data_routes(_target_id)?
+    let route_id = target_ids_to_route_ids(_target_id)?
     target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
       producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
       metrics_id, worker_ingress_ts)
-    false
+    route_id
+
+class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
+  let _target_state_name: String
+  let _target_key: Key
+  let _sender_name: String
+  let _data: D
+  let _metric_name: String
+  let _msg_uid: MsgId
+  let _frac_ids: FractionalMessageId
+
+  fun input(): Any val => _data
+  fun metric_name(): String => _metric_name
+  fun msg_uid(): U128 => _msg_uid
+  fun frac_ids(): FractionalMessageId => _frac_ids
+
+  new val create(t_s_n: String, tk: Key, from: String, m_data: D,
+    m_name: String, msg_uid': MsgId, frac_ids': FractionalMessageId)
+  =>
+    _target_state_name = t_s_n
+    _target_key = tk
+    _sender_name = from
+    _data = m_data
+    _metric_name = m_name
+    _msg_uid = msg_uid'
+    _frac_ids = frac_ids'
+
+  fun sender_name(): String => _sender_name
+
+  fun deliver(pipeline_time_spent: U64,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
+  =>
+    ifdef "trace" then
+      @printf[I32]("DataRouter found Step\n".cstring())
+    end
+
+    try
+      let target_step = keys_to_routes(_target_key)?
+      let route_id = keys_to_route_ids(_target_key)?
+      target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+        producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+        worker_ingress_ts)
+      route_id
+    else
+      Fail()
+      error
+    end
+
+  fun replay_deliver(pipeline_time_spent: U64,
+    data_routes: Map[StepId, Consumer] val,
+    target_ids_to_route_ids: Map[StepId, RouteId] val,
+    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    keys_to_routes: Map[String, Step] val,
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
+  =>
+    try
+      let target_step = keys_to_routes(_target_key)?
+      let route_id = keys_to_route_ids(_target_key)?
+      target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
+      metrics_id, worker_ingress_ts)
+      route_id
+    else
+      Fail()
+      error
+    end
 
 class val JoinClusterMsg is ChannelMsg
   """
@@ -885,34 +996,42 @@ class val AnnounceJoiningWorkersMsg is ChannelMsg
     control_addrs = c_addrs
     data_addrs = d_addrs
 
+class val AnnounceHashPartitionsGrowMsg is ChannelMsg
+  let sender: String
+  let joining_workers: Array[String] val
+  let hash_partitions: Map[String, HashPartitions] val
+
+  new val create(sender': String, joining_workers': Array[String] val,
+    hash_partitions': Map[String, HashPartitions] val)
+  =>
+    sender = sender'
+    joining_workers = joining_workers'
+    hash_partitions = hash_partitions'
+
 class val ConnectedToJoiningWorkersMsg is ChannelMsg
   let sender: String
 
   new val create(sender': String) =>
     sender = sender'
 
-trait val AnnounceNewStatefulStepMsg is ChannelMsg
-  fun update_registry(r: RouterRegistry)
-
-class val KeyedAnnounceNewStatefulStepMsg[
-  K: (Hashable val & Equatable[K] val)] is AnnounceNewStatefulStepMsg
+class val AnnounceNewStatefulStepMsg is ChannelMsg
   """
   This message is sent to notify another worker that a new stateful step has
   been created on this worker and that partition routers should be updated.
   """
   let _step_id: StepId
   let _worker_name: String
-  let _key: K
+  let _key: Key
   let _state_name: String
 
-  new val create(id: StepId, worker: String, k: K, s_name: String) =>
+  new val create(id: StepId, worker: String, k: Key, s_name: String) =>
     _step_id = id
     _worker_name = worker
     _key = k
     _state_name = s_name
 
   fun update_registry(r: RouterRegistry) =>
-    r.add_state_proxy[K](_step_id, ProxyAddress(_worker_name, _step_id), _key,
+    r.add_state_proxy(_step_id, ProxyAddress(_worker_name, _step_id), _key,
       _state_name)
 
 class val AnnounceNewSourceMsg is ChannelMsg
