@@ -24,13 +24,13 @@ Please note that the release script was written with the assumption that you are
 Cutting a release candidate is a simple process. Run a script with the correct arguments and you are done. The release candidate script is run as:
 
 ```bash
-bash .release/rc.bash MY_VERSION MY_GOLDEN_COMMIT
+bash .release/rc.sh MY_VERSION MY_GOLDEN_COMMIT
 ```
 
 So, for example, if you are releasing version `0.4.0` from golden commit `8a8ee28` then your command would be:
 
 ```bash
-bash .release/rc.bash 0.4.0 8a8ee28
+bash .release/rc.sh 0.4.0 8a8ee28
 ```
 
 The script will make changes on in your local Wallaroo repo and will prompt you before pushing them back to GitHub.

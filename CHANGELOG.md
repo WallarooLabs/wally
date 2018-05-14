@@ -35,6 +35,18 @@ All notable changes to Wallaroo will be documented in this file.
 - Clean up external message protocol ([PR #2032](https://github.com/wallaroolabs/wallaroo/pull/2032))
 - Remove "name()" from StateBuilder interface ([PR #1988](https://github.com/wallaroolabs/wallaroo/pull/1988))
 
+## [0.4.2] - 2018-05-14
+
+### Fixed
+
+- Improve Python exception handling in user provided functions ([PR #2194](https://github.com/WallarooLabs/wallaroo/pull/2194))
+
+### Added
+
+- Add Artful Aardvark Support ([PR #2189](https://github.com/WallarooLabs/wallaroo/pull/2189))
+- Add Wallaroo in Vagrant ([PR #2183](https://github.com/WallarooLabs/wallaroo/pull/2183))
+- Add documentation for Wallaroo in Docker on Windows([PR #2177](https://github.com/WallarooLabs/wallaroo/pull/2177))
+
 ## [0.4.1] - 2018-03-14
 
 ### Fixed
@@ -105,3 +117,4 @@ All notable changes to Wallaroo will be documented in this file.
 
 - Don't report a cluster as ready to work until node connection protocol has completed ([PR #1771](https://github.com/wallaroolabs/wallaroo/pull/1771))
 - Add Env as argument to source/sink builders ([PR #1734](https://github.com/wallaroolabs/wallaroo/pull/1734))
+

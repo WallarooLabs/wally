@@ -67,6 +67,15 @@ cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
 make
 ```
 
+### Compiling for Artful Ubuntu
+
+Due to ponyc's dependence on PIC on Artful Ubuntu, all applications must be compiled with the `PONYCFLAGS="--pic"` flag, like so:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
+make PONYCFLAGS="--pic"
+```
+
 Now start up the "Celsius to Fahrenheit" application.
 
 ```bash
