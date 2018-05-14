@@ -2,6 +2,14 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
+## [unreleased] - unreleased
+
+### Added
+
+- Add Artful Aardvark Support ([PR #2189](https://github.com/WallarooLabs/wallaroo/pull/2189))
+- Add Wallaroo in Vagrant ([PR #2183](https://github.com/WallarooLabs/wallaroo/pull/2183))
+- Add documentation for Wallaroo in Docker on Windows([PR #2177](https://github.com/WallarooLabs/wallaroo/pull/2177))
+
 ## [0.4.1] - 2018-03-14
 
 ### Fixed
