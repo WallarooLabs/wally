@@ -91,4 +91,5 @@ def decoder(bs):
 
 @wallaroo.encoder
 def encoder(data):
-    return data.word + " => " + str(data.count) + "\n"
+    output = data.word + " => " + str(data.count) + "\n"
+    return output.encode("utf-8")

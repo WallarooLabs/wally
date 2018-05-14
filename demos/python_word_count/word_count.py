@@ -78,4 +78,4 @@ def decoder(bs):
 def encoder(data):
     output = data.word + " => " + str(data.count) + "\n"
     print output
-    return output
+    return output.encode("utf-8")
