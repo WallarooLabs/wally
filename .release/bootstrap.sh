@@ -61,9 +61,9 @@ install_monitoring_hub_dependencies() {
     erlang-ssl=$OTP_VERSION erlang-mnesia=$OTP_VERSION erlang-runtime-tools=$OTP_VERSION \
     erlang-inets=$OTP_VERSION elixir=$ELIXIR_VERSION
 
-  mkdir /home/ubuntu/.nvm
-  curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | NVM_DIR="/home/ubuntu/.nvm" PROFILE="ubuntu" bash
-  NVM_DIR="/home/ubuntu/.nvm"
+  mkdir /home/vagrant/.nvm
+  curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | NVM_DIR="/home/vagrant/.nvm" PROFILE="vagrant" bash
+  NVM_DIR="/home/vagrant/.nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
   nvm install node
   nvm alias default node
@@ -115,8 +115,8 @@ install_docker() {
   sudo apt-get update
   sudo apt-get install -y docker-ce
 
-  ## give docker access to non-root users ubuntu
-  sudo usermod -aG docker ubuntu
+  ## give docker access to non-root users vagrant
+  sudo usermod -aG docker vagrant
 }
 
 install_go() {
@@ -184,6 +184,6 @@ echo "----- Dependencies installed"
 confirm_git_ssh
 
 ## clone Wallaroo
-pushd /home/ubuntu
+pushd /home/vagrant
 clone_and_report
 pushd wallaroo || exit

@@ -126,7 +126,7 @@ push_docker_images() {
     echo "Docker image: $wallaroo_docker_image_path already exists."
   else
     # push the image
-    if $(docker push $wallaroo_docker_image_path)
+    if docker push $wallaroo_docker_image_path
     then
       echo "Pushed image $wallaroo_docker_image_path successfully."
     else
@@ -142,7 +142,7 @@ push_docker_images() {
     echo "Docker image: $metrics_ui_docker_image_path already exists."
   else
     # push the image
-    if $(docker push $metrics_ui_docker_image_path)
+    if docker push $metrics_ui_docker_image_path
     then
       echo "Pushed image $metrics_ui_docker_image_path successfully."
     else
@@ -150,6 +150,11 @@ push_docker_images() {
       exit 1
     fi
   fi
+}
+
+git_reset() {
+  git reset --hard HEAD
+  git checkout $BRANCH
 }
 
 if [ $# -lt 2 ]; then
@@ -171,3 +176,4 @@ set_docker_image_names
 build_metrics_ui_image
 build_wallaroo_image
 push_docker_images
+git_reset
