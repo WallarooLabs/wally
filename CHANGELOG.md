@@ -4,6 +4,10 @@ All notable changes to Wallaroo will be documented in this file.
 
 ## [unreleased] - unreleased
 
+### Fixed
+
+- Improve Python exception handling in user provided functions ([PR #2194](https://github.com/WallarooLabs/wallaroo/pull/2194))
+
 ### Added
 
 - Add Artful Aardvark Support ([PR #2189](https://github.com/WallarooLabs/wallaroo/pull/2189))
