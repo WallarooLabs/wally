@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 export DEBIAN_FRONTEND=noninteractive
 
-export WALLAROO_VERSION="release-0.4.2"
+export WALLAROO_VERSION="0.4.2"
 export PONYC_VERSION="0.21.3"
 export OTP_VERSION="1:20.1-1"
 export ELIXIR_VERSION="1.5.2-1"
