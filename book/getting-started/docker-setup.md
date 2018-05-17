@@ -44,6 +44,8 @@ docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }
 
 * **Wallaroo Source Code**: full Wallaroo source code is provided, including Python example applications.
 
+* **Machida with Resilience**: runs Wallaroo Python applications and writes state to disk for recovery. This version of Machida can be used via the `machida-resilience` binary. Note that this is an Enterprise feature and requires a paid user agreement for use in production. See the [Interworker Serialization and Resilience](/book/python/interworker-serialization-and-resilience.md) documentation for general information and the [Resilience](/book/running-wallaroo/wallaroo-command-line-options.md#resilience) section of our [Command Line Options](/book/running-wallaroo/wallaroo-command-line-options.md) documentation for information on its usage.
+
 ## Additional Windows Setup
 
 There are a few extra recommended steps that Windows users should make before continuing on to starting the Wallaroo Docker image. These steps are needed in order to persist the Wallaroo source code and Python virtual environment using [virtualenv](https://virtualenv.pypa.io/en/stable/) onto your local machine from within the Wallaroo Docker container. This will allow code changes and installed Python modules to persist beyond the lifecycle of a Docker container.
