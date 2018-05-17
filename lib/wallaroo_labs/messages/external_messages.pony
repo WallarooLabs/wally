@@ -39,6 +39,14 @@ primitive _PartitionCountQueryResponse              fun apply(): U16 => 13
 primitive _SourceIdsQuery                           fun apply(): U16 => 14
 primitive _SourceIdsQueryResponse                   fun apply(): U16 => 15
 primitive _ReportStatus                             fun apply(): U16 => 16
+primitive _StateEntityQuery                         fun apply(): U16 => 17
+primitive _StateEntityQueryResponse                 fun apply(): U16 => 18
+primitive _StatelessPartitionQuery                  fun apply(): U16 => 19
+primitive _StatelessPartitionQueryResponse          fun apply(): U16 => 20
+primitive _StateEntityCountQuery                    fun apply(): U16 => 21
+primitive _StateEntityCountQueryResponse            fun apply(): U16 => 22
+primitive _StatelessPartitionCountQuery             fun apply(): U16 => 23
+primitive _StatelessPartitionCountQueryResponse     fun apply(): U16 => 24
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -146,6 +154,66 @@ primitive ExternalMsgEncoder
     let sis = SourceIdsQueryEncoder.response(source_ids)
     _encode(_SourceIdsQueryResponse(), sis, wb)
 
+  fun state_entity_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    A message requesting the state entities on the worker (organized by entity
+    key).
+    """
+    _encode(_StateEntityQuery(), "", wb)
+
+  fun state_entity_query_response(state_routers: Map[String, PartitionRouter],
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let digest_map = _state_entity_digest(state_routers)
+    let seqr = StateEntityQueryEncoder.state_entity_keys(digest_map)
+    _encode(_StateEntityQueryResponse(), seqr, wb)
+
+  fun stateless_partition_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    A message requesting the current distribution of stateless partition across
+    workers (organized by entity key).
+    """
+    _encode(_StatelessPartitionQuery(), "", wb)
+
+  fun stateless_partition_query_response(
+    stateless_routers: Map[U128, StatelessPartitionRouter],
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let digest_map = _stateless_partition_digest(stateless_routers)
+    let spqr = StatelessPartitionQueryEncoder.stateless_partition_keys(digest_map)
+    _encode(_StatelessPartitionQueryResponse(), spqr, wb)
+
+  fun state_entity_count_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    A message requesting the count of state entities on the worker (organized by
+    entity key).
+    """
+    _encode(_StateEntityCountQuery(), "", wb)
+
+  fun state_entity_count_query_response(
+    state_routers: Map[String, PartitionRouter],
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let digest_map = _state_entity_digest(state_routers)
+    let secqr = StateEntityCountQueryEncoder.state_entity_count(digest_map)
+    _encode(_StateEntityCountQueryResponse(), secqr, wb)
+
+  fun stateless_partition_count_query(wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    A message requesting the count of stateless partition across workers
+    (organized by entity key).
+    """
+    _encode(_StatelessPartitionCountQuery(), "", wb)
+
+  fun stateless_partition_count_query_response(
+    stateless_routers: Map[U128, StatelessPartitionRouter],
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let digest_map = _stateless_partition_digest(stateless_routers)
+    let spcqr =
+      StatelessPartitionCountQueryEncoder.stateless_partition_count(digest_map)
+    _encode(_StatelessPartitionCountQueryResponse(), spcqr, wb)
+
   fun _partition_digest(state_routers: Map[String,
     PartitionRouter], stateless_routers: Map[U128, StatelessPartitionRouter]):
     Map[String, Map[String, Map[String, Array[String] val] val] val]
@@ -167,6 +235,29 @@ primitive ExternalMsgEncoder
     digest_map("state_partitions") = consume state_ps
     digest_map("stateless_partitions") = consume stateless_ps
     digest_map
+
+  fun _state_entity_digest(state_routers: Map[String, PartitionRouter]):
+    Map[String, Array[String] val] val
+  =>
+    let state_ps = recover trn Map[String, Array[String] val] end
+
+    for (k, v) in state_routers.pairs() do
+      state_ps(k) = v.state_entity_digest()
+    end
+
+    consume state_ps
+
+  fun _stateless_partition_digest(
+    stateless_routers: Map[U128, StatelessPartitionRouter]):
+    Map[String, Map[String, Array[String] val] val] val
+  =>
+    let stateless_ps =
+      recover iso Map[String, Map[String, Array[String] val] val] end
+
+    for (k, v) in stateless_routers.pairs() do
+      stateless_ps(k.string()) = v.distribution_digest()
+    end
+    stateless_ps
 
   fun report_status(code: String, wb: Writer = Writer): Array[ByteSeq] val =>
     _encode(_ReportStatus(), code, wb)
@@ -216,6 +307,23 @@ primitive ExternalMsgDecoder
       SourceIdsQueryJsonDecoder.response(s)
     | (_ReportStatus(), let s: String) =>
       ExternalReportStatusMsg(s)
+    | (_StateEntityQuery(), let s: String) =>
+      ExternalStateEntityQueryMsg
+    | (_StateEntityQueryResponse(), let s: String) =>
+      ExternalStateEntityQueryResponseMsg(s)
+    | (_StatelessPartitionQuery(), let s: String) =>
+      ExternalStatelessPartitionQueryMsg
+    | (_StatelessPartitionQueryResponse(), let s: String) =>
+      ExternalStatelessPartitionQueryResponseMsg(s)
+
+    | (_StateEntityCountQuery(), let s: String) =>
+      ExternalStateEntityCountQueryMsg
+    | (_StateEntityCountQueryResponse(), let s: String) =>
+      ExternalStateEntityCountQueryResponseMsg(s)
+    | (_StatelessPartitionCountQuery(), let s: String) =>
+      ExternalStatelessPartitionCountQueryMsg
+    | (_StatelessPartitionCountQueryResponse(), let s: String) =>
+      ExternalStatelessPartitionCountQueryResponseMsg(s)
     else
       error
     end
@@ -408,3 +516,34 @@ class val ExternalReportStatusMsg is ExternalMsg
   new val create(c: String) =>
     code = c
 
+primitive ExternalStateEntityQueryMsg is ExternalMsg
+
+class val ExternalStateEntityQueryResponseMsg is ExternalMsg
+  let msg: String
+
+  new val create(m: String) =>
+    msg = m
+
+primitive ExternalStatelessPartitionQueryMsg is ExternalMsg
+
+class val ExternalStatelessPartitionQueryResponseMsg is ExternalMsg
+  let msg: String
+
+  new val create(m: String) =>
+    msg = m
+
+primitive ExternalStateEntityCountQueryMsg is ExternalMsg
+
+class val ExternalStateEntityCountQueryResponseMsg is ExternalMsg
+  let msg: String
+
+  new val create(m: String) =>
+    msg = m
+
+primitive ExternalStatelessPartitionCountQueryMsg is ExternalMsg
+
+class val ExternalStatelessPartitionCountQueryResponseMsg is ExternalMsg
+  let msg: String
+
+  new val create(m: String) =>
+    msg = m

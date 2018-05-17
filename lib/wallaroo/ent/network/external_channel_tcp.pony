@@ -182,6 +182,31 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
           else
             @printf[I32]("Failed to parse ReportStatusCode\n".cstring())
           end
+        | let m: ExternalStateEntityQueryMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalStateEntityQueryMsg on External " +
+              "Channel\n").cstring())
+          end
+          _local_topology_initializer.state_entity_query(conn)
+        | let m: ExternalStatelessPartitionQueryMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalStatelessPartitionQueryMsg on" +
+              " External Channel\n").cstring())
+          end
+          _local_topology_initializer.stateless_partition_query(conn)
+
+        | let m: ExternalStateEntityCountQueryMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalStateEntityCountQueryMsg on "
+              "External Channel\n").cstring())
+          end
+          _local_topology_initializer.state_entity_count_query(conn)
+        | let m: ExternalStatelessPartitionCountQueryMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalStatelessPartitionCountQueryMsg "
+              "on External Channel\n").cstring())
+          end
+          _local_topology_initializer.stateless_partition_count_query(conn)
         else
           @printf[I32](("Incoming External Message type not handled by " +
             "external channel.\n").cstring())

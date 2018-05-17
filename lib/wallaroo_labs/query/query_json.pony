@@ -121,6 +121,76 @@ primitive PartitionQueryEncoder
     end
     _JsonEncoder(consume entries, _JsonMap)
 
+primitive StateEntityQueryEncoder
+  fun state_entity_keys(
+    digest: Map[String, Array[String] val] val):
+    String
+  =>
+    let entries = recover iso Array[String] end
+
+    for (k, v) in digest.pairs() do
+      entries.push(_Quoted(k) + ":" + _JsonEncoder(v, _JsonArray, true))
+    end
+
+    _JsonEncoder(consume entries, _JsonMap)
+
+primitive StateEntityCountQueryEncoder
+  fun state_entity_count(
+    digest: Map[String, Array[String] val] val):
+    String
+  =>
+    let entries = recover iso Array[String] end
+
+    for (k, v) in digest.pairs() do
+      entries.push(_Quoted(k) + ":" + v.size().string())
+    end
+
+    _JsonEncoder(consume entries, _JsonMap)
+
+primitive StatelessPartitionQueryEncoder
+  fun stateless_partition_keys(
+    stateless_partitions: Map[String, Map[String, Array[String] val] val] val):
+    String
+  =>
+    let entries = recover iso Array[String] end
+
+    for (k, v) in stateless_partitions.pairs() do
+      entries.push(_Quoted(k) + ":" + partitions_by_worker(v))
+    end
+
+    _JsonEncoder(consume entries, _JsonMap)
+
+  fun partitions_by_worker(pbw: Map[String, Array[String] val] val): String =>
+    let digest = recover iso Array[String] end
+    for (k, v) in pbw.pairs() do
+      digest.push(_Quoted(k) + ":" + _JsonEncoder(v, _JsonArray))
+    end
+
+    _JsonEncoder(consume digest, _JsonMap)
+
+primitive StatelessPartitionCountQueryEncoder
+  fun stateless_partition_count(
+    stateless_partitions: Map[String, Map[String, Array[String] val] val] val):
+    String
+  =>
+    let entries = recover iso Array[String] end
+
+    for (k, v) in stateless_partitions.pairs() do
+      entries.push(_Quoted(k) + ":" + partition_count_by_worker(v))
+    end
+
+    _JsonEncoder(consume entries, _JsonMap)
+
+  fun partition_count_by_worker(pbw: Map[String, Array[String] val] val):
+    String
+  =>
+    let digest = recover iso Array[String] end
+    for (k, v) in pbw.pairs() do
+      digest.push(_Quoted(k) + ":" + v.size().string())
+    end
+
+    _JsonEncoder(consume digest, _JsonMap)
+
 primitive ShrinkQueryJsonEncoder
   fun request(query: Bool, node_names: Array[String] val, node_count: U64):
     String
