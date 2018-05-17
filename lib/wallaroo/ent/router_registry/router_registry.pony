@@ -669,6 +669,26 @@ actor RouterRegistry is InFlightAckRequester
       consume ids)
     conn.writev(msg)
 
+  be state_entity_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.state_entity_query_response(
+      _partition_routers)
+    conn.writev(msg)
+
+  be stateless_partition_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.stateless_partition_query_response(
+      _stateless_partition_routers)
+    conn.writev(msg)
+
+  be state_entity_count_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.state_entity_count_query_response(
+      _partition_routers)
+    conn.writev(msg)
+
+  be stateless_partition_count_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.stateless_partition_count_query_response(
+      _stateless_partition_routers)
+    conn.writev(msg)
+
   //////////////
   // LOG ROTATION
   //////////////

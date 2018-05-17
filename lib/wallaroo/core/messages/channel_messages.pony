@@ -841,8 +841,8 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
+    keys_to_routes: Map[Key, Step] val,
+    keys_to_route_ids: Map[Key, RouteId] val): RouteId ?
   =>
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
@@ -865,8 +865,8 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     producer_id: StepId, producer: Producer, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
+    keys_to_routes: Map[Key, Step] val,
+    keys_to_route_ids: Map[Key, RouteId] val): RouteId ?
   =>
     try
       let target_step = keys_to_routes(_target_key)?

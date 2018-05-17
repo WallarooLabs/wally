@@ -950,9 +950,17 @@ class val DataRouter is Equatable[DataRouter]
 
     consume rs
 
-  fun remove_keyed_route(id: StepId, key: Key): DataRouter =>
+  // !@ Get rid of id', we don't use it anymore
+  fun remove_keyed_route(id': StepId, key: Key): DataRouter =>
     ifdef debug then
-      Invariant(_data_routes.contains(id) and _keyed_routes.contains(key))
+      Invariant(_keyed_routes.contains(key))
+    end
+
+    let id = try
+      _keyed_step_ids(key)?
+    else
+      Fail()
+      0
     end
 
     // TODO: Using persistent maps for our fields would make this much more
@@ -1128,6 +1136,7 @@ trait val PartitionRouter is (Router & Equatable[PartitionRouter])
     ob: box->Map[String, OutgoingBoundary]): PartitionRouter
   fun blueprint(): PartitionRouterBlueprint
   fun distribution_digest(): Map[String, Array[String] val] val
+  fun state_entity_digest(): Array[String] val
   fun route_builder(): RouteBuilder
 
 trait val AugmentablePartitionRouter is PartitionRouter
@@ -1570,6 +1579,16 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
       end
       digest(k) = consume next
     end
+    consume digest
+
+  fun state_entity_digest(): Array[String] val =>
+    // Return an array of keys
+    let digest = recover trn Array[String] end
+
+    for k in _local_routes.keys() do
+      digest.push(k)
+    end
+
     consume digest
 
   fun eq(that: box->PartitionRouter): Bool =>
