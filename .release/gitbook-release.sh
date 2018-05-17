@@ -64,6 +64,7 @@ update_versions_in_gitbook() {
   version=$(< VERSION)
   echo "Replacing {{ book.wallaroo_version }}"
   find book -name '*.md' -exec sed -i -- "s/{{ book.wallaroo_version }}/$version/g" {} \;
+  find -name 'intro.md' -exec sed -i -- "s/{{ book.wallaroo_version }}/$version/g" {} \;
   echo "Replacing {{ metrics_ui_version }}"
   find book -name '*.md' -exec sed -i -- "s/{{ metrics_ui_version }}/$ui_version/g" {} \;
   echo "Replacing {{ docker_version_url }}"
@@ -105,6 +106,7 @@ git_clean() {
   git clean -fd
   git remote rm doc-site
   echo "Checking out to $BRANCH"
+  git reset --hard origin/$BRANCH
   git checkout $BRANCH
 }
 
