@@ -1,0 +1,12 @@
+{
+  "deps": [
+    { "type": "local",
+      "local-path": "../../../../lib/"
+    },
+    {
+      "type": "github",
+      "repo": "mfelsche/ponycheck",
+      "tag": "62a27532773ed63749151abce8e9d20690ce73a5"
+    }
+  ]
+}
