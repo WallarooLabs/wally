@@ -1651,6 +1651,18 @@ actor LocalTopologyInitializer is LayoutInitializer
   be source_ids_query(conn: TCPConnection) =>
     _router_registry.source_ids_query(conn)
 
+  be state_entity_query(conn: TCPConnection) =>
+    _router_registry.state_entity_query(conn)
+
+  be stateless_partition_query(conn: TCPConnection) =>
+    _router_registry.stateless_partition_query(conn)
+
+  be state_entity_count_query(conn: TCPConnection) =>
+    _router_registry.state_entity_count_query(conn)
+
+  be stateless_partition_count_query(conn: TCPConnection) =>
+    _router_registry.stateless_partition_count_query(conn)
+
   be report_status(code: ReportStatusCode) =>
     match code
     | BoundaryCountStatus =>

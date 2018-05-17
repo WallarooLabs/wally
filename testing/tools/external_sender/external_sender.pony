@@ -93,6 +93,18 @@ actor Main
           ExternalMsgEncoder.source_ids_query()
         | "boundary-count-status" =>
           ExternalMsgEncoder.report_status("boundary-count-status")
+        | "state-entity-query" =>
+          await_response = true
+          ExternalMsgEncoder.state_entity_query()
+        | "stateless-partition-query" =>
+          await_response = true
+          ExternalMsgEncoder.stateless_partition_query()
+        | "state-entity-count-query" =>
+          await_response = true
+          ExternalMsgEncoder.state_entity_count_query()
+        | "stateless-partition-count-query" =>
+          await_response = true
+          ExternalMsgEncoder.stateless_partition_count_query()
         else // default to print
           ExternalMsgEncoder.print_message(message)
         end
@@ -181,6 +193,30 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
           for s_id in m.source_ids.values() do
             _env.out.print(". " + s_id.string())
           end
+          conn.dispose()
+        | let m: ExternalStateEntityQueryResponseMsg =>
+          if not _json then
+            _env.out.print("State Entity Distribution:")
+          end
+          _env.out.print(m.msg)
+          conn.dispose()
+        | let m: ExternalStatelessPartitionQueryResponseMsg =>
+          if not _json then
+            _env.out.print("Stateless Partition Distribution:")
+          end
+          _env.out.print(m.msg)
+          conn.dispose()
+        | let m: ExternalStateEntityCountQueryResponseMsg =>
+          if not _json then
+            _env.out.print("State Entity Count:")
+          end
+          _env.out.print(m.msg)
+          conn.dispose()
+        | let m: ExternalStatelessPartitionCountQueryResponseMsg =>
+          if not _json then
+            _env.out.print("Stateless Partition Count:")
+          end
+          _env.out.print(m.msg)
           conn.dispose()
         else
           _env.err.print("Received unhandled external message type")
