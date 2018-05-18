@@ -2,6 +2,12 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
+## [unreleased] - unreleased
+
+### Added
+
+- Add Machida with Resilience to Wallaroo in Docker
+
 ## [0.4.2] - 2018-05-14
 
 ### Fixed
