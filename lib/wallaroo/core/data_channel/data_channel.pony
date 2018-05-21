@@ -33,6 +33,7 @@ use "net"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
+use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -52,6 +53,7 @@ actor DataChannel
   var _event: AsioEventID = AsioEvent.none()
   var _connected: Bool = false
   var _readable: Bool = false
+  var _reading: Bool = false
   var _writeable: Bool = false
   var _throttled: Bool = false
   var _closed: Bool = false
@@ -64,10 +66,12 @@ actor DataChannel
   var _pending_writev_total: USize = 0
 
   var _read_buf: Array[U8] iso
+  var _read_buf_offset: USize = 0
   var _expect_read_buf: Reader = Reader
 
   var _next_size: USize
   let _max_size: USize
+  let _max_received_count: U8 = 50
 
   var _read_len: USize = 0
   var _expect: USize = 0
@@ -589,7 +593,7 @@ actor DataChannel
         data.truncate(_read_len)
         _read_len = 0
 
-        _notify.received(this, consume data, 1)
+        _notify.received(this, consume data)
         _read_buf_size()
       end
 
@@ -600,10 +604,20 @@ actor DataChannel
     """
     Resize the read buffer.
     """
-    if _expect != 0 then
-      _read_buf.undefined(_expect)
-    else
+    if _expect == 0 then
       _read_buf.undefined(_next_size)
+    else
+      if _expect > _read_buf_offset then
+        let data = _read_buf = recover Array[U8] end
+        _read_buf.undefined(_next_size)
+        for i in Range(0, _read_buf_offset) do
+          try
+            _read_buf.update(i, data(i)?)?
+          else
+            Fail()
+          end
+        end
+      end
     end
 
   fun ref _queue_read() =>
@@ -630,58 +644,92 @@ actor DataChannel
     ifdef not windows then
       try
         var sum: USize = 0
-        var received_called: USize = 0
+        var received_count: U8 = 0
+        _reading = true
 
         while _readable and not _shutdown_peer do
           if _muted then
+            _reading = false
             return
           end
 
-          // Read as much data as possible.
-          let len = @pony_os_recv[USize](
-            _event,
-            _read_buf.cpointer().usize() + _read_len,
-            _read_buf.size() - _read_len) ?
+          if _read_buf_offset > _expect then
+            if (_expect == 0) and (_read_buf_offset > 0) then
+              let data = _read_buf = recover Array[U8] end
+              data.truncate(_read_buf_offset)
+              _read_buf_offset = 0
 
-          match len
-          | 0 =>
-            // Would block, try again later.
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            @pony_asio_event_set_readable[None](_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
-            return
-          | _next_size =>
-            // Increase the read buffer size.
-            _next_size = _max_size.min(_next_size * 2)
-          end
-
-          _read_len = _read_len + len
-
-          if _read_len >= _expect then
-            let data = _read_buf = recover Array[U8] end
-            data.truncate(_read_len)
-            _read_len = 0
-
-            received_called = received_called + 1
-            if not _notify.received(this, consume data,
-              received_called)
-            then
-              _read_buf_size()
-              _read_again()
-              return
+              received_count = received_count + 1
+              if not _notify.received(this, consume data) then
+                _read_buf_size()
+                _read_again()
+                _reading = false
+                return
+              else
+                _read_buf_size()
+              end
+              if received_count >= _max_received_count then
+                _read_again()
+                _reading = false
+                return
+              end
             else
+              while _read_buf_offset >= _expect do
+                let x = _read_buf = recover Array[U8] end
+                (let data, _read_buf) = (consume x).chop(_expect)
+                _read_buf_offset = _read_buf_offset - _expect
+
+                // increment max reads
+                received_count = received_count + 1
+                if not _notify.received(this, consume data) then
+                  _read_buf_size()
+                  _read_again()
+                  _reading = false
+                  return
+                end
+
+                if received_count >= _max_received_count then
+                  _read_buf_size()
+                  _read_again()
+                  _reading = false
+                  return
+                end
+              end
+
               _read_buf_size()
             end
-
-            sum = sum + len
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
+              // _read_buf_size()
               _read_again()
+              _reading = false
               return
             end
+          else
+            // Read as much data as possible.
+            let len = @pony_os_recv[USize](
+              _event,
+              _read_buf.cpointer(_read_buf_offset),
+              _read_buf.space() - _read_buf_offset) ?
+
+            match len
+            | 0 =>
+              // Would block, try again later.
+              // this is safe because asio thread isn't currently subscribed
+              // for a read event so will not be writing to the readable flag
+              @pony_asio_event_set_readable[None](_event, false)
+              _readable = false
+              @pony_asio_event_resubscribe_read(_event)
+              _reading = false
+              return
+            | (_read_buf.space() - _read_buf_offset) =>
+              // Increase the read buffer size.
+              _next_size = _max_size.min(_next_size * 2)
+            end
+
+            _read_buf_offset = _read_buf_offset + len
+            sum = sum + len
           end
         end
       else
