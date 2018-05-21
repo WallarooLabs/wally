@@ -162,8 +162,7 @@ class _TestDataChannelExpectNotify is DataChannelNotify
     _h.complete_action("expect received")
     qty
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val,
-    n: USize): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
   =>
     if _frame then
       _frame = false
@@ -251,8 +250,7 @@ class _TestDataChannelWritevNotifyServer is DataChannelNotify
   new iso create(h: TestHelper) =>
     _h = h
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] iso,
-    n: USize): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] iso): Bool
   =>
     _buffer.append(consume data)
 
@@ -316,8 +314,7 @@ class _TestDataChannelMuteReceiveNotify is DataChannelNotify
     _h.complete_action("receiver asks for data")
     _h.dispose_when_done(conn)
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val,
-    n: USize): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
   =>
     _h.complete(false)
     true
@@ -347,8 +344,7 @@ class _TestDataChannelMuteSendNotify is DataChannelNotify
   fun ref connect_failed(conn: DataChannel ref) =>
     _h.fail_action("sender connected")
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val,
-    n: USize): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
   =>
      conn.write("it's sad that you won't ever read this")
      _h.complete_action("sender sent data")
@@ -404,8 +400,7 @@ class _TestDataChannelUnmuteReceiveNotify is DataChannelNotify
     conn.unmute(_h)
     _h.complete_action("receiver unmuted")
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val,
-    n: USize): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
   =>
     _h.complete(true)
     true
@@ -486,8 +481,7 @@ class _TestDataChannelThrottleSendNotify is DataChannelNotify
   fun ref connect_failed(conn: DataChannel ref) =>
     _h.fail_action("sender connected")
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] val,
-    n: USize): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] val): Bool
   =>
     conn.write("it's sad that you won't ever read this")
     _h.complete_action("sender sent data")

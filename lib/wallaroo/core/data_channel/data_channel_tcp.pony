@@ -179,8 +179,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     _receiver.data_connect(sender_boundary_id, conn)
     conn._unmute(this)
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] iso,
-    n: USize): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] iso): Bool
   =>
     if _header then
       ifdef "trace" then

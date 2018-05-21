@@ -101,8 +101,7 @@ interface DataChannelNotify
     """
     data
 
-  fun ref received(conn: DataChannel ref, data: Array[U8] iso,
-    times: USize): Bool
+  fun ref received(conn: DataChannel ref, data: Array[U8] iso): Bool
   =>
     """
     Called when new data is received on the connection. Return true if you
