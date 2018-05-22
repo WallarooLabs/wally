@@ -27,6 +27,7 @@ from integration import (add_runner,
                          ObservabilityNotifier,
                          partition_counts_query,
                          partitions_query,
+                         state_entity_query,
                          PipelineTestError,
                          Reader,
                          Runner,
@@ -234,6 +235,11 @@ def test_all_workers_have_partitions(partitions):
     assert(map(len, partitions['state_partitions']['letter-state']
                     .values()).count(0) == 0)
 
+def test_worker_has_state_entities(state_entities):
+    """
+    Test that the worker has state_entities
+    """
+    assert(len(state_entities['letter-state']) > 0)
 
 def test_cluster_is_processing(status):
     """
@@ -258,11 +264,13 @@ def test_migrated_partitions(pre_partitions, workers, partitions):
     i_pre = inverted(pre_partitions)
     i_post = inverted(partitions)
     keys = ['state_partitions']
+    # make sure that none of the joining workers are in the pre-partitions
     for joining in workers.get('joining', {}):
         for ptype in keys:
             for step in partitions[ptype]:
                 for pid in partitions[ptype][step][joining]:
                     assert(i_pre[ptype][step][pid] != joining)
+    # make sure that none of the leaving workers are in the post-partitions
     for leaving in workers.get('leaving', {}):
         for ptype in keys:
             for step in pre_partitions[ptype]:
@@ -363,13 +371,14 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
             metrics_host, metrics_port = metrics.get_connection_info()
             time.sleep(0.05)
 
-            num_ports = sources + 3 + (2 * (workers - 1))
+            num_ports = sources + 3 + (3 * (workers - 1))
             ports = get_port_values(num=num_ports, host=host)
             (input_ports, (control_port, data_port, external_port),
              worker_ports) = (ports[:sources],
                               ports[sources:sources+3],
-                              zip(ports[-(2*(workers-1)):][::2],
-                                  ports[-(2*(workers-1)):][1::2]))
+                              zip(ports[-(3*(workers-1)):][::3],
+                                  ports[-(3*(workers-1)):][1::3],
+                                  ports[-(3*(workers-1)):][2::3]))
             inputs = ','.join(['{}:{}'.format(host, p) for p in
                                input_ports])
 
@@ -380,6 +389,8 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                                                   host, external_port)
             query_func_cluster_status = partial(cluster_status_query, host,
                                                 external_port)
+            query_func_state_entity = partial(state_entity_query, host,
+                                              external_port)
 
             # Start the initial runners
             start_runners(runners, command, host, inputs, outputs,
@@ -405,8 +416,8 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                 raise obs.error
 
             # Verify all workers start with partitions
-            obs = ObservabilityNotifier(query_func_partitions,
-                test_all_workers_have_partitions)
+            obs = ObservabilityNotifier(query_func_state_entity,
+                test_worker_has_state_entities)
             obs.start()
             obs.join()
             if obs.error:
@@ -440,9 +451,10 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                     left = []
                     if joiners > 0:  # autoscale: grow
                         # create a new worker and have it join
-                        new_ports = get_port_values(num=(joiners * 2), host=host,
+                        new_ports = get_port_values(num=(joiners * 3), host=host,
                                                     base_port=25000)
-                        joiner_ports = zip(new_ports[::2], new_ports[1::2])
+                        joiner_ports = zip(new_ports[::3], new_ports[1::3],
+                                           new_ports[2::3])
                         for i in range(joiners):
                             add_runner(runners, command, host, inputs, outputs,
                                        metrics_port,
