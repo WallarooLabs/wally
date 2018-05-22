@@ -305,22 +305,7 @@ actor DataChannel
     `qty` is zero, the call can contain any amount of data. This has no effect
     if called in the `sent` notifier callback.
     """
-    if not _in_sent then
       _expect = _notify.expect(this, qty)
-      _read_buf_size()
-    end
-
-/*
-  fun ref expect(qty: USize = 0) =>
-    """
-    A `received` call on the notifier must contain exactly `qty` bytes. If
-    `qty` is zero, the call can contain any amount of data. This has no effect
-    if called in the `sent` notifier callback.
-    """
-    if not _in_sent then
-      _expect = _notify.expect(this, qty)
-    end
-*/
 
   fun ref set_nodelay(state: Bool) =>
     """
@@ -646,14 +631,13 @@ actor DataChannel
         var sum: USize = 0
         var received_count: U8 = 0
         _reading = true
-
         while _readable and not _shutdown_peer do
           if _muted then
             _reading = false
             return
           end
 
-          if _read_buf_offset > _expect then
+          if _read_buf_offset >= _expect then
             if (_expect == 0) and (_read_buf_offset > 0) then
               let data = _read_buf = recover Array[U8] end
               data.truncate(_read_buf_offset)
@@ -701,35 +685,40 @@ actor DataChannel
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
-              // _read_buf_size()
               _read_again()
               _reading = false
               return
             end
           else
-            // Read as much data as possible.
-            let len = @pony_os_recv[USize](
-              _event,
-              _read_buf.cpointer(_read_buf_offset),
-              _read_buf.space() - _read_buf_offset) ?
+            if _read_buf.space() > _read_buf_offset then
 
-            match len
-            | 0 =>
-              // Would block, try again later.
-              // this is safe because asio thread isn't currently subscribed
-              // for a read event so will not be writing to the readable flag
-              @pony_asio_event_set_readable[None](_event, false)
-              _readable = false
-              @pony_asio_event_resubscribe_read(_event)
-              _reading = false
-              return
-            | (_read_buf.space() - _read_buf_offset) =>
-              // Increase the read buffer size.
-              _next_size = _max_size.min(_next_size * 2)
+              // Read as much data as possible.
+              let len = @pony_os_recv[USize](
+                _event,
+                _read_buf.cpointer(_read_buf_offset),
+                _read_buf.space() - _read_buf_offset) ?
+
+              match len
+              | 0 =>
+                // Would block, try again later.
+                // this is safe because asio thread isn't currently subscribed
+                // for a read event so will not be writing to the readable flag
+                @pony_asio_event_set_readable[None](_event, false)
+                _readable = false
+                @pony_asio_event_resubscribe_read(_event)
+                _reading = false
+                return
+              | (_read_buf.space() - _read_buf_offset) =>
+                // Increase the read buffer size.
+                _next_size = _max_size.min(_next_size * 2)
+              end
+
+              _read_buf_offset = _read_buf_offset + len
+              sum = sum + len
+            else
+              _read_buf_size()
+              _read_again()
             end
-
-            _read_buf_offset = _read_buf_offset + len
-            sum = sum + len
           end
         end
       else
@@ -737,6 +726,7 @@ actor DataChannel
         _shutdown_peer = true
         _hard_close()
       end
+      _reading = false
     end
 
   fun ref _notify_connecting() =>
