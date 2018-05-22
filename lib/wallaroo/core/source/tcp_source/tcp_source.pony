@@ -595,7 +595,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
           return
         end
 
-        if _read_buf_offset > _expect then
+        if _read_buf_offset >= _expect then
           if (_expect == 0) and (_read_buf_offset > 0) then
             let data = _read_buf = recover Array[U8] end
             data.truncate(_read_buf_offset)
@@ -649,29 +649,34 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
             return
           end
         else
+          if _read_buf.space() > _read_buf_offset then
           // Read as much data as possible.
-          let len = @pony_os_recv[USize](
-            _event,
-            _read_buf.cpointer(_read_buf_offset),
-            _read_buf.space() - _read_buf_offset) ?
+            let len = @pony_os_recv[USize](
+              _event,
+              _read_buf.cpointer(_read_buf_offset),
+              _read_buf.space() - _read_buf_offset) ?
 
-          match len
-          | 0 =>
-            // Would block, try again later.
-            // this is safe because asio thread isn't currently subscribed
-            // for a read event so will not be writing to the readable flag
-            @pony_asio_event_set_readable[None](_event, false)
-            _readable = false
-            @pony_asio_event_resubscribe_read(_event)
-            _reading = false
-            return
-          | (_read_buf.space() - _read_buf_offset) =>
-            // Increase the read buffer size.
-            _next_size = _max_size.min(_next_size * 2)
+            match len
+            | 0 =>
+              // Would block, try again later.
+              // this is safe because asio thread isn't currently subscribed
+              // for a read event so will not be writing to the readable flag
+              @pony_asio_event_set_readable[None](_event, false)
+              _readable = false
+              @pony_asio_event_resubscribe_read(_event)
+              _reading = false
+              return
+            | (_read_buf.space() - _read_buf_offset) =>
+              // Increase the read buffer size.
+              _next_size = _max_size.min(_next_size * 2)
+            end
+
+            _read_buf_offset = _read_buf_offset + len
+            sum = sum + len
+          else
+            _read_buf_size()
+            _read_again()
           end
-
-          _read_buf_offset = _read_buf_offset + len
-          sum = sum + len
         end
       end
     else
