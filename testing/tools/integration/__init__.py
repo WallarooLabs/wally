@@ -104,4 +104,5 @@ from observability import (cluster_status_query,
                            ObservabilityResponseError,
                            ObservabilityTimeoutError,
                            partition_counts_query,
-                           partitions_query)
+                           partitions_query,
+                           state_entity_query)

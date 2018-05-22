@@ -42,7 +42,8 @@ class ObservabilityResponseError(Exception):
 QUERY_TYPES = {
     'partition-query': 'partition-query',
     'partition-counts': 'partition-count-query',
-    'cluster-status': 'cluster-status-query'}
+    'cluster-status': 'cluster-status-query',
+    'state-entity-query': 'state-entity-query'}
 
 
 def external_sender_query(host, port, query_type):
@@ -97,6 +98,20 @@ def partition_counts_query(host, port):
     information.
     """
     stdout = external_sender_query(host, port, 'partition-counts')
+    try:
+        return json.loads(stdout)
+    except Exception as err:
+        e = ObservabilityResponseError("Failed to deserialize observability"
+                                      " response:\n{!r}".format(stdout))
+        logging.error(e)
+        raise
+
+
+def state_entity_query(host, port):
+    """
+    Query the worker at the given address for its state entities
+    """
+    stdout = external_sender_query(host, port, 'state-entity-query')
     try:
         return json.loads(stdout)
     except Exception as err:
