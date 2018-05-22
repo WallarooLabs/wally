@@ -966,7 +966,8 @@ INITIALIZER_CMD = r'''{worker_count} \
     --cluster-initializer'''
 WORKER_CMD = r'''
     --my-control {host}:{control_port} \
-    --my-data {host}:{data_port}'''
+    --my-data {host}:{data_port} \
+    --external {host}:{external_port}'''
 JOIN_CMD = r'''--join {host}:{join_port} \
     {worker_count}'''
 CONTROL_CMD = r'''--control {host}:{control_port}'''
@@ -1031,7 +1032,9 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
                               worker_block=WORKER_CMD.format(
                                   host=host,
                                   data_port=worker_ports[x-1][1],
-                                  control_port=worker_ports[x-1][0]),
+                                  control_port=worker_ports[x-1][0],
+                                  external_port=worker_ports[x-1][2]
+                                  ),
                               join_block=CONTROL_CMD.format(host=host,
                                   control_port=control_port),
                               alt_block=alt_block if alt_func(x) else '',
@@ -1062,7 +1065,7 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
 
 def add_runner(runners, command, host, inputs, outputs, metrics_port,
                control_port, external_port, data_port, res_dir, workers,
-               my_control_port, my_data_port,
+               my_control_port, my_data_port, my_external_port,
                alt_block=None, alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    host=host,
@@ -1095,7 +1098,8 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
                           worker_block=WORKER_CMD.format(
                               host=host,
                               control_port=my_control_port,
-                              data_port=my_data_port),
+                              data_port=my_data_port,
+                              external_port=my_external_port),
                           join_block=JOIN_CMD.format(
                               host=host,
                               join_port=control_port,
