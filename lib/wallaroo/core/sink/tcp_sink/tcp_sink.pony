@@ -71,10 +71,8 @@ actor TCPSink is Consumer
 
   ## Possible future work
 
-  - Much better algo for determining how many credits to hand out per producer
   - At the moment we treat sending over TCP as done. In the future we can and
     should support ack of the data being handled from the other side.
-  - Handle reconnecting after being disconnected from the downstream
   - Optional in sink deduplication (this woud involve storing what we sent and
     was acknowleged.)
   """
