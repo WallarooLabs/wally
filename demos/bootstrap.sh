@@ -1,6 +1,6 @@
 #!/bin/bash
 
-wallaroo_version="0c02e661"
+wallaroo_version="0894eac4"
 ## setup our various additional source
 
 ## pony bintray repo setup
@@ -34,11 +34,13 @@ apt-get install -y build-essential \
   libssl-dev \
   make \
   pony-stable \
-  ponyc=0.21.0-4301.acd811b \
+  ponyc=0.21.3 \
   python-dev
 
-## switch to default vagrant user
-su - vagrant
+# install go
+wget https://dl.google.com/go/go1.9.6.linux-amd64.tar.gz
+tar -x -C /usr/local -f go1.9.6.linux-amd64.tar.gz
+echo "PATH=$PATH:/usr/local/go/bin" | tee -a /home/vagrant/.profile
 
 ## clone Wallaroo and build various Wallaroo tools
 pushd /home/vagrant
@@ -49,11 +51,7 @@ git clone https://github.com/WallarooLabs/wallaroo
 pushd wallaroo || exit
 git checkout $wallaroo_version
 
-pushd machida || exit
-make
-popd
-
-make build-giles-all build-utils-all
+PATH=$PATH:/usr/local/go/bin make build-machida-all build-demos-go_word_count-all build-giles-all build-utils-all
 
 ## allow vagrant user access to everything
 pushd /home/vagrant
