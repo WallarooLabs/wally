@@ -329,6 +329,12 @@ actor DataReceiver is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
+  be unknown_key(key: Key) =>
+    None
+
+  be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
+    None
+
   be mute(c: Consumer) =>
     match _latest_conn
     | let conn: DataChannel =>
