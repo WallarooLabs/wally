@@ -234,6 +234,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _initialized: SetIs[Initializable] = _initialized.create()
   var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
   let _initializables: SetIs[Initializable] = _initializables.create()
+  let _state_step_creator: StateStepCreator
   var _initialization_lifecycle_complete: Bool = false
 
   // Partition router blueprints
@@ -262,7 +263,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     event_log: EventLog, recovery: Recovery,
     recovery_replayer: RecoveryReplayer,
     local_topology_file: String, data_channel_file: String,
-    worker_names_file: String, cluster_manager: (ClusterManager | None) = None,
+    worker_names_file: String, state_step_creator: StateStepCreator,
+    cluster_manager: (ClusterManager | None) = None,
     is_joining: Bool = false)
   =>
     _application = app
@@ -283,6 +285,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     _cluster_manager = cluster_manager
     _is_joining = is_joining
     _router_registry.register_local_topology_initializer(this)
+    _state_step_creator = state_step_creator
+    _initializables.set(_state_step_creator)
 
   be update_topology(t: LocalTopology) =>
     _topology = t
@@ -873,6 +877,21 @@ actor LocalTopologyInitializer is LayoutInitializer
                       _outgoing_boundaries, _initializables,
                       data_routes_ref, keyed_data_routes_ref,
                       keyed_step_ids_ref)?
+
+                    let ssc_keyed_data_routes = recover iso Map[Key, Step] end
+
+                    for (k, v) in keyed_data_routes_ref.pairs() do
+                      ssc_keyed_data_routes(k) = v
+                    end
+
+                    let ssc_keyed_step_ids = recover iso Map[Key, StepId] end
+
+                    for (k, v) in keyed_step_ids_ref.pairs() do
+                      ssc_keyed_step_ids(k) = v
+                    end
+
+                    _state_step_creator.initialize_routes(this,
+                      consume ssc_keyed_data_routes, consume ssc_keyed_step_ids)
                   else
                     @printf[I32]("Failed to update state_map\n".cstring())
                     error

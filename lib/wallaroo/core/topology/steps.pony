@@ -378,6 +378,12 @@ actor Step is (Producer & Consumer)
   fun ref current_sequence_id(): SeqId =>
     _seq_id_generator.latest_for_run()
 
+  be unknown_key(key: Key) =>
+    None
+
+  be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
+    None
+
   fun ref filter_queued_msg(i_producer: Producer, i_route_id: RouteId,
     i_seq_id: SeqId)
   =>

@@ -368,6 +368,12 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   fun ref current_sequence_id(): SeqId =>
     _seq_id
 
+  be unknown_key(key: Key) =>
+    None
+
+  be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
+    None
+
   be report_status(code: ReportStatusCode) =>
     match code
     | BoundaryCountStatus =>

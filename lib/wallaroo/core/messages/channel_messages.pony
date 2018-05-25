@@ -856,7 +856,11 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
         worker_ingress_ts)
       route_id
     else
-      Fail()
+      ifdef "trace" then
+        @printf[I32]("DataRouter could not find route for key %s\n".cstring(),
+          _target_key.cstring())
+      end
+      producer.unknown_key(_target_key)
       error
     end
 
