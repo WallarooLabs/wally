@@ -330,13 +330,15 @@ actor Startup
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_replayer, connections)
 
+      let state_step_creator = StateStepCreator
+
       let local_topology_initializer =
         LocalTopologyInitializer(
           _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers, event_log, recovery,
           recovery_replayer, _local_topology_file, _data_channel_file,
-          _worker_names_file)
+          _worker_names_file, state_step_creator)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -491,13 +493,16 @@ actor Startup
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_replayer, connections)
 
+      let state_step_creator = StateStepCreator
+
       let local_topology_initializer =
         LocalTopologyInitializer(
           _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
           event_log, recovery, recovery_replayer,
-          _local_topology_file, _data_channel_file, _worker_names_file
+          _local_topology_file, _data_channel_file, _worker_names_file,
+          state_step_creator
           where is_joining = true)
 
       if (_external_host != "") or (_external_service != "") then

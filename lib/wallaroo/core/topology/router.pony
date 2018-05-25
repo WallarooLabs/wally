@@ -891,7 +891,12 @@ class val DataRouter is Equatable[DataRouter]
         producer.bookkeeping(route_id, seq_id)
       end
     else
-      Fail()
+      // !@ We used to fail here, but the only reason we should get here is
+      // is because we couldn't find a route for the key. Maybe we should
+      // handle this differently.
+      ifdef "trace" then
+        @printf[I32]("DataRouter could not find a step\n".cstring())
+      end
     end
 
   fun replay_route(r_msg: ReplayableDeliveryMsg, pipeline_time_spent: U64,
@@ -1196,11 +1201,9 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
           try
             _hash_partitions.get_claimant_by_key(key)?
           else
-            //!@ We should be creating new steps for unseen keys now
-            ifdef debug then
-              @printf[I32](("LocalPartitionRouter.route: No entry for " +
-              "key %s\n\n").cstring(), key.string().cstring())
-            end
+            @printf[I32](("Could not find claimant for key " +
+              " '%s'\n\n").cstring(), key.string().cstring())
+            Fail()
             return (true, latest_ts)
           end
         if worker == _worker_name then
@@ -1222,9 +1225,11 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
               (true, latest_ts)
             end
           else
-            // We should always have a local route if we know the key
-            // already and we claim it.
-            Fail()
+            ifdef debug then
+              @printf[I32](("LocalPartitionRouter.route: No entry for " +
+                "key '%s'\n\n").cstring(), key.string().cstring())
+            end
+            producer.unknown_key(key)
             (true, latest_ts)
           end
         else
