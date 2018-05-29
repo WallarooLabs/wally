@@ -637,7 +637,7 @@ actor DataChannel
             return
           end
 
-          if _read_buf_offset >= _expect then
+          if (_read_buf_offset >= _expect) and (_read_buf_offset != 0) then
             if (_expect == 0) and (_read_buf_offset > 0) then
               let data = _read_buf = recover Array[U8] end
               data.truncate(_read_buf_offset)
