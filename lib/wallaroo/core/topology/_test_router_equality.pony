@@ -299,7 +299,7 @@ primitive _StepGenerator
   =>
     Step(auth, RouterRunner, MetricsReporter("", "", _NullMetricsSink),
       1, BoundaryOnlyRouteBuilder, event_log, recovery_replayer,
-      recover Map[String, OutgoingBoundary] end)
+      recover Map[String, OutgoingBoundary] end, StateStepCreator)
 
 primitive _BoundaryGenerator
   fun apply(worker_name: String, auth: AmbientAuth): OutgoingBoundary =>
@@ -309,12 +309,13 @@ primitive _BoundaryGenerator
 primitive _RouterRegistryGenerator
   fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
     RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
-      _ConnectionsGenerator(env, auth), _DummyRecoveryFileCleaner, 0,
+      _ConnectionsGenerator(env, auth), StateStepCreator,
+      _DummyRecoveryFileCleaner, 0,
       false)
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>
-    DataReceivers(auth, _ConnectionsGenerator(env, auth), "")
+    DataReceivers(auth, _ConnectionsGenerator(env, auth), "", StateStepCreator)
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>

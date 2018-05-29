@@ -11,8 +11,7 @@ actor StateStepCreator is Initializable
 
   be application_created(initializer: LocalTopologyInitializer,
     omni_router: OmniRouter) =>
-    // initializer.report_initialized(this)
-    None
+    initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     initializer.report_ready_to_work(this)

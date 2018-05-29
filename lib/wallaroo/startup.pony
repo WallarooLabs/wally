@@ -313,13 +313,15 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
+      let state_step_creator = StateStepCreator
+
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name, is_recovering)
+        _startup_options.worker_name, state_step_creator, is_recovering)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
-        connections, this, _startup_options.stop_the_world_pause,
-        _is_joining)
+        connections, state_step_creator, this,
+        _startup_options.stop_the_world_pause, _is_joining)
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
 
@@ -329,8 +331,6 @@ actor Startup
 
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_replayer, connections)
-
-      let state_step_creator = StateStepCreator
 
       let local_topology_initializer =
         LocalTopologyInitializer(
@@ -354,7 +354,7 @@ actor Startup
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
         _application_distributor = ApplicationDistributor(auth, _application,
-          local_topology_initializer)
+          local_topology_initializer, state_step_creator)
         match _application_distributor
         | let ad: ApplicationDistributor =>
           match _startup_options.worker_count
@@ -476,13 +476,15 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
+      let state_step_creator = StateStepCreator
+
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name)
+        _startup_options.worker_name, state_step_creator)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
-        connections, this, _startup_options.stop_the_world_pause, _is_joining,
-        m.sender_name)
+        connections, state_step_creator, this,
+        _startup_options.stop_the_world_pause, _is_joining, m.sender_name)
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
 
@@ -492,8 +494,6 @@ actor Startup
 
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_replayer, connections)
-
-      let state_step_creator = StateStepCreator
 
       let local_topology_initializer =
         LocalTopologyInitializer(

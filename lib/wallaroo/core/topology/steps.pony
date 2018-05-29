@@ -71,11 +71,14 @@ actor Step is (Producer & Consumer)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
 
+  let _state_step_creator: StateStepCreator
+
   new create(auth: AmbientAuth, runner: Runner iso,
     metrics_reporter: MetricsReporter iso,
     id: U128, route_builder: RouteBuilder, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    state_step_creator: StateStepCreator,
     router: Router = EmptyRouter,
     omni_router: OmniRouter = EmptyOmniRouter)
   =>
@@ -90,6 +93,7 @@ actor Step is (Producer & Consumer)
     _event_log = event_log
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
+    _state_step_creator = state_step_creator
     _id = id
     _in_flight_ack_waiter = InFlightAckWaiter(_id)
 
@@ -379,7 +383,7 @@ actor Step is (Producer & Consumer)
     _seq_id_generator.latest_for_run()
 
   be unknown_key(key: Key) =>
-    None
+    _state_step_creator.report_unknown_key(this, key)
 
   be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
     None
