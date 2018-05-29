@@ -40,6 +40,7 @@ actor RouterRegistry is InFlightAckRequester
   let _data_receivers: DataReceivers
   let _worker_name: String
   let _connections: Connections
+  let _state_step_creator: StateStepCreator
   let _recovery_file_cleaner: RecoveryFileCleaner
   var _data_router: DataRouter =
     DataRouter(recover Map[StepId, Consumer] end, recover Map[Key, Step] end,
@@ -130,6 +131,7 @@ actor RouterRegistry is InFlightAckRequester
 
   new create(auth: AmbientAuth, worker_name: String,
     data_receivers: DataReceivers, c: Connections,
+    state_step_creator: StateStepCreator,
     recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64,
     is_joining: Bool, contacted_worker: (String | None) = None)
   =>
@@ -137,6 +139,7 @@ actor RouterRegistry is InFlightAckRequester
     _worker_name = worker_name
     _data_receivers = data_receivers
     _connections = c
+    _state_step_creator = state_step_creator
     _recovery_file_cleaner = recovery_file_cleaner
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
@@ -1506,7 +1509,8 @@ actor RouterRegistry is InFlightAckRequester
         let step = Step(_auth, runner_builder(where event_log = event_log,
           auth = _auth), consume reporter, msg.step_id(),
           runner_builder.route_builder(), event_log, recovery_replayer,
-          consume outgoing_boundaries where omni_router = omnr)
+          consume outgoing_boundaries, _state_step_creator
+          where omni_router = omnr)
         step.receive_state(msg.state())
         msg.update_router_registry(this, step)
       else

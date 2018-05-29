@@ -343,7 +343,8 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
     step_id_map': Map[Key, U128] val, partition': Partition[PIn] val,
     state_runner_builder: StateRunnerBuilder[S] val,
     route_builder': RouteBuilder,
-    forward_route_builder': RouteBuilder, id': U128 = 0,
+    forward_route_builder': RouteBuilder,
+    id': U128 = 0,
     multi_worker: Bool = false)
   =>
     _id = if id' == 0 then StepIdGenerator() else id' end

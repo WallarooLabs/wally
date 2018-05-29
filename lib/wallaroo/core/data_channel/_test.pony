@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "ponytest"
 use "wallaroo/core/boundary"
+use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -81,9 +82,10 @@ class _TestDataChannel is DataChannelListenNotify
         _NullMetricsSink, "127.0.0.1", "0",
         true, "/tmp/foo_connections.txt", false
         where event_log = event_log)
-      let dr = DataReceivers(auth, conns, "worker_name")
+      let ssc = StateStepCreator
+      let dr = DataReceivers(auth, conns, "worker_name", ssc)
       let rr = RouterRegistry(auth, "worker_name", dr, conns,
-        _DummyRecoveryFileCleaner, 1, false)
+        StateStepCreator, _DummyRecoveryFileCleaner, 1, false)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
       h.dispose_when_done(conns)
       h.complete_action("server create")

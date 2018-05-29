@@ -77,6 +77,7 @@ class val StepBuilder
   fun apply(next: Router, metrics_conn: MetricsSink,
     event_log: EventLog, recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    state_step_creator: StateStepCreator,
     router: Router = EmptyRouter,
     omni_router: OmniRouter = EmptyOmniRouter): Step tag
   =>
@@ -85,7 +86,7 @@ class val StepBuilder
     let step = Step(auth, consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
       _runner_builder.route_builder(), event_log, recovery_replayer,
-      outgoing_boundaries, router, omni_router)
+      outgoing_boundaries, state_step_creator, router, omni_router)
     step.update_router(next)
     step
 

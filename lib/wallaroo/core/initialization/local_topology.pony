@@ -89,7 +89,8 @@ class val LocalTopology
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer tag],
     keyed_data_routes: Map[Key, Step],
-    keyed_step_ids: Map[Key, StepId]) ?
+    keyed_step_ids: Map[Key, StepId],
+    state_step_creator: StateStepCreator) ?
   =>
     let subpartition =
       try
@@ -105,7 +106,8 @@ class val LocalTopology
         .cstring())
       state_map(state_name) = subpartition.build(_app_name, _worker_name,
          metrics_conn, auth, event_log, recovery_replayer, outgoing_boundaries,
-         initializables, data_routes, keyed_data_routes, keyed_step_ids)
+         initializables, data_routes, keyed_data_routes, keyed_step_ids,
+         state_step_creator)
     end
 
   fun graph(): Dag[StepInitializer] val => _graph
@@ -634,14 +636,24 @@ actor LocalTopologyInitializer is LayoutInitializer
     | let t: LocalTopology =>
       @printf[I32]("Saving topology!\n".cstring())
       try
-        let local_topology_file = FilePath(_auth, _local_topology_file)?
+        let local_topology_file = try
+          FilePath(_auth, _local_topology_file)?
+        else
+          @printf[I32]("Error opening topology file!\n".cstring())
+          error
+        end
         // TODO: Back up old file before clearing it?
         let file = File(local_topology_file)
         // Clear contents of file.
         file.set_length(0)
         let wb = Writer
         let sa = SerialiseAuth(_auth)
-        let s = Serialised(sa, t)?
+        let s = try
+          Serialised(sa, t)?
+        else
+          @printf[I32]("Error serializing topology!\n".cstring())
+          error
+        end
         let osa = OutputSerialisedAuth(_auth)
         let serialised_topology: Array[U8] val = s.output(osa)
         wb.write(serialised_topology)
@@ -876,22 +888,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       _metrics_conn, _event_log, _recovery_replayer, _auth,
                       _outgoing_boundaries, _initializables,
                       data_routes_ref, keyed_data_routes_ref,
-                      keyed_step_ids_ref)?
-
-                    let ssc_keyed_data_routes = recover iso Map[Key, Step] end
-
-                    for (k, v) in keyed_data_routes_ref.pairs() do
-                      ssc_keyed_data_routes(k) = v
-                    end
-
-                    let ssc_keyed_step_ids = recover iso Map[Key, StepId] end
-
-                    for (k, v) in keyed_step_ids_ref.pairs() do
-                      ssc_keyed_step_ids(k) = v
-                    end
-
-                    _state_step_creator.initialize_routes(this,
-                      consume ssc_keyed_data_routes, consume ssc_keyed_step_ids)
+                      keyed_step_ids_ref,
+                      _state_step_creator)?
                   else
                     @printf[I32]("Failed to update state_map\n".cstring())
                     error
@@ -937,6 +935,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
                 let next_step = builder(partition_router, _metrics_conn,
                   _event_log, _recovery_replayer, _auth, _outgoing_boundaries,
+                  _state_step_creator,
                   state_comp_target_router)
                 _router_registry.register_partition_router_subscriber(
                   builder.state_name(), next_step)
@@ -986,7 +985,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                   end
 
                 let next_step = builder(out_router, _metrics_conn, _event_log,
-                  _recovery_replayer, _auth, _outgoing_boundaries)
+                  _recovery_replayer, _auth, _outgoing_boundaries,
+                  _state_step_creator)
 
                 // ASSUMPTION: If an out_router is a MultiRouter, then none
                 // of its subrouters are partition routers. Put differently,
@@ -1032,7 +1032,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 @printf[I32](("----Spinning up state for " + builder.name() +
                   "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn,
-                  _event_log, _recovery_replayer, _auth, _outgoing_boundaries)
+                  _event_log, _recovery_replayer, _auth, _outgoing_boundaries,
+                  _state_step_creator)
                 data_routes(next_id) = state_step
                 _initializables.set(state_step)
 
@@ -1075,7 +1076,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
                     let pre_state_step = b(state_step_router, _metrics_conn,
                       _event_log, _recovery_replayer, _auth,
-                      _outgoing_boundaries, state_comp_target)
+                      _outgoing_boundaries, _state_step_creator,
+                      state_comp_target)
                     data_routes(b.id()) = pre_state_step
                     _initializables.set(pre_state_step)
 
@@ -1242,7 +1244,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                     _metrics_conn, _event_log, _recovery_replayer, _auth,
                     _outgoing_boundaries, _initializables,
                     data_routes_ref, keyed_data_routes_ref,
-                    keyed_step_ids_ref)?
+                    keyed_step_ids_ref,
+                    _state_step_creator)?
                 else
                   @printf[I32]("Failed to update state map\n".cstring())
                   error
@@ -1322,7 +1325,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 source_data.route_builder(),
                 _outgoing_boundary_builders,
                 _event_log, _auth, pipeline_name,
-                this,  consume source_reporter, _recovering))
+                this,  consume source_reporter, _recovering,
+                _state_step_creator))
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
@@ -1371,7 +1375,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                   _metrics_conn, _event_log, _recovery_replayer, _auth,
                   _outgoing_boundaries, _initializables,
                   data_routes_ref, keyed_data_routes_ref,
-                  keyed_step_ids_ref)?
+                  keyed_step_ids_ref,
+                  _state_step_creator)?
               else
                 @printf[I32]("Failed to update state map\n".cstring())
                 error
@@ -1426,9 +1431,15 @@ actor LocalTopologyInitializer is LayoutInitializer
           keyed_step_ids(k) = v
         end
 
+        let sendable_keyed_data_routes = consume val keyed_data_routes
+        let sendable_keyed_step_ids = consume val keyed_step_ids
+
         let data_router = DataRouter(sendable_data_routes,
-          consume keyed_data_routes, consume keyed_step_ids)
+          sendable_keyed_data_routes, sendable_keyed_step_ids)
         _router_registry.set_data_router(data_router)
+
+        _state_step_creator.initialize_routes(this,
+          sendable_keyed_data_routes, sendable_keyed_step_ids)
 
         if not _is_initializer then
           // Inform the initializer that we're done initializing our local
