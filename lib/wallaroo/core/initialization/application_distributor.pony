@@ -36,13 +36,16 @@ actor ApplicationDistributor is Distributor
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _application: Application val
+  let _state_step_creator: StateStepCreator
 
   new create(auth: AmbientAuth, application: Application val,
-    local_topology_initializer: LocalTopologyInitializer)
+    local_topology_initializer: LocalTopologyInitializer,
+    state_step_creator: StateStepCreator)
   =>
     _auth = auth
     _local_topology_initializer = local_topology_initializer
     _application = application
+    _state_step_creator = state_step_creator
 
   be distribute(cluster_initializer: (ClusterInitializer | None),
     worker_count: USize, worker_names: Array[String] val,

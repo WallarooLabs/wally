@@ -39,4 +39,5 @@ interface val SourceListenerBuilderBuilder
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso, recovering: Bool,
+    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter): SourceListenerBuilder

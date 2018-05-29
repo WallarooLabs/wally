@@ -40,12 +40,15 @@ actor DataReceivers
 
   var _router_registry: (RouterRegistry | None) = None
 
+  let _state_step_creator: StateStepCreator
+
   new create(auth: AmbientAuth, connections: Connections, worker_name: String,
-    is_recovering: Bool = false)
+    state_step_creator: StateStepCreator, is_recovering: Bool = false)
   =>
     _auth = auth
     _connections = connections
     _worker_name = worker_name
+    _state_step_creator = state_step_creator
     if not is_recovering then
       _initialized = true
     end
@@ -76,7 +79,7 @@ actor DataReceivers
         _data_receivers(boundary_id)?
       else
         let new_dr = DataReceiver(_auth, _worker_name, sender_name,
-          _initialized)
+          _state_step_creator, _initialized)
         match _router_registry
         | let rr: RouterRegistry =>
           rr.register_data_receiver(sender_name, new_dr)

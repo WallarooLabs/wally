@@ -30,6 +30,7 @@ actor DataReceiver is Producer
   let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
+  let _state_step_creator: StateStepCreator
   var _sender_step_id: StepId = 0
   var _router: DataRouter =
     DataRouter(recover Map[StepId, Consumer] end, recover Map[Key, Step] end,
@@ -59,12 +60,13 @@ actor DataReceiver is Producer
   var _in_flight_ack_waiter: InFlightAckWaiter = InFlightAckWaiter
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
-    initialized: Bool = false)
+    state_step_creator: StateStepCreator, initialized: Bool = false)
   =>
     _id = StepIdGenerator()
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
+    _state_step_creator = state_step_creator
     if initialized then
       _processing_phase = _DataReceiverAcceptingMessagesPhase(this)
     end
@@ -330,7 +332,7 @@ actor DataReceiver is Producer
     0
 
   be unknown_key(key: Key) =>
-    None
+    _state_step_creator.report_unknown_key(this, key)
 
   be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
     None

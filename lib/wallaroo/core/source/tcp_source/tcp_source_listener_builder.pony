@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "wallaroo/core/boundary"
+use "wallaroo/core/common"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/core/initialization"
@@ -40,6 +41,7 @@ class val TCPSourceListenerBuilder
   let _host: String
   let _service: String
   let _metrics_reporter: MetricsReporter
+  let _state_step_creator: StateStepCreator
 
   new val create(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry, route_builder: RouteBuilder,
@@ -47,6 +49,7 @@ class val TCPSourceListenerBuilder
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
+    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter,
     host: String = "", service: String = "0")
   =>
@@ -60,6 +63,7 @@ class val TCPSourceListenerBuilder
     _event_log = event_log
     _auth = auth
     _target_router = target_router
+    _state_step_creator = state_step_creator
     _host = host
     _service = service
     _metrics_reporter = consume metrics_reporter
@@ -68,7 +72,7 @@ class val TCPSourceListenerBuilder
     TCPSourceListener(env, _source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders, _event_log, _auth,
       _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      _target_router, _host, _service)
+      _state_step_creator, _target_router, _host, _service)
 
 class val TCPSourceListenerBuilderBuilder
   let _host: String
@@ -84,11 +88,11 @@ class val TCPSourceListenerBuilderBuilder
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso, recovering: Bool,
+    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter): TCPSourceListenerBuilder
   =>
     TCPSourceListenerBuilder(source_builder, router, router_registry,
       route_builder,
       outgoing_boundary_builders, event_log, auth, pipeline_name,
-      layout_initializer, consume metrics_reporter, target_router, _host,
-      _service)
-
+      layout_initializer, consume metrics_reporter, state_step_creator,
+      target_router, _host, _service)

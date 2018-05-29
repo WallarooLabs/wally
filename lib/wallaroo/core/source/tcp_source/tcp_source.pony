@@ -96,6 +96,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   let _max_received_count: U8 = 50
 
   let _router_registry: RouterRegistry
+  let _state_step_creator: StateStepCreator
 
   let _event_log: EventLog
   let _acker_x: Acker
@@ -110,7 +111,8 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     fd: U32, init_size: USize = 64, max_size: USize = 16384,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
+    state_step_creator: StateStepCreator)
   =>
     """
     A new connection accepted on a server.
@@ -133,6 +135,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
+    _state_step_creator = state_step_creator
 
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
@@ -369,7 +372,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     _seq_id
 
   be unknown_key(key: Key) =>
-    None
+    _state_step_creator.report_unknown_key(this, key)
 
   be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
     None

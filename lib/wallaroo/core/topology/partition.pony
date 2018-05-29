@@ -154,7 +154,8 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer],
     keyed_data_routes: Map[Key, Step],
-    keyed_step_ids: Map[Key, StepId]): PartitionRouter
+    keyed_step_ids: Map[Key, StepId],
+    state_step_creator: StateStepCreator): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartition ?
   fun runner_builder(): RunnerBuilder
 
@@ -191,7 +192,8 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
     initializables: SetIs[Initializable],
     data_routes: Map[StepId, Consumer],
     keyed_data_routes: Map[Key, Step],
-    keyed_step_ids: Map[Key, StepId]):
+    keyed_step_ids: Map[Key, StepId],
+    state_step_creator: StateStepCreator):
     LocalPartitionRouter[PIn, S] val
   =>
     let hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
@@ -212,7 +214,8 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
               let next_state_step = Step(auth, _runner_builder(
                 where event_log = event_log, auth = auth),
                 consume reporter, id, _runner_builder.route_builder(),
-                  event_log, recovery_replayer, outgoing_boundaries)
+                  event_log, recovery_replayer, outgoing_boundaries,
+                  state_step_creator)
 
               initializables.set(next_state_step)
               data_routes(id) = next_state_step
