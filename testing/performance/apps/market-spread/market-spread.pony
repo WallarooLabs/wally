@@ -359,9 +359,6 @@ primitive OrderResultEncoder
     wb.f64_be(r.bid)
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
-    let payload = wb.done()
-    HubProtocol.payload("rejected-orders", "reports:market-spread",
-      consume payload, wb)
     wb.done()
 
 class LegalSymbols

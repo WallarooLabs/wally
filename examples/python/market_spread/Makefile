@@ -48,15 +48,16 @@ integration-tests-examples-python-market_spread: market_spread_py_test
 market_spread_py_test:
 	cd $(MARKET_SPREAD_PY_PATH) && \
 	python _test/gen.py && \
-	integration_test --framed-file-sender _market.txt 1 \
+	integration_test \
+		--framed-file-sender _market.txt 1 \
 		--framed-file-sender _orders.txt 0 \
-	  --log-level error \
+		--log-level error \
 		--command 'machida --application-module market_spread' \
 		--validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
 		--output 'received.txt' \
 		--workers 5 \
 		--sources 2 \
-		--sink-mode newlines \
+		--sink-mode framed \
 		--sink-expect 1000
 
 clean-examples-python-market_spread: market_spread_py_clean
