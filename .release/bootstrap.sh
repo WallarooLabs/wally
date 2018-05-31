@@ -5,6 +5,8 @@ set -o nounset
 export DEBIAN_FRONTEND=noninteractive
 
 export PONYC_VERSION="0.21.0-4301.acd811b"
+export PONY_STABLE_VERSION="0.1.1-70.6c4de6b"
+export CHANGLOG_TOOL_VERSION="0.2.1"
 export OTP_VERSION="1:20.1-1"
 export ELIXIR_VERSION="1.5.2-1"
 export GO_VERSION="1.9.4"
@@ -28,7 +30,7 @@ install_pony_stable() {
   sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
   echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list.d/pony-stable-debian.list
   sudo apt-get update
-  sudo apt-get -V -y install pony-stable
+  sudo apt-get -V -y install pony-stable=$PONY_STABLE_VERSION
 
   echo "** pony-stable installed"
 }
@@ -136,6 +138,7 @@ install_go() {
 install_changelog_tool() {
   git clone https://github.com/ponylang/changelog-tool
   cd changelog-tool
+  git checkout $CHANGLOG_TOOL_VERSION
   make
   sudo make install
 }
