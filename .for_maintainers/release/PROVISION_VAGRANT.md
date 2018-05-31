@@ -6,6 +6,8 @@ This document is aimed at members of the Wallaroo team who might be cutting a re
 
 in order to properly provision the Vagrant box used for the Wallaroo release process you will need the following:
 
+- **Vagrant:** Download links for the appropriate installer or package for each supported OS can be found on the [Vagrant downloads page](https://www.vagrantup.com/downloads.html).
+
 - **WallarooLabs Bintray Docker Credentials:** You will need a Docker Username and API Key setup via Bintray with access to the `wallaroo-labs-docker-wallaroolabs.bintray.io` Docker repository. Please note that you MUST be a member of the `wallaroo-labs/wallaroolabs` Bintray Docker repository in order to have publish access. If you need access, contact @seanTallen or @JONBRWN before continuing.
 
 - **`~/.gitconfig` file:** the `.release/Vagrantfile` expects a `.gitconfig` file to exist under `~/.gitconfig` on the host, which will be shared with the Vagrant box for committing purposes.
