@@ -24,7 +24,7 @@ cd  .release
 vagrant up
 ```
 
-This command will bring up a vagrant box with Wallaroo's build and release dependencies installed and with the `wallaroo` repo cloned to `/users/ubuntu/wallaroo`.
+This command will bring up a vagrant box with Wallaroo's build and release dependencies installed and with the `wallaroo` repo cloned to `/users/vagrant/wallaroo`.
 
 ### SSH into Wallaroo Vagrant box
 
@@ -59,7 +59,7 @@ git pull
 From within the Wallaroo Vagrant box run the following:
 
 ```bash
-cd /users/ubuntu/wallaroo
+cd /users/vagrant/wallaroo
 bash .release/gitbook-release.sh VERSION COMMIT
 ```
 
