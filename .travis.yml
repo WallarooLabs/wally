@@ -31,7 +31,7 @@ env:
     # ponyc version to install
     # needs to be a version in bintray or
     # a valid `git checkout` value if from source
-    - PONYC_VERSION: "master"
+    - PONYC_VERSION: "0.22.3"
     # ponyc from source variables
     # LLVM version used if building ponyc from source
     - LLVM_VERSION: "3.9.1"
