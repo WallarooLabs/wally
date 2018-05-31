@@ -78,7 +78,7 @@ actor RouterRegistry is InFlightAckRequester
   let _sources: Map[StepId, Source] = _sources.create()
   let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
   // Map from Source digestof value to source id
-  let _source_ids: Map[U64, StepId] = _source_ids.create()
+  let _source_ids: Map[USize, StepId] = _source_ids.create()
   let _data_channel_listeners: SetIs[DataChannelListener] =
     _data_channel_listeners.create()
   let _control_channel_listeners: SetIs[TCPListener] =

@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 export DEBIAN_FRONTEND=noninteractive
 
-export PONYC_VERSION="0.21.0-4301.acd811b"
+export PONYC_VERSION="0.22.2"
 export OTP_VERSION="1:20.1-1"
 export ELIXIR_VERSION="1.5.2-1"
 export GO_VERSION="1.9.4"

@@ -117,13 +117,13 @@ actor Main
 class FromWallarooListenerNotify is TCPListenNotify
   let _coordinator: Coordinator
   let _store: Store
-  let _stderr: StdStream
+  let _stderr: OutStream
   let _forward: Bool
   let _forwarding_actor: (MsgForwarder | None)
 
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream,
+    store: Store, stderr: OutStream,
     forward: Bool, forwarding_actor: (MsgForwarder | None))
   =>
     _coordinator = coordinator
@@ -148,14 +148,14 @@ class FromWallarooListenerNotify is TCPListenNotify
 class FromWallarooNotify is TCPConnectionNotify
   let _coordinator: Coordinator
   let _store: Store
-  let _stderr: StdStream
+  let _stderr: OutStream
   let _forward: Bool
   let _forwarding_actor: (MsgForwarder | None)
   var _header: Bool = true
   var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream,
+    store: Store, stderr: OutStream,
     forward: Bool, forwarding_actor: (MsgForwarder | None))
   =>
     _coordinator = coordinator
