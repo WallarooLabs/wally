@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: wallaroolabs/wallaroo-ci:standard
+      - image: wallaroolabs/wallaroo-ci:2018.06.07.1
     steps:
       - checkout
       - run: make build debug=true
@@ -14,19 +14,19 @@ jobs:
       - run: changelog-tool verify CHANGELOG.md
   integration-tests:
     docker:
-      - image: wallaroolabs/wallaroo-ci:standard
+      - image: wallaroolabs/wallaroo-ci:2018.06.07.1
     steps:
       - checkout
       - run: make integration-tests debug=true
   integration-tests-with-resilience:
     docker:
-      - image: wallaroolabs/wallaroo-ci:standard
+      - image: wallaroolabs/wallaroo-ci:2018.06.07.1
     steps:
       - checkout
       - run: make integration-tests-testing-correctness-tests-all resilience=on debug=true
   unit-tests:
     docker:
-      - image: wallaroolabs/wallaroo-ci:standard
+      - image: wallaroolabs/wallaroo-ci:2018.06.07.1
     steps:
       - checkout
       - run: make unit-tests debug=true

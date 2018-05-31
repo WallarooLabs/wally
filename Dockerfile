@@ -6,13 +6,16 @@ RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 
+ENV PONYC_VERSION 0.22.6
+ENV PONY_STABLE_VERSION 0.1.2-90.2af1a62
+
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2" && \
     echo "deb http://dl.bintray.com/pony-language/ponyc-debian pony-language main" >> /etc/apt/sources.list && \
     echo "deb http://dl.bintray.com/pony-language/pony-stable-debian /" >> /etc/apt/sources.list && \
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     git \
-    ponyc \
-    pony-stable \
+    ponyc=${PONYC_VERSION} \
+    pony-stable=${PONY_STABLE_VERSION} \
     build-essential \
     libsnappy-dev \
     liblz4-dev \
