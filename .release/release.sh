@@ -93,9 +93,9 @@ push_rc_changes() {
 
 checkout_and_pull_release_branch() {
   echo "Checking out to release branch..."
-  git checkout origin/release
+  git checkout release
   git pull
-  if ! git diff --exit-code release origin/release
+  if ! git diff --exit-code release origin release
   then
     echo "ERROR! There are local-only changes on branch 'release'!"
     exit 1
@@ -115,7 +115,7 @@ merge_rc_branch_into_release() {
 push_release_branch() {
   echo "Pushing release branch..."
   ## Push `release` branch
-  git push origin/release
+  git push origin release
 }
 
 verify_push() {
@@ -136,14 +136,6 @@ tag_and_push() {
   echo "Tagging and pushing $for_version tag..."
   git tag "$for_version" release
   git push origin "$for_version"
-}
-
-release_gitbook() {
-  .release/gitbookrelease.sh
-}
-
-release_docker_images() {
-  .release/docker-release.sh
 }
 
 if [ $# -lt 2 ]; then

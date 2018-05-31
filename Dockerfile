@@ -1,10 +1,15 @@
 FROM ubuntu:xenial-20171006
 
+# Set locale, required for Metrics UI
+RUN apt-get update && apt-get install -y locales
+RUN locale-gen en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2" && \
     echo "deb http://dl.bintray.com/pony-language/ponyc-debian pony-language main" >> /etc/apt/sources.list && \
     echo "deb http://dl.bintray.com/pony-language/pony-stable-debian /" >> /etc/apt/sources.list && \
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-# libraries and build tools
     git \
     ponyc \
     pony-stable \
@@ -12,7 +17,6 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 
     libsnappy-dev \
     liblz4-dev \
     libssl-dev \
-# useful tools/utilities
     man \
     netcat-openbsd \
     curl \
@@ -24,12 +28,10 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 
     sysstat \
     htop \
     numactl \
-# python
     python-dev \
     python-pip && \
     pip install virtualenv virtualenvwrapper && \
     pip install --upgrade pip && \
-# cleanup
     rm -rf /var/lib/apt/lists/* && \
     apt-get -y autoremove --purge && \
     apt-get -y clean
@@ -84,6 +86,9 @@ RUN make clean && \
     cp utils/cluster_shutdown/cluster_shutdown /wallaroo-bin/cluster_shutdown && \
     cp utils/data_receiver/data_receiver /wallaroo-bin/data_receiver && \
     cp env-setup /wallaroo-bin && \
+    make clean-machida-all && \
+    make target_cpu=x86-64 build-machida-all resilience=on && \
+    cp machida/build/machida /wallaroo-bin/machida-resilience && \
     make clean
 
 VOLUME /src/wallaroo

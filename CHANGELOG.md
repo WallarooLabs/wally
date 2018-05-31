@@ -35,6 +35,12 @@ All notable changes to Wallaroo will be documented in this file.
 - Clean up external message protocol ([PR #2032](https://github.com/wallaroolabs/wallaroo/pull/2032))
 - Remove "name()" from StateBuilder interface ([PR #1988](https://github.com/wallaroolabs/wallaroo/pull/1988))
 
+## [0.4.3] - 2018-05-18
+
+### Added
+
+- Add Machida with Resilience to Wallaroo in Docker
+
 ## [0.4.2] - 2018-05-14
 
 ### Fixed

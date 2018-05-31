@@ -153,6 +153,7 @@ push_docker_images() {
 }
 
 git_reset() {
+  git clean -df
   git reset --hard HEAD
   git checkout $BRANCH
 }
