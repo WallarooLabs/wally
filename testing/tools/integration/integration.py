@@ -105,12 +105,12 @@ class SingleSocketReceiver(StoppableThread):
         else:
             self.name = self.__base_name__
 
-    def try_recv(self, bs):
+    def try_recv(self, bs, flags=0):
         """
         Try to to run `sock.recv(bs)` and return None if error
         """
         try:
-            return self.sock.recv(bs)
+            return self.sock.recv(bs, flags)
         except:
             return None
 
@@ -160,12 +160,12 @@ class SingleSocketReceiver(StoppableThread):
 
     def run_framed(self):
         while not self.stopped():
-            header = self.try_recv(self.header_length)
+            header = self.try_recv(self.header_length, socket.MSG_WAITALL)
             if not header:
                 self.stop()
                 continue
             expect = struct.unpack(self.header_fmt, header)[0]
-            data = self.try_recv(expect)
+            data = self.try_recv(expect, socket.MSG_WAITALL)
             if not data:
                 self.stop()
             else:
