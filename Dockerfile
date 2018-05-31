@@ -1,13 +1,16 @@
 FROM ubuntu:xenial-20171006
 
+ENV PONYC_VERSION 0.22.2
+ENV PONY_STABLE_VERSION 0.1.2-90.2af1a62
+
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2" && \
     echo "deb http://dl.bintray.com/pony-language/ponyc-debian pony-language main" >> /etc/apt/sources.list && \
     echo "deb http://dl.bintray.com/pony-language/pony-stable-debian /" >> /etc/apt/sources.list && \
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 # libraries and build tools
     git \
-    ponyc \
-    pony-stable \
+    ponyc=${PONYC_VERSION} \
+    pony-stable=${PONY_STABLE_VERSION} \
     build-essential \
     libsnappy-dev \
     liblz4-dev \
