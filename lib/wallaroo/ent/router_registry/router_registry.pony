@@ -43,8 +43,8 @@ actor RouterRegistry is InFlightAckRequester
   let _state_step_creator: StateStepCreator
   let _recovery_file_cleaner: RecoveryFileCleaner
   var _data_router: DataRouter =
-    DataRouter(recover Map[StepId, Consumer] end, recover Map[Key, Step] end,
-      recover Map[Key, StepId] end)
+    DataRouter(recover Map[StepId, Consumer] end,
+      recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end)
   var _pre_state_data: (Array[PreStateData] val | None) = None
   let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()
@@ -1451,7 +1451,7 @@ actor RouterRegistry is InFlightAckRequester
     worker
     """
     _remove_all_routes_to_step(step)
-    _move_step_to_proxy(id, key, proxy_address)
+    _move_step_to_proxy(id, state_name, key, proxy_address)
 
   fun ref _remove_all_routes_to_step(step: Step) =>
     for source in _sources.values() do
@@ -1459,12 +1459,13 @@ actor RouterRegistry is InFlightAckRequester
     end
     _data_router.remove_routes_to_consumer(step)
 
-  fun ref _move_step_to_proxy(id: U128, key: Key, proxy_address: ProxyAddress)
+  fun ref _move_step_to_proxy(id: U128, state_name: String, key: Key,
+    proxy_address: ProxyAddress)
   =>
     """
     Called when a step has been migrated off this worker to another worker
     """
-    _remove_step_from_data_router(id, key)
+    _remove_step_from_data_router(id, state_name, key)
     _add_proxy_to_omni_router(id, proxy_address)
 
   be add_state_proxy(id: StepId, proxy_address: ProxyAddress, key: Key,
@@ -1475,8 +1476,10 @@ actor RouterRegistry is InFlightAckRequester
     """
     _add_proxy_to_omni_router(id, proxy_address)
 
-  fun ref _remove_step_from_data_router(id: StepId, key: Key) =>
-    let new_data_router = _data_router.remove_keyed_route(id, key)
+  fun ref _remove_step_from_data_router(id: StepId, state_name: String,
+    key: Key)
+  =>
+    let new_data_router = _data_router.remove_keyed_route(id, state_name, key)
     _data_router = new_data_router
     _distribute_data_router()
 
@@ -1531,7 +1534,7 @@ actor RouterRegistry is InFlightAckRequester
       match target
       | let step: Step =>
         _register_omni_router_step(step)
-        _data_router = _data_router.add_keyed_route(id, key, step)
+        _data_router = _data_router.add_keyed_route(id, state_name, key, step)
         _distribute_data_router()
 
         let partition_router =

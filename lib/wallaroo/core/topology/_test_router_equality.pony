@@ -199,21 +199,21 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     base_routes(1) = step1
     base_routes(2) = step2
 
-    let base_keyed_routes = recover val Map[Key, Step] end
+    let base_keyed_routes = recover val KeyToStepInfo[Step] end
 
     let target_routes = recover trn Map[U128, Consumer] end
     target_routes(1) = step1
 
     var base_router = DataRouter(consume base_routes, base_keyed_routes,
-      recover Map[Key, StepId] end)
+      recover KeyToStepInfo[StepId] end)
     let target_router = DataRouter(consume target_routes, base_keyed_routes,
-      recover Map[Key, StepId] end)
+      recover KeyToStepInfo[StepId] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
     // !@ Update test to use key
     // !@ Need to insert a key before testing to see if it works
-    base_router = base_router.remove_keyed_route(2, "Key")
+    base_router = base_router.remove_keyed_route(2, "StateName", "Key")
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -241,17 +241,17 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     target_routes(1) = step1
     target_routes(2) = step2
 
-    let base_keyed_routes = recover val Map[Key, Step] end
+    let base_keyed_routes = recover val KeyToStepInfo[Step] end
 
     var base_router = DataRouter(consume base_routes, base_keyed_routes,
-      recover Map[Key, StepId] end)
+      recover KeyToStepInfo[StepId] end)
     let target_router = DataRouter(consume target_routes, base_keyed_routes,
-      recover Map[Key, StepId] end)
+      recover KeyToStepInfo[StepId] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
     // !@ Update test to use key
-    base_router = base_router.add_keyed_route(2, "Key", step2)
+    base_router = base_router.add_keyed_route(2, "StateName", "Key", step2)
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -299,7 +299,8 @@ primitive _StepGenerator
   =>
     Step(auth, RouterRunner, MetricsReporter("", "", _NullMetricsSink),
       1, BoundaryOnlyRouteBuilder, event_log, recovery_replayer,
-      recover Map[String, OutgoingBoundary] end, StateStepCreator)
+      recover Map[String, OutgoingBoundary] end,
+      _StateStepCreatorGenerator(auth))
 
 primitive _BoundaryGenerator
   fun apply(worker_name: String, auth: AmbientAuth): OutgoingBoundary =>
@@ -309,13 +310,14 @@ primitive _BoundaryGenerator
 primitive _RouterRegistryGenerator
   fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
     RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
-      _ConnectionsGenerator(env, auth), StateStepCreator,
+      _ConnectionsGenerator(env, auth), _StateStepCreatorGenerator(auth),
       _DummyRecoveryFileCleaner, 0,
       false)
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>
-    DataReceivers(auth, _ConnectionsGenerator(env, auth), "", StateStepCreator)
+    DataReceivers(auth, _ConnectionsGenerator(env, auth), "",
+      _StateStepCreatorGenerator(auth))
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
@@ -332,6 +334,10 @@ primitive _StatelessPartitionGenerator
   fun apply(): StatelessPartitionRouter =>
     LocalStatelessPartitionRouter(0, "", recover Map[U64, U128] end,
       recover Map[U64, (Step | ProxyRouter)] end, 1)
+
+primitive _StateStepCreatorGenerator
+  fun apply(auth: AmbientAuth): StateStepCreator =>
+    StateStepCreator(auth, "app", "worker", _NullMetricsSink, EventLog())
 
 actor _Cluster is Cluster
   be notify_cluster_of_new_stateful_step(id: StepId, key: Key,

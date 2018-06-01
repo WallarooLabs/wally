@@ -371,10 +371,12 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   fun ref current_sequence_id(): SeqId =>
     _seq_id
 
-  be unknown_key(key: Key) =>
-    _state_step_creator.report_unknown_key(this, key)
+  be unknown_key(state_name: String, key: Key) =>
+    _state_step_creator.report_unknown_key(this, state_name, key)
 
-  be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
+  be update_keyed_route(state_name: String, key: Key, step: Step,
+    step_id: StepId)
+  =>
     None
 
   be report_status(code: ReportStatusCode) =>
