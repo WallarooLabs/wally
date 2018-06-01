@@ -74,18 +74,21 @@ class _TestDataChannel is DataChannelListenNotify
     h.expect_action("server accept")
 
     try
+      let app_name = "app_name"
+      let worker_name = "worker_name"
       let auth = h.env.root as AmbientAuth
       let event_log = EventLog()
-      let conns = Connections("app_name", "worker_name", auth,
+      let metrics_sink = _NullMetricsSink
+      let conns = Connections(app_name, worker_name, auth,
         "127.0.0.1", "0",
         "127.0.0.1", "0",
         _NullMetricsSink, "127.0.0.1", "0",
         true, "/tmp/foo_connections.txt", false
         where event_log = event_log)
-      let ssc = StateStepCreator
-      let dr = DataReceivers(auth, conns, "worker_name", ssc)
-      let rr = RouterRegistry(auth, "worker_name", dr, conns,
-        StateStepCreator, _DummyRecoveryFileCleaner, 1, false)
+      let ssc = StateStepCreator(auth, app_name, worker_name, metrics_sink, event_log)
+      let dr = DataReceivers(auth, conns, worker_name, ssc)
+      let rr = RouterRegistry(auth, worker_name, dr, conns,
+        ssc, _DummyRecoveryFileCleaner, 1, false)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
       h.dispose_when_done(conns)
       h.complete_action("server create")

@@ -728,8 +728,8 @@ trait val DeliveryMsg is ChannelMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val
+    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_route_ids: KeyToStepInfo[RouteId] val
   ): RouteId ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
@@ -738,8 +738,8 @@ trait val ReplayableDeliveryMsg is DeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     producer_id: StepId, producer: Producer, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
+    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   fun input(): Any val
   fun metric_name(): String
   fun msg_uid(): MsgId
@@ -778,8 +778,8 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
+    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
     ifdef "trace" then
@@ -798,8 +798,8 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     producer_id: StepId, producer: Producer, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
+    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
     let route_id = target_ids_to_route_ids(_target_id)?
@@ -841,16 +841,16 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: Map[Key, Step] val,
-    keys_to_route_ids: Map[Key, RouteId] val): RouteId ?
+    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   =>
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
 
     try
-      let target_step = keys_to_routes(_target_key)?
-      let route_id = keys_to_route_ids(_target_key)?
+      let target_step = keys_to_routes(_target_state_name, _target_key)?
+      let route_id = keys_to_route_ids(_target_state_name, _target_key)?
       target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
         producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
         worker_ingress_ts)
@@ -860,7 +860,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
         @printf[I32]("DataRouter could not find route for key %s\n".cstring(),
           _target_key.cstring())
       end
-      producer.unknown_key(_target_key)
+      producer.unknown_key(_target_state_name, _target_key)
       error
     end
 
@@ -869,12 +869,12 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     producer_id: StepId, producer: Producer, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: Map[Key, Step] val,
-    keys_to_route_ids: Map[Key, RouteId] val): RouteId ?
+    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   =>
     try
-      let target_step = keys_to_routes(_target_key)?
-      let route_id = keys_to_route_ids(_target_key)?
+      let target_step = keys_to_routes(_target_state_name, _target_key)?
+      let route_id = keys_to_route_ids(_target_state_name, _target_key)?
       target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
       producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
       metrics_id, worker_ingress_ts)

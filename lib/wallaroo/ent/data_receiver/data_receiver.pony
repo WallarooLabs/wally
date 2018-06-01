@@ -33,8 +33,8 @@ actor DataReceiver is Producer
   let _state_step_creator: StateStepCreator
   var _sender_step_id: StepId = 0
   var _router: DataRouter =
-    DataRouter(recover Map[StepId, Consumer] end, recover Map[Key, Step] end,
-      recover Map[Key, StepId] end)
+    DataRouter(recover Map[StepId, Consumer] end,
+      recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end)
   var _last_id_seen: SeqId = 0
   var _last_id_acked: SeqId = 0
   var _connected: Bool = false
@@ -331,10 +331,12 @@ actor DataReceiver is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  be unknown_key(key: Key) =>
-    _state_step_creator.report_unknown_key(this, key)
+  be unknown_key(state_name: String, key: Key) =>
+    _state_step_creator.report_unknown_key(this, state_name, key)
 
-  be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
+  be update_keyed_route(state_name: String, key: Key, step: Step,
+    step_id: StepId)
+  =>
     None
 
   be mute(c: Consumer) =>

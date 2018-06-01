@@ -153,8 +153,8 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer],
-    keyed_data_routes: Map[Key, Step],
-    keyed_step_ids: Map[Key, StepId],
+    keyed_data_routes: KeyToStepInfo[Step],
+    keyed_step_ids: KeyToStepInfo[StepId],
     state_step_creator: StateStepCreator): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartition ?
   fun runner_builder(): RunnerBuilder
@@ -191,8 +191,8 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[StepId, Consumer],
-    keyed_data_routes: Map[Key, Step],
-    keyed_step_ids: Map[Key, StepId],
+    keyed_data_routes: KeyToStepInfo[Step],
+    keyed_step_ids: KeyToStepInfo[StepId],
     state_step_creator: StateStepCreator):
     LocalPartitionRouter[PIn, S] val
   =>
@@ -201,6 +201,8 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
     let m = recover trn Map[Key, Step] end
 
     var partition_count: USize = 0
+
+    state_step_creator.add_builder(_state_name, _runner_builder)
 
     for c in _key_distribution.claimants() do
       if c == worker_name then
@@ -219,8 +221,8 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
 
               initializables.set(next_state_step)
               data_routes(id) = next_state_step
-              keyed_data_routes(key) = next_state_step
-              keyed_step_ids(key) = id
+              keyed_data_routes.add(_state_name, key, next_state_step)
+              keyed_step_ids.add(_state_name, key, id)
               m(key) = next_state_step
               partition_count = partition_count + 1
             else

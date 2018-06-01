@@ -313,7 +313,8 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
-      let state_step_creator = StateStepCreator
+      let state_step_creator = StateStepCreator(auth, _app_name,
+        _startup_options.worker_name, metrics_conn, event_log)
 
       let data_receivers = DataReceivers(auth, connections,
         _startup_options.worker_name, state_step_creator, is_recovering)
@@ -476,7 +477,8 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
-      let state_step_creator = StateStepCreator
+      let state_step_creator = StateStepCreator(auth, _app_name,
+        _startup_options.worker_name, metrics_conn, event_log)
 
       let data_receivers = DataReceivers(auth, connections,
         _startup_options.worker_name, state_step_creator)
@@ -518,7 +520,7 @@ actor Startup
 
       router_registry.set_data_router(
         DataRouter(recover Map[StepId, Consumer] end,
-          recover Map[Key, Step] end, recover Map[Key, StepId] end))
+          recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end))
       local_topology_initializer.update_topology(m.local_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)

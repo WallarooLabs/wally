@@ -36,10 +36,12 @@ actor DummyProducer is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  be unknown_key(key: Key) =>
+  be unknown_key(state_name: String, key: Key) =>
     None
 
-  be update_keyed_route(key: Key, step: Step, step_id: StepId) =>
+  be update_keyed_route(state_name: String, key: Key, step: Step,
+    step_id: StepId)
+  =>
     None
 
   be remove_route_to_consumer(c: Consumer) =>

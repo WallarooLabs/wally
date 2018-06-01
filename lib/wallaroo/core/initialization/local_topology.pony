@@ -88,8 +88,8 @@ class val LocalTopology
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer tag],
-    keyed_data_routes: Map[Key, Step],
-    keyed_step_ids: Map[Key, StepId],
+    keyed_data_routes: KeyToStepInfo[Step],
+    keyed_step_ids: KeyToStepInfo[StepId],
     state_step_creator: StateStepCreator) ?
   =>
     let subpartition =
@@ -757,13 +757,9 @@ actor LocalTopologyInitializer is LayoutInitializer
         // DataRouter for the data channel boundary
         var data_routes = recover trn Map[U128, Consumer] end
 
-        let keyed_data_routes_ref = Map[Key, Step]
+        let keyed_data_routes_ref = KeyToStepInfo[Step]
 
-        var keyed_data_routes = recover trn Map[Key, Step] end
-
-        let keyed_step_ids_ref = Map[Key, StepId]
-
-        var keyed_step_ids = recover trn Map[Key, StepId] end
+        let keyed_step_ids_ref = KeyToStepInfo[StepId]
 
         // Update the step ids for all OutgoingBoundaries
         if worker_count > 1 then
@@ -1423,23 +1419,13 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         let sendable_data_routes = consume val data_routes
 
-        for (k, v) in keyed_data_routes_ref.pairs() do
-          keyed_data_routes(k) = v
-        end
-
-        for (k, v) in keyed_step_ids_ref.pairs() do
-          keyed_step_ids(k) = v
-        end
-
-        let sendable_keyed_data_routes = consume val keyed_data_routes
-        let sendable_keyed_step_ids = consume val keyed_step_ids
-
         let data_router = DataRouter(sendable_data_routes,
-          sendable_keyed_data_routes, sendable_keyed_step_ids)
+          keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone())
         _router_registry.set_data_router(data_router)
 
         _state_step_creator.initialize_routes(this,
-          sendable_keyed_data_routes, sendable_keyed_step_ids)
+          keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone(),
+          _recovery_replayer, _outgoing_boundaries)
 
         if not _is_initializer then
           // Inform the initializer that we're done initializing our local
@@ -1580,7 +1566,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         // We have not yet been assigned any keys by the cluster at this
         // stage, so we use an empty map to represent that.
         let data_router = DataRouter(consume data_routes,
-          recover Map[Key, Step] end, recover Map[Key, StepId] end)
+          recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end)
 
         _router_registry.set_data_router(data_router)
 
