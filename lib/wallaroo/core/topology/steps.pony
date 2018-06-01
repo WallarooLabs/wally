@@ -39,6 +39,9 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 
+interface tag _ReportReadyToWork
+  be report_ready_to_work(initializable: Initializable)
+
 actor Step is (Producer & Consumer)
   let _auth: AmbientAuth
   var _id: U128
@@ -59,7 +62,7 @@ actor Step is (Producer & Consumer)
   var _upstreams: SetIs[Producer] = _upstreams.create()
 
   // Lifecycle
-  var _initializer: (LocalTopologyInitializer | None) = None
+  var _initializer: (_ReportReadyToWork | None) = None
   var _initialized: Bool = false
   var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
@@ -136,6 +139,37 @@ actor Step is (Producer & Consumer)
   be application_created(initializer: LocalTopologyInitializer,
     omni_router: OmniRouter)
   =>
+    // for consumer in _router.routes().values() do
+    //   if not _routes.contains(consumer) then
+    //     _routes(consumer) =
+    //       _route_builder(this, consumer, _metrics_reporter)
+    //   end
+    // end
+
+    // for boundary in _outgoing_boundaries.values() do
+    //   if not _routes.contains(boundary) then
+    //     _routes(boundary) =
+    //       _route_builder(this, boundary, _metrics_reporter)
+    //   end
+    // end
+
+    // for r in _routes.values() do
+    //   r.application_created()
+    //   ifdef "resilience" then
+    //     _acker_x.add_route(r)
+    //   end
+    // end
+
+    // _omni_router = omni_router
+
+    // _initialized = true
+    _initialize_routes_boundaries_omni_router(omni_router)
+    initializer.report_initialized(this)
+
+  be initialize(omni_router: OmniRouter) =>
+    _initialize_routes_boundaries_omni_router(omni_router)
+
+  fun ref _initialize_routes_boundaries_omni_router(omni_router: OmniRouter) =>
     for consumer in _router.routes().values() do
       if not _routes.contains(consumer) then
         _routes(consumer) =
@@ -160,9 +194,22 @@ actor Step is (Producer & Consumer)
     _omni_router = omni_router
 
     _initialized = true
-    initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
+    // _initializer = initializer
+    // if _routes.size() > 0 then
+    //   for r in _routes.values() do
+    //     r.application_initialized("Step")
+    //   end
+    // else
+    //   _report_ready_to_work()
+    // end
+    _initializer_initialized(initializer)
+
+  be initializer_initialized(initializer: _ReportReadyToWork) =>
+    _initializer_initialized(initializer)
+
+  fun ref _initializer_initialized(initializer: _ReportReadyToWork) =>
     _initializer = initializer
     if _routes.size() > 0 then
       for r in _routes.values() do
@@ -186,8 +233,8 @@ actor Step is (Producer & Consumer)
 
   fun ref _report_ready_to_work() =>
     match _initializer
-    | let lti: LocalTopologyInitializer =>
-      lti.report_ready_to_work(this)
+    | let rrtw: _ReportReadyToWork =>
+      rrtw.report_ready_to_work(this)
     else
       Fail()
     end

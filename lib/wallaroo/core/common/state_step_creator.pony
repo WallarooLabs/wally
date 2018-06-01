@@ -52,6 +52,21 @@ class KeyToStepInfo[Info: Any #share]
       map[(String, String, Info)](
         { (x) => (x._1, x._2._1, x._2._2) })
 
+class _WaitingProducers
+  let _waiting_producers: Map[String, Map[Key, SetIs[Producer]]] =
+    _waiting_producers.create()
+
+  fun ref add(state_name: String, key: Key, producer: Producer) =>
+    try
+      _waiting_producers.insert_if_absent(state_name, Map[Key, SetIs[Producer]])?
+        .insert_if_absent(key, SetIs[Producer])?.set(producer)
+    end
+
+  fun ref retrieve(state_name: String, key: Key): SetIs[Producer] ? =>
+    let keys_for_state = _waiting_producers(state_name)?
+    (_, let producers) = keys_for_state.remove(key)?
+    producers
+
 actor StateStepCreator is Initializable
   var _keys_to_steps: KeyToStepInfo[Step] = _keys_to_steps.create()
   var _keys_to_step_ids: KeyToStepInfo[StepId] = _keys_to_step_ids.create()
@@ -68,6 +83,13 @@ actor StateStepCreator is Initializable
   var _outgoing_boundaries: (None | Map[String, OutgoingBoundary] val) = None
 
   let _runner_builders: Map[String, RunnerBuilder] = _runner_builders.create()
+
+  var _omni_router: (None | OmniRouter) = None
+
+  let _pending_steps: MapIs[Step, (String, Key, StepId)] =
+    _pending_steps.create()
+
+  let _waiting_producers: _WaitingProducers = _waiting_producers.create()
 
   new create(auth: AmbientAuth,
     app_name: String,
@@ -86,7 +108,7 @@ actor StateStepCreator is Initializable
 
   be application_created(initializer: LocalTopologyInitializer,
     omni_router: OmniRouter) =>
-    None
+    _omni_router = omni_router
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     initializer.report_ready_to_work(this)
@@ -103,12 +125,12 @@ actor StateStepCreator is Initializable
         .cstring(), key.cstring())
 
       try
-        (let recovery_replayer, let outgoing_boundaries) = try
+        (let recovery_replayer, let outgoing_boundaries, let omni_router) = try
           (_recovery_replayer as RecoveryReplayer,
-            _outgoing_boundaries as Map[String, OutgoingBoundary] val)
+            _outgoing_boundaries as Map[String, OutgoingBoundary] val,
+            _omni_router as OmniRouter)
         else
-          @printf[I32]("Could not find runner_builder for state '%s'\n".cstring(),
-            state_name.cstring())
+          @printf[I32]("Missing things in StateStepCreator\n".cstring())
           Fail()
           error
         end
@@ -131,11 +153,10 @@ actor StateStepCreator is Initializable
           _event_log, recovery_replayer, outgoing_boundaries,
           this)
 
-        _keys_to_steps.add(state_name, key, state_step)
-        _keys_to_step_ids.add(state_name, key, id)
-
-        producer.update_keyed_route(state_name, key,
-          state_step, id)
+        _pending_steps(state_step) = (state_name, key, id)
+        _waiting_producers.add(state_name, key, producer)
+        state_step.initialize(omni_router)
+        state_step.initializer_initialized(this)
       end
     end
 
@@ -167,3 +188,49 @@ actor StateStepCreator is Initializable
       end
     end
     highest
+
+  be report_ready_to_work(initializable: Initializable) =>
+    """
+    Handles the `report_ready_to_work` message from a step once it is ready
+    to work.
+    """
+
+    match initializable
+    | let step: Step =>
+      try
+        ifdef "trace" then
+          @printf[I32](("Got a message that a step is ready!\n").cstring())
+        end
+
+        (let state_name, let key, let id) =
+          _pending_steps(step)?
+
+        _keys_to_steps.add(state_name, key, step)
+        _keys_to_step_ids.add(state_name, key, id)
+
+        try
+          for producer in _waiting_producers.retrieve(state_name, key)?.values() do
+            ifdef "trace" then
+              @printf[I32](("Sending step for '%s':'%s' to the producer!\n")
+                .cstring(), state_name.cstring(), key.cstring())
+            end
+
+            producer.update_keyed_route(state_name, key,
+              step, id)
+          end
+        else
+          @printf[I32](("Could not find producers for new key '%s':'%s'\n")
+            .cstring(), state_name.cstring(), key.cstring())
+          Fail()
+        end
+
+      else
+        @printf[I32](("StateStepCreator received report_ready_to_work from " +
+          "an unknown step.\n").cstring())
+        Fail()
+      end
+    else
+      @printf[I32](("StateStepCreator received report_ready_to_work from a " +
+        "non-step initializable.\n").cstring())
+      Fail()
+    end
