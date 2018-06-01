@@ -96,14 +96,12 @@ class val StateComputationMulti is w.StateComputation[GoData, GoData, GoState]
     | 0 =>
       (None, state_changed_indicator)
     else
-      recover
-        let results = recover trn Array[GoData](size.usize()) end
-        for i in Range(0, size.usize()) do
-          results.push(GoData(@GetMultiResultItem(res, i.u64())))
-        end
-        RemoveComponent(res, ComponentType.data())
-        (consume results, state_changed_indicator)
+      let results = recover trn Array[GoData](size.usize()) end
+      for i in Range(0, size.usize()) do
+        results.push(GoData(@GetMultiResultItem(res, i.u64())))
       end
+      RemoveComponent(res, ComponentType.data())
+      (consume results, state_changed_indicator)
     end
 
   fun state_change_builders(): Array[StateChangeBuilder[GoState]] val =>

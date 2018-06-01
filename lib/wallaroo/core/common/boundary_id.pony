@@ -27,5 +27,5 @@ class BoundaryId is Equatable[BoundaryId]
   fun eq(that: box->BoundaryId): Bool =>
     (name == that.name) and (step_id == that.step_id)
 
-  fun hash(): U64 =>
+  fun hash(): USize =>
     name.hash() xor step_id.hash()
