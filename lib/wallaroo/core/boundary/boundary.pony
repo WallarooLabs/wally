@@ -710,6 +710,10 @@ actor OutgoingBoundary is Consumer
     Perform a graceful shutdown. Don't accept new writes, but don't finish
     closing until we get a zero length read.
     """
+    if _delayed_writes then
+      _pending_writes()
+      _delayed_writes = false
+    end
     _closed = true
     _try_shutdown()
 
