@@ -860,7 +860,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
         @printf[I32]("DataRouter could not find route for key %s\n".cstring(),
           _target_key.cstring())
       end
-      producer.unknown_key(_target_state_name, _target_key)
+      producer.unknown_key(_target_state_name, _target_key, _data)
       error
     end
 
