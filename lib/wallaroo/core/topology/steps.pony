@@ -429,7 +429,7 @@ actor Step is (Producer & Consumer)
   fun ref current_sequence_id(): SeqId =>
     _seq_id_generator.latest_for_run()
 
-  be unknown_key(state_name: String, key: Key) =>
+  be unknown_key(state_name: String, key: Key, data: Any val) =>
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   be update_keyed_route(state_name: String, key: Key, step: Step,
