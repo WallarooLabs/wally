@@ -1131,7 +1131,8 @@ class val DataRouter is Equatable[DataRouter]
 trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun state_name(): String
   fun register_routes(router: Router, route_builder': RouteBuilder)
-  fun update_route(step_id: StepId, key: Key, step: Step): PartitionRouter ?
+  fun update_route(step_id: StepId, key: Key, step: Step):
+    PartitionRouter ?
   fun rebalance_steps_grow(auth: AmbientAuth,
     target_workers: Array[(String, OutgoingBoundary)] val,
     router_registry: RouterRegistry ref): PartitionRouter
@@ -1240,7 +1241,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
               @printf[I32](("LocalPartitionRouter.route: No entry for " +
                 "key '%s'\n\n").cstring(), key.string().cstring())
             end
-            producer.unknown_key(_state_name, key)
+            producer.unknown_key(_state_name, key, data)
             (true, latest_ts)
           end
         else
@@ -1301,7 +1302,8 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     end
     consume diff
 
-  fun update_route(step_id: StepId, key: Key, step: Step): PartitionRouter
+  fun update_route(step_id: StepId, key: Key, step: Step):
+    PartitionRouter
   =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient

@@ -71,6 +71,9 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
   let _metrics_reporter: MetricsReporter
 
+  let _pending_data_store: PendingDataStore =
+    _pending_data_store.create()
+
   // TCP
   let _listen: TCPSourceListener
   let _notify: TCPSourceNotify
@@ -371,13 +374,38 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   fun ref current_sequence_id(): SeqId =>
     _seq_id
 
-  be unknown_key(state_name: String, key: Key) =>
+  be unknown_key(state_name: String, key: Key, data: Any val) =>
+    _pending_data_store.add(state_name, key, data)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   be update_keyed_route(state_name: String, key: Key, step: Step,
     step_id: StepId)
   =>
-    None
+    try
+      _notify.update_route(step_id, key, step)?
+    else
+      @printf[I32]("Failed to update route for '%s':'%s'\n".cstring(),
+        state_name.cstring(), key.cstring())
+      Fail()
+    end
+
+    try
+      match _notify
+      | let n: TCPSourceNotify =>
+        for d in _pending_data_store.retrieve(state_name, key)?.values() do
+          try
+            n.process_message(this, d)?
+          else
+            @printf[I32]("Failed to send pending messages for '%s':'%s'\n".cstring(),
+              state_name.cstring(), key.cstring())
+          end
+        end
+      end
+    else
+      @printf[I32]("Failed to retrieve pending messages for '%s':'%s'\n".cstring(),
+        state_name.cstring(), key.cstring())
+      Fail()
+    end
 
   be report_status(code: ReportStatusCode) =>
     match code

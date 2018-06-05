@@ -45,7 +45,11 @@ interface TCPSourceNotify
 
   fun ref update_router(router: Router)
 
+  fun ref update_route(step_id: StepId, key: Key, step: Step)?
+
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
+
+  fun ref process_message(source: TCPSource ref, data': Any val)?
 
   fun ref accepted(conn: TCPSource ref) =>
     """
