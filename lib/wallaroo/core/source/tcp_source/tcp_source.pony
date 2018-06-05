@@ -374,14 +374,27 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   fun ref current_sequence_id(): SeqId =>
     _seq_id
 
-  be unknown_key(state_name: String, key: Key, data: Any val) =>
-    _pending_data_store.add(state_name, key, data)
+  be unknown_key[D: Any val](state_name: String, key: Key,
+    routing_args: TypedRoutingArguments[D])
+  =>
+    _pending_data_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   be update_keyed_route(state_name: String, key: Key, step: Step,
     step_id: StepId)
   =>
     try
+      let r = _route_builder(this, step, _metrics_reporter)
+      _routes(step) = r
+
+      // TODO: this is a hack, there's some additional updating of the route
+      // that nees to be done.
+      r.application_created()
+      ifdef "resilience" then
+        _acker_x.add_route(r)
+      end
+      r.application_initialized("TCPSource")
+
       _notify.update_route(step_id, key, step)?
     else
       @printf[I32]("Failed to update route for '%s':'%s'\n".cstring(),
@@ -390,19 +403,9 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     end
 
     try
-      match _notify
-      | let n: TCPSourceNotify =>
-        for d in _pending_data_store.retrieve(state_name, key)?.values() do
-          try
-            n.process_message(this, d)?
-          else
-            @printf[I32]("Failed to send pending messages for '%s':'%s'\n".cstring(),
-              state_name.cstring(), key.cstring())
-          end
-        end
-      end
+      _pending_data_store.process_pending(state_name, key, this, _notify)?
     else
-      @printf[I32]("Failed to retrieve pending messages for '%s':'%s'\n".cstring(),
+      @printf[I32]("Failed to retrieve messages for '%s':'%s'\n".cstring(),
         state_name.cstring(), key.cstring())
       Fail()
     end

@@ -84,6 +84,7 @@ actor StateStepCreator is Initializable
 
   let _runner_builders: Map[String, RunnerBuilder] = _runner_builders.create()
 
+  // !@ need to register for changes in the OmniRouter
   var _omni_router: (None | OmniRouter) = None
 
   let _pending_steps: MapIs[Step, (String, Key, StepId)] =
@@ -151,11 +152,12 @@ actor StateStepCreator is Initializable
           where event_log = _event_log, auth = _auth),
           consume reporter, id, runner_builder.route_builder(),
           _event_log, recovery_replayer, outgoing_boundaries,
-          this)
+          this
+          where omni_router = omni_router)
 
         _pending_steps(state_step) = (state_name, key, id)
         _waiting_producers.add(state_name, key, producer)
-        state_step.initialize(omni_router)
+        state_step.initialize()
         state_step.initializer_initialized(this)
       end
     end

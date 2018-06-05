@@ -567,7 +567,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
             worker_ingress_ts)
         end
       else
-        @printf[I32]("StateRunner: Input was not a StateProcessor!\n"
+        @printf[I32]("StateRunner: Input was not type In!\n"
           .cstring())
         (true, latest_ts)
       end
