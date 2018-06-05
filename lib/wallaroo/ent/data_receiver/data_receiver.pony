@@ -331,7 +331,9 @@ actor DataReceiver is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  be unknown_key(state_name: String, key: Key, data: Any val) =>
+  be unknown_key[D: Any val](state_name: String, key: Key,
+    routing_args: TypedRoutingArguments[D])
+  =>
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   be update_keyed_route(state_name: String, key: Key, step: Step,

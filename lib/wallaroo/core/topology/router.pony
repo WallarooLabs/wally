@@ -34,6 +34,47 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 use "wallaroo/core/state"
 
+interface Rerouter
+  fun ref reroute[D: Any val](producer: Producer ref,
+    route_args: TypedRoutingArguments[D])
+
+trait val RoutingArguments
+  fun val apply(rerouter: Rerouter, producer: Producer ref)
+  fun val route_with(router: Router, producer: Producer ref)
+
+class val TypedRoutingArguments[D: Any val] is RoutingArguments
+  let _metric_name: String
+  let _pipeline_time_spent: U64
+  let _data: D
+  let _producer_id: StepId
+  let _i_msg_uid: MsgId
+  let _frac_ids: FractionalMessageId
+  let _latest_ts: U64
+  let _metrics_id: U16
+  let _worker_ingress_ts: U64
+
+  new val create(metric_name: String, pipeline_time_spent: U64, data: D,
+    producer_id: StepId, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _metric_name = metric_name
+    _pipeline_time_spent = pipeline_time_spent
+    _data = data
+    _producer_id = producer_id
+    _i_msg_uid = i_msg_uid
+    _frac_ids = frac_ids
+    _latest_ts = latest_ts
+    _metrics_id = metrics_id
+    _worker_ingress_ts = worker_ingress_ts
+
+  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
+    rerouter.reroute[D](producer, this)
+
+  fun val route_with(router: Router, producer: Producer ref) =>
+    router.route[D](_metric_name, _pipeline_time_spent, _data, _producer_id,
+      producer, _i_msg_uid, _frac_ids, _latest_ts, _metrics_id,
+      _worker_ingress_ts)
+
 trait val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer_id: StepId, producer: Producer ref, i_msg_uid: MsgId,
@@ -456,6 +497,7 @@ class val StepIdRouter is OmniRouter
 
           (false, latest_ts)
         else
+          @printf[I32]("!@ target_id = %s\n".cstring(), target_id.string().cstring())
           // No route for this target
           Fail()
           (true, latest_ts)
@@ -1241,7 +1283,10 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
               @printf[I32](("LocalPartitionRouter.route: No entry for " +
                 "key '%s'\n\n").cstring(), key.string().cstring())
             end
-            producer.unknown_key(_state_name, key, data)
+            let routing_args = TypedRoutingArguments[D](metric_name,
+              pipeline_time_spent, data, producer_id, i_msg_uid,
+              frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+            producer.unknown_key[D](_state_name, key, routing_args)
             (true, latest_ts)
           end
         else

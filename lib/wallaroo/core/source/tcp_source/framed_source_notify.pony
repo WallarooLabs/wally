@@ -95,12 +95,14 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     else
       _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
       let ingest_ts = Time.nanos()
+      let pipeline_time_spent: U64 = 0
+      var latest_metrics_id: U16 = 1
 
       ifdef "trace" then
         @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
       end
 
-      (let is_finished, let last_ts, let pipeline_time_spent) =
+      (let is_finished, let last_ts) =
         try
           let decoded =
             try
@@ -111,17 +113,42 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
               end
               error
             end
-          _process_message(source, decoded, ingest_ts)
+          let decode_end_ts = Time.nanos()
+          _metrics_reporter.step_metric(_pipeline_name,
+            "Decode Time in TCP Source", latest_metrics_id, ingest_ts,
+            decode_end_ts)
+          latest_metrics_id = latest_metrics_id + 1
+
+          ifdef "trace" then
+            @printf[I32](("Msg decoded at " + _pipeline_name +
+              " source\n").cstring())
+          end
+          _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
+            _source_id, source, _router, _omni_router, _msg_id_gen(), None,
+            decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
         else
           @printf[I32](("Unable to decode message at " + _pipeline_name +
             " source\n").cstring())
           ifdef debug then
             Fail()
           end
-          (true, ingest_ts, U64(0))
+          (true, ingest_ts)
         end
 
-      _report_message(is_finished, last_ts, pipeline_time_spent)
+      if is_finished then
+        let end_ts = Time.nanos()
+        let time_spent = end_ts - ingest_ts
+
+        ifdef "detailed-metrics" then
+          _metrics_reporter.step_metric(_pipeline_name,
+            "Before end at TCP Source", 9999,
+            last_ts, end_ts)
+        end
+
+        _metrics_reporter.pipeline_metric(_pipeline_name, time_spent +
+          pipeline_time_spent)
+        _metrics_reporter.worker_metric(_pipeline_name, time_spent)
+      end
 
       source.expect(_header_size)
       _header = true
@@ -133,33 +160,10 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
       end
     end
 
-  fun ref process_message(source: TCPSource ref, data': Any val)? =>
-    let data = data' as In
-    let r = _process_message(source, data, 0)
-    _report_message(r._1, r._2, r._3)
-
-  fun ref _process_message(source: TCPSource ref, decoded: In, ingest_ts: U64):
-    (Bool, U64, U64)
+  fun ref reroute[D: Any val](source: Producer ref,
+    route_args: TypedRoutingArguments[D])
   =>
-    var latest_metrics_id: U16 = 1
-    let pipeline_time_spent: U64 = 0
-    let decode_end_ts = Time.nanos()
-
-    _metrics_reporter.step_metric(_pipeline_name,
-      "Decode Time in TCP Source", latest_metrics_id, ingest_ts,
-      decode_end_ts)
-    latest_metrics_id = latest_metrics_id + 1
-
-    ifdef "trace" then
-      @printf[I32](("Msg decoded at " + _pipeline_name +
-        " source\n").cstring())
-    end
-    (let is_finished, let last_ts) =
-      _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-      _source_id, source, _router, _omni_router, _msg_id_gen(), None,
-      decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
-
-    (is_finished, last_ts, pipeline_time_spent)
+    route_args.route_with(_router, source)
 
   fun ref _report_message(is_finished: Bool, last_ts: U64,
     pipeline_time_spent: U64)
