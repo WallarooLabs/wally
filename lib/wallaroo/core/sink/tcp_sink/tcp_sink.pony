@@ -142,6 +142,7 @@ actor TCPSink is Consumer
     """
     _env = env
     _sink_id = sink_id
+    @printf[I32]("!@ NEW SINK sink_id = %s\n".cstring(), sink_id.string().cstring())
     _name = sink_name
     _event_log = event_log
     _recovering = recovering

@@ -26,24 +26,32 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 use "collections"
+use "wallaroo/core/topology"
 
 class PendingDataStore
-  let _data_store: Map[String, Map[Key, Array[Any val]]] =
+  let _data_store: Map[String, Map[Key, Array[RoutingArguments]]] =
     _data_store.create()
 
-  fun ref add(state_name: String, key: Key, data: Any val) =>
+  fun ref add(state_name: String, key: Key, routing_args: RoutingArguments) =>
     """
     Add a data item to the state_name/key array.
     """
     try
-      _data_store.insert_if_absent(state_name, Map[Key, Array[Any val]])?.
-        insert_if_absent(key, Array[Any val])?.push(data)
+      _data_store.insert_if_absent(state_name, Map[Key, Array[RoutingArguments]])?.
+        insert_if_absent(key, Array[RoutingArguments])?.push(routing_args)
     end
 
-  fun ref retrieve(state_name: String, key: Key): Array[Any val] ? =>
+  fun ref retrieve(state_name: String, key: Key): Array[RoutingArguments] ? =>
     """
     Return the array of data items associated with the state_name/key and remove
     the key and items from the store.
     """
     (_, let v) = _data_store(state_name)?.remove(key)?
     v
+
+  fun ref process_pending(state_name: String, key: Key, producer: Producer ref,
+    rerouter: Rerouter) ?
+  =>
+    for r in retrieve(state_name, key)?.values() do
+      r(rerouter, producer)
+    end
