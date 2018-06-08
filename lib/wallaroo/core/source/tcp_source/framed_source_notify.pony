@@ -160,8 +160,8 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
       end
     end
 
-  fun ref reroute[D: Any val](source: Producer ref,
-    route_args: TypedRoutingArguments[D])
+  fun ref reroute(source: Producer ref,
+    route_args: RoutingArguments)
   =>
     route_args.route_with(_router, source)
 
