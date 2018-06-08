@@ -49,9 +49,15 @@ class PendingDataStore
     (_, let v) = _data_store(state_name)?.remove(key)?
     v
 
-  fun ref process_pending(state_name: String, key: Key, producer: Producer ref,
-    rerouter: Rerouter) ?
+  fun ref process_pending(producer: Producer ref, rerouter: Rerouter,
+    router: Router)
   =>
-    for r in retrieve(state_name, key)?.values() do
-      r(rerouter, producer)
+    for (state_name, keys_routing_args) in _data_store.pairs() do
+      for (key, route_args) in keys_routing_args.pairs() do
+        if router.routes_key(state_name, key) then
+          for r in route_args.values() do
+            r(rerouter, producer)
+          end
+        end
+      end
     end

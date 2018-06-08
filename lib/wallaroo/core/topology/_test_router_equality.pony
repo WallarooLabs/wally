@@ -213,7 +213,7 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
 
     // !@ Update test to use key
     // !@ Need to insert a key before testing to see if it works
-    base_router = base_router.remove_keyed_route(2, "StateName", "Key")
+    base_router = base_router.remove_keyed_route("StateName", "Key")
 
     h.assert_eq[Bool](true, base_router == target_router)
 

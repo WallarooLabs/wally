@@ -166,10 +166,6 @@ actor Step is (Producer & Consumer)
     _initialize_routes_boundaries_omni_router(omni_router)
     initializer.report_initialized(this)
 
-  be initialize() =>
-    // _initialize_routes_boundaries_omni_router(omni_router)
-    _initialized = true
-
   fun ref _initialize_routes_boundaries_omni_router(omni_router: OmniRouter) =>
     for consumer in _router.routes().values() do
       if not _routes.contains(consumer) then
@@ -430,15 +426,10 @@ actor Step is (Producer & Consumer)
   fun ref current_sequence_id(): SeqId =>
     _seq_id_generator.latest_for_run()
 
-  be unknown_key[D: Any val](state_name: String, key: Key,
+  fun ref unknown_key[D: Any val](state_name: String, key: Key,
       routing_args: TypedRoutingArguments[D])
   =>
     _state_step_creator.report_unknown_key(this, state_name, key)
-
-  be update_keyed_route(state_name: String, key: Key, step: Step,
-    step_id: StepId)
-  =>
-    None
 
   fun ref filter_queued_msg(i_producer: Producer, i_route_id: RouteId,
     i_seq_id: SeqId)

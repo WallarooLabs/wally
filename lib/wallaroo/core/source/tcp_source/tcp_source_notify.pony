@@ -49,8 +49,7 @@ interface TCPSourceNotify
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
 
-  fun ref reroute[D: Any val](source: Producer ref,
-    route_args: TypedRoutingArguments[D])
+  fun ref reroute(source: Producer ref, route_args: RoutingArguments)
 
   fun ref accepted(conn: TCPSource ref) =>
     """

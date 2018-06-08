@@ -1726,7 +1726,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             i.application_created(this, o_router)
             match i
             | let s: Step =>
-              _router_registry.register_omni_router_step(s)
+              _router_registry.register_omni_router_updatable(s)
             end
           end
         end

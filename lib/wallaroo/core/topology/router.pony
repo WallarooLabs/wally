@@ -35,8 +35,8 @@ use "wallaroo/core/sink"
 use "wallaroo/core/state"
 
 interface Rerouter
-  fun ref reroute[D: Any val](producer: Producer ref,
-    route_args: TypedRoutingArguments[D])
+  fun ref reroute(producer: Producer ref,
+    route_args: RoutingArguments)
 
 trait val RoutingArguments
   fun val apply(rerouter: Rerouter, producer: Producer ref)
@@ -68,9 +68,11 @@ class val TypedRoutingArguments[D: Any val] is RoutingArguments
     _worker_ingress_ts = worker_ingress_ts
 
   fun val apply(rerouter: Rerouter, producer: Producer ref) =>
-    rerouter.reroute[D](producer, this)
+    rerouter.reroute(producer, this)
 
   fun val route_with(router: Router, producer: Producer ref) =>
+    // !@ this doesn't correctly capture times for calculating latencies,
+    // so what do we want to do about this?
     router.route[D](_metric_name, _pipeline_time_spent, _data, _producer_id,
       producer, _i_msg_uid, _frac_ids, _latest_ts, _metrics_id,
       _worker_ingress_ts)
@@ -82,6 +84,7 @@ trait val Router
     worker_ingress_ts: U64): (Bool, U64)
   fun routes(): Array[Consumer] val
   fun routes_not_in(router: Router): Array[Consumer] val
+  fun routes_key(state_name: String, key: Key): Bool
 
 class val EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -96,6 +99,9 @@ class val EmptyRouter is Router
 
   fun routes_not_in(router: Router): Array[Consumer] val =>
     recover Array[Consumer] end
+
+  fun routes_key(state_name: String, key: Key): Bool =>
+    false
 
 class val DirectRouter is Router
   let _target: Consumer
@@ -139,6 +145,9 @@ class val DirectRouter is Router
     else
       recover [_target] end
     end
+
+  fun routes_key(state_name: String, key: Key): Bool =>
+    false
 
 class val MultiRouter is Router
   let _routers: Array[Router] val
@@ -208,6 +217,17 @@ class val MultiRouter is Router
     end
     consume rs
 
+  fun routes_key(state_name: String, key: Key): Bool =>
+    var found = false
+    for r in _routers.values() do
+      if r.routes_key(state_name, key) then
+        found = true
+        break
+      end
+    end
+
+    found
+
 class val ProxyRouter is (Router & Equatable[ProxyRouter])
   let _worker_name: String
   let _target: OutgoingBoundary
@@ -265,6 +285,9 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
     else
       recover [_target] end
     end
+
+  fun routes_key(state_name: String, key: Key): Bool =>
+    false
 
   fun update_proxy_address(pa: ProxyAddress): ProxyRouter =>
     ProxyRouter(_worker_name, _target, pa, _auth)
@@ -386,6 +409,9 @@ class val EmptyOmniRouter is OmniRouter
   fun routes_not_in(router: OmniRouter): Array[Consumer] val =>
     recover Array[Consumer] end
 
+  fun routes_key(state_name: String, key: Key): Bool =>
+    false
+
   fun producer_for(step_id: StepId): Producer ? =>
     error
 
@@ -497,7 +523,6 @@ class val StepIdRouter is OmniRouter
 
           (false, latest_ts)
         else
-          @printf[I32]("!@ target_id = %s\n".cstring(), target_id.string().cstring())
           // No route for this target
           Fail()
           (true, latest_ts)
@@ -725,6 +750,9 @@ class val StepIdRouter is OmniRouter
       if not other_routes.contains(r) then diff.push(r) end
     end
     consume diff
+
+  fun routes_key(state_name: String, key: Key): Bool =>
+    false
 
   fun producer_for(step_id: StepId): Producer ? =>
     if _step_map.contains(step_id) then
@@ -998,8 +1026,7 @@ class val DataRouter is Equatable[DataRouter]
 
     consume rs
 
-  // !@ Get rid of id', we don't use it anymore
-  fun remove_keyed_route(id': StepId, state_name: String, key: Key): DataRouter =>
+  fun remove_keyed_route(state_name: String, key: Key): DataRouter =>
     ifdef debug then
       Invariant(_keyed_routes.contains(state_name, key))
     end
@@ -1346,6 +1373,9 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
       if not other_routes.contains(r) then diff.push(r) end
     end
     consume diff
+
+  fun routes_key(state_name': String, key: Key): Bool =>
+    (_state_name == state_name') and _local_routes.contains(key)
 
   fun update_route(step_id: StepId, key: Key, step: Step):
     PartitionRouter
@@ -1848,6 +1878,9 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     end
     consume diff
 
+  fun routes_key(state_name: String, key: Key): Bool =>
+    false
+
   fun update_route(partition_id': U64, target: (Step | ProxyRouter)):
     StatelessPartitionRouter ?
   =>
@@ -2144,6 +2177,9 @@ class val HashedProxyRouter is (Router & Equatable[HashedProxyRouter])
     else
       recover [_target] end
     end
+
+  fun routes_key(state_name: String, key: Key): Bool =>
+    false
 
   fun val update_boundary(ob: box->Map[String, OutgoingBoundary]):
     HashedProxyRouter

@@ -33,6 +33,7 @@ use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/query"
 
+type _OmniRouterUpdatable is (Step | StateStepCreator)
 
 actor RouterRegistry is InFlightAckRequester
   let _id: StepId
@@ -73,7 +74,7 @@ actor RouterRegistry is InFlightAckRequester
     Map[U128, SetIs[RouterUpdateable]] =
       _stateless_partition_router_subs.create()
   // All steps that have an OmniRouter
-  let _omni_router_steps: SetIs[Step] = _omni_router_steps.create()
+  let _omni_router_updatables: SetIs[_OmniRouterUpdatable] = _omni_router_updatables.create()
   //
   ////////////////
 
@@ -140,6 +141,8 @@ actor RouterRegistry is InFlightAckRequester
     _data_receivers = data_receivers
     _connections = c
     _state_step_creator = state_step_creator
+    _state_step_creator.set_router_registry(this)
+    register_omni_router_updatable(_state_step_creator)
     _recovery_file_cleaner = recovery_file_cleaner
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
@@ -312,11 +315,11 @@ actor RouterRegistry is InFlightAckRequester
       Fail()
     end
 
-  be register_omni_router_step(s: Step) =>
-    _register_omni_router_step(s)
+  be register_omni_router_updatable(s: _OmniRouterUpdatable) =>
+    _register_omni_router_updatable(s)
 
-  fun ref _register_omni_router_step(s: Step) =>
-    _omni_router_steps.set(s)
+  fun ref _register_omni_router_updatable(s: _OmniRouterUpdatable) =>
+    _omni_router_updatables.set(s)
 
   be register_boundaries(bs: Map[String, OutgoingBoundary] val,
     bbs: Map[String, OutgoingBoundaryBuilder] val)
@@ -348,8 +351,8 @@ actor RouterRegistry is InFlightAckRequester
         end
       end
     end
-    for step in _omni_router_steps.values() do
-      step.add_boundaries(new_boundaries_sendable)
+    for updatable in _omni_router_updatables.values() do
+      updatable.add_boundaries(new_boundaries_sendable)
     end
     for step in _data_router.routes().values() do
       match step
@@ -394,13 +397,16 @@ actor RouterRegistry is InFlightAckRequester
       _distribute_omni_router()
     end
 
+  be register_state_step(step: Step, state_name: String, key: Key, step_id: StepId) =>
+    _add_routes_to_state_step(step_id, step, key, state_name)
+
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
 
   fun _distribute_omni_router() =>
     try
-      for step in _omni_router_steps.values() do
-        step.update_omni_router(_omni_router as OmniRouter)
+      for updatable in _omni_router_updatables.values() do
+        updatable.update_omni_router(_omni_router as OmniRouter)
       end
       match _local_topology_initializer
       | let lti: LocalTopologyInitializer =>
@@ -487,8 +493,8 @@ actor RouterRegistry is InFlightAckRequester
         end
       end
     end
-    for step in _omni_router_steps.values() do
-      step.remove_boundary(worker)
+    for updatable in _omni_router_updatables.values() do
+      updatable.remove_boundary(worker)
     end
 
     for source in _sources.values() do
@@ -1488,7 +1494,7 @@ actor RouterRegistry is InFlightAckRequester
     """
     Called when a step has been migrated off this worker to another worker
     """
-    _remove_step_from_data_router(id, state_name, key)
+    _remove_step_from_data_router(state_name, key)
     _add_proxy_to_omni_router(id, proxy_address)
 
   be add_state_proxy(id: StepId, proxy_address: ProxyAddress, key: Key,
@@ -1499,10 +1505,8 @@ actor RouterRegistry is InFlightAckRequester
     """
     _add_proxy_to_omni_router(id, proxy_address)
 
-  fun ref _remove_step_from_data_router(id: StepId, state_name: String,
-    key: Key)
-  =>
-    let new_data_router = _data_router.remove_keyed_route(id, state_name, key)
+  fun ref _remove_step_from_data_router(state_name: String, key: Key) =>
+    let new_data_router = _data_router.remove_keyed_route(state_name, key)
     _data_router = new_data_router
     _distribute_data_router()
 
@@ -1553,16 +1557,19 @@ actor RouterRegistry is InFlightAckRequester
     Called when a stateful step has been migrated to this worker from another
     worker
     """
+    _add_routes_to_state_step(id, target, key, state_name)
+    _connections.notify_cluster_of_new_stateful_step(id, key, state_name,
+      recover [source_worker] end)
+
+  fun ref _add_routes_to_state_step(id: StepId, target: Consumer, key: Key,
+    state_name: String)
+  =>
     try
       match target
       | let step: Step =>
-        _register_omni_router_step(step)
+        _register_omni_router_updatable(step)
         _data_router = _data_router.add_keyed_route(id, state_name, key, step)
         _distribute_data_router()
-
-        let partition_router =
-          _partition_routers(state_name)?.update_route(id, key, step)?
-        _distribute_partition_router(partition_router)
 
         // Add routes to state computation targets to state step
         match _pre_state_data
@@ -1582,6 +1589,11 @@ actor RouterRegistry is InFlightAckRequester
         else
           Fail()
         end
+
+        let partition_router =
+          _partition_routers(state_name)?.update_route(id, key, step)?
+        _distribute_partition_router(partition_router)
+
         _partition_routers(state_name) = partition_router
       else
         Fail()
@@ -1589,12 +1601,9 @@ actor RouterRegistry is InFlightAckRequester
     else
       Fail()
     end
-    _move_proxy_to_step(id, target, source_worker)
-    _connections.notify_cluster_of_new_stateful_step(id, key, state_name,
-      recover [source_worker] end)
+    _move_proxy_to_step(id, target)
 
-  fun ref _move_proxy_to_step(id: U128, target: Consumer,
-    source_worker: String)
+  fun ref _move_proxy_to_step(id: U128, target: Consumer)
   =>
     """
     Called when a step has been migrated to this worker from another worker
