@@ -48,6 +48,14 @@ mkdir wallaroo-tutorial
 pushd wallaroo-tutorial || exit
 
 git clone https://github.com/WallarooLabs/wallaroo
+
+# ping chuck's clone tracking endpoint
+curl -v -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d "{\"date\":\"$(date)\",\"source\":\"vagrant-demo\",\"count\":1}" \
+  https://hooks.zapier.com/hooks/catch/175929/f4hnh4/
+
 pushd wallaroo || exit
 git checkout $wallaroo_version
 
