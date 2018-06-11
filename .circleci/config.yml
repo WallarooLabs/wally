@@ -5,30 +5,35 @@ jobs:
       - image: wallaroolabs/wallaroo-ci:2018.06.11.1
     steps:
       - checkout
+      - run: .circleci/clone_tracker.sh
       - run: make build debug=true
   verify-changelog:
     docker:
       - image: ponylang/changelog-tool:release
     steps:
       - checkout
+      - run: .circleci/clone_tracker.sh
       - run: changelog-tool verify CHANGELOG.md
   integration-tests:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.06.11.1
     steps:
       - checkout
+      - run: .circleci/clone_tracker.sh
       - run: make integration-tests debug=true
   integration-tests-with-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.06.11.1
     steps:
       - checkout
+      - run: .circleci/clone_tracker.sh
       - run: make integration-tests-testing-correctness-tests-all resilience=on debug=true
   unit-tests:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.06.11.1
     steps:
       - checkout
+      - run: .circleci/clone_tracker.sh
       - run: make unit-tests debug=true
 workflows:
   version: 2

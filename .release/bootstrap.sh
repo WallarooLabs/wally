@@ -158,7 +158,7 @@ clone_and_report() {
   curl -v -H "Accept: application/json" \
         -H "Content-Type: application/json" \
         -X POST \
-        -d "{\"date\":\"$(date)\",\"source\":\"vagrant\",\"count\":1}" \
+        -d "{\"date\":\"$(date)\",\"source\":\"vagrant-release\",\"count\":1}" \
         https://hooks.zapier.com/hooks/catch/175929/f4hnh4/
 
   echo "** Wallaroo repo cloned"
