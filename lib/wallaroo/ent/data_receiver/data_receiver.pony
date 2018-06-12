@@ -43,6 +43,9 @@ actor DataReceiver is Producer
 
   var _last_request: USize = 0
 
+  let _pending_data_store: PendingDataStore =
+    _pending_data_store.create()
+
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
   var _latest_conn: (DataChannel | None) = None
@@ -248,6 +251,8 @@ actor DataReceiver is Producer
       _watermarker.add_route(id)
     end
 
+    _pending_data_store.process_pending(this, this, _router)
+
   be remove_route_to_consumer(c: Consumer) =>
     // DataReceiver doesn't have its own routes
     None
@@ -266,6 +271,11 @@ actor DataReceiver is Producer
         metrics_id, worker_ingress_ts)
       _maybe_ack()
     end
+
+  fun ref reroute(source: Producer ref,
+    route_args: RoutingArguments)
+  =>
+    route_args.route_with(_router, source)
 
   be request_ack() =>
     if _last_id_acked < _last_id_seen then
@@ -331,9 +341,10 @@ actor DataReceiver is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  fun ref unknown_key[D: Any val](state_name: String, key: Key,
-    routing_args: TypedRoutingArguments[D])
+  fun ref unknown_key(state_name: String, key: Key,
+    routing_args: RoutingArguments)
   =>
+    _pending_data_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   be mute(c: Consumer) =>

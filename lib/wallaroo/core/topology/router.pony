@@ -40,7 +40,7 @@ interface Rerouter
 
 trait val RoutingArguments
   fun val apply(rerouter: Rerouter, producer: Producer ref)
-  fun val route_with(router: Router, producer: Producer ref)
+  fun val route_with(router: (Router | DataRouter), producer: Producer ref)
 
 class val TypedRoutingArguments[D: Any val] is RoutingArguments
   let _metric_name: String
@@ -70,12 +70,104 @@ class val TypedRoutingArguments[D: Any val] is RoutingArguments
   fun val apply(rerouter: Rerouter, producer: Producer ref) =>
     rerouter.reroute(producer, this)
 
-  fun val route_with(router: Router, producer: Producer ref) =>
+  fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
     // !@ this doesn't correctly capture times for calculating latencies,
     // so what do we want to do about this?
-    router.route[D](_metric_name, _pipeline_time_spent, _data, _producer_id,
-      producer, _i_msg_uid, _frac_ids, _latest_ts, _metrics_id,
-      _worker_ingress_ts)
+    match router
+    | let r: Router =>
+      r.route[D](_metric_name, _pipeline_time_spent, _data, _producer_id,
+        producer, _i_msg_uid, _frac_ids, _latest_ts, _metrics_id,
+        _worker_ingress_ts)
+    else
+      @printf[I32]("Router failed to reroute message.\n".cstring())
+      Fail()
+    end
+
+class val TypedDataRoutingArguments[D: Any val] is RoutingArguments
+  let _metric_name: String
+  let _pipeline_time_spent: U64
+  let _data: D
+  let _producer_id: StepId
+  let _seq_id: SeqId
+  let _frac_ids: FractionalMessageId
+  let _latest_ts: U64
+  let _metrics_id: U16
+  let _worker_ingress_ts: U64
+
+  new val create(metric_name: String, pipeline_time_spent: U64, data: D,
+    producer_id: StepId, seq_id: SeqId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _metric_name = metric_name
+    _pipeline_time_spent = pipeline_time_spent
+    _data = data
+    _producer_id = producer_id
+    _seq_id = seq_id
+    _frac_ids = frac_ids
+    _latest_ts = latest_ts
+    _metrics_id = metrics_id
+    _worker_ingress_ts = worker_ingress_ts
+
+  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
+    rerouter.reroute(producer, this)
+
+  fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
+    // !@ this doesn't correctly capture times for calculating latencies,
+    // so what do we want to do about this?
+    match (router, producer, _data)
+    | (let data_router: DataRouter, let data_receiver: DataReceiver ref,
+      let dm: DeliveryMsg)
+    =>
+      data_router.route(dm, _pipeline_time_spent, _producer_id,
+        data_receiver, _seq_id, _latest_ts, _metrics_id,
+        _worker_ingress_ts)
+    else
+      @printf[I32]("DataRouter failed to reroute message.\n".cstring())
+      Fail()
+    end
+
+class val TypedDataReplayRoutingArguments[D: Any val] is RoutingArguments
+  let _metric_name: String
+  let _pipeline_time_spent: U64
+  let _data: D
+  let _producer_id: StepId
+  let _seq_id: SeqId
+  let _frac_ids: FractionalMessageId
+  let _latest_ts: U64
+  let _metrics_id: U16
+  let _worker_ingress_ts: U64
+
+  new val create(metric_name: String, pipeline_time_spent: U64, data: D,
+    producer_id: StepId, seq_id: SeqId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _metric_name = metric_name
+    _pipeline_time_spent = pipeline_time_spent
+    _data = data
+    _producer_id = producer_id
+    _seq_id = seq_id
+    _frac_ids = frac_ids
+    _latest_ts = latest_ts
+    _metrics_id = metrics_id
+    _worker_ingress_ts = worker_ingress_ts
+
+  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
+    rerouter.reroute(producer, this)
+
+  fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
+    // !@ this doesn't correctly capture times for calculating latencies,
+    // so what do we want to do about this?
+    match (router, producer, _data)
+    | (let data_router: DataRouter, let data_receiver: DataReceiver ref,
+      let dm: ReplayableDeliveryMsg)
+    =>
+      data_router.replay_route(dm, _pipeline_time_spent, _producer_id,
+        data_receiver, _seq_id, _latest_ts, _metrics_id,
+        _worker_ingress_ts)
+    else
+      @printf[I32]("DataRouter failed to reroute message.\n".cstring())
+      Fail()
+    end
 
 trait val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -982,13 +1074,12 @@ class val DataRouter is Equatable[DataRouter]
       ifdef "resilience" then
         producer.bookkeeping(route_id, seq_id)
       end
-      false
     else
+      // !@ this now gets an exception on an unknown key, which gets handled
+      // by the StateStepCreator.
       ifdef debug then
         @printf[I32]("DataRouter failed to find route on replay\n".cstring())
       end
-      Fail()
-      true
     end
 
   fun register_producer(producer: Producer) =>
@@ -1139,6 +1230,9 @@ class val DataRouter is Equatable[DataRouter]
         p.remove_route_to_consumer(c)
       end
     end
+
+  fun routes_key(state_name: String, key: Key): Bool =>
+    _keyed_routes.contains(state_name, key)
 
   fun eq(that: box->DataRouter): Bool =>
     MapTagEquality[U128, Consumer](_data_routes, that._data_routes) and
@@ -1313,7 +1407,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
             let routing_args = TypedRoutingArguments[D](metric_name,
               pipeline_time_spent, data, producer_id, i_msg_uid,
               frac_ids, latest_ts, metrics_id, worker_ingress_ts)
-            producer.unknown_key[D](_state_name, key, routing_args)
+            producer.unknown_key(_state_name, key, routing_args)
             (true, latest_ts)
           end
         else
