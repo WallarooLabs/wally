@@ -403,8 +403,8 @@ actor _TestProducer is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  fun ref unknown_key[D: Any val](state_name: String, key: Key,
-    routing_args: TypedRoutingArguments[D])
+  fun ref unknown_key(state_name: String, key: Key,
+    routing_args: RoutingArguments)
   =>
     None
 

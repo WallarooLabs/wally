@@ -375,8 +375,8 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   fun ref current_sequence_id(): SeqId =>
     _seq_id
 
-  fun ref unknown_key[D: Any val](state_name: String, key: Key,
-    routing_args: TypedRoutingArguments[D])
+  fun ref unknown_key(state_name: String, key: Key,
+    routing_args: RoutingArguments)
   =>
     _pending_data_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)

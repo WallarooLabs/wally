@@ -723,7 +723,7 @@ class val ReplayMsg is ChannelMsg
 trait val DeliveryMsg is ChannelMsg
   fun sender_name(): String
   fun deliver(pipeline_time_spent: U64,
-    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
@@ -733,10 +733,10 @@ trait val DeliveryMsg is ChannelMsg
   ): RouteId ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
-  fun replay_deliver(pipeline_time_spent: U64,
+  fun val replay_deliver(pipeline_time_spent: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
-    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: KeyToStepInfo[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
@@ -773,7 +773,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun sender_name(): String => _sender_name
 
   fun deliver(pipeline_time_spent: U64,
-    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
@@ -793,10 +793,10 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
       worker_ingress_ts)
     route_id
 
-  fun replay_deliver(pipeline_time_spent: U64,
+  fun val replay_deliver(pipeline_time_spent: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
-    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: KeyToStepInfo[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
@@ -836,7 +836,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
   fun sender_name(): String => _sender_name
 
   fun deliver(pipeline_time_spent: U64,
-    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
@@ -860,14 +860,17 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
         @printf[I32]("DataRouter could not find route for key %s\n".cstring(),
           _target_key.cstring())
       end
-      // producer.unknown_key[D](_target_state_name, _target_key, _data)
+      let ra = TypedDataRoutingArguments[D](_metric_name, pipeline_time_spent,
+        _data, producer_id, seq_id, _frac_ids, latest_ts, metrics_id,
+        worker_ingress_ts)
+      producer.unknown_key(_target_state_name, _target_key, ra)
       error
     end
 
-  fun replay_deliver(pipeline_time_spent: U64,
+  fun val replay_deliver(pipeline_time_spent: U64,
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
-    producer_id: StepId, producer: Producer, seq_id: SeqId,
+    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: KeyToStepInfo[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
@@ -875,12 +878,21 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     try
       let target_step = keys_to_routes(_target_state_name, _target_key)?
       let route_id = keys_to_route_ids(_target_state_name, _target_key)?
-      target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+
+      target_step.replay_run[D](_metric_name, pipeline_time_spent,
+        _data, producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id,
+        latest_ts, metrics_id, worker_ingress_ts)
+
       route_id
     else
-      Fail()
+      ifdef "trace" then
+        @printf[I32]("DataRouter could not find route for key %s\n".cstring(),
+          _target_key.cstring())
+      end
+      let ra = TypedDataReplayRoutingArguments[ReplayableDeliveryMsg](_metric_name, pipeline_time_spent,
+        this, producer_id, seq_id, _frac_ids, latest_ts, metrics_id,
+        worker_ingress_ts)
+      producer.unknown_key(_target_state_name, _target_key, ra)
       error
     end
 

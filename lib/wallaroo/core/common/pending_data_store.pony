@@ -50,7 +50,7 @@ class PendingDataStore
     v
 
   fun ref process_pending(producer: Producer ref, rerouter: Rerouter,
-    router: Router)
+    router: (Router | DataRouter))
   =>
     for (state_name, keys_routing_args) in _data_store.pairs() do
       for (key, route_args) in keys_routing_args.pairs() do
