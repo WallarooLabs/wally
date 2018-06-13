@@ -55,8 +55,11 @@ class PendingDataStore
     for (state_name, keys_routing_args) in _data_store.pairs() do
       for (key, route_args) in keys_routing_args.pairs() do
         if router.routes_key(state_name, key) then
-          for r in route_args.values() do
-            r(rerouter, producer)
+          try
+            keys_routing_args.remove(key)?
+            for r in route_args.values() do
+              r(rerouter, producer)
+            end
           end
         end
       end
