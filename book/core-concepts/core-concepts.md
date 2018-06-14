@@ -16,54 +16,22 @@ A Wallaroo application can have multiple interacting pipelines. For example, an 
 
 ## Concepts
 
-### State
-
-: Accumulated result of data stored over the course of time
-
-### Computation
-
-: Code that transforms an input of some type `In` to
+* *State* -- Accumulated result of data stored over the course of time
+* *Computation* -- Code that transforms an input of some type `In` to
 an output of some type `Out` (or optionally `None` if the input should be
 filtered out).
-
-### State Computation
-
-: Code that takes an input type `In` and a state
+* *State Computation* -- Code that takes an input type `In` and a state
 object of some type `State`, operates on that input and state (possibly
 making state updates), and optionally producing an output of some type `Out`.
-
-### Source
-
-: Input point for data from external systems into an application.
-
-### Sink
-
-: Output point from an application to external systems.
-
-### Decoder
-
-: Code that transforms a stream of bytes from an external system
+* *Source* -- Input point for data from external systems into an application.
+* *Sink* -- Output point from an application to external systems.
+* *Decoder* -- Code that transforms a stream of bytes from an external system
 into a series of application input types.
-
-### Encoder
-
-: Code that transforms an application output type into bytes for
+* *Encoder* -- Code that transforms an application output type into bytes for
 sending to an external system.
-
-### Pipeline
-
-: A sequence of computations and/or state computations originating
+* *Pipeline* -- A sequence of computations and/or state computations originating
 from a source and optionally terminating in a sink.
-
-### Application
-
-: A collection of pipelines.
-
-### Topology
-
-: A graph of how all sources, sinks, and computations are
+* *Application* -- A collection of pipelines.
+* *Topology* -- A graph of how all sources, sinks, and computations are
 connected within an application.
-
-### API
-
-Wallaroo provides APIs for implementing all of the above concepts.
+* *API* -- Wallaroo provides APIs for implementing all of the above concepts.
