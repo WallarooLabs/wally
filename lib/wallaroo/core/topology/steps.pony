@@ -111,14 +111,14 @@ actor Step is (Producer & Consumer & Rerouter)
     for consumer in _router.routes().values() do
       if not _routes.contains(consumer) then
         _routes(consumer) =
-          _route_builder(this, consumer, _metrics_reporter)
+          _route_builder(_id, this, consumer, _metrics_reporter)
       end
     end
 
     for boundary in _outgoing_boundaries.values() do
       if not _routes.contains(boundary) then
         _routes(boundary) =
-          _route_builder(this, boundary, _metrics_reporter)
+          _route_builder(_id, this, boundary, _metrics_reporter)
       end
     end
 
@@ -149,14 +149,14 @@ actor Step is (Producer & Consumer & Rerouter)
     for consumer in _router.routes().values() do
       if not _routes.contains(consumer) then
         _routes(consumer) =
-          _route_builder(this, consumer, _metrics_reporter)
+          _route_builder(_id, this, consumer, _metrics_reporter)
       end
     end
 
     for boundary in _outgoing_boundaries.values() do
       if not _routes.contains(boundary) then
         _routes(boundary) =
-          _route_builder(this, boundary, _metrics_reporter)
+          _route_builder(_id, this, boundary, _metrics_reporter)
       end
     end
 
@@ -225,7 +225,7 @@ actor Step is (Producer & Consumer & Rerouter)
     end
 
     for consumer in router'.routes().values() do
-      let next_route = route_builder(this, consumer, _metrics_reporter)
+      let next_route = route_builder(_id, this, consumer, _metrics_reporter)
       if not _routes.contains(consumer) then
         _routes(consumer) = next_route
         ifdef "resilience" then
@@ -251,7 +251,8 @@ actor Step is (Producer & Consumer & Rerouter)
       end
       for consumer in _router.routes().values() do
         if not _routes.contains(consumer) then
-          let new_route = _route_builder(this, consumer, _metrics_reporter)
+          let new_route = _route_builder(_id, this, consumer,
+            _metrics_reporter)
           ifdef "resilience" then
             _acker_x.add_route(new_route)
           end
@@ -296,7 +297,7 @@ actor Step is (Producer & Consumer & Rerouter)
     for (worker, boundary) in boundaries.pairs() do
       if not _outgoing_boundaries.contains(worker) then
         _outgoing_boundaries(worker) = boundary
-        let new_route = _route_builder(this, boundary, _metrics_reporter)
+        let new_route = _route_builder(_id, this, boundary, _metrics_reporter)
         ifdef "resilience" then
           _acker_x.add_route(new_route)
         end
@@ -506,16 +507,25 @@ actor Step is (Producer & Consumer & Rerouter)
       None
     end
 
-  be register_producer(producer: Producer) =>
+  be register_producer(id: StepId, producer: Producer,
+    back_edge: Bool = false)
+  =>
     _upstreams.set(producer)
 
-  be unregister_producer(producer: Producer) =>
+    //!@ Add to input channels
+
+  be unregister_producer(id: StepId, producer: Producer,
+    back_edge: Bool = false)
+  =>
     // TODO: Investigate whether we need this Invariant or why it's sometimes
     // violated during shrink.
     // ifdef debug then
     //   Invariant(_upstreams.contains(producer))
     // end
     _upstreams.unset(producer)
+
+    //!@ Remove input channels
+
 
   be report_status(code: ReportStatusCode) =>
     match code

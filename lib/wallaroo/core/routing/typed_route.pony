@@ -33,21 +33,23 @@ class TypedRoute[In: Any val] is Route
   // route 0 is used for filtered messages
   let _route_id: U64 = 1 + RouteIdGenerator()
   var _step_type: String = ""
+  let _step_id: StepId
   let _step: Producer ref
   let _consumer: Consumer
   let _metrics_reporter: MetricsReporter
   var _route: RouteLogic = _EmptyRouteLogic
 
-  new create(step: Producer ref, consumer: Consumer,
+  new create(step_id: StepId, step: Producer ref, consumer: Consumer,
     metrics_reporter: MetricsReporter ref)
   =>
+    _step_id = step_id
     _step = step
     _consumer = consumer
     _metrics_reporter = metrics_reporter
-    _route = _RouteLogic(step, consumer, "Typed")
+    _route = _RouteLogic(step_id, step, consumer, "Typed")
 
   fun ref application_created() =>
-    _consumer.register_producer(_step)
+    _consumer.register_producer(_step_id, _step)
 
   fun ref application_initialized(step_type: String) =>
     _step_type = step_type

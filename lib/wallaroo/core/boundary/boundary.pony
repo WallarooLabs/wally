@@ -435,20 +435,29 @@ actor OutgoingBoundary is Consumer
     // TODO: How do we propagate this down?
     None
 
-  be register_producer(producer: Producer) =>
+  be register_producer(id: StepId, producer: Producer,
+    back_edge: Bool = false)
+  =>
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
     end
 
     _upstreams.set(producer)
 
-  be unregister_producer(producer: Producer) =>
+    //!@ Add to input channels
+
+
+  be unregister_producer(id: StepId, producer: Producer,
+    back_edge: Bool = false)
+  =>
     // TODO: Determine if we need this Invariant.
     // ifdef debug then
     //   Invariant(_upstreams.contains(producer))
     // end
 
     _upstreams.unset(producer)
+
+    //!@ Remove from input channels
 
   be report_status(code: ReportStatusCode) =>
     _in_flight_ack_waiter.report_status(code)
