@@ -99,6 +99,7 @@ interface tag Source is (DisposableActor & BoundaryUpdateable &
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   be reconnect_boundary(target_worker_name: String)
+  be identify_inputs()
   be mute(c: Consumer)
   be unmute(c: Consumer)
 
