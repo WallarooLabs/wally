@@ -57,10 +57,10 @@ actor EmptySink is Consumer
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be register_producer(producer: Producer) =>
+  be register_producer(id: StepId, producer: Producer) =>
     None
 
-  be unregister_producer(producer: Producer) =>
+  be unregister_producer(id: StepId, producer: Producer) =>
     None
 
   be report_status(code: ReportStatusCode) =>

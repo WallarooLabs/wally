@@ -133,12 +133,12 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
     for consumer in routes.values() do
       _routes(consumer) =
-        _route_builder(this, consumer, _metrics_reporter)
+        _route_builder(_source_id, this, consumer, _metrics_reporter)
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, _metrics_reporter)
+        _route_builder(_source_id, this, boundary, _metrics_reporter)
     end
 
     _notify.update_boundaries(_outgoing_boundaries)
@@ -173,7 +173,8 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
     for target in new_router.routes().values() do
       if not _routes.contains(target) then
-        let new_route = _route_builder(this, target, _metrics_reporter)
+        let new_route = _route_builder(_source_id, this, target,
+          _metrics_reporter)
         _acker_x.add_route(new_route)
         _routes(target) = new_route
       end
@@ -210,7 +211,8 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
           target_worker_name, _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
-        let new_route = _route_builder(this, boundary, _metrics_reporter)
+        let new_route = _route_builder(_source_id, this, boundary,
+          _metrics_reporter)
         _acker_x.add_route(new_route)
         _routes(boundary) = new_route
       end
