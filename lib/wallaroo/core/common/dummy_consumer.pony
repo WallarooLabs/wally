@@ -25,10 +25,10 @@ use "wallaroo/core/topology"
 
 
 actor DummyConsumer is Consumer
-  be register_producer(producer: Producer) =>
+  be register_producer(id: StepId, producer: Producer) =>
     None
 
-  be unregister_producer(producer: Producer) =>
+  be unregister_producer(id: StepId, producer: Producer) =>
     None
 
   be report_status(code: ReportStatusCode) =>
