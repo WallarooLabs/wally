@@ -1125,6 +1125,8 @@ class val DataRouter is Equatable[DataRouter]
     let id = try
       _keyed_step_ids(state_name, key)?
     else
+      @printf[I32]("!@ `remove_keyed_route('%s', '%s')` FAILED\n".cstring(),
+        state_name.cstring(), key.cstring())
       Fail()
       0
     end
@@ -1138,14 +1140,14 @@ class val DataRouter is Equatable[DataRouter]
 
     let new_keyed_routes = recover trn KeyToStepInfo[Step] end
     for (sn, k, v) in _keyed_routes.pairs() do
-      if (sn != state_name) and (k != key) then
+      if not ((sn == state_name) and (k == key)) then
         new_keyed_routes.add(sn, k, v)
       end
     end
 
     let new_keyed_step_ids = recover trn KeyToStepInfo[StepId] end
     for (sn, k, v) in _keyed_step_ids.pairs() do
-      if (sn != state_name) and (k != key) then
+      if not ((sn == state_name) and (k == key)) then
         new_keyed_step_ids.add(sn, k, v)
       end
     end
@@ -1162,7 +1164,7 @@ class val DataRouter is Equatable[DataRouter]
 
     let new_kid_map = recover trn KeyToStepInfo[RouteId] end
     for (sn, k, v) in _keys_to_route_ids.pairs() do
-      if (sn != state_name) and (k != key) then
+      if not ((sn == state_name) and (k == key)) then
         new_kid_map.add(sn, k, v)
       end
     end

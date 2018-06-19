@@ -722,7 +722,7 @@ class val ReplayMsg is ChannelMsg
 
 trait val DeliveryMsg is ChannelMsg
   fun sender_name(): String
-  fun deliver(pipeline_time_spent: U64,
+  fun val deliver(pipeline_time_spent: U64,
     producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
@@ -772,7 +772,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
 
   fun sender_name(): String => _sender_name
 
-  fun deliver(pipeline_time_spent: U64,
+  fun val deliver(pipeline_time_spent: U64,
     producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
@@ -835,7 +835,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
 
   fun sender_name(): String => _sender_name
 
-  fun deliver(pipeline_time_spent: U64,
+  fun val deliver(pipeline_time_spent: U64,
     producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[StepId, Consumer] val,
@@ -860,8 +860,9 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
         @printf[I32]("DataRouter could not find route for key %s\n".cstring(),
           _target_key.cstring())
       end
-      let ra = TypedDataRoutingArguments[D](_metric_name, pipeline_time_spent,
-        _data, producer_id, seq_id, _frac_ids, latest_ts, metrics_id,
+      let ra = TypedDataRoutingArguments[ReplayableDeliveryMsg](_metric_name,
+        pipeline_time_spent,
+        this, producer_id, seq_id, _frac_ids, latest_ts, metrics_id,
         worker_ingress_ts)
       producer.unknown_key(_target_state_name, _target_key, ra)
       error

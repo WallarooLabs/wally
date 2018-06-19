@@ -202,8 +202,6 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
 
     var partition_count: USize = 0
 
-    state_step_creator.add_builder(_state_name, _runner_builder)
-
     for c in _key_distribution.claimants() do
       if c == worker_name then
         try

@@ -69,7 +69,8 @@ actor StateStepCreator is Initializable
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
     recover _outgoing_boundaries.create() end
 
-  let _runner_builders: Map[String, RunnerBuilder] = _runner_builders.create()
+  var _runner_builders: Map[String, RunnerBuilder] val =
+    recover _runner_builders.create() end
 
   var _omni_router: (None | OmniRouter) = None
 
@@ -143,23 +144,23 @@ actor StateStepCreator is Initializable
       end
     end
 
-  be add_builder(state_name: String, runner_builder: RunnerBuilder) =>
-    _runner_builders(state_name) = runner_builder
-
   be set_router_registry(router_registry: RouterRegistry) =>
     _router_registry = router_registry
 
-  be initialize_routes(initializer: LocalTopologyInitializer,
+  be initialize_routes_and_builders(initializer: LocalTopologyInitializer,
     keys_to_steps: KeyToStepInfo[Step] iso,
     keys_to_step_ids: KeyToStepInfo[StepId] iso,
     recovery_replayer: RecoveryReplayer,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val)
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    runner_builders: Map[String, RunnerBuilder] val)
   =>
     _keys_to_steps = consume keys_to_steps
     _keys_to_step_ids = consume keys_to_step_ids
 
     _recovery_replayer = recovery_replayer
     _outgoing_boundaries = outgoing_boundaries
+
+    _runner_builders = runner_builders
 
     initializer.report_initialized(this)
 
