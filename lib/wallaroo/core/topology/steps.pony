@@ -76,6 +76,9 @@ actor Step is (Producer & Consumer)
 
   let _state_step_creator: StateStepCreator
 
+  let _pending_data_store: PendingDataStore =
+    _pending_data_store.create()
+
   new create(auth: AmbientAuth, runner: Runner iso,
     metrics_reporter: MetricsReporter iso,
     id: U128, route_builder: RouteBuilder, event_log: EventLog,
@@ -283,6 +286,7 @@ actor Step is (Producer & Consumer)
           _routes(consumer) = new_route
         end
       end
+      _pending_data_store.process_pending(this, this, _router)
     else
       Fail()
     end
@@ -420,6 +424,11 @@ actor Step is (Producer & Consumer)
         i_route_id, i_seq_id)
     end
 
+  fun ref reroute(producer: Producer ref,
+    route_args: RoutingArguments)
+  =>
+    route_args.route_with(_router, this)
+
   fun ref next_sequence_id(): SeqId =>
     _seq_id_generator.new_id()
 
@@ -429,6 +438,7 @@ actor Step is (Producer & Consumer)
   fun ref unknown_key(state_name: String, key: Key,
       routing_args: RoutingArguments)
   =>
+    _pending_data_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   fun ref filter_queued_msg(i_producer: Producer, i_route_id: RouteId,

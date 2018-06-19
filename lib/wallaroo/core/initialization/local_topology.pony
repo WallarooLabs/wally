@@ -1423,9 +1423,16 @@ actor LocalTopologyInitializer is LayoutInitializer
           keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone())
         _router_registry.set_data_router(data_router)
 
-        _state_step_creator.initialize_routes(this,
+        let runner_builders = recover iso Map[String, RunnerBuilder] end
+
+        for (state_name, subpartition) in t.state_builders().pairs() do
+          runner_builders(state_name) = subpartition.runner_builder()
+        end
+
+        _state_step_creator.initialize_routes_and_builders(this,
           keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone(),
-          _recovery_replayer, _outgoing_boundaries)
+          _recovery_replayer, _outgoing_boundaries,
+          consume runner_builders)
 
         if not _is_initializer then
           // Inform the initializer that we're done initializing our local
@@ -1567,6 +1574,16 @@ actor LocalTopologyInitializer is LayoutInitializer
         // stage, so we use an empty map to represent that.
         let data_router = DataRouter(consume data_routes,
           recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end)
+
+        let runner_builders = recover iso Map[String, RunnerBuilder] end
+
+        for (state_name, subpartition) in t.state_builders().pairs() do
+          runner_builders(state_name) = subpartition.runner_builder()
+        end
+
+        _state_step_creator.initialize_routes_and_builders(this,
+          recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end,
+          _recovery_replayer, _outgoing_boundaries, consume runner_builders)
 
         _router_registry.set_data_router(data_router)
 
