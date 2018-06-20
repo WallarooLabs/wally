@@ -694,9 +694,5 @@ class WallarooShutdownHandler is SignalNotify
     _auth = a
 
   fun ref apply(count: U32): Bool =>
-    try
-      let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)?
-      _connections.send_control_to_cluster(clean_shutdown_msg)
-      _recovery_file_cleaner.clean_recovery_files()
-    end
+    _connections.clean_files_shutdown(_recovery_file_cleaner)
     false

@@ -200,7 +200,7 @@ actor Connections is Cluster
   =>
     _send_control_to_cluster(data, exclusions)
 
-  be _send_control_to_cluster(data: Array[ByteSeq] val,
+  fun _send_control_to_cluster(data: Array[ByteSeq] val,
     exclusions: Array[String] val = recover Array[String] end)
   =>
     for worker in _control_conns.keys() do
@@ -818,6 +818,15 @@ actor Connections is Cluster
 
   be shutdown() =>
     _shutdown()
+
+  be clean_files_shutdown(file_cleaner: RecoveryFileCleaner) =>
+    try
+      let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)?
+      _send_control_to_cluster(clean_shutdown_msg)
+      file_cleaner.clean_recovery_files()
+    else
+      Fail()
+    end
 
   fun ref _shutdown() =>
     for (key, conn) in _control_conns.pairs() do
