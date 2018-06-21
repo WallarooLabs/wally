@@ -39,13 +39,18 @@ trait tag StatusReporter
   be report_status(code: ReportStatusCode)
 
 trait tag Producer is (Muteable & Ackable & AckRequester &
-  InFlightAckRequester)
+  InFlightAckRequester & SnapshotRequester)
   fun ref route_to(c: Consumer): (Route | None)
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   be remove_route_to_consumer(c: Consumer)
+
+trait tag SnapshotRequester
+  be ack_snapshot(s: Snapshottable, snapshot_id: SnapshotId)
+  fun ref snapshot_state()
+  fun ref snapshot_complete()
 
 interface tag RouterUpdateable
   be update_router(r: Router)
@@ -54,13 +59,16 @@ interface tag BoundaryUpdateable
   be remove_boundary(worker: String)
 
 trait tag Consumer is (Runnable & StateReceiver & AckRequester &
-  Initializable & InFlightAckResponder & StatusReporter)
+  Initializable & InFlightAckResponder & StatusReporter & Snapshottable)
   // TODO: For now, since we do not allow application graph cycles, all back
   // edges are from DataReceivers. This allows us to simply identify them
   // directly. Once we allow application cycles, we will need a more
   // flexible approach.
   be register_producer(id: StepId, producer: Producer, back_edge: Bool)
   be unregister_producer(id: StepId, producer: Producer, back_edge: Bool)
+
+trait Snapshottable
+  be receive_snapshot_barrier(sr: SnapshotRequester, snapshot_id: SnapshotId)
 
 trait tag Runnable
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
