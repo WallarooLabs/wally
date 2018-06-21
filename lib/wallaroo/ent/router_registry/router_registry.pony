@@ -35,7 +35,7 @@ use "wallaroo_labs/query"
 
 type _OmniRouterUpdatable is (Step | StateStepCreator)
 
-actor RouterRegistry is InFlightAckRequester
+actor RouterRegistry is (InFlightAckRequester)
   let _id: StepId
   let _auth: AmbientAuth
   let _data_receivers: DataReceivers
@@ -43,6 +43,7 @@ actor RouterRegistry is InFlightAckRequester
   let _connections: Connections
   let _state_step_creator: StateStepCreator
   let _recovery_file_cleaner: RecoveryFileCleaner
+  let _snapshot_initiator: SnapshotInitiator
   var _data_router: DataRouter =
     DataRouter(recover Map[StepId, Consumer] end,
       recover LocalStatePartitions end, recover LocalStatePartitionIds end)
@@ -134,7 +135,8 @@ actor RouterRegistry is InFlightAckRequester
     data_receivers: DataReceivers, c: Connections,
     state_step_creator: StateStepCreator,
     recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64,
-    is_joining: Bool, contacted_worker: (String | None) = None)
+    is_joining: Bool, snapshot_initiator: SnapshotInitiator,
+    contacted_worker: (String | None) = None)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -144,6 +146,7 @@ actor RouterRegistry is InFlightAckRequester
     _state_step_creator.set_router_registry(this)
     register_omni_router_updatable(_state_step_creator)
     _recovery_file_cleaner = recovery_file_cleaner
+    _snapshot_initiator = snapshot_initiator
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
     _id = (digestof this).u128()
@@ -207,6 +210,7 @@ actor RouterRegistry is InFlightAckRequester
   be register_source(source: Source, source_id: StepId) =>
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
+    _snapshot_initiator.register_source(source, source_id)
     if not _stop_the_world_in_process and _application_ready_to_work then
       source.unmute(_dummy_consumer)
     end
