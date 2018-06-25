@@ -315,7 +315,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     _event_log.flush_buffer(_source_id, low_watermark)
 
   // Log-rotation
-  be snapshot_state() =>
+  be remote_snapshot_state() =>
     ifdef "trace" then
       @printf[I32]("snapshot_state in TCPSource\n".cstring())
     end
@@ -449,8 +449,16 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   be receive_in_flight_resume_ack(request_id: RequestId) =>
     _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
-  //
+  //////////////
+  // SNAPSHOTS
+  //////////////
+  be receive_snapshot_barrier(sr: SnapshotRequester, snapshot_id: SnapshotId)
+  =>
+
+
+  /////////
   // TCP
+  /////////
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.

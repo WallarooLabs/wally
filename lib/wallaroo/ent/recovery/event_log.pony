@@ -27,8 +27,9 @@ interface tag Resilient
   be initialize_seq_id_on_recovery(seq_id: SeqId)
   be log_flushed(low_watermark: SeqId)
 
+  //!@
   // Log-rotation
-  be snapshot_state()
+  be remote_snapshot_state()
 
 
 class val EventLogConfig
@@ -281,7 +282,8 @@ actor EventLog
       _resilients_to_snapshot.set(v)
     end
     for r in _resilients.values() do
-      r.snapshot_state()
+      //!@
+      r.remote_snapshot_state()
     end
 
   fun ref _rotate_file() =>

@@ -77,6 +77,7 @@ actor TCPSink is Consumer
     was acknowleged.)
   """
   let _env: Env
+  let _snapshot_initiator: SnapshotInitiator
   // Steplike
   let _sink_id: StepId
   let _event_log: EventLog
@@ -131,7 +132,8 @@ actor TCPSink is Consumer
 
   new create(sink_id: StepId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: TCPEncoderWrapper,
-    metrics_reporter: MetricsReporter iso, host: String, service: String,
+    metrics_reporter: MetricsReporter iso,
+    snapshot_initiator: SnapshotInitiator, host: String, service: String,
     initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
     reconnect_pause: U64 = 10_000_000_000)
@@ -147,6 +149,7 @@ actor TCPSink is Consumer
     _recovering = recovering
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
+    _snapshot_initiator = snapshot_initiator
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
@@ -301,6 +304,12 @@ actor TCPSink is Consumer
   be register_producer(id: StepId, producer: Producer,
     back_edge: Bool = false)
   =>
+    @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+    // If we have at least one upstream, then we are involved in snapshotting.
+    if _upstreams.size() == 0 then
+      _snapshot_initiator.register_sink(this)
+    end
+
     _upstreams.set(producer)
 
     //!@ Add to input channels
@@ -308,11 +317,18 @@ actor TCPSink is Consumer
   be unregister_producer(id: StepId, producer: Producer,
     back_edge: Bool = false)
   =>
+    @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
 
     _upstreams.unset(producer)
+
+    // If we have no upstreams, then we are not involved in snapshotting.
+    if _upstreams.size() == 0 then
+      _snapshot_initiator.unregister_sink(this)
+    end
 
     //!@ Remove from input channels
 

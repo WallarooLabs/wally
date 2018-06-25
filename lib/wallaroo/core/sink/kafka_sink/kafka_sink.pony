@@ -44,6 +44,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
   var _initializer: (LocalTopologyInitializer | None) = None
+  let _snapshot_initiator: SnapshotInitiator
 
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
@@ -70,9 +71,10 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   let _pending_delivery_report: MapIs[Any tag, (String, U16, U64, U64, U64,
     (U64 | None))] = _pending_delivery_report.create()
 
-  new create(sink_id: StepId, name: String, event_log: EventLog, recovering: Bool,
-    encoder_wrapper: KafkaEncoderWrapper, metrics_reporter: MetricsReporter iso,
-    conf: KafkaConfig val, auth: TCPConnectionAuth)
+  new create(sink_id: StepId, name: String, event_log: EventLog,
+    recovering: Bool, encoder_wrapper: KafkaEncoderWrapper,
+    metrics_reporter: MetricsReporter iso, conf: KafkaConfig val,
+    snapshot_initiator: SnapshotInitiator, auth: TCPConnectionAuth)
   =>
     _name = name
     _recovering = recovering
@@ -81,6 +83,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _conf = conf
+    _snapshot_initiator = snapshot_initiator
     _auth = auth
 
     _topic = try
@@ -255,6 +258,11 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   be register_producer(id: StepId, producer: Producer,
     back_edge: Bool = false)
   =>
+    // If we have at least one upstream, then we are involved in snapshotting.
+    if _upstreams.size() == 0 then
+      _snapshot_initiator.register_sink(this)
+    end
+
     _upstreams.set(producer)
 
     //!@ Add to input channels
@@ -267,6 +275,11 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     end
 
     _upstreams.unset(producer)
+
+    // If we have no upstreams, then we are not involved in snapshotting.
+    if _upstreams.size() == 0 then
+      _snapshot_initiator.unregister_sink(this)
+    end
 
     //!@ Remove from input channels
 
@@ -391,7 +404,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     Fail()
 
   // Log-rotation
-  be snapshot_state() =>
+  be remote_snapshot_state() =>
     ifdef "trace" then
       @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
     end
