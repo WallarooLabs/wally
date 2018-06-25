@@ -438,6 +438,8 @@ actor OutgoingBoundary is Consumer
   be register_producer(id: StepId, producer: Producer,
     back_edge: Bool = false)
   =>
+    @printf[I32]("!@ Registered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
+
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
     end
@@ -450,6 +452,8 @@ actor OutgoingBoundary is Consumer
   be unregister_producer(id: StepId, producer: Producer,
     back_edge: Bool = false)
   =>
+    @printf[I32]("!@ Unregistered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
+
     // TODO: Determine if we need this Invariant.
     // ifdef debug then
     //   Invariant(_upstreams.contains(producer))

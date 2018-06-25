@@ -219,6 +219,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _event_log: EventLog
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
+  let _snapshot_initiator: SnapshotInitiator
   var _is_initializer: Bool
   var _outgoing_boundary_builders:
     Map[String, OutgoingBoundaryBuilder] val =
@@ -271,7 +272,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
-    recovery_replayer: RecoveryReplayer,
+    recovery_replayer: RecoveryReplayer, snapshot_initiator: SnapshotInitiator,
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, state_step_creator: StateStepCreator,
     cluster_manager: (ClusterManager | None) = None,
@@ -289,6 +290,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _event_log = event_log
     _recovery = recovery
     _recovery_replayer = recovery_replayer
+    _snapshot_initiator = snapshot_initiator
     _local_topology_file = local_topology_file
     _data_channel_file = data_channel_file
     _worker_names_file = worker_names_file
@@ -739,6 +741,10 @@ actor LocalTopologyInitializer is LayoutInitializer
           error
         end
 
+        for w in t.worker_names.values() do
+          _snapshot_initiator.add_worker(w)
+        end
+
         _router_registry.set_pre_state_data(t.pre_state_data())
 
         _save_local_topology()
@@ -1124,8 +1130,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let sink =
                   try
                     egress_builder(_worker_name, consume sink_reporter,
-                      _event_log, _recovering, _env, _auth,
-                      _outgoing_boundaries)?
+                      _event_log, _recovering, _snapshot_initiator,
+                      _env, _auth, _outgoing_boundaries)?
                   else
                     @printf[I32]("Failed to build sink from egress_builder\n"
                       .cstring())
@@ -1509,7 +1515,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   fun ref _initialize_joining_worker() =>
-    @printf[I32]("---------------------------------------------------------\n".cstring())
+    @printf[I32]("---------------------------------------------------------\n"
+      .cstring())
     @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n"
       .cstring())
     try
@@ -1533,8 +1540,8 @@ actor LocalTopologyInitializer is LayoutInitializer
               // Create a sink or OutgoingBoundary. If the latter,
               // egress_builder finds it from _outgoing_boundaries
               let sink = egress_builder(_worker_name,
-                consume sink_reporter, _event_log, _recovering, _env, _auth,
-                _outgoing_boundaries)?
+                consume sink_reporter, _event_log, _recovering,
+                _snapshot_initiator, _env, _auth, _outgoing_boundaries)?
 
               _initializables.set(sink)
 

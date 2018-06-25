@@ -66,7 +66,8 @@ class val KafkaSinkBuilder
     _auth = auth
 
   fun apply(sink_name: String, event_log: EventLog,
-    reporter: MetricsReporter iso, env: Env, recovering: Bool): Sink
+    reporter: MetricsReporter iso, env: Env,
+    snapshot_initiator: SnapshotInitiator, recovering: Bool): Sink
   =>
     // generate md5 hash for sink id
     let rb: Reader = Reader
@@ -80,7 +81,7 @@ class val KafkaSinkBuilder
     match KafkaConfigFactory(_ksco, env.out)
     | let kc: KafkaConfig val =>
       KafkaSink(sink_id, name, event_log, recovering, _encoder_wrapper,
-        consume reporter, kc, _auth)
+        consume reporter, kc, snapshot_initiator, _auth)
     | let ksce: KafkaConfigError =>
       @printf[U32]("%s\n".cstring(), ksce.message().cstring())
       Fail()
