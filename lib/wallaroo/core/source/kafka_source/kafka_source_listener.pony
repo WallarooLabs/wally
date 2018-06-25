@@ -46,13 +46,14 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso, recovering: Bool,
+    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter): KafkaSourceListenerBuilder[In]
   =>
     KafkaSourceListenerBuilder[In](source_builder, router, router_registry,
       route_builder,
       outgoing_boundary_builders, event_log, auth, pipeline_name,
-      layout_initializer, consume metrics_reporter, target_router, _ksco,
-      _auth, recovering)
+      layout_initializer, consume metrics_reporter, state_step_creator,
+      target_router, _ksco, _auth, recovering)
 
 class val KafkaSourceListenerBuilder[In: Any val]
   let _step_id_gen: StepIdGenerator = StepIdGenerator
@@ -65,6 +66,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
   let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
   let _auth: AmbientAuth
+  let _state_step_creator: StateStepCreator
   let _target_router: Router
   let _metrics_reporter: MetricsReporter
   let _ksco: KafkaConfigOptions val
@@ -77,6 +79,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
+    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter,
     ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth, recovering: Bool)
   =>
@@ -89,6 +92,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _layout_initializer = layout_initializer
     _event_log = event_log
     _auth = auth
+    _state_step_creator = state_step_creator
     _target_router = target_router
     _metrics_reporter = consume metrics_reporter
     _ksco = ksco
@@ -99,7 +103,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
     KafkaSourceListener[In](env, _source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders, _event_log, _auth,
       _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      _target_router, _ksco, _tcp_auth, _recovering)
+      _state_step_creator, _target_router, _ksco, _tcp_auth, _recovering)
 
 
 class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
@@ -125,6 +129,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _notify: KafkaSourceListenerNotify[In]
   let _event_log: EventLog
+  let _state_step_creator: StateStepCreator
   var _router: Router
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder
@@ -147,6 +152,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
+    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter,
     ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth, recovering: Bool)
   =>
@@ -156,6 +162,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _event_log = event_log
     _notify = KafkaSourceListenerNotify[In](source_builder, event_log, auth,
       target_router)
+    _state_step_creator = state_step_creator
     _router = router
     _router_registry = router_registry
     _route_builder = route_builder
@@ -238,7 +245,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
                 _notify.build_source(source_id, _env)?, _event_log,
                 _router.routes(), _route_builder, _outgoing_boundary_builders,
                 _layout_initializer, _metrics_reporter.clone(), topic, part_id,
-                kc, _router_registry, _recovering)
+                kc, _router_registry, _state_step_creator, _recovering)
               partitions_sources(part_id) = source
               _router_registry.register_source(source, source_id)
               match _router

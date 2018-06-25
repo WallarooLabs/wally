@@ -145,6 +145,11 @@ class KafkaSourceNotify[In: Any val]
       _metrics_reporter.worker_metric(_pipeline_name, time_spent)
     end
 
+  fun ref reroute(source: Producer ref,
+    route_args: RoutingArguments)
+  =>
+    route_args.route_with(_router, source)
+
   fun ref update_router(router: Router) =>
     _router = router
 
@@ -158,4 +163,3 @@ class KafkaSourceNotify[In: Any val]
           "Updating boundaries is a noop for this kind of Source.\n").cstring())
       end
     end
-
