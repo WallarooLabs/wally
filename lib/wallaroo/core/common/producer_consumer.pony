@@ -48,7 +48,6 @@ trait tag Producer is (Muteable & Ackable & AckRequester &
   be remove_route_to_consumer(c: Consumer)
 
 trait tag SnapshotRequester
-  be ack_snapshot(s: Snapshottable, snapshot_id: SnapshotId)
   fun ref snapshot_state()
   fun ref snapshot_complete()
 

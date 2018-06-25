@@ -21,6 +21,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
 
 type Sink is (Consumer & DisposableActor)
 
@@ -29,4 +30,5 @@ interface val SinkConfig[Out: Any val]
 
 interface val SinkBuilder
   fun apply(sink_name: String, event_log: EventLog,
-    reporter: MetricsReporter iso, env: Env, recovering: Bool): Sink
+    reporter: MetricsReporter iso, env: Env,
+    snapshot_initiator: SnapshotInitiator, recovering: Bool): Sink

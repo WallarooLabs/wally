@@ -20,13 +20,19 @@ actor SnapshotInitiator is SnapshotRequester
   let _connections: Connections
   let _sources: Map[StepId, Source] = _sources.create()
   let _source_ids: Map[USize, StepId] = _source_ids.create()
+  let _sinks: SetIs[Sink] = _sinks.create()
   let _workers: _StringSet = _workers.create()
 
-  new create(connections: Connections, workers: Array[String] val) =>
+  // !@ TODO: Make snapshot interval configurable. And also make it possible to
+  // turn snapshotting off.
+  new create(connections: Connections) =>
     _connections = connections
-    for w in workers.values() do
-      _workers.set(w)
-    end
+
+  be register_sink(sink: Sink) =>
+    _sinks.set(sink)
+
+  be unregister_sink(sink: Sink) =>
+    _sinks.unset(sink)
 
   be register_source(source: Source, source_id: StepId) =>
     _sources(source_id) = source
@@ -46,11 +52,10 @@ actor SnapshotInitiator is SnapshotRequester
     end
     _current_snapshot_id = _current_snapshot_id + 1
     _snapshot_handler = InProgressSnapshotHandler(this, _current_snapshot_id,
-      _sources)
+      _sinks)
     for s in _sources.values() do
-      s.begin_snapshot(this, _current_snapshot_id)
+      s.receive_snapshot_barrier(this, _current_snapshot_id)
     end
-
 
   fun ref snapshot_state() =>
     None
