@@ -74,6 +74,11 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
   var _in_flight_ack_waiter: InFlightAckWaiter
 
+  let _state_step_creator: StateStepCreator
+
+  let _pending_data_store: PendingDataStore =
+    _pending_data_store.create()
+
   let _topic: String
   let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
@@ -87,6 +92,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     metrics_reporter: MetricsReporter iso,
     topic: String, partition_id: KafkaPartitionId,
     kafka_client: KafkaClient tag, router_registry: RouterRegistry,
+    state_step_creator: StateStepCreator,
     recovering: Bool)
   =>
     _source_id = source_id
@@ -100,6 +106,8 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     _notify = consume notify
     _event_log = event_log
     _acker_x = Acker
+
+    _state_step_creator = state_step_creator
 
     _recovering = recovering
 
@@ -171,6 +179,13 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       end
     end
     _notify.update_router(new_router)
+    _pending_data_store.process_pending(this, _notify, new_router)
+
+  fun ref unknown_key(state_name: String, key: Key,
+    routing_args: RoutingArguments)
+  =>
+    _pending_data_store.add(state_name, key, routing_args)
+    _state_step_creator.report_unknown_key(this, state_name, key)
 
   be remove_route_to_consumer(c: Consumer) =>
     if _routes.contains(c) then
