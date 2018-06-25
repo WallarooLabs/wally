@@ -26,7 +26,12 @@ trait StepMessageProcessor
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
-  fun ref ack_snapshot(s: Snapshottable, s_id: SnapshotId) =>
+  fun snapshot_in_progress(): Bool =>
+    false
+
+  fun ref receive_snapshot_barrier(sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
+  =>
     Fail()
 
   fun ref flush(omni_router: OmniRouter)
@@ -87,12 +92,6 @@ class QueueingStepMessageProcessor is StepMessageProcessor
     messages.push(msg)
     step.filter_queued_msg(i_producer, i_route_id, i_seq_id)
 
-  fun ref begin_snapshot(p: Producer, s_id: SnapshotId) =>
-    Fail()
-
-  fun ref ack_snapshot(c: Consumer, s_id: SnapshotId) =>
-    Fail()
-
   fun ref flush(omni_router: OmniRouter) =>
     for msg in messages.values() do
       msg.run(step, omni_router)
@@ -101,20 +100,20 @@ class QueueingStepMessageProcessor is StepMessageProcessor
 
 class SnapshotStepMessageProcessor is StepMessageProcessor
   let step: Step ref
-  let _snapshot_acker: SnapshotAcker
+  let _snapshot_forwarder: SnapshotBarrierForwarder
   var messages: Array[QueuedStepMessage] = messages.create()
 
-  new create(s: Step ref, snapshot_acker: SnapshotAcker)
+  new create(s: Step ref, snapshot_forwarder: SnapshotBarrierForwarder)
   =>
     step = s
-    _snapshot_acker = snapshot_acker
+    _snapshot_forwarder = snapshot_forwarder
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    if _snapshot_acker.input_blocking(i_producer) then
+    if _snapshot_forwarder.input_blocking(i_producer) then
       let msg = TypedQueuedStepMessage[D](metric_name, pipeline_time_spent,
         data, i_producer_id, msg_uid, frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts)
@@ -125,8 +124,13 @@ class SnapshotStepMessageProcessor is StepMessageProcessor
         latest_ts, metrics_id, worker_ingress_ts)
     end
 
-  fun ref ack_snapshot(s: Snapshottable, s_id: SnapshotId) =>
-    _snapshot_acker.ack_snapshot(s, s_id)
+  fun snapshot_in_progress(): Bool =>
+    true
+
+  fun ref receive_snapshot_barrier(sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
+  =>
+    _snapshot_forwarder.receive_snapshot_barrier(sr, snapshot_id)
 
   fun ref flush(omni_router: OmniRouter) =>
     for msg in messages.values() do

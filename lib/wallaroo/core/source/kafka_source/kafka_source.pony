@@ -321,7 +321,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
 
   // Log-rotation
-  be snapshot_state() =>
+  be remote_snapshot_state() =>
     ifdef "trace" then
       @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
     end

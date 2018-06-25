@@ -311,6 +311,8 @@ actor Startup
       _connections = connections
       connections.register_disposable(this)
 
+      let snapshot_initiator = SnapshotInitiator(connections)
+
       _setup_shutdown_handler(connections, this, auth)
 
       let state_step_creator = StateStepCreator(auth, _app_name,

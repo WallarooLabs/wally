@@ -29,16 +29,16 @@ class WaitingSnapshotHandler is SnapshotHandler
 class InProgressSnapshotHandler is SnapshotHandler
   let _initiator: SnapshotInitiator
   let _snapshot_id: SnapshotId
-  let _sources: SetIs[Snapshottable] = _sources.create()
-  let _acked_sources: SetIs[Snapshottable] = _acked_sources.create()
+  let _sinks: SetIs[Snapshottable] = _sinks.create()
+  let _acked_sinks: SetIs[Snapshottable] = _acked_sinks.create()
 
   new create(i: SnapshotInitiator, snapshot_id: SnapshotId,
-    sources: Map[StepId, Source] box)
+    sources: SetIs[Sink] box)
   =>
     _initiator = i
     _snapshot_id = snapshot_id
-    for s in sources.values() do
-      _sources.set(s)
+    for s in sinks.values() do
+      _sinks.set(s)
     end
 
   fun in_progress(): Bool =>
@@ -46,11 +46,11 @@ class InProgressSnapshotHandler is SnapshotHandler
 
   fun ref ack_snapshot(s: Snapshottable, snapshot_id: SnapshotId) =>
     if snapshot_id != _snapshot_id then Fail() end
-    if not _sources.contains(s) then Fail() end
+    if not _sinks.contains(s) then Fail() end
 
     _acked_sources.set(s)
-    if _acked_sources.size() == _sources.size() then
-      _initiator.all_sources_acked()
+    if _acked_sinks.size() == _sinks.size() then
+      _initiator.all_sinks_acked()
     end
 
 class WorkerAcksSnapshotHandler is SnapshotHandler
