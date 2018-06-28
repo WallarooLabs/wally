@@ -728,7 +728,7 @@ trait val DeliveryMsg is ChannelMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_routes: KeyToStepInfoTag[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val
   ): RouteId ?
 
@@ -738,7 +738,7 @@ trait val ReplayableDeliveryMsg is DeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_routes: KeyToStepInfoTag[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   fun input(): Any val
   fun metric_name(): String
@@ -778,7 +778,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_routes: KeyToStepInfoTag[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
@@ -798,7 +798,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_routes: KeyToStepInfoTag[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
@@ -841,7 +841,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     data_routes: Map[StepId, Consumer] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_routes: KeyToStepInfoTag[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   =>
     ifdef "trace" then
@@ -873,7 +873,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     producer_id: StepId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: KeyToStepInfo[Step] val,
+    keys_to_routes: KeyToStepInfoTag[Step] val,
     keys_to_route_ids: KeyToStepInfo[RouteId] val): RouteId ?
   =>
     try
