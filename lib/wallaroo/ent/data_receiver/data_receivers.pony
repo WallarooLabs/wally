@@ -35,7 +35,7 @@ actor DataReceivers
     _data_receivers.create()
   var _data_router: DataRouter =
     DataRouter(recover Map[StepId, Consumer] end,
-      recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end)
+      recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end)
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
   var _router_registry: (RouterRegistry | None) = None

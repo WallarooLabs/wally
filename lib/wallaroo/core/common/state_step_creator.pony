@@ -8,7 +8,7 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo_labs/mort"
 
-class KeyToStepInfo[Info: Any #share]
+class KeyToStepInfo[Info: Any val]
   let _info: Map[String, Map[Key, Info]]
 
   new create() =>
@@ -53,8 +53,53 @@ class KeyToStepInfo[Info: Any #share]
       map[(String, String, Info)](
         { (x) => (x._1, x._2._1, x._2._2) })
 
+class KeyToStepInfoTag[Info: Any tag]
+  let _info: Map[String, Map[Key, Info]]
+
+  new create() =>
+    _info = _info.create()
+
+  fun apply(state_name: String, key: box->Key!): this->Info ? =>
+    _info(state_name)?(key)?
+
+  fun ref add(state_name: String, key: Key, info: Info^) =>
+    try
+      _info.insert_if_absent(state_name, Map[Key, Info])?(key) = info
+    end
+
+  fun contains(state_name: String, key: Key): Bool =>
+    try
+      apply(state_name, key)?
+      true
+    else
+      false
+    end
+
+  fun clone(): KeyToStepInfoTag[Info] iso^ =>
+    let c = recover iso KeyToStepInfoTag[Info].create() end
+
+    for (sn, k_i) in _info.pairs() do
+      for (key, info) in k_i.pairs() do
+        c.add(sn, key, info)
+      end
+    end
+
+    c
+
+  fun pairs(): Iter[(String, String, Info)] =>
+    """
+    Return an iterator over tuples where the first two values are the state name
+    and the key, and the last value is the info value.
+    """
+    Iter[(String, Map[String, Info] box)](_info.pairs()).
+      flat_map[(String, (String, Info))](
+        { (k_m) => Iter[String].repeat_value(k_m._1)
+          .zip[(String, Info)](k_m._2.pairs()) }).
+      map[(String, String, Info)](
+        { (x) => (x._1, x._2._1, x._2._2) })
+
 actor StateStepCreator is Initializable
-  var _keys_to_steps: KeyToStepInfo[Step] = _keys_to_steps.create()
+  var _keys_to_steps: KeyToStepInfoTag[Step] = _keys_to_steps.create()
   var _keys_to_step_ids: KeyToStepInfo[StepId] = _keys_to_step_ids.create()
 
   let _step_id_gen: StepIdGenerator = _step_id_gen.create()
@@ -148,7 +193,7 @@ actor StateStepCreator is Initializable
     _router_registry = router_registry
 
   be initialize_routes_and_builders(initializer: LocalTopologyInitializer,
-    keys_to_steps: KeyToStepInfo[Step] iso,
+    keys_to_steps: KeyToStepInfoTag[Step] iso,
     keys_to_step_ids: KeyToStepInfo[StepId] iso,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,

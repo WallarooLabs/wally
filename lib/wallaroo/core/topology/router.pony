@@ -967,14 +967,14 @@ class val DataRouter is Equatable[DataRouter]
   // _keyed_routes contains a subset of the routes in _data_routes.
   // _keyed_routes keeps track of state step routes, while
   // _data_routes keeps track of *all* routes.
-  let _keyed_routes: KeyToStepInfo[Step] val
+  let _keyed_routes: KeyToStepInfoTag[Step] val
   let _keyed_step_ids: KeyToStepInfo[StepId] val
   let _target_ids_to_route_ids: Map[StepId, RouteId] val
   let _route_ids_to_target_ids: Map[RouteId, StepId] val
   let _keys_to_route_ids: KeyToStepInfo[RouteId] val
 
   new val create(data_routes: Map[StepId, Consumer] val,
-    keyed_routes: KeyToStepInfo[Step] val,
+    keyed_routes: KeyToStepInfoTag[Step] val,
     keyed_step_ids: KeyToStepInfo[StepId] val)
   =>
     _data_routes = data_routes
@@ -1012,7 +1012,7 @@ class val DataRouter is Equatable[DataRouter]
     _keys_to_route_ids = consume kid_map
 
   new val with_route_ids(data_routes: Map[StepId, Consumer] val,
-    keyed_routes: KeyToStepInfo[Step] val,
+    keyed_routes: KeyToStepInfoTag[Step] val,
     keyed_step_ids: KeyToStepInfo[StepId] val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
@@ -1138,7 +1138,7 @@ class val DataRouter is Equatable[DataRouter]
       if k != id then new_data_routes(k) = v end
     end
 
-    let new_keyed_routes = recover trn KeyToStepInfo[Step] end
+    let new_keyed_routes = recover trn KeyToStepInfoTag[Step] end
     for (sn, k, v) in _keyed_routes.pairs() do
       if not ((sn == state_name) and (k == key)) then
         new_keyed_routes.add(sn, k, v)
@@ -1184,7 +1184,7 @@ class val DataRouter is Equatable[DataRouter]
     end
     new_data_routes(id) = target
 
-    let new_keyed_routes = recover trn KeyToStepInfo[Step] end
+    let new_keyed_routes = recover trn KeyToStepInfoTag[Step] end
     for (sn, k, v) in _keyed_routes.pairs() do
       new_keyed_routes.add(sn, k, v)
     end

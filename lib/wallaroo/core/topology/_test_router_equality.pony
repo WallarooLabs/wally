@@ -199,7 +199,7 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     base_routes(1) = step1
     base_routes(2) = step2
 
-    let base_keyed_routes = recover val KeyToStepInfo[Step] end
+    let base_keyed_routes = recover val KeyToStepInfoTag[Step] end
 
     let target_routes = recover trn Map[U128, Consumer] end
     target_routes(1) = step1
@@ -241,7 +241,7 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     target_routes(1) = step1
     target_routes(2) = step2
 
-    let base_keyed_routes = recover val KeyToStepInfo[Step] end
+    let base_keyed_routes = recover val KeyToStepInfoTag[Step] end
 
     var base_router = DataRouter(consume base_routes, base_keyed_routes,
       recover KeyToStepInfo[StepId] end)
