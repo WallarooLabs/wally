@@ -45,7 +45,7 @@ actor RouterRegistry is InFlightAckRequester
   let _recovery_file_cleaner: RecoveryFileCleaner
   var _data_router: DataRouter =
     DataRouter(recover Map[StepId, Consumer] end,
-      recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end)
+      recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end)
   var _pre_state_data: (Array[PreStateData] val | None) = None
   let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()

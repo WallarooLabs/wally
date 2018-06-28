@@ -520,7 +520,7 @@ actor Startup
 
       router_registry.set_data_router(
         DataRouter(recover Map[StepId, Consumer] end,
-          recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end))
+          recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end))
       local_topology_initializer.update_topology(m.local_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)

@@ -153,7 +153,7 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer],
-    keyed_data_routes: KeyToStepInfo[Step],
+    keyed_data_routes: KeyToStepInfoTag[Step],
     keyed_step_ids: KeyToStepInfo[StepId],
     state_step_creator: StateStepCreator): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartition ?
@@ -191,7 +191,7 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[StepId, Consumer],
-    keyed_data_routes: KeyToStepInfo[Step],
+    keyed_data_routes: KeyToStepInfoTag[Step],
     keyed_step_ids: KeyToStepInfo[StepId],
     state_step_creator: StateStepCreator):
     LocalPartitionRouter[PIn, S] val

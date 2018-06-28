@@ -88,7 +88,7 @@ class val LocalTopology
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer tag],
-    keyed_data_routes: KeyToStepInfo[Step],
+    keyed_data_routes: KeyToStepInfoTag[Step],
     keyed_step_ids: KeyToStepInfo[StepId],
     state_step_creator: StateStepCreator) ?
   =>
@@ -757,7 +757,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         // DataRouter for the data channel boundary
         var data_routes = recover trn Map[U128, Consumer] end
 
-        let keyed_data_routes_ref = KeyToStepInfo[Step]
+        let keyed_data_routes_ref = KeyToStepInfoTag[Step]
 
         let keyed_step_ids_ref = KeyToStepInfo[StepId]
 
@@ -1573,7 +1573,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         // We have not yet been assigned any keys by the cluster at this
         // stage, so we use an empty map to represent that.
         let data_router = DataRouter(consume data_routes,
-          recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end)
+          recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end)
 
         let runner_builders = recover iso Map[String, RunnerBuilder] end
 
@@ -1582,7 +1582,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         _state_step_creator.initialize_routes_and_builders(this,
-          recover KeyToStepInfo[Step] end, recover KeyToStepInfo[StepId] end,
+          recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end,
           _recovery_replayer, _outgoing_boundaries, consume runner_builders)
 
         _router_registry.set_data_router(data_router)
