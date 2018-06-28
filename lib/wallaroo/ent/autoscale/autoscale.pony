@@ -277,37 +277,52 @@ trait AutoscalePhase
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
   =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref joining_worker_initialized(worker: String) =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref worker_connected_to_joining_workers(worker: String) =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref stop_the_world_for_join_migration_initiated() =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref join_migration_initiated() =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref ready_for_join_migration() =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref all_step_migration_complete() =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref receive_join_migration_ack(worker: String) =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref leaving_worker_finished_migration(worker: String) =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref receive_leaving_migration_ack(worker: String) =>
+    _print_invalid_call_debug_info()
     Fail()
 
   fun ref autoscale_complete() =>
+    _print_invalid_call_debug_info()
     Fail()
+
+  fun ref _print_invalid_call_debug_info() =>
+    @printf[I32]("Invalid call on autoscale phase %s\n".cstring(),
+      name().cstring())
 
 class _EmptyAutoscalePhase is AutoscalePhase
   fun name(): String => "EmptyAutoscalePhase"
