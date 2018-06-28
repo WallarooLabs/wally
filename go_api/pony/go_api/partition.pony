@@ -1,8 +1,8 @@
 use "collections"
 
-use @PartitionFunctionPartition[Pointer[U8] val](pid: U64, did: U64)
+use @PartitionFunctionPartition[Pointer[U8] val](pid: U64, did: U64, sz: Pointer[U64])
 use @PartitionListGetSize[U64](plid: U64)
-use @PartitionListGetItem[Pointer[U8] val](plid: U64, idx: U64)
+use @PartitionListGetItem[Pointer[U8] val](plid: U64, idx: U64, sz: Pointer[U64])
 
 class val PartitionFunction
   var _partition_function_id: U64
@@ -11,9 +11,10 @@ class val PartitionFunction
     _partition_function_id = partition_function_id
 
   fun apply(data: GoData val): String =>
-    let sp = @PartitionFunctionPartition(_partition_function_id, data.id())
+    var sz: U64 = 0
+    let sp = @PartitionFunctionPartition(_partition_function_id, data.id(), addressof sz)
     recover
-      let s = String.copy_cstring(sp)
+      let s = String.copy_cpointer(sp, sz.usize())
       @free(sp)
       s
     end
@@ -37,8 +38,9 @@ primitive PartitionList
     let partition_list = recover trn Array[String](partition_list_size.usize()) end
 
     for i in Range[U64](0, partition_list_size) do
-      let sp = @PartitionListGetItem(plid, i)
-      partition_list.push(recover String.copy_cstring(sp) end)
+      var sz: U64 = 0
+      let sp = @PartitionListGetItem(plid, i, addressof sz)
+      partition_list.push(recover String.copy_cpointer(sp, sz.usize()) end)
       @free(sp)
     end
 

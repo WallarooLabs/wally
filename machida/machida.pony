@@ -185,7 +185,10 @@ class PyPartitionFunction
         Fail()
       end
 
-      let ret = String.copy_cstring(@PyString_AsString(ps))
+      let py_string_p = @PyString_AsString(ps)
+      let py_string_size = @PyString_Size(ps)
+
+      let ret = String.copy_cpointer(py_string_p, py_string_size)
 
       Machida.dec_ref(ps)
 

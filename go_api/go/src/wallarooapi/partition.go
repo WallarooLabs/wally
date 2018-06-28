@@ -2,31 +2,32 @@ package wallarooapi
 
 import (
 	"C"
-	"fmt"
+	"unsafe"
 )
 
 type PartitionFunction interface {
-	Partition(data interface{}) string
+	Partition(data interface{}) []byte
 }
 
 //export PartitionFunctionPartition
-func PartitionFunctionPartition(partitionFunctionId uint64, dataId uint64) *C.char {
+func PartitionFunctionPartition(partitionFunctionId uint64, dataId uint64, sz *uint64) unsafe.Pointer {
 	partitionFunction := GetComponent(partitionFunctionId, PartitionFunctionTypeId).(PartitionFunction)
 	data := GetComponent(dataId, DataTypeId).(interface{})
-	s := partitionFunction.Partition(data)
-	return C.CString(s)
+	b := partitionFunction.Partition(data)
+	sz = len(b)
+	return C.CBytes(b)
 }
 
 //export PartitionListGetSize
 func PartitionListGetSize(partitionListId uint64) uint64 {
-	fmt.Printf("partitionListId = %d\n", partitionListId)
-	partitionList := GetComponent(partitionListId, PartitionListTypeId).([]string)
+	partitionList := GetComponent(partitionListId, PartitionListTypeId).([][]byte)
 	return uint64(len(partitionList))
 }
 
 //export PartitionListGetItem
-func PartitionListGetItem(partitionListId uint64, idx uint64) *C.char {
-	partitionList := GetComponent(partitionListId, PartitionListTypeId).([]string)
-	s := partitionList[idx]
-	return C.CString(s)
+func PartitionListGetItem(partitionListId uint64, idx uint64, sz *uint64) unsafe.Pointer {
+	partitionList := GetComponent(partitionListId, PartitionListTypeId).([][]byte)
+	b := partitionList[idx]
+	sz = len(b)
+	return C.CBytes(b)
 }
