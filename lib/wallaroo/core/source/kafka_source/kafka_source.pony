@@ -226,7 +226,18 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   fun ref _register_output(id: StepId, c: Consumer) =>
     if _outputs.contains(id) then
       try
+        if _outputs(id)? is c then
+          // We already know about this output.
+          return
+        end
+      else
+        Unreachable()
+      end
+
+      try
         _routes(c)?.unregister_producer(id)
+        _outputs.remove(id)?
+        _remove_route_if_no_output(c)
       else
         Fail()
       end
@@ -244,7 +255,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       try
         _routes(c)?.register_producer(id)
       else
-        Fail()
+        Unreachable()
       end
     end
 

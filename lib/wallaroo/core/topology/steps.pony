@@ -277,7 +277,18 @@ actor Step is (Producer & Consumer & Rerouter)
   fun ref _register_output(id: StepId, c: Consumer) =>
     if _outputs.contains(id) then
       try
+        if _outputs(id)? is c then
+          // We already know about this output.
+          return
+        end
+      else
+        Unreachable()
+      end
+
+      try
         _routes(c)?.unregister_producer(id)
+        _outputs.remove(id)?
+        _remove_route_if_no_output(c)
       else
         Fail()
       end
@@ -295,7 +306,7 @@ actor Step is (Producer & Consumer & Rerouter)
       try
         _routes(c)?.register_producer(id)
       else
-        Fail()
+        Unreachable()
       end
     end
 
@@ -351,20 +362,24 @@ actor Step is (Producer & Consumer & Rerouter)
     end
 
   be update_target_id_router(target_id_router: TargetIdRouter) =>
-    //!@
-    // let old_router = _target_id_router
+    let old_router = _target_id_router
     _target_id_router = target_id_router
-    //!@
-    // for (old_id, outdated_consumer) in
-    //   old_router.routes_not_in(_target_id_router).pairs()
-    // do
-    //   if _outputs.contains(old_id) then
-    //     try
-    //       _outputs.remove(old_id)?
-    //       _remove_route_if_no_output(outdated_consumer)
-    //     end
-    //   end
-    // end
+    for (old_id, outdated_consumer) in
+      old_router.routes_not_in(_target_id_router).pairs()
+    do
+      if _outputs.contains(old_id) then
+        try
+          _routes(outdated_consumer)?.unregister_producer(old_id)
+          _outputs.remove(old_id)?
+          _remove_route_if_no_output(outdated_consumer)
+        end
+      end
+    end
+
+    for (id, consumer) in target_id_router.route().pairs() do
+      _register_output(id, consumer)
+    end
+
     _add_boundaries(target_id_router.boundaries())
 
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
