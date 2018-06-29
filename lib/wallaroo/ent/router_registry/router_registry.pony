@@ -878,8 +878,16 @@ actor RouterRegistry is InFlightAckRequester
     for w in target_workers.values() do
       @printf[I32]("Migrating partitions to %s\n".cstring(), w.cstring())
     end
+    var had_steps_to_migrate = false
     for state_name in _partition_routers.keys() do
-      _migrate_partition_steps(state_name, target_workers)
+      let steps_to_migrate_for_this_state =
+        _migrate_partition_steps(state_name, target_workers)
+      if steps_to_migrate_for_this_state then
+        had_steps_to_migrate = true
+      end
+    end
+    if not had_steps_to_migrate then
+      try_to_resume_processing_immediately()
     end
 
   be begin_migration_of_all() =>
@@ -1160,11 +1168,11 @@ actor RouterRegistry is InFlightAckRequester
     _connections.ack_migration_batch_complete(sender_name)
 
   fun ref _migrate_partition_steps(state_name: String,
-    target_workers: Array[String] val)
+    target_workers: Array[String] val): Bool
   =>
     """
     Called to initiate migrating partition steps to a target worker in order
-    to rebalance.
+    to rebalance. Return false if there were no steps to migrate.
     """
     try
       for w in target_workers.values() do
@@ -1185,14 +1193,15 @@ actor RouterRegistry is InFlightAckRequester
         state_name, this)
     else
       Fail()
+      false
     end
 
   fun ref _migrate_all_partition_steps(state_name: String,
-    target_workers: Array[(String, OutgoingBoundary)] val)
+    target_workers: Array[(String, OutgoingBoundary)] val): Bool
   =>
     """
     Called to initiate migrating all partition steps the set of remaining
-    workers.
+    workers. Return false if there is nothing to migrate.
     """
     try
       @printf[I32]("Migrating steps for %s partition to %d workers\n"
@@ -1201,6 +1210,7 @@ actor RouterRegistry is InFlightAckRequester
       partition_router.rebalance_steps_shrink(target_workers, state_name, this)
     else
       Fail()
+      false
     end
 
   fun ref add_to_step_waiting_list(step_id: StepId) =>
@@ -1340,8 +1350,17 @@ actor RouterRegistry is InFlightAckRequester
 
     @printf[I32]("Migrating all partitions to %d remaining workers\n"
       .cstring(), remaining_workers.size())
+
+    var had_steps_to_migrate = false
     for state_name in _partition_routers.keys() do
-      _migrate_all_partition_steps(state_name, rws)
+      let steps_to_migrate_for_this_state =
+        _migrate_all_partition_steps(state_name, rws)
+      if steps_to_migrate_for_this_state then
+        had_steps_to_migrate = true
+      end
+    end
+    if not had_steps_to_migrate then
+      try_to_resume_processing_immediately()
     end
 
   fun ref _stop_the_world_for_shrink_migration() =>

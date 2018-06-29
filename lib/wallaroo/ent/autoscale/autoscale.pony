@@ -62,8 +62,6 @@ class Autoscale
     2) _WaitingForAutoscale: Autoscale is complete and we are back to our
       initial waiting state.
 
-
-
     SHRINK (coordinator):
     1) _InitiatingShrink: RouterRegistry currently handles the details. We're
       waiting until all steps have been migrated from leaving workers.
