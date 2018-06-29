@@ -1046,10 +1046,10 @@ trait val PartitionRouter is (Router & Equatable[PartitionRouter])
   fun rebalance_steps_grow(
     target_workers: Array[(String, OutgoingBoundary)] val,
     worker_count: USize, state_name': String,
-    router_registry: RouterRegistry ref)
+    router_registry: RouterRegistry ref): Bool
   fun rebalance_steps_shrink(
     target_workers: Array[(String, OutgoingBoundary)] val,
-    state_name': String, router_registry: RouterRegistry ref)
+    state_name': String, router_registry: RouterRegistry ref): Bool
   // Total number of steps in partition
   fun size(): USize
   // Number of local steps in partition
@@ -1264,8 +1264,12 @@ class val LocalPartitionRouter[In: Any val,
   fun rebalance_steps_grow(
     target_workers: Array[(String, OutgoingBoundary)] val,
     worker_count: USize, state_name': String,
-    router_registry: RouterRegistry ref)
+    router_registry: RouterRegistry ref): Bool
   =>
+    """
+    Begin migration of state steps known to this router that we determine
+    must be routed. Return false if there are none to migrate.
+    """
     let joining_worker_count = target_workers.size()
     let former_worker_count = worker_count - joining_worker_count
     (let total_to_send, let to_send_counts) =
@@ -1275,14 +1279,23 @@ class val LocalPartitionRouter[In: Any val,
     let steps_to_migrate' = steps_to_migrate(total_to_send, to_send_counts,
       target_workers)
 
-    migrate_steps(state_name', router_registry, steps_to_migrate',
-      target_workers.size())
+    if steps_to_migrate'.size() == 0 then
+      false
+    else
+      migrate_steps(state_name', router_registry, steps_to_migrate',
+        target_workers.size())
+      true
+    end
 
   fun rebalance_steps_shrink(
     target_workers: Array[(String, OutgoingBoundary)] val,
     state_name': String,
-    router_registry: RouterRegistry ref)
+    router_registry: RouterRegistry ref): Bool
   =>
+    """
+    Begin migration of state steps known to this router that we determine
+    must be routed. Return false if there are none to migrate.
+    """
     let total_to_send = _local_map.size()
     let to_send_counts =
       PartitionRebalancer.step_counts_to_send_on_leaving(total_to_send,
@@ -1291,8 +1304,13 @@ class val LocalPartitionRouter[In: Any val,
     let steps_to_migrate' = steps_to_migrate(total_to_send, to_send_counts,
       target_workers)
 
-    migrate_steps(state_name', router_registry, steps_to_migrate',
-      target_workers.size())
+    if steps_to_migrate'.size() == 0 then
+      false
+    else
+      migrate_steps(state_name', router_registry, steps_to_migrate',
+        target_workers.size())
+      true
+    end
 
   fun steps_to_migrate(total_to_send: USize, to_send_counts: Array[USize] val,
     target_workers: Array[(String, OutgoingBoundary)] val):
@@ -1341,11 +1359,6 @@ class val LocalPartitionRouter[In: Any val,
     steps_to_migrate': Array[(String, OutgoingBoundary, Key, U128, Step)],
     target_worker_count: USize)
   =>
-    if (steps_to_migrate'.size() == 0) then
-      // There is nothing to send over. Can we immediately resume processing?
-      router_registry.try_to_resume_processing_immediately()
-      return
-    end
     @printf[I32]("^^Migrating %lu steps to %d workers\n".cstring(),
       steps_to_migrate'.size(), target_worker_count)
     for (target_worker, boundary, key, step_id, step)
