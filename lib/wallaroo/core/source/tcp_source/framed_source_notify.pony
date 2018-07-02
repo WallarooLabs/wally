@@ -61,7 +61,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
 
   new iso create(source_id: StepId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
-    runner_builder: RunnerBuilder, router: Router,
+    runner_builder: RunnerBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
     pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
@@ -74,12 +74,15 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
       target_router, pre_state_target_ids)
-    _router = _runner.clone_router_and_set_input_type(router)
+    _router = _runner.clone_router_and_set_input_type(router')
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
 
   fun routes(): Array[Consumer] val =>
     _router.routes()
+
+  fun router(): Router =>
+    _router
 
   fun ref received(source: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -160,11 +163,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
       end
     end
 
-  fun ref reroute(source: Producer ref,
-    route_args: RoutingArguments)
-  =>
-    route_args.route_with(_router, source)
-
   fun ref _report_message(is_finished: Bool, last_ts: U64,
     pipeline_time_spent: U64)
   =>
@@ -183,8 +181,8 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
       _metrics_reporter.worker_metric(_pipeline_name, time_spent)
     end
 
-  fun ref update_router(router: Router) =>
-    _router = router
+  fun ref update_router(router': Router) =>
+    _router = router'
 
   fun ref update_route(step_id: StepId, key: Key, step: Step) ? =>
     match _router
