@@ -42,7 +42,7 @@ use "wallaroo/core/sink/tcp_sink"
 interface tag _ReportReadyToWork
   be report_ready_to_work(initializable: Initializable)
 
-actor Step is (Producer & Consumer)
+actor Step is (Producer & Consumer & Rerouter)
   let _auth: AmbientAuth
   var _id: U128
   let _runner: Runner
@@ -85,7 +85,7 @@ actor Step is (Producer & Consumer)
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_step_creator: StateStepCreator,
-    router: Router = EmptyRouter,
+    router': Router = EmptyRouter,
     omni_router: OmniRouter = EmptyOmniRouter)
   =>
     _auth = auth
@@ -108,7 +108,7 @@ actor Step is (Producer & Consumer)
     end
     _event_log.register_resilient(this, id)
 
-    let initial_router = _runner.clone_router_and_set_input_type(router)
+    let initial_router = _runner.clone_router_and_set_input_type(router')
     _update_router(initial_router)
 
     for consumer in _router.routes().values() do
@@ -132,6 +132,9 @@ actor Step is (Producer & Consumer)
     end
 
     _step_message_processor = NormalStepMessageProcessor(this)
+
+  fun router(): Router =>
+    _router
 
   //
   // Application startup lifecycle event
@@ -245,14 +248,14 @@ actor Step is (Producer & Consumer)
   be update_route_builder(route_builder: RouteBuilder) =>
     _route_builder = route_builder
 
-  be register_routes(router: Router, route_builder: RouteBuilder) =>
+  be register_routes(router': Router, route_builder: RouteBuilder) =>
     ifdef debug then
       if _initialized then
         Fail()
       end
     end
 
-    for consumer in router.routes().values() do
+    for consumer in router'.routes().values() do
       let next_route = route_builder(this, consumer, _metrics_reporter)
       if not _routes.contains(consumer) then
         _routes(consumer) = next_route
@@ -262,13 +265,13 @@ actor Step is (Producer & Consumer)
       end
     end
 
-  be update_router(router: Router) =>
-    _update_router(router)
+  be update_router(router': Router) =>
+    _update_router(router')
 
-  fun ref _update_router(router: Router) =>
+  fun ref _update_router(router': Router) =>
     try
       let old_router = _router
-      _router = router
+      _router = router'
       for outdated_consumer in old_router.routes_not_in(_router).values() do
         if _routes.contains(outdated_consumer) then
           let outdated_route = _routes(outdated_consumer)?
@@ -423,11 +426,6 @@ actor Step is (Producer & Consumer)
       _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_producer,
         i_route_id, i_seq_id)
     end
-
-  fun ref reroute(producer: Producer ref,
-    route_args: RoutingArguments)
-  =>
-    route_args.route_with(_router, this)
 
   fun ref next_sequence_id(): SeqId =>
     _seq_id_generator.new_id()
