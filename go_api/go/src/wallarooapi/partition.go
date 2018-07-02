@@ -14,7 +14,7 @@ func PartitionFunctionPartition(partitionFunctionId uint64, dataId uint64, sz *u
 	partitionFunction := GetComponent(partitionFunctionId, PartitionFunctionTypeId).(PartitionFunction)
 	data := GetComponent(dataId, DataTypeId).(interface{})
 	b := partitionFunction.Partition(data)
-	sz = len(b)
+	*sz = uint64(len(b))
 	return C.CBytes(b)
 }
 
@@ -28,6 +28,6 @@ func PartitionListGetSize(partitionListId uint64) uint64 {
 func PartitionListGetItem(partitionListId uint64, idx uint64, sz *uint64) unsafe.Pointer {
 	partitionList := GetComponent(partitionListId, PartitionListTypeId).([][]byte)
 	b := partitionList[idx]
-	sz = len(b)
+	*sz = uint64(len(b))
 	return C.CBytes(b)
 }
