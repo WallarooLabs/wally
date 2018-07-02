@@ -25,7 +25,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
 
-actor DataReceiver is Producer
+actor DataReceiver is (Producer & Rerouter)
   let _id: StepId
   let _auth: AmbientAuth
   let _worker_name: String
@@ -73,6 +73,9 @@ actor DataReceiver is Producer
     if initialized then
       _processing_phase = _DataReceiverAcceptingMessagesPhase(this)
     end
+
+  fun router(): DataRouter =>
+    _router
 
   be start_replay_processing() =>
     _processing_phase = _DataReceiverAcceptingReplaysPhase(this)
@@ -232,7 +235,7 @@ actor DataReceiver is Producer
       _watermarker.sent(route_id, seq_id)
     end
 
-  be update_router(router: DataRouter) =>
+  be update_router(router': DataRouter) =>
     // TODO: This commented line conflicts with invariant downstream. The
     // idea is to unregister if we've registered but not otherwise.
     // The invariant says you can only call this method on a step if
@@ -245,7 +248,7 @@ actor DataReceiver is Producer
     // of a DataReceiver, so we would only need this if that were to change.
     //_router.unregister_producer(this, 0)
 
-    _router = router
+    _router = router'
     _router.register_producer(this)
     for id in _router.route_ids().values() do
       _watermarker.add_route(id)
@@ -271,11 +274,6 @@ actor DataReceiver is Producer
         metrics_id, worker_ingress_ts)
       _maybe_ack()
     end
-
-  fun ref reroute(source: Producer ref,
-    route_args: RoutingArguments)
-  =>
-    route_args.route_with(_router, source)
 
   be request_ack() =>
     if _last_id_acked < _last_id_seen then

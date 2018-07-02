@@ -40,7 +40,7 @@ primitive KafkaSourceNotifyBuilder[In: Any val]
       runner_builder, router, consume metrics_reporter, event_log,
       target_router, pre_state_target_ids)
 
-class KafkaSourceNotify[In: Any val]
+class KafkaSourceNotify[In: Any val] is Rerouter
   let _source_id: StepId
   let _env: Env
   let _auth: AmbientAuth
@@ -55,7 +55,7 @@ class KafkaSourceNotify[In: Any val]
 
   new iso create(source_id: StepId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SourceHandler[In] val,
-    runner_builder: RunnerBuilder, router: Router,
+    runner_builder: RunnerBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
     pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
@@ -68,7 +68,7 @@ class KafkaSourceNotify[In: Any val]
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
       target_router, pre_state_target_ids)
-    _router = _runner.clone_router_and_set_input_type(router)
+    _router = _runner.clone_router_and_set_input_type(router')
     _metrics_reporter = consume metrics_reporter
 
   fun routes(): Array[Consumer] val =>
@@ -145,13 +145,11 @@ class KafkaSourceNotify[In: Any val]
       _metrics_reporter.worker_metric(_pipeline_name, time_spent)
     end
 
-  fun ref reroute(source: Producer ref,
-    route_args: RoutingArguments)
-  =>
-    route_args.route_with(_router, source)
+  fun router(): Router =>
+    _router
 
-  fun ref update_router(router: Router) =>
-    _router = router
+  fun ref update_router(router': Router) =>
+    _router = router'
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
     match _router

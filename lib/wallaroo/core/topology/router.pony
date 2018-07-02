@@ -34,9 +34,13 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 use "wallaroo/core/state"
 
-interface Rerouter
+trait Rerouter
+  fun router(): (Router | DataRouter)
+
   fun ref reroute(producer: Producer ref,
     route_args: RoutingArguments)
+  =>
+    route_args.route_with(router(), producer)
 
 trait val RoutingArguments
   fun val apply(rerouter: Rerouter, producer: Producer ref)
