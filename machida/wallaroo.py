@@ -55,7 +55,7 @@ class ApplicationBuilder(object):
         return self
 
     def to_state_partition(self, computation, state_class, state_name,
-                           partition_function, partition_keys):
+                           partition_function, partition_keys = []):
         self._actions.append(("to_state_partition", computation,
                               StateBuilder(state_name, state_class),
                               state_name, partition_function, partition_keys))

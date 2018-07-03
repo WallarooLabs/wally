@@ -50,7 +50,7 @@ func ApplicationSetup() *C.char {
 	application := app.MakeApplication("Word Count Application")
 	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
 		ToMulti(&SplitBuilder{}).
-		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition()).
+		ToStatePartitionWithKeys(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition()).
 		ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
 	json := application.ToJson()
@@ -66,27 +66,27 @@ func hostsPortsToList(hostsPorts string) [][]string {
 	return hostsPortsList
 }
 
-func LetterPartition() []string {
-	letterPartition := make([]string, 27)
+func LetterPartition() [][]byte {
+	letterPartition := make([][]byte, 27)
 
 	for i := 0; i < 26; i++ {
-		letterPartition[i] = string([]byte{byte(i + 'a')})
+		letterPartition[i] = []byte{byte(i + 'a')}
 	}
 
-	letterPartition[26] = "!"
+	letterPartition[26] = []byte{byte('!')}
 
 	return letterPartition
 }
 
 type WordPartitionFunction struct{}
 
-func (wpf *WordPartitionFunction) Partition(data interface{}) string {
+func (wpf *WordPartitionFunction) Partition(data interface{}) []byte {
 	word := data.(*string)
 	firstLetter := (*word)[0]
 	if (firstLetter >= 'a') && (firstLetter <= 'z') {
-		return string(firstLetter)
+		return []byte{firstLetter}
 	}
-	return "!"
+	return []byte{byte('!')}
 }
 
 type Decoder struct{}
