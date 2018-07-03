@@ -6,12 +6,12 @@ import (
 	"os"
 )
 
-func symbolToKey(symbol string) string {
-	return fmt.Sprintf("%4s", symbol)
+func symbolToKey(symbol string) []byte {
+	return []byte(fmt.Sprintf("%4s", symbol))
 }
 
-func LoadValidSymbols() []string {
-	symbols := make([]string, 0)
+func LoadValidSymbols() [][]byte {
+	symbols := make([][]byte, 0)
 	file, _ := os.Open("symbols.txt")
 	defer file.Close()
 
@@ -25,7 +25,7 @@ func LoadValidSymbols() []string {
 type SymbolPartitionFunction struct {
 }
 
-func (spf *SymbolPartitionFunction) Partition(data interface{}) string {
+func (spf *SymbolPartitionFunction) Partition(data interface{}) []byte {
 	symbol := data.(SymbolMessage).GetSymbol()
 	return symbolToKey(symbol)
 }
