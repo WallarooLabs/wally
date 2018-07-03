@@ -37,11 +37,11 @@ func ApplicationSetup() *C.char {
 
 	application := app.MakeApplication("market-spread")
 	application.NewPipeline("Orders", app.MakeTCPSourceConfig(orderHost, orderPort, &ms.OrderDecoder{})).
-		ToStatePartition(&ms.CheckOrder{}, &ms.SymbolDataBuilder{}, "symbol-data", &ms.SymbolPartitionFunction{}, symbols).
+		ToStatePartitionWithKeys(&ms.CheckOrder{}, &ms.SymbolDataBuilder{}, "symbol-data", &ms.SymbolPartitionFunction{}, symbols).
 		ToSink(app.MakeTCPSinkConfig(outHost, outPort, &ms.OrderResultEncoder{}))
 
 	application.NewPipeline("Market Data", app.MakeTCPSourceConfig(marketDataHost, marketDataPort, &ms.MarketDataDecoder{})).
-		ToStatePartition(&ms.UpdateMarketData{}, &ms.SymbolDataBuilder{}, "symbol-data", &ms.SymbolPartitionFunction{}, symbols).
+		ToStatePartitionWithKeys(&ms.UpdateMarketData{}, &ms.SymbolDataBuilder{}, "symbol-data", &ms.SymbolPartitionFunction{}, symbols).
 		Done()
 
 	json := application.ToJson()

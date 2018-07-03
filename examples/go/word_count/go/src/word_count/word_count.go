@@ -50,7 +50,7 @@ func ApplicationSetup() *C.char {
 	application := app.MakeApplication("Word Count Application")
 	application.NewPipeline("Split and Count", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
 		ToMulti(&SplitBuilder{}).
-		ToStatePartition(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition()).
+		ToStatePartitionWithKeys(&CountWord{}, &WordTotalsBuilder{}, "word totals", &WordPartitionFunction{}, LetterPartition()).
 		ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
 	json := application.ToJson()
