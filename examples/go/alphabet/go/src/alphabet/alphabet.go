@@ -49,7 +49,7 @@ func ApplicationSetup() *C.char {
 
 	application := app.MakeApplication("Alphabet")
 	application.NewPipeline("Alphabet", app.MakeTCPSourceConfig(inHost, inPort, &Decoder{})).
-		ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions()).
+		ToStatePartitionWithKeys(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals", &LetterPartitionFunction{}, MakeLetterPartitions()).
 		ToSink(app.MakeTCPSinkConfig(outHost, outPort, &Encoder{}))
 
 	return C.CString(application.ToJson())
@@ -95,16 +95,16 @@ func (rvtb *RunningVotesTotalBuilder) Build() interface{} {
 
 type LetterPartitionFunction struct{}
 
-func (lpf *LetterPartitionFunction) Partition(data interface{}) string {
+func (lpf *LetterPartitionFunction) Partition(data interface{}) []byte {
 	lav := data.(*LetterAndVotes)
-	return string([]byte{lav.Letter})
+	return []byte{lav.Letter}
 }
 
-func MakeLetterPartitions() []string {
-	letterPartition := make([]string, 26)
+func MakeLetterPartitions() [][]byte {
+	letterPartition := make([][]byte, 26)
 
 	for i := 0; i < 26; i++ {
-		letterPartition[i] = string([]byte{byte(i + 'a')})
+		letterPartition[i] = []byte{byte(i + 'a')}
 	}
 
 	return letterPartition

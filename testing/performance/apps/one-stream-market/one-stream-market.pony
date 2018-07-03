@@ -83,10 +83,10 @@ actor Main
         end
       end
       let symbol_data_partition = if symbols_file_path is None then
-          Partition[Symboly val, String](
+          Partition[Symboly val](
             SymbolPartitionFunction, LegalSymbols.symbols)
         else
-          Partition[Symboly val, String](
+          Partition[Symboly val](
             SymbolPartitionFunction,
             PartitionFileReader(symbols_file_path as String,
               env.root as AmbientAuth))
@@ -106,7 +106,7 @@ actor Main
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_state_partition[Symboly val, String,
+            .to_state_partition[Symboly val,
               (NbboResult val | None), SymbolData](ProcessNbbo,
                 SymbolDataBuilder, "symbol-data",
                 symbol_data_partition where multi_worker = true)
