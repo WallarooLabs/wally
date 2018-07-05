@@ -517,6 +517,9 @@ class ComputationRunner[In: Any val, Out: Any val]
           (this_is_finished, this_last_ts)
         end
       else
+        @printf[I32]("ComputationRunner: Input was not correct type!\n"
+          .cstring())
+        Fail()
         (true, latest_ts)
       end
 
@@ -584,6 +587,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
       else
         @printf[I32]("StateRunner: Input was not a StateProcessor!\n"
           .cstring())
+        Fail()
         (true, latest_ts)
       end
     ifdef "detailed-metrics" then
@@ -717,6 +721,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
       (is_finished, last_ts)
     else
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
+      Fail()
       (true, latest_ts)
     end
 
