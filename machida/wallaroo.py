@@ -111,20 +111,15 @@ class ApplicationBuilder(object):
                 self._validate_unique_pipeline_name(action[1], action[2])
                 expect_steps = True
             if action[0] == "to_state_partition_u64":
-                self._validate_unique_step_name(action[1])
                 self._validate_state(action[2], action[3], action[5])
                 self._validate_u64_partition_labels(action[5])
                 self._validate_partition_function(action[4])
             elif action[0] == "to_state_partition":
-                self._validate_unique_step_name(action[1])
                 self._validate_state(action[2], action[3], action[5])
                 self._validate_unique_partition_labels(action[5])
                 self._validate_partition_function(action[4])
             elif action[0] == "to_stateful":
-                self._validate_unique_step_name(action[1])
                 self._validate_state(action[2], action[3])
-            elif action[0] == "to_parallel" or action[0] == "to":
-                self._validate_unique_step_name(action[1])
             elif action[0] == "to_sink":
                 has_sink = True
                 expect_steps = False
@@ -136,15 +131,6 @@ class ApplicationBuilder(object):
         if not has_sink:
             raise WallarooParameterError(
                 "At least one pipeline must define a sink")
-
-    def _validate_unique_step_name(self, computation):
-        if computation.name in self._steps:
-            raise WallarooParameterError((
-                "A computation named {0} is defined more than once. "
-                "Please use unique names for your steps."
-                ).format(repr(computation.name)))
-        else:
-            self._steps[computation.name] = computation
 
     def _validate_unique_pipeline_name(self, pipeline, source_config):
         if pipeline in self._pipelines:
