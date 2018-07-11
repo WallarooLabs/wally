@@ -152,6 +152,12 @@ class DataChannelConnectNotifier is DataChannelNotify
   // be used (we fail if it is).
   var _receiver: _DataReceiverWrapper = _InitDataReceiver
 
+  // Keep track of register_producer calls that we weren't ready to forward
+  let _queued_register_producers: Array[(StepId, StepId)] =
+    _queued_register_producers.create()
+  let _queued_unregister_producers: Array[(StepId, StepId)] =
+    _queued_register_producers.create()
+
   new iso create(connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso,
     layout_initializer: LayoutInitializer tag,
@@ -165,6 +171,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _receiver = _WaitingDataReceiver(this)
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
     conn: DataChannel ref)
@@ -179,7 +186,34 @@ class DataChannelConnectNotifier is DataChannelNotify
     // State change to our real DataReceiver.
     _receiver = _DataReceiver(dr)
     _receiver.data_connect(sender_boundary_id, conn)
+
+    // If we have pending register_producer calls, then try to process them now
+    var retries = Array[(StepId, StepId)]
+    for r in _queued_register_producers.values() do
+      retries.push(r)
+    end
+    _queued_register_producers.clear()
+    for (input, output) in retries.values() do
+      _receiver.register_producer(input, output)
+    end
+    // If we have pending unregister_producer calls, then try to process them
+    // now
+    retries = Array[(StepId, StepId)]
+    for r in _queued_unregister_producers.values() do
+      retries.push(r)
+    end
+    _queued_unregister_producers.clear()
+    for (input, output) in retries.values() do
+      _receiver.unregister_producer(input, output)
+    end
+
     conn._unmute(this)
+
+  fun ref queue_register_producer(input_id: StepId, output_id: StepId) =>
+    _queued_register_producers.push((input_id, output_id))
+
+  fun ref queue_unregister_producer(input_id: StepId, output_id: StepId) =>
+    _queued_unregister_producers.push((input_id, output_id))
 
   fun ref received(conn: DataChannel ref, data: Array[U8] iso): Bool
   =>
@@ -323,9 +357,9 @@ trait _DataReceiverWrapper
   fun report_status(code: ReportStatusCode) =>
     Fail()
 
-  fun register_producer(input_id: StepId, output_id: StepId) =>
+  fun ref register_producer(input_id: StepId, output_id: StepId) =>
     Fail()
-  fun unregister_producer(input_id: StepId, output_id: StepId) =>
+  fun ref unregister_producer(input_id: StepId, output_id: StepId) =>
     Fail()
 
   fun forward_barrier(target_id: StepId, origin_id: StepId,
@@ -334,6 +368,18 @@ trait _DataReceiverWrapper
     Fail()
 
 class _InitDataReceiver is _DataReceiverWrapper
+
+class _WaitingDataReceiver is _DataReceiverWrapper
+  let _dccn: DataChannelConnectNotifier ref
+
+  new create(dccn: DataChannelConnectNotifier ref) =>
+    _dccn = dccn
+
+  fun ref register_producer(input_id: StepId, output_id: StepId) =>
+    _dccn.queue_register_producer(input_id, output_id)
+
+  fun ref unregister_producer(input_id: StepId, output_id: StepId) =>
+    _dccn.queue_unregister_producer(input_id, output_id)
 
 class _DataReceiver is _DataReceiverWrapper
   let data_receiver: DataReceiver
@@ -359,10 +405,10 @@ class _DataReceiver is _DataReceiverWrapper
   fun report_status(code: ReportStatusCode) =>
     data_receiver.report_status(code)
 
-  fun register_producer(input_id: StepId, output_id: StepId) =>
+  fun ref register_producer(input_id: StepId, output_id: StepId) =>
     data_receiver.register_producer(input_id, output_id)
 
-  fun unregister_producer(input_id: StepId, output_id: StepId) =>
+  fun ref unregister_producer(input_id: StepId, output_id: StepId) =>
     data_receiver.unregister_producer(input_id, output_id)
 
   fun forward_barrier(target_id: StepId, origin_id: StepId,
