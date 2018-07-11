@@ -463,6 +463,9 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   ///////////////
   // SNAPSHOTS
   ///////////////
+  be remote_snapshot_state() =>
+    None
+
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     // Nothing to snapshot at this point
     None
