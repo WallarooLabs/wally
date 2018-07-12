@@ -30,5 +30,9 @@ func DecoderPayloadLength(decoderId uint64, b unsafe.Pointer, size uint64) uint6
 //export DecoderDecode
 func DecoderDecode(decoderId uint64, b unsafe.Pointer, size uint64) uint64 {
 	decoder := GetComponent(decoderId, DecoderTypeId).(Decoder)
-	return AddComponent(decoder.Decode(C.GoBytes(b, C.int(size))), DataTypeId)
+	res := decoder.Decode(C.GoBytes(b, C.int(size)))
+	if res == nil {
+		return 0
+	}
+	return AddComponent(res, DataTypeId)
 }
