@@ -271,7 +271,7 @@ primitive _SourceConfig
       let host = source("Host")?.string()?
       let port = source("Port")?.string()?
       let decoder_id = source("DecoderId")?.int()?.u64()
-      TCPSourceConfig[GoData](GoFramedSourceHandler(decoder_id), host, port)
+      TCPSourceConfig[(GoData | None)](GoFramedSourceHandler(decoder_id), host, port)
     | "KafkaSource" =>
       let kafka_source_name = source("Name")?.string()?
 
@@ -280,7 +280,7 @@ primitive _SourceConfig
 
       let decoder_id = source("DecoderId")?.int()?.u64()
 
-      KafkaSourceConfig[GoData](consume ksco, env.root as TCPConnectionAuth,
+      KafkaSourceConfig[(GoData | None)](consume ksco, env.root as TCPConnectionAuth,
         GoSourceHandler(decoder_id))
     else
       error

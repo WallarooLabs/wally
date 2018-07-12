@@ -207,16 +207,19 @@ class PyPartitionFunction
   fun _final() =>
     Machida.dec_ref(_partition_function)
 
-class PySourceHandler is SourceHandler[PyData val]
+class PySourceHandler is SourceHandler[(PyData val | None)]
   var _source_decoder: Pointer[U8] val
 
   new create(source_decoder: Pointer[U8] val) =>
     _source_decoder = source_decoder
 
-  fun decode(data: Array[U8] val): PyData val =>
-    recover
-      PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
-        data.size()))
+  fun decode(data: Array[U8] val): (PyData val | None) =>
+    let r = Machida.source_decoder_decode(_source_decoder, data.cpointer(),
+        data.size())
+    if not Machida.is_py_none(r) then
+      recover PyData(r) end
+    else
+      None
     end
 
   fun _serialise_space(): USize =>
@@ -231,7 +234,7 @@ class PySourceHandler is SourceHandler[PyData val]
   fun _final() =>
     Machida.dec_ref(_source_decoder)
 
-class PyFramedSourceHandler is FramedSourceHandler[PyData val]
+class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
   var _source_decoder: Pointer[U8] val
   let _header_length: USize
 
@@ -252,10 +255,13 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
     Machida.framed_source_decoder_payload_length(_source_decoder, data.cpointer(),
       data.size())
 
-  fun decode(data: Array[U8] val): PyData val =>
-    recover
-      PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
-        data.size()))
+  fun decode(data: Array[U8] val): (PyData val | None) =>
+    let r = Machida.source_decoder_decode(_source_decoder, data.cpointer(),
+        data.size())
+    if not Machida.is_py_none(r) then
+      recover PyData(r) end
+    else
+      None
     end
 
   fun _serialise_space(): USize =>
@@ -856,7 +862,7 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
-      TCPSourceConfig[PyData val](decoder, host, port)
+      TCPSourceConfig[(PyData val | None)](decoder, host, port)
     | "kafka-internal" =>
       let kafka_source_name = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
@@ -871,7 +877,7 @@ primitive _SourceConfig
         PySourceHandler(d)
       end
 
-      KafkaSourceConfig[PyData val](consume ksco, (env.root as TCPConnectionAuth), decoder)
+      KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
     | "kafka" =>
       let ksco = _kafka_config_options(source_config_tuple)
 
@@ -881,7 +887,7 @@ primitive _SourceConfig
         PySourceHandler(d)
       end
 
-      KafkaSourceConfig[PyData val](consume ksco, (env.root as TCPConnectionAuth), decoder)
+      KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
     else
       error
     end
