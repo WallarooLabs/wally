@@ -80,10 +80,6 @@ actor ApplicationDistributor is Distributor
       // that sink.
       let step_map = recover trn Map[U128, (ProxyAddress | U128)] end
 
-      // Keep track of shared state so that it's only created once
-      let state_partition_map =
-        recover trn Map[String, PartitionAddresses val] end
-
       // Keep track of all prestate data so we can register routes
       let pre_state_data = recover trn Array[PreStateData] end
 
