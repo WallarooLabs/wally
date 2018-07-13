@@ -515,7 +515,7 @@ actor RouterRegistry is InFlightAckRequester
       source_listener.update_boundary_builders(boundary_builders_to_send)
     end
 
-  be create_partition_routers_from_blueprints(
+  be create_partition_routers_from_blueprints(workers: Array[String] val,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val)
   =>
     let obs_trn = recover trn Map[String, OutgoingBoundary] end
@@ -524,8 +524,8 @@ actor RouterRegistry is InFlightAckRequester
     end
     let obs = consume val obs_trn
     for (s, b) in partition_blueprints.pairs() do
-      let next_router = b.build_router(_worker_name, obs, _auth)
-       _distribute_partition_router(next_router)
+      let next_router = b.build_router(_worker_name, workers, obs, _auth)
+      _distribute_partition_router(next_router)
       _partition_routers(s) = next_router
     end
 
@@ -881,41 +881,14 @@ actor RouterRegistry is InFlightAckRequester
     end
     var had_steps_to_migrate = false
     for state_name in _partition_routers.keys() do
-      let steps_to_migrate_for_this_state =
+      let had_steps_to_migrate_for_this_state =
         _migrate_partition_steps(state_name, target_workers)
-      if steps_to_migrate_for_this_state then
+      if had_steps_to_migrate_for_this_state then
         had_steps_to_migrate = true
       end
     end
     if not had_steps_to_migrate then
       try_to_resume_processing_immediately()
-    end
-
-  be begin_migration_of_all() =>
-    """
-    Begin partition migration of *all* local stateful partition steps,
-    as part of a shrink-to-fit migration.
-    """
-    if _partition_routers.size() == 0 then
-      //no steps have been migrated
-      @printf[I32](("Resuming message processing immediately. No partitions " +
-        "to migrate.\n").cstring())
-      _resume_the_world(_worker_name)
-    end
-
-    let target_workers: Array[(String, OutgoingBoundary)] val =
-      match _omni_router
-      | let omr: OmniRouter =>
-        omr.get_outgoing_boundaries_sorted()
-      | None =>
-        recover val Array[(String, OutgoingBoundary)] end
-      end
-    Invariant(target_workers.size() == _outgoing_boundaries.size())
-
-    @printf[I32]("Migrating all partitions to %d remaining workers\n".cstring(),
-      target_workers.size())
-    for state_name in _partition_routers.keys() do
-      _migrate_all_partition_steps(state_name, target_workers)
     end
 
   be step_migration_complete(step_id: StepId) =>
@@ -1019,9 +992,45 @@ actor RouterRegistry is InFlightAckRequester
       Fail()
     end
 
-  fun ref all_join_migration_acks_received() =>
+  fun ref all_join_migration_acks_received(joining_workers: Array[String] val,
+    is_coordinator: Bool)
+  =>
+    if is_coordinator then
+      let hash_partitions_trn = recover trn Map[String, HashPartitions] end
+      for (state_name, pr) in _partition_routers.pairs() do
+        hash_partitions_trn(state_name) = pr.hash_partitions()
+      end
+      let hash_partitions = consume val hash_partitions_trn
+      try
+        let msg = ChannelMsgEncoder.announce_hash_partitions_grow(_worker_name,
+          joining_workers, hash_partitions, _auth)?
+        for w in joining_workers.values() do
+          _connections.send_control(w, msg)
+        end
+      else
+        Fail()
+      end
+    end
     _connections.request_cluster_unmute()
     _unmute_request(_worker_name)
+
+  be update_partition_routers_after_grow(joining_workers: Array[String] val,
+    hash_partitions: Map[String, HashPartitions] val)
+  =>
+    """
+    Called on joining workers after migration is complete and they've been
+    informed of all hash partitions.
+    """
+    for (state_name, pr) in _partition_routers.pairs() do
+      var new_pr = pr.update_boundaries(_auth, _outgoing_boundaries)
+      try
+        new_pr = new_pr.update_hash_partitions(hash_partitions(state_name)?)
+        _distribute_partition_router(new_pr)
+        _partition_routers(state_name) = new_pr
+      else
+        Fail()
+      end
+    end
 
   fun ref _initiate_request_in_flight_acks(custom_action: CustomAction,
     excluded_workers: Array[String] val = recover Array[String] end)
@@ -1190,15 +1199,24 @@ actor RouterRegistry is InFlightAckRequester
         tws.push((w, boundary))
       end
       let partition_router = _partition_routers(state_name)?
-      partition_router.rebalance_steps_grow(consume tws, _worker_count(),
-        state_name, this)
+      // Simultaneously calculate new partition router and initiate individual
+      // step migration. We get the new router back as well as a Bool
+      // indicating whether any steps were migrated.
+      (let new_partition_router, let had_steps_to_migrate) =
+        partition_router.rebalance_steps_grow(_auth, consume tws, this)
+      // TODO: It could be if had_steps_to_migrate is false then we don't
+      // need to distribute the router because it didn't change. Investigate.
+      _distribute_partition_router(new_partition_router)
+      _partition_routers(state_name) = new_partition_router
+      had_steps_to_migrate
     else
       Fail()
       false
     end
 
   fun ref _migrate_all_partition_steps(state_name: String,
-    target_workers: Array[(String, OutgoingBoundary)] val): Bool
+    target_workers: Array[(String, OutgoingBoundary)] val,
+    leaving_workers: Array[String] val): Bool
   =>
     """
     Called to initiate migrating all partition steps the set of remaining
@@ -1208,7 +1226,8 @@ actor RouterRegistry is InFlightAckRequester
       @printf[I32]("Migrating steps for %s partition to %d workers\n"
         .cstring(), state_name.cstring(), target_workers.size())
       let partition_router = _partition_routers(state_name)?
-      partition_router.rebalance_steps_shrink(target_workers, state_name, this)
+      partition_router.rebalance_steps_shrink(target_workers, leaving_workers,
+        this)
     else
       Fail()
       false
@@ -1355,7 +1374,7 @@ actor RouterRegistry is InFlightAckRequester
     var had_steps_to_migrate = false
     for state_name in _partition_routers.keys() do
       let steps_to_migrate_for_this_state =
-        _migrate_all_partition_steps(state_name, rws)
+        _migrate_all_partition_steps(state_name, rws, leaving_workers)
       if steps_to_migrate_for_this_state then
         had_steps_to_migrate = true
       end
@@ -1412,7 +1431,12 @@ actor RouterRegistry is InFlightAckRequester
       Fail()
     end
 
-  fun ref all_leaving_workers_finished() =>
+  fun ref all_leaving_workers_finished(leaving_workers: Array[String] val) =>
+    for (state_name, pr) in _partition_routers.pairs() do
+      let new_pr = pr.recalculate_hash_partitions_for_shrink(leaving_workers)
+      _partition_routers(state_name) = new_pr
+      _distribute_partition_router(new_pr)
+    end
     _connections.request_cluster_unmute()
     _unmute_request(_worker_name)
 
@@ -1427,8 +1451,7 @@ actor RouterRegistry is InFlightAckRequester
     worker
     """
     _remove_all_routes_to_step(step)
-    _add_state_proxy_to_partition_router(proxy_address, key, state_name)
-    _move_step_to_proxy(id, proxy_address)
+    _move_step_to_proxy(id, key, proxy_address)
 
   fun ref _remove_all_routes_to_step(step: Step) =>
     for source in _sources.values() do
@@ -1436,11 +1459,12 @@ actor RouterRegistry is InFlightAckRequester
     end
     _data_router.remove_routes_to_consumer(step)
 
-  fun ref _move_step_to_proxy(id: U128, proxy_address: ProxyAddress) =>
+  fun ref _move_step_to_proxy(id: U128, key: Key, proxy_address: ProxyAddress)
+  =>
     """
     Called when a step has been migrated off this worker to another worker
     """
-    _remove_step_from_data_router(id)
+    _remove_step_from_data_router(id, key)
     _add_proxy_to_omni_router(id, proxy_address)
 
   be add_state_proxy(id: StepId, proxy_address: ProxyAddress, key: Key,
@@ -1449,34 +1473,12 @@ actor RouterRegistry is InFlightAckRequester
     """
     Called when a stateful step has been added to another worker
     """
-    _add_state_proxy_to_partition_router(proxy_address, key, state_name)
     _add_proxy_to_omni_router(id, proxy_address)
 
-  fun ref _add_state_proxy_to_partition_router(proxy_address: ProxyAddress,
-    key: Key, state_name: String)
-  =>
-    try
-      let proxy_router = ProxyRouter(_worker_name,
-        _outgoing_boundaries(proxy_address.worker)?, proxy_address, _auth)
-      let partition_router =
-        _partition_routers(state_name)?.update_route(key, proxy_router)?
-      _partition_routers(state_name) = partition_router
-      _distribute_partition_router(partition_router)
-    else
-      Fail()
-    end
-
-  fun ref _remove_step_from_data_router(id: StepId) =>
-    try
-      let moving_step = _data_router.step_for_id(id)?
-
-      // !@ Update to get actual key instead of this placeholder
-      let new_data_router = _data_router.remove_keyed_route(id, "Key")
-      _data_router = new_data_router
-      _distribute_data_router()
-    else
-      Fail()
-    end
+  fun ref _remove_step_from_data_router(id: StepId, key: Key) =>
+    let new_data_router = _data_router.remove_keyed_route(id, key)
+    _data_router = new_data_router
+    _distribute_data_router()
 
   fun ref _add_proxy_to_omni_router(id: U128,
     proxy_address: ProxyAddress)
@@ -1517,7 +1519,7 @@ actor RouterRegistry is InFlightAckRequester
       Fail()
     end
 
-  fun ref move_proxy_to_stateful_step(id: U128, target: Consumer, key: Key,
+  fun ref move_proxy_to_stateful_step(id: StepId, target: Consumer, key: Key,
     state_name: String, source_worker: String)
   =>
     """
@@ -1530,9 +1532,11 @@ actor RouterRegistry is InFlightAckRequester
         _register_omni_router_step(step)
         _data_router = _data_router.add_keyed_route(id, key, step)
         _distribute_data_router()
+
         let partition_router =
-          _partition_routers(state_name)?.update_route(key, step)?
+          _partition_routers(state_name)?.update_route(id, key, step)?
         _distribute_partition_router(partition_router)
+
         // Add routes to state computation targets to state step
         match _pre_state_data
         | let psds: Array[PreStateData] val =>

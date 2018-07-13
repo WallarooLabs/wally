@@ -47,6 +47,7 @@ actor TCPSourceListener is SourceListener
   """
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _env: Env
+  let _auth: AmbientAuth
   let _pipeline_name: String
   var _router: Router
   let _router_registry: RouterRegistry
@@ -63,11 +64,11 @@ actor TCPSourceListener is SourceListener
   let _metrics_reporter: MetricsReporter
   var _source_builder: SourceBuilder
   let _event_log: EventLog
-  let _auth: AmbientAuth
   let _target_router: Router
 
-  new create(env: Env, source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry, route_builder: RouteBuilder,
+  new create(env: Env, source_builder: SourceBuilder,
+    router: Router, router_registry: RouterRegistry,
+    route_builder: RouteBuilder,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
@@ -80,6 +81,7 @@ actor TCPSourceListener is SourceListener
     Listens for both IPv4 and IPv6 connections.
     """
     _env = env
+    _auth = auth
     _pipeline_name = pipeline_name
     _router = router
     _router_registry = router_registry
@@ -92,7 +94,6 @@ actor TCPSourceListener is SourceListener
     _metrics_reporter = consume metrics_reporter
     _source_builder = source_builder
     _event_log = event_log
-    _auth = auth
     _target_router = target_router
 
     _init_size = init_size
@@ -209,7 +210,7 @@ actor TCPSourceListener is SourceListener
     """
     try
       let source_id = _step_id_gen()
-      let source = TCPSource._accept(source_id, this,
+      let source = TCPSource._accept(source_id, _auth, this,
         _notify_connected(source_id)?, _event_log, _router.routes(),
         _route_builder, _outgoing_boundary_builders, _layout_initializer,
         ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry)
