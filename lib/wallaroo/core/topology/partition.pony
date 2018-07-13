@@ -51,10 +51,7 @@ primitive SingleStepPartitionFunction[In: Any val] is
   PartitionFunction[In]
   fun apply(input: In): String => "key"
 
-interface PartitionAddresses is Equatable[PartitionAddresses]
-  fun update_key(key: Key, pa: ProxyAddress): PartitionAddresses val ?
-
-class KeyedPartitionAddresses
+class val KeyDistribution is Equatable[KeyDistribution]
   let _hash_partitions: HashPartitions
   let _workers_to_keys: Map[String, Array[Key] val] val
 
@@ -71,20 +68,14 @@ class KeyedPartitionAddresses
   fun workers_to_keys(): Map[String, Array[Key] val] val =>
     _workers_to_keys
 
-  fun update_key(key: Key, pa: ProxyAddress): PartitionAddresses val =>
+  fun update_key(key: Key, pa: ProxyAddress): KeyDistribution val =>
     // !@ Calculate new hash partitions
-    KeyedPartitionAddresses(_hash_partitions, _workers_to_keys)
+    KeyDistribution(_hash_partitions, _workers_to_keys)
 
-  fun eq(that: box->PartitionAddresses): Bool =>
-    match that
-    | let that_keyed: box->KeyedPartitionAddresses =>
-      //!@ Meaningful equality
-      true
-    else
-      false
-    end
+  fun eq(that: box->KeyDistribution): Bool =>
+    _hash_partitions == that._hash_partitions
 
-  fun ne(that: box->PartitionAddresses): Bool => not eq(that)
+  fun ne(that: box->KeyDistribution): Bool => not eq(that)
 
 interface StateAddresses
   fun apply(key: Key): (Step tag | ProxyRouter | None)
@@ -131,27 +122,28 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer],
-    keyed_data_routes: Map[Key, Step]): PartitionRouter
+    keyed_data_routes: Map[Key, Step],
+    keyed_step_ids: Map[Key, StepId]): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartition ?
   fun runner_builder(): RunnerBuilder
 
 class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
   StateSubpartition
   let _state_name: String
-  let _partition_addresses: KeyedPartitionAddresses val
+  let _key_distribution: KeyDistribution
   let _id_map: Map[Key, U128] val
   let _partition_function: PartitionFunction[PIn] val
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
 
   new val create(state_name': String,
-    partition_addresses': KeyedPartitionAddresses val,
+    key_distribution': KeyDistribution,
     id_map': Map[Key, U128] val, runner_builder': RunnerBuilder,
     partition_function': PartitionFunction[PIn] val,
     pipeline_name': String)
   =>
     _state_name = state_name'
-    _partition_addresses = partition_addresses'
+    _key_distribution = key_distribution'
     _id_map = id_map'
     _partition_function = partition_function'
     _pipeline_name = pipeline_name'
@@ -167,21 +159,20 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[StepId, Consumer],
-    keyed_data_routes: Map[Key, Step]):
+    keyed_data_routes: Map[Key, Step],
+    keyed_step_ids: Map[Key, StepId]):
     LocalPartitionRouter[PIn, S] val
   =>
     let hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
 
-    let routes = recover trn Map[Key, (Step | ProxyRouter)] end
-
-    let m = recover trn Map[StepId, Step] end
+    let m = recover trn Map[Key, Step] end
 
     var partition_count: USize = 0
 
-    for c in _partition_addresses.claimants() do
+    for c in _key_distribution.claimants() do
       if c == worker_name then
         try
-          let keys = _partition_addresses.workers_to_keys()(c)?
+          let keys = _key_distribution.workers_to_keys()(c)?
           for key in keys.values() do
             try
               let id = _id_map(key)?
@@ -195,8 +186,8 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
               initializables.set(next_state_step)
               data_routes(id) = next_state_step
               keyed_data_routes(key) = next_state_step
-              m(id) = next_state_step
-              routes(key) = next_state_step
+              keyed_step_ids(key) = id
+              m(key) = next_state_step
               partition_count = partition_count + 1
             else
               @printf[I32](("Missing step id for " + key + "!\n").cstring())
@@ -222,18 +213,13 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
       " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
     LocalPartitionRouter[PIn, S](_state_name, worker_name, consume m,
-      _id_map, consume routes, consume hashed_node_routes,
-      _partition_addresses.hash_partitions(), _partition_function)
+      _id_map, consume hashed_node_routes,
+      _key_distribution.hash_partitions(), _partition_function)
 
-  fun update_key(key: Key, pa: ProxyAddress): StateSubpartition ?
-  =>
-    match _partition_addresses.update_key(key, pa)
-    | let kpa: KeyedPartitionAddresses val =>
-      KeyedStateSubpartition[PIn, S](_state_name, kpa, _id_map,
-        _runner_builder, _partition_function, _pipeline_name)
-    else
-      error
-    end
+  fun update_key(key: Key, pa: ProxyAddress): StateSubpartition =>
+    let kpa = _key_distribution.update_key(key, pa)
+    KeyedStateSubpartition[PIn, S](_state_name, kpa, _id_map,
+      _runner_builder, _partition_function, _pipeline_name)
 
   fun eq(that: box->StateSubpartition): Bool =>
     match that
@@ -241,7 +227,7 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
       // ASSUMPTION: Add RunnerBuilder equality check assumes that
       // runner builder would not change over time, which currently
       // is true.
-      (_partition_addresses == kss._partition_addresses) and
+      (_key_distribution == kss._key_distribution) and
         (MapEquality[Key, U128](_id_map, kss._id_map)) and
         (_partition_function is kss._partition_function) and
         (_pipeline_name == kss._pipeline_name) and

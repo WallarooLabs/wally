@@ -356,7 +356,7 @@ primitive ChannelMsgEncoder
     has been created on this worker and that partition routers should be
     updated.
     """
-    _encode(KeyedAnnounceNewStatefulStepMsg(id, worker_name, key,
+    _encode(AnnounceNewStatefulStepMsg(id, worker_name, key,
       state_name), auth)?
 
   fun announce_new_source(worker_name: String, id: StepId,
@@ -707,7 +707,6 @@ class val ReplayMsg is ChannelMsg
 
 
 trait val DeliveryMsg is ChannelMsg
-  fun target_id(): StepId
   fun sender_name(): String
   fun deliver(pipeline_time_spent: U64,
     producer_id: StepId, producer: Producer, seq_id: SeqId,
@@ -717,7 +716,7 @@ trait val DeliveryMsg is ChannelMsg
     route_ids_to_target_ids: Map[RouteId, StepId] val,
     keys_to_routes: Map[String, Step] val,
     keys_to_route_ids: Map[String, RouteId] val
-  ): (Bool, RouteId) ?
+  ): RouteId ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
   fun replay_deliver(pipeline_time_spent: U64,
@@ -726,7 +725,7 @@ trait val ReplayableDeliveryMsg is DeliveryMsg
     producer_id: StepId, producer: Producer, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
   fun input(): Any val
   fun metric_name(): String
   fun msg_uid(): MsgId
@@ -757,7 +756,6 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     _msg_uid = msg_uid'
     _frac_ids = frac_ids'
 
-  fun target_id(): StepId => _target_id
   fun sender_name(): String => _sender_name
 
   fun deliver(pipeline_time_spent: U64,
@@ -767,7 +765,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
     keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
     ifdef "trace" then
@@ -779,7 +777,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
       producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
-    (false, route_id)
+    route_id
 
   fun replay_deliver(pipeline_time_spent: U64,
     data_routes: Map[StepId, Consumer] val,
@@ -787,14 +785,14 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     producer_id: StepId, producer: Producer, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
     let route_id = target_ids_to_route_ids(_target_id)?
     target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
       producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
       metrics_id, worker_ingress_ts)
-    (false, route_id)
+    route_id
 
 class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_state_name: String
@@ -821,8 +819,6 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     _msg_uid = msg_uid'
     _frac_ids = frac_ids'
 
-  // !@ RETURNING 0 IS THE WRONG THING TO DO HERE, WHAT SHOULD WE DO?
-  fun target_id(): StepId => 0
   fun sender_name(): String => _sender_name
 
   fun deliver(pipeline_time_spent: U64,
@@ -832,7 +828,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
     keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
   =>
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
@@ -844,7 +840,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
       target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
         producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
         worker_ingress_ts)
-      (false, route_id)
+      route_id
     else
       Fail()
       error
@@ -856,7 +852,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
     producer_id: StepId, producer: Producer, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: Map[String, Step] val,
-    keys_to_route_ids: Map[String, RouteId] val): (Bool, RouteId) ?
+    keys_to_route_ids: Map[String, RouteId] val): RouteId ?
   =>
     try
       let target_step = keys_to_routes(_target_key)?
@@ -864,7 +860,7 @@ class val ForwardHashedMsg[D: Any val] is ReplayableDeliveryMsg
       target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
       producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
       metrics_id, worker_ingress_ts)
-      (false, route_id)
+      route_id
     else
       Fail()
       error
@@ -992,10 +988,7 @@ class val ConnectedToJoiningWorkersMsg is ChannelMsg
   new val create(sender': String) =>
     sender = sender'
 
-trait val AnnounceNewStatefulStepMsg is ChannelMsg
-  fun update_registry(r: RouterRegistry)
-
-class val KeyedAnnounceNewStatefulStepMsg is AnnounceNewStatefulStepMsg
+class val AnnounceNewStatefulStepMsg is ChannelMsg
   """
   This message is sent to notify another worker that a new stateful step has
   been created on this worker and that partition routers should be updated.
