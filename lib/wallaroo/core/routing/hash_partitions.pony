@@ -1,13 +1,23 @@
 use "collections"
 use "crypto"
+use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/equality"
 use "wallaroo_labs/mort"
 
 class val HashPartitions is Equatable[HashPartitions]
   let _lower_bounds: Array[U128]
+  let _workers: Array[String] val
   let _nodes: Map[U128, String] = _nodes.create()
 
   new val create(nodes: Array[String] val) =>
+    let unsorted_workers = Array[String]
+    for n in nodes.values() do unsorted_workers.push(n) end
+    let sorted_workers_ref = Sort[Array[String], String](unsorted_workers)
+    let sorted_workers = recover trn Array[String] end
+    for w in sorted_workers_ref.values() do
+      sorted_workers.push(w)
+    end
+    _workers = consume sorted_workers
     _lower_bounds = Array[U128]
     let count = nodes.size().u128()
     let part_size = U128.max_value() / count
@@ -17,10 +27,10 @@ class val HashPartitions is Equatable[HashPartitions]
       try
         _nodes(next_lower_bound) = nodes(i.usize())?
       else
-        @printf[I32]("What went wrong?\n".cstring())
+        Fail()
       end
       next_lower_bound = next_lower_bound + part_size
-  end
+    end
 
   fun get_claimant(hash: U128): String ? =>
     var next_to_last_idx: USize = _lower_bounds.size() - 1
@@ -64,6 +74,39 @@ class val HashPartitions is Equatable[HashPartitions]
 
   fun claimants(): Iterator[String] ref =>
     _nodes.values()
+
+  // !@ This is crudely recalculating from scratch.  We need to move as few
+  // keys as possible.
+  fun add_claimants(cs: Array[String] val): HashPartitions ? =>
+    let new_ws = recover trn Array[String] end
+    for w in _workers.values() do
+      new_ws.push(w)
+    end
+    for w in cs.values() do
+      if ArrayHelpers[String].contains[String](_workers, w) then error end
+      new_ws.push(w)
+    end
+    // We're relying on the fact that the workers are sorted here when
+    // HashPartitions is created to ensure that this always leads to the
+    // same partitioning.
+    HashPartitions(consume new_ws)
+
+  // !@ This is crudely recalculating from scratch.  We need to move as few
+  // keys as possible.
+  fun remove_claimants(to_remove: Array[String] val): HashPartitions ? =>
+    let new_ws = recover trn Array[String] end
+    for w in to_remove.values() do
+      if not ArrayHelpers[String].contains[String](_workers, w) then error end
+    end
+    for w in _workers.values() do
+      if not ArrayHelpers[String].contains[String](to_remove, w) then
+        new_ws.push(w)
+      end
+    end
+    // We're relying on the fact that the workers are sorted here when
+    // HashPartitions is created to ensure that this always leads to the
+    // same partitioning.
+    HashPartitions(consume new_ws)
 
   fun eq(that: box->HashPartitions): Bool =>
     ArrayEquality[U128](_lower_bounds, that._lower_bounds) and
