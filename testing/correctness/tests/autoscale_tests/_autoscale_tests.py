@@ -24,6 +24,7 @@ from integration import (add_runner,
                          iter_generator,
                          Metrics,
                          MetricsData,
+                         multi_states_query,
                          ObservabilityNotifier,
                          partition_counts_query,
                          partitions_query,
@@ -43,7 +44,7 @@ from integration import (add_runner,
 
 from collections import Counter
 from functools import partial
-from itertools import cycle
+from itertools import chain, cycle
 import json
 import logging
 import os
@@ -62,6 +63,14 @@ class AutoscaleTestError(Exception):
 
 
 class AutoscaleTimeoutError(AutoscaleTestError):
+    pass
+
+
+class DuplicateKeyError(AutoscaleTestError):
+    pass
+
+
+class MigrationError(AutoscaleTestError):
     pass
 
 
@@ -210,6 +219,29 @@ def get_crashed_runners(runners):
     return filter(lambda r: r.poll(), runners)
 
 
+
+def joined_partition_query_data(responses):
+    """
+    Join partition query responses from multiple workers into a single
+    partition map.
+    Raise error on duplicate partitions.
+    """
+    steps = {}
+    for worker in responses.keys():
+        for step in responses[worker].keys():
+            if step not in steps:
+                steps[step] = {}
+            for part in responses[worker][step]:
+                if part in steps[step]:
+                    dup0 = worker
+                    dup1 = steps[step][part]
+                    raise DuplicateKeyError("Found duplicate keys! Step: {}, "
+                                            "Key: {}, Loc1: {}, Loc2: {}"
+                                            .format(step, part, dup0, dup1))
+                steps[step][part] = worker
+    return steps
+
+
 def test_crashed_workers(runners):
     """
     Test if there are any crashed workers and raise an error if yes
@@ -235,11 +267,13 @@ def test_all_workers_have_partitions(partitions):
     assert(map(len, partitions['state_partitions']['letter-state']
                     .values()).count(0) == 0)
 
+
 def test_worker_has_state_entities(state_entities):
     """
     Test that the worker has state_entities
     """
     assert(len(state_entities['letter-state']) > 0)
+
 
 def test_cluster_is_processing(status):
     """
@@ -255,27 +289,57 @@ def test_cluster_is_not_processing(status):
     assert(status['processing_messages'] is False)
 
 
-def test_migrated_partitions(pre_partitions, workers, partitions):
+def test_migration(pre_partitions, post_partitions, workers):
     """
-    Test that post-migration partition data matches up to expected data based
-    on pre-migration partition data.
+    - Test that no "joining" workers are present in the pre set
+    - Test that no "leaving" workers are present in the post set
+    - Test that state partitions moved between the pre_partitiosn map and
+      the post_partitions map.
+    - Test that all of the states present in the `pre` set are also present
+      in the `post` set. New state are allowed in the `post` because of
+      dynamic partitioning (new partitions may be created in real time).
     """
-    # invert the partitions dicts
-    i_pre = inverted(pre_partitions)
-    i_post = inverted(partitions)
-    keys = ['state_partitions']
-    # make sure that none of the joining workers are in the pre-partitions
-    for joining in workers.get('joining', {}):
-        for ptype in keys:
-            for step in partitions[ptype]:
-                for pid in partitions[ptype][step][joining]:
-                    assert(i_pre[ptype][step][pid] != joining)
-    # make sure that none of the leaving workers are in the post-partitions
-    for leaving in workers.get('leaving', {}):
-        for ptype in keys:
-            for step in pre_partitions[ptype]:
-                for pid in pre_partitions[ptype][step][leaving]:
-                    assert(i_post[ptype][step][pid] != leaving)
+    # prepare some useful sets for set-wise comparison
+    pre_parts = {step: set(pre_partitions[step].keys()) for step in
+                 pre_partitions}
+    post_parts = {step: set(post_partitions[step].keys()) for step in
+                  post_partitions}
+    pre_workers = set(chain(*[pre_partitions[step].values() for step in
+                             pre_partitions]))
+    post_workers = set(chain(*[post_partitions[step].values() for step in
+                               post_partitions]))
+    joining = set(workers.get('joining', []))
+    leaving = set(workers.get('leaving', []))
+
+    print('pre', pre_workers)
+    print('post', post_workers)
+    print('joining', joining)
+    print('leaving', leaving)
+    # test no joining workers are present in pre set
+    assert((pre_workers - joining) == pre_workers)
+
+    # test no leaving workers are present in post set
+    assert((post_workers - leaving) == post_workers)
+
+    # test that no parts go missing after migration
+    for step in pre_parts:
+        assert(step in post_parts)
+        assert(post_parts[step] <= pre_parts[step])
+
+    # test that state parts moved between pre and post (by step)
+    for step in pre_partitions:
+        # Test step did not disappear after migration
+        assert(step in post_partitions)
+        # Test step moved?
+        try:
+            assert(pre_partitions[step] != post_partitions[step])
+        except Exception as err:
+            print('arrrrgh')
+            print(step)
+            print('pre: {}'.format(pre_partitions[step]))
+            print('post: {}'.format(post_partitions[step]))
+            raise err
+
 
 
 # Autoscale tests runner functions
@@ -371,35 +435,23 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
             metrics_host, metrics_port = metrics.get_connection_info()
             time.sleep(0.05)
 
-            num_ports = sources + 3 + (3 * (workers - 1))
+            num_ports = sources + 3 + 3 * workers
             ports = get_port_values(num=num_ports, host=host)
-            (input_ports, (control_port, data_port, external_port),
-             worker_ports) = (ports[:sources],
-                              ports[sources:sources+3],
-                              zip(ports[-(3*(workers-1)):][::3],
-                                  ports[-(3*(workers-1)):][1::3],
-                                  ports[-(3*(workers-1)):][2::3]))
+            (input_ports, worker_ports) = (
+                ports[:sources],
+                [ports[sources:][i:i+3] for i in xrange(0,
+                    len(ports[sources:]), 3)])
             inputs = ','.join(['{}:{}'.format(host, p) for p in
                                input_ports])
 
-            # Prepare query functions with host and port pre-defined
-            query_func_partitions = partial(partitions_query, host,
-                                            external_port)
-            query_func_partition_counts = partial(partition_counts_query,
-                                                  host, external_port)
-            query_func_cluster_status = partial(cluster_status_query, host,
-                                                external_port)
-            query_func_state_entity = partial(state_entity_query, host,
-                                              external_port)
-
             # Start the initial runners
             start_runners(runners, command, host, inputs, outputs,
-                          metrics_port, control_port, external_port, data_port,
-                          res_dir, workers, worker_ports)
+                          metrics_port, res_dir, workers, worker_ports)
 
             # Verify cluster is processing messages
-            obs = ObservabilityNotifier(query_func_cluster_status,
-                test_cluster_is_processing)
+            obs = ObservabilityNotifier(cluster_status_query,
+                (host, worker_ports[0][2]),
+                tests=test_cluster_is_processing)
             obs.start()
             obs.join()
             if obs.error:
@@ -408,16 +460,18 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
             # Verify that `workers` workers are active
             # Create a partial function
             partial_test_worker_count = partial(test_worker_count, workers)
-            obs = ObservabilityNotifier(query_func_cluster_status,
-                partial_test_worker_count)
+            obs = ObservabilityNotifier(cluster_status_query,
+                (host, worker_ports[0][2]),
+                tests=partial_test_worker_count)
             obs.start()
             obs.join()
             if obs.error:
                 raise obs.error
 
-            # Verify all workers start with partitions
-            obs = ObservabilityNotifier(query_func_state_entity,
-                test_worker_has_state_entities)
+            # Verify initializer starts with partitions
+            obs = ObservabilityNotifier(state_entity_query,
+                (host, worker_ports[0][2]),
+                 test_worker_has_state_entities)
             obs.start()
             obs.join()
             if obs.error:
@@ -434,8 +488,9 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
             for cyc in range(cycles):
                 for joiners in ops:
                     # Verify cluster is processing before proceeding
-                    obs = ObservabilityNotifier(query_func_cluster_status,
-                        test_cluster_is_processing, timeout=30)
+                    obs = ObservabilityNotifier(cluster_status_query,
+                        (host, worker_ports[0][2]),
+                        tests=test_cluster_is_processing, timeout=30)
                     obs.start()
                     obs.join()
                     if obs.error:
@@ -445,7 +500,10 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                     test_crashed_workers(runners)
 
                     # get partition data before autoscale operation begins
-                    pre_partitions = query_func_partitions()
+                    addresses = [(r.name, r.external) for r in runners
+                                 if r.is_alive()]
+                    responses = multi_states_query(addresses)
+                    pre_partitions = joined_partition_query_data(responses)
                     steps.append(joiners)
                     joined = []
                     left = []
@@ -453,35 +511,19 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                         # create a new worker and have it join
                         new_ports = get_port_values(num=(joiners * 3), host=host,
                                                     base_port=25000)
-                        joiner_ports = zip(new_ports[::3], new_ports[1::3],
-                                           new_ports[2::3])
+                        joiner_ports = [new_ports[i:i+3] for i in
+                                        xrange(0, len(new_ports), 3)]
                         for i in range(joiners):
                             add_runner(runners, command, host, inputs, outputs,
                                        metrics_port,
-                                       control_port, external_port, data_port, res_dir,
+                                       worker_ports[0][0], res_dir,
                                        joiners, *joiner_ports[i])
                             joined.append(runners[-1])
 
                         # Verify cluster has resumed processing
-                        obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_processing, timeout=120)
-                        obs.start()
-                        obs.join()
-                        if obs.error:
-                            raise obs.error
-
-                        # Test: all workers have partitions, partitions ids
-                        # for new workers have been migrated from pre-join
-                        # workers
-                        # create list of joining workers
-                        diff_names = {'joining': [r.name for r in joined]}
-                        # Create partial function of the test with the
-                        # data baked in
-                        tmp = partial(test_migrated_partitions, pre_partitions, diff_names)
-                        # Start the test notifier
-                        obs = ObservabilityNotifier(query_func_partitions,
-                            [test_all_workers_have_partitions,
-                             tmp])
+                        obs = ObservabilityNotifier(cluster_status_query,
+                            (host, worker_ports[0][2]),
+                            tests=test_cluster_is_processing, timeout=120)
                         obs.start()
                         obs.join()
                         if obs.error:
@@ -538,17 +580,19 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                     # Test for crashed workers
                     test_crashed_workers(runners)
 
-                    # Validate autoscale via partition query
-                    try:
-                        partitions = partitions_query(host, external_port)
-                        phase_validate_partitions(runners, partitions,
-                                                  joined=[r.name for r in joined],
-                                                  left=[r.name for r in left])
-                    except Exception as err:
-                        print('error validating {} have joined and {} have left'
-                              .format([r.name for r in joined],
-                                      [r.name for r in left]))
-                        raise
+                    # Test: at least some states moved, and no states from
+                    #       pre are missing from the post
+
+                    # get partition data before autoscale operation begins
+                    addresses = [(r.name, r.external) for r in runners
+                                 if r.is_alive()]
+                    responses = multi_states_query(addresses)
+                    post_partitions = joined_partition_query_data(responses)
+                    test_migration(pre_partitions, post_partitions,
+                                   workers={'joining': [r.name for r
+                                                        in joined],
+                                            'leaving': [r.name for r
+                                                        in left]})
 
                     # Wait a second before the next operation, allowing some
                     # more data to go through the system

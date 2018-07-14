@@ -94,19 +94,17 @@ def _test_log_rotation_external_trigger_no_recovery(command):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        num_ports = sources + 3 + (2 * (workers - 1))
+        num_ports = sources + 3 * workers
         ports = get_port_values(num=num_ports, host=host)
-        (input_ports, (control_port, data_port, external_port),
-         worker_ports) = (ports[:sources],
-                          ports[sources:sources+3],
-                          zip(ports[-(2*(workers-1)):][::2],
-                              ports[-(2*(workers-1)):][1::2]))
+        (input_ports, worker_ports) = (
+            ports[:sources],
+            [ports[sources:][i:i+3] for i in xrange(0,
+                len(ports[sources:]), 3)])
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, control_port, external_port, data_port,
-                      res_dir, workers, worker_ports)
+                      metrics_port, res_dir, workers, worker_ports)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
@@ -436,19 +434,17 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        num_ports = sources + 3 + (2 * (workers - 1))
+        num_ports = sources + 3 * workers
         ports = get_port_values(num=num_ports, host=host)
-        (input_ports, (control_port, data_port, external_port),
-         worker_ports) = (ports[:sources],
-                          ports[sources:sources+3],
-                          zip(ports[-(2*(workers-1)):][::2],
-                              ports[-(2*(workers-1)):][1::2]))
+        (input_ports, worker_ports) = (
+            ports[:sources],
+            [ports[sources:][i:i+3] for i in xrange(0,
+                len(ports[sources:]), 3)])
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, control_port, external_port, data_port,
-                      res_dir, workers, worker_ports)
+                      metrics_port, res_dir, workers, worker_ports)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
@@ -461,7 +457,6 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         sender = Sender(host, input_ports[0], reader, batch_size=100,
                         interval=0.05)
         sender.start()
-
 
 
         # wait until sender completes (~1 second)
@@ -581,19 +576,18 @@ def _test_log_rotation_file_size_trigger_recovery(command):
         metrics_host, metrics_port = metrics.get_connection_info()
         time.sleep(0.05)
 
-        num_ports = sources + 3 + (2 * (workers - 1))
+        num_ports = sources + 3 * workers
         ports = get_port_values(num=num_ports, host=host)
-        (input_ports, (control_port, data_port, external_port),
-         worker_ports) = (ports[:sources],
-                          ports[sources:sources+3],
-                          zip(ports[-(2*(workers-1)):][::2],
-                              ports[-(2*(workers-1)):][1::2]))
+        (input_ports, worker_ports) = (
+            ports[:sources],
+            [ports[sources:][i:i+3] for i in xrange(0,
+                len(ports[sources:]), 3)])
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
 
         start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, control_port, external_port, data_port,
-                      res_dir, workers, worker_ports, alt_block, alt_func)
+                      metrics_port, res_dir, workers, worker_ports,
+                      alt_block, alt_func)
 
         # Wait for first runner (initializer) to report application ready
         runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
