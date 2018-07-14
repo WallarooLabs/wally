@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Try until fail or MAX repetitions
+# Repeat a command up to MAX repetitions or until it fails once.
+#
+# USAGE: ./try_until 10 echo hello world
+
+max_runs=$1
+shift
+echo The command: $@
+echo will run for $max_runs iterations or until it fails.
+
+count=1
+while [ $count -le $max_runs ]
+do
+  echo "Trying iteration: $count"
+  $@ > TRY_UNTIL.log.$count 2>&1
+  if [[ "$?" -ne 0 ]]; then
+    echo "Test failed after $count iterations"
+    spd-say "Test failed after $count iterations"
+    echo "The failing test's output is:"
+    cat TRY_UNTIL.log.$count
+    exit $?
+  fi
+  (( count++ ))
+done
+rm TRY_UNTIL.log.*
