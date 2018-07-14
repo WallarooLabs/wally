@@ -46,6 +46,7 @@ actor Main
     var msg_size: USize = 80
     var write_to_file: Bool = true
     var binary_integer: Bool = false
+    var partition: String = ""
     var start_from: U64 = 0
     var vary_by: U64 = 0
 
@@ -75,6 +76,7 @@ actor Main
           .add("msg-size", "g", I64Argument)
           .add("no-write", "w", None)
           .add("vary-by", "j", I64Argument)
+          .add("partition", "p", StringArgument)
 
         for option in options do
           match option
@@ -104,6 +106,8 @@ actor Main
             write_to_file = false
           | ("vary-by", let arg: I64) =>
             vary_by = arg.u64()
+          | ("partition", let arg: String) =>
+            partition = arg
           end
         end
 
@@ -189,7 +193,7 @@ actor Main
               end
             else
               if binary_integer then
-                BinaryIntegerDataSource(start_from)
+                BinaryIntegerDataSource(start_from, partition)
               else
                 IntegerDataSource(start_from)
               end
@@ -489,16 +493,23 @@ class IntegerDataSource is Iterator[String]
 
 class BinaryIntegerDataSource is Iterator[Array[U8] val]
   var _counter: U64
+  let _partition: String
+  let _length: U32
 
-  new iso create(start_from: U64 = 0) =>
+  new iso create(start_from: U64 = 0, partition: String = "") =>
     _counter = start_from
+    _partition = partition
+    _length = 8 + partition.size().u32()
 
   fun ref has_next(): Bool =>
     true
 
   fun ref next(): Array[U8] val =>
     _counter = _counter + 1
-    Bytes.from_u64(_counter, Bytes.from_u32(U32(8)))
+    let out: Array[U8] iso = Bytes.from_u64(_counter,
+      Bytes.from_u32(U32(_length)))
+    out.append(_partition)
+    consume out
 
 class FileDataSource is Iterator[String]
   let _lines: Iterator[String]

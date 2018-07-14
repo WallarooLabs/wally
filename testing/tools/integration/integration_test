@@ -61,10 +61,11 @@ class CSVGenAction(argparse.Action):
 class SeqGenAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """
-        Permit three cases: 1, 2, and 3 values
+        Permit four cases: 1, 2, 3, and 4 values
         1 value: range = {0}, source = 0, header format = '>I'
         2 values: range = {0}, source = {1}, header format = '>I'
         3 values: range = {0}, source = {1}, header format = {2}
+        4 values: range = {0}, source = {1}, header format = {2}, partition = {3}
 
         range is a range notation, using () for exclusive, [] for inclusive,
         and two integers separated by a comma to denote the start and stop.
@@ -82,12 +83,20 @@ class SeqGenAction(argparse.Action):
         elif len(values) == 3:
             start, stop = self.__range_parse__(values[0])
             source = int(values[1])
-            gen = sequence_generator(stop, start, values[2])
+            header_fmt = values[2]
+            gen = sequence_generator(stop, start, header_fmt)
+        elif len(values) == 4:
+            start, stop = self.__range_parse__(values[0])
+            source = int(values[1])
+            header_fmt = values[2]
+            partition = values[3]
+            gen = sequence_generator(stop, start, header_fmt, partition)
         else:
-            msg = ('Argument "{f}" requires 1, 2, or 3 arguments specifying '
-                   '(start, stop] [, source-index [, header format]].\n'
-                   "When unspecified, source-index is 0, and header format is "
-                   "'>I'".format(f=self.dest))
+            msg = ('Argument "{f}" requires 1, 2, 3, or 4 arguments specifying '
+                   '(start, stop] [, source-index [, header format '
+                   '[, partition]]].\n'
+                   "When unspecified, source-index is 0, header format is "
+                   "'>I', and partition is empty".format(f=self.dest))
             raise argparse.ArgumentTypeError(msg)
 
         try:
@@ -359,7 +368,8 @@ def CLI():
                             "files that use newlines to separate records."))
     gens.add_argument('--sequence-sender', dest='generators',
                       action=SeqGenAction, nargs='+',
-                      metavar=('range', 'source_index', 'header_format'),
+                      metavar=('range', 'source_index', 'header_format',
+                               'partition'),
                       help=("Send values from the set of integers "
                             "(start,stop]"))
     gens.add_argument('--csv-sender', dest='generators', action=CSVGenAction,
