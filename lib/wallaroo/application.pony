@@ -35,8 +35,8 @@ use "wallaroo/core/topology"
 class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
-  // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, PartitionBuilder] = _state_builders.create()
+  // _state_builders maps from state_name to StateSubpartitions
+  let _state_builders: Map[String, PartitionsBuilder] = _state_builders.create()
   var sink_count: USize = 0
 
   new create(name': String) =>
@@ -56,18 +56,18 @@ class Application
     pipelines.push(p)
 
   fun ref add_state_builder(state_name: String,
-    state_partition: PartitionBuilder)
+    state_partition: PartitionsBuilder)
   =>
     _state_builders(state_name) = state_partition
 
   fun ref increment_sink_count() =>
     sink_count = sink_count + 1
 
-  fun state_builder(state_name: String): PartitionBuilder ? =>
+  fun state_builder(state_name: String): PartitionsBuilder ? =>
     _state_builders(state_name)?
 
-  fun state_builders(): Map[String, PartitionBuilder] val =>
-    let builders = recover trn Map[String, PartitionBuilder] end
+  fun state_builders(): Map[String, PartitionsBuilder] val =>
+    let builders = recover trn Map[String, PartitionsBuilder] end
     for (k, v) in _state_builders.pairs() do
       builders(k) = v
     end
@@ -189,7 +189,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     // special case of partitioned state with one partition. This works but is
     // a bit confusing when reading the code.
     let step_id_gen = StepIdGenerator
-    let single_step_partition = Partition[Last](
+    let single_step_partition = Partitions[Last](
       SingleStepPartitionFunction[Last], recover ["key"] end)
     let step_id_map = recover trn Map[Key, StepId] end
 
@@ -219,7 +219,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       s_comp: StateComputation[Last, Next, S] val,
       s_initializer: StateBuilder[S],
       state_name: String,
-      partition: Partition[PIn],
+      partition: Partitions[PIn],
       multi_worker: Bool = false): PipelineBuilder[In, Out, Next]
   =>
     let step_id_gen = StepIdGenerator

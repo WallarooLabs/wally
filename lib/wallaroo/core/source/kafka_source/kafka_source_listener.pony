@@ -46,13 +46,12 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso, recovering: Bool,
-    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter): KafkaSourceListenerBuilder[In]
   =>
     KafkaSourceListenerBuilder[In](source_builder, router, router_registry,
       route_builder,
       outgoing_boundary_builders, event_log, auth, pipeline_name,
-      layout_initializer, consume metrics_reporter, state_step_creator,
+      layout_initializer, consume metrics_reporter,
       target_router, _ksco, _auth, recovering)
 
 class val KafkaSourceListenerBuilder[In: Any val]
@@ -66,7 +65,6 @@ class val KafkaSourceListenerBuilder[In: Any val]
   let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
   let _auth: AmbientAuth
-  let _state_step_creator: StateStepCreator
   let _target_router: Router
   let _metrics_reporter: MetricsReporter
   let _ksco: KafkaConfigOptions val
@@ -79,7 +77,6 @@ class val KafkaSourceListenerBuilder[In: Any val]
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter,
     ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth, recovering: Bool)
   =>
@@ -92,18 +89,17 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _layout_initializer = layout_initializer
     _event_log = event_log
     _auth = auth
-    _state_step_creator = state_step_creator
     _target_router = target_router
     _metrics_reporter = consume metrics_reporter
     _ksco = ksco
     _tcp_auth = tcp_auth
     _recovering = recovering
 
-  fun apply(env: Env): SourceListener =>
+  fun apply(state_step_creator: StateStepCreator, env: Env): SourceListener =>
     KafkaSourceListener[In](env, _source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders, _event_log, _auth,
       _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      _state_step_creator, _target_router, _ksco, _tcp_auth, _recovering)
+      state_step_creator, _target_router, _ksco, _tcp_auth, _recovering)
 
 
 class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler

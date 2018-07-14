@@ -45,7 +45,7 @@ actor RouterRegistry is InFlightAckRequester
   let _recovery_file_cleaner: RecoveryFileCleaner
   var _data_router: DataRouter =
     DataRouter(recover Map[StepId, Consumer] end,
-      recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end)
+      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
   var _pre_state_data: (Array[PreStateData] val | None) = None
   let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()
@@ -1523,7 +1523,7 @@ actor RouterRegistry is InFlightAckRequester
   /////
   // Step moved onto this worker
   /////
-  be receive_immigrant_step(subpartition: StateSubpartition,
+  be receive_immigrant_step(subpartition: StateSubpartitions,
     runner_builder: RunnerBuilder, reporter: MetricsReporter iso,
     recovery_replayer: RecoveryReplayer, msg: StepMigrationMsg)
   =>

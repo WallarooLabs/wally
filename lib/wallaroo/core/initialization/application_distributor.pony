@@ -36,16 +36,13 @@ actor ApplicationDistributor is Distributor
   let _step_id_gen: StepIdGenerator = StepIdGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _application: Application val
-  let _state_step_creator: StateStepCreator
 
   new create(auth: AmbientAuth, application: Application val,
-    local_topology_initializer: LocalTopologyInitializer,
-    state_step_creator: StateStepCreator)
+    local_topology_initializer: LocalTopologyInitializer)
   =>
     _auth = auth
     _local_topology_initializer = local_topology_initializer
     _application = application
-    _state_step_creator = state_step_creator
 
   be distribute(cluster_initializer: (ClusterInitializer | None),
     worker_count: USize, worker_names: Array[String] val,
@@ -113,11 +110,11 @@ actor ApplicationDistributor is Distributor
 
       // Create StateSubpartitions
 
-      let ssb_trn = recover trn Map[String, StateSubpartition] end
+      let ssb_trn = recover trn Map[String, StateSubpartitions] end
       for (s_name, p_builder) in application.state_builders().pairs() do
         ssb_trn(s_name) = p_builder.state_subpartition(all_workers)
       end
-      let state_subpartitions: Map[String, StateSubpartition] val =
+      let state_subpartitions: Map[String, StateSubpartitions] val =
         consume ssb_trn
 
       // Keep track of sink ids
@@ -442,7 +439,7 @@ actor ApplicationDistributor is Distributor
           // make sure it gets put on the same worker
           try
             match step_runner_builders(count)?
-            | let pb: PartitionBuilder =>
+            | let pb: PartitionsBuilder =>
               count = count + 1
             end
           end
@@ -640,7 +637,7 @@ actor ApplicationDistributor is Distributor
                 // partition router.
                 let next_id = next_runner_builder.id()
                 let pony_thread_count = ThreadCount()
-                let psd = StatelessPartition.pre_stateless_data(
+                let psd = StatelessPartitions.pre_stateless_data(
                   pipeline.name(), next_id, all_workers, pony_thread_count)?
 
                 local_graphs(worker)?.add_node(psd, next_id)
@@ -772,8 +769,8 @@ actor ApplicationDistributor is Distributor
                 end
 
               match next_runner_builder
-              | let pb: PartitionBuilder =>
-                @printf[I32](("A PartitionBuilder should never begin the " +
+              | let pb: PartitionsBuilder =>
+                @printf[I32](("A PartitionsBuilder should never begin the " +
                   "chain on a non-initializer worker!\n").cstring())
                 error
               else

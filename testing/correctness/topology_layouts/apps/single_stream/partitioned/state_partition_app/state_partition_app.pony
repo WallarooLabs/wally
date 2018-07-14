@@ -37,7 +37,7 @@ actor Main
   new create(env: Env) =>
     try
 
-      let powers_of_2_partition = Partition[U64](
+      let powers_of_2_partition = Partitions[U64](
         PowersOfTwoPartitionFunction, PowersOfTwo())
 
       let application = recover val

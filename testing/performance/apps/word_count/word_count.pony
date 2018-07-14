@@ -38,8 +38,8 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      let word_totals_partition = Partition[String](
-        WordPartitionFunction, PartitionFileReader("letters.txt",
+      let word_totals_partition = Partitions[String](
+        WordPartitionFunction, PartitionsFileReader("letters.txt",
           env.root as AmbientAuth))
 
       let application = recover val

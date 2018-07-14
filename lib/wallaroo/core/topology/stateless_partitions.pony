@@ -2,7 +2,8 @@ use "collections"
 use "wallaroo/core/common"
 
 
-primitive StatelessPartition
+// !@ StatelessPartition -> StatelessPartitions
+primitive StatelessPartitions
   fun pre_stateless_data(pipeline_name: String, partition_id: StepId,
     workers: Array[String] val, threads_per_worker: USize): PreStatelessData ?
   =>

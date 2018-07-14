@@ -41,7 +41,7 @@ actor Main
 
       // This is basically the same as applying mod 2 before a double
       // computation
-      let mod6partition = Partition[U64](
+      let mod6partition = Partitions[U64](
         Mod6PartitionFunction, recover ["0"; "2"; "4"] end)
 
       let application = recover val

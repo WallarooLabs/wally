@@ -199,21 +199,42 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     base_routes(1) = step1
     base_routes(2) = step2
 
-    let base_keyed_routes = recover val KeyToStepInfoTag[Step] end
+    let base_partitions = recover val
+      LocalStatePartitions
+        .>add("state", "key1", step1)
+        .>add("state", "key2", step2)
+    end
+
+    let base_partition_ids = recover val
+      LocalStatePartitionIds
+        .>add("state", "key1", 1)
+        .>add("state", "key2", 2)
+    end
 
     let target_routes = recover trn Map[U128, Consumer] end
     target_routes(1) = step1
 
-    var base_router = DataRouter(consume base_routes, base_keyed_routes,
-      recover KeyToStepInfo[StepId] end)
-    let target_router = DataRouter(consume target_routes, base_keyed_routes,
-      recover KeyToStepInfo[StepId] end)
+    let target_partitions = recover val
+      LocalStatePartitions
+        .>add("state", "key1", step1)
+    end
+
+    let target_partition_ids = recover val
+      LocalStatePartitionIds
+        .>add("state", "key1", 1)
+    end
+
+    var base_router = DataRouter(consume base_routes, base_partitions,
+      base_partition_ids)
+
+    let target_router = DataRouter(consume target_routes, target_partitions,
+      target_partition_ids)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
     // !@ Update test to use key
     // !@ Need to insert a key before testing to see if it works
-    base_router = base_router.remove_keyed_route("StateName", "Key")
+    base_router = base_router.remove_keyed_route("state", "key1")
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -241,12 +262,12 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     target_routes(1) = step1
     target_routes(2) = step2
 
-    let base_keyed_routes = recover val KeyToStepInfoTag[Step] end
+    let base_keyed_routes = recover val LocalStatePartitions end
 
     var base_router = DataRouter(consume base_routes, base_keyed_routes,
-      recover KeyToStepInfo[StepId] end)
+      recover LocalStatePartitionIds end)
     let target_router = DataRouter(consume target_routes, base_keyed_routes,
-      recover KeyToStepInfo[StepId] end)
+      recover LocalStatePartitionIds end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 

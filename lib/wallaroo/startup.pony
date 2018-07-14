@@ -355,7 +355,7 @@ actor Startup
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
         _application_distributor = ApplicationDistributor(auth, _application,
-          local_topology_initializer, state_step_creator)
+          local_topology_initializer)
         match _application_distributor
         | let ad: ApplicationDistributor =>
           match _startup_options.worker_count
@@ -520,7 +520,7 @@ actor Startup
 
       router_registry.set_data_router(
         DataRouter(recover Map[StepId, Consumer] end,
-          recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end))
+          recover LocalStatePartitions end, recover LocalStatePartitionIds end))
       local_topology_initializer.update_topology(m.local_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)

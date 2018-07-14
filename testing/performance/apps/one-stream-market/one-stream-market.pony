@@ -83,12 +83,12 @@ actor Main
         end
       end
       let symbol_data_partition = if symbols_file_path is None then
-          Partition[Symboly val](
+          Partitions[Symboly val](
             SymbolPartitionFunction, LegalSymbols.symbols)
         else
-          Partition[Symboly val](
+          Partitions[Symboly val](
             SymbolPartitionFunction,
-            PartitionFileReader(symbols_file_path as String,
+            PartitionsFileReader(symbols_file_path as String,
               env.root as AmbientAuth))
         end
 

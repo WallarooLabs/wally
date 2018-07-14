@@ -286,7 +286,7 @@ fun ref create2(sizes: Array[(String, U128)] val) =>
   fun get_sizes(): Array[(String, U128)] =>
     let s: Array[(String, U128)] = s.create()
 
-    try 
+    try
       for i in Range[USize](0, _lower_bounds.size()) do
         let c = _lb_to_c(_lower_bounds(i)?)?
         s.push((c, _interval_sizes(i)?))
@@ -479,7 +479,7 @@ fun ref create2(sizes: Array[(String, U128)] val) =>
       Fail()
     end
     new_sizes
-    
+
   fun _process_additions(old_sizes: Array[(String, U128)],
     size_add: Map[String, U128], decimal_digits: USize):
     Array[(String, U128)]
@@ -514,7 +514,7 @@ fun ref create2(sizes: Array[(String, U128)] val) =>
             let to_add = size_add(left_c)?
 
             if to_add >= s then
-              // Assign all of s to left. 
+              // Assign all of s to left.
               new_sizes.push((left_c, s))
               size_add(left_c) = to_add - s
             else

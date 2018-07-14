@@ -317,30 +317,30 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
   fun route_builder(): RouteBuilder => _route_builder
   fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
 
-trait val PartitionBuilder
+trait val PartitionsBuilder
   // These two methods need to be deterministic at the moment since they
   // are called at different times
   fun state_subpartition(workers: (String | Array[String] val)):
-    StateSubpartition
+    StateSubpartitions
   fun key_distribution(workers: (String | Array[String] val)):
     KeyDistribution
   fun state_name(): String
   fun is_multi(): Bool
 
 class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
-  (PartitionBuilder & RunnerBuilder)
+  (PartitionsBuilder & RunnerBuilder)
   let _pipeline_name: String
   let _state_name: String
   let _state_runner_builder: StateRunnerBuilder[S] val
   let _step_id_map: Map[Key, U128] val
-  let _partition: Partition[PIn] val
+  let _partition: Partitions[PIn] val
   let _route_builder: RouteBuilder
   let _forward_route_builder: RouteBuilder
   let _id: U128
   let _multi_worker: Bool
 
   new val create(pipeline_name: String, state_name': String,
-    step_id_map': Map[Key, U128] val, partition': Partition[PIn] val,
+    step_id_map': Map[Key, U128] val, partition': Partitions[PIn] val,
     state_runner_builder: StateRunnerBuilder[S] val,
     route_builder': RouteBuilder,
     forward_route_builder': RouteBuilder,
@@ -376,9 +376,9 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
   fun is_multi(): Bool => _multi_worker
 
   fun state_subpartition(workers: (String | Array[String] val)):
-    StateSubpartition
+    StateSubpartitions
   =>
-    KeyedStateSubpartition[PIn, S](_state_name,
+    KeyedStateSubpartitions[PIn, S](_state_name,
       key_distribution(workers), _step_id_map, _state_runner_builder,
       _partition.function(), _pipeline_name)
 

@@ -98,7 +98,7 @@ actor Main
         pa.push("1")
         consume pa
       end
-      let partition = Partition[U64](WindowPartitionFunction, part_ar)
+      let partition = Partitions[U64](WindowPartitionFunction, part_ar)
 
       let application = recover val
         Application("Sequence Window Printer")

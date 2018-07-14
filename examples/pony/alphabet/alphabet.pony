@@ -32,8 +32,8 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      let letter_partition = Partition[Votes val](
-        LetterPartitionFunction, PartitionFileReader("letters.txt",
+      let letter_partition = Partitions[Votes val](
+        LetterPartitionFunction, PartitionsFileReader("letters.txt",
           env.root as AmbientAuth))
 
       let application = recover val

@@ -21,11 +21,12 @@ use "pony-kafka"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/ent/recovery"
-use "wallaroo_labs/mort"
 use "wallaroo/core/metrics"
+use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo/ent/recovery"
+use "wallaroo_labs/mort"
 
 primitive KafkaSourceNotifyBuilder[In: Any val]
   fun apply(source_id: StepId, pipeline_name: String, env: Env,
