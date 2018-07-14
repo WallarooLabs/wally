@@ -39,9 +39,6 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 
-interface tag _ReportReadyToWork
-  be report_ready_to_work(initializable: Initializable)
-
 actor Step is (Producer & Consumer & Rerouter)
   let _auth: AmbientAuth
   var _id: U128
@@ -62,7 +59,7 @@ actor Step is (Producer & Consumer & Rerouter)
   var _upstreams: SetIs[Producer] = _upstreams.create()
 
   // Lifecycle
-  var _initializer: (_ReportReadyToWork | None) = None
+  var _initializer: (LocalTopologyInitializer | StateStepCreator | None) = None
   var _initialized: Bool = false
   var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
@@ -76,8 +73,8 @@ actor Step is (Producer & Consumer & Rerouter)
 
   let _state_step_creator: StateStepCreator
 
-  let _pending_data_store: PendingDataStore =
-    _pending_data_store.create()
+  let _pending_message_store: PendingMessageStore =
+    _pending_message_store.create()
 
   new create(auth: AmbientAuth, runner: Runner iso,
     metrics_reporter: MetricsReporter iso,
@@ -145,30 +142,6 @@ actor Step is (Producer & Consumer & Rerouter)
   be application_created(initializer: LocalTopologyInitializer,
     omni_router: OmniRouter)
   =>
-    // for consumer in _router.routes().values() do
-    //   if not _routes.contains(consumer) then
-    //     _routes(consumer) =
-    //       _route_builder(this, consumer, _metrics_reporter)
-    //   end
-    // end
-
-    // for boundary in _outgoing_boundaries.values() do
-    //   if not _routes.contains(boundary) then
-    //     _routes(boundary) =
-    //       _route_builder(this, boundary, _metrics_reporter)
-    //   end
-    // end
-
-    // for r in _routes.values() do
-    //   r.application_created()
-    //   ifdef "resilience" then
-    //     _acker_x.add_route(r)
-    //   end
-    // end
-
-    // _omni_router = omni_router
-
-    // _initialized = true
     _initialize_routes_boundaries_omni_router(omni_router)
     initializer.report_initialized(this)
 
@@ -199,20 +172,16 @@ actor Step is (Producer & Consumer & Rerouter)
     _initialized = true
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
-    // _initializer = initializer
-    // if _routes.size() > 0 then
-    //   for r in _routes.values() do
-    //     r.application_initialized("Step")
-    //   end
-    // else
-    //   _report_ready_to_work()
-    // end
-    _initializer_initialized(initializer)
+    _prepare_ready_to_work(initializer)
 
-  be initializer_initialized(initializer: _ReportReadyToWork) =>
-    _initializer_initialized(initializer)
+  be quick_initialize(initializer:
+    (LocalTopologyInitializer | StateStepCreator))
+  =>
+    _prepare_ready_to_work(initializer)
 
-  fun ref _initializer_initialized(initializer: _ReportReadyToWork) =>
+  fun ref _prepare_ready_to_work(initializer:
+    (LocalTopologyInitializer | StateStepCreator))
+  =>
     _initializer = initializer
     if _routes.size() > 0 then
       for r in _routes.values() do
@@ -236,7 +205,7 @@ actor Step is (Producer & Consumer & Rerouter)
 
   fun ref _report_ready_to_work() =>
     match _initializer
-    | let rrtw: _ReportReadyToWork =>
+    | let rrtw: (LocalTopologyInitializer | StateStepCreator) =>
       rrtw.report_ready_to_work(this)
     else
       Fail()
@@ -289,7 +258,7 @@ actor Step is (Producer & Consumer & Rerouter)
           _routes(consumer) = new_route
         end
       end
-      _pending_data_store.process_pending(this, this, _router)
+      _pending_message_store.process_known_keys(this, this, _router)
     else
       Fail()
     end
@@ -436,7 +405,7 @@ actor Step is (Producer & Consumer & Rerouter)
   fun ref unknown_key(state_name: String, key: Key,
       routing_args: RoutingArguments)
   =>
-    _pending_data_store.add(state_name, key, routing_args)
+    _pending_message_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   fun ref filter_queued_msg(i_producer: Producer, i_route_id: RouteId,

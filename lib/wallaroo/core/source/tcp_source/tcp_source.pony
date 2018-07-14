@@ -71,8 +71,8 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
   let _metrics_reporter: MetricsReporter
 
-  let _pending_data_store: PendingDataStore =
-    _pending_data_store.create()
+  let _pending_message_store: PendingMessageStore =
+    _pending_message_store.create()
 
   // TCP
   let _listen: TCPSourceListener
@@ -210,7 +210,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     end
 
     _notify.update_router(new_router)
-    _pending_data_store.process_pending(this, _notify, new_router)
+    _pending_message_store.process_known_keys(this, _notify, new_router)
 
   be remove_route_to_consumer(c: Consumer) =>
     if _routes.contains(c) then
@@ -378,7 +378,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   =>
-    _pending_data_store.add(state_name, key, routing_args)
+    _pending_message_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   be report_status(code: ReportStatusCode) =>

@@ -34,145 +34,6 @@ use "wallaroo/core/routing"
 use "wallaroo/core/sink"
 use "wallaroo/core/state"
 
-trait Rerouter
-  fun router(): (Router | DataRouter)
-
-  fun ref reroute(producer: Producer ref,
-    route_args: RoutingArguments)
-  =>
-    route_args.route_with(router(), producer)
-
-trait val RoutingArguments
-  fun val apply(rerouter: Rerouter, producer: Producer ref)
-  fun val route_with(router: (Router | DataRouter), producer: Producer ref)
-
-class val TypedRoutingArguments[D: Any val] is RoutingArguments
-  let _metric_name: String
-  let _pipeline_time_spent: U64
-  let _data: D
-  let _producer_id: StepId
-  let _i_msg_uid: MsgId
-  let _frac_ids: FractionalMessageId
-  let _latest_ts: U64
-  let _metrics_id: U16
-  let _worker_ingress_ts: U64
-
-  new val create(metric_name: String, pipeline_time_spent: U64, data: D,
-    producer_id: StepId, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    _metric_name = metric_name
-    _pipeline_time_spent = pipeline_time_spent
-    _data = data
-    _producer_id = producer_id
-    _i_msg_uid = i_msg_uid
-    _frac_ids = frac_ids
-    _latest_ts = latest_ts
-    _metrics_id = metrics_id
-    _worker_ingress_ts = worker_ingress_ts
-
-  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
-    rerouter.reroute(producer, this)
-
-  fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
-    // !@ this doesn't correctly capture times for calculating latencies,
-    // so what do we want to do about this?
-    match router
-    | let r: Router =>
-      r.route[D](_metric_name, _pipeline_time_spent, _data, _producer_id,
-        producer, _i_msg_uid, _frac_ids, _latest_ts, _metrics_id,
-        _worker_ingress_ts)
-    else
-      @printf[I32]("Router failed to reroute message.\n".cstring())
-      Fail()
-    end
-
-class val TypedDataRoutingArguments[D: Any val] is RoutingArguments
-  let _metric_name: String
-  let _pipeline_time_spent: U64
-  let _data: D
-  let _producer_id: StepId
-  let _seq_id: SeqId
-  let _frac_ids: FractionalMessageId
-  let _latest_ts: U64
-  let _metrics_id: U16
-  let _worker_ingress_ts: U64
-
-  new val create(metric_name: String, pipeline_time_spent: U64, data: D,
-    producer_id: StepId, seq_id: SeqId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    _metric_name = metric_name
-    _pipeline_time_spent = pipeline_time_spent
-    _data = data
-    _producer_id = producer_id
-    _seq_id = seq_id
-    _frac_ids = frac_ids
-    _latest_ts = latest_ts
-    _metrics_id = metrics_id
-    _worker_ingress_ts = worker_ingress_ts
-
-  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
-    rerouter.reroute(producer, this)
-
-  fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
-    // !@ this doesn't correctly capture times for calculating latencies,
-    // so what do we want to do about this?
-    match (router, producer, _data)
-    | (let data_router: DataRouter, let data_receiver: DataReceiver ref,
-      let dm: DeliveryMsg)
-    =>
-      data_router.route(dm, _pipeline_time_spent, _producer_id,
-        data_receiver, _seq_id, _latest_ts, _metrics_id,
-        _worker_ingress_ts)
-    else
-      @printf[I32]("DataRouter failed to reroute message.\n".cstring())
-      Fail()
-    end
-
-class val TypedDataReplayRoutingArguments[D: Any val] is RoutingArguments
-  let _metric_name: String
-  let _pipeline_time_spent: U64
-  let _data: D
-  let _producer_id: StepId
-  let _seq_id: SeqId
-  let _frac_ids: FractionalMessageId
-  let _latest_ts: U64
-  let _metrics_id: U16
-  let _worker_ingress_ts: U64
-
-  new val create(metric_name: String, pipeline_time_spent: U64, data: D,
-    producer_id: StepId, seq_id: SeqId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    _metric_name = metric_name
-    _pipeline_time_spent = pipeline_time_spent
-    _data = data
-    _producer_id = producer_id
-    _seq_id = seq_id
-    _frac_ids = frac_ids
-    _latest_ts = latest_ts
-    _metrics_id = metrics_id
-    _worker_ingress_ts = worker_ingress_ts
-
-  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
-    rerouter.reroute(producer, this)
-
-  fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
-    // !@ this doesn't correctly capture times for calculating latencies,
-    // so what do we want to do about this?
-    match (router, producer, _data)
-    | (let data_router: DataRouter, let data_receiver: DataReceiver ref,
-      let dm: ReplayableDeliveryMsg)
-    =>
-      data_router.replay_route(dm, _pipeline_time_spent, _producer_id,
-        data_receiver, _seq_id, _latest_ts, _metrics_id,
-        _worker_ingress_ts)
-    else
-      @printf[I32]("DataRouter failed to reroute message.\n".cstring())
-      Fail()
-    end
-
 trait val Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer_id: StepId, producer: Producer ref, i_msg_uid: MsgId,
@@ -180,7 +41,7 @@ trait val Router
     worker_ingress_ts: U64): (Bool, U64)
   fun routes(): Array[Consumer] val
   fun routes_not_in(router: Router): Array[Consumer] val
-  fun routes_key(state_name: String, key: Key): Bool
+  fun has_state_partition(state_name: String, key: Key): Bool
 
 class val EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -196,7 +57,7 @@ class val EmptyRouter is Router
   fun routes_not_in(router: Router): Array[Consumer] val =>
     recover Array[Consumer] end
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     false
 
 class val DirectRouter is Router
@@ -242,7 +103,7 @@ class val DirectRouter is Router
       recover [_target] end
     end
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     false
 
 class val MultiRouter is Router
@@ -313,10 +174,10 @@ class val MultiRouter is Router
     end
     consume rs
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     var found = false
     for r in _routers.values() do
-      if r.routes_key(state_name, key) then
+      if r.has_state_partition(state_name, key) then
         found = true
         break
       end
@@ -382,7 +243,7 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
       recover [_target] end
     end
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     false
 
   fun update_proxy_address(pa: ProxyAddress): ProxyRouter =>
@@ -505,7 +366,7 @@ class val EmptyOmniRouter is OmniRouter
   fun routes_not_in(router: OmniRouter): Array[Consumer] val =>
     recover Array[Consumer] end
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     false
 
   fun producer_for(step_id: StepId): Producer ? =>
@@ -847,7 +708,7 @@ class val StepIdRouter is OmniRouter
     end
     consume diff
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     false
 
   fun producer_for(step_id: StepId): Producer ? =>
@@ -971,15 +832,15 @@ class val DataRouter is Equatable[DataRouter]
   // _keyed_routes contains a subset of the routes in _data_routes.
   // _keyed_routes keeps track of state step routes, while
   // _data_routes keeps track of *all* routes.
-  let _keyed_routes: KeyToStepInfoTag[Step] val
-  let _keyed_step_ids: KeyToStepInfo[StepId] val
+  let _keyed_routes: LocalStatePartitions val
+  let _keyed_step_ids: LocalStatePartitionIds val
   let _target_ids_to_route_ids: Map[StepId, RouteId] val
   let _route_ids_to_target_ids: Map[RouteId, StepId] val
-  let _keys_to_route_ids: KeyToStepInfo[RouteId] val
+  let _keys_to_route_ids: StatePartitionRouteIds val
 
   new val create(data_routes: Map[StepId, Consumer] val,
-    keyed_routes: KeyToStepInfoTag[Step] val,
-    keyed_step_ids: KeyToStepInfo[StepId] val)
+    keyed_routes: LocalStatePartitions val,
+    keyed_step_ids: LocalStatePartitionIds val)
   =>
     _data_routes = data_routes
     _keyed_routes = keyed_routes
@@ -1004,8 +865,8 @@ class val DataRouter is Equatable[DataRouter]
     _target_ids_to_route_ids = consume tid_map
     _route_ids_to_target_ids = consume rid_map
 
-    let kid_map = recover trn KeyToStepInfo[RouteId] end
-    for (sn, k, s_id) in _keyed_step_ids.pairs() do
+    let kid_map = recover trn StatePartitionRouteIds end
+    for (sn, k, s_id) in _keyed_step_ids.triples() do
       try
         let r_id = _target_ids_to_route_ids(s_id)?
         kid_map.add(sn, k, r_id)
@@ -1016,11 +877,11 @@ class val DataRouter is Equatable[DataRouter]
     _keys_to_route_ids = consume kid_map
 
   new val with_route_ids(data_routes: Map[StepId, Consumer] val,
-    keyed_routes: KeyToStepInfoTag[Step] val,
-    keyed_step_ids: KeyToStepInfo[StepId] val,
+    keyed_routes: LocalStatePartitions val,
+    keyed_step_ids: LocalStatePartitionIds val,
     target_ids_to_route_ids: Map[StepId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, StepId] val,
-    keys_to_route_ids: KeyToStepInfo[RouteId] val)
+    keys_to_route_ids: StatePartitionRouteIds val)
   =>
     _data_routes = data_routes
     _keyed_routes = keyed_routes
@@ -1079,8 +940,11 @@ class val DataRouter is Equatable[DataRouter]
         producer.bookkeeping(route_id, seq_id)
       end
     else
-      // !@ this now gets an exception on an unknown key, which gets handled
-      // by the StateStepCreator.
+      // If this is reached it means that there was a message for an unknown
+      // key. The StateStepCreator has been notified and will take care of
+      // creating a new step to handle the key and then distributing a new
+      // router which will be used to resend the message, so we don't need to
+      // Fail() here.
       ifdef debug then
         @printf[I32]("DataRouter failed to find route on replay\n".cstring())
       end
@@ -1142,15 +1006,15 @@ class val DataRouter is Equatable[DataRouter]
       if k != id then new_data_routes(k) = v end
     end
 
-    let new_keyed_routes = recover trn KeyToStepInfoTag[Step] end
-    for (sn, k, v) in _keyed_routes.pairs() do
+    let new_keyed_routes = recover trn LocalStatePartitions end
+    for (sn, k, v) in _keyed_routes.triples() do
       if not ((sn == state_name) and (k == key)) then
         new_keyed_routes.add(sn, k, v)
       end
     end
 
-    let new_keyed_step_ids = recover trn KeyToStepInfo[StepId] end
-    for (sn, k, v) in _keyed_step_ids.pairs() do
+    let new_keyed_step_ids = recover trn LocalStatePartitionIds end
+    for (sn, k, v) in _keyed_step_ids.triples() do
       if not ((sn == state_name) and (k == key)) then
         new_keyed_step_ids.add(sn, k, v)
       end
@@ -1166,8 +1030,8 @@ class val DataRouter is Equatable[DataRouter]
       if v != id then new_rid_map(k) = v end
     end
 
-    let new_kid_map = recover trn KeyToStepInfo[RouteId] end
-    for (sn, k, v) in _keys_to_route_ids.pairs() do
+    let new_kid_map = recover trn StatePartitionRouteIds end
+    for (sn, k, v) in _keys_to_route_ids.triples() do
       if not ((sn == state_name) and (k == key)) then
         new_kid_map.add(sn, k, v)
       end
@@ -1188,14 +1052,14 @@ class val DataRouter is Equatable[DataRouter]
     end
     new_data_routes(id) = target
 
-    let new_keyed_routes = recover trn KeyToStepInfoTag[Step] end
-    for (sn, k, v) in _keyed_routes.pairs() do
+    let new_keyed_routes = recover trn LocalStatePartitions end
+    for (sn, k, v) in _keyed_routes.triples() do
       new_keyed_routes.add(sn, k, v)
     end
     new_keyed_routes.add(state_name, key, target)
 
-    let new_keyed_step_ids = recover trn KeyToStepInfo[StepId] end
-    for (sn, k, v) in _keyed_step_ids.pairs() do
+    let new_keyed_step_ids = recover trn LocalStatePartitionIds end
+    for (sn, k, v) in _keyed_step_ids.triples() do
       new_keyed_step_ids.add(sn, k, v)
     end
     new_keyed_step_ids.add(state_name, key, id)
@@ -1215,8 +1079,8 @@ class val DataRouter is Equatable[DataRouter]
     end
     new_rid_map(new_route_id) = id
 
-    let new_kid_map = recover trn KeyToStepInfo[RouteId] end
-    for (sn, k, v) in _keys_to_route_ids.pairs() do
+    let new_kid_map = recover trn StatePartitionRouteIds end
+    for (sn, k, v) in _keys_to_route_ids.triples() do
       new_kid_map.add(sn, k, v)
     end
     new_kid_map.add(state_name, key, new_route_id)
@@ -1237,7 +1101,7 @@ class val DataRouter is Equatable[DataRouter]
       end
     end
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     _keyed_routes.contains(state_name, key)
 
   fun eq(that: box->DataRouter): Bool =>
@@ -1414,7 +1278,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
               pipeline_time_spent, data, producer_id, i_msg_uid,
               frac_ids, latest_ts, metrics_id, worker_ingress_ts)
             producer.unknown_key(_state_name, key, routing_args)
-            (true, latest_ts)
+            (false, latest_ts)
           end
         else
           try
@@ -1422,7 +1286,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
             let msg = r.build_msg[D](metric_name, pipeline_time_spent, data,
               key, producer_id, producer, i_msg_uid, frac_ids, latest_ts,
               metrics_id, worker_ingress_ts)
-            r.route[ForwardHashedMsg[D]](metric_name, pipeline_time_spent, msg,
+            r.route[ForwardKeyedMsg[D]](metric_name, pipeline_time_spent, msg,
               producer_id, producer, i_msg_uid, frac_ids, latest_ts,
               metrics_id, worker_ingress_ts)
           else
@@ -1474,7 +1338,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     end
     consume diff
 
-  fun routes_key(state_name': String, key: Key): Bool =>
+  fun has_state_partition(state_name': String, key: Key): Bool =>
     (_state_name == state_name') and _local_routes.contains(key)
 
   fun update_route(step_id: StepId, key: Key, step: Step):
@@ -1785,7 +1649,8 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     consume digest
 
   fun state_entity_digest(): Array[String] val =>
-    // Return an array of keys
+    // Return an array of String representation of keys for use in query
+    // response
     let digest = recover trn Array[String] end
 
     for k in _local_routes.keys() do
@@ -1978,7 +1843,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     end
     consume diff
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     false
 
   fun update_route(partition_id': U64, target: (Step | ProxyRouter)):
@@ -2227,9 +2092,9 @@ class val HashedProxyRouter is (Router & Equatable[HashedProxyRouter])
   fun build_msg[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, producer_id: StepId, producer: Producer ref,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): ForwardHashedMsg[D]
+    metrics_id: U16, worker_ingress_ts: U64): ForwardKeyedMsg[D]
   =>
-    ForwardHashedMsg[D](
+    ForwardKeyedMsg[D](
       _target_state_name,
       key,
       _worker_name,
@@ -2278,7 +2143,7 @@ class val HashedProxyRouter is (Router & Equatable[HashedProxyRouter])
       recover [_target] end
     end
 
-  fun routes_key(state_name: String, key: Key): Bool =>
+  fun has_state_partition(state_name: String, key: Key): Bool =>
     false
 
   fun val update_boundary(ob: box->Map[String, OutgoingBoundary]):

@@ -41,9 +41,9 @@ actor Main
 
       // This is basically the same as applying mod 2 before a double
       // computation
-      let mod3partition = Partition[U64](
+      let mod3partition = Partitions[U64](
         Mod3PartitionFunction, recover ["0"; "1"; "2"] end)
-      let mod6partition = Partition[CountMax](
+      let mod6partition = Partitions[CountMax](
         CountMaxMod6PartitionFunction, recover ["0"; "2"; "4"] end)
 
       let application = recover val

@@ -50,8 +50,8 @@ class val LocalTopology
   let _worker_name: String
   let _graph: Dag[StepInitializer] val
   let _step_map: Map[U128, (ProxyAddress | U128)] val
-  // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, StateSubpartition] val
+  // _state_builders maps from state_name to StateSubpartitions
+  let _state_builders: Map[String, StateSubpartitions] val
   let _pre_state_data: Array[PreStateData] val
   let _proxy_ids: Map[String, U128] val
   // resilience
@@ -62,7 +62,7 @@ class val LocalTopology
   new val create(name': String, worker_name': String,
     graph': Dag[StepInitializer] val,
     step_map': Map[U128, (ProxyAddress | U128)] val,
-    state_builders': Map[String, StateSubpartition] val,
+    state_builders': Map[String, StateSubpartitions] val,
     pre_state_data': Array[PreStateData] val,
     proxy_ids': Map[String, U128] val,
     worker_names': Array[String] val, non_shrinkable': SetIs[String] val)
@@ -78,7 +78,7 @@ class val LocalTopology
     worker_names = worker_names'
     non_shrinkable = non_shrinkable'
 
-  fun state_builders(): Map[String, StateSubpartition] val =>
+  fun state_builders(): Map[String, StateSubpartitions] val =>
     _state_builders
 
   fun update_state_map(state_name: String,
@@ -88,8 +88,8 @@ class val LocalTopology
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer tag],
-    keyed_data_routes: KeyToStepInfoTag[Step],
-    keyed_step_ids: KeyToStepInfo[StepId],
+    keyed_data_routes: LocalStatePartitions,
+    keyed_step_ids: LocalStatePartitionIds,
     state_step_creator: StateStepCreator) ?
   =>
     let subpartition =
@@ -129,7 +129,7 @@ class val LocalTopology
     pa: ProxyAddress): LocalTopology ?
   =>
     let new_subpartition = _state_builders(state_name)?.update_key(key, pa)?
-    let new_state_builders = recover trn Map[String, StateSubpartition] end
+    let new_state_builders = recover trn Map[String, StateSubpartitions] end
     for (k, v) in _state_builders.pairs() do
       new_state_builders(k) = v
     end
@@ -186,12 +186,13 @@ class val LocalTopology
 
   fun eq(that: box->LocalTopology): Bool =>
     // This assumes that _graph and _pre_state_data never change over time
+
     (_app_name == that._app_name) and
       (_worker_name == that._worker_name) and
       (_graph is that._graph) and
       MapEquality2[U128, ProxyAddress, U128](_step_map, that._step_map)
         and
-      MapEquality[String, StateSubpartition](_state_builders,
+      MapEquality[String, StateSubpartitions](_state_builders,
         that._state_builders) and
       (_pre_state_data is that._pre_state_data) and
       MapEquality[String, U128](_proxy_ids, that._proxy_ids) and
@@ -640,6 +641,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           FilePath(_auth, _local_topology_file)?
         else
           @printf[I32]("Error opening topology file!\n".cstring())
+          Fail()
           error
         end
         // TODO: Back up old file before clearing it?
@@ -652,6 +654,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           Serialised(sa, t)?
         else
           @printf[I32]("Error serializing topology!\n".cstring())
+          Fail()
           error
         end
         let osa = OutputSerialisedAuth(_auth)
@@ -757,9 +760,9 @@ actor LocalTopologyInitializer is LayoutInitializer
         // DataRouter for the data channel boundary
         var data_routes = recover trn Map[U128, Consumer] end
 
-        let keyed_data_routes_ref = KeyToStepInfoTag[Step]
+        let keyed_data_routes_ref = LocalStatePartitions
 
-        let keyed_step_ids_ref = KeyToStepInfo[StepId]
+        let keyed_step_ids_ref = LocalStatePartitionIds
 
         // Update the step ids for all OutgoingBoundaries
         if worker_count > 1 then
@@ -1321,8 +1324,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 source_data.route_builder(),
                 _outgoing_boundary_builders,
                 _event_log, _auth, pipeline_name,
-                this,  consume source_reporter, _recovering,
-                _state_step_creator))
+                this,  consume source_reporter, _recovering))
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
@@ -1423,16 +1425,16 @@ actor LocalTopologyInitializer is LayoutInitializer
           keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone())
         _router_registry.set_data_router(data_router)
 
-        let runner_builders = recover iso Map[String, RunnerBuilder] end
+        let state_runner_builders = recover iso Map[String, RunnerBuilder] end
 
         for (state_name, subpartition) in t.state_builders().pairs() do
-          runner_builders(state_name) = subpartition.runner_builder()
+          state_runner_builders(state_name) = subpartition.runner_builder()
         end
 
         _state_step_creator.initialize_routes_and_builders(this,
           keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone(),
           _recovery_replayer, _outgoing_boundaries,
-          consume runner_builders)
+          consume state_runner_builders)
 
         if not _is_initializer then
           // Inform the initializer that we're done initializing our local
@@ -1573,17 +1575,17 @@ actor LocalTopologyInitializer is LayoutInitializer
         // We have not yet been assigned any keys by the cluster at this
         // stage, so we use an empty map to represent that.
         let data_router = DataRouter(consume data_routes,
-          recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end)
+          recover LocalStatePartitions end, recover LocalStatePartitionIds end)
 
-        let runner_builders = recover iso Map[String, RunnerBuilder] end
+        let state_runner_builders = recover iso Map[String, RunnerBuilder] end
 
         for (state_name, subpartition) in t.state_builders().pairs() do
-          runner_builders(state_name) = subpartition.runner_builder()
+          state_runner_builders(state_name) = subpartition.runner_builder()
         end
 
         _state_step_creator.initialize_routes_and_builders(this,
-          recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end,
-          _recovery_replayer, _outgoing_boundaries, consume runner_builders)
+          recover LocalStatePartitions end, recover LocalStatePartitionIds end,
+          _recovery_replayer, _outgoing_boundaries, consume state_runner_builders)
 
         _router_registry.set_data_router(data_router)
 
@@ -1840,7 +1842,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         "topology was initialized!\n").cstring())
     else
       for builder in sl_builders.values() do
-        let sl = builder(_env)
+        let sl = builder(_state_step_creator, _env)
         _router_registry.register_source_listener(sl)
       end
     end

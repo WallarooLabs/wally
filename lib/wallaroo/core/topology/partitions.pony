@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "files"
+use "itertools"
 use "net"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/equality"
@@ -32,7 +33,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
 
-class val Partition[In: Any val]
+class val Partitions[In: Any val]
   let _function: PartitionFunction[In] val
   let _keys: Array[Key] val
 
@@ -145,7 +146,7 @@ class KeyedStateAddresses
 
     consume ss
 
-trait val StateSubpartition is Equatable[StateSubpartition]
+trait val StateSubpartitions is Equatable[StateSubpartitions]
   fun build(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,
     auth: AmbientAuth, event_log: EventLog,
@@ -153,14 +154,14 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer],
-    keyed_data_routes: KeyToStepInfoTag[Step],
-    keyed_step_ids: KeyToStepInfo[StepId],
+    keyed_data_routes: LocalStatePartitions,
+    keyed_step_ids: LocalStatePartitionIds,
     state_step_creator: StateStepCreator): PartitionRouter
-  fun update_key(key: Key, pa: ProxyAddress): StateSubpartition ?
+  fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions ?
   fun runner_builder(): RunnerBuilder
 
-class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
-  StateSubpartition
+class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
+  StateSubpartitions
   let _state_name: String
   let _key_distribution: KeyDistribution
   let _id_map: Map[Key, U128] val
@@ -191,8 +192,8 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[StepId, Consumer],
-    keyed_data_routes: KeyToStepInfoTag[Step],
-    keyed_step_ids: KeyToStepInfo[StepId],
+    keyed_data_routes: LocalStatePartitions,
+    keyed_step_ids: LocalStatePartitionIds,
     state_step_creator: StateStepCreator):
     LocalPartitionRouter[PIn, S] val
   =>
@@ -250,14 +251,14 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
       _id_map, consume hashed_node_routes,
       _key_distribution.hash_partitions(), _partition_function)
 
-  fun update_key(key: Key, pa: ProxyAddress): StateSubpartition =>
+  fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions =>
     let kpa = _key_distribution.update_key(key, pa)
-    KeyedStateSubpartition[PIn, S](_state_name, kpa, _id_map,
+    KeyedStateSubpartitions[PIn, S](_state_name, kpa, _id_map,
       _runner_builder, _partition_function, _pipeline_name)
 
-  fun eq(that: box->StateSubpartition): Bool =>
+  fun eq(that: box->StateSubpartitions): Bool =>
     match that
-    | let kss: box->KeyedStateSubpartition[PIn, S] =>
+    | let kss: box->KeyedStateSubpartitions[PIn, S] =>
       // ASSUMPTION: Add RunnerBuilder equality check assumes that
       // runner builder would not change over time, which currently
       // is true.
@@ -270,9 +271,9 @@ class val KeyedStateSubpartition[PIn: Any val, S: State ref] is
       false
     end
 
-  fun ne(that: box->StateSubpartition): Bool => not eq(that)
+  fun ne(that: box->StateSubpartitions): Bool => not eq(that)
 
-primitive PartitionFileReader
+primitive PartitionsFileReader
   fun apply(filename: String, auth: AmbientAuth): Array[Key] val =>
     let keys = recover trn Array[Key] end
 
@@ -296,3 +297,146 @@ primitive PartitionFileReader
     end
 
     consume keys
+
+primitive _Contains
+  fun apply[T: (Step | StepId | RouteId)](map: Map[String, Map[Key, T]] box,
+    state_name: String, key: Key)
+    : Bool
+  =>
+    if map.contains(state_name) then
+      try
+        let inner_m = map(state_name)?
+        inner_m.contains(key)
+      else
+        Unreachable()
+        false
+      end
+    else
+      false
+    end
+
+class LocalStatePartitions
+  let _info: Map[String, Map[Key, Step]]
+
+  new create() =>
+    _info = _info.create()
+
+  fun apply(state_name: String, key: box->Key!): this->Step ? =>
+    _info(state_name)?(key)?
+
+  fun ref add(state_name: String, key: Key, info: Step^) =>
+    try
+      _info.insert_if_absent(state_name, Map[Key, Step])?(key) = info
+    else
+      Unreachable()
+    end
+
+  fun contains(state_name: String, key: Key): Bool =>
+    _Contains[Step](_info, state_name, key)
+
+  fun clone(): LocalStatePartitions iso^ =>
+    let c = recover iso LocalStatePartitions.create() end
+
+    for (sn, k_i) in _info.pairs() do
+      for (key, info) in k_i.pairs() do
+        c.add(sn, key, info)
+      end
+    end
+
+    c
+
+  fun triples(): Iter[(String, String, Step)] =>
+    """
+    Return an iterator over tuples where the first two values are the state name
+    and the key, and the last value is the info value.
+    """
+    Iter[(String, Map[String, Step] box)](_info.pairs()).
+      flat_map[(String, (String, Step))](
+        { (k_m) => Iter[String].repeat_value(k_m._1)
+          .zip[(String, Step)](k_m._2.pairs()) }).
+      map[(String, String, Step)](
+        { (x) => (x._1, x._2._1, x._2._2) })
+
+class LocalStatePartitionIds
+  let _info: Map[String, Map[Key, StepId]]
+
+  new create() =>
+    _info = _info.create()
+
+  fun apply(state_name: String, key: box->Key!): this->StepId ? =>
+    _info(state_name)?(key)?
+
+  fun ref add(state_name: String, key: Key, info: StepId^) =>
+    try
+      _info.insert_if_absent(state_name, Map[Key, StepId])?(key) = info
+    else
+      Unreachable()
+    end
+
+  fun contains(state_name: String, key: Key): Bool =>
+    _Contains[StepId](_info, state_name, key)
+
+  fun clone(): LocalStatePartitionIds iso^ =>
+    let c = recover iso LocalStatePartitionIds.create() end
+
+    for (sn, k_i) in _info.pairs() do
+      for (key, info) in k_i.pairs() do
+        c.add(sn, key, info)
+      end
+    end
+
+    c
+
+  fun triples(): Iter[(String, String, StepId)] =>
+    """
+    Return an iterator over tuples where the first two values are the state name
+    and the key, and the last value is the info value.
+    """
+    Iter[(String, Map[String, StepId] box)](_info.pairs()).
+      flat_map[(String, (String, StepId))](
+        { (k_m) => Iter[String].repeat_value(k_m._1)
+          .zip[(String, StepId)](k_m._2.pairs()) }).
+      map[(String, String, StepId)](
+        { (x) => (x._1, x._2._1, x._2._2) })
+
+class StatePartitionRouteIds
+  let _info: Map[String, Map[Key, RouteId]]
+
+  new create() =>
+    _info = _info.create()
+
+  fun apply(state_name: String, key: box->Key!): this->RouteId ? =>
+    _info(state_name)?(key)?
+
+  fun ref add(state_name: String, key: Key, info: RouteId^) =>
+    try
+      _info.insert_if_absent(state_name, Map[Key, RouteId])?(key) = info
+    else
+      Unreachable()
+    end
+
+  fun contains(state_name: String, key: Key): Bool =>
+    _Contains[RouteId](_info, state_name, key)
+
+  fun clone(): StatePartitionRouteIds iso^ =>
+    let c = recover iso StatePartitionRouteIds.create() end
+
+    for (sn, k_i) in _info.pairs() do
+      for (key, info) in k_i.pairs() do
+        c.add(sn, key, info)
+      end
+    end
+
+    c
+
+  fun triples(): Iter[(String, String, RouteId)] =>
+    """
+    Return an iterator over tuples where the first two values are the state name
+    and the key, and the last value is the info value.
+    """
+    Iter[(String, Map[String, RouteId] box)](_info.pairs()).
+      flat_map[(String, (String, RouteId))](
+        { (k_m) => Iter[String].repeat_value(k_m._1)
+          .zip[(String, RouteId)](k_m._2.pairs()) }).
+      map[(String, String, RouteId)](
+        { (x) => (x._1, x._2._1, x._2._2) })

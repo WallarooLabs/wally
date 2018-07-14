@@ -59,7 +59,7 @@ actor Main
         consume a
       end
 
-      let letter_partition = Partition[Votes val](
+      let letter_partition = Partitions[Votes val](
         LetterPartitionFunction, parts)
 
       let application = recover val

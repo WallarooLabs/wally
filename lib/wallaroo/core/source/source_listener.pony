@@ -30,7 +30,7 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 
 interface val SourceListenerBuilder
-  fun apply(env: Env): SourceListener
+  fun apply(state_step_creator: StateStepCreator, env: Env): SourceListener
 
 interface val SourceListenerBuilderBuilder
   fun apply(source_builder: SourceBuilder, router: Router,
@@ -39,5 +39,4 @@ interface val SourceListenerBuilderBuilder
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso, recovering: Bool,
-    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter): SourceListenerBuilder

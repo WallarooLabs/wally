@@ -93,59 +93,90 @@ primitive _StepMapGenerator
 
 primitive _BaseStateBuildersGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String] val):
-    Map[String, StateSubpartition] val
+    Map[String, StateSubpartitions] val
   =>
-    let m = recover trn Map[String, StateSubpartition] end
-    m("state") = _BaseStateSubpartitionGenerator(rb, pf)
+    let m = recover trn Map[String, StateSubpartitions] end
+    m("state") = _BaseStateSubpartitionsGenerator(rb, pf)
     consume m
 
 primitive _TargetStateBuildersGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String] val):
-    Map[String, StateSubpartition] val
+    Map[String, StateSubpartitions] val
   =>
-    let m = recover trn Map[String, StateSubpartition] end
-    m("state") = _TargetStateSubpartitionGenerator(rb, pf)
+    let m = recover trn Map[String, StateSubpartitions] end
+    m("state") = _TargetStateSubpartitionsGenerator(rb, pf)
     consume m
 
-primitive _BaseStateSubpartitionGenerator
+primitive _BaseStateSubpartitionsGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String] val):
-    StateSubpartition
+    StateSubpartitions
   =>
-    KeyedStateSubpartition[String, EmptyState]("s",
+    KeyedStateSubpartitions[String, EmptyState]("s",
       _BaseKeyDistributionGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 
-primitive _TargetStateSubpartitionGenerator
+primitive _TargetStateSubpartitionsGenerator
   fun apply(rb: RunnerBuilder, pf: PartitionFunction[String] val):
-    StateSubpartition
+    StateSubpartitions
   =>
-    KeyedStateSubpartition[String, EmptyState]("s",
+    KeyedStateSubpartitions[String, EmptyState]("s",
       _TargetKeyDistributionGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 
+primitive _HashPartitionsAndWorkersToKeys
+  fun apply(workers: Array[String] val, keys: Array[String] val)
+    : (HashPartitions, Map[String, Array[String] val] val)
+  =>
+    let hash_partitions = HashPartitions(workers)
+
+    let wtk = recover val
+
+      let wtk' = Map[String, Array[String]]
+
+      for w in workers.values() do
+        wtk'(w) = Array[String]
+      end
+
+      for k in keys.values() do
+        try
+          wtk'(hash_partitions.get_claimant_by_key(k)?)?.push(k)
+        end
+      end
+
+      let wtk'' = Map[String, Array[String] val]
+
+      for (w, w_keys) in wtk'.pairs() do
+        let new_keys = recover iso Array[String] end
+        for k in w_keys.values() do
+          new_keys.push(k)
+        end
+        wtk''(w) = consume new_keys
+      end
+
+      wtk''
+    end
+
+    (hash_partitions, wtk)
+
 primitive _BaseKeyDistributionGenerator
   fun apply(): KeyDistribution val =>
-    //!@ remove m
-    let m = recover trn Map[String, ProxyAddress] end
-    m("k1") = ProxyAddress("w1", 10)
-    m("k2") = ProxyAddress("w2", 20)
-    m("k3") = ProxyAddress("w3", 30)
-    let m': Map[String, ProxyAddress] val = consume m
+    let workers = _BaseWorkerNamesGenerator()
+    let keys = recover val ["k1"; "k2"; "k3"] end
 
-    KeyDistribution(HashPartitions(recover [] end),
-      recover Map[String, Array[String] val] end)
+    (let hp, let wtk) =
+      _HashPartitionsAndWorkersToKeys(workers, keys)
+
+    KeyDistribution(hp, wtk)
 
 primitive _TargetKeyDistributionGenerator
   fun apply(): KeyDistribution val =>
-    //!@ remove m
-    let m = recover trn Map[String, ProxyAddress] end
-    m("k1") = ProxyAddress("w2", 10)
-    m("k2") = ProxyAddress("w2", 20)
-    m("k3") = ProxyAddress("w3", 30)
-    let m': Map[String, ProxyAddress] val = consume m
+    let workers = _TargetWorkerNamesGenerator()
+    let keys = recover val ["k1"; "k2"; "k3"] end
 
-    KeyDistribution(HashPartitions(recover [] end),
-      recover Map[String, Array[String] val] end)
+    (let hp, let wtk) =
+      _HashPartitionsAndWorkersToKeys(workers, keys)
+
+    KeyDistribution(hp, wtk)
 
 primitive _IdMapGenerator
   fun apply(): Map[String, U128] val =>

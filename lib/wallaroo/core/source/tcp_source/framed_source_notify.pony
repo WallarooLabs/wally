@@ -163,24 +163,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
       end
     end
 
-  fun ref _report_message(is_finished: Bool, last_ts: U64,
-    pipeline_time_spent: U64)
-  =>
-    if is_finished then
-      let end_ts = Time.nanos()
-      let time_spent = end_ts - last_ts
-
-      ifdef "detailed-metrics" then
-        _metrics_reporter.step_metric(_pipeline_name,
-          "Before end at TCP Source", 9999,
-          last_ts, end_ts)
-      end
-
-      _metrics_reporter.pipeline_metric(_pipeline_name, time_spent +
-        pipeline_time_spent)
-      _metrics_reporter.worker_metric(_pipeline_name, time_spent)
-    end
-
   fun ref update_router(router': Router) =>
     _router = router'
 

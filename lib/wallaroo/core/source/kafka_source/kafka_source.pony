@@ -76,8 +76,8 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
   let _state_step_creator: StateStepCreator
 
-  let _pending_data_store: PendingDataStore =
-    _pending_data_store.create()
+  let _pending_message_store: PendingMessageStore =
+    _pending_message_store.create()
 
   let _topic: String
   let _partition_id: KafkaPartitionId
@@ -179,12 +179,12 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       end
     end
     _notify.update_router(new_router)
-    _pending_data_store.process_pending(this, _notify, new_router)
+    _pending_message_store.process_known_keys(this, _notify, new_router)
 
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   =>
-    _pending_data_store.add(state_name, key, routing_args)
+    _pending_message_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   be remove_route_to_consumer(c: Consumer) =>

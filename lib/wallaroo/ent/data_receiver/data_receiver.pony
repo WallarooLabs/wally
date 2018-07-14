@@ -34,7 +34,7 @@ actor DataReceiver is (Producer & Rerouter)
   var _sender_step_id: StepId = 0
   var _router: DataRouter =
     DataRouter(recover Map[StepId, Consumer] end,
-      recover KeyToStepInfoTag[Step] end, recover KeyToStepInfo[StepId] end)
+      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
   var _last_id_seen: SeqId = 0
   var _last_id_acked: SeqId = 0
   var _connected: Bool = false
@@ -43,8 +43,8 @@ actor DataReceiver is (Producer & Rerouter)
 
   var _last_request: USize = 0
 
-  let _pending_data_store: PendingDataStore =
-    _pending_data_store.create()
+  let _pending_message_store: PendingMessageStore =
+    _pending_message_store.create()
 
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
@@ -254,7 +254,7 @@ actor DataReceiver is (Producer & Rerouter)
       _watermarker.add_route(id)
     end
 
-    _pending_data_store.process_pending(this, this, _router)
+    _pending_message_store.process_known_keys(this, this, _router)
 
   be remove_route_to_consumer(c: Consumer) =>
     // DataReceiver doesn't have its own routes
@@ -342,7 +342,7 @@ actor DataReceiver is (Producer & Rerouter)
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   =>
-    _pending_data_store.add(state_name, key, routing_args)
+    _pending_message_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
   be mute(c: Consumer) =>

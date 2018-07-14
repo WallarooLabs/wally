@@ -596,7 +596,7 @@ primitive Machida
         let partition_values = Machida.py_list_to_pony_array_string(
           @PyTuple_GetItem(item, 5))
 
-        let partition = Partition[PyData val](partition_function,
+        let partition = Partitions[PyData val](partition_function,
           partition_values)
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_state_partition[PyData val, PyData val, PyState](
