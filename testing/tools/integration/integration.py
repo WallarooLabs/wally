@@ -706,7 +706,7 @@ class Runner(threading.Thread):
     `get_output` may be used to get the entire output text up to the present,
     as well as after the runner has been stopped via `stop()`.
     """
-    def __init__(self, cmd_string, name):
+    def __init__(self, cmd_string, name, external=None):
         super(Runner, self).__init__()
         self.daemon = True
         self.cmd_string = ' '.join(v.strip('\\').strip() for v in
@@ -716,6 +716,7 @@ class Runner(threading.Thread):
         self.file = tempfile.NamedTemporaryFile()
         self.p = None
         self.name = name
+        self.external = external
 
     def run(self):
         try:
@@ -769,7 +770,7 @@ class Runner(threading.Thread):
         return self.file.tell()
 
     def respawn(self):
-        return Runner(self.cmd_string, self.name)
+        return Runner(self.cmd_string, self.name, external=self.external)
 
 
 class RunnerReadyChecker(StoppableThread):
@@ -982,9 +983,8 @@ SPIKE_MARGIN = r'''--spike-margin {margin}'''
 
 
 def start_runners(runners, command, host, inputs, outputs, metrics_port,
-                  control_port, external_port, data_port, res_dir, workers,
-                  worker_ports=[], alt_block=None, alt_func=lambda x: False,
-                  spikes={}):
+                  res_dir, workers, worker_ports=[], alt_block=None,
+                  alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
                                    host=host,
                                    inputs=inputs,
@@ -1009,14 +1009,15 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
         name='initializer',
         initializer_block=INITIALIZER_CMD.format(
             worker_count=WORKER_COUNT_CMD.format(worker_count=workers),
-            data_port=data_port,
-            external_port=external_port,
+            data_port=worker_ports[0][1],
+            external_port=worker_ports[0][2],
             host=host),
         worker_block='',
-        join_block=CONTROL_CMD.format(host=host, control_port=control_port),
+        join_block=CONTROL_CMD.format(host=host, control_port=worker_ports[0][0]),
         alt_block=alt_block if alt_func(x) else '',
         spike_block=spike_block)
-    runners.append(Runner(cmd_string=cmd, name='initializer'))
+    runners.append(Runner(cmd_string=cmd, name='initializer',
+                          external=(host, worker_ports[0][2])))
     for x in range(1, workers):
         if x in spikes:
             logging.info("Enabling spike for worker{}".format(x))
@@ -1031,16 +1032,16 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
                               initializer_block='',
                               worker_block=WORKER_CMD.format(
                                   host=host,
-                                  data_port=worker_ports[x-1][1],
-                                  control_port=worker_ports[x-1][0],
-                                  external_port=worker_ports[x-1][2]
-                                  ),
+                                  control_port=worker_ports[x][0],
+                                  data_port=worker_ports[x][1],
+                                  external_port=worker_ports[x][2]),
                               join_block=CONTROL_CMD.format(host=host,
-                                  control_port=control_port),
+                                  control_port=worker_ports[0][0]),
                               alt_block=alt_block if alt_func(x) else '',
                               spike_block=spike_block)
         runners.append(Runner(cmd_string=cmd,
-                              name='worker{}'.format(x)))
+                              name='worker{}'.format(x),
+                              external=(host, worker_ports[x][2])))
 
     # start the workers, 50ms apart
     for idx, r in enumerate(runners):
@@ -1064,7 +1065,7 @@ def start_runners(runners, command, host, inputs, outputs, metrics_port,
 
 
 def add_runner(runners, command, host, inputs, outputs, metrics_port,
-               control_port, external_port, data_port, res_dir, workers,
+               control_port, res_dir, workers,
                my_control_port, my_data_port, my_external_port,
                alt_block=None, alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
@@ -1108,7 +1109,8 @@ def add_runner(runners, command, host, inputs, outputs, metrics_port,
                           alt_block=alt_block if alt_func(x) else '',
                           spike_block=spike_block)
     runner = Runner(cmd_string=cmd,
-                    name='worker{}'.format(x))
+                    name='worker{}'.format(x),
+                    external=(host, my_external_port))
     runners.append(runner)
 
     # start the new worker
@@ -1260,23 +1262,18 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             logging.debug("Attempt #%d to start workers with random listen"
                           " ports..." % attempt)
             try:
-                # Number of ports:
-                #             sources
-                #           + 3 for initializer [control, data, external]
-                #           + 2 * (workers - 1) [(my_control, my_data) for
-                #                                each remaining worker]
-                num_ports = sources + 3 + (2 * (workers - 1))
+                #           + 3 [control, data, external] for
+                #             each worker
+                num_ports = sources + 3 * workers
                 ports = get_port_values(num=num_ports, host=host)
-                (input_ports, (control_port, data_port, external_port),
-                 worker_ports) = (ports[:sources],
-                                  ports[sources:sources+3],
-                                  zip(ports[-(2*(workers-1)):][::2],
-                                      ports[-(2*(workers-1)):][1::2]))
+                (input_ports, worker_ports) = (
+                    ports[:sources],
+                    [ports[sources:][i:i+3] for i in xrange(0,
+                        len(ports[sources:]), 3)])
                 inputs = ','.join(['{}:{}'.format(host, p) for p in
                                    input_ports])
                 start_runners(runners, command, host, inputs, outputs,
-                              metrics_port, control_port, external_port,
-                              data_port, resilience_dir, workers,
+                              metrics_port, resilience_dir, workers,
                               worker_ports, spikes=spikes)
                 break
             except PipelineTestError as err:
@@ -1464,13 +1461,20 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                     raise AssertionError("Validation failed. Expected {!r} but"
                                          " received {!r}".format(expected,
                                                                  processed))
+    except:
+        logging.exception("Integration pipeline_test encountered an error")
+        raise
     finally:
+        logging.info("Doing final cleanup")
         # clean up any remaining runner processes
         for r in runners:
             r.stop()
         # Wait on runners to finish waiting on their subprocesses to exit
         for r in runners:
-            r.join(runner_join_timeout)
+            # Check thread ident to avoid error when joining an un-started
+            # thread.
+            if r.ident:  # ident is set when a thread is started
+                r.join(runner_join_timeout)
         alive = []
         for r in runners:
             if r.is_alive():

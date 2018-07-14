@@ -38,8 +38,7 @@ CUSTOM_PATH += :$(EXTERNAL_SENDER_PATH):$(TESTING_ALPHABET_PATH):$(TESTING_ALPHA
 CUSTOM_PYTHONPATH += $(TESTING_ALPHABET_PYTHON_PATH):$(TESTING_ALPHABET_PYTHON27_PATH)
 
 build-testing-correctness-tests-autoscale_tests: build-testing-correctness-apps-alphabet
-build-testing-correctness-tests-autoscale_tests: build-testing-correctness-apps-alphabet27
-# build-testing-correctness-tests-autoscale_tests: build-machida
+#build-testing-correctness-tests-autoscale_tests: build-machida
 build-testing-correctness-tests-autoscale_tests: build-testing-tools-external_sender
 build-testing-correctness-tests-autoscale_tests: build-utils-cluster_shrinker
 integration-tests-testing-correctness-tests-autoscale_tests: build-testing-correctness-tests-autoscale_tests

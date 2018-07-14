@@ -26,7 +26,7 @@ CMD_PONY = 'alphabet'
 CMD_PYTHON = 'machida --application-module alphabet'
 
 CYCLES=1
-APIS = {'pony': CMD_PONY, 'python': CMD_PYTHON}
+APIS = {'pony': CMD_PONY,} # 'python': CMD_PYTHON}
 # Add '--to-parallel' to the original commands:
 APIS_TO_PARALLEL = {k + '_toparallel': v + ' --to-parallel' for k, v
                     in APIS.items()}
@@ -86,6 +86,9 @@ for api, cmd in APIS.items():
                 create_autoscale_test(api, cmd, [o1], CYCLES)
             else:
                 create_autoscale_test(api, cmd, [o1, o2], CYCLES)
+            break
+        break
+    break
 
 #
 # Shrink with `to_parallel` steps
