@@ -1,0 +1,10 @@
+{
+  "deps": [
+    { "type": "local",
+      "local-path": "../../../../../lib/"
+    },
+    { "type": "local",
+      "local-path": "../"
+    }
+  ]
+}

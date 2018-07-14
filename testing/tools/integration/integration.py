@@ -573,7 +573,7 @@ class Sender(StoppableThread):
                          .format(len(self.batch)))
 
 
-def sequence_generator(stop=1000, start=0, header_fmt='>I'):
+def sequence_generator(stop=1000, start=0, header_fmt='>I', partition=''):
     """
     Generate a sequence of integers, encoded as big-endian U64.
 
@@ -582,10 +582,17 @@ def sequence_generator(stop=1000, start=0, header_fmt='>I'):
     `header_length` denotes the byte length of the length header
     `header_fmt` is the format to use for encoding the length using
     `struct.pack`
+    `partition` is a string representing the optional partition key. It is
+    empty by default.
     """
+    size = 8 + len(partition)
+    fmt = '>Q{}s'.format(len(partition)) if partition else '>Q'
     for x in xrange(start+1, stop+1):
-        yield struct.pack(header_fmt, 8)
-        yield struct.pack('>Q', x)
+        yield struct.pack(header_fmt, size)
+        if partition:
+            yield struct.pack(fmt, x, partition)
+        else:
+            yield struct.pack(fmt, x)
 
 
 def iter_generator(items, to_string=lambda s: str(s), header_fmt='>I',
@@ -715,6 +722,7 @@ class Runner(threading.Thread):
         self.error = None
         self.file = tempfile.NamedTemporaryFile()
         self.p = None
+        self.pid = None
         self.name = name
         self.external = external
 
@@ -725,6 +733,7 @@ class Runner(threading.Thread):
             self.p = subprocess.Popen(args=self.cmd_args,
                                       stdout=self.file,
                                       stderr=subprocess.STDOUT)
+            self.pid = self.p.pid
             self.p.wait()
         except Exception as err:
             self.error = err
