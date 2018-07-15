@@ -232,9 +232,7 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
 
     h.assert_eq[Bool](false, base_router == target_router)
 
-    // !@ Update test to use key
-    // !@ Need to insert a key before testing to see if it works
-    base_router = base_router.remove_keyed_route("state", "key1")
+    base_router = base_router.remove_keyed_route("state", "key2")
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -271,7 +269,6 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
 
     h.assert_eq[Bool](false, base_router == target_router)
 
-    // !@ Update test to use key
     base_router = base_router.add_keyed_route(2, "StateName", "Key", step2)
 
     h.assert_eq[Bool](true, base_router == target_router)
