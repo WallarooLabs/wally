@@ -35,75 +35,11 @@ actor _TestRouterEquality is TestList
     None
 
   fun tag tests(test: PonyTest) =>
-    test(_TestLocalPartitionRouterEquality)
     test(_TestOmniRouterEquality)
     test(_TestDataRouterEqualityAfterRemove)
     test(_TestDataRouterEqualityAfterAdd)
     test(_TestLatestAfterNew)
     test(_TestLatestWithoutNew)
-
-class iso _TestLocalPartitionRouterEquality is UnitTest
-  """
-  Test that updating LocalPartitionRouter creates the expected changes
-
-  Move step id 1 from worker w1 to worker w2.
-  """
-  fun name(): String =>
-    "topology/LocalPartitionRouterEquality"
-
-  fun ref apply(h: TestHelper) ? =>
-    let auth = h.env.root as AmbientAuth
-    let event_log = EventLog()
-    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
-
-    let step1 = _StepGenerator(auth, event_log, recovery_replayer)
-    let step2 = _StepGenerator(auth, event_log, recovery_replayer)
-    let step3 = _StepGenerator(auth, event_log, recovery_replayer)
-    let boundary2 = _BoundaryGenerator("w1", auth)
-    let boundary3 = _BoundaryGenerator("w1", auth)
-
-    let base_local_map = recover trn Map[Key, Step] end
-    base_local_map("k1") = step1
-    let target_local_map: Map[Key, Step] val = recover Map[Key, Step] end
-
-    let base_step_ids = recover trn Map[String, U128] end
-    base_step_ids("k1") = 1
-    base_step_ids("k2") = 2
-    base_step_ids("k3") = 3
-    let target_step_ids = recover trn Map[String, U128] end
-    target_step_ids("k1") = 1
-    target_step_ids("k2") = 2
-    target_step_ids("k3") = 3
-
-    let new_proxy_router = ProxyRouter("w1", boundary2,
-      ProxyAddress("w2", 1), auth)
-
-    //!@ remove this
-    let base_partition_routes = _BasePartitionRoutesGenerator(event_log, auth,
-      step1, boundary2, boundary3)
-    // !@ DO SOMETHING CORRECT WITH BASE HASHED NODE ROUTES
-    let base_hashed_node_routes = recover val Map[String, HashedProxyRouter]
-      end
-      //!@ remove this
-    let target_partition_routes = _TargetPartitionRoutesGenerator(event_log, auth,
-      new_proxy_router, boundary2, boundary3)
-
-    var base_router: PartitionRouter =
-      LocalPartitionRouter[String, EmptyState]("s", "w1",
-        consume base_local_map, consume base_step_ids,
-        base_hashed_node_routes, HashPartitions(recover [] end),
-        _PartitionFunctionGenerator())
-    var target_router: PartitionRouter =
-      LocalPartitionRouter[String, EmptyState]("s", "w2",
-        consume target_local_map, consume target_step_ids,
-        base_hashed_node_routes, HashPartitions(recover [] end),
-        _PartitionFunctionGenerator())
-    h.assert_eq[Bool](false, base_router == target_router)
-
-    // !@ I added 1 and step1 here just to get this to compile
-    base_router = base_router.update_route(1, "k1", step1)?
-
-    h.assert_eq[Bool](true, base_router == target_router)
 
 class iso _TestOmniRouterEquality is UnitTest
   """
@@ -272,32 +208,6 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     base_router = base_router.add_keyed_route(2, "StateName", "Key", step2)
 
     h.assert_eq[Bool](true, base_router == target_router)
-
-primitive _BasePartitionRoutesGenerator
-  fun apply(event_log: EventLog, auth: AmbientAuth, step1: Step,
-    boundary2: OutgoingBoundary, boundary3: OutgoingBoundary):
-    Map[String, (Step | ProxyRouter)] val
-  =>
-    let m = recover trn Map[String, (Step | ProxyRouter)] end
-    m("k1") = step1
-    m("k2") = ProxyRouter("w1", boundary2,
-      ProxyAddress("w2", 2), auth)
-    m("k3") = ProxyRouter("w1", boundary3,
-      ProxyAddress("w3", 3), auth)
-    consume m
-
-primitive _TargetPartitionRoutesGenerator
-  fun apply(event_log: EventLog, auth: AmbientAuth,
-    new_proxy_router: ProxyRouter, boundary2: OutgoingBoundary,
-    boundary3: OutgoingBoundary): Map[String, (Step | ProxyRouter)] val
-  =>
-    let m = recover trn Map[String, (Step | ProxyRouter)] end
-    m("k1") = new_proxy_router
-    m("k2") = ProxyRouter("w1", boundary2,
-      ProxyAddress("w2", 2), auth)
-    m("k3") = ProxyRouter("w1", boundary3,
-      ProxyAddress("w3", 3), auth)
-    consume m
 
 primitive _LocalMapGenerator
   fun apply(): Map[U128, Step] val =>
