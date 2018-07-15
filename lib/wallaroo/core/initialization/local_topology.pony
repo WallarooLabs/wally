@@ -145,9 +145,16 @@ class val LocalTopology
         new_worker_names.push(n)
       end
       new_worker_names.push(w)
+
+      let new_state_builders = recover iso Map[String, StateSubpartitions] end
+
+      for (state_name, state_subpartitions) in _state_builders.pairs() do
+        new_state_builders(state_name) = state_subpartitions.add_worker_name(w)
+      end
+
       LocalTopology(_app_name, _worker_name, _graph, _step_map,
-        _state_builders, _pre_state_data, _proxy_ids, consume new_worker_names,
-        non_shrinkable)
+        consume new_state_builders, _pre_state_data, _proxy_ids,
+        consume new_worker_names, non_shrinkable)
     else
       this
     end

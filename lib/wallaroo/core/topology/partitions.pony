@@ -104,6 +104,15 @@ class val KeyDistribution is Equatable[KeyDistribution]
 
     KeyDistribution(_hash_partitions, consume new_workers_to_keys)
 
+  fun add_worker_name(worker: String): KeyDistribution =>
+    let workers = recover iso
+      Array[String].>concat(_hash_partitions.claimants()).>push(worker)
+    end
+
+    let new_hash_partitions = HashPartitions(consume workers)
+
+    KeyDistribution(consume new_hash_partitions, _workers_to_keys)
+
   fun eq(that: box->KeyDistribution): Bool =>
     _hash_partitions == that._hash_partitions
 
@@ -158,6 +167,7 @@ trait val StateSubpartitions is Equatable[StateSubpartitions]
     keyed_step_ids: LocalStatePartitionIds,
     state_step_creator: StateStepCreator): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions ?
+  fun add_worker_name(worker: String): StateSubpartitions
   fun runner_builder(): RunnerBuilder
 
 class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
@@ -254,6 +264,11 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions =>
     let kpa = _key_distribution.update_key(key, pa)
     KeyedStateSubpartitions[PIn, S](_state_name, kpa, _id_map,
+      _runner_builder, _partition_function, _pipeline_name)
+
+  fun add_worker_name(worker: String): StateSubpartitions =>
+    let kd = _key_distribution.add_worker_name(worker)
+    KeyedStateSubpartitions[PIn, S](_state_name, kd, _id_map,
       _runner_builder, _partition_function, _pipeline_name)
 
   fun eq(that: box->StateSubpartitions): Bool =>
