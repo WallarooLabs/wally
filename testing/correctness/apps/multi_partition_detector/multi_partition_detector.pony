@@ -18,6 +18,9 @@ Copyright 2017 The Wallaroo Authors.
 
 """
 """
+
+use "debug"
+
 // submodules
 use t = "building_blocks"
 use "inline_validation"
@@ -51,7 +54,7 @@ actor Main
 
     try
       // Still requires passing an array here...
-      let partition = Partition[t.Message](WindowPartitionFunction, [])
+      let partition = Partitions[t.Message](WindowPartitionFunction, [])
 
       let tid1 = TraceID("1")
       let tid2 = TraceID("2")
@@ -103,12 +106,14 @@ class WindowState is State
     end
     _window.push(m.value())
 
+    let values: Array[U64] val = _window.to_array()
     try
       // Test validity of updated window
-      let values = _window.to_array()
-      Fact(IncrementsTest(consume values), "Increments test failed on " +
+      Fact(IncrementsTest(values), "Increments test failed on " +
         m.string())?
     else
+      Debug("failed values ...")
+      Debug(values)
       Fail()
     end
 
