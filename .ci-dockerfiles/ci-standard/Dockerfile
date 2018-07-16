@@ -13,6 +13,7 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 
     build-essential \
     git \
     liblz4-dev \
+    libpcre2-dev \
     libsnappy-dev \
     libssl-dev \
     make \
