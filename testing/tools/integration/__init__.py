@@ -100,6 +100,7 @@ from metrics_parser import (MetricsData,
 
 
 from observability import (cluster_status_query,
+                           get_func_name,
                            multi_states_query,
                            ObservabilityNotifier,
                            ObservabilityResponseError,

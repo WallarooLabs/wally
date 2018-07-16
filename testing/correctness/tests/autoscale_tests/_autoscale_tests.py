@@ -20,6 +20,7 @@ from integration import (add_runner,
                          cluster_status_query,
                          CrashedWorkerError,
                          ex_validate,
+                         get_func_name,
                          get_port_values,
                          iter_generator,
                          Metrics,
@@ -53,6 +54,8 @@ from string import lowercase
 from struct import calcsize, pack, unpack
 import tempfile
 import time
+
+from pytest_wait import pause_for_user
 
 
 class AutoscaleTestError(Exception):
@@ -293,7 +296,7 @@ def test_migration(pre_partitions, post_partitions, workers):
     """
     - Test that no "joining" workers are present in the pre set
     - Test that no "leaving" workers are present in the post set
-    - Test that state partitions moved between the pre_partitiosn map and
+    - Test that state partitions moved between the pre_partitions map and
       the post_partitions map.
     - Test that all of the states present in the `pre` set are also present
       in the `post` set. New state are allowed in the `post` because of
@@ -330,16 +333,53 @@ def test_migration(pre_partitions, post_partitions, workers):
     for step in pre_partitions:
         # Test step did not disappear after migration
         assert(step in post_partitions)
-        # Test step moved?
-        try:
-            assert(pre_partitions[step] != post_partitions[step])
-        except Exception as err:
-            print('arrrrgh')
-            print(step)
-            print('pre: {}'.format(pre_partitions[step]))
-            print('post: {}'.format(post_partitions[step]))
-            raise err
+        # Test some partitions moved
+        assert(pre_partitions[step] != post_partitions[step])
 
+
+def wait_for_cluster_to_resume_processing(runners):
+    # Wait until all workers have resumed processing
+    for r in runners:
+        if not r.is_alive():
+            continue
+        obs = ObservabilityNotifier(cluster_status_query,
+            r.external,
+            tests=test_cluster_is_processing, timeout=120)
+        obs.start()
+        obs.join()
+        if obs.error:
+            raise obs.error
+
+
+def try_until_timeout(test, pre_process=None, timeout=30):
+    """
+    Try a test until it passes or the time runs out
+
+    :parameters
+    `test` - a runnable test function that raises an error if it fails
+    `pre_process` - a runnable function that generates test input.
+        The test input is used as the parameters for the function given by
+        `test`.
+    `timeout` - the timeout, in seconds, before the test is failed.
+    """
+    t0 = time.time()
+    c = 0
+    while True:
+        c += 1
+        try:
+            if pre_process:
+                args = pre_process()
+                test(*args)
+            else:
+                test()
+        except:
+            if time.time() - t0 > timeout:
+                print("Failed on attempt {} of test: {}..."
+                      .format(c, get_func_name(test)))
+                raise
+            time.sleep(2)
+        else:
+            return
 
 
 # Autoscale tests runner functions
@@ -507,8 +547,9 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                     steps.append(joiners)
                     joined = []
                     left = []
+
                     if joiners > 0:  # autoscale: grow
-                        # create a new worker and have it join
+                        # create new workers and have them join
                         new_ports = get_port_values(num=(joiners * 3), host=host,
                                                     base_port=25000)
                         joiner_ports = [new_ports[i:i+3] for i in
@@ -519,15 +560,6 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                                        worker_ports[0][0], res_dir,
                                        joiners, *joiner_ports[i])
                             joined.append(runners[-1])
-
-                        # Verify cluster has resumed processing
-                        obs = ObservabilityNotifier(cluster_status_query,
-                            (host, worker_ports[0][2]),
-                            tests=test_cluster_is_processing, timeout=120)
-                        obs.start()
-                        obs.join()
-                        if obs.error:
-                            raise obs.error
 
                     elif joiners < 0:  # autoscale: shrink
                         # choose the most recent, still-alive runners to leave
@@ -545,37 +577,17 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                                                     .format(joiners, len(left)))
 
                         # Send the shrink command
-                        resp = send_shrink_cmd(host, external_port, names=[r.name for r in left])
-                        print("Sent a shrink command for {}".format([r.name for r in left]))
+                        resp = send_shrink_cmd(*runners[0].external,
+                                               names=[r.name for r in left])
+                        print("Sent a shrink command for {}".format(
+                            [r.name for r in left]))
                         print("Response was: {}".format(resp))
-
-                        # Verify cluster has resumed processing
-                        obs = ObservabilityNotifier(query_func_cluster_status,
-                            test_cluster_is_processing, timeout=120)
-                        obs.start()
-                        obs.join()
-                        if obs.error:
-                            raise obs.error
-
-                        # Test: all workers have partitions, partitions ids
-                        # from departing workers have been migrated to remaining
-                        # workers
-                        # create list of leaving workers
-                        diff_names = {'leaving': [r.name for r in left]}
-                        # Create partial function of the test with the
-                        # data baked in
-                        tmp = partial(test_migrated_partitions, pre_partitions, diff_names)
-                        # Start the test notifier
-                        obs = ObservabilityNotifier(query_func_partitions,
-                            [test_all_workers_have_partitions,
-                             tmp])
-                        obs.start()
-                        obs.join()
-                        if obs.error:
-                            raise obs.error
 
                     else:  # Handle the 0 case as a noop
                         continue
+
+                    # Wait until all live workers report 'ready'
+                    wait_for_cluster_to_resume_processing(runners)
 
                     # Test for crashed workers
                     test_crashed_workers(runners)
@@ -584,19 +596,24 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
                     #       pre are missing from the post
 
                     # get partition data before autoscale operation begins
-                    addresses = [(r.name, r.external) for r in runners
-                                 if r.is_alive()]
-                    responses = multi_states_query(addresses)
-                    post_partitions = joined_partition_query_data(responses)
-                    test_migration(pre_partitions, post_partitions,
-                                   workers={'joining': [r.name for r
-                                                        in joined],
-                                            'leaving': [r.name for r
-                                                        in left]})
+                    workers={'joining': [r.name for r in joined],
+                             'leaving': [r.name for r in left]}
+                    # use a pre_process function to recreate this data for
+                    # retriable tests
+                    def pre_process():
+                        addresses = [(r.name, r.external) for r in runners
+                                     if r.is_alive()]
+                        responses = multi_states_query(addresses)
+                        post_partitions = joined_partition_query_data(responses)
+                        return (pre_partitions, post_partitions, workers)
+                    # retry the test until it passes or a timeout elapses
+                    try_until_timeout(test_migration, pre_process, timeout=120)
 
                     # Wait a second before the next operation, allowing some
                     # more data to go through the system
                     time.sleep(1)
+
+            time.sleep(2)
 
             # Test for crashed workers
             test_crashed_workers(runners)
@@ -617,11 +634,8 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
 
             # Use Sink value to determine when to stop runners and sink
             pack677 = '>I2sQ'
-            pack27 = '>IsQ'
             await_values = [pack(pack677, calcsize(pack677)-4, c, v) for c, v in
                             expected.items()]
-            #await_values = [pack(pack27, calcsize(pack27)-4, c, v) for c, v in
-            #                expected.items()]
             stopper = SinkAwaitValue(sink, await_values, 30)
             stopper.start()
             stopper.join()
@@ -645,7 +659,11 @@ def _autoscale_sequence(command, ops=[], cycles=1, initial=None):
 
             # validate output
             phase_validate_output(runners, sink, expected)
-
+        #except:
+        #    # wait for user interaction to continue
+        #    if os.environ.get('pause_for_user'):
+        #        pause_for_user()
+        #    raise
         finally:
             for r in runners:
                 r.stop()
