@@ -41,7 +41,7 @@ MULTI_PARTITION_DETECTOR_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 
-#build-testing-correctness-apps-multi_partition_detector:
+build-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector-validator
 integration-tests-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector
 integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test
 integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test_10_worker
