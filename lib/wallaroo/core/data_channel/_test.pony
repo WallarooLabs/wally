@@ -43,6 +43,7 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     test(_TestDataChannelWritev)
     test(_TestDataChannelExpect)
+    test(_TestDataChannelExpectBigInputs)
     test(_TestDataChannelMute)
     test(_TestDataChannelUnmute)
     ifdef not windows then
@@ -133,22 +134,57 @@ class iso _TestDataChannelExpect is UnitTest
     h.expect_action("server receive")
     h.expect_action("expect received")
 
-    _TestDataChannel(h)(_TestDataChannelExpectNotify(h, false), _TestDataChannelExpectNotify(h, true))
+    let input = BigString.of_length(16383)
+    _TestDataChannel(h)(
+      _TestDataChannelExpectNotify(h, false, input),
+      _TestDataChannelExpectNotify(h, true, input))
+
+
+class iso _TestDataChannelExpectBigInputs is UnitTest
+  """
+  Test expecting framed data with TCP, where the total size
+  of the data exceeds the _max_size parameter of the DataChannel.
+  DataChannel uses a default value of 16384, therefore we construct
+  a string of length 16385 bytes.
+
+  WARNING: This test exhausts all available memory on the
+  testing machine.
+
+  """
+  fun name(): String => "data_channel/expect"
+  fun exclusion_group(): String => "data_channel"
+
+  fun ref apply(h: TestHelper) =>
+    h.expect_action("client receive")
+    h.expect_action("server receive")
+    h.expect_action("expect received")
+
+    let input = BigString.of_length(16385)
+    _TestDataChannel(h)(
+      _TestDataChannelExpectNotify(h, false, input),
+      _TestDataChannelExpectNotify(h, true, input))
+
+
+primitive BigString
+  fun of_length(l: USize) : String =>
+    String.from_array(recover Array[U8].init('a', l) end)
 
 class _TestDataChannelExpectNotify is DataChannelNotify
   let _h: TestHelper
   let _server: Bool
+  let _expected_input: String
   var _expect: USize = 4
   var _frame: Bool = true
 
-  new iso create(h: TestHelper, server: Bool) =>
+  new iso create(h: TestHelper, server: Bool, expected_input: String) =>
     _server = server
     _h = h
+    _expected_input = expected_input
 
   fun ref accepted(conn: DataChannel ref) =>
     conn.set_nodelay(true)
     conn.expect(_expect)
-    _send(conn, "hi there")
+    _send(conn, _expected_input)
 
   fun ref connect_failed(conn: DataChannel ref) =>
     _h.fail_action("client connect")
@@ -179,7 +215,7 @@ class _TestDataChannelExpectNotify is DataChannelNotify
         _h.assert_eq[String](String.from_array(data), "goodbye")
       else
         _h.complete_action("client receive")
-        _h.assert_eq[String](String.from_array(data), "hi there")
+        _h.assert_eq[String](String.from_array(data), _expected_input)
         _send(conn, "goodbye")
       end
 

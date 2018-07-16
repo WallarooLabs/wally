@@ -652,12 +652,12 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
             return
           end
         else
-          if _read_buf.space() > _read_buf_offset then
+          if _read_buf.size() > _read_buf_offset then
           // Read as much data as possible.
             let len = @pony_os_recv[USize](
               _event,
               _read_buf.cpointer(_read_buf_offset),
-              _read_buf.space() - _read_buf_offset) ?
+              _read_buf.size() - _read_buf_offset) ?
 
             match len
             | 0 =>
@@ -669,7 +669,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
               @pony_asio_event_resubscribe_read(_event)
               _reading = false
               return
-            | (_read_buf.space() - _read_buf_offset) =>
+            | (_read_buf.size() - _read_buf_offset) =>
               // Increase the read buffer size.
               _next_size = _max_size.min(_next_size * 2)
             end
@@ -700,20 +700,10 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     """
     Resize the read buffer.
     """
-    if _expect == 0 then
-      _read_buf.undefined(_next_size)
+    if _expect != 0 then
+      _read_buf.undefined(_expect.next_pow2().max(_next_size))
     else
-      if _expect > _read_buf_offset then
-        let data = _read_buf = recover Array[U8] end
-        _read_buf.undefined(_next_size)
-        for i in Range(0, _read_buf_offset) do
-          try
-            _read_buf.update(i, data(i)?)?
-          else
-            Fail()
-          end
-        end
-      end
+      _read_buf.undefined(_next_size)
     end
 
   fun ref _mute() =>
