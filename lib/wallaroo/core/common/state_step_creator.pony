@@ -49,6 +49,9 @@ actor StateStepCreator is Initializable
   let _pending_steps: MapIs[Step, (String, Key, StepId)] =
     _pending_steps.create()
 
+  let _known_state_key: Map[String, Set[Key]] =
+    _known_state_key.create()
+
   var _router_registry: (None | RouterRegistry) = None
 
   new create(auth: AmbientAuth,
@@ -77,6 +80,25 @@ actor StateStepCreator is Initializable
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  fun _state_key_is_known(state_name: String, key: Key): Bool =>
+    if _known_state_key.contains(state_name) then
+      try
+        _known_state_key(state_name)?.contains(key)
+      else
+        Unreachable()
+        false
+      end
+    else
+      false
+    end
+
+  fun ref _state_key_known(state_name: String, key: Key) =>
+    try
+      _known_state_key.insert_if_absent(state_name, Set[Key])?.set(key)
+    else
+      Unreachable()
+    end
+
   be report_unknown_key(producer: Producer, state_name: String, key: Key) =>
     """
     Creates a new step to handle a previously unknown key if a step does not
@@ -86,8 +108,9 @@ actor StateStepCreator is Initializable
     producer gets a new router it will check the list of unprocessed messages
     to see if any of them can be handled by the new router.
     """
+    if not _state_key_is_known(state_name, key) then
+      _state_key_known(state_name, key)
 
-    if not _keys_to_steps.contains(state_name, key) then
       try
         let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
 
