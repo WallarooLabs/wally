@@ -23,6 +23,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Added
 
+- Add support for dynamic keys ([PR #2265](https://github.com/WallarooLabs/wallaroo/pull/2265))
 - Inform joining worker to shut down on join error ([PR #2086](https://github.com/wallaroolabs/wallaroo/pull/2086))
 - Add partition count observability query ([PR #2081](https://github.com/wallaroolabs/wallaroo/pull/2081))
 - Add support for multiple sinks per pipeline ([PR #2060](https://github.com/wallaroolabs/wallaroo/pull/2060))
@@ -123,4 +124,3 @@ All notable changes to Wallaroo will be documented in this file.
 
 - Don't report a cluster as ready to work until node connection protocol has completed ([PR #1771](https://github.com/wallaroolabs/wallaroo/pull/1771))
 - Add Env as argument to source/sink builders ([PR #1734](https://github.com/wallaroolabs/wallaroo/pull/1734))
-
