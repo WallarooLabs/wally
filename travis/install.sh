@@ -56,7 +56,6 @@ install_ponyc() {
     "source")
       echo "Installing ponyc dependencies"
       install_llvm
-      install_pcre
       echo "Installing ponyc from source"
       pushd /tmp
       git clone https://github.com/ponylang/ponyc.git
@@ -150,6 +149,7 @@ wget -S --header="Accept: application/json" --header="Content-Type: application/
 echo "----- Installing dependencies"
 
 install_cpuset
+install_pcre
 install_ponyc
 install_pony_stable
 install_kafka_compression_libraries
