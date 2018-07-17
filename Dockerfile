@@ -47,7 +47,6 @@ COPY CHANGELOG.md /wallaroo-src/
 COPY CODE_OF_CONDUCT.md /wallaroo-src/
 COPY CONTRIBUTING.md /wallaroo-src/
 COPY cover.jpg /wallaroo-src/
-COPY cpp_api /wallaroo-src/cpp_api/
 COPY Dockerfile /wallaroo-src/
 COPY examples /wallaroo-src/examples/
 COPY giles /wallaroo-src/giles/
