@@ -20,3 +20,5 @@ To get set up for running examples, if you haven't already, refer to [Choosing a
 
 - [alphabet_partitioned](alphabet_partitioned/): a vote counting stream application using partitioning.
 - [market_spread](market_spread/): a stream application that keeps a state for market data and checks trade orders against it in real time. This application uses state, partitioning, and two pipelines, each with its own source.
+- [word_count](word_count/): an application that counts the number of occurences of words in a stream
+- [word_count_with_dynamic_keys](word_count_with_dynamic_keys/): an application that counts the number of occurences of words in a stream, where each word is stored in a separate partition
