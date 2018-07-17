@@ -157,7 +157,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 ## Download the Metrics UI
 
 ```bash
-sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ metrics_ui_version }}
+sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_metrics_ui_url }}
 ```
 
 ## Compiling Machida

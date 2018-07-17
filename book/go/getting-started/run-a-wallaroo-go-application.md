@@ -24,7 +24,7 @@ To start the Metrics UI run:
 
 ```bash
 docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:{{ metrics_ui_version }}
+  wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_metrics_ui_url }}
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
