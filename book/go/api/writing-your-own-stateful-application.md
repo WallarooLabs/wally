@@ -13,7 +13,7 @@ As with the Reverse Word example, we will list the components required:
 * Computation for adding votes
 * State objects
 * State change management
-* A list of keys that are valid for partitioning our state objects
+* The keys to partition the state objects
 * A partitioning function
 
 ### State Computation
@@ -167,25 +167,27 @@ That is, while the stateless computation constructor `To` took only a computatio
 
 Partitioning is a key aspect of how work is distributed in Wallaroo. From the application's point of view, what is required is:
 
-* a list of partition keys
+* the keys to partition the state objects
 * a partitioning function
 * partition-compatible states - the state should be defined in such a way that each partition can have its own distinct state instance
 
 ### Partition
 
-If we were to use partitioning in the alphabet application from the previous section and we wanted to partition by key, then one way we could go about it is to create a partition key list.
+If we were to use partitioning in the alphabet application from the previous section and we wanted to partition by key, then one way we could go about it is to create a partition key array.
 
-To create a partition key list, we use the `MakeLetterPartitions()` function:
+To create this, we use the `MakeLetterPartitions()` function:
 
 ```go
-func MakeLetterPartitions() []uint64 {
-  letterPartition := make([]uint64, 26)
+func LetterPartition() []uint64 {
+	letterPartition := make([]byte, 27)
 
-  for i := 0; i < 26; i++ {
-    letterPartition[i] = uint64(i + 'a')
-  }
+	for i := 0; i < 26; i++ {
+		letterPartition[i] = []byte(i + 'a')
+	}
 
-  return letterPartition
+	letterPartition[26] = '!'
+
+	return letterPartition
 }
 ```
 
@@ -194,9 +196,9 @@ And then we define a partitioning function which returns a key from the above li
 ```go
 type LetterPartitionFunction struct {}
 
-func (lpf *LetterPartitionFunction) Partition(data interface{}) uint64 {
+func (lpf *LetterPartitionFunction) Partition(data interface{}) []byte {
   lav := data.(*LetterAndVotes)
-  return uint64(lav.Letter)
+  return []byte(lav.Letter)
 }
 ```
 

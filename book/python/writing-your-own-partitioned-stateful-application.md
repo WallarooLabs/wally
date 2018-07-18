@@ -62,9 +62,9 @@ class TotalVotes(object):
 
 ### Application Setup
 
-Finally, the application setup is a little different now that we use partitioning. A partition is an intrinsic part of a pipeline's definition, as it changes how Wallaroo connects elements behind the scenes, so we have to distinguish partitioned state from non-partitioned state. This is done with `to_state_partition` and `to_state_partition_u64` respectively (compared with `to_stateful` in the non-partitioned case, as in the previous section).
+Finally, the application setup is a little different now that we use partitioning. A partition is an intrinsic part of a pipeline's definition, as it changes how Wallaroo connects elements behind the scenes, so we have to distinguish partitioned state from non-partitioned state. This is done with `to_state_partition` (compared with `to_stateful` in the non-partitioned case, as in the previous section).
 
-As with `to_stateful`, `to_state_partition` takes a state computation _function_, a state _class_ and its name. In addition, it takes a partition function and a partition keys list:
+As with `to_stateful`, `to_state_partition` takes a state computation _function_, a state _class_ and its name. In addition, it takes a partition function and a list of partition key strings:
 
 ```python
 ab.to_state_partition(add_votes, TotalVotes, "letter state",
