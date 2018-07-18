@@ -25,7 +25,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
 
-trait tag Sink is (Consumer & DisposableActor & SnapshotRequester)
+trait tag Sink is (Consumer & DisposableActor)
   fun inputs(): Map[StepId, Producer] box
 
 interface val SinkConfig[Out: Any val]

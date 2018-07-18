@@ -528,34 +528,12 @@ actor OutgoingBoundary is Consumer
   ///////////////
   // SNAPSHOTS
   ///////////////
-  be forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
-    snapshot_id: SnapshotId)
-  =>
-    try
-      let msg = ChannelMsgEncoder.snapshot_barrier(target_step_id,
-        origin_step_id, snapshot_id, _auth)?
-      _writev(msg)
-    else
-      Fail()
-    end
-
-  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    // We only forward snapshot barriers at the boundary. The OutgoingBoundary
-    // does not participate directly in the snapshot protocol.
-    Fail()
-
   be remote_snapshot_state() =>
     // Nothing to snapshot at this point.
     None
 
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     // Nothing to snapshot at this point.
-    None
-
-  fun ref snapshot_complete() =>
-    // We don't need to do anything special here at this point.
     None
 
   ///////////

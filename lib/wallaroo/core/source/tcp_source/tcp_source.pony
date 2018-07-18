@@ -505,32 +505,15 @@ actor TCPSource is (Producer & StatusReporter)
       end
     end
 
+  be barrier_complete(token: BarrierToken) =>
+    @printf[I32]("!@ barrier_complete at TCPSource %s\n".cstring(), _source_id.string().cstring())
+    // !@ Here's where we could ack finished messages up to snapshot point.
+    None
+
   //////////////
   // SNAPSHOTS
   //////////////
-  be initiate_snapshot_barrier(snapshot_id: SnapshotId) =>
-    // TODO: Eventually we might need to snapshot information about the
-    // source here before sending down the barrier.
-    for (o_id, o) in _outputs.pairs() do
-      match o
-      | let ob: OutgoingBoundary =>
-        ob.forward_snapshot_barrier(o_id, _source_id, snapshot_id)
-      else
-        o.receive_snapshot_barrier(_source_id, this, snapshot_id)
-      end
-    end
-
-  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    // Sources have no inputs on which to receive barriers
-    Fail()
-
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    // !@
-    None
-
-  fun ref snapshot_complete() =>
     // !@
     None
 

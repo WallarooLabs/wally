@@ -279,9 +279,6 @@ class DataChannelConnectNotifier is DataChannelNotify
         _receiver.unregister_producer(m.source_id, m.target_id)
       | let m: ForwardBarrierMsg =>
         _receiver.forward_barrier(m.target_id, m.origin_id, m.token)
-      | let m: SnapshotBarrierMsg =>
-        _receiver.forward_snapshot_barrier(m.target_id, m.origin_id,
-          m.snapshot_id)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
           .cstring())
@@ -335,10 +332,6 @@ trait _DataReceiverWrapper
     token: BarrierToken)
   =>
     Fail()
-  fun forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
-    snapshot_id: SnapshotId)
-  =>
-    Fail()
 
 class _InitDataReceiver is _DataReceiverWrapper
 
@@ -376,9 +369,3 @@ class _DataReceiver is _DataReceiverWrapper
     token: BarrierToken)
   =>
     data_receiver.forward_barrier(target_id, origin_id, token)
-
-  fun forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
-    snapshot_id: SnapshotId)
-  =>
-    data_receiver.forward_snapshot_barrier(target_step_id, origin_step_id,
-      snapshot_id)

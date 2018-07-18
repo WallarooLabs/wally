@@ -299,9 +299,30 @@ actor BarrierInitiator is Initializable
     result_promise: BarrierResultPromise)
   =>
     result_promise(barrier_token)
+    try
+      let msg = ChannelMsgEncoder.barrier_complete(barrier_token, _auth)?
+      for w in _workers.values() do
+        if w != _worker_name then _connections.send_control(w, msg) end
+      end
+    else
+      Fail()
+    end
+    for s in _sources.values() do
+      s.barrier_complete(barrier_token)
+    end
 
     //!@
     check()
+
+  be remote_barrier_complete(barrier_token: BarrierToken) =>
+    """
+    Called in response to primary worker for this barrier token sending
+    message that this barrier is complete. We can now inform all local
+    sources (for example, so they can ack messages up to a snapshot).
+    """
+    for s in _sources.values() do
+      s.barrier_complete(barrier_token)
+    end
 
   //!@
   be check() =>

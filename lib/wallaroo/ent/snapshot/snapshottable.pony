@@ -10,9 +10,6 @@ the License. You may obtain a copy of the License at
 
 */
 
-use "wallaroo/core/common"
-
-
+//!@ Do we need this?
 trait tag Snapshottable
-  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
+  fun ref snapshot_state(snapshot_id: SnapshotId)
