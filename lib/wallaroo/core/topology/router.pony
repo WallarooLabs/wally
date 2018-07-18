@@ -283,89 +283,59 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
       (_target is that._target) and
       (_target_proxy_address == that._target_proxy_address)
 
-// An OmniRouter is a router that can route a message to any Consumer in the
-// system by using a target id.
-trait val OmniRouter is Equatable[OmniRouter]
+trait val TargetIdRouter is Equatable[TargetIdRouter]
   fun route_with_target_ids[D: Any val](target_ids: Array[StepId] val,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer_id: StepId, producer: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64): (Bool, U64)
 
-  fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter
-  fun val remove_boundary(w: String): OmniRouter
-  fun val add_data_receiver(w: String, dr: DataReceiver): OmniRouter
-  fun val remove_data_receiver(w: String): OmniRouter
-  fun val add_source(source_id: StepId, s: (ProxyAddress | Source)): OmniRouter
-  fun val remove_source(source_id: StepId): OmniRouter
+  fun val update_boundaries(obs: Map[String, OutgoingBoundary] box):
+    TargetIdRouter
 
-  fun val update_route_to_proxy(id: U128,
-    pa: ProxyAddress): OmniRouter
+  fun val update_route_to_proxy(id: StepId, worker: String): TargetIdRouter
 
-  fun val update_route_to_step(id: U128,
-    step: Consumer): OmniRouter
+  fun val update_route_to_consumer(id: StepId, step: Consumer): TargetIdRouter
 
-  fun val update_stateless_partition_router(id: U128,
-    pr: StatelessPartitionRouter): OmniRouter
+  fun val update_stateless_partition_router(id: StepId,
+    pr: StatelessPartitionRouter): TargetIdRouter
 
   fun get_outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)] val
 
   fun routes(): Map[StepId, Consumer] val
 
-  fun routes_not_in(router: OmniRouter): Map[StepId, Consumer] val
+  fun routes_not_in(router: TargetIdRouter): Map[StepId, Consumer] val
 
   fun boundaries(): Map[String, OutgoingBoundary] val
 
-  fun producer_for(step_id: StepId): Producer ?
+  // fun blueprint(): TargetIdRouterBlueprint
 
-  fun data_receiver_for(worker: String): DataReceiver ?
-
-  fun blueprint(): OmniRouterBlueprint
-
-class val EmptyOmniRouter is OmniRouter
+class val EmptyTargetIdRouter is TargetIdRouter
   fun route_with_target_ids[D: Any val](target_ids: Array[StepId] val,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer_id: StepId, producer: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64): (Bool, U64)
   =>
-    @printf[I32]("route_with_target_ids() was called on an EmptyOmniRouter\n"
+    @printf[I32]("route_with_target_ids() was called on an EmptyTargetIdRouter\n"
       .cstring())
     (true, latest_ts)
 
-  fun val add_boundary(w: String,
-    boundary: OutgoingBoundary): OmniRouter
+  fun val update_boundaries(obs: Map[String, OutgoingBoundary] box):
+    TargetIdRouter
   =>
     this
 
-  fun val remove_boundary(w: String): OmniRouter =>
-    this
-
-  fun val add_data_receiver(w: String, dr: DataReceiver): OmniRouter =>
-    this
-
-  fun val remove_data_receiver(w: String): OmniRouter =>
-    this
-
-  fun val add_source(source_id: StepId, s: (ProxyAddress | Source)): OmniRouter
+  fun val update_route_to_proxy(id: StepId, worker: String): TargetIdRouter
   =>
     this
 
-  fun val remove_source(source_id: StepId): OmniRouter =>
-    this
-
-  fun val update_route_to_proxy(id: U128, pa: ProxyAddress):
-    OmniRouter
+  fun val update_route_to_consumer(id: StepId, step: Consumer): TargetIdRouter
   =>
     this
 
-  fun val update_route_to_step(id: U128,
-    step: Consumer): OmniRouter
-  =>
-    this
-
-  fun val update_stateless_partition_router(id: U128,
-    pr: StatelessPartitionRouter): OmniRouter
+  fun val update_stateless_partition_router(id: StepId,
+    pr: StatelessPartitionRouter): TargetIdRouter
   =>
     this
 
@@ -376,8 +346,306 @@ class val EmptyOmniRouter is OmniRouter
   =>
     recover val Array[(String, OutgoingBoundary)] end
 
-  fun routes_not_in(router: OmniRouter): Map[StepId, Consumer] val =>
+  fun routes_not_in(router: TargetIdRouter): Map[StepId, Consumer] val =>
     recover Map[StepId, Consumer] end
+
+  fun eq(that: box->TargetIdRouter): Bool =>
+    false
+
+  fun boundaries(): Map[String, OutgoingBoundary] val =>
+    recover Map[String, OutgoingBoundary] end
+
+  fun blueprint(): TargetIdRouterBlueprint =>
+    EmptyTargetIdRouterBlueprint
+
+class val StateStepRouter is TargetIdRouter
+  let _worker_name: String
+  let _consumers: Map[StepId, Consumer] val
+  let _proxies: Map[StepId, ProxyAddress] val
+  let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _stateless_partitions: Map[U128, StatelessPartitionRouter] val
+  let _target_workers: Array[String] val
+
+  new val create(worker_name: String,
+    consumers: Map[StepId, Consumer] val,
+    proxies: Map[StepId, ProxyAddress] val,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    stateless_partitions: Map[U128, StatelessPartitionRouter] val,
+    target_workers: Array[String] val)
+  =>
+    _worker_name = worker_name
+    _consumers = consumers
+    _proxies = proxies
+    _outgoing_boundaries = outgoing_boundaries
+    _stateless_partitions = stateless_partitions
+    _target_workers = target_workers
+
+  new val from_boundaries(w: String, obs: Map[String, OutgoingBoundary] val) =>
+    _worker_name = w
+    _consumers = recover Map[StepId, Consumer] end
+    _proxies = recover Map[StepId, ProxyAddress] end
+    _outgoing_boundaries = obs
+    _stateless_partitions = recover Map[U128, StatelessPartitionRouter] end
+    _target_workers = recover Array[String] end
+
+  fun route_with_target_ids[D: Any val](target_ids: Array[StepId] val,
+    metric_name: String, pipeline_time_spent: U64, data: D,
+    producer_id: StepId, producer: Producer ref, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64): (Bool, U64)
+  =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at StateStepRouter\n".cstring())
+    end
+    ifdef debug then
+      Invariant(target_ids.size() > 0)
+    end
+    var is_finished = true
+    if target_ids.size() == 1 then
+      try
+        (is_finished, _) = _route_with_target_id[D](target_ids(0)?,
+          metric_name, pipeline_time_spent, data, producer_id, producer,
+          msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+      else
+        Fail()
+      end
+    else
+      for (next_o_frac_id, next_target_id) in target_ids.pairs() do
+        let o_frac_ids =
+          match frac_ids
+          | None =>
+            recover val Array[U32].init(next_o_frac_id.u32(), 1) end
+          | let f_ids: Array[U32 val] val =>
+            recover val
+              let z = Array[U32](f_ids.size() + 1)
+              for f_id in f_ids.values() do
+                z.push(f_id)
+              end
+              z.push(next_o_frac_id.u32())
+              z
+            end
+          end
+
+        (let is_f, _) = _route_with_target_id[D](next_target_id, metric_name,
+          pipeline_time_spent, data, producer_id, producer, msg_uid,
+          o_frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+
+        // If at least one downstream message is not finished, then this
+        // message is not yet finished
+        if not is_f then is_finished = false end
+      end
+    end
+    (is_finished, latest_ts)
+
+  fun _route_with_target_id[D: Any val](target_id: StepId,
+    metric_name: String, pipeline_time_spent: U64, data: D,
+    producer_id: StepId, producer: Producer ref, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64): (Bool, U64)
+  =>
+    if _consumers.contains(target_id) then
+      try
+        @printf[I32]("!@ Routing to target id %s\n".cstring(), target_id.string().cstring())
+        let target = _consumers(target_id)?
+
+        let might_be_route = producer.route_to(target)
+        match might_be_route
+        | let r: Route =>
+          ifdef "trace" then
+            @printf[I32]("StateStepRouter found Route to Step\n".cstring())
+          end
+          r.run[D](metric_name, pipeline_time_spent, data,
+            producer_id, producer, msg_uid, frac_ids,
+            latest_ts, metrics_id, worker_ingress_ts)
+
+          (false, latest_ts)
+        else
+          // No route for this target
+          Fail()
+          (true, latest_ts)
+        end
+      else
+        Unreachable()
+        (true, latest_ts)
+      end
+    else
+      // This target_id step exists on another worker
+      if _proxies.contains(target_id) then
+        try
+          let pa = _proxies(target_id)?
+          try
+            // Try as though we have a reference to the right boundary
+            let boundary = _outgoing_boundaries(pa.worker)?
+            let might_be_route = producer.route_to(boundary)
+            match might_be_route
+            | let r: Route =>
+              ifdef "trace" then
+                @printf[I32](("StateStepRouter found Route to " +
+                  " OutgoingBoundary\n").cstring())
+              end
+              let delivery_msg = ForwardMsg[D](pa.step_id,
+                _worker_name, data, metric_name,
+                pa, msg_uid, frac_ids)
+
+              r.forward(delivery_msg, pipeline_time_spent,
+                producer, latest_ts, metrics_id,
+                metric_name, worker_ingress_ts)
+              (false, latest_ts)
+            else
+              // We don't have a route to this boundary
+              ifdef debug then
+                @printf[I32]("StateStepRouter had no Route\n".cstring())
+              end
+              Fail()
+              (true, latest_ts)
+            end
+          else
+            // We don't have a reference to the right outgoing boundary
+            ifdef debug then
+              @printf[I32](("StateStepRouter has no reference to " +
+                " OutgoingBoundary\n").cstring())
+            end
+            Fail()
+            (true, latest_ts)
+          end
+        else
+          Fail()
+          (true, latest_ts)
+        end
+      else
+        try
+          _stateless_partitions(target_id)?.route[D](metric_name,
+            pipeline_time_spent, data, producer_id, producer, msg_uid,
+            frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+        else
+          // Apparently this target_id does not refer to a valid step id
+          ifdef debug then
+            @printf[I32](("StateStepRouter: target id does not refer to " +
+              "valid step id\n").cstring())
+          end
+          Fail()
+          (true, latest_ts)
+        end
+      end
+    end
+
+  fun val update_route_to_consumer(id: StepId, consumer: Consumer):
+    TargetIdRouter
+  =>
+    let dr = recover iso Map[StepId, Consumer] end
+    for (c_id, c) in _consumers.pairs() do
+      dr(c_id) = c
+    end
+    dr(id) = consumer
+    var new_router = StateStepRouter(_worker_name, consume dr, _proxies,
+      _outgoing_boundaries, _stateless_partitions, _target_workers)
+
+    // If we have a proxy to this step, then we need to remove it now.
+    if _proxies.contains(id) then
+      try
+        let pa = _proxies(id)?
+        new_router = new_router.remove_proxy(id, pa.worker)
+      else
+        Unreachable()
+      end
+    end
+
+    new_router
+
+  fun val remove_consumer(id: StepId, consumer: Consumer): TargetIdRouter =>
+    let dr = recover iso Map[StepId, Consumer] end
+    for (c_id, c) in _consumers.pairs() do
+      if c_id != id then
+        dr(c_id) = c
+      end
+    end
+    StateStepRouter(_worker_name, _consumers, _proxies, _outgoing_boundaries,
+      _stateless_partitions, _target_workers)
+
+  fun val update_route_to_proxy(id: StepId, worker: String): TargetIdRouter
+  =>
+    let ps = recover iso Map[StepId, ProxyAddress] end
+    for (s_id, pa) in _proxies.pairs() do
+      ps(s_id) = pa
+    end
+    ps(id) = ProxyAddress(worker, id)
+    let tws =
+      if not ArrayHelpers[String].contains[String](_target_workers, worker)
+      then
+        let a = recover iso Array[String] end
+        for w in _target_workers.values() do
+          a.push(w)
+        end
+        a.push(worker)
+        consume a
+      else
+        _target_workers
+      end
+
+    var new_router = StateStepRouter(_worker_name, _consumers, consume ps,
+      _outgoing_boundaries, _stateless_partitions, tws)
+
+    // If we have a reference to a consumer for this id, then we need to
+    // remove it now.
+    if _consumers.contains(id) then
+      try
+        let c = _consumers(id)?
+        new_router = new_router.remove_consumer(id, c)
+      else
+        Unreachable()
+      end
+    end
+
+    new_router
+
+  fun val remove_proxy(id: StepId, worker: String, boundary: OutgoingBoundary):
+    TargetIdRouter
+  =>
+    var removing_worker = true
+    let ps = recover iso Map[StepId, ProxyAddress] end
+    for (s_id, pa) in _proxies.pairs() do
+      if s_id != id then
+        if pa.worker == worker then removing_worker = false end
+        ps(s_id) = pa
+      end
+    end
+    let tws =
+      if removing_worker then
+        let a = recover iso Array[String] end
+        for w in _target_workers.values() do
+          if w != worker then
+            a.push(w)
+          end
+        end
+        consume a
+      else
+        _target_workers
+      end
+    StateStepRouter(_worker_name, _consumers, consume ps,
+      _outgoing_boundaries, _stateless_partitions, tws)
+
+  fun val update_boundaries(obs: Map[String, OutgoingBoundary] box):
+    TargetIdRouter
+  =>
+    let m = recover iso Map[String, OutgoingBoundary] end
+    for (w, b) in obs.values() do
+      m(w) = b
+    end
+    StateStepRouter(_worker_name, _consumers, _proxies, consume m,
+      _stateless_partitions, _target_workers)
+
+  fun val update_stateless_partition_router(id: U128,
+    pr: StatelessPartitionRouter): TargetIdRouter
+
+  //!@ We should be using RouterRegistry's map for this and remove this method.
+  fun get_outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)] val
+  =>
+    let keys = Array[String]
+    for k in _outgoing_boundaries.keys() do
+      keys.push(k)
+    end
+
+    let sorted_keys = Sort[Array[String], String](keys)
 
   fun has_state_partition(state_name: String, key: Key): Bool =>
     false
@@ -385,19 +653,43 @@ class val EmptyOmniRouter is OmniRouter
   fun producer_for(step_id: StepId): Producer ? =>
     error
 
-  fun data_receiver_for(worker: String): DataReceiver ? =>
-    error
+  fun routes(): Map[StepId, Consumer] val =>
+    let rs = recover iso Map[StepId, Consumer] end
+    for (id, c) in _consumers.pairs() do
+      rs(id) = c
+    end
+    for (id, pa) in _proxies.pairs() do
+      try
+        let b = _outgoing_boundaries(pa.worker)?
+        rs(id) = b
+      else
+        Fail()
+      end
+    end
+    for sp in _stateless_partitions.pairs() do
+      for (id, c) in sp.routes().pairs() do
+        rs(id) = c
+      end
+    end
+    consume rs
 
-  fun eq(that: box->OmniRouter): Bool =>
-    false
+  fun routes_not_in(router: TargetIdRouter): Map[StepId, Consumer] val =>
+    let rs = recover iso Map[StepId, Consumer] end
+    let those_routes = router.routes()
+    for (id, r) in routes().pairs() do
+      if not those_routes.contains(id) then
+        rs(id) = r
+      end
+    end
+    consume rs
 
   fun boundaries(): Map[String, OutgoingBoundary] val =>
-    recover Map[String, OutgoingBoundary] end
+    _outgoing_boundaries
 
-  fun blueprint(): OmniRouterBlueprint =>
-    EmptyOmniRouterBlueprint
+  // fun blueprint(): TargetIdRouterBlueprint
 
-class val StepIdRouter is OmniRouter
+//!@
+class val StepIdRouter //is TargetIdRouter
   let _worker_name: String
   let _data_routes: Map[StepId, Consumer] val
   let _step_map: Map[StepId, (ProxyAddress | StepId)] val
@@ -429,7 +721,7 @@ class val StepIdRouter is OmniRouter
     worker_ingress_ts: U64): (Bool, U64)
   =>
     ifdef "trace" then
-      @printf[I32]("Rcvd msg at OmniRouter\n".cstring())
+      @printf[I32]("Rcvd msg at TargetIdRouter\n".cstring())
     end
     ifdef debug then
       Invariant(target_ids.size() > 0)
@@ -486,7 +778,7 @@ class val StepIdRouter is OmniRouter
         match might_be_route
         | let r: Route =>
           ifdef "trace" then
-            @printf[I32]("OmniRouter found Route to Step\n".cstring())
+            @printf[I32]("TargetIdRouter found Route to Step\n".cstring())
           end
           r.run[D](metric_name, pipeline_time_spent, data,
             producer_id, producer, msg_uid, frac_ids,
@@ -515,7 +807,7 @@ class val StepIdRouter is OmniRouter
               match might_be_route
               | let r: Route =>
                 ifdef "trace" then
-                  @printf[I32]("OmniRouter found Route to OutgoingBoundary\n"
+                  @printf[I32]("TargetIdRouter found Route to OutgoingBoundary\n"
                     .cstring())
                 end
                 let delivery_msg = ForwardMsg[D](pa.step_id,
@@ -529,7 +821,7 @@ class val StepIdRouter is OmniRouter
               else
                 // We don't have a route to this boundary
                 ifdef debug then
-                  @printf[I32]("OmniRouter had no Route\n".cstring())
+                  @printf[I32]("TargetIdRouter had no Route\n".cstring())
                 end
                 Fail()
                 (true, latest_ts)
@@ -537,7 +829,7 @@ class val StepIdRouter is OmniRouter
             else
               // We don't have a reference to the right outgoing boundary
               ifdef debug then
-                @printf[I32](("OmniRouter has no reference to " +
+                @printf[I32](("TargetIdRouter has no reference to " +
                   " OutgoingBoundary\n").cstring())
               end
               Fail()
@@ -558,7 +850,7 @@ class val StepIdRouter is OmniRouter
         else
           // Apparently this target_id does not refer to a valid step id
           ifdef debug then
-            @printf[I32](("OmniRouter: target id does not refer to valid " +
+            @printf[I32](("TargetIdRouter: target id does not refer to valid " +
               " step id\n").cstring())
           end
           Fail()
@@ -567,7 +859,7 @@ class val StepIdRouter is OmniRouter
       end
     end
 
-  fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter =>
+  fun val add_boundary(w: String, boundary: OutgoingBoundary): TargetIdRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
     let new_outgoing_boundaries = recover trn Map[String, OutgoingBoundary] end
@@ -579,7 +871,7 @@ class val StepIdRouter is OmniRouter
       consume new_outgoing_boundaries, _stateless_partitions, _sources,
       _data_receivers)
 
-  fun val remove_boundary(w: String): OmniRouter =>
+  fun val remove_boundary(w: String): TargetIdRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
     let new_outgoing_boundaries = recover trn Map[String, OutgoingBoundary] end
@@ -592,7 +884,7 @@ class val StepIdRouter is OmniRouter
       consume new_outgoing_boundaries, _stateless_partitions, _sources,
       _data_receivers)
 
-  fun val add_data_receiver(w: String, dr: DataReceiver): OmniRouter =>
+  fun val add_data_receiver(w: String, dr: DataReceiver): TargetIdRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
     let new_data_receivers = recover trn Map[String, DataReceiver] end
@@ -604,7 +896,7 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, _stateless_partitions, _sources,
       consume new_data_receivers)
 
-  fun val remove_data_receiver(w: String): OmniRouter =>
+  fun val remove_data_receiver(w: String): TargetIdRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
     let new_data_receivers = recover trn Map[String, DataReceiver] end
@@ -615,7 +907,7 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, _stateless_partitions, _sources,
       consume new_data_receivers)
 
-  fun val add_source(source_id: StepId, s: (ProxyAddress | Source)): OmniRouter
+  fun val add_source(source_id: StepId, s: (ProxyAddress | Source)): TargetIdRouter
   =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
@@ -628,7 +920,7 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, _stateless_partitions, consume new_sources,
       _data_receivers)
 
-  fun val remove_source(source_id: StepId): OmniRouter =>
+  fun val remove_source(source_id: StepId): TargetIdRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
     let new_sources = recover trn Map[StepId, (ProxyAddress | Source)] end
@@ -639,7 +931,7 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, _stateless_partitions, consume new_sources,
       _data_receivers)
 
-  fun val update_route_to_proxy(id: U128, pa: ProxyAddress): OmniRouter =>
+  fun val update_route_to_proxy(id: U128, pa: ProxyAddress): TargetIdRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
     let new_data_routes = recover trn Map[StepId, Consumer] end
@@ -655,7 +947,7 @@ class val StepIdRouter is OmniRouter
     StepIdRouter(_worker_name, consume new_data_routes, consume new_step_map,
       _outgoing_boundaries, _stateless_partitions, _sources, _data_receivers)
 
-  fun val update_route_to_step(id: StepId, step: Consumer): OmniRouter =>
+  fun val update_route_to_step(id: StepId, step: Consumer): TargetIdRouter =>
     // TODO: Using persistent maps for our fields would make this more
     // efficient
     let new_data_routes = recover trn Map[StepId, Consumer] end
@@ -674,7 +966,7 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, _stateless_partitions, _sources, _data_receivers)
 
   fun val update_stateless_partition_router(p_id: U128,
-    pr: StatelessPartitionRouter): OmniRouter
+    pr: StatelessPartitionRouter): TargetIdRouter
   =>
     let new_stateless_partitions = recover trn
       Map[U128, StatelessPartitionRouter] end
@@ -688,7 +980,7 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, consume new_stateless_partitions, _sources,
       _data_receivers)
 
-  //!@ Probably remove this since we shouldn't be using an OmniRouter as a
+  //!@ Probably remove this since we shouldn't be using an TargetIdRouter as a
   // source of routes.
   fun routes(): Map[StepId, Consumer] val =>
     """
@@ -720,7 +1012,7 @@ class val StepIdRouter is OmniRouter
     end
     consume diff
 
-  fun routes_not_in(router: OmniRouter): Map[StepId, Consumer] val =>
+  fun routes_not_in(router: TargetIdRouter): Map[StepId, Consumer] val =>
     let m = recover iso Map[StepId, Consumer] end
     let other_routes = router.routes()
     for (id, c) in routes().pairs() do
@@ -759,7 +1051,7 @@ class val StepIdRouter is OmniRouter
   fun boundaries(): Map[String, OutgoingBoundary] val =>
     _outgoing_boundaries
 
-  fun blueprint(): OmniRouterBlueprint =>
+  fun blueprint(): TargetIdRouterBlueprint =>
     let new_step_map = recover trn Map[StepId, ProxyAddress] end
     for (k, v) in _step_map.pairs() do
       match v
@@ -782,7 +1074,7 @@ class val StepIdRouter is OmniRouter
     end
     StepIdRouterBlueprint(consume new_step_map, consume new_source_map)
 
-  fun eq(that: box->OmniRouter): Bool =>
+  fun eq(that: box->TargetIdRouter): Bool =>
     match that
     | let o: box->StepIdRouter =>
       (_worker_name == o._worker_name) and
@@ -797,19 +1089,19 @@ class val StepIdRouter is OmniRouter
       false
     end
 
-trait val OmniRouterBlueprint
+trait val TargetIdRouterBlueprint
   fun build_router(worker_name: String,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    local_sinks: Map[StepId, Consumer] val): OmniRouter
+    local_sinks: Map[StepId, Consumer] val): TargetIdRouter
 
-class val EmptyOmniRouterBlueprint is OmniRouterBlueprint
+class val EmptyTargetIdRouterBlueprint is TargetIdRouterBlueprint
   fun build_router(worker_name: String,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    local_sinks: Map[StepId, Consumer] val): OmniRouter
+    local_sinks: Map[StepId, Consumer] val): TargetIdRouter
   =>
-    EmptyOmniRouter
+    EmptyTargetIdRouter
 
-class val StepIdRouterBlueprint is OmniRouterBlueprint
+class val StepIdRouterBlueprint is TargetIdRouterBlueprint
   let _step_map: Map[StepId, ProxyAddress] val
   let _source_map: Map[StepId, ProxyAddress] val
 
@@ -821,7 +1113,7 @@ class val StepIdRouterBlueprint is OmniRouterBlueprint
 
   fun build_router(worker_name: String,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    local_sinks: Map[StepId, Consumer] val): OmniRouter
+    local_sinks: Map[StepId, Consumer] val): TargetIdRouter
   =>
     let data_routes = recover trn Map[StepId, Consumer] end
     let new_step_map = recover trn Map[StepId, (ProxyAddress | StepId)] end
@@ -1274,9 +1566,6 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
   fun state_name(): String =>
     _state_name
 
-  fun route_builder(): RouteBuilder =>
-    TypedRouteBuilder[StateProcessor[S]]
-
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer_id: StepId, producer: Producer ref, i_msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
@@ -1366,21 +1655,14 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
       _local_routes, _step_ids, _hashed_node_routes, _hash_partitions,
       new_p_function)
 
-  fun register_routes(router: Router, route_builder': RouteBuilder) =>
+  fun register_routes(router: Router) =>
     @printf[I32]("!@ PartitionRouter registering routes\n".cstring())
 
-                //!@
-                match router
-                | let er: EmptyRouter =>
-                  @printf[I32]("!@ PR: Somehow target_router is EmptyRouter\n".cstring())
-                | let dr: DirectRouter =>
-                  @printf[I32]("!@ PR: DirectRouter as expected\n".cstring())
-                end
     for r in _partition_routes.values() do
       match r
       | let step: Step =>
         @printf[I32]("!@ PR: Registering with a step.\n".cstring())
-        step.register_routes(router, route_builder')
+        step.register_routes(router)
       end
     end
 
@@ -1799,7 +2081,7 @@ class val LocalPartitionRouterBlueprint[In: Any val, S: State ref]
 trait val StatelessPartitionRouter is (Router &
   Equatable[StatelessPartitionRouter])
   fun partition_id(): U128
-  fun register_routes(router: Router, route_builder': RouteBuilder)
+  fun register_routes(router: Router)
   fun update_route(partition_id': U64, target: (Step | ProxyRouter)):
     StatelessPartitionRouter ?
   // // Total number of steps in partition
@@ -1880,11 +2162,11 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       (true, latest_ts)
     end
 
-  fun register_routes(router: Router, route_builder': RouteBuilder) =>
+  fun register_routes(router: Router) =>
     for r in _partition_routes.values() do
       match r
       | let step: Step =>
-        step.register_routes(router, route_builder')
+        step.register_routes(router)
       end
     end
 
