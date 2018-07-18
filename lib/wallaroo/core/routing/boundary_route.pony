@@ -124,19 +124,3 @@ class BoundaryRoute is Route
 
   fun ref report_status(code: ReportStatusCode) =>
     _consumer.report_status(code)
-
-  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    producer: InFlightAckRequester)
-  =>
-    _consumer.request_in_flight_ack(request_id, requester_id, producer)
-
-  fun ref request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    _consumer.request_in_flight_resume_ack(in_flight_resume_ack_id, request_id,
-      requester_id, requester, leaving_workers)
-
-  fun ref receive_in_flight_ack(request_id: RequestId) =>
-    _step.receive_in_flight_ack(request_id)

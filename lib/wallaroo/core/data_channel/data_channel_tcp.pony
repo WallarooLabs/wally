@@ -35,6 +35,7 @@ use "wallaroo_labs/bytes"
 use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -270,25 +271,14 @@ class DataChannelConnectNotifier is DataChannelNotify
           c.boundary_id)
       | let m: SpinUpLocalTopologyMsg =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
-      | let m: RequestInFlightAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received RequestInFlightAckMsg from %s\n".cstring(),
-            m.sender.cstring())
-        end
-        _receiver.request_in_flight_ack(m.request_id, m.requester_id)
       | let m: ReportStatusMsg =>
         _receiver.report_status(m.code)
-      | let m: RequestInFlightResumeAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received RequestInFlightResumeAckMsg from %s\n"
-            .cstring(), m.sender.cstring())
-        end
-        _receiver.request_in_flight_resume_ack(m.in_flight_resume_ack_id,
-          m.request_id, m.requester_id, m.leaving_workers)
       | let m: RegisterProducerMsg =>
         _receiver.register_producer(m.source_id, m.target_id)
       | let m: UnregisterProducerMsg =>
         _receiver.unregister_producer(m.source_id, m.target_id)
+      | let m: ForwardBarrierMsg =>
+        _receiver.forward_barrier(m.target_id, m.origin_id, m.token)
       | let m: SnapshotBarrierMsg =>
         _receiver.forward_snapshot_barrier(m.target_id, m.origin_id,
           m.snapshot_id)
@@ -335,18 +325,15 @@ trait _DataReceiverWrapper
     Fail()
   fun report_status(code: ReportStatusCode) =>
     Fail()
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
-    Fail()
-  fun request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    leaving_workers: Array[String] val)
-  =>
-    Fail()
 
   fun register_producer(input_id: StepId, output_id: StepId) =>
     Fail()
   fun unregister_producer(input_id: StepId, output_id: StepId) =>
+    Fail()
+
+  fun forward_barrier(target_id: StepId, origin_id: StepId,
+    token: BarrierToken)
+  =>
     Fail()
   fun forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
     snapshot_id: SnapshotId)
@@ -379,22 +366,16 @@ class _DataReceiver is _DataReceiverWrapper
   fun report_status(code: ReportStatusCode) =>
     data_receiver.report_status(code)
 
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
-    data_receiver.request_in_flight_ack(request_id, requester_id)
-
-  fun request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    leaving_workers: Array[String] val)
-  =>
-    data_receiver.request_in_flight_resume_ack(in_flight_resume_ack_id,
-      request_id, requester_id, leaving_workers)
-
   fun register_producer(input_id: StepId, output_id: StepId) =>
     data_receiver.register_producer(input_id, output_id)
 
   fun unregister_producer(input_id: StepId, output_id: StepId) =>
     data_receiver.unregister_producer(input_id, output_id)
+
+  fun forward_barrier(target_id: StepId, origin_id: StepId,
+    token: BarrierToken)
+  =>
+    data_receiver.forward_barrier(target_id, origin_id, token)
 
   fun forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
     snapshot_id: SnapshotId)

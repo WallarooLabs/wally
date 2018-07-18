@@ -23,6 +23,7 @@ use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/snapshot"
@@ -33,8 +34,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
-  StatusReporter & KafkaConsumer)
+actor KafkaSource[In: Any val] is (Producer & StatusReporter & KafkaConsumer)
   let _source_id: StepId
   let _auth: AmbientAuth
   let _step_id_gen: StepIdGenerator = StepIdGenerator
@@ -72,13 +72,13 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   let _notify: KafkaSourceNotify[In]
 
   var _muted: Bool = true
+  var _disposed: Bool = false
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
   let _router_registry: RouterRegistry
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-  var _in_flight_ack_waiter: InFlightAckWaiter
 
   let _state_step_creator: StateStepCreator
 
@@ -123,8 +123,6 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
-
-    _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       let new_boundary =
@@ -395,6 +393,18 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     _last_flushed_seq_id = low_watermark
     _last_flushed_offset = offset
 
+  //////////////
+  // BARRIER
+  //////////////
+  be initiate_barrier(token: BarrierToken) =>
+    for (o_id, o) in _outputs.pairs() do
+      match o
+      | let ob: OutgoingBoundary =>
+        ob.forward_barrier(o_id, _source_id, token)
+      else
+        o.receive_barrier(_source_id, this, token)
+      end
+    end
 
   //////////////
   // SNAPSHOTS
@@ -495,47 +505,6 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       route.report_status(code)
     end
 
-  be request_in_flight_ack(upstream_request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
-  =>
-    _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
-      requester)
-
-    if _routes.size() > 0 then
-      for route in _routes.values() do
-        let request_id = _in_flight_ack_waiter.add_consumer_request(
-          requester_id)
-        route.request_in_flight_ack(request_id, _source_id, this)
-      end
-    else
-      requester.try_finish_in_flight_request_early(requester_id)
-    end
-
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(
-      in_flight_resume_ack_id, request_id, requester_id, requester)
-    then
-      for route in _routes.values() do
-        let new_request_id =
-          _in_flight_ack_waiter.add_consumer_resume_request()
-        route.request_in_flight_resume_ack(in_flight_resume_ack_id,
-          new_request_id, _source_id, this, leaving_workers)
-      end
-    end
-
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
-
-  be receive_in_flight_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_request(request_id)
-
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
-
   fun ref _mute() =>
     ifdef debug then
       @printf[I32]("Muting %s\n".cstring(), _name.cstring())
@@ -615,9 +584,13 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   be dispose() =>
     @printf[I32]("Shutting down %s\n".cstring(), _name.cstring())
 
-    _unregister_all_outputs()
-    for b in _outgoing_boundaries.values() do
-      b.dispose()
-    end
+    if not _disposed then
+      _unregister_all_outputs()
+      _router_registry.unregister_source(this, _source_id)
+      for b in _outgoing_boundaries.values() do
+        b.dispose()
+      end
 
-    _kc.dispose()
+      _kc.dispose()
+      _disposed = true
+    end

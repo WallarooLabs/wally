@@ -22,7 +22,9 @@ use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/source"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/in_flight_acking"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -240,7 +242,17 @@ primitive _RouterRegistryGenerator
     RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
       _ConnectionsGenerator(env, auth), _StateStepCreatorGenerator(auth),
       _DummyRecoveryFileCleaner, 0,
-      false, _SnapshotInitiatorGenerator(env, auth))
+      false, _BarrierInitiatorGenerator(env, auth),
+      _SnapshotInitiatorGenerator(env, auth),
+      _InFlightAckInitiatorGenerator(env, auth))
+
+primitive _BarrierInitiatorGenerator
+  fun apply(env: Env, auth: AmbientAuth): BarrierInitiator =>
+    BarrierInitiator(auth, "w", _ConnectionsGenerator(env, auth))
+
+primitive _InFlightAckInitiatorGenerator
+  fun apply(env: Env, auth: AmbientAuth): InFlightAckInitiator =>
+    InFlightAckInitiator("w", _BarrierInitiatorGenerator(env, auth))
 
 primitive _SnapshotInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): SnapshotInitiator =>

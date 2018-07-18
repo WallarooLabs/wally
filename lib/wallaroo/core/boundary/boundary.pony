@@ -34,6 +34,7 @@ use "time"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/time"
 use "wallaroo/core/common"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
 use "wallaroo/ent/snapshot"
 use "wallaroo/ent/spike"
@@ -105,7 +106,6 @@ actor OutgoingBoundary is Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
 
   var _mute_outstanding: Bool = false
-  var _in_flight_ack_waiter: InFlightAckWaiter = InFlightAckWaiter
 
   // TCP
   var _notify: WallarooOutgoingNetworkActorNotify
@@ -281,7 +281,6 @@ actor OutgoingBoundary is Consumer
 
   be register_step_id(step_id: StepId) =>
     _step_id = step_id
-    _in_flight_ack_waiter = InFlightAckWaiter(_step_id)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
@@ -494,57 +493,37 @@ actor OutgoingBoundary is Consumer
     _upstreams.unset(producer)
 
   be report_status(code: ReportStatusCode) =>
-    _in_flight_ack_waiter.report_status(code)
     try
       _writev(ChannelMsgEncoder.report_status(code, _auth)?)
     else
       Fail()
     end
 
-  be request_in_flight_ack(upstream_request_id: RequestId,
-    requester_id: StepId, upstream_requester: InFlightAckRequester)
+  //////////////
+  // BARRIER
+  //////////////
+  be forward_barrier(target_step_id: StepId, origin_step_id: StepId,
+    barrier_token: BarrierToken)
   =>
-    if not _in_flight_ack_waiter.already_added_request(requester_id) then
-      try
-        _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
-          upstream_requester)
-        let request_id = _in_flight_ack_waiter.add_consumer_request(
-          requester_id)
-        _writev(ChannelMsgEncoder.request_in_flight_ack(_worker_name,
-          request_id, requester_id, _auth)?)
-      else
-        Fail()
-      end
+    try
+      let msg = ChannelMsgEncoder.forward_barrier(target_step_id,
+        origin_step_id, barrier_token, _auth)?
+      _writev(msg)
     else
-      upstream_requester.receive_in_flight_ack(upstream_request_id)
+      Fail()
     end
 
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  be receive_barrier(step_id: StepId, producer: Producer,
+    barrier_token: BarrierToken)
   =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
-      request_id, requester_id, requester)
-    then
-      try
-        let new_request_id =
-          _in_flight_ack_waiter.add_consumer_resume_request()
-        _writev(ChannelMsgEncoder.request_in_flight_resume_ack(_worker_name,
-          in_flight_resume_ack_id, new_request_id, _step_id,
-          leaving_workers, _auth)?)
-      else
-        Fail()
-      end
-    end
+    // We only forward barriers at the boundary. The OutgoingBoundary
+    // does not participate directly in the barrier protocol.
+    Fail()
 
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
-
-  be receive_in_flight_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_request(request_id)
-
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
+  fun ref barrier_complete(barrier_token: BarrierToken) =>
+    // We only forward barriers at the boundary. The OutgoingBoundary
+    // does not participate directly in the barrier protocol.
+    Fail()
 
   ///////////////
   // SNAPSHOTS
@@ -1130,18 +1109,6 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
-      | let fa: InFlightAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received InFlightAckMsg from %s\n".cstring(),
-            fa.sender.cstring())
-        end
-        _outgoing_boundary.receive_in_flight_ack(fa.request_id)
-      | let fa: FinishedCompleteAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received FinishedCompleteAckMsg from %s\n".cstring(),
-            fa.sender.cstring())
-        end
-        _outgoing_boundary.receive_in_flight_resume_ack(fa.request_id)
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())

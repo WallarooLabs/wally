@@ -22,6 +22,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
 
@@ -110,7 +111,8 @@ class val TCPSinkBuilder
 
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
-    snapshot_initiator: SnapshotInitiator, recovering: Bool): Sink
+    barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
+    recovering: Bool): Sink
   =>
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
@@ -118,4 +120,5 @@ class val TCPSinkBuilder
     let id: StepId = StepIdGenerator()
 
     TCPSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
-      consume reporter, snapshot_initiator, _host, _service, _initial_msgs)
+      consume reporter, barrier_initiator, snapshot_initiator, _host, _service,
+      _initial_msgs)

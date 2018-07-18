@@ -20,6 +20,7 @@ use "collections"
 use "net"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -169,6 +170,7 @@ class val EgressBuilder
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,
     event_log: EventLog, recovering: Bool,
+    barrier_initiator: BarrierInitiator,
     snapshot_initiator: SnapshotInitiator, env: Env, auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val =
       recover Map[String, OutgoingBoundary] end): Consumer ?
@@ -184,8 +186,8 @@ class val EgressBuilder
     | None =>
       match _sink_builder
       | let sb: SinkBuilder =>
-        sb(_name, event_log, reporter.clone(), env, snapshot_initiator,
-          recovering)
+        sb(_name, event_log, reporter.clone(), env, barrier_initiator,
+          snapshot_initiator, recovering)
       else
         EmptySink
       end

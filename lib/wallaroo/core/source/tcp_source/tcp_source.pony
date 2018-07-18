@@ -33,6 +33,7 @@ use "net"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -53,7 +54,7 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
+actor TCPSource is (Producer & StatusReporter)
   """
   # TCPSource
 
@@ -99,6 +100,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   var _shutdown: Bool = false
   // Start muted. Wait for unmute to begin processing
   var _muted: Bool = true
+  var _disposed: Bool = false
   var _expect_read_buf: Reader = Reader
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
   let _max_received_count: U8 = 50
@@ -111,7 +113,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-  var _in_flight_ack_waiter: InFlightAckWaiter
 
   new _accept(source_id: StepId, auth: AmbientAuth, listen: TCPSourceListener,
     notify: TCPSourceNotify iso, event_log: EventLog,
@@ -127,7 +128,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     """
     _source_id = source_id
     _auth = auth
-    _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter
     _listen = listen
@@ -200,7 +200,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     _mute()
 
   be update_router(router: Router) =>
-    @printf[I32]("!@ TCPSource: update_router\n".cstring())
     let new_router =
       match router
       | let pr: PartitionRouter =>
@@ -217,7 +216,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       old_router.routes_not_in(_router).pairs()
     do
       if _outputs.contains(old_id) then
-        @printf[I32]("!@ -- update_router\n".cstring())
         _unregister_output(old_id, outdated_consumer)
       end
     end
@@ -233,7 +231,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       ifdef debug then
         Invariant(_routes.contains(c))
       end
-      @printf[I32]("!@ -- remove_route_to_consumer\n".cstring())
       _unregister_output(id, c)
     end
 
@@ -440,7 +437,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     active graph (or on dispose())
     """
     for (id, consumer) in _outputs.pairs() do
-      @printf[I32]("!@ -- _unregister_all_outputs\n".cstring())
+      // @printf[I32]("!@ -- _unregister_all_outputs\n".cstring())
       _unregister_output(id, consumer)
     end
 
@@ -448,12 +445,16 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     """
     - Close the connection gracefully.
     """
-    _unregister_all_outputs()
-    @printf[I32]("Shutting down TCPSource\n".cstring())
-    for b in _outgoing_boundaries.values() do
-      b.dispose()
+    if not _disposed then
+      _unregister_all_outputs()
+      _router_registry.unregister_source(this, _source_id)
+      @printf[I32]("Shutting down TCPSource\n".cstring())
+      for b in _outgoing_boundaries.values() do
+        b.dispose()
+      end
+      close()
+      _disposed = true
     end
-    close()
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
@@ -490,55 +491,19 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       route.report_status(code)
     end
 
-  be request_in_flight_ack(upstream_request_id: RequestId,
-    requester_id: StepId, upstream_requester: InFlightAckRequester)
-  =>
-    if not _in_flight_ack_waiter.already_added_request(requester_id) then
-      _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
-        upstream_requester)
-      if _routes.size() > 0 then
-        for route in _routes.values() do
-          let request_id = _in_flight_ack_waiter.add_consumer_request(
-            requester_id)
-          route.request_in_flight_ack(request_id, _source_id, this)
-        end
+  //////////////
+  // BARRIER
+  //////////////
+  be initiate_barrier(token: BarrierToken) =>
+    @printf[I32]("!@ Source initiate_barrier\n".cstring())
+    for (o_id, o) in _outputs.pairs() do
+      match o
+      | let ob: OutgoingBoundary =>
+        ob.forward_barrier(o_id, _source_id, token)
       else
-        upstream_requester.try_finish_in_flight_request_early(requester_id)
-      end
-    else
-      upstream_requester.receive_in_flight_ack(upstream_request_id)
-    end
-
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(
-      in_flight_resume_ack_id, request_id, requester_id, requester)
-    then
-      for w in leaving_workers.values() do
-        _remove_boundary(w)
-      end
-      if _routes.size() > 0 then
-        for route in _routes.values() do
-          let new_request_id =
-            _in_flight_ack_waiter.add_consumer_resume_request()
-          route.request_in_flight_resume_ack(in_flight_resume_ack_id,
-            new_request_id, _source_id, this, leaving_workers)
-        end
-      else
-        _in_flight_ack_waiter.try_finish_resume_request_early()
+        o.receive_barrier(_source_id, this, token)
       end
     end
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
-
-  be receive_in_flight_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_request(request_id)
-
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
   //////////////
   // SNAPSHOTS

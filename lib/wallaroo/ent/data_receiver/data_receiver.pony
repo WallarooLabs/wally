@@ -15,6 +15,7 @@ use "net"
 use "time"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
@@ -69,8 +70,6 @@ actor DataReceiver is (Producer & Rerouter)
 
   var _processing_phase: _DataReceiverProcessingPhase =
     _DataReceiverNotProcessingPhase
-
-  var _in_flight_ack_waiter: InFlightAckWaiter = InFlightAckWaiter
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     state_step_creator: StateStepCreator, initialized: Bool = false)
@@ -139,6 +138,7 @@ actor DataReceiver is (Producer & Rerouter)
     _timer_init = _EmptyTimerInit
 
   be register_producer(input_id: StepId, output_id: StepId) =>
+    @printf[I32]("!@ DataReceiver: Register producer %s with %s\n".cstring(), input_id.string().cstring(), output_id.string().cstring())
     _router.register_producer(input_id, output_id, this)
     _boundary_edges.set(BoundaryEdge(input_id, output_id))
 
@@ -177,68 +177,21 @@ actor DataReceiver is (Producer & Rerouter)
     None
 
   be report_status(code: ReportStatusCode) =>
-    _in_flight_ack_waiter.report_status(code)
     _router.report_status(code)
 
-  be request_in_flight_ack(upstream_request_id: RequestId, requester_id: StepId)
+  ///////////////
+  // BARRIER
+  ///////////////
+  be forward_barrier(target_step_id: StepId, origin_step_id: StepId,
+    barrier_token: BarrierToken)
   =>
-    if not _in_flight_ack_waiter.already_added_request(requester_id) then
-      _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
-        EmptyInFlightAckRequester, _WriteInFlightAck(this,
-          upstream_request_id))
-      let requested = _router.request_in_flight_ack(requester_id, this,
-        _in_flight_ack_waiter)
-      if not requested then
-        _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
-      end
-    else
-      write_in_flight_ack(upstream_request_id)
-    end
+    _router.forward_barrier(target_step_id, origin_step_id, this,
+      barrier_token)
 
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    upstream_request_id: RequestId, requester_id: StepId,
-    leaving_workers: Array[String] val)
-  =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
-      upstream_request_id, requester_id, EmptyInFlightAckRequester,
-      _WriteFinishedCompleteAck(this, upstream_request_id))
-    then
-      _router.request_in_flight_resume_ack(in_flight_resume_ack_id,
-        requester_id, this, _in_flight_ack_waiter, leaving_workers)
-    end
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
-
-  be receive_in_flight_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_request(request_id)
-
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
-
-  be write_in_flight_ack(upstream_request_id: RequestId) =>
-    _write_in_flight_ack(upstream_request_id)
-
-  fun ref _write_in_flight_ack(upstream_request_id: RequestId) =>
-    try
-      let ack_msg = ChannelMsgEncoder.in_flight_ack(_worker_name,
-        upstream_request_id, _auth)?
-      _write_on_conn(ack_msg)
-    else
-      Fail()
-    end
-
-  be write_in_flight_resume_ack(upstream_request_id: RequestId) =>
-    _write_in_flight_resume_ack(upstream_request_id)
-
-  fun ref _write_in_flight_resume_ack(upstream_request_id: RequestId) =>
-    try
-      let ack_msg = ChannelMsgEncoder.in_flight_resume_ack(_worker_name,
-        upstream_request_id, _auth)?
-      _write_on_conn(ack_msg)
-    else
-      Fail()
-    end
+  fun ref barrier_complete() =>
+    // The DataReceiver only forwards the barrier at this point, so this
+    // should never be called.
+    Fail()
 
   ///////////////
   // SNAPSHOTS
@@ -471,25 +424,3 @@ class _RequestAck is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _d.request_ack()
     true
-
-class _WriteInFlightAck is CustomAction
-  let _data_receiver: DataReceiver
-  let _request_id: RequestId
-
-  new iso create(data_receiver: DataReceiver, request_id: RequestId) =>
-    _data_receiver = data_receiver
-    _request_id = request_id
-
-  fun ref apply() =>
-    _data_receiver.write_in_flight_ack(_request_id)
-
-class _WriteFinishedCompleteAck is CustomAction
-  let _data_receiver: DataReceiver
-  let _request_id: RequestId
-
-  new iso create(data_receiver: DataReceiver, request_id: RequestId) =>
-    _data_receiver = data_receiver
-    _request_id = request_id
-
-  fun ref apply() =>
-    _data_receiver.write_in_flight_resume_ack(_request_id)

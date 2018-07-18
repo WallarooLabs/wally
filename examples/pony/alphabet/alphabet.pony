@@ -99,6 +99,7 @@ primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
     sc_repo: StateChangeRepository[LetterState],
     state: LetterState): (LetterTotal val, StateChange[LetterState] ref)
   =>
+    // @printf[I32]("!@ AddVotes %s\n".cstring(), votes.string().cstring())
     let state_change: AddVotesStateChange ref =
       try
         sc_repo.lookup_by_name("AddVotes")? as AddVotesStateChange
@@ -143,6 +144,9 @@ class Votes
   new val create(l: String, c: U64) =>
     letter = l
     count = c
+
+  fun string(): String =>
+    letter + ": " + count.string()
 
 class LetterTotal
   let letter: String

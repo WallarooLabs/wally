@@ -27,6 +27,7 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
 
@@ -68,7 +69,8 @@ class val KafkaSinkBuilder
 
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
-    snapshot_initiator: SnapshotInitiator, recovering: Bool): Sink
+    barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
+    recovering: Bool): Sink
   =>
     // generate md5 hash for sink id
     let rb: Reader = Reader
@@ -82,7 +84,7 @@ class val KafkaSinkBuilder
     match KafkaConfigFactory(_ksco, env.out)
     | let kc: KafkaConfig val =>
       KafkaSink(sink_id, name, event_log, recovering, _encoder_wrapper,
-        consume reporter, kc, snapshot_initiator, _auth)
+        consume reporter, kc, barrier_initiator, snapshot_initiator, _auth)
     | let ksce: KafkaConfigError =>
       @printf[U32]("%s\n".cstring(), ksce.message().cstring())
       Fail()

@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
@@ -94,7 +95,7 @@ interface val SourceConfig[In: Any val]
     SourceBuilderBuilder
 
 interface tag Source is (DisposableActor & BoundaryUpdateable &
-  InFlightAckResponder & StatusReporter & SnapshotRequester & Snapshottable)
+  StatusReporter & SnapshotRequester & Snapshottable)
   be update_router(router: PartitionRouter)
   be remove_route_to_consumer(id: StepId, c: Consumer)
   be add_boundary_builders(
@@ -102,6 +103,7 @@ interface tag Source is (DisposableActor & BoundaryUpdateable &
   be reconnect_boundary(target_worker_name: String)
   be mute(c: Consumer)
   be unmute(c: Consumer)
+  be initiate_barrier(token: BarrierToken)
   be initiate_snapshot_barrier(snapshot_id: SnapshotId)
 
 interface tag SourceListener is (DisposableActor & BoundaryUpdateable)
