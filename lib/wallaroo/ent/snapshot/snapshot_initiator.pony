@@ -76,6 +76,8 @@ actor SnapshotInitiator is (SnapshotRequester & Initializable)
     _workers.unset(w)
 
   be initiate_snapshot() =>
+    //!@ Send out initiate to cluster!
+
     if _snapshot_handler.in_progress() then
       Fail()
     end

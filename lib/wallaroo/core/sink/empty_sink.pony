@@ -19,11 +19,12 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/snapshot"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/snapshot"
 use "wallaroo_labs/mort"
 
 actor EmptySink is Sink
@@ -73,20 +74,6 @@ actor EmptySink is Sink
   be report_status(code: ReportStatusCode) =>
     None
 
-  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    producer: InFlightAckRequester)
-  =>
-    producer.receive_in_flight_ack(request_id)
-
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    None
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    None
-
   be request_ack() =>
     None
 
@@ -105,3 +92,15 @@ actor EmptySink is Sink
 
   be dispose() =>
     None
+
+  be receive_barrier(step_id: StepId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref barrier_complete(barrier_token: BarrierToken) =>
+    None
+
+  fun inputs(): Map[StepId, Producer] box =>
+    Map[StepId, Producer]
+

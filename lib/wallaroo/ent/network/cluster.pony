@@ -46,11 +46,6 @@ trait tag Cluster
   be stop_the_world(exclusions: Array[String] val) =>
     None
 
-  be request_in_flight_acks(requester_id: StepId,
-    router_registry: RouterRegistry, exclusions: Array[String] val)
-  =>
-    None
-
   be request_cluster_unmute() =>
     None
 

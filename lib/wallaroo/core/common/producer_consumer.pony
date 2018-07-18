@@ -18,29 +18,18 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "wallaroo/core/boundary"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/snapshot"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-trait tag InFlightAckRequester
-  be receive_in_flight_ack(request_id: RequestId)
-  be receive_in_flight_resume_ack(request_id: RequestId)
-  be try_finish_in_flight_request_early(requester_id: StepId)
-
-trait tag InFlightAckResponder
-  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
 
 trait tag StatusReporter
   be report_status(code: ReportStatusCode)
 
-trait tag Producer is (Muteable & Ackable & AckRequester &
-  InFlightAckRequester & SnapshotRequester)
+trait tag Producer is (Muteable & Ackable & AckRequester & SnapshotRequester)
   fun ref route_to(c: Consumer): (Route | None)
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
@@ -55,7 +44,7 @@ interface tag BoundaryUpdateable
   be remove_boundary(worker: String)
 
 trait tag Consumer is (Runnable & StateReceiver & AckRequester &
-  Initializable & InFlightAckResponder & StatusReporter & Snapshottable)
+  Initializable & StatusReporter & Snapshottable & BarrierReceiver)
   // TODO: For now, since we do not allow application graph cycles, all back
   // edges are from DataReceivers. This allows us to simply identify them
   // directly. Once we allow application cycles, we will need a more

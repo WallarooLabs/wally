@@ -23,6 +23,7 @@ use "collections"
 use "wallaroo_labs/mort"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/snapshot"
@@ -396,28 +397,25 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReportStatusMsg(code), auth)?
 
-  fun request_in_flight_ack(sender: String, request_id: RequestId,
-    requester_id: StepId, auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(RequestInFlightAckMsg(sender, request_id, requester_id), auth)?
-
-  fun request_in_flight_resume_ack(sender: String,
-    in_flight_resume_ack_id: InFlightResumeAckId, request_id: RequestId,
-    requester_id: StepId, leaving_workers: Array[String] val,
+  fun remote_initiate_barrier(sender: String, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(RequestInFlightResumeAckMsg(sender, in_flight_resume_ack_id,
-      request_id, requester_id, leaving_workers), auth)?
+    _encode(RemoteInitiateBarrierMsg(sender, token), auth)?
 
-  fun in_flight_ack(sender: String, request_id: RequestId, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(InFlightAckMsg(sender, request_id), auth)?
-
-  fun in_flight_resume_ack(sender: String, request_id: RequestId,
+  fun worker_ack_barrier_start(sender: String, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(FinishedCompleteAckMsg(sender, request_id), auth)?
+    _encode(WorkerAckBarrierStartMsg(sender, token), auth)?
+
+  fun worker_ack_barrier(sender: String, token: BarrierToken,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(WorkerAckBarrierMsg(sender, token), auth)?
+
+  fun forward_barrier(target_step_id: StepId, origin_step_id: StepId,
+    token: BarrierToken, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token), auth)?
 
   fun resume_the_world(sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1093,51 +1091,40 @@ class val CleanShutdownMsg is ChannelMsg
   new val create(m: String) =>
     msg = m
 
-class val InFlightAckMsg is ChannelMsg
+class val RemoteInitiateBarrierMsg is ChannelMsg
   let sender: String
-  let request_id: RequestId
+  let token: BarrierToken
 
-  new val create(sender': String, request_id': RequestId) =>
+  new val create(sender': String, token': BarrierToken) =>
     sender = sender'
-    request_id = request_id'
+    token = token'
 
-class val FinishedCompleteAckMsg is ChannelMsg
+class val WorkerAckBarrierStartMsg is ChannelMsg
   let sender: String
-  let request_id: RequestId
+  let token: BarrierToken
 
-  new val create(sender': String, request_id': RequestId) =>
+  new val create(sender': String, token': BarrierToken) =>
     sender = sender'
-    request_id = request_id'
+    token = token'
 
-class val RequestInFlightAckMsg is ChannelMsg
+class val WorkerAckBarrierMsg is ChannelMsg
   let sender: String
-  let request_id: RequestId
-  let requester_id: StepId
+  let token: BarrierToken
 
-  new val create(sender': String, request_id': RequestId,
-    requester_id': StepId)
+  new val create(sender': String, token': BarrierToken) =>
+    sender = sender'
+    token = token'
+
+class val ForwardBarrierMsg is ChannelMsg
+  let target_id: StepId
+  let origin_id: StepId
+  let token: BarrierToken
+
+  new val create(target_id': StepId, origin_id': StepId, token': BarrierToken)
   =>
-    sender = sender'
-    request_id = request_id'
-    requester_id = requester_id'
-
-class val RequestInFlightResumeAckMsg is ChannelMsg
-  let sender: String
-  let in_flight_resume_ack_id: InFlightResumeAckId
-  let request_id: RequestId
-  let requester_id: StepId
-  let leaving_workers: Array[String] val
-
-  new val create(sender': String,
-    in_flight_resume_ack_id': InFlightResumeAckId,
-    request_id': RequestId, requester_id': StepId,
-    leaving_workers': Array[String] val)
-  =>
-    sender = sender'
-    in_flight_resume_ack_id = in_flight_resume_ack_id'
-    request_id = request_id'
-    requester_id = requester_id'
-    leaving_workers = leaving_workers'
+    target_id = target_id'
+    origin_id = origin_id'
+    token = token'
 
 class val ResumeTheWorldMsg is ChannelMsg
   let sender: String
