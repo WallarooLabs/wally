@@ -50,8 +50,6 @@ class BoundaryRoute is Route
     _route = _RouteLogic(step_id, step, consumer, "Boundary")
 
   fun ref application_created() =>
-    //!@
-    // _consumer.register_producer(_step_id, _step)
     None
 
   fun ref application_initialized(step_type: String) =>
@@ -64,8 +62,8 @@ class BoundaryRoute is Route
   fun ref dispose() =>
     None
 
-  fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>

@@ -79,8 +79,7 @@ actor DummyProducer is Producer
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     None
 
-  be application_created(initializer: LocalTopologyInitializer,
-    target_id_router: TargetIdRouter)
+  be application_created(initializer: LocalTopologyInitializer)
   =>
     None
 

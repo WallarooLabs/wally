@@ -80,9 +80,7 @@ actor DummyConsumer is Consumer
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     None
 
-  be application_created(initializer: LocalTopologyInitializer,
-    target_id_router: TargetIdRouter)
-  =>
+  be application_created(initializer: LocalTopologyInitializer) =>
     None
 
   be application_initialized(initializer: LocalTopologyInitializer) =>

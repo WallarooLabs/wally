@@ -92,8 +92,7 @@ trait tag AckRequester
 
 trait tag Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer)
-  be application_created(initializer: LocalTopologyInitializer,
-    target_id_router: TargetIdRouter)
+  be application_created(initializer: LocalTopologyInitializer)
 
   be application_initialized(initializer: LocalTopologyInitializer)
   be application_ready_to_work(initializer: LocalTopologyInitializer)

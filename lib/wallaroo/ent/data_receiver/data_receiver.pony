@@ -61,6 +61,12 @@ actor DataReceiver is (Producer & Rerouter)
   // Keep track of point to point connections over the boundary
   let _boundary_edges: Set[BoundaryEdge] = _boundary_edges.create()
 
+  // Keep track of register_producer calls that we weren't ready to forward
+  let _queued_register_producers: Array[(StepId, StepId)] =
+    _queued_register_producers.create()
+  let _queued_unregister_producers: Array[(StepId, StepId)] =
+    _queued_register_producers.create()
+
   var _processing_phase: _DataReceiverProcessingPhase =
     _DataReceiverNotProcessingPhase
 
@@ -135,6 +141,12 @@ actor DataReceiver is (Producer & Rerouter)
   be register_producer(input_id: StepId, output_id: StepId) =>
     _router.register_producer(input_id, output_id, this)
     _boundary_edges.set(BoundaryEdge(input_id, output_id))
+
+  fun ref queue_register_producer(input_id: StepId, output_id: StepId) =>
+    _queued_register_producers.push((input_id, output_id))
+
+  fun ref queue_unregister_producer(input_id: StepId, output_id: StepId) =>
+    _queued_unregister_producers.push((input_id, output_id))
 
   be unregister_producer(input_id: StepId, output_id: StepId) =>
     _router.unregister_producer(input_id, output_id, this)
@@ -280,6 +292,26 @@ actor DataReceiver is (Producer & Rerouter)
     // _router.unregister_producer(this)
 
     _router = router'
+
+    // If we have pending register_producer calls, then try to process them now
+    var retries = Array[(StepId, StepId)]
+    for r in _queued_register_producers.values() do
+      retries.push(r)
+    end
+    _queued_register_producers.clear()
+    for (input, output) in retries.values() do
+      _router.register_producer(input, output, this)
+    end
+    // If we have pending unregister_producer calls, then try to process them
+    // now
+    retries = Array[(StepId, StepId)]
+    for r in _queued_unregister_producers.values() do
+      retries.push(r)
+    end
+    _queued_unregister_producers.clear()
+    for (input, output) in retries.values() do
+      _router.unregister_producer(input, output, this)
+    end
 
     //!@ We now need to wait for actual steps to contact us to register
     // them as producers

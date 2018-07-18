@@ -149,7 +149,6 @@ actor TCPSink is Sink
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    @printf[I32]("<<---------->>!@ Sink with id: %s\n".cstring(), sink_id.string().cstring())
     _env = env
     _sink_id = sink_id
     _name = sink_name
@@ -179,9 +178,7 @@ actor TCPSink is Sink
     _initializer = initializer
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    target_id_router: TargetIdRouter)
-  =>
+  be application_created(initializer: LocalTopologyInitializer) =>
     _mute_upstreams()
     initializer.report_initialized(this)
 

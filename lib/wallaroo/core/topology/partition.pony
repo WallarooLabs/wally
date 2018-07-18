@@ -109,7 +109,6 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
 
 interface StateAddresses
   fun apply(key: Any val): (Step tag | ProxyRouter | None)
-  fun register_routes(router: Router)
   fun steps(): Array[Consumer] val
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
@@ -130,15 +129,6 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
       None
     end
 
-  fun register_routes(router: Router) =>
-    @printf[I32]("!@ KeyedStateAddresses register routes\n".cstring())
-    for s in _addresses.values() do
-      match s
-      | let step: Step =>
-        step.register_routes(router)
-      end
-    end
-
   fun steps(): Array[Consumer] val =>
     let ss = recover trn Array[Consumer] end
     for s in _addresses.values() do
@@ -157,7 +147,8 @@ trait val StateSubpartition is Equatable[StateSubpartition]
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer]): PartitionRouter
+    data_routes: Map[U128, Consumer], state_steps: Map[String, Array[Step]]):
+      PartitionRouter
   fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
     pa: ProxyAddress): StateSubpartition ?
   fun runner_builder(): RunnerBuilder
@@ -193,7 +184,11 @@ class val KeyedStateSubpartition[PIn: Any val,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer]):
+    data_routes: Map[U128, Consumer],
+    keyed_data_routes: LocalStatePartitions,
+    keyed_step_ids: LocalStatePartitionIds,
+    state_steps: Map[String, Array[Step]],
+    state_step_creator: StateStepCreator):
     LocalPartitionRouter[PIn, Key, S] val
   =>
     let routes = recover trn Map[Key, (Step | ProxyRouter)] end
@@ -201,6 +196,8 @@ class val KeyedStateSubpartition[PIn: Any val,
     let m = recover trn Map[U128, Step] end
 
     var partition_count: USize = 0
+
+    let new_state_steps = Array[Step]
 
     for (key, id) in _id_map.pairs() do
       let proxy_address = _partition_addresses(key)
@@ -213,6 +210,7 @@ class val KeyedStateSubpartition[PIn: Any val,
             consume reporter, id, event_log, recovery_replayer,
             outgoing_boundaries)
 
+          new_state_steps.push(next_state_step)
           initializables.set(next_state_step)
           data_routes(id) = next_state_step
           m(id) = next_state_step
@@ -232,6 +230,8 @@ class val KeyedStateSubpartition[PIn: Any val,
         @printf[I32]("Missing proxy address!\n".cstring())
       end
     end
+
+    state_steps(_state_name) = new_state_steps
 
     @printf[I32](("Spinning up " + partition_count.string() +
       " state partitions for " + _pipeline_name + " pipeline\n").cstring())

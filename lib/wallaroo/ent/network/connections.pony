@@ -575,7 +575,8 @@ actor Connections is Cluster
   be create_routers_from_blueprints(workers: Array[String] val,
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    omr_blueprint: TargetIdRouterBlueprint, local_sinks: Map[StepId, Consumer] val,
+    tidr_blueprints: Map[String, TargetIdRouterBlueprint] val,
+    local_sinks: Map[StepId, Consumer] val,
     router_registry: RouterRegistry, lti: LocalTopologyInitializer)
   =>
     // We delegate to router registry through here to ensure that we've
@@ -583,7 +584,7 @@ actor Connections is Cluster
     // create_connections was called.
 
     // We must create the target_id_router first
-    router_registry.create_target_id_router_from_blueprint(omr_blueprint,
+    router_registry.create_target_id_routers_from_blueprint(tidr_blueprints,
       local_sinks, lti)
     router_registry.create_partition_routers_from_blueprints(workers,
       pr_blueprints)
@@ -723,7 +724,7 @@ actor Connections is Cluster
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
-    omr_blueprint: TargetIdRouterBlueprint)
+    tidr_blueprints: Map[String, TargetIdRouterBlueprint] val)
   =>
     _register_disposable(conn)
     if not _control_addrs.contains(worker) then
@@ -744,7 +745,7 @@ actor Connections is Cluster
           _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
           _metrics_service, consume c_addrs, consume d_addrs,
           local_topology.worker_names, partition_blueprints,
-          stateless_partition_blueprints, omr_blueprint, _auth)?
+          stateless_partition_blueprints, tidr_blueprints, _auth)?
         conn.writev(inform_msg)
         @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
           "necessary information.***\n").cstring(), worker.cstring())

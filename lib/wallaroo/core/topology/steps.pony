@@ -121,14 +121,6 @@ actor Step is (Producer & Consumer & Rerouter)
       _register_output(c_id, consumer)
     end
 
-    //!@
-    // for boundary in _outgoing_boundaries.values() do
-    //   if not _routes.contains(boundary) then
-    //     _routes(boundary) =
-    //       _route_builder(_id, this, boundary, _metrics_reporter)
-    //   end
-    // end
-
     for r in _routes.values() do
       ifdef "resilience" then
         _acker_x.add_route(r)
@@ -146,45 +138,7 @@ actor Step is (Producer & Consumer & Rerouter)
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    target_id_router: TargetIdRouter)
-  =>
-    _initialize_routes_boundaries_omni_router(omni_router)
-    initializer.report_initialized(this)
-
-  fun ref _initialize_routes_boundaries_omni_router(omni_router: OmniRouter) =>
-    //!@ We shouldn't need this here.  This should happen whenever a router is
-    // updated
-    // for (c_id, consumer) in _router.routes().pairs() do
-    //   if _outputs.contains(c_id) then
-    //     try
-    //       _routes(consumer)?.unregister_producer(c_id)
-    //     else
-    //       Fail()
-    //     end
-    //   end
-    //   _outputs(c_id) = consumer
-    //   if not _routes.contains(consumer) then
-    //     let new_route = _route_builder(_id, this, consumer, _metrics_reporter)
-    //     _routes(consumer) = new_route
-    //     new_route.register_producer(c_id)
-    //   else
-    //     try
-    //       _routes(consumer)?.register_producer(c_id)
-    //     else
-    //       Fail()
-    //     end
-    //   end
-    // end
-
-    //!@
-    // for boundary in _outgoing_boundaries.values() do
-    //   if not _routes.contains(boundary) then
-    //     _routes(boundary) =
-    //       _route_builder(_id, this, boundary, _metrics_reporter)
-    //   end
-    // end
-
+  be application_created(initializer: LocalTopologyInitializer) =>
     for r in _routes.values() do
       r.application_created()
       ifdef "resilience" then
@@ -192,9 +146,8 @@ actor Step is (Producer & Consumer & Rerouter)
       end
     end
 
-    _target_id_router = target_id_router
-
     _initialized = true
+    initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     _prepare_ready_to_work(initializer)
@@ -239,18 +192,6 @@ actor Step is (Producer & Consumer & Rerouter)
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be register_routes(router': Router) =>
-    ifdef debug then
-      if _initialized then
-        Fail()
-      end
-    end
-
-    for (c_id, consumer) in router'.routes().pairs() do
-      _register_output(c_id, consumer)
-      @printf[I32]("!@ Registered output %s at step %s\n".cstring(), c_id.string().cstring(), _id.string().cstring())
-    end
-
   be update_router(router': Router) =>
     _update_router(router')
 
@@ -261,13 +202,7 @@ actor Step is (Producer & Consumer & Rerouter)
       old_router.routes_not_in(_router).pairs()
     do
       if _outputs.contains(old_id) then
-        try
-          _outputs.remove(old_id)?
-          _routes(outdated_consumer)?.unregister_producer(old_id)
-          _remove_route_if_no_output(outdated_consumer)
-        else
-          Fail()
-        end
+        _unregister_output(old_id, outdated_consumer)
       end
     end
     for (c_id, consumer) in _router.routes().pairs() do
@@ -277,20 +212,14 @@ actor Step is (Producer & Consumer & Rerouter)
   fun ref _register_output(id: StepId, c: Consumer) =>
     if _outputs.contains(id) then
       try
-        if _outputs(id)? is c then
+        let old_c = _outputs(id)?
+        if old_c is c then
           // We already know about this output.
           return
         end
+        _unregister_output(id, old_c)
       else
         Unreachable()
-      end
-
-      try
-        _routes(c)?.unregister_producer(id)
-        _outputs.remove(id)?
-        _remove_route_if_no_output(c)
-      else
-        Fail()
       end
     end
 
@@ -310,20 +239,22 @@ actor Step is (Producer & Consumer & Rerouter)
       end
     end
 
+  fun ref _unregister_output(id: StepId, c: Consumer) =>
+    try
+      _routes(c)?.unregister_producer(id)
+      _outputs.remove(id)?
+      _remove_route_if_no_output(c)
+    else
+      Fail()
+    end
+
   fun ref _unregister_all_outputs() =>
     """
     This method should only be called if we are removing this step from the
     active graph (or on dispose())
     """
     for (id, consumer) in _outputs.pairs() do
-      try
-        _routes(consumer)?.unregister_producer(id)
-      else
-        Fail()
-      end
-      _pending_message_store.process_known_keys(this, this, _router)
-    else
-      Fail()
+      _unregister_output(id, consumer)
     end
 
   be remove_route_to_consumer(id: StepId, c: Consumer) =>
@@ -331,15 +262,7 @@ actor Step is (Producer & Consumer & Rerouter)
       ifdef debug then
         Invariant(_routes.contains(c))
       end
-      try
-        _outputs.remove(id)?
-        try
-          _routes(c)?.unregister_producer(id)
-        else
-          Fail()
-        end
-        _remove_route_if_no_output(c)
-      end
+      _unregister_output(id, c)
     end
 
   fun ref _remove_route_if_no_output(c: Consumer) =>
@@ -368,15 +291,11 @@ actor Step is (Producer & Consumer & Rerouter)
       old_router.routes_not_in(_target_id_router).pairs()
     do
       if _outputs.contains(old_id) then
-        try
-          _routes(outdated_consumer)?.unregister_producer(old_id)
-          _outputs.remove(old_id)?
-          _remove_route_if_no_output(outdated_consumer)
-        end
+        _unregister_output(old_id, outdated_consumer)
       end
     end
 
-    for (id, consumer) in target_id_router.route().pairs() do
+    for (id, consumer) in target_id_router.routes().pairs() do
       _register_output(id, consumer)
     end
 
@@ -401,18 +320,22 @@ actor Step is (Producer & Consumer & Rerouter)
     _remove_boundary(worker)
 
   fun ref _remove_boundary(worker: String) =>
-    if _outgoing_boundaries.contains(worker) then
-      try
-        let boundary = _outgoing_boundaries(worker)?
-        _outgoing_boundaries.remove(worker)?
-        if _routes.contains(boundary) then
-          _routes(boundary)?.dispose()
-          _routes.remove(boundary)?
-        end
-      else
-        Fail()
-      end
-    end
+    None
+    //!@
+    // try
+    //   let old_ob = _outgoing_boundaries.remove(worker)?._2
+    //   _routes(old_ob)?.dispose()
+    //   for (id, c) in _outputs.pairs() do
+    //     match c
+    //     | let ob: OutgoingBoundary =>
+    //       if ob is old_ob then
+    //         _unregister_output(id, c)
+    //       end
+    //     end
+    //   end
+    // else
+    //   Fail()
+    // end
 
   be remove_route_for(step: Consumer) =>
     try
@@ -728,7 +651,6 @@ actor Step is (Producer & Consumer & Rerouter)
   ///////////////
   // GROW-TO-FIT
   be receive_state(state: ByteSeq val) =>
-    // @printf[I32]("!@ Receiving state on %s\n".cstring(), _id.string().cstring())
     ifdef "autoscale" then
       try
         match Serialised.input(InputSerialisedAuth(_auth),
@@ -761,7 +683,8 @@ actor Step is (Producer & Consumer & Rerouter)
 
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Key) =>
     ifdef "autoscale" then
-      _unregister_all_outputs()
+      //@!
+      // _unregister_all_outputs()
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
         // TODO: Should this be possible?
