@@ -90,7 +90,6 @@ trait BasicPipeline
   fun name(): String
   fun source_id(): USize
   fun source_builder(): SourceBuilderBuilder ?
-  fun source_route_builder(): RouteBuilder
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
   fun val sink_builders(): Array[SinkBuilder] val
   fun val sink_ids(): Array[StepId] val
@@ -104,7 +103,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _app_name: String
   let _runner_builders: Array[RunnerBuilder]
   var _source_builder: (SourceBuilderBuilder | None) = None
-  let _source_route_builder: RouteBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
   var _sink_builders: Array[SinkBuilder] = Array[SinkBuilder]
 
@@ -118,7 +116,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _runner_builders = Array[RunnerBuilder]
     _name = n
     _app_name = app_name
-    _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
     _source_listener_builder_builder = sc.source_listener_builder_builder()
     _source_builder = sc.source_builder(_app_name, _name)
@@ -136,8 +133,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun source_builder(): SourceBuilderBuilder ? =>
     _source_builder as SourceBuilderBuilder
-
-  fun source_route_builder(): RouteBuilder => _source_route_builder
 
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder
@@ -168,8 +163,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     comp_builder: ComputationBuilder[Last, Next],
     id: U128 = 0): PipelineBuilder[In, Out, Next]
   =>
-    let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder,
-      TypedRouteBuilder[Next])
+    let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder)
     _p.add_runner_builder(next_builder)
     PipelineBuilder[In, Out, Next](_a, _p)
 
@@ -178,7 +172,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     id: U128 = 0): PipelineBuilder[In, Out, Next]
   =>
     let next_builder = ComputationRunnerBuilder[Last, Next](
-      comp_builder, TypedRouteBuilder[Next] where parallelized' = true)
+      comp_builder where parallelized' = true)
     _p.add_runner_builder(next_builder)
     PipelineBuilder[In, Out, Next](_a, _p)
 
@@ -206,18 +200,14 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     step_id_map("key") = step_id_gen()
 
     let next_builder = PreStateRunnerBuilder[Last, Next, Last, S](
-      s_comp, state_name, SingleStepPartitionFunction[Last],
-      TypedRouteBuilder[StateProcessor[S]],
-      TypedRouteBuilder[Next])
+      s_comp, state_name, SingleStepPartitionFunction[Last])
 
     _p.add_runner_builder(next_builder)
 
     let state_builder = PartitionedStateRunnerBuilder[Last, S](_p.name(),
       state_name, consume step_id_map, single_step_partition,
       StateRunnerBuilder[S](s_initializer, state_name,
-        s_comp.state_change_builders()),
-      TypedRouteBuilder[StateProcessor[S]],
-      TypedRouteBuilder[Next])
+        s_comp.state_change_builders()))
 
     _a.add_state_builder(state_name, state_builder)
 
@@ -248,8 +238,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     let next_builder = PreStateRunnerBuilder[Last, Next, PIn, S](
       s_comp, state_name, partition.function(),
-      TypedRouteBuilder[StateProcessor[S]],
-      TypedRouteBuilder[Next] where multi_worker = multi_worker)
+      where multi_worker = multi_worker)
 
     _p.add_runner_builder(next_builder)
 
@@ -257,8 +246,6 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       state_name, consume step_id_map, partition,
       StateRunnerBuilder[S](s_initializer, state_name,
         s_comp.state_change_builders()),
-      TypedRouteBuilder[StateProcessor[S]],
-      TypedRouteBuilder[Next]
       where multi_worker = multi_worker)
 
     _a.add_state_builder(state_name, state_builder)

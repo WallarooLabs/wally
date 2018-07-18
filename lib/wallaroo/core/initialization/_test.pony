@@ -204,8 +204,7 @@ primitive _PreStateDataGenerator
 
 primitive _RunnerBuilderGenerator
   fun apply(): RunnerBuilder =>
-    ComputationRunnerBuilder[U8, U8](_ComputationBuilderGenerator(),
-      BoundaryOnlyRouteBuilder)
+    ComputationRunnerBuilder[U8, U8](_ComputationBuilderGenerator())
 
 primitive _ComputationBuilderGenerator
   fun apply(): ComputationBuilder[U8, U8] val =>
