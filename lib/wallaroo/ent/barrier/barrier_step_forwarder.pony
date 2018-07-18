@@ -42,7 +42,11 @@ class BarrierStepForwarder
     barrier_token: BarrierToken)
   =>
     @printf[I32]("!@ receive_barrier at Forwarder from %s!\n".cstring(), step_id.string().cstring())
-    if barrier_token != _barrier_token then Fail() end
+    if barrier_token != _barrier_token then
+      @printf[I32]("!@ Received %s when still processing %s\n".cstring(),
+        _barrier_token.string().cstring(), barrier_token.string().cstring())
+      Fail()
+    end
 
     let inputs = _step.inputs()
 

@@ -20,18 +20,18 @@ use "wallaroo_labs/mort"
 trait BarrierHandler
   fun name(): String
   fun in_progress(): Bool
-  fun ref ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken) =>
+  fun ref ack_barrier(s: BarrierReceiver) =>
     _print_invalid_call_debug_info()
     Fail()
-  fun ref worker_ack_barrier_start(w: String, barrier_token: BarrierToken)
+  fun ref worker_ack_barrier_start(w: String)
   =>
     _print_invalid_call_debug_info()
     Fail()
-  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken)
+  fun ref worker_ack_barrier(w: String)
   =>
     _print_invalid_call_debug_info()
     Fail()
-  fun start() =>
+  fun ref check_for_completion() =>
     Fail()
   fun ref _print_invalid_call_debug_info() =>
     @printf[I32]("Invalid call on BarrierHandler %s\n".cstring(),
@@ -82,17 +82,16 @@ class PendingBarrierHandler is BarrierHandler
   fun _is_primary(): Bool =>
     _worker_name == _primary_worker
 
-  fun ref ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken) =>
+  fun ref ack_barrier(s: BarrierReceiver) =>
     """
     If we receive barrier acks in this phase, we hold on to them for later.
     """
     @printf[I32]("!@ ack sink barrier at PendingBarrierHandler\n".cstring())
-    if barrier_token != _barrier_token then Fail() end
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
 
-  fun ref worker_ack_barrier_start(w: String, barrier_token: BarrierToken) =>
+  fun ref worker_ack_barrier_start(w: String) =>
     """
     If we receive worker acks in this phase, we hold on to them for later.
     """
@@ -103,14 +102,10 @@ class PendingBarrierHandler is BarrierHandler
       Invariant(not SetHelpers[String].contains[String](_workers_acked_start,
         w))
     end
-    if barrier_token != _barrier_token then
-      @printf[I32]("!@ Rcvd %s, expected %s\n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring())
-      Fail()
-    end
     if _is_primary() then
       // We are the primary, so we need to wait for everyone's ack
       _workers_acked_start.set(w)
-      _check_for_completion()
+      check_for_completion()
     else
       // We're not the primary, so we should only receive an ack from the
       // primary.
@@ -121,7 +116,7 @@ class PendingBarrierHandler is BarrierHandler
       end
     end
 
-  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
+  fun ref worker_ack_barrier(w: String) =>
     """
     If we receive worker barrier acks in this phase, we hold on to them for
     later.
@@ -132,10 +127,9 @@ class PendingBarrierHandler is BarrierHandler
       Invariant(not SetHelpers[String].contains[String](_workers_acked_barrier,
         w))
     end
-    if barrier_token != _barrier_token then Fail() end
     _workers_acked_barrier.set(w)
 
-  fun ref _check_for_completion() =>
+  fun ref check_for_completion() =>
     @printf[I32]("!@ PendingBarrierHandler _check_for_completion with %s _acked_workers and %s _workers\n".cstring(), _workers_acked_start.size().string().cstring(), _workers.size().string().cstring())
     if _workers_acked_start.size() == _workers.size() then
       _initiator.confirm_start_barrier(_barrier_token)
@@ -185,7 +179,6 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
       _workers.set(w)
     end
     _result_promise = result_promise
-    _check_for_completion()
 
   fun name(): String =>
     "InProgressPrimaryBarrierHandler"
@@ -193,15 +186,14 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
   fun in_progress(): Bool =>
     true
 
-  fun ref ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken) =>
+  fun ref ack_barrier(s: BarrierReceiver) =>
     @printf[I32]("!@ ack_barrier at InProgressPrimaryBarrierHandler\n".cstring())
-    if barrier_token != _barrier_token then Fail() end
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
-    _check_for_completion()
+    check_for_completion()
 
-  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
+  fun ref worker_ack_barrier(w: String) =>
     """
     If we receive worker acks in this phase, we hold on to them for later.
     """
@@ -210,15 +202,12 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
       Invariant(SetHelpers[String].contains[String](_workers, w))
       Invariant(not SetHelpers[String].contains[String](_workers_acked, w))
     end
-    if barrier_token != _barrier_token then Fail() end
     _workers_acked.set(w)
 
-  fun ref _check_for_completion() =>
+  fun ref check_for_completion() =>
     @printf[I32]("!@ InProgressPrimaryBarrierHandler _check_for_completion with %s _acked_sinks and %s _sinks\n".cstring(), _acked_sinks.size().string().cstring(), _sinks.size().string().cstring())
     if _acked_sinks.size() == _sinks.size() then
       let acked_ws = recover iso SetIs[String] end
-      // Add ourself to ack list
-      acked_ws.set(_worker_name)
       for w in _workers_acked.values() do
         acked_ws.set(w)
       end
@@ -246,7 +235,6 @@ class InProgressSecondaryBarrierHandler is BarrierHandler
       _sinks.set(s)
     end
     _primary_worker = primary_worker
-    _check_for_completion()
 
   fun name(): String =>
     "InProgressSecondaryBarrierHandler"
@@ -254,16 +242,13 @@ class InProgressSecondaryBarrierHandler is BarrierHandler
   fun in_progress(): Bool =>
     true
 
-  fun ref ack_barrier(s: BarrierReceiver,
-    barrier_token: BarrierToken)
-  =>
-    if barrier_token != _barrier_token then Fail() end
+  fun ref ack_barrier(s: BarrierReceiver) =>
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
-    _check_for_completion()
+    check_for_completion()
 
-  fun ref _check_for_completion() =>
+  fun ref check_for_completion() =>
     if _acked_sinks.size() == _sinks.size() then
       _initiator.all_secondary_sinks_acked(_barrier_token, _primary_worker)
     end
@@ -292,25 +277,20 @@ class WorkerAcksBarrierHandler is BarrierHandler
     end
     _result_promise = result_promise
 
-    _check_for_completion()
-
   fun name(): String =>
     "WorkerAcksBarrierHandler"
 
   fun in_progress(): Bool =>
     true
 
-  fun ref worker_ack_barrier(w: String,
-    barrier_token: BarrierToken)
-  =>
+  fun ref worker_ack_barrier(w: String) =>
     @printf[I32]("!@ worker_ack_barrier for %s from WorkerAcksBarrierHandler\n".cstring(), w.cstring())
-    if barrier_token != _barrier_token then Fail() end
     if not SetHelpers[String].contains[String](_workers, w) then Fail() end
 
     _acked_workers.set(w)
-    _check_for_completion()
+    check_for_completion()
 
-  fun ref _check_for_completion() =>
+  fun ref check_for_completion() =>
     if _acked_workers.size() == _workers.size() then
       @printf[I32]("!@ All workers are completed for acks!\n".cstring())
       _initiator.all_workers_acked(_barrier_token, _result_promise)

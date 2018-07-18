@@ -188,6 +188,10 @@ actor Startup
         Fail()
       end
 
+      // TODO: Replace this with the name of this worker, whatever it
+      // happens to be.
+      let initializer_name = "initializer"
+
       let auth = _env.root as AmbientAuth
       _set_recovery_file_names(auth)
 
@@ -316,7 +320,7 @@ actor Startup
       connections.register_disposable(this)
 
       let barrier_initiator = BarrierInitiator(auth,
-        _startup_options.worker_name, connections)
+        _startup_options.worker_name, connections, initializer_name)
 
       let snapshot_initiator = SnapshotInitiator(connections,
         _startup_options.time_between_snapshots, barrier_initiator,
@@ -372,6 +376,7 @@ actor Startup
         @printf[I32]("Running as Initializer...\n".cstring())
         _application_distributor = ApplicationDistributor(auth, _application,
           local_topology_initializer)
+
         match _application_distributor
         | let ad: ApplicationDistributor =>
           match _startup_options.worker_count
@@ -379,7 +384,7 @@ actor Startup
             _cluster_initializer = ClusterInitializer(auth,
               _startup_options.worker_name, wc, connections, ad,
               local_topology_initializer, _startup_options.d_addr,
-              metrics_conn, is_recovering)
+              metrics_conn, is_recovering, initializer_name)
           else
             Unreachable()
           end
@@ -442,6 +447,10 @@ actor Startup
       let auth = _env.root as AmbientAuth
       _set_recovery_file_names(auth)
 
+      // TODO: Replace this with the name of this worker, whatever it
+      // happens to be.
+      let initializer_name = "initializer"
+
       let metrics_conn = ReconnectingMetricsSink(m.metrics_host,
         m.metrics_service, _application.name(), _startup_options.worker_name)
 
@@ -492,7 +501,7 @@ actor Startup
       connections.register_disposable(this)
 
       let barrier_initiator = BarrierInitiator(auth,
-        _startup_options.worker_name, connections)
+        _startup_options.worker_name, connections, initializer_name)
 
       let snapshot_initiator = SnapshotInitiator(connections,
         _startup_options.time_between_snapshots, barrier_initiator,

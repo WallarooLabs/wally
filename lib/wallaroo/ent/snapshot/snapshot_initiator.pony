@@ -67,7 +67,7 @@ actor SnapshotInitiator is Initializable
     let token = SnapshotBarrierToken(_current_snapshot_id)
     let action = Promise[BarrierToken]
     action.next[None](recover this~snapshot_complete() end)
-    _barrier_initiator.initiate_barrier(token, action)
+    _barrier_initiator.inject_barrier(token, action)
 
   be snapshot_complete(token: BarrierToken) =>
     ifdef "resilience" then

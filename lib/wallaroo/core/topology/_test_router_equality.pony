@@ -247,7 +247,8 @@ primitive _RouterRegistryGenerator
 
 primitive _BarrierInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): BarrierInitiator =>
-    BarrierInitiator(auth, "w", _ConnectionsGenerator(env, auth))
+    BarrierInitiator(auth, "w", _ConnectionsGenerator(env, auth),
+      "init")
 
 primitive _InFlightAckInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): InFlightAckInitiator =>

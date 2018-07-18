@@ -40,7 +40,7 @@ actor InFlightAckInitiator
       .next[None](recover this~in_flight_acks_complete() end)
       .next[None]({(_: None) => in_flight_promise(None)})
 
-    _barrier_initiator.initiate_barrier(_current_in_flight_token,
+    _barrier_initiator.inject_barrier(_current_in_flight_token,
       barrier_promise)
 
   be initiate_in_flight_resume_acks(
@@ -58,7 +58,7 @@ actor InFlightAckInitiator
       .next[None](recover this~in_flight_acks_complete() end)
       .next[None]({(_: None) => in_flight_promise(None)})
 
-    _barrier_initiator.initiate_barrier(_current_in_flight_token,
+    _barrier_initiator.inject_barrier(_current_in_flight_token,
       barrier_promise)
 
   be in_flight_acks_complete(barrier_token: BarrierToken) =>

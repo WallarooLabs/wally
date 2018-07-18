@@ -396,6 +396,12 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReportStatusMsg(code), auth)?
 
+  fun forward_inject_barrier(token: BarrierToken,
+    result_promise: BarrierResultPromise, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+  _encode(ForwardInjectBarrierMsg(token, result_promise), auth)?
+
   fun remote_initiate_barrier(sender: String, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1086,6 +1092,14 @@ class val CleanShutdownMsg is ChannelMsg
 
   new val create(m: String) =>
     msg = m
+
+class val ForwardInjectBarrierMsg is ChannelMsg
+  let token: BarrierToken
+  let result_promise: BarrierResultPromise
+
+  new val create(token': BarrierToken, promise: BarrierResultPromise) =>
+    token = token'
+    result_promise = promise
 
 class val RemoteInitiateBarrierMsg is ChannelMsg
   let sender: String

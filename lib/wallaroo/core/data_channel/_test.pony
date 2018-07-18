@@ -93,9 +93,9 @@ class _TestDataChannel is DataChannelListenNotify
       let dr = DataReceivers(auth, conns, worker_name, ssc)
       let rr = RouterRegistry(auth, worker_name, dr, conns, ssc,
         _DummyRecoveryFileCleaner, 1, false,
-        BarrierInitiator(auth, worker_name, conns),
+        BarrierInitiator(auth, worker_name, conns, "init"),
         InFlightAckInitiator(worker_name, BarrierInitiator(auth,
-        worker_name, conns)))
+        worker_name, conns, "init")))
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
       h.dispose_when_done(conns)
       h.complete_action("server create")
