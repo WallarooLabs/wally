@@ -39,9 +39,9 @@ trait val Router
     producer_id: StepId, producer: Producer ref, i_msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64): (Bool, U64)
-  fun routes(): Array[Consumer] val
-  fun routes_not_in(router: Router): Array[Consumer] val
   fun has_state_partition(state_name: String, key: Key): Bool
+  fun routes(): Map[StepId, Consumer] val
+  fun routes_not_in(router: Router): Map[StepId, Consumer] val
 
 class val EmptyRouter is Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -51,19 +51,21 @@ class val EmptyRouter is Router
   =>
     (true, latest_ts)
 
-  fun routes(): Array[Consumer] val =>
-    recover Array[Consumer] end
+  fun routes(): Map[StepId, Consumer] val =>
+    recover Map[StepId, Consumer] end
 
-  fun routes_not_in(router: Router): Array[Consumer] val =>
-    recover Array[Consumer] end
+  fun routes_not_in(router: Router): Map[StepId, Consumer] val =>
+    recover Map[StepId, Consumer] end
 
   fun has_state_partition(state_name: String, key: Key): Bool =>
     false
 
 class val DirectRouter is Router
+  let _target_id: StepId
   let _target: Consumer
 
-  new val create(target: Consumer) =>
+  new val create(t_id: StepId, target: Consumer) =>
+    _target_id = t_id
     _target = target
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -93,15 +95,20 @@ class val DirectRouter is Router
       (true, latest_ts)
     end
 
-  fun routes(): Array[Consumer] val =>
-    recover [_target] end
+  fun routes(): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
+    m(_target_id) = _target
+    consume m
 
-  fun routes_not_in(router: Router): Array[Consumer] val =>
-    if router.routes().contains(_target) then
-      recover Array[Consumer] end
-    else
-      recover [_target] end
+  fun routes_not_in(router: Router): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] val end
+    for (id, c) in router.routes().values() do
+      if _target_id = id then
+        return consume m
+      end
     end
+    m(_target_id) = _target
+    consume m
 
   fun has_state_partition(state_name: String, key: Key): Bool =>
     false
@@ -151,25 +158,21 @@ class val MultiRouter is Router
     end
     (is_finished, latest_ts)
 
-  fun routes(): Array[Consumer] val =>
-    let r_set = SetIs[Consumer]
+  fun routes(): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
     for router in _routers.values() do
-      for r in router.routes().values() do
-        r_set.set(r)
+      for (id, r) in router.routes().pairs() do
+        m(id) = r
       end
     end
-    let rs = recover iso Array[Consumer] end
-    for r in r_set.values() do
-      rs.push(r)
-    end
-    consume rs
+    consume m
 
-  fun routes_not_in(router: Router): Array[Consumer] val =>
-    let rs = recover iso Array[Consumer] end
+  fun routes_not_in(router: Router): Map[StepId, Consumer] val =>
+    let rs = recover iso Map[StepId, Consumer] end
     let those_routes = router.routes()
-    for r in routes().values() do
-      if not those_routes.contains(r) then
-        rs.push(r)
+    for (id, r) in routes().pairs() do
+      if not those_routes.contains(id) then
+        rs(id) = r
       end
     end
     consume rs
@@ -233,14 +236,18 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
     ProxyRouter(_worker_name, _target,
       ProxyAddress(_target_proxy_address.worker, target_id), _auth)
 
-  fun routes(): Array[Consumer] val =>
-    recover [_target] end
+  fun routes(): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
+    m(_target_proxy_address.step_id) = _target
+    consume m
 
-  fun routes_not_in(router: Router): Array[Consumer] val =>
-    if router.routes().contains(_target) then
-      recover Array[Consumer] end
+  fun routes_not_in(router: Router): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
+    if router.routes().contains(_target_proxy_address.step_id) then
+      consume m
     else
-      recover [_target] end
+      m(_target_proxy_address.step_id) = _target
+      consume m
     end
 
   fun has_state_partition(state_name: String, key: Key): Bool =>
@@ -357,14 +364,15 @@ class val EmptyOmniRouter is OmniRouter
   =>
     this
 
-  fun routes(): Array[Consumer] val =>
-    recover Array[Consumer] end
+  fun routes(): Map[StepId, Consumer] val =>
+    recover Map[StepId, Consumer] end
+
   fun get_outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)] val
   =>
     recover val Array[(String, OutgoingBoundary)] end
 
-  fun routes_not_in(router: OmniRouter): Array[Consumer] val =>
-    recover Array[Consumer] end
+  fun routes_not_in(router: OmniRouter): Map[StepId, Consumer] val =>
+    recover Map[StepId, Consumer] end
 
   fun has_state_partition(state_name: String, key: Key): Bool =>
     false
@@ -674,12 +682,12 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, consume new_stateless_partitions, _sources,
       _data_receivers)
 
-  fun routes(): Array[Consumer] val =>
-    let diff = recover trn Array[Consumer] end
-    for r in _data_routes.values() do
-      diff.push(r)
+  fun routes(): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
+    for (id, r) in _data_routes.pairs() do
+      m(id) = r
     end
-    consume diff
+    consume m
 
   fun get_outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)] val
   =>
@@ -700,13 +708,13 @@ class val StepIdRouter is OmniRouter
     end
     consume diff
 
-  fun routes_not_in(router: OmniRouter): Array[Consumer] val =>
-    let diff = recover trn Array[Consumer] end
+  fun routes_not_in(router: OmniRouter): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
     let other_routes = router.routes()
-    for r in _data_routes.values() do
-      if not other_routes.contains(r) then diff.push(r) end
+    for (id, r) in _data_routes.pairs() do
+      if not other_routes.contains(id) then m(id) = r end
     end
-    consume diff
+    consume m
 
   fun has_state_partition(state_name: String, key: Key): Bool =>
     false
@@ -977,13 +985,17 @@ class val DataRouter is Equatable[DataRouter]
     end
     ids
 
-  fun routes(): Array[Consumer] val =>
-    let rs = recover trn Array[Consumer] end
-    for step in _data_routes.values() do
-      rs.push(step)
+  fun routes(): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
+    for (state_name, key, step) in _data_routes.triples() do
+      try
+        let id = _keyed_step_ids(state_name, key)?
+        m(id) = step
+      else
+        Fail()
+      end
     end
-
-    consume rs
+    consume m
 
   fun remove_keyed_route(state_name: String, key: Key): DataRouter =>
     ifdef debug then
@@ -1319,20 +1331,24 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
       step.register_routes(router, route_builder')
     end
 
-  fun routes(): Array[Consumer] val =>
-    let cs = recover trn Array[Consumer] end
+  fun routes(): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
 
-    for step in _local_routes.values() do
-      cs.push(step)
+    for (key, step) in _local_routes.pairs() do
+      try
+        let id = _step_ids(key)?
+        m(id) = step
+      else
+        Fail()
+      end
     end
+    consume m
 
-    consume cs
-
-  fun routes_not_in(router: Router): Array[Consumer] val =>
-    let diff = recover trn Array[Consumer] end
+  fun routes_not_in(router: Router): Map[StepId, Consumer] val =>
+    let diff = recover iso Map[StepId, Consumer] end
     let other_routes = router.routes()
-    for r in routes().values() do
-      if not other_routes.contains(r) then diff.push(r) end
+    for (id, r) in routes().pairs() do
+      if not other_routes.contains(id) then diff(id) = r end
     end
     consume diff
 
@@ -1812,32 +1828,29 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       end
     end
 
-  fun routes(): Array[Consumer] val =>
-    let cs: SetIs[Consumer] = cs.create()
+  fun routes(): Map[StepId, Consumer] val =>
+    let m = recover iso Map[StepId, Consumer] end
 
-    for s in _partition_routes.values() do
+    for (id, s) in _partition_routes.pairs() do
       match s
       | let step: Step =>
-        cs.set(step)
-      | let pr: ProxyRouter =>
-        for r in pr.routes().values() do
-          cs.set(r)
-        end
+        m(id) = step
+      //!@ Do we need to include boundaries in the routes? Or do we assume
+      // that steps/sources will have a boundary route already?
+      // | let pr: ProxyRouter =>
+      //   for (r_id, r) in pr.routes().pairs() do
+      //     m(r_id) = r
+      //   end
       end
     end
 
-    let to_send = recover trn Array[Consumer] end
-    for c in cs.values() do
-      to_send.push(c)
-    end
+    consume m
 
-    consume to_send
-
-  fun routes_not_in(router: Router): Array[Consumer] val =>
-    let diff = recover trn Array[Consumer] end
+  fun routes_not_in(router: Router): Map[StepId, Consumer] val =>
+    let diff = recover iso Map[StepId, Consumer] end
     let other_routes = router.routes()
-    for r in routes().values() do
-      if not other_routes.contains(r) then diff.push(r) end
+    for (id, r) in routes().pairs() do
+      if not other_routes.contains(id) then diff(id) = r end
     end
     consume diff
 
