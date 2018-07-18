@@ -33,3 +33,6 @@ class val ProxyAddress
     (worker == that.worker) and (step_id == that.step_id)
 
   fun ne(that: box->ProxyAddress): Bool => not eq(that)
+
+  fun hash(): USize =>
+    worker.hash() xor step_id.hash()
