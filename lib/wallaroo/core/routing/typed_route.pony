@@ -49,7 +49,9 @@ class TypedRoute[In: Any val] is Route
     _route = _RouteLogic(step_id, step, consumer, "Typed")
 
   fun ref application_created() =>
-    _consumer.register_producer(_step_id, _step)
+    //!@
+    // _consumer.register_producer(_step_id, _step)
+    None
 
   fun ref application_initialized(step_type: String) =>
     _step_type = step_type
@@ -88,6 +90,12 @@ class TypedRoute[In: Any val] is Route
     // Forward should never be called on a TypedRoute
     Fail()
     true
+
+  fun register_producer(target_id: StepId) =>
+    _consumer.register_producer(_step_id, _step)
+
+  fun unregister_producer(target_id: StepId) =>
+    _consumer.unregister_producer(_step_id, _step)
 
   fun ref _send_message_on_route(metric_name: String, pipeline_time_spent: U64,
     input: In, cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,

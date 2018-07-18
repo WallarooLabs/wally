@@ -35,6 +35,7 @@ use "wallaroo_labs/bytes"
 use "wallaroo_labs/time"
 use "wallaroo/core/common"
 use "wallaroo/ent/network"
+use "wallaroo/ent/snapshot"
 use "wallaroo/ent/spike"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
@@ -102,6 +103,12 @@ actor OutgoingBoundary is Consumer
 
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
+
+  //!@ We shouldn't need this since there should only be one id per upstream
+  // of a boundary, which has no immediate data receiver upstreams.
+  // _inputs keeps track of all inputs by step id.
+  let _inputs: Map[StepId, Producer] = _inputs.create()
+
   var _mute_outstanding: Bool = false
   var _in_flight_ack_waiter: InFlightAckWaiter = InFlightAckWaiter
 
@@ -288,7 +295,16 @@ actor OutgoingBoundary is Consumer
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    // Run should never be called on an OutgoingBoundary
+    // run() should never be called on an OutgoingBoundary
+    Fail()
+
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
+  =>
+    // process_message() should never be called on an OutgoingBoundary
     Fail()
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
@@ -435,9 +451,7 @@ actor OutgoingBoundary is Consumer
     // TODO: How do we propagate this down?
     None
 
-  be register_producer(id: StepId, producer: Producer,
-    back_edge: Bool = false)
-  =>
+  be register_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
 
     ifdef debug then
@@ -448,10 +462,7 @@ actor OutgoingBoundary is Consumer
 
     //!@ Add to input channels??
 
-
-  be unregister_producer(id: StepId, producer: Producer,
-    back_edge: Bool = false)
-  =>
+  be unregister_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Unregistered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
 
     // TODO: Determine if we need this Invariant.
@@ -462,6 +473,36 @@ actor OutgoingBoundary is Consumer
     _upstreams.unset(producer)
 
     //!@ Remove from input channels??
+
+  be forward_register_producer(source_id: StepId, target_id: StepId,
+    producer: Producer)
+  =>
+    ifdef debug then
+      Invariant(not _upstreams.contains(producer))
+    end
+    try
+      let msg = ChannelMsgEncoder.register_producer(_worker_name,
+        source_id, target_id, _auth)?
+      writev(msg)
+    else
+      Fail()
+    end
+    _upstreams.set(producer)
+
+  be forward_unregister_producer(source_id: StepId, target_id: StepId,
+    producer: Producer)
+  =>
+    ifdef debug then
+      Invariant(_upstreams.contains(producer))
+    end
+    try
+      let msg = ChannelMsgEncoder.unregister_producer(_worker_name,
+        source_id, target_id, _auth)?
+      writev(msg)
+    else
+      Fail()
+    end
+    _upstreams.unset(producer)
 
   be report_status(code: ReportStatusCode) =>
     _in_flight_ack_waiter.report_status(code)
@@ -516,8 +557,42 @@ actor OutgoingBoundary is Consumer
   be receive_in_flight_resume_ack(request_id: RequestId) =>
     _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
-  //
+  ///////////////
+  // SNAPSHOTS
+  ///////////////
+  be forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
+    snapshot_id: SnapshotId)
+  =>
+    try
+      let msg = ChannelMsgEncoder.snapshot_barrier(target_step_id,
+        origin_step_id, snapshot_id, _auth)?
+      _writev(msg)
+    else
+      Fail()
+    end
+
+  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
+  =>
+    // We only forward snapshot barriers at the boundary. The OutgoingBoundary
+    // does not participate directly in the snapshot protocol.
+    Fail()
+
+  be remote_snapshot_state() =>
+    // Nothing to snapshot at this point.
+    None
+
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    // Nothing to snapshot at this point.
+    None
+
+  fun ref snapshot_complete() =>
+    // We don't need to do anything special here at this point.
+    None
+
+  ///////////
   // TCP
+  ///////////
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.

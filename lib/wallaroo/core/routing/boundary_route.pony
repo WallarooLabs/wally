@@ -51,7 +51,9 @@ class BoundaryRoute is Route
     _route = _RouteLogic(step_id, step, consumer, "Boundary")
 
   fun ref application_created() =>
-    _consumer.register_producer(_step_id, _step)
+    //!@
+    // _consumer.register_producer(_step_id, _step)
+    None
 
   fun ref application_initialized(step_type: String) =>
     _step_type = step_type
@@ -93,6 +95,12 @@ class BoundaryRoute is Route
       metrics_id,
       metric_name,
       worker_ingress_ts)
+
+  fun register_producer(target_id: StepId) =>
+    _consumer.forward_register_producer(_step_id, target_id, _step)
+
+  fun unregister_producer(target_id: StepId) =>
+    _consumer.forward_unregister_producer(_step_id, target_id, _step)
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,

@@ -36,6 +36,7 @@ use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/snapshot"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -62,7 +63,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   let _source_id: StepId
   let _auth: AmbientAuth
   let _step_id_gen: StepIdGenerator = StepIdGenerator
-  let _router: Router
+  var _router: Router
   let _routes: MapIs[Consumer, Route] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
@@ -160,12 +161,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     _event_log.register_resilient(this, _source_id)
     _acker_x = Acker
 
-    //TODO: either only accept when we are done recovering or don't start
-    //listening until we are done recovering
-    _notify.accepted(this)
-
     _readable = true
-    _pending_reads()
 
     let new_router =
       match router
@@ -178,10 +174,8 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       end
     _router = new_router
 
-    for (id, consumer) in _router.routes().pairs() do
-      _outputs(id) = consumer
-      _routes(consumer) =
-        _route_builder(_source_id, this, consumer, _metrics_reporter)
+    for (c_id, consumer) in _router.routes().pairs() do
+      _register_output(c_id, consumer)
     end
 
     //!@
@@ -189,6 +183,12 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     //   _routes(boundary) =
     //     _route_builder(_source_id, this, boundary, _metrics_reporter)
     // end
+
+
+    _pending_reads()
+    //TODO: either only accept when we are done recovering or don't start
+    //listening until we are done recovering
+    _notify.accepted(this)
 
     _notify.update_boundaries(_outgoing_boundaries)
 
@@ -224,27 +224,17 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     for (old_id, outdated_consumer) in
       old_router.routes_not_in(_router).pairs()
     do
-      try
-        if _outputs.contains(old_id) then
-          try
-            _outputs.remove(old_id)?
-            _remove_route_if_no_output(outdated_consumer)
-          end
+      if _outputs.contains(old_id) then
+        try
+          _outputs.remove(old_id)?
+          _remove_route_if_no_output(outdated_consumer)
+        else
+          Fail()
         end
-      else
-        Fail()
       end
     end
     for (c_id, consumer) in _router.routes().pairs() do
-      _outputs(c_id) = consumer
-      if not _routes.contains(consumer) then
-        let new_route = _route_builder(_source_id, this, consumer,
-          _metrics_reporter)
-        ifdef "resilience" then
-          _acker_x.add_route(new_route)
-        end
-        _routes(consumer) = new_route
-      end
+      _register_output(c_id, consumer)
     end
 
     _notify.update_router(new_router)
@@ -258,6 +248,31 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       try
         _outputs.remove(id)?
         _remove_route_if_no_output(c)
+      end
+    end
+
+  fun ref _register_output(id: StepId, c: Consumer) =>
+    if _outputs.contains(id) then
+      try
+        _routes(c)?.unregister_producer(id)
+      else
+        Fail()
+      end
+    end
+
+    _outputs(id) = c
+    if not _routes.contains(c) then
+      let new_route = _route_builder(_source_id, this, c, _metrics_reporter)
+      _routes(c) = new_route
+      ifdef "resilience" then
+        _acker_x.add_route(new_route)
+      end
+      new_route.register_producer(id)
+    else
+      try
+        _routes(c)?.register_producer(id)
+      else
+        Fail()
       end
     end
 
@@ -412,10 +427,24 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
     _acker().ack_received(this, route_id, seq_id)
 
+  fun ref _unregister_all_outputs() =>
+    """
+    This method should only be called if we are removing this source from the
+    active graph (or on dispose())
+    """
+    for (id, consumer) in _outputs.pairs() do
+      try
+        _routes(consumer)?.unregister_producer(id)
+      else
+        Fail()
+      end
+    end
+
   be dispose() =>
     """
     - Close the connection gracefully.
     """
+    _unregister_all_outputs()
     @printf[I32]("Shutting down TCPSource\n".cstring())
     for b in _outgoing_boundaries.values() do
       b.dispose()
@@ -510,9 +539,31 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   //////////////
   // SNAPSHOTS
   //////////////
-  be receive_snapshot_barrier(sr: SnapshotRequester, snapshot_id: SnapshotId)
-  =>
+  be initiate_snapshot_barrier(snapshot_id: SnapshotId) =>
+    // TODO: Eventually we might need to snapshot information about the
+    // source here before sending down the barrier.
+    for (o_id, o) in _outputs.pairs() do
+      match o
+      | let ob: OutgoingBoundary =>
+        ob.forward_snapshot_barrier(o_id, _source_id, snapshot_id)
+      else
+        o.receive_snapshot_barrier(_source_id, this, snapshot_id)
+      end
+    end
 
+  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
+  =>
+    // Sources have no inputs on which to receive barriers
+    Fail()
+
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    // !@
+    None
+
+  fun ref snapshot_complete() =>
+    // !@
+    None
 
   /////////
   // TCP
