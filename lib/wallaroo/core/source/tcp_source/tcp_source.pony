@@ -69,7 +69,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
   let _outputs: Map[StepId, Consumer] = _outputs.create()
-  let _route_builder: RouteBuilder
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
@@ -116,7 +115,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
 
   new _accept(source_id: StepId, auth: AmbientAuth, listen: TCPSourceListener,
     notify: TCPSourceNotify iso, event_log: EventLog,
-    router: Router, route_builder: RouteBuilder,
+    router: Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     fd: U32, init_size: USize = 64, max_size: USize = 16384,
@@ -146,7 +145,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     _router_registry = router_registry
     _state_step_creator = state_step_creator
 
-    _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let new_boundary =
@@ -178,13 +176,6 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       _register_output(c_id, consumer)
     end
 
-    //!@
-    // for (worker, boundary) in _outgoing_boundaries.pairs() do
-    //   _routes(boundary) =
-    //     _route_builder(_source_id, this, boundary, _metrics_reporter)
-    // end
-
-
     _pending_reads()
     //TODO: either only accept when we are done recovering or don't start
     //listening until we are done recovering
@@ -209,6 +200,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     _mute()
 
   be update_router(router: Router) =>
+    @printf[I32]("!@ TCPSource: update_router\n".cstring())
     let new_router =
       match router
       | let pr: PartitionRouter =>
@@ -220,17 +212,13 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       end
 
     let old_router = _router
-    _router = router
+    _router = new_router
     for (old_id, outdated_consumer) in
       old_router.routes_not_in(_router).pairs()
     do
       if _outputs.contains(old_id) then
-        try
-          _outputs.remove(old_id)?
-          _remove_route_if_no_output(outdated_consumer)
-        else
-          Fail()
-        end
+        @printf[I32]("!@ -- update_router\n".cstring())
+        _unregister_output(old_id, outdated_consumer)
       end
     end
     for (c_id, consumer) in _router.routes().pairs() do
@@ -245,24 +233,27 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       ifdef debug then
         Invariant(_routes.contains(c))
       end
-      try
-        _outputs.remove(id)?
-        _remove_route_if_no_output(c)
-      end
+      @printf[I32]("!@ -- remove_route_to_consumer\n".cstring())
+      _unregister_output(id, c)
     end
 
   fun ref _register_output(id: StepId, c: Consumer) =>
     if _outputs.contains(id) then
       try
-        _routes(c)?.unregister_producer(id)
+        let old_c = _outputs(id)?
+        if old_c is c then
+          // We already know about this output.
+          return
+        end
+        _unregister_output(id, old_c)
       else
-        Fail()
+        Unreachable()
       end
     end
 
     _outputs(id) = c
     if not _routes.contains(c) then
-      let new_route = _route_builder(_source_id, this, c, _metrics_reporter)
+      let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
       _routes(c) = new_route
       ifdef "resilience" then
         _acker_x.add_route(new_route)
@@ -272,8 +263,17 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
       try
         _routes(c)?.register_producer(id)
       else
-        Fail()
+        Unreachable()
       end
+    end
+
+  fun ref _unregister_output(id: StepId, c: Consumer) =>
+    try
+      _routes(c)?.unregister_producer(id)
+      _outputs.remove(id)?
+      _remove_route_if_no_output(c)
+    else
+      Fail()
     end
 
   fun ref _remove_route_if_no_output(c: Consumer) =>
@@ -309,7 +309,7 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
           target_worker_name, _layout_initializer)
         _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
-        let new_route = _route_builder(_source_id, this, boundary,
+        let new_route = RouteBuilder(_source_id, this, boundary,
           _metrics_reporter)
         _acker_x.add_route(new_route)
         _routes(boundary) = new_route
@@ -321,17 +321,24 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     _remove_boundary(worker)
 
   fun ref _remove_boundary(worker: String) =>
-    if _outgoing_boundaries.contains(worker) then
-      try
-        let boundary = _outgoing_boundaries(worker)?
-        _routes(boundary)?.dispose()
-        _routes.remove(boundary)?
-        _outgoing_boundaries.remove(worker)?
-      else
-        Fail()
-      end
-    end
-    _notify.update_boundaries(_outgoing_boundaries)
+    None
+    //!@
+    // try
+    //   let old_ob = _outgoing_boundaries.remove(worker)?._2
+    //   _routes(old_ob)?.dispose()
+    //   for (id, c) in _outputs.pairs() do
+    //     match c
+    //     | let ob: OutgoingBoundary =>
+    //       if ob is old_ob then
+    //         @printf[I32]("!@ YO UNREGISTER OB\n".cstring())
+    //         _unregister_output(id, old_ob)
+    //       end
+    //     end
+    //   end
+    // else
+    //   Fail()
+    // end
+    // _notify.update_boundaries(_outgoing_boundaries)
 
   be reconnect_boundary(target_worker_name: String) =>
     try
@@ -433,11 +440,8 @@ actor TCPSource is (Producer & InFlightAckResponder & StatusReporter)
     active graph (or on dispose())
     """
     for (id, consumer) in _outputs.pairs() do
-      try
-        _routes(consumer)?.unregister_producer(id)
-      else
-        Fail()
-      end
+      @printf[I32]("!@ -- _unregister_all_outputs\n".cstring())
+      _unregister_output(id, consumer)
     end
 
   be dispose() =>
