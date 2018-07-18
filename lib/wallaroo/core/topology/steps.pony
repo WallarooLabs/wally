@@ -711,35 +711,6 @@ actor Step is (Producer & Consumer & Rerouter)
   //////////////
   // SNAPSHOTS
   //////////////
-  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    @printf[I32]("!@ receive_snapshot_barrier at %s\n".cstring(), _id.string().cstring())
-    if _step_message_processor.snapshot_in_progress() then
-      _step_message_processor.receive_snapshot_barrier(step_id, sr,
-        snapshot_id)
-    else
-      // !@ Handle this more cleanly. We need to make sure we don't lose
-      // queued messages, but should snapshots ever be possible when we're in
-      // the queueing state?
-      match _step_message_processor
-      | let nsmp: NormalStepMessageProcessor =>
-        let sr_inputs = recover iso Map[StepId, SnapshotRequester] end
-        for (sr_id, i) in _inputs.pairs() do
-          sr_inputs(sr_id) = i
-        end
-        let s_outputs = recover iso Map[StepId, Snapshottable] end
-        for (s_id, i) in _outputs.pairs() do
-          s_outputs(s_id) = i
-        end
-        _step_message_processor = SnapshotStepMessageProcessor(this,
-          SnapshotBarrierForwarder(_id, this, consume sr_inputs,
-            consume s_outputs, snapshot_id))
-      else
-        Fail()
-      end
-    end
-
   be remote_snapshot_state() =>
     ifdef "resilience" then
       StepStateSnapshotter(_runner, _id, _seq_id_generator, _event_log)
@@ -747,12 +718,7 @@ actor Step is (Producer & Consumer & Rerouter)
 
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     ifdef "resilience" then
-      StepStateSnapshotter(_runner, _id, _seq_id_generator, _event_log)
+      None
+      //!@ How do we really snapshot now?
+      // StepStateSnapshotter(_runner, _id, _seq_id_generator, _event_log)
     end
-
-  fun ref snapshot_complete() =>
-    @printf[I32]("!@ snapshot_complete called at %s\n".cstring(), _id.string().cstring())
-    ifdef debug then
-      Invariant(_step_message_processor.snapshot_in_progress())
-    end
-    _step_message_processor = NormalStepMessageProcessor(this)

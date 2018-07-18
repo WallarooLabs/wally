@@ -419,6 +419,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _barrier_initiator.worker_ack_barrier_start(m.sender, m.token)
       | let m: WorkerAckBarrierMsg =>
         _barrier_initiator.worker_ack_barrier(m.sender, m.token)
+      | let m: BarrierCompleteMsg =>
+        _barrier_initiator.remote_barrier_complete(m.token)
       | let m: ResumeTheWorldMsg =>
         ifdef "trace" then
           @printf[I32]("Received ResumeTheWorldMsg from %s\n".cstring(),

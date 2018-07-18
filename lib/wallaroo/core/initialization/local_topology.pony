@@ -757,7 +757,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         for w in t.worker_names.values() do
-          _snapshot_initiator.add_worker(w)
           _barrier_initiator.add_worker(w)
         end
 

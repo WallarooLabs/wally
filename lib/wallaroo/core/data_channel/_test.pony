@@ -94,7 +94,6 @@ class _TestDataChannel is DataChannelListenNotify
       let rr = RouterRegistry(auth, worker_name, dr, conns, ssc,
         _DummyRecoveryFileCleaner, 1, false,
         BarrierInitiator(auth, worker_name, conns),
-        SnapshotInitiator(conns, 1, false),
         InFlightAckInitiator(worker_name, BarrierInitiator(auth,
         worker_name, conns)))
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
