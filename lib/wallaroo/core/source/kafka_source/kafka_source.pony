@@ -149,9 +149,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     _router = new_router
 
     for (c_id, consumer) in _router.routes().pairs() do
-      _outputs(c_id) = consumer
-      _routes(consumer) =
-        _route_builder(_source_id, this, consumer, _metrics_reporter)
+      _register_output(c_id, consumer)
     end
 
     //!@
@@ -205,15 +203,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       end
     end
     for (c_id, consumer) in _router.routes().pairs() do
-      _outputs(c_id) = consumer
-      if not _routes.contains(consumer) then
-        let new_route = _route_builder(_source_id, this, consumer,
-          _metrics_reporter)
-        ifdef "resilience" then
-          _acker_x.add_route(new_route)
-        end
-        _routes(consumer) = new_route
-      end
+      _register_output(c_id, consumer)
     end
 
     _notify.update_router(new_router)
@@ -233,6 +223,31 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       try
         _outputs.remove(id)?
         _remove_route_if_no_output(c)
+      end
+    end
+
+  fun ref _register_output(id: StepId, c: Consumer) =>
+    if _outputs.contains(id) then
+      try
+        _routes(c)?.unregister_producer(id)
+      else
+        Fail()
+      end
+    end
+
+    _outputs(id) = c
+    if not _routes.contains(c) then
+      let new_route = _route_builder(_source_id, this, c, _metrics_reporter)
+      _routes(c) = new_route
+      ifdef "resilience" then
+        _acker_x.add_route(new_route)
+      end
+      new_route.register_producer(id)
+    else
+      try
+        _routes(c)?.register_producer(id)
+      else
+        Fail()
       end
     end
 
@@ -585,9 +600,23 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     end
     _map_seq_id_offset(current_sequence_id()) = msg_metadata.get_offset()
 
+  fun ref _unregister_all_outputs() =>
+    """
+    This method should only be called if we are removing this source from the
+    active graph (or on dispose())
+    """
+    for (id, consumer) in _outputs.pairs() do
+      try
+        _routes(consumer)?.unregister_producer(id)
+      else
+        Fail()
+      end
+    end
+
   be dispose() =>
     @printf[I32]("Shutting down %s\n".cstring(), _name.cstring())
 
+    _unregister_all_outputs()
     for b in _outgoing_boundaries.values() do
       b.dispose()
     end

@@ -285,6 +285,10 @@ class DataChannelConnectNotifier is DataChannelNotify
         end
         _receiver.request_in_flight_resume_ack(m.in_flight_resume_ack_id,
           m.request_id, m.requester_id, m.leaving_workers)
+      | let m: RegisterProducerMsg =>
+        _receiver.register_producer(m.source_id, m.target_id)
+      | let m: UnregisterProducerMsg =>
+        _receiver.unregister_producer(m.source_id, m.target_id)
       | let m: SnapshotBarrierMsg =>
         _receiver.forward_snapshot_barrier(m.target_id, m.origin_id,
           m.snapshot_id)
@@ -340,6 +344,10 @@ trait _DataReceiverWrapper
   =>
     Fail()
 
+  fun register_producer(input_id: StepId, output_id: StepId) =>
+    Fail()
+  fun unregister_producer(input_id: StepId, output_id: StepId) =>
+    Fail()
   fun forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
     snapshot_id: SnapshotId)
   =>
@@ -381,6 +389,12 @@ class _DataReceiver is _DataReceiverWrapper
   =>
     data_receiver.request_in_flight_resume_ack(in_flight_resume_ack_id,
       request_id, requester_id, leaving_workers)
+
+  fun register_producer(input_id: StepId, output_id: StepId) =>
+    data_receiver.register_producer(input_id, output_id)
+
+  fun unregister_producer(input_id: StepId, output_id: StepId) =>
+    data_receiver.unregister_producer(input_id, output_id)
 
   fun forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
     snapshot_id: SnapshotId)

@@ -423,6 +423,16 @@ primitive ChannelMsgEncoder
   =>
     _encode(ResumeTheWorldMsg(sender), auth)?
 
+  fun register_producer(sender: String, source_id: StepId, target_id: StepId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(RegisterProducerMsg(sender, source_id, target_id), auth)?
+
+  fun unregister_producer(sender: String, source_id: StepId, target_id: StepId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(UnregisterProducerMsg(sender, source_id, target_id), auth)?
+
   fun snapshot_barrier(target_id: StepId, origin_id: StepId,
     snapshot_id: SnapshotId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1134,6 +1144,28 @@ class val ResumeTheWorldMsg is ChannelMsg
 
   new val create(sender': String) =>
     sender = sender'
+
+class val RegisterProducerMsg is ChannelMsg
+  let sender: String
+  let source_id: StepId
+  let target_id: StepId
+
+  new val create(sender': String, source_id': StepId, target_id': StepId)
+  =>
+    sender = sender'
+    source_id = source_id'
+    target_id = target_id'
+
+class val UnregisterProducerMsg is ChannelMsg
+  let sender: String
+  let source_id: StepId
+  let target_id: StepId
+
+  new val create(sender': String, source_id': StepId, target_id': StepId)
+  =>
+    sender = sender'
+    source_id = source_id'
+    target_id = target_id'
 
 class val SnapshotBarrierMsg is ChannelMsg
   let target_id: StepId

@@ -266,6 +266,7 @@ actor DataReceiver is (Producer & Rerouter)
     end
 
   be update_router(router': DataRouter) =>
+    //!@
     // TODO: This commented line conflicts with invariant downstream. The
     // idea is to unregister if we've registered but not otherwise.
     // The invariant says you can only call this method on a step if

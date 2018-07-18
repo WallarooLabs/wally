@@ -3,15 +3,15 @@
 use "wallaroo/core/common"
 
 class val BoundaryEdge is Equatable[BoundaryEdge]
-  let input: StepId
-  let output: StepId
+  let input_id: StepId
+  let output_id: StepId
 
   new val create(i: StepId, o: StepId) =>
-    input = i
-    output = o
+    input_id = i
+    output_id = o
 
   fun eq(that: box->BoundaryEdge): Bool =>
-    (input == that.input) and (output == that.output)
+    (input_id == that.input_id) and (output_id == that.output_id)
 
   fun hash(): USize =>
-    input.hash() xor output.hash()
+    input_id.hash() xor output_id.hash()
