@@ -3,10 +3,10 @@
 use "wallaroo/core/common"
 
 class val BoundaryEdge is Equatable[BoundaryEdge]
-  let input_id: StepId
-  let output_id: StepId
+  let input_id: RoutingId
+  let output_id: RoutingId
 
-  new val create(i: StepId, o: StepId) =>
+  new val create(i: RoutingId, o: RoutingId) =>
     input_id = i
     output_id = o
 

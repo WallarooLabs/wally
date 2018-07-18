@@ -32,12 +32,12 @@ use "wallaroo/core/topology"
 
 
 primitive TCPFramedSourceNotifyBuilder[In: Any val]
-  fun apply(source_id: StepId, pipeline_name: String, env: Env,
+  fun apply(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end):
     SourceNotify iso^
   =>
     TCPFramedSourceNotify[In](source_id, pipeline_name, env, auth, handler,
@@ -45,7 +45,7 @@ primitive TCPFramedSourceNotifyBuilder[In: Any val]
       target_router, pre_state_target_ids)
 
 class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
-  let _source_id: StepId
+  let _source_id: RoutingId
   let _env: Env
   let _auth: AmbientAuth
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
@@ -59,12 +59,12 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
-  new iso create(source_id: StepId, pipeline_name: String, env: Env,
+  new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
   =>
     _source_id = source_id
     _pipeline_name = pipeline_name
@@ -78,7 +78,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
 
-  fun routes(): Map[StepId, Consumer] val =>
+  fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
 
   fun router(): Router =>
@@ -171,7 +171,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun ref update_router(router': Router) =>
     _router = router'
 
-  fun ref update_route(step_id: StepId, key: Key, step: Step) ? =>
+  fun ref update_route(step_id: RoutingId, key: Key, step: Step) ? =>
     match _router
     | let p_router: PartitionRouter =>
       _router = p_router.update_route(step_id, key, step)?

@@ -25,7 +25,7 @@ use "wallaroo/ent/snapshot"
 
 trait SinkMessageProcessor
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -33,12 +33,12 @@ trait SinkMessageProcessor
   fun barrier_in_progress(): Bool =>
     false
 
-  fun ref receive_new_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     Fail()
 
-  fun ref receive_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     Fail()
@@ -47,7 +47,7 @@ trait SinkMessageProcessor
 
 class EmptySinkMessageProcessor is SinkMessageProcessor
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -64,7 +64,7 @@ class NormalSinkMessageProcessor is SinkMessageProcessor
     sink = s
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -90,7 +90,7 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
     _barrier_acker = barrier_acker
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -109,12 +109,12 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
   fun barrier_in_progress(): Bool =>
     true
 
-  fun ref receive_new_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     _barrier_acker.receive_new_barrier(step_id, producer, barrier_token)
 
-  fun ref receive_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     _barrier_acker.receive_barrier(step_id, producer, barrier_token)

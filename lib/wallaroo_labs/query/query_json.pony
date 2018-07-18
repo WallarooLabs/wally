@@ -32,11 +32,11 @@ primitive _JsonMap
   fun apply(): (String, String) => ("{", "}")
 
 
-type _StepIds is Array[String] val
+type _RoutingIds is Array[String] val
 
-type _StepIdsByWorker is Map[String, _StepIds] val
+type _RoutingIdsByWorker is Map[String, _RoutingIds] val
 
-type _PartitionQueryMap is Map[String, _StepIdsByWorker] val
+type _PartitionQueryMap is Map[String, _RoutingIdsByWorker] val
 
 
 primitive _Quoted
@@ -64,10 +64,10 @@ primitive _JsonEncoder
     end
 
 primitive PartitionQueryEncoder
-  fun partition_entities(se: _StepIds): String =>
+  fun partition_entities(se: _RoutingIds): String =>
     _JsonEncoder(se, _JsonArray)
 
-  fun partition_entities_by_worker(se: _StepIdsByWorker): String =>
+  fun partition_entities_by_worker(se: _RoutingIdsByWorker): String =>
     let entries = recover iso Array[String] end
     for (k, v) in se.pairs() do
       entries.push(_Quoted(k) + ":" + partition_entities(v))
@@ -81,7 +81,7 @@ primitive PartitionQueryEncoder
     end
     _JsonEncoder(consume entries, _JsonMap)
 
-  fun partition_counts_by_worker(se: _StepIdsByWorker): String =>
+  fun partition_counts_by_worker(se: _RoutingIdsByWorker): String =>
     let entries = recover iso Array[String] end
     for (k, v) in se.pairs() do
       entries.push(_Quoted(k) + ":" + v.size().string())
@@ -244,11 +244,11 @@ primitive JsonDecoder
     consume items
 
 primitive PartitionQueryDecoder
-  fun partition_entities(se: String): _StepIds =>
+  fun partition_entities(se: String): _RoutingIds =>
     JsonDecoder.string_array(se)
 
-  fun partition_entities_by_worker(se: String): _StepIdsByWorker =>
-    let entities = recover iso Map[String, _StepIds] end
+  fun partition_entities_by_worker(se: String): _RoutingIdsByWorker =>
+    let entities = recover iso Map[String, _RoutingIds] end
     var is_key = true
     var after_list = false
     var next_key = recover iso Array[U8] end
@@ -280,7 +280,7 @@ primitive PartitionQueryDecoder
     consume entities
 
   fun partitions(qm: String): _PartitionQueryMap =>
-    let entities = recover iso Map[String, _StepIdsByWorker] end
+    let entities = recover iso Map[String, _RoutingIdsByWorker] end
     var is_key = true
     var after_map = false
     var next_key = recover iso Array[U8] end

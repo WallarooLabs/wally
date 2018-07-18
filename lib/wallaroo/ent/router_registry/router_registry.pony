@@ -28,7 +28,6 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/autoscale"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/in_flight_acking"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
@@ -37,14 +36,17 @@ use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/query"
 
-type _TargetIdRouterUpdatable is (Step | StateStepCreator)
+//!@ clean this up
+type _TargetIdRouterUpdatable is Step
+
+type _RouterSub is (BoundaryUpdatable & RouterUpdatable)
 
 actor RouterRegistry
   //!@ TODO: Get {(_: None) => _self~be_call()} to work!
   // For sending promises with callbacks
   let _self: RouterRegistry tag = this
 
-  let _id: StepId
+  let _id: RoutingId
   let _auth: AmbientAuth
   let _data_receivers: DataReceivers
   let _worker_name: String
@@ -52,10 +54,8 @@ actor RouterRegistry
   let _state_step_creator: StateStepCreator
   let _recovery_file_cleaner: RecoveryFileCleaner
   let _barrier_initiator: BarrierInitiator
-  let _in_flight_ack_initiator: InFlightAckInitiator
-  var _data_router: DataRouter =
-    DataRouter(recover Map[StepId, Consumer] end,
-      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
+  let _autoscale_initiator: AutoscaleInitiator
+  var _data_router: DataRouter
   var _pre_state_data: (Array[PreStateData] val | None) = None
   let _partition_routers: Map[String, PartitionRouter] =
     _partition_routers.create()
@@ -76,18 +76,24 @@ actor RouterRegistry
   // Subscribers
   // All steps that have a PartitionRouter, registered by partition
   // state name
-  let _partition_router_subs: Map[String, SetIs[RouterUpdatable]] =
-      _partition_router_subs.create()
+  let _partition_router_subs: Map[String, SetIs[_RouterSub]] =
+    _partition_router_subs.create()
   // All steps that have a StatelessPartitionRouter, registered by
   // partition id
   let _stateless_partition_router_subs:
-    Map[U128, SetIs[RouterUpdatable]] =
+    Map[U128, SetIs[_RouterSub]] =
       _stateless_partition_router_subs.create()
   // All steps that have a TargetIdRouter (state steps), registered by state
   // name. The StateStepCreator is also registered here.
   let _target_id_router_updatables:
     Map[String, SetIs[_TargetIdRouterUpdatable]] =
       _target_id_router_updatables.create()
+
+  // For anyone who wants to know about every target_id_router
+  //!@ clean this up
+  let _all_target_id_router_subs: SetIs[StateStepCreator] =
+    _all_target_id_router_subs.create()
+
   // Certain TargetIdRouters need to keep track of changes to particular
   // stateless partition routers. This is true when a state step needs to
   // route outputs to a stateless partition. Map is from partition id to
@@ -98,10 +104,10 @@ actor RouterRegistry
   //
   ////////////////
 
-  let _sources: Map[StepId, Source] = _sources.create()
+  let _sources: Map[RoutingId, Source] = _sources.create()
   let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
   // Map from Source digestof value to source id
-  let _source_ids: Map[USize, StepId] = _source_ids.create()
+  let _source_ids: Map[USize, RoutingId] = _source_ids.create()
   let _data_channel_listeners: SetIs[DataChannelListener] =
     _data_channel_listeners.create()
   let _control_channel_listeners: SetIs[TCPListener] =
@@ -155,7 +161,7 @@ actor RouterRegistry
     state_step_creator: StateStepCreator,
     recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64,
     is_joining: Bool, barrier_initiator: BarrierInitiator,
-    in_flight_ack_initiator: InFlightAckInitiator,
+    autoscale_initiator: AutoscaleInitiator,
     contacted_worker: (String | None) = None)
   =>
     _auth = auth
@@ -164,15 +170,18 @@ actor RouterRegistry
     _connections = c
     _state_step_creator = state_step_creator
     _state_step_creator.set_router_registry(this)
-    register_target_id_router_updatable(_state_step_creator)
+    _all_target_id_router_subs.set(_state_step_creator)
     _recovery_file_cleaner = recovery_file_cleaner
     _barrier_initiator = barrier_initiator
-    _in_flight_ack_initiator = in_flight_ack_initiator
+    _autoscale_initiator = autoscale_initiator
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
     _id = (digestof this).u128()
     _data_receivers.set_router_registry(this)
     _contacted_worker = contacted_worker
+    _data_router = DataRouter(_worker_name,
+      recover Map[RoutingId, Consumer] end,
+      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
     _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining)
 
   fun _worker_count(): USize =>
@@ -228,7 +237,7 @@ actor RouterRegistry
   be register_disposable(d: DisposableActor) =>
     _connections.register_disposable(d)
 
-  be register_source(source: Source, source_id: StepId) =>
+  be register_source(source: Source, source_id: RoutingId) =>
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
     _barrier_initiator.register_source(source, source_id)
@@ -239,7 +248,7 @@ actor RouterRegistry
     _connections.register_disposable(source)
     _connections.notify_cluster_of_new_source(source_id)
 
-  be unregister_source(source: Source, source_id: StepId) =>
+  be unregister_source(source: Source, source_id: RoutingId) =>
     try
       _sources.remove(source_id)?
       _source_ids.remove(digestof source)?
@@ -250,7 +259,7 @@ actor RouterRegistry
       Fail()
     end
 
-  be register_remote_source(sender: String, source_id: StepId) =>
+  be register_remote_source(sender: String, source_id: RoutingId) =>
     None
 
   be register_source_listener(source_listener: SourceListener) =>
@@ -280,23 +289,23 @@ actor RouterRegistry
     _data_channels.set(dc)
 
   be register_partition_router_subscriber(state_name: String,
-    sub: RouterUpdatable)
+    sub: _RouterSub)
   =>
     _register_partition_router_subscriber(state_name, sub)
 
   fun ref _register_partition_router_subscriber(state_name: String,
-    sub: RouterUpdatable)
+    sub: _RouterSub)
   =>
     try
       _partition_router_subs.insert_if_absent(state_name,
-        SetIs[RouterUpdateable])?
+        SetIs[_RouterSub])?
       _partition_router_subs(state_name)?.set(sub)
     else
       Fail()
     end
 
   be unregister_partition_router_subscriber(state_name: String,
-    sub: RouterUpdatable)
+    sub: _RouterSub)
   =>
     Invariant(_partition_router_subs.contains(state_name))
     try
@@ -306,19 +315,19 @@ actor RouterRegistry
     end
 
   be register_stateless_partition_router_subscriber(partition_id: U128,
-    sub: RouterUpdatable)
+    sub: _RouterSub)
   =>
     _register_stateless_partition_router_subscriber(partition_id, sub)
 
   fun ref _register_stateless_partition_router_subscriber(
-    partition_id: U128, sub: RouterUpdatable)
+    partition_id: U128, sub: _RouterSub)
   =>
     try
       if _stateless_partition_router_subs.contains(partition_id) then
         _stateless_partition_router_subs(partition_id)?.set(sub)
       else
         _stateless_partition_router_subs(partition_id) =
-          SetIs[RouterUpdatable]
+          SetIs[_RouterSub]
         _stateless_partition_router_subs(partition_id)?.set(sub)
       end
     else
@@ -326,7 +335,7 @@ actor RouterRegistry
     end
 
   be unregister_stateless_partition_router_subscriber(partition_id: U128,
-    sub: RouterUpdatable)
+    sub: _RouterSub)
   =>
     Invariant(_stateless_partition_router_subs.contains(partition_id))
     try
@@ -346,14 +355,14 @@ actor RouterRegistry
     try
       _target_id_router_updatables.insert_if_absent(state_name,
         SetIs[_TargetIdRouterUpdatable])?
-      _target_id_router_updatables(state_name).set(sub)
+      _target_id_router_updatables(state_name)?.set(sub)
     else
       Fail()
     end
     if _target_id_routers.contains(state_name) then
       try
         let target_id_router = _target_id_routers(state_name)?
-        step.update_target_id_router(target_id_router)
+        sub.update_target_id_router(target_id_router)
       else
         Unreachable()
       end
@@ -394,7 +403,6 @@ actor RouterRegistry
         updatable.add_boundaries(new_boundaries_sendable)
       end
     end
-    end
     for step in _data_router.routes().values() do
       match step
       | let s: Step => s.add_boundaries(new_boundaries_sendable)
@@ -433,7 +441,7 @@ actor RouterRegistry
   be register_data_receiver(worker: String, dr: DataReceiver) =>
     _data_receiver_map(worker) = dr
 
-  be register_state_step(step: Step, state_name: String, key: Key, step_id: StepId) =>
+  be register_state_step(step: Step, state_name: String, key: Key, step_id: RoutingId) =>
     _add_routes_to_state_step(step_id, step, key, state_name)
 
   fun _distribute_data_router() =>
@@ -446,11 +454,17 @@ actor RouterRegistry
     """
     try
       let target_id_router = _target_id_routers(state_name)?
-      _target_id_router_steps.insert_if_absent(state_name, SetIs[Step])?
+      _target_id_router_updatables.insert_if_absent(state_name,
+        SetIs[_TargetIdRouterUpdatable])?
 
       for updatable in _target_id_router_updatables(state_name)?.values() do
-        updatable.update_target_id_router(_target_id_router)
+        updatable.update_target_id_router(target_id_router)
       end
+
+      for sub in _all_target_id_router_subs.values() do
+        sub.update_target_id_router(state_name, target_id_router)
+      end
+
       match _local_topology_initializer
       | let lti: LocalTopologyInitializer =>
         lti.update_target_id_router(state_name, target_id_router)
@@ -466,7 +480,7 @@ actor RouterRegistry
 
     try
       _partition_router_subs.insert_if_absent(state_name,
-        SetIs[RouterUpdateable])?
+        SetIs[_RouterSub])?
       for sub in _partition_router_subs(state_name)?.values() do
         sub.update_router(partition_router)
       end
@@ -482,7 +496,7 @@ actor RouterRegistry
     try
       if not _stateless_partition_router_subs.contains(partition_id) then
         _stateless_partition_router_subs(partition_id) =
-          SetIs[RouterUpdatable]
+          SetIs[_RouterSub]
       end
       for sub in
         _stateless_partition_router_subs(partition_id)?.values()
@@ -613,7 +627,7 @@ actor RouterRegistry
 
   be create_target_id_routers_from_blueprint(
     target_id_router_blueprints: Map[String, TargetIdRouterBlueprint] val,
-    local_sinks: Map[StepId, Consumer] val,
+    local_sinks: Map[RoutingId, Consumer] val,
     lti: LocalTopologyInitializer)
   =>
     let obs_trn = recover trn Map[String, OutgoingBoundary] end
@@ -770,10 +784,10 @@ actor RouterRegistry
     _stop_the_world_for_log_rotation()
 
     let action = Promise[None]
-    action.next[None](recover this~begin_log_rotation() end)
-    _in_flight_ack_initiator.initiate_in_flight_acks(action)
+    action.next[None]({(_: None) => _self.begin_log_rotation()})
+    _autoscale_initiator.initiate_autoscale(action)
 
-  be begin_log_rotation(n: None) =>
+  be begin_log_rotation() =>
     """
     Start the log rotation and initiate snapshots.
     """
@@ -864,8 +878,9 @@ actor RouterRegistry
     @printf[I32]("!@ setting up migration action\n".cstring())
 
     let action = Promise[None]
-    action.next[None](recover this~initiate_join_migration(new_workers) end)
-    _in_flight_ack_initiator.initiate_in_flight_acks(action)
+    action.next[None]({(_: None) =>
+      _self.initiate_join_migration(new_workers)})
+    _autoscale_initiator.initiate_autoscale(action)
 
   fun ref stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
     """
@@ -896,8 +911,8 @@ actor RouterRegistry
       // _distribute_target_id_router()
 
       let action = Promise[None]
-      action.next[None](recover this~initiate_autoscale_complete() end)
-      _in_flight_ack_initiator.initiate_in_flight_resume_acks(action)
+      action.next[None]({(_: None) => _self.initiate_autoscale_complete()})
+      _autoscale_initiator.initiate_autoscale_resume_acks(action)
 
       // We are done with this round of leaving workers
       _leaving_workers = recover Array[String] end
@@ -905,7 +920,7 @@ actor RouterRegistry
       @printf[I32]("!@ but I didn't initiate\n".cstring())
     end
 
-  be initiate_autoscale_complete(n: None) =>
+  be initiate_autoscale_complete() =>
     try
       (_autoscale as Autoscale).autoscale_complete()
     else
@@ -945,7 +960,7 @@ actor RouterRegistry
   //     Fail()
   //   end
 
-  be initiate_join_migration(target_workers: Array[String] val, n: None) =>
+  be initiate_join_migration(target_workers: Array[String] val) =>
     @printf[I32]("!@ initiate_join_migration\n".cstring())
     // Update BarrierInitiator about new workers
     for w in target_workers.values() do
@@ -988,7 +1003,7 @@ actor RouterRegistry
       try_to_resume_processing_immediately()
     end
 
-  be step_migration_complete(step_id: StepId) =>
+  be step_migration_complete(step_id: RoutingId) =>
     """
     Step with provided step id has been created on another worker.
     """
@@ -1213,7 +1228,7 @@ actor RouterRegistry
       false
     end
 
-  fun ref add_to_step_waiting_list(step_id: StepId) =>
+  fun ref add_to_step_waiting_list(step_id: RoutingId) =>
     _step_waiting_list.set(step_id)
 
   /////////////////
@@ -1270,9 +1285,9 @@ actor RouterRegistry
       _prepare_shrink(remaining_workers, leaving_workers)
 
       let action = Promise[None]
-      action.next[None](recover this~announce_leaving_migration(
-        remaining_workers, leaving_workers) end)
-      _in_flight_ack_initiator.initiate_in_flight_acks(action)
+      action.next[None]({(_: None) =>
+        _self.announce_leaving_migration(remaining_workers, leaving_workers)})
+      _autoscale_initiator.initiate_autoscale(action)
     end
 
   be prepare_shrink(remaining_workers: Array[String] val,
@@ -1368,7 +1383,7 @@ actor RouterRegistry
     end
 
   be announce_leaving_migration(remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val, n: None)
+    leaving_workers: Array[String] val)
   =>
     try
       let msg = ChannelMsgEncoder.begin_leaving_migration(remaining_workers,
@@ -1449,17 +1464,17 @@ actor RouterRegistry
   /////
   // Step moved off this worker or new step added to another worker
   /////
-  fun ref move_stateful_step_to_proxy(id: StepId, step: Step,
+  fun ref move_stateful_step_to_proxy(id: RoutingId, step: Step,
     proxy_address: ProxyAddress, key: Key, state_name: String)
   =>
     """
     Called when a stateful step has been migrated off this worker to another
     worker
     """
-    _remove_all_routes_to_step(step)
+    _remove_all_routes_to_step(id, step)
     _move_step_to_proxy(id, state_name, key, proxy_address)
 
-  fun ref _remove_all_routes_to_step(id: StepId, step: Step) =>
+  fun ref _remove_all_routes_to_step(id: RoutingId, step: Step) =>
     for source in _sources.values() do
       source.remove_route_to_consumer(id, step)
     end
@@ -1475,7 +1490,7 @@ actor RouterRegistry
     //!@
     // _add_proxy_to_target_id_router(id, proxy_address)
 
-  be add_state_proxy(id: StepId, proxy_address: ProxyAddress, key: Key,
+  be add_state_proxy(id: RoutingId, proxy_address: ProxyAddress, key: Key,
     state_name: String)
   =>
     """
@@ -1490,7 +1505,7 @@ actor RouterRegistry
     _distribute_data_router()
 
 //!@
-  // fun ref _add_proxy_to_target_id_router(id: StepId,
+  // fun ref _add_proxy_to_target_id_router(id: RoutingId,
   //   proxy_address: ProxyAddress)
   // =>
   //   match _target_id_router
@@ -1530,7 +1545,7 @@ actor RouterRegistry
       Fail()
     end
 
-  fun ref move_proxy_to_stateful_step(id: StepId, target: Consumer, key: Key,
+  fun ref move_proxy_to_stateful_step(id: RoutingId, target: Consumer, key: Key,
     state_name: String, source_worker: String)
   =>
     """
@@ -1541,7 +1556,7 @@ actor RouterRegistry
     _connections.notify_cluster_of_new_stateful_step(id, key, state_name,
       recover [source_worker] end)
 
-  fun ref _add_routes_to_state_step(id: StepId, target: Consumer, key: Key,
+  fun ref _add_routes_to_state_step(id: RoutingId, target: Consumer, key: Key,
     state_name: String)
   =>
     try

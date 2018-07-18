@@ -21,7 +21,7 @@ use "wallaroo_labs/mort"
 
 
 interface DataReceiversSubscriber
-  be data_receiver_added(sender_name: String, boundary_step_id: StepId,
+  be data_receiver_added(sender_name: String, boundary_step_id: RoutingId,
     dr: DataReceiver)
 
 actor DataReceivers
@@ -33,9 +33,7 @@ actor DataReceivers
 
   let _data_receivers: Map[BoundaryId, DataReceiver] =
     _data_receivers.create()
-  var _data_router: DataRouter =
-    DataRouter(recover Map[StepId, Consumer] end,
-      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
+  var _data_router: DataRouter
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
   var _router_registry: (RouterRegistry | None) = None
@@ -49,6 +47,9 @@ actor DataReceivers
     _connections = connections
     _worker_name = worker_name
     _state_step_creator = state_step_creator
+    _data_router =
+      DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
+        recover LocalStatePartitions end, recover LocalStatePartitionIds end)
     if not is_recovering then
       _initialized = true
     end

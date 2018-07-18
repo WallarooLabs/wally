@@ -36,7 +36,7 @@ class KafkaSourceListenerNotify[In: Any val]
     _target_router = target_router
     _auth = auth
 
-  fun ref build_source(source_id: StepId, env: Env):
+  fun ref build_source(source_id: RoutingId, env: Env):
     KafkaSourceNotify[In] iso^ ?
   =>
     try
@@ -69,7 +69,7 @@ class val KafkaSourceBuilderBuilder[In: Any val]
 
   fun apply(runner_builder: RunnerBuilder, router: Router,
     metrics_conn: MetricsSink,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end,
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end,
     worker_name: String, metrics_reporter: MetricsReporter iso):
       SourceBuilder
   =>

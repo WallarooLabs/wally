@@ -24,10 +24,10 @@ class MsgIdGenerator
   fun ref apply(): MsgId =>
     _guid.u128()
 
-class StepIdGenerator
+class RoutingIdGenerator
   let _guid: GuidGenerator = GuidGenerator
 
-  fun ref apply(): StepId =>
+  fun ref apply(): RoutingId =>
     _guid.u128()
 
 class RouteIdGenerator

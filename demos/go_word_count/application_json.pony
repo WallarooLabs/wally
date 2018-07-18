@@ -47,14 +47,14 @@ primitive JSONBlock
             "Connections": [
                 {
                     "Class": "ToComputation",
-                    "StepId": 1,
-                    "FromStepId": 0,
+                    "RoutingId": 1,
+                    "FromRoutingId": 0,
                     "ComputationBuilderId": 2
                 },
                 {
                     "Class": "ToStatePartition",
-                    "StepId": 2,
-                    "FromStepId": 1,
+                    "RoutingId": 2,
+                    "FromRoutingId": 1,
                     "StateComputationId": 4,
                     "StateBuilderId": 3,
                     "StateName": "word-count",
@@ -63,8 +63,8 @@ primitive JSONBlock
                 },
                 {
                     "Class": "ToSink",
-                    "StepId": 3,
-                    "FromStepId": 2,
+                    "RoutingId": 3,
+                    "FromRoutingId": 2,
                     "Sink": {
                         "Class": "TCPSink",
                         "EncoderId": 5,

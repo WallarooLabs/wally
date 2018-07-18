@@ -17,31 +17,31 @@ use "wallaroo_labs/mort"
 
 
 class BarrierSinkAcker
-  let _step_id: StepId
+  let _step_id: RoutingId
   let _sink: Sink ref
   var _barrier_token: BarrierToken = InitialBarrierToken
   let _barrier_initiator: BarrierInitiator
-  let _inputs_blocking: Map[StepId, Producer] = _inputs_blocking.create()
+  let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
 
   // !@ Perhaps to add invariant wherever inputs can be updated in
   // the encapsulating actor to check if barrier is in progress.
-  new create(step_id: StepId, sink: Sink ref,
+  new create(step_id: RoutingId, sink: Sink ref,
     barrier_initiator: BarrierInitiator)
   =>
     _step_id = step_id
     _sink = sink
     _barrier_initiator = barrier_initiator
 
-  fun input_blocking(id: StepId): Bool =>
+  fun input_blocking(id: RoutingId): Bool =>
     _inputs_blocking.contains(id)
 
-  fun ref receive_new_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     _barrier_token = barrier_token
     receive_barrier(step_id, producer, barrier_token)
 
-  fun ref receive_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     if barrier_token != _barrier_token then Fail() end

@@ -27,24 +27,24 @@ use "wallaroo/ent/snapshot"
 
 
 actor DummyConsumer is Consumer
-  be register_producer(id: StepId, producer: Producer) =>
+  be register_producer(id: RoutingId, producer: Producer) =>
     None
 
-  be unregister_producer(id: StepId, producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
     None
 
   be report_status(code: ReportStatusCode) =>
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     None
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -52,7 +52,7 @@ actor DummyConsumer is Consumer
     None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -76,7 +76,7 @@ actor DummyConsumer is Consumer
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be receive_barrier(step_id: StepId, producer: Producer,
+  be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     None

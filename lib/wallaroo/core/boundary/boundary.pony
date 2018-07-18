@@ -74,13 +74,13 @@ class val OutgoingBoundaryBuilder
     _service = s
     _spike_config = spike_config
 
-  fun apply(step_id: StepId, target_worker: String): OutgoingBoundary =>
+  fun apply(step_id: RoutingId, target_worker: String): OutgoingBoundary =>
     let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
       _reporter.clone(), _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary
 
-  fun build_and_initialize(step_id: StepId, target_worker: String,
+  fun build_and_initialize(step_id: RoutingId, target_worker: String,
     layout_initializer: LayoutInitializer): OutgoingBoundary
   =>
     """
@@ -138,7 +138,7 @@ actor OutgoingBoundary is Consumer
   let _auth: AmbientAuth
   let _worker_name: String
   let _target_worker: String
-  var _step_id: StepId = 0
+  var _step_id: RoutingId = 0
   let _host: String
   let _service: String
   let _from: String
@@ -259,7 +259,7 @@ actor OutgoingBoundary is Consumer
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
       + "\n").cstring())
 
-  be migrate_step(step_id: StepId, state_name: String, key: Key,
+  be migrate_step(step_id: RoutingId, state_name: String, key: Key,
     state: ByteSeq val)
   =>
     try
@@ -279,11 +279,11 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
-  be register_step_id(step_id: StepId) =>
+  be register_step_id(step_id: RoutingId) =>
     _step_id = step_id
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -291,7 +291,7 @@ actor OutgoingBoundary is Consumer
     Fail()
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -300,7 +300,7 @@ actor OutgoingBoundary is Consumer
     Fail()
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer, msg_uid: MsgId,
+    data: D, producer_id: RoutingId, producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -443,7 +443,7 @@ actor OutgoingBoundary is Consumer
     // TODO: How do we propagate this down?
     None
 
-  be register_producer(id: StepId, producer: Producer) =>
+  be register_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
 
     ifdef debug then
@@ -452,7 +452,7 @@ actor OutgoingBoundary is Consumer
 
     _upstreams.set(producer)
 
-  be unregister_producer(id: StepId, producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Unregistered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
 
     // TODO: Determine if we need this Invariant.
@@ -462,7 +462,7 @@ actor OutgoingBoundary is Consumer
 
     _upstreams.unset(producer)
 
-  be forward_register_producer(source_id: StepId, target_id: StepId,
+  be forward_register_producer(source_id: RoutingId, target_id: RoutingId,
     producer: Producer)
   =>
     @printf[I32]("!@ Forward Registered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
@@ -475,7 +475,7 @@ actor OutgoingBoundary is Consumer
     end
     _upstreams.set(producer)
 
-  be forward_unregister_producer(source_id: StepId, target_id: StepId,
+  be forward_unregister_producer(source_id: RoutingId, target_id: RoutingId,
     producer: Producer)
   =>
     @printf[I32]("!@ Forward UNRegistered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
@@ -502,7 +502,7 @@ actor OutgoingBoundary is Consumer
   //////////////
   // BARRIER
   //////////////
-  be forward_barrier(target_step_id: StepId, origin_step_id: StepId,
+  be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken)
   =>
     try
@@ -513,7 +513,7 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
-  be receive_barrier(step_id: StepId, producer: Producer,
+  be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     // We only forward barriers at the boundary. The OutgoingBoundary

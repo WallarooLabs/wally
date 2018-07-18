@@ -42,7 +42,7 @@ actor DummyProducer is Producer
   =>
     None
 
-  be remove_route_to_consumer(id: StepId, c: Consumer) =>
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     None
 
   // Muteable

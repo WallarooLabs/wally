@@ -14,6 +14,6 @@ use "wallaroo/core/common"
 
 
 trait tag BarrierReceiver
-  be receive_barrier(step_id: StepId, producer: Producer,
+  be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   fun ref barrier_complete(barrier_token: BarrierToken)

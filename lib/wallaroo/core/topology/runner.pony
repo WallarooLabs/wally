@@ -40,7 +40,7 @@ interface Runner
   // and a U64 indicating the last timestamp for calculating the duration of
   // the computation
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer ref, router: Router,
+    data: D, producer_id: RoutingId, producer: Producer ref, router: Router,
     target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -63,7 +63,7 @@ trait val RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end):
       Runner iso^
 
   fun name(): String
@@ -72,14 +72,14 @@ trait val RunnerBuilder
   fun is_stateful(): Bool
   fun is_stateless_parallel(): Bool => false
   fun is_multi(): Bool => false
-  fun id(): StepId
+  fun id(): RoutingId
   fun clone_router_and_set_input_type(r: Router): Router
   =>
     r
 
 class val RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder] val
-  let _id: StepId
+  let _id: RoutingId
   var _state_name: String
   let _parallelized: Bool
 
@@ -91,7 +91,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
       try
         bs(0)?.id()
       else
-        StepIdGenerator()
+        RoutingIdGenerator()
       end
 
     _state_name =
@@ -107,7 +107,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end):
       Runner iso^
   =>
     var remaining: USize = _runner_builders.size()
@@ -150,7 +150,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
     else
       false
     end
-  fun id(): StepId => _id
+  fun id(): RoutingId => _id
   fun clone_router_and_set_input_type(r: Router): Router
   =>
     try
@@ -165,7 +165,7 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   let _id: U128
   let _parallelized: Bool
 
-  new val create(comp_builder: ComputationBuilder[In, Out], id': StepId = 0,
+  new val create(comp_builder: ComputationBuilder[In, Out], id': RoutingId = 0,
     parallelized': Bool = false)
   =>
     _comp_builder = comp_builder
@@ -176,7 +176,7 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end):
       Runner iso^
   =>
     match (consume next_runner)
@@ -190,14 +190,14 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun state_name(): String => ""
   fun is_stateful(): Bool => false
   fun is_stateless_parallel(): Bool => _parallelized
-  fun id(): StepId => _id
+  fun id(): RoutingId => _id
 
 class val PreStateRunnerBuilder[In: Any val, Out: Any val,
   PIn: Any val, S: State ref] is RunnerBuilder
   let _state_comp: StateComputation[In, Out, S] val
   let _state_name: String
   let _partition_function: PartitionFunction[PIn] val
-  let _id: StepId
+  let _id: RoutingId
   let _is_multi: Bool
 
   new val create(state_comp: StateComputation[In, Out, S] val,
@@ -207,14 +207,14 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
     _state_comp = state_comp
     _state_name = state_name'
     _partition_function = partition_function'
-    _id = StepIdGenerator()
+    _id = RoutingIdGenerator()
     _is_multi = multi_worker
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end):
       Runner iso^
   =>
     PreStateRunner[In, Out, S](_state_comp, _state_name, pre_state_target_ids')
@@ -224,7 +224,7 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun is_prestate(): Bool => true
   fun is_stateful(): Bool => true
   fun is_multi(): Bool => _is_multi
-  fun id(): StepId => _id
+  fun id(): RoutingId => _id
   fun clone_router_and_set_input_type(r: Router): Router
   =>
     match r
@@ -235,10 +235,13 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
     end
 
 class val StateRunnerBuilder[S: State ref] is RunnerBuilder
+  // This is the id for the entire state collection. It's used, for example,
+  // to route messages to a Key that exists on another worker where we don't
+  // know the specific routing ids of the state steps.
+  let _id: RoutingId
   let _state_builder: StateBuilder[S]
   let _state_name: String
   let _state_change_builders: Array[StateChangeBuilder[S]] val
-  let _id: U128
 
   new val create(state_builder: StateBuilder[S],
     state_name': String,
@@ -247,13 +250,13 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
     _state_builder = state_builder
     _state_name = state_name'
     _state_change_builders = state_change_builders
-    _id = StepIdGenerator()
+    _id = RoutingIdGenerator()
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end):
       Runner iso^
   =>
     let sr = StateRunner[S](_state_builder, event_log, auth)
@@ -265,7 +268,7 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
   fun name(): String => _state_name + " StateRunnerBuilder"
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
-  fun id(): StepId => _id
+  fun id(): RoutingId => _id
 
 trait val PartitionsBuilder
   // These two methods need to be deterministic at the moment since they
@@ -279,20 +282,20 @@ trait val PartitionsBuilder
 
 class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
   (PartitionsBuilder & RunnerBuilder)
+  let _id: RoutingId
   let _pipeline_name: String
   let _state_name: String
   let _state_runner_builder: StateRunnerBuilder[S] val
-  let _step_id_map: Map[Key, U128] val
+  let _step_id_map: Map[Key, RoutingId] val
   let _partition: Partitions[PIn] val
-  let _id: U128
   let _multi_worker: Bool
 
   new val create(pipeline_name: String, state_name': String,
-    step_id_map': Map[Key, U128] val, partition': Partitions[PIn] val,
+    step_id_map': Map[Key, RoutingId] val, partition': Partitions[PIn] val,
     state_runner_builder: StateRunnerBuilder[S] val,
-    id': StepId = 0, multi_worker: Bool = false)
+    multi_worker: Bool = false)
   =>
-    _id = if id' == 0 then StepIdGenerator() else id' end
+    _id = state_runner_builder.id()
     _state_name = state_name'
     _pipeline_name = pipeline_name
     _state_runner_builder = state_runner_builder
@@ -304,7 +307,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end):
       Runner iso^
   =>
     _state_runner_builder(event_log, auth, consume next_runner, router)
@@ -312,7 +315,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
   fun name(): String => _state_name
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
-  fun id(): StepId => _id
+  fun id(): RoutingId => _id
   fun step_id_map(): Map[Key, U128] val => _step_id_map
   fun is_multi(): Bool => _multi_worker
 
@@ -373,7 +376,7 @@ class ComputationRunner[In: Any val, Out: Any val]
     _next = consume next
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer ref, router: Router,
+    data: D, producer_id: RoutingId, producer: Producer ref, router: Router,
     target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -469,14 +472,14 @@ class ComputationRunner[In: Any val, Out: Any val]
     _next.clone_router_and_set_input_type(r)
 
 class PreStateRunner[In: Any val, Out: Any val, S: State ref]
-  let _target_ids: Array[StepId] val
+  let _target_ids: Array[RoutingId] val
   let _state_comp: StateComputation[In, Out, S] val
   let _name: String
   let _prep_name: String
   let _state_name: String
 
   new iso create(state_comp: StateComputation[In, Out, S] val,
-    state_name': String, target_ids: Array[StepId] val)
+    state_name': String, target_ids: Array[RoutingId] val)
   =>
     _target_ids = target_ids
     _state_comp = state_comp
@@ -485,7 +488,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
     _state_name = state_name'
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer ref, router: Router,
+    data: D, producer_id: RoutingId, producer: Producer ref, router: Router,
     target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -580,7 +583,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
     end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer ref, router: Router,
+    data: D, producer_id: RoutingId, producer: Producer ref, router: Router,
     target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
@@ -685,7 +688,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
 
 class iso RouterRunner
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer ref, router: Router,
+    data: D, producer_id: RoutingId, producer: Producer ref, router: Router,
     target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
