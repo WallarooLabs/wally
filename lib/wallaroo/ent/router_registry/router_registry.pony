@@ -1486,11 +1486,11 @@ actor RouterRegistry is (InFlightAckRequester)
     _remove_all_routes_to_step(step)
     _move_step_to_proxy(id, state_name, key, proxy_address)
 
-  fun ref _remove_all_routes_to_step(step: Step) =>
+  fun ref _remove_all_routes_to_step(id: StepId, step: Step) =>
     for source in _sources.values() do
-      source.remove_route_to_consumer(step)
+      source.remove_route_to_consumer(id, step)
     end
-    _data_router.remove_routes_to_consumer(step)
+    _data_router.remove_routes_to_consumer(id, step)
 
   fun ref _move_step_to_proxy(id: U128, state_name: String, key: Key,
     proxy_address: ProxyAddress)

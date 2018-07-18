@@ -95,7 +95,7 @@ interface val SourceConfig[In: Any val]
 interface tag Source is (DisposableActor & BoundaryUpdateable &
   InFlightAckResponder & StatusReporter & SnapshotRequester & Snapshottable)
   be update_router(router: PartitionRouter)
-  be remove_route_to_consumer(c: Consumer)
+  be remove_route_to_consumer(id: StepId, c: Consumer)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   be reconnect_boundary(target_worker_name: String)
