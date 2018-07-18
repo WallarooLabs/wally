@@ -26,7 +26,6 @@ use "wallaroo/core/common"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
@@ -417,6 +416,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token), auth)?
 
+  fun barrier_complete(token: BarrierToken, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(BarrierCompleteMsg(token), auth)?
+
   fun resume_the_world(sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(ResumeTheWorldMsg(sender), auth)?
@@ -430,14 +434,6 @@ primitive ChannelMsgEncoder
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(UnregisterProducerMsg(sender, source_id, target_id), auth)?
-
-  fun snapshot_barrier(target_id: StepId, origin_id: StepId,
-    snapshot_id: SnapshotId, auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    """
-    This message is sent to forward a snapshot barrier between workers.
-    """
-    _encode(SnapshotBarrierMsg(target_id, origin_id, snapshot_id), auth)?
 
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
@@ -1126,6 +1122,13 @@ class val ForwardBarrierMsg is ChannelMsg
     origin_id = origin_id'
     token = token'
 
+class val BarrierCompleteMsg is ChannelMsg
+  let token: BarrierToken
+
+  new val create(token': BarrierToken)
+  =>
+    token = token'
+
 class val ResumeTheWorldMsg is ChannelMsg
   let sender: String
 
@@ -1153,18 +1156,6 @@ class val UnregisterProducerMsg is ChannelMsg
     sender = sender'
     source_id = source_id'
     target_id = target_id'
-
-class val SnapshotBarrierMsg is ChannelMsg
-  let target_id: StepId
-  let origin_id: StepId
-  let snapshot_id: SnapshotId
-
-  new val create(target_id': StepId, origin_id': StepId,
-    snapshot_id': SnapshotId)
-  =>
-    target_id = target_id'
-    origin_id = origin_id'
-    snapshot_id = snapshot_id'
 
 class val ReportStatusMsg is ChannelMsg
   let code: ReportStatusCode
