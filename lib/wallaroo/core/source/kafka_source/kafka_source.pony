@@ -23,6 +23,7 @@ use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
+use "wallaroo/core/source"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -34,7 +35,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-actor KafkaSource[In: Any val] is (Producer & StatusReporter & KafkaConsumer)
+actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _source_id: StepId
   let _auth: AmbientAuth
   let _step_id_gen: StepIdGenerator = StepIdGenerator
