@@ -154,7 +154,7 @@ actor DataChannel
     _queue_read()
     _pending_reads()
 
-  be identify_data_receiver(dr: DataReceiver, sender_step_id: StepId) =>
+  be identify_data_receiver(dr: DataReceiver, sender_step_id: RoutingId) =>
     """
     Each abstract data channel (a connection from an OutgoingBoundary)
     corresponds to a single DataReceiver. On reconnect, we want a new

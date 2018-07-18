@@ -32,10 +32,10 @@ use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
+use "wallaroo/ent/autoscale"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/cluster_manager"
-use "wallaroo/ent/in_flight_acking"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -188,6 +188,10 @@ actor Startup
         Fail()
       end
 
+      // TODO: Replace this with the name of this worker, whatever it
+      // happens to be.
+      let initializer_name = "initializer"
+
       let auth = _env.root as AmbientAuth
       _set_recovery_file_names(auth)
 
@@ -316,13 +320,13 @@ actor Startup
       connections.register_disposable(this)
 
       let barrier_initiator = BarrierInitiator(auth,
-        _startup_options.worker_name, connections)
+        _startup_options.worker_name, connections, initializer_name)
 
       let snapshot_initiator = SnapshotInitiator(connections,
         _startup_options.time_between_snapshots, barrier_initiator,
         _startup_options.snapshots_enabled, _startup_options.is_initializer)
 
-      let in_flight_ack_initiator = InFlightAckInitiator(
+      let autoscale_initiator = AutoscaleInitiator(
         _startup_options.worker_name, barrier_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
@@ -337,7 +341,7 @@ actor Startup
         _startup_options.worker_name, data_receivers,
         connections, state_step_creator, this,
         _startup_options.stop_the_world_pause, _is_joining, barrier_initiator,
-        in_flight_ack_initiator)
+        autoscale_initiator)
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
 
@@ -372,6 +376,7 @@ actor Startup
         @printf[I32]("Running as Initializer...\n".cstring())
         _application_distributor = ApplicationDistributor(auth, _application,
           local_topology_initializer)
+
         match _application_distributor
         | let ad: ApplicationDistributor =>
           match _startup_options.worker_count
@@ -379,7 +384,7 @@ actor Startup
             _cluster_initializer = ClusterInitializer(auth,
               _startup_options.worker_name, wc, connections, ad,
               local_topology_initializer, _startup_options.d_addr,
-              metrics_conn, is_recovering)
+              metrics_conn, is_recovering, initializer_name)
           else
             Unreachable()
           end
@@ -442,6 +447,10 @@ actor Startup
       let auth = _env.root as AmbientAuth
       _set_recovery_file_names(auth)
 
+      // TODO: Replace this with the name of this worker, whatever it
+      // happens to be.
+      let initializer_name = "initializer"
+
       let metrics_conn = ReconnectingMetricsSink(m.metrics_host,
         m.metrics_service, _application.name(), _startup_options.worker_name)
 
@@ -492,13 +501,13 @@ actor Startup
       connections.register_disposable(this)
 
       let barrier_initiator = BarrierInitiator(auth,
-        _startup_options.worker_name, connections)
+        _startup_options.worker_name, connections, initializer_name)
 
       let snapshot_initiator = SnapshotInitiator(connections,
         _startup_options.time_between_snapshots, barrier_initiator,
         _startup_options.snapshots_enabled)
 
-      let in_flight_ack_initiator = InFlightAckInitiator(
+      let autoscale_initiator = AutoscaleInitiator(
         _startup_options.worker_name, barrier_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
@@ -513,7 +522,7 @@ actor Startup
         _startup_options.worker_name, data_receivers,
         connections, state_step_creator, this,
         _startup_options.stop_the_world_pause, _is_joining, barrier_initiator,
-        in_flight_ack_initiator, m.sender_name)
+        autoscale_initiator, m.sender_name)
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
 
@@ -545,8 +554,10 @@ actor Startup
       end
 
       router_registry.set_data_router(
-        DataRouter(recover Map[StepId, Consumer] end,
-          recover LocalStatePartitions end, recover LocalStatePartitionIds end))
+        DataRouter(_startup_options.worker_name,
+          recover Map[RoutingId, Consumer] end,
+          recover LocalStatePartitions end,
+          recover LocalStatePartitionIds end))
       local_topology_initializer.update_topology(m.local_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)

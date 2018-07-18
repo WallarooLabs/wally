@@ -40,7 +40,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   // Steplike
   let _name: String
   var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
-  let _sink_id: StepId
+  let _sink_id: RoutingId
   let _event_log: EventLog
   var _recovering: Bool
   let _encoder: KafkaEncoderWrapper
@@ -56,7 +56,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   // _inputs keeps track of all inputs by step id. There might be
   // duplicate producers in this map (unlike upstreams) since there might be
   // multiple upstream step ids over a boundary
-  let _inputs: Map[StepId, Producer] = _inputs.create()
+  let _inputs: Map[RoutingId, Producer] = _inputs.create()
   var _mute_outstanding: Bool = false
 
   var _kc: (KafkaClient tag | None) = None
@@ -80,7 +80,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   let _pending_delivery_report: MapIs[Any tag, (String, U16, U64, U64, U64,
     (U64 | None))] = _pending_delivery_report.create()
 
-  new create(sink_id: StepId, name: String, event_log: EventLog,
+  new create(sink_id: RoutingId, name: String, event_log: EventLog,
     recovering: Bool, encoder_wrapper: KafkaEncoderWrapper,
     metrics_reporter: MetricsReporter iso, conf: KafkaConfig val,
     barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
@@ -198,7 +198,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
         .cstring())
     end
 
-  fun inputs(): Map[StepId, Producer] box =>
+  fun inputs(): Map[RoutingId, Producer] box =>
     _inputs
 
   fun ref _kafka_producer_throttled(client: KafkaClient, topic_partitions_throttled: Map[String, Set[KafkaPartitionId]] val)
@@ -270,7 +270,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
 
     None
 
-  be register_producer(id: StepId, producer: Producer) =>
+  be register_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
@@ -280,7 +280,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     _inputs(id) = producer
     _upstreams.set(producer)
 
-  be unregister_producer(id: StepId, producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
 
     ifdef debug then
@@ -312,7 +312,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -321,7 +321,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -381,7 +381,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     end
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -427,7 +427,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   ///////////////
   // BARRIER
   ///////////////
-  be receive_barrier(step_id: StepId, producer: Producer,
+  be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     if _message_processor.barrier_in_progress() then

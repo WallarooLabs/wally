@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/routing"
@@ -35,7 +36,7 @@ actor BarrierSource is Source
   out of existence. We shouldn't depend on their presence to be able to
   inject barriers.
   """
-  let _source_id: StepId
+  let _source_id: RoutingId
   // Routers for the pipelines with sources on this worker.
   var _routers: Map[String, Router] = _routers.create()
   // Map from identifier to pipeline names to interpret routers we receive.
@@ -48,13 +49,13 @@ actor BarrierSource is Source
 
 ////////
   // Map from pipeline name to outputs for sources in that pipeline.
-  let _pipeline_outputs: Map[String, Map[StepId, Consumer]] =
+  let _pipeline_outputs: Map[String, Map[RoutingId, Consumer]] =
     _pipeline_outputs.create()
 
   // All outputs from this BarrierSource. There might be duplicate entries
   // across the _pipeline_outputs maps, so we use this for actually
   // sending barriers.
-  let _outputs: Map[StepId, Consumer] = _outputs.create()
+  let _outputs: Map[RoutingId, Consumer] = _outputs.create()
 ///////
 
   var _disposed: Bool = false
@@ -66,7 +67,7 @@ actor BarrierSource is Source
   let _acker_x: Acker = Acker
   ////////////////////
 
-  new create(source_id: StepId, router_registry: RouterRegistry) =>
+  new create(source_id: RoutingId, router_registry: RouterRegistry) =>
     """
     A new connection accepted on a server.
     """
@@ -81,7 +82,7 @@ actor BarrierSource is Source
     """
     let p_identifier = _PipelineIdentifierCreator(router)
     try
-      _pipeline_outputs.insert_if_absent(pipeline_name, Map[StepId, Consumer])?
+      _pipeline_outputs.insert_if_absent(pipeline_name, Map[RoutingId, Consumer])?
       _pipeline_identifiers.insert_if_absent(p_identifier, SetIs[String])?
       _pipeline_identifiers(p_identifier)?.set(pipeline_name)
     else
@@ -130,10 +131,25 @@ actor BarrierSource is Source
       _register_output(pipeline_name, c_id, consumer)
     end
 
-  be remove_route_to_consumer(id: StepId, c: Consumer) =>
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     None
 
-  fun ref _register_output(pipeline: String, id: StepId, c: Consumer) =>
+  be register_downstreams(action: Promise[Source]) =>
+    """
+    We register during initialization without need for explicit management
+    here (unlike, say, TCPSource).
+    """
+    None
+
+  fun ref unknown_key(state_name: String, key: Key,
+    routing_args: RoutingArguments)
+  =>
+    """
+    We never route messages, only barriers.
+    """
+    None
+
+  fun ref _register_output(pipeline: String, id: RoutingId, c: Consumer) =>
     try
       if _pipeline_outputs(pipeline)?.contains(id) then
         try
@@ -172,7 +188,7 @@ actor BarrierSource is Source
       end
     end
 
-  fun ref _unregister_output(pipeline: String, id: StepId, c: Consumer) =>
+  fun ref _unregister_output(pipeline: String, id: RoutingId, c: Consumer) =>
     try
       _pipeline_outputs(pipeline)?.remove(id)?
       match c
@@ -199,6 +215,9 @@ actor BarrierSource is Source
     BarrierSource should not have its own OutgoingBoundaries, but should
     instead use the canonical ones for this worker.
     """
+    None
+
+  be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     None
 
   be remove_boundary(worker: String) =>

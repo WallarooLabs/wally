@@ -17,5 +17,23 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 type SeqId is U64
+type RoutingId is U128
+// TODO: Remove this with old watermarking algo.
 type RouteId is U64
 type RequestId is U64
+
+// We assign each stateless partition a sequential index so that we can route
+// messages in a round robin fashion modding over the incoming sequence ids.
+type SeqPartitionIndex is U64
+
+// TODO: Remove this and explicitly assign each worker a RoutingId using our
+// normal randomization method (so that we don't create collisions by
+// following this same kind of approach in different parts of our system).
+primitive WorkerStateRoutingId
+  fun apply(worker: String): RoutingId =>
+    """
+    This is a temporary method of assigning each worker a special RoutingId
+    for registering producers and sending barriers to unknown state steps
+    existing on another worker.
+    """
+    worker.hash().u128()

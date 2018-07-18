@@ -45,7 +45,7 @@ actor TCPSourceListener is SourceListener
   """
   # TCPSourceListener
   """
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
   let _auth: AmbientAuth
   let _pipeline_name: String
@@ -134,6 +134,10 @@ actor TCPSourceListener is SourceListener
       end
     end
     _outgoing_boundary_builders = consume new_builders
+
+  be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+    //!@ Should we fail here?
+    None
 
   be update_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
@@ -246,7 +250,7 @@ actor TCPSourceListener is SourceListener
       Fail()
     end
 
-  fun ref _notify_connected(source_id: StepId): TCPSourceNotify iso^ ? =>
+  fun ref _notify_connected(source_id: RoutingId): TCPSourceNotify iso^ ? =>
     try
       _source_builder(source_id, _event_log, _auth, _target_router, _env)
         as TCPSourceNotify iso^

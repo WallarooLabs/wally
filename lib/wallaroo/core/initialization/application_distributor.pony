@@ -33,7 +33,7 @@ use "wallaroo_labs/thread_count"
 
 actor ApplicationDistributor is Distributor
   let _auth: AmbientAuth
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _application: Application val
 
@@ -118,7 +118,7 @@ actor ApplicationDistributor is Distributor
         consume ssb_trn
 
       // Keep track of sink ids
-      let sink_ids: Array[StepId] = sink_ids.create()
+      let sink_ids: Array[RoutingId] = sink_ids.create()
 
       // Keep track of proxy ids per worker
       let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
@@ -330,7 +330,7 @@ actor ApplicationDistributor is Distributor
 
         // If the source contains a prestate runner, then we might need
         // pre state target ids
-        let source_pre_state_target_ids_trn = recover trn Array[StepId] end
+        let source_pre_state_target_ids_trn = recover trn Array[RoutingId] end
         if source_seq_builder.is_prestate() then
           try
             let id = step_runner_builders(0)?.id()
@@ -551,7 +551,7 @@ actor ApplicationDistributor is Distributor
                     worker
                   end
 
-                let pre_state_target_ids_trn = recover trn Array[StepId] end
+                let pre_state_target_ids_trn = recover trn Array[RoutingId] end
                 try
                   pre_state_target_ids_trn.push(
                     step_runner_builders(runner_builder_idx + 1)?.id())
@@ -663,7 +663,7 @@ actor ApplicationDistributor is Distributor
 
                 // Get the id for the step that all stateless partition
                 // computations will connect to as their output target.
-                let successor_step_ids_trn = recover trn Array[StepId] end
+                let successor_step_ids_trn = recover trn Array[RoutingId] end
                 if (runner_builder_idx + 1) < step_runner_builders.size()
                 then
                   successor_step_ids_trn.push(

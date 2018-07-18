@@ -13,4 +13,4 @@ the License. You may obtain a copy of the License at
 use "promises"
 
 
-type InFlightAckResultPromise is Promise[None]
+type AutoscaleResultPromise is Promise[None]

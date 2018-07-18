@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/barrier"
@@ -29,7 +30,7 @@ use "wallaroo/core/topology"
 
 trait val SourceBuilder
   fun name(): String
-  fun apply(source_id: StepId, event_log: EventLog, auth: AmbientAuth,
+  fun apply(source_id: RoutingId, event_log: EventLog, auth: AmbientAuth,
     target_router: Router, env: Env): SourceNotify iso^
   fun val update_router(router: Router): SourceBuilder
 
@@ -41,7 +42,7 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
   let _handler: SH
   let _router: Router
   let _metrics_conn: MetricsSink
-  let _pre_state_target_ids: Array[StepId] val
+  let _pre_state_target_ids: Array[RoutingId] val
   let _metrics_reporter: MetricsReporter
   let _source_notify_builder: SourceNotifyBuilder[In, SH]
 
@@ -50,7 +51,7 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
     runner_builder: RunnerBuilder,
     handler: SH,
     router: Router, metrics_conn: MetricsSink,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end,
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end,
     metrics_reporter: MetricsReporter iso,
     source_notify_builder: SourceNotifyBuilder[In, SH])
   =>
@@ -67,7 +68,7 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
 
   fun name(): String => _name
 
-  fun apply(source_id: StepId, event_log: EventLog, auth: AmbientAuth,
+  fun apply(source_id: RoutingId, event_log: EventLog, auth: AmbientAuth,
     target_router: Router, env: Env): SourceNotify iso^
   =>
     _source_notify_builder(source_id, _name, env, auth, _handler,
@@ -83,7 +84,7 @@ interface val SourceBuilderBuilder
   fun name(): String
   fun apply(runner_builder: RunnerBuilder, router: Router,
     metrics_conn: MetricsSink,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end,
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end,
     worker_name: String,
     metrics_reporter: MetricsReporter iso):
       SourceBuilder
@@ -94,10 +95,11 @@ interface val SourceConfig[In: Any val]
   fun source_builder(app_name: String, name: String):
     SourceBuilderBuilder
 
-trait tag Source is (Producer & DisposableActor & BoundaryUpdateable &
+trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   StatusReporter)
+  be register_downstreams(action: Promise[Source])
   be update_router(router: PartitionRouter)
-  be remove_route_to_consumer(id: StepId, c: Consumer)
+  be remove_route_to_consumer(id: RoutingId, c: Consumer)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   be reconnect_boundary(target_worker_name: String)
@@ -106,7 +108,7 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdateable &
   be initiate_barrier(token: BarrierToken)
   be barrier_complete(token: BarrierToken)
 
-interface tag SourceListener is (DisposableActor & BoundaryUpdateable)
+interface tag SourceListener is (DisposableActor & BoundaryUpdatable)
   be update_router(router: PartitionRouter)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)

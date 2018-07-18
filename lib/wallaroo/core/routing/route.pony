@@ -32,7 +32,7 @@ trait Route
   // Return false to indicate queue is full and if producer is a Source, it
   // should mute
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
 
@@ -41,8 +41,8 @@ trait Route
     latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64)
 
-  fun register_producer(target_id: StepId)
-  fun unregister_producer(target_id: StepId)
+  fun register_producer(target_id: RoutingId)
+  fun unregister_producer(target_id: RoutingId)
 
   fun ref request_ack()
 
@@ -53,13 +53,13 @@ trait RouteLogic
   fun ref dispose()
 
 class _RouteLogic is RouteLogic
-  let _step_id: StepId
+  let _step_id: RoutingId
   let _step: Producer ref
   let _consumer: Consumer
   var _step_type: String = ""
   var _route_type: String = ""
 
-  new create(step_id: StepId, step: Producer ref, consumer: Consumer,
+  new create(step_id: RoutingId, step: Producer ref, consumer: Consumer,
     r_type: String)
   =>
     _step_id = step_id
@@ -106,7 +106,7 @@ class EmptyRoute is Route
   fun ref request_ack() => None
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
@@ -122,10 +122,10 @@ class EmptyRoute is Route
     true
 
 
-  fun register_producer(target_id: StepId) =>
+  fun register_producer(target_id: RoutingId) =>
     Fail()
 
-  fun unregister_producer(target_id: StepId) =>
+  fun unregister_producer(target_id: RoutingId) =>
     Fail()
 
   fun ref report_status(code: ReportStatusCode) =>

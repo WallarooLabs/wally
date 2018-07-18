@@ -53,7 +53,7 @@ trait val StateProcessor[S: State ref] is BasicComputation
   // no state change).
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     target_id_router: TargetIdRouter, metric_name: String,
-    pipeline_time_spent: U64, producer_id: StepId, producer: Producer ref,
+    pipeline_time_spent: U64, producer_id: RoutingId, producer: Producer ref,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64):
     (Bool, (StateChange[S] ref | DirectStateChange | None), U64,
@@ -66,10 +66,10 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
   is (StateProcessor[S] & InputWrapper)
   let _state_comp: StateComputation[In, Out, S] val
   let _input: In
-  let _target_ids: Array[StepId] val
+  let _target_ids: Array[RoutingId] val
 
   new val create(input': In, state_comp: StateComputation[In, Out, S] val,
-    target_ids: Array[StepId] val) =>
+    target_ids: Array[RoutingId] val) =>
     _state_comp = state_comp
     _input = input'
     _target_ids = target_ids
@@ -78,7 +78,7 @@ class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
 
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     target_id_router: TargetIdRouter, metric_name: String,
-    pipeline_time_spent: U64, producer_id: StepId, producer: Producer ref,
+    pipeline_time_spent: U64, producer_id: RoutingId, producer: Producer ref,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64):
     (Bool, (StateChange[S] ref | DirectStateChange | None), U64,
