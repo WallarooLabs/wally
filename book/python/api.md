@@ -114,21 +114,7 @@ Add a partitioned state computation to the current pipeline.
 
 `partition_function` must be a [Partition](#partition).
 
-`partition_keys` must be a list of objects where all of the objects can be hashed with the `hash` function and be checked for equality with other objects.
-
-##### `to_state_partition_u64(computation, state_builder, state_partition_name, partition_function, partition_keys)`
-
-Add a partitioned state computation to the current pipeline.
-
-`computation` must be a [StateComputation](#statecomputation).
-
-`state` must be [State](#state).
-
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions keeps them separate acting as a namespace.
-
-`partition_function` must be a [Partition](#partition).
-
-`partition_keys` must be a list of non-negative `int`.
+`partition_keys` must be a list of strings.
 
 ##### `to_sink(sink_config)`
 
@@ -305,7 +291,7 @@ It is important to ensure that data returned is always immutable or unique to av
 
 ### Key
 
-Partition Keys must correctly support the `__eq__` (`==`) and `__hash__` operators. Some built-in types, such as strings and numbers, already support these out of the box. If you are defining your own types, however, you must also implement the `__eq__` and `__hash__` methods.
+Partition keys are `string` values.
 
 ### Partition
 

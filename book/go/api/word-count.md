@@ -93,10 +93,10 @@ Note we set up 27 partitions to count our words, one for each letter plus one ca
 
 ```go
 func LetterPartition() []uint64 {
-	letterPartition := make([]uint64, 27)
+	letterPartition := make([]byte, 27)
 
 	for i := 0; i < 26; i++ {
-		letterPartition[i] = uint64(i + 'a')
+		letterPartition[i] = []byte(i + 'a')
 	}
 
 	letterPartition[26] = '!'
@@ -139,13 +139,13 @@ Did you catch what is going on? Previously, we've seen our stateless computation
 ```go
 type WordPartitionFunction struct {}
 
-func (wpf *WordPartitionFunction) Partition (data interface{}) uint64 {
+func (wpf *WordPartitionFunction) Partition (data interface{}) []byte {
 	word := data.(*string)
 	firstLetter := (*word)[0]
 	if (firstLetter >= 'a') && (firstLetter <= 'z') {
-		return uint64(firstLetter)
+		return []byte(firstLetter)
 	}
-	return uint64('!')
+	return []byte('!')
 }
 ```
 
