@@ -45,9 +45,8 @@ actor Step is (Producer & Consumer & Rerouter)
   var _id: U128
   let _runner: Runner
   var _router: Router = EmptyRouter
-  // For use if this is a state step, otherwise EmptyOmniRouter
-  var _omni_router: OmniRouter
-  var _route_builder: RouteBuilder
+  // For use if this is a state step, otherwise EmptyTargetIdRouter
+  var _target_id_router: TargetIdRouter
   let _metrics_reporter: MetricsReporter
   // list of envelopes
   let _deduplication_list: DeduplicationList = _deduplication_list.create()
@@ -89,12 +88,12 @@ actor Step is (Producer & Consumer & Rerouter)
 
   new create(auth: AmbientAuth, runner: Runner iso,
     metrics_reporter: MetricsReporter iso,
-    id: U128, route_builder: RouteBuilder, event_log: EventLog,
+    id: U128, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_step_creator: StateStepCreator,
     router': Router = EmptyRouter,
-    omni_router: OmniRouter = EmptyOmniRouter)
+    target_id_router: TargetIdRouter = EmptyTargetIdRouter)
   =>
     _auth = auth
     _runner = consume runner
@@ -102,8 +101,7 @@ actor Step is (Producer & Consumer & Rerouter)
     | let r: ReplayableRunner => r.set_step_id(id)
     end
     _metrics_reporter = consume metrics_reporter
-    _omni_router = omni_router
-    _route_builder = route_builder
+    _target_id_router = target_id_router
     _event_log = event_log
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
@@ -123,14 +121,6 @@ actor Step is (Producer & Consumer & Rerouter)
       _register_output(c_id, consumer)
     end
 
-    //!@
-    // for boundary in _outgoing_boundaries.values() do
-    //   if not _routes.contains(boundary) then
-    //     _routes(boundary) =
-    //       _route_builder(_id, this, boundary, _metrics_reporter)
-    //   end
-    // end
-
     for r in _routes.values() do
       ifdef "resilience" then
         _acker_x.add_route(r)
@@ -148,45 +138,7 @@ actor Step is (Producer & Consumer & Rerouter)
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
-  =>
-    _initialize_routes_boundaries_omni_router(omni_router)
-    initializer.report_initialized(this)
-
-  fun ref _initialize_routes_boundaries_omni_router(omni_router: OmniRouter) =>
-    //!@ We shouldn't need this here.  This should happen whenever a router is
-    // updated
-    // for (c_id, consumer) in _router.routes().pairs() do
-    //   if _outputs.contains(c_id) then
-    //     try
-    //       _routes(consumer)?.unregister_producer(c_id)
-    //     else
-    //       Fail()
-    //     end
-    //   end
-    //   _outputs(c_id) = consumer
-    //   if not _routes.contains(consumer) then
-    //     let new_route = _route_builder(_id, this, consumer, _metrics_reporter)
-    //     _routes(consumer) = new_route
-    //     new_route.register_producer(c_id)
-    //   else
-    //     try
-    //       _routes(consumer)?.register_producer(c_id)
-    //     else
-    //       Fail()
-    //     end
-    //   end
-    // end
-
-    //!@
-    // for boundary in _outgoing_boundaries.values() do
-    //   if not _routes.contains(boundary) then
-    //     _routes(boundary) =
-    //       _route_builder(_id, this, boundary, _metrics_reporter)
-    //   end
-    // end
-
+  be application_created(initializer: LocalTopologyInitializer) =>
     for r in _routes.values() do
       r.application_created()
       ifdef "resilience" then
@@ -194,9 +146,8 @@ actor Step is (Producer & Consumer & Rerouter)
       end
     end
 
-    _omni_router = omni_router
-
     _initialized = true
+    initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     _prepare_ready_to_work(initializer)
@@ -241,20 +192,6 @@ actor Step is (Producer & Consumer & Rerouter)
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be update_route_builder(route_builder: RouteBuilder) =>
-    _route_builder = route_builder
-
-  be register_routes(router': Router, route_builder: RouteBuilder) =>
-    ifdef debug then
-      if _initialized then
-        Fail()
-      end
-    end
-
-    for (c_id, consumer) in router'.routes().pairs() do
-      _register_output(c_id, consumer)
-    end
-
   be update_router(router': Router) =>
     _update_router(router')
 
@@ -265,13 +202,7 @@ actor Step is (Producer & Consumer & Rerouter)
       old_router.routes_not_in(_router).pairs()
     do
       if _outputs.contains(old_id) then
-        try
-          _outputs.remove(old_id)?
-          _routes(outdated_consumer)?.unregister_producer(old_id)
-          _remove_route_if_no_output(outdated_consumer)
-        else
-          Fail()
-        end
+        _unregister_output(old_id, outdated_consumer)
       end
     end
     for (c_id, consumer) in _router.routes().pairs() do
@@ -281,15 +212,20 @@ actor Step is (Producer & Consumer & Rerouter)
   fun ref _register_output(id: StepId, c: Consumer) =>
     if _outputs.contains(id) then
       try
-        _routes(c)?.unregister_producer(id)
+        let old_c = _outputs(id)?
+        if old_c is c then
+          // We already know about this output.
+          return
+        end
+        _unregister_output(id, old_c)
       else
-        Fail()
+        Unreachable()
       end
     end
 
     _outputs(id) = c
     if not _routes.contains(c) then
-      let new_route = _route_builder(_id, this, c, _metrics_reporter)
+      let new_route = RouteBuilder(_id, this, c, _metrics_reporter)
       _routes(c) = new_route
       ifdef "resilience" then
         _acker_x.add_route(new_route)
@@ -299,8 +235,17 @@ actor Step is (Producer & Consumer & Rerouter)
       try
         _routes(c)?.register_producer(id)
       else
-        Fail()
+        Unreachable()
       end
+    end
+
+  fun ref _unregister_output(id: StepId, c: Consumer) =>
+    try
+      _routes(c)?.unregister_producer(id)
+      _outputs.remove(id)?
+      _remove_route_if_no_output(c)
+    else
+      Fail()
     end
 
   fun ref _unregister_all_outputs() =>
@@ -309,14 +254,7 @@ actor Step is (Producer & Consumer & Rerouter)
     active graph (or on dispose())
     """
     for (id, consumer) in _outputs.pairs() do
-      try
-        _routes(consumer)?.unregister_producer(id)
-      else
-        Fail()
-      end
-      _pending_message_store.process_known_keys(this, this, _router)
-    else
-      Fail()
+      _unregister_output(id, consumer)
     end
 
   be remove_route_to_consumer(id: StepId, c: Consumer) =>
@@ -324,15 +262,7 @@ actor Step is (Producer & Consumer & Rerouter)
       ifdef debug then
         Invariant(_routes.contains(c))
       end
-      try
-        _outputs.remove(id)?
-        try
-          _routes(c)?.unregister_producer(id)
-        else
-          Fail()
-        end
-        _remove_route_if_no_output(c)
-      end
+      _unregister_output(id, c)
     end
 
   fun ref _remove_route_if_no_output(c: Consumer) =>
@@ -354,20 +284,22 @@ actor Step is (Producer & Consumer & Rerouter)
       Fail()
     end
 
-  be update_omni_router(omni_router: OmniRouter) =>
-    let old_router = _omni_router
-    _omni_router = omni_router
+  be update_target_id_router(target_id_router: TargetIdRouter) =>
+    let old_router = _target_id_router
+    _target_id_router = target_id_router
     for (old_id, outdated_consumer) in
-      old_router.routes_not_in(_omni_router).pairs()
+      old_router.routes_not_in(_target_id_router).pairs()
     do
       if _outputs.contains(old_id) then
-        try
-          _outputs.remove(old_id)?
-          _remove_route_if_no_output(outdated_consumer)
-        end
+        _unregister_output(old_id, outdated_consumer)
       end
     end
-    _add_boundaries(omni_router.boundaries())
+
+    for (id, consumer) in target_id_router.routes().pairs() do
+      _register_output(id, consumer)
+    end
+
+    _add_boundaries(target_id_router.boundaries())
 
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
     _add_boundaries(boundaries)
@@ -376,7 +308,7 @@ actor Step is (Producer & Consumer & Rerouter)
     for (worker, boundary) in boundaries.pairs() do
       if not _outgoing_boundaries.contains(worker) then
         _outgoing_boundaries(worker) = boundary
-        let new_route = _route_builder(_id, this, boundary, _metrics_reporter)
+        let new_route = RouteBuilder(_id, this, boundary, _metrics_reporter)
         ifdef "resilience" then
           _acker_x.add_route(new_route)
         end
@@ -388,16 +320,22 @@ actor Step is (Producer & Consumer & Rerouter)
     _remove_boundary(worker)
 
   fun ref _remove_boundary(worker: String) =>
-    if _outgoing_boundaries.contains(worker) then
-      try
-        let boundary = _outgoing_boundaries(worker)?
-        _routes(boundary)?.dispose()
-        _routes.remove(boundary)?
-        _outgoing_boundaries.remove(worker)?
-      else
-        Fail()
-      end
-    end
+    None
+    //!@
+    // try
+    //   let old_ob = _outgoing_boundaries.remove(worker)?._2
+    //   _routes(old_ob)?.dispose()
+    //   for (id, c) in _outputs.pairs() do
+    //     match c
+    //     | let ob: OutgoingBoundary =>
+    //       if ob is old_ob then
+    //         _unregister_output(id, c)
+    //       end
+    //     end
+    //   end
+    // else
+    //   Fail()
+    // end
 
   be remove_route_for(step: Consumer) =>
     try
@@ -447,7 +385,7 @@ actor Step is (Producer & Consumer & Rerouter)
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
-      pipeline_time_spent, data, _id, this, _router, _omni_router,
+      pipeline_time_spent, data, _id, this, _router, _target_id_router,
       msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
       _metrics_reporter)
 
@@ -586,6 +524,9 @@ actor Step is (Producer & Consumer & Rerouter)
       None
     end
 
+  fun has_route_to(c: Consumer): Bool =>
+    _routes.contains(c)
+
   be register_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
 
@@ -672,7 +613,7 @@ actor Step is (Producer & Consumer & Rerouter)
       match _step_message_processor
       | let qmp: QueueingStepMessageProcessor =>
         // Process all queued messages
-        qmp.flush(_omni_router)
+        qmp.flush(_target_id_router)
 
         _step_message_processor = NormalStepMessageProcessor(this)
       end
@@ -742,7 +683,8 @@ actor Step is (Producer & Consumer & Rerouter)
 
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Key) =>
     ifdef "autoscale" then
-      _unregister_all_outputs()
+      //@!
+      // _unregister_all_outputs()
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
         // TODO: Should this be possible?

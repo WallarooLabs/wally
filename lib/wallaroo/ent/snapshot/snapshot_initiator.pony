@@ -43,9 +43,7 @@ actor SnapshotInitiator is (SnapshotRequester & Initializable)
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
-  =>
+  be application_created(initializer: LocalTopologyInitializer) =>
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>

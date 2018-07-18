@@ -43,13 +43,11 @@ class val StepBuilder
   let _id: StepId
   let _pre_state_target_ids: Array[StepId] val
   let _is_stateful: Bool
-  let _forward_route_builder: RouteBuilder
 
   new val create(app_name: String, worker_name: String,
     pipeline_name': String, r: RunnerBuilder, id': StepId,
     is_stateful': Bool = false,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end,
-    forward_route_builder': RouteBuilder = BoundaryOnlyRouteBuilder)
+    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -59,7 +57,6 @@ class val StepBuilder
     _id = id'
     _is_stateful = is_stateful'
     _pre_state_target_ids = pre_state_target_ids'
-    _forward_route_builder = forward_route_builder'
 
   fun name(): String => _runner_builder.name()
   fun state_name(): String => _state_name
@@ -69,9 +66,6 @@ class val StepBuilder
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder => _forward_route_builder
-  fun in_route_builder(): (RouteBuilder | None) =>
-    _runner_builder.in_route_builder()
   fun clone_router_and_set_input_type(r: Router): Router =>
     _runner_builder.clone_router_and_set_input_type(r)
 
@@ -80,14 +74,14 @@ class val StepBuilder
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_step_creator: StateStepCreator,
     router: Router = EmptyRouter,
-    omni_router: OmniRouter = EmptyOmniRouter): Step tag
+    target_id_router: TargetIdRouter = EmptyTargetIdRouter): Step tag
   =>
     let runner = _runner_builder(where event_log = event_log, auth = auth,
       router = router, pre_state_target_ids' = pre_state_target_ids())
     let step = Step(auth, consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
-      _runner_builder.route_builder(), event_log, recovery_replayer,
-      outgoing_boundaries, state_step_creator, router, omni_router)
+      event_log, recovery_replayer,
+      outgoing_boundaries, state_step_creator, router, target_id_router)
     step.update_router(next)
     step
 
@@ -98,12 +92,10 @@ class val SourceData
   let _state_name: String
   let _builder: SourceBuilderBuilder
   let _runner_builder: RunnerBuilder
-  let _route_builder: RouteBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
   let _pre_state_target_ids: Array[StepId] val
 
   new val create(id': StepId, b: SourceBuilderBuilder, r: RunnerBuilder,
-    default_source_route_builder: RouteBuilder,
     s: SourceListenerBuilderBuilder,
     pre_state_target_ids': Array[StepId] val = recover Array[StepId] end)
   =>
@@ -113,20 +105,12 @@ class val SourceData
     _builder = b
     _runner_builder = r
     _state_name = _runner_builder.state_name()
-    _route_builder =
-      match _runner_builder.route_builder()
-      | let e: BoundaryOnlyRouteBuilder =>
-        default_source_route_builder
-      else
-        _runner_builder.route_builder()
-      end
     _source_listener_builder_builder = s
 
     _pre_state_target_ids = pre_state_target_ids'
 
   fun builder(): SourceBuilderBuilder => _builder
   fun runner_builder(): RunnerBuilder => _runner_builder
-  fun route_builder(): RouteBuilder => _route_builder
 
   fun name(): String => _name
   fun state_name(): String => _state_name
@@ -136,8 +120,6 @@ class val SourceData
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder =>
-    _runner_builder.forward_route_builder()
   fun clone_router_and_set_input_type(r: Router): Router
   =>
     _runner_builder.clone_router_and_set_input_type(r)
@@ -179,7 +161,6 @@ class val EgressBuilder
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
   fun clone_router_and_set_input_type(r: Router,
     dr: (Router | None) = None): Router => r
 
@@ -215,19 +196,16 @@ class val PreStateData
   let _pre_state_name: String
   let _runner_builder: RunnerBuilder
   let _target_ids: Array[StepId] val
-  let _forward_route_builder: RouteBuilder
 
   new val create(runner_builder: RunnerBuilder, t_ids: Array[StepId] val) =>
     _runner_builder = runner_builder
     _state_name = runner_builder.state_name()
     _pre_state_name = runner_builder.name()
     _target_ids = t_ids
-    _forward_route_builder = runner_builder.forward_route_builder()
 
   fun state_name(): String => _state_name
   fun pre_state_name(): String => _pre_state_name
   fun target_ids(): Array[StepId] val => _target_ids
-  fun forward_route_builder(): RouteBuilder => _forward_route_builder
   fun clone_router_and_set_input_type(r: Router): Router =>
     _runner_builder.clone_router_and_set_input_type(r)
 
@@ -271,6 +249,5 @@ class val PreStatelessData
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
   fun clone_router_and_set_input_type(r: Router,
     dr: (Router | None) = None): Router => r
