@@ -10,6 +10,11 @@ the License. You may obtain a copy of the License at
 
 */
 
+use "collections"
+use "wallaroo/core/sink"
+use "wallaroo_labs/mort"
+
+
 trait SnapshotHandler
   fun in_progress(): Bool
   fun ref ack_snapshot(s: Snapshottable, snapshot_id: SnapshotId) =>
@@ -33,7 +38,7 @@ class InProgressSnapshotHandler is SnapshotHandler
   let _acked_sinks: SetIs[Snapshottable] = _acked_sinks.create()
 
   new create(i: SnapshotInitiator, snapshot_id: SnapshotId,
-    sources: SetIs[Sink] box)
+    sinks: SetIs[Sink] box)
   =>
     _initiator = i
     _snapshot_id = snapshot_id
@@ -48,18 +53,22 @@ class InProgressSnapshotHandler is SnapshotHandler
     if snapshot_id != _snapshot_id then Fail() end
     if not _sinks.contains(s) then Fail() end
 
-    _acked_sources.set(s)
+    _acked_sinks.set(s)
     if _acked_sinks.size() == _sinks.size() then
-      _initiator.all_sinks_acked()
+      _initiator.all_sinks_acked(_snapshot_id)
     end
 
 class WorkerAcksSnapshotHandler is SnapshotHandler
   let _initiator: SnapshotInitiator
+  let _snapshot_id: SnapshotId
   let _workers: SetIs[String] = _workers.create()
   let _acked_workers: SetIs[String] = _acked_workers.create()
 
-  new create(i: SnapshotInitiator, ws: SetIs[String] box) =>
+  new create(i: SnapshotInitiator, s_id: SnapshotId,
+    ws: _StringSet box)
+  =>
     _initiator = i
+    _snapshot_id = s_id
     for w in ws.values() do
       _workers.set(w)
     end
@@ -73,5 +82,5 @@ class WorkerAcksSnapshotHandler is SnapshotHandler
 
     _acked_workers.set(w)
     if _acked_workers.size() == _workers.size() then
-      _initiator.all_workers_acked()
+      _initiator.all_workers_acked(_snapshot_id)
     end

@@ -39,6 +39,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/snapshot"
 use "wallaroo_labs/mort"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
@@ -284,6 +285,13 @@ class DataChannelConnectNotifier is DataChannelNotify
         end
         _receiver.request_in_flight_resume_ack(m.in_flight_resume_ack_id,
           m.request_id, m.requester_id, m.leaving_workers)
+      | let m: RegisterProducerMsg =>
+        _receiver.register_producer(m.source_id, m.target_id)
+      | let m: UnregisterProducerMsg =>
+        _receiver.unregister_producer(m.source_id, m.target_id)
+      | let m: SnapshotBarrierMsg =>
+        _receiver.forward_snapshot_barrier(m.target_id, m.origin_id,
+          m.snapshot_id)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
           .cstring())
@@ -315,48 +323,37 @@ class DataChannelConnectNotifier is DataChannelNotify
     //      create a new connection in OutgoingBoundary
 
 trait _DataReceiverWrapper
-  fun data_connect(sender_step_id: StepId, conn: DataChannel)
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun report_status(code: ReportStatusCode)
-
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId)
-  fun request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    leaving_workers: Array[String] val)
-
-class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
     Fail()
-
   fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
-
   fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
-
-  fun upstream_replay_finished() =>
-    Fail()
-
   fun report_status(code: ReportStatusCode) =>
     Fail()
-
   fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
     Fail()
-
   fun request_in_flight_resume_ack(
     in_flight_resume_ack_id: InFlightResumeAckId,
     request_id: RequestId, requester_id: StepId,
     leaving_workers: Array[String] val)
   =>
     Fail()
+
+  fun register_producer(input_id: StepId, output_id: StepId) =>
+    Fail()
+  fun unregister_producer(input_id: StepId, output_id: StepId) =>
+    Fail()
+  fun forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
+    snapshot_id: SnapshotId)
+  =>
+    Fail()
+
+class _InitDataReceiver is _DataReceiverWrapper
 
 class _DataReceiver is _DataReceiverWrapper
   let data_receiver: DataReceiver
@@ -392,3 +389,15 @@ class _DataReceiver is _DataReceiverWrapper
   =>
     data_receiver.request_in_flight_resume_ack(in_flight_resume_ack_id,
       request_id, requester_id, leaving_workers)
+
+  fun register_producer(input_id: StepId, output_id: StepId) =>
+    data_receiver.register_producer(input_id, output_id)
+
+  fun unregister_producer(input_id: StepId, output_id: StepId) =>
+    data_receiver.unregister_producer(input_id, output_id)
+
+  fun forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
+    snapshot_id: SnapshotId)
+  =>
+    data_receiver.forward_snapshot_barrier(target_step_id, origin_step_id,
+      snapshot_id)

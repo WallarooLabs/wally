@@ -33,9 +33,11 @@ use "net"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/sink"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -53,7 +55,7 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSink is Consumer
+actor TCPSink is Sink
   """
   # TCPSink
 
@@ -77,6 +79,7 @@ actor TCPSink is Consumer
     was acknowleged.)
   """
   let _env: Env
+  var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
   let _snapshot_initiator: SnapshotInitiator
   // Steplike
   let _sink_id: StepId
@@ -164,6 +167,7 @@ actor TCPSink is Consumer
     _service = service
     _from = from
     _connect_count = 0
+    _message_processor = NormalSinkMessageProcessor(this)
     _mute_upstreams()
 
   //
@@ -199,6 +203,16 @@ actor TCPSink is Consumer
     i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _message_processor.process_message[D](metric_name, pipeline_time_spent,
+      data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+      latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     var receive_ts: U64 = 0
     ifdef "detailed-metrics" then
@@ -305,9 +319,7 @@ actor TCPSink is Consumer
   be request_ack() =>
     _terminus_route.request_ack()
 
-  be register_producer(id: StepId, producer: Producer,
-    back_edge: Bool = false)
-  =>
+  be register_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
@@ -317,9 +329,7 @@ actor TCPSink is Consumer
     _inputs(id) = producer
     _upstreams.set(producer)
 
-  be unregister_producer(id: StepId, producer: Producer,
-    back_edge: Bool = false)
-  =>
+  be unregister_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
 
     ifdef debug then
@@ -332,19 +342,19 @@ actor TCPSink is Consumer
       else
         Fail()
       end
-    end
 
-    var have_input = false
-    for i in _inputs.values() do
-      if i is producer then have_input = true end
-    end
-    if not have_input then
-      _upstreams.unset(producer)
-    end
+      var have_input = false
+      for i in _inputs.values() do
+        if i is producer then have_input = true end
+      end
+      if not have_input then
+        _upstreams.unset(producer)
+      end
 
-    // If we have no inputs, then we are not involved in snapshotting.
-    if _inputs.size() == 0 then
-      _snapshot_initiator.unregister_sink(this)
+      // If we have no inputs, then we are not involved in snapshotting.
+      if _inputs.size() == 0 then
+        _snapshot_initiator.unregister_sink(this)
+      end
     end
 
   be report_status(code: ReportStatusCode) =>
@@ -364,8 +374,48 @@ actor TCPSink is Consumer
   be try_finish_in_flight_request_early(requester_id: StepId) =>
     None
 
-  //
+  ///////////////
+  // SNAPSHOTS
+  ///////////////
+  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
+  =>
+    if _message_processor.snapshot_in_progress() then
+      _message_processor.receive_snapshot_barrier(step_id, sr,
+        snapshot_id)
+    else
+      match _message_processor
+      | let nsmp: NormalSinkMessageProcessor =>
+        let sr_inputs = recover iso Map[StepId, SnapshotRequester] end
+        for (sr_id, i) in _inputs.pairs() do
+          sr_inputs(sr_id) = i
+        end
+        _message_processor = SnapshotSinkMessageProcessor(this,
+          SnapshotBarrierAcker(_sink_id, this, consume sr_inputs,
+            _snapshot_initiator, snapshot_id))
+      else
+        Fail()
+      end
+    end
+
+  be remote_snapshot_state() =>
+    // Nothing to snapshot at this point
+    None
+
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    // Nothing to snapshot at this point
+    None
+
+  fun ref snapshot_complete() =>
+    ifdef debug then
+      Invariant(_message_processor.snapshot_in_progress())
+    end
+    _message_processor.flush()
+    _message_processor = NormalSinkMessageProcessor(this)
+
+  ///////////////
   // TCP
+  ///////////////
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.

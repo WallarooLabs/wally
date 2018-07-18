@@ -11,10 +11,19 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
+use "time"
+use "wallaroo/core/common"
+use "wallaroo/core/initialization"
+use "wallaroo/core/sink"
+use "wallaroo/core/source"
+use "wallaroo/core/topology"
+use "wallaroo/ent/network"
 use "wallaroo_labs/mort"
 
 
-actor SnapshotInitiator is SnapshotRequester
+actor SnapshotInitiator is (SnapshotRequester & Initializable)
+  var _is_active: Bool
+  var _time_between_snapshots: U64
   var _snapshot_handler: SnapshotHandler = WaitingSnapshotHandler(this)
   var _current_snapshot_id: SnapshotId = 0
   let _connections: Connections
@@ -22,11 +31,33 @@ actor SnapshotInitiator is SnapshotRequester
   let _source_ids: Map[USize, StepId] = _source_ids.create()
   let _sinks: SetIs[Sink] = _sinks.create()
   let _workers: _StringSet = _workers.create()
+  let _timers: Timers = Timers
 
-  // !@ TODO: Make snapshot interval configurable. And also make it possible to
-  // turn snapshotting off.
-  new create(connections: Connections) =>
+  new create(connections: Connections, time_between_snapshots: U64,
+    is_active: Bool = true)
+  =>
+    _is_active = is_active
+    _time_between_snapshots = time_between_snapshots
     _connections = connections
+
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer,
+    omni_router: OmniRouter)
+  =>
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    ifdef "resilience" then
+      if _is_active then
+        let t = Timer(_InitiateSnapshot(this), _time_between_snapshots)
+        _timers(consume t)
+      end
+    end
 
   be register_sink(sink: Sink) =>
     _sinks.set(sink)
@@ -54,32 +85,53 @@ actor SnapshotInitiator is SnapshotRequester
     _snapshot_handler = InProgressSnapshotHandler(this, _current_snapshot_id,
       _sinks)
     for s in _sources.values() do
-      s.receive_snapshot_barrier(this, _current_snapshot_id)
+      s.initiate_snapshot_barrier(_current_snapshot_id)
     end
 
-  fun ref snapshot_state() =>
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
     None
 
   fun ref snapshot_complete() =>
     None
 
   be ack_snapshot(s: Snapshottable, snapshot_id: SnapshotId) =>
+    """
+    Called by sinks when they have received snapshot barriers on all
+    their inputs.
+    """
     _snapshot_handler.ack_snapshot(s, snapshot_id)
 
   be worker_ack_snapshot(w: String, snapshot_id: SnapshotId) =>
     _snapshot_handler.worker_ack_snapshot(w, snapshot_id)
 
-  be all_sources_acked() =>
+  be all_sinks_acked(snapshot_id: SnapshotId) =>
     //!@ Send out ack requests to cluster
 
-    _snapshot_handler = WorkerAcksSnapshotHandler(this, _workers)
+    _snapshot_handler = WorkerAcksSnapshotHandler(this, snapshot_id, _workers)
 
-  be all_workers_acked() =>
+  be all_workers_acked(snapshot_id: SnapshotId) =>
     //!@ Write out snapshot id to disk
 
     //!@ Send out "write snapshot id to disk" to cluster
 
     _snapshot_handler = WaitingSnapshotHandler(this)
+    ifdef "resilience" then
+      // Prepare for next snapshot
+      if _is_active then
+        let t = Timer(_InitiateSnapshot(this), _time_between_snapshots)
+        _timers(consume t)
+      end
+    end
+
+class _InitiateSnapshot is TimerNotify
+  let _si: SnapshotInitiator
+
+  new iso create(si: SnapshotInitiator) =>
+    _si = si
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _si.initiate_snapshot()
+    false
 
 
 /////////////////////////////////////////////////////////////////////////////

@@ -119,12 +119,8 @@ actor Step is (Producer & Consumer & Rerouter)
     let initial_router = _runner.clone_router_and_set_input_type(router')
     _update_router(initial_router)
 
-    for (id, consumer) in _router.routes().pairs() do
-      _outputs(id) = consumer
-      if not _routes.contains(consumer) then
-        _routes(consumer) =
-          _route_builder(_id, this, consumer, _metrics_reporter)
-      end
+    for (c_id, consumer) in _router.routes().pairs() do
+      _register_output(c_id, consumer)
     end
 
     //!@
@@ -159,13 +155,29 @@ actor Step is (Producer & Consumer & Rerouter)
     initializer.report_initialized(this)
 
   fun ref _initialize_routes_boundaries_omni_router(omni_router: OmniRouter) =>
-    for (id, consumer) in _router.routes().pairs() do
-      _outputs(id) = consumer
-      if not _routes.contains(consumer) then
-        _routes(consumer) =
-          _route_builder(_id, this, consumer, _metrics_reporter)
-      end
-    end
+    //!@ We shouldn't need this here.  This should happen whenever a router is
+    // updated
+    // for (c_id, consumer) in _router.routes().pairs() do
+    //   if _outputs.contains(c_id) then
+    //     try
+    //       _routes(consumer)?.unregister_producer(c_id)
+    //     else
+    //       Fail()
+    //     end
+    //   end
+    //   _outputs(c_id) = consumer
+    //   if not _routes.contains(consumer) then
+    //     let new_route = _route_builder(_id, this, consumer, _metrics_reporter)
+    //     _routes(consumer) = new_route
+    //     new_route.register_producer(c_id)
+    //   else
+    //     try
+    //       _routes(consumer)?.register_producer(c_id)
+    //     else
+    //       Fail()
+    //     end
+    //   end
+    // end
 
     //!@
     // for boundary in _outgoing_boundaries.values() do
@@ -240,14 +252,7 @@ actor Step is (Producer & Consumer & Rerouter)
     end
 
     for (c_id, consumer) in router'.routes().pairs() do
-      _outputs(c_id) = consumer
-      let next_route = route_builder(_id, this, consumer, _metrics_reporter)
-      if not _routes.contains(consumer) then
-        _routes(consumer) = next_route
-        ifdef "resilience" then
-          _acker_x.add_route(next_route)
-        end
-      end
+      _register_output(c_id, consumer)
     end
 
   be update_router(router': Router) =>
@@ -259,26 +264,55 @@ actor Step is (Producer & Consumer & Rerouter)
     for (old_id, outdated_consumer) in
       old_router.routes_not_in(_router).pairs()
     do
-      try
-        if _outputs.contains(old_id) then
-          try
-            _outputs.remove(old_id)?
-            _remove_route_if_no_output(outdated_consumer)
-          end
+      if _outputs.contains(old_id) then
+        try
+          _outputs.remove(old_id)?
+          _routes(outdated_consumer)?.unregister_producer(old_id)
+          _remove_route_if_no_output(outdated_consumer)
+        else
+          Fail()
         end
+      end
+    end
+    for (c_id, consumer) in _router.routes().pairs() do
+      _register_output(c_id, consumer)
+    end
+
+  fun ref _register_output(id: StepId, c: Consumer) =>
+    if _outputs.contains(id) then
+      try
+        _routes(c)?.unregister_producer(id)
       else
         Fail()
       end
     end
-    for (c_id, consumer) in _router.routes().pairs() do
-      _outputs(c_id) = consumer
-      if not _routes.contains(consumer) then
-        let new_route = _route_builder(_id, this, consumer,
-          _metrics_reporter)
-        ifdef "resilience" then
-          _acker_x.add_route(new_route)
-        end
-        _routes(consumer) = new_route
+
+    _outputs(id) = c
+    if not _routes.contains(c) then
+      let new_route = _route_builder(_id, this, c, _metrics_reporter)
+      _routes(c) = new_route
+      ifdef "resilience" then
+        _acker_x.add_route(new_route)
+      end
+      new_route.register_producer(id)
+    else
+      try
+        _routes(c)?.register_producer(id)
+      else
+        Fail()
+      end
+    end
+
+  fun ref _unregister_all_outputs() =>
+    """
+    This method should only be called if we are removing this step from the
+    active graph (or on dispose())
+    """
+    for (id, consumer) in _outputs.pairs() do
+      try
+        _routes(consumer)?.unregister_producer(id)
+      else
+        Fail()
       end
       _pending_message_store.process_known_keys(this, this, _router)
     else
@@ -292,6 +326,11 @@ actor Step is (Producer & Consumer & Rerouter)
       end
       try
         _outputs.remove(id)?
+        try
+          _routes(c)?.unregister_producer(id)
+        else
+          Fail()
+        end
         _remove_route_if_no_output(c)
       end
     end
@@ -538,7 +577,7 @@ actor Step is (Producer & Consumer & Rerouter)
     _deduplication_list.clear()
 
   be dispose() =>
-    None
+    _unregister_all_outputs()
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
@@ -547,17 +586,13 @@ actor Step is (Producer & Consumer & Rerouter)
       None
     end
 
-  be register_producer(id: StepId, producer: Producer,
-    back_edge: Bool = false)
-  =>
+  be register_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
 
     _inputs(id) = producer
     _upstreams.set(producer)
 
-  be unregister_producer(id: StepId, producer: Producer,
-    back_edge: Bool = false)
-  =>
+  be unregister_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Unregistered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
 
     // TODO: Investigate whether we need this Invariant or why it's sometimes
@@ -566,20 +601,24 @@ actor Step is (Producer & Consumer & Rerouter)
     //   Invariant(_upstreams.contains(producer))
     // end
 
+    ifdef debug then
+      Invariant(_inputs.contains(id))
+    end
+
     if _inputs.contains(id) then
       try
         _inputs.remove(id)?
       else
         Fail()
       end
-    end
 
-    var have_input = false
-    for i in _inputs.values() do
-      if i is producer then have_input = true end
-    end
-    if not have_input then
-      _upstreams.unset(producer)
+      var have_input = false
+      for i in _inputs.values() do
+        if i is producer then have_input = true end
+      end
+      if not have_input then
+        _upstreams.unset(producer)
+      end
     end
 
   be report_status(code: ReportStatusCode) =>
@@ -703,6 +742,7 @@ actor Step is (Producer & Consumer & Rerouter)
 
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Key) =>
     ifdef "autoscale" then
+      _unregister_all_outputs()
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
         // TODO: Should this be possible?
@@ -718,23 +758,29 @@ actor Step is (Producer & Consumer & Rerouter)
   //////////////
   // SNAPSHOTS
   //////////////
-  be receive_snapshot_barrier(sr: SnapshotRequester, snapshot_id: SnapshotId)
+  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
   =>
     if _step_message_processor.snapshot_in_progress() then
-      _step_message_processor.receive_snapshot_barrier(sr, snapshot_id)
+      _step_message_processor.receive_snapshot_barrier(step_id, sr,
+        snapshot_id)
     else
       // !@ Handle this more cleanly. We need to make sure we don't lose
       // queued messages, but should snapshots ever be possible when we're in
       // the queueing state?
       match _step_message_processor
       | let nsmp: NormalStepMessageProcessor =>
-        let outputs = recover iso StepIs[Consumer] end
-        for c in _routes.keys() do
-          outputs.set(c)
+        let sr_inputs = recover iso Map[StepId, SnapshotRequester] end
+        for (sr_id, i) in _inputs.pairs() do
+          sr_inputs(sr_id) = i
+        end
+        let s_outputs = recover iso Map[StepId, Snapshottable] end
+        for (s_id, i) in _outputs.pairs() do
+          s_outputs(s_id) = i
         end
         _step_message_processor = SnapshotStepMessageProcessor(this,
-          SnapshotBarrierForwarder(this, _upstreams, consume outputs,
-            snapshot_id)
+          SnapshotBarrierForwarder(_id, this, consume sr_inputs,
+            consume s_outputs, snapshot_id))
       else
         Fail()
       end
@@ -745,7 +791,7 @@ actor Step is (Producer & Consumer & Rerouter)
       StepStateSnapshotter(_runner, _id, _seq_id_generator, _event_log)
     end
 
-  fun ref snapshot_state() =>
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
     ifdef "resilience" then
       StepStateSnapshotter(_runner, _id, _seq_id_generator, _event_log)
     end

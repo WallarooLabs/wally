@@ -41,6 +41,9 @@ trait Route
     latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64)
 
+  fun register_producer(target_id: StepId)
+  fun unregister_producer(target_id: StepId)
+
   fun ref request_ack()
 
   fun ref report_status(code: ReportStatusCode)
@@ -124,6 +127,13 @@ class EmptyRoute is Route
   =>
     Fail()
     true
+
+
+  fun register_producer(target_id: StepId) =>
+    Fail()
+
+  fun unregister_producer(target_id: StepId) =>
+    Fail()
 
   fun ref report_status(code: ReportStatusCode) =>
     Fail()
