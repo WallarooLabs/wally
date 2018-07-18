@@ -94,7 +94,7 @@ interface val SourceConfig[In: Any val]
   fun source_builder(app_name: String, name: String):
     SourceBuilderBuilder
 
-interface tag Source is (DisposableActor & BoundaryUpdateable &
+trait tag Source is (Producer & DisposableActor & BoundaryUpdateable &
   StatusReporter)
   be update_router(router: PartitionRouter)
   be remove_route_to_consumer(id: StepId, c: Consumer)

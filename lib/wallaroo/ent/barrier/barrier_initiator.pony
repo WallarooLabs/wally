@@ -15,6 +15,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/source"
+use "wallaroo/core/source/barrier_source"
 use "wallaroo/core/sink"
 use "wallaroo/ent/network"
 use "wallaroo_labs/mort"
@@ -49,6 +50,7 @@ actor BarrierInitiator is Initializable
   let _worker_name: String
   var _barrier_handler: BarrierHandler = WaitingBarrierHandler
   let _connections: Connections
+  var _barrier_source: (BarrierSource | None) = None
   let _sources: Map[StepId, Source] = _sources.create()
   let _source_ids: Map[USize, StepId] = _source_ids.create()
   let _sinks: SetIs[BarrierReceiver] = _sinks.create()
@@ -80,6 +82,9 @@ actor BarrierInitiator is Initializable
 
   be unregister_sink(sink: Sink) =>
     _sinks.unset(sink)
+
+  be register_barrier_source(b_source: BarrierSource) =>
+    _barrier_source = b_source
 
   be register_source(source: Source, source_id: StepId) =>
     _sources(source_id) = source
@@ -229,13 +234,21 @@ actor BarrierInitiator is Initializable
         barrier_token, acked_sinks, _sinks, primary_worker)
     end
 
-    @printf[I32]("!@ calling initiate_barrier at %s sources\n".cstring(), _sources.size().string().cstring())
-    //!@
-    if (_sources.size() == 0) and (_workers.size() == 1) then
-      @printf[I32]("!@ initiate_barrier FINISH EARLY\n".cstring())
-      //!@ FINISH EARLY
-      all_workers_acked(_current_barrier_token, result_promise)
+    //!@ NEEDS WORK!
+    if (_sources.size() == 0) and (_barrier_source is None) then
+      if (_workers.size() == 1) or (_sinks.size() == 0) then
+        @printf[I32]("!@ start_barrier FINISH EARLY\n".cstring())
+        //!@ FINISH EARLY
+        all_workers_acked(_current_barrier_token, result_promise)
+      end
     else
+      try
+        (_barrier_source as BarrierSource).initiate_barrier(
+          _current_barrier_token)
+      else
+        Fail()
+      end
+      @printf[I32]("!@ calling initiate_barrier at %s sources\n".cstring(), _sources.size().string().cstring())
       for s in _sources.values() do
         s.initiate_barrier(_current_barrier_token)
       end
@@ -304,6 +317,12 @@ actor BarrierInitiator is Initializable
       for w in _workers.values() do
         if w != _worker_name then _connections.send_control(w, msg) end
       end
+    else
+      Fail()
+    end
+    try
+      (_barrier_source as BarrierSource).barrier_complete(
+        _current_barrier_token)
     else
       Fail()
     end

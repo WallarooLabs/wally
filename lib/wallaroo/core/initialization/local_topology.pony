@@ -39,6 +39,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
+use "wallaroo/core/source/barrier_source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/dag"
@@ -812,6 +813,12 @@ actor LocalTopologyInitializer is LayoutInitializer
         // pipelines). Map from state name to router.
         let state_step_routers = Map[String, TargetIdRouter]
 
+        // If this worker has at least one Source, then we'll also need a
+        // a BarrierSource to ensure that snapshot barriers always get to
+        // source targets (even if our local Sources pop out of existence
+        // for some reason, as when TCPSources disconnect).
+        var barrier_source: (BarrierSource | None) = None
+
         /////////
         // Initialize based on DAG
         //
@@ -1366,6 +1373,20 @@ actor LocalTopologyInitializer is LayoutInitializer
                     error
                   end
                 end
+
+              // If there is no BarrierSource, we need to create one, since
+              // this worker has at least one Source on it.
+              if barrier_source is None then
+                let b_source = BarrierSource(_step_id_gen(), _router_registry)
+                _barrier_initiator.register_barrier_source(b_source)
+                barrier_source = b_source
+              end
+              try
+                (barrier_source as BarrierSource).register_pipeline(
+                  pipeline_name, out_router)
+              else
+                Unreachable()
+              end
 
               let source_reporter = MetricsReporter(t.name(), t.worker_name(),
                 _metrics_conn)
