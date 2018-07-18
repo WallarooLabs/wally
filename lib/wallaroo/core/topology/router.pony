@@ -1410,16 +1410,6 @@ class val DataRouter is Equatable[DataRouter]
       Fail()
     end
 
-  fun forward_snapshot_barrier(target_step_id: StepId,
-    origin_step_id: StepId, sr: SnapshotRequester, snapshot_id: SnapshotId)
-  =>
-    try
-      _data_routes(target_step_id)?.receive_snapshot_barrier(origin_step_id,
-        sr, snapshot_id)
-    else
-      Fail()
-    end
-
   fun eq(that: box->DataRouter): Bool =>
     MapTagEquality[U128, Consumer](_data_routes, that._data_routes) and
       MapEquality[U128, RouteId](_target_ids_to_route_ids,

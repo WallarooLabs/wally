@@ -43,15 +43,6 @@ trait StepMessageProcessor
   =>
     Fail()
 
-  //!@
-  fun snapshot_in_progress(): Bool =>
-    false
-    //!@
-  fun ref receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    Fail()
-
   fun ref flush(target_id_router: TargetIdRouter)
 
 class EmptyStepMessageProcessor is StepMessageProcessor
@@ -170,48 +161,6 @@ class BarrierStepMessageProcessor is StepMessageProcessor
     barrier_token: BarrierToken)
   =>
     _barrier_forwarder.receive_barrier(step_id, producer, barrier_token)
-
-  fun ref flush(target_id_router: TargetIdRouter) =>
-    for msg in messages.values() do
-      msg.process_message(step)
-    end
-    messages = Array[QueuedMessage]
-
-
-//!@
-class SnapshotStepMessageProcessor is StepMessageProcessor
-  let step: Step ref
-  let _snapshot_forwarder: SnapshotBarrierForwarder
-  var messages: Array[QueuedMessage] = messages.create()
-
-  new create(s: Step ref, snapshot_forwarder: SnapshotBarrierForwarder)
-  =>
-    step = s
-    _snapshot_forwarder = snapshot_forwarder
-
-  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    if _snapshot_forwarder.input_blocking(i_producer_id, i_producer) then
-      let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
-        data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
-        i_route_id, latest_ts, metrics_id, worker_ingress_ts)
-      messages.push(msg)
-    else
-      step.process_message[D](metric_name, pipeline_time_spent, data,
-        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
-    end
-
-  fun snapshot_in_progress(): Bool =>
-    true
-
-  fun ref receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    _snapshot_forwarder.receive_snapshot_barrier(step_id, sr, snapshot_id)
 
   fun ref flush(target_id_router: TargetIdRouter) =>
     for msg in messages.values() do

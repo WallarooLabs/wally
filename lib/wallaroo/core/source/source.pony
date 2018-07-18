@@ -95,7 +95,7 @@ interface val SourceConfig[In: Any val]
     SourceBuilderBuilder
 
 interface tag Source is (DisposableActor & BoundaryUpdateable &
-  StatusReporter & SnapshotRequester & Snapshottable)
+  StatusReporter)
   be update_router(router: PartitionRouter)
   be remove_route_to_consumer(id: StepId, c: Consumer)
   be add_boundary_builders(
@@ -104,7 +104,7 @@ interface tag Source is (DisposableActor & BoundaryUpdateable &
   be mute(c: Consumer)
   be unmute(c: Consumer)
   be initiate_barrier(token: BarrierToken)
-  be initiate_snapshot_barrier(snapshot_id: SnapshotId)
+  be barrier_complete(token: BarrierToken)
 
 interface tag SourceListener is (DisposableActor & BoundaryUpdateable)
   be update_router(router: PartitionRouter)

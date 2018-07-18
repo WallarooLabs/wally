@@ -330,7 +330,6 @@ actor TCPSink is Sink
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
       _barrier_initiator.register_sink(this)
-      _snapshot_initiator.register_sink(this)
     end
 
     _inputs(id) = producer
@@ -361,7 +360,6 @@ actor TCPSink is Sink
       // If we have no inputs, then we are not involved in snapshotting.
       if _inputs.size() == 0 then
         _barrier_initiator.unregister_sink(this)
-        _snapshot_initiator.unregister_sink(this)
       end
     end
 
@@ -409,27 +407,6 @@ actor TCPSink is Sink
   ///////////////
   // SNAPSHOTS
   ///////////////
-  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    if _message_processor.snapshot_in_progress() then
-      _message_processor.receive_snapshot_barrier(step_id, sr,
-        snapshot_id)
-    else
-      match _message_processor
-      | let nsmp: NormalSinkMessageProcessor =>
-        let sr_inputs = recover iso Map[StepId, SnapshotRequester] end
-        for (sr_id, i) in _inputs.pairs() do
-          sr_inputs(sr_id) = i
-        end
-        _message_processor = SnapshotSinkMessageProcessor(this,
-          SnapshotBarrierAcker(_sink_id, this, consume sr_inputs,
-            _snapshot_initiator, snapshot_id))
-      else
-        Fail()
-      end
-    end
-
   be remote_snapshot_state() =>
     // Nothing to snapshot at this point
     None
@@ -437,13 +414,6 @@ actor TCPSink is Sink
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     // Nothing to snapshot at this point
     None
-
-  fun ref snapshot_complete() =>
-    ifdef debug then
-      Invariant(_message_processor.snapshot_in_progress())
-    end
-    _message_processor.flush()
-    _message_processor = NormalSinkMessageProcessor(this)
 
   ///////////////
   // TCP

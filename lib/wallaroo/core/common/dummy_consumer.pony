@@ -76,15 +76,13 @@ actor DummyConsumer is Consumer
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    None
-
   be receive_barrier(step_id: StepId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     None
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
+    None
+
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
     None

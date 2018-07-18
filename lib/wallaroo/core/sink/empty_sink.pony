@@ -79,15 +79,7 @@ actor EmptySink is Sink
 
   be receive_state(state: ByteSeq val) => Fail()
 
-  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    None
-
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    None
-
-  fun ref snapshot_complete() =>
     None
 
   be dispose() =>

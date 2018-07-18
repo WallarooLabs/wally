@@ -406,27 +406,13 @@ actor KafkaSource[In: Any val] is (Producer & StatusReporter & KafkaConsumer)
       end
     end
 
+  be barrier_complete(token: BarrierToken) =>
+    // !@ Here's where we could ack finished messages up to snapshot point.
+    None
+
   //////////////
   // SNAPSHOTS
   //////////////
-  be initiate_snapshot_barrier(snapshot_id: SnapshotId) =>
-    // TODO: Eventually we might need to snapshot information about the
-    // source here before sending down the barrier.
-    for (o_id, o) in _outputs.pairs() do
-      match o
-      | let ob: OutgoingBoundary =>
-        ob.forward_snapshot_barrier(o_id, _source_id, snapshot_id)
-      else
-        o.receive_snapshot_barrier(_source_id, this, snapshot_id)
-      end
-    end
-
-  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
-    snapshot_id: SnapshotId)
-  =>
-    // Sources have no inputs on which to receive barriers
-    Fail()
-
   be remote_snapshot_state() =>
     ifdef "trace" then
       @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
@@ -440,10 +426,9 @@ actor KafkaSource[In: Any val] is (Producer & StatusReporter & KafkaConsumer)
     // !@
     None
 
-  fun ref snapshot_complete() =>
-    // !@
-    None
-
+////////
+// WATERMARKING
+///////
   be log_flushed(low_watermark: SeqId) =>
     ifdef "trace" then
       @printf[I32]("log_flushed for: %llu in %s\n".cstring(), low_watermark,
