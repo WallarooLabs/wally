@@ -22,6 +22,7 @@ use "net"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/source"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/rebalancing"
 use "wallaroo/ent/router_registry"
@@ -1230,11 +1231,10 @@ class val DataRouter is Equatable[DataRouter]
   fun register_producer(input_id: StepId, output_id: StepId,
     producer: DataReceiver ref)
   =>
-    if _data_routes.contains(input_id) then
+    if _data_routes.contains(output_id) then
       try
         _data_routes(output_id)?.register_producer(input_id, producer)
       else
-        @printf[I32]("!@ Failed to register_producer: inputid: %s, outputid: %s\n".cstring(), input_id.string().cstring(), output_id.string().cstring())
         Unreachable()
       end
     else
@@ -1244,7 +1244,7 @@ class val DataRouter is Equatable[DataRouter]
   fun unregister_producer(input_id: StepId, output_id: StepId,
     producer: DataReceiver ref)
   =>
-    if _data_routes.contains(input_id) then
+    if _data_routes.contains(output_id) then
       try
         _data_routes(output_id)?.unregister_producer(input_id, producer)
       else
@@ -1253,16 +1253,6 @@ class val DataRouter is Equatable[DataRouter]
     else
       producer.queue_unregister_producer(input_id, output_id)
     end
-
-  // fun register_producer(producer: Producer) =>
-  //   for (s_id, step) in _data_routes.pairs() do
-  //     step.register_producer(s_id, producer)
-  //   end
-
-  // fun unregister_producer(producer: Producer) =>
-  //   for (s_id, step) in _data_routes.pairs() do
-  //     step.unregister_producer(s_id, producer)
-  //   end
 
   fun request_ack(r_ids: Array[RouteId]) =>
     try
@@ -1410,6 +1400,16 @@ class val DataRouter is Equatable[DataRouter]
   fun has_state_partition(state_name: String, key: Key): Bool =>
     _keyed_routes.contains(state_name, key)
 
+  fun forward_barrier(target_step_id: StepId, origin_step_id: StepId,
+    producer: Producer, barrier_token: BarrierToken)
+  =>
+    try
+      _data_routes(target_step_id)?.receive_barrier(origin_step_id,
+        producer, barrier_token)
+    else
+      Fail()
+    end
+
   fun forward_snapshot_barrier(target_step_id: StepId,
     origin_step_id: StepId, sr: SnapshotRequester, snapshot_id: SnapshotId)
   =>
@@ -1438,43 +1438,6 @@ class val DataRouter is Equatable[DataRouter]
   fun report_status(code: ReportStatusCode) =>
     for consumer in _data_routes.values() do
       consumer.report_status(code)
-    end
-
-  fun request_in_flight_ack(requester_id: StepId,
-    requester: InFlightAckRequester, in_flight_ack_waiter: InFlightAckWaiter):
-    Bool
-  =>
-    """
-    Returns false if there were no data routes to request on.
-    """
-    ifdef "trace" then
-      @printf[I32]("Finished ack requested at DataRouter\n".cstring())
-    end
-    if _data_routes.size() > 0 then
-      for consumer in _data_routes.values() do
-        let request_id = in_flight_ack_waiter.add_consumer_request(
-          requester_id)
-        consumer.request_in_flight_ack(request_id, requester_id, requester)
-      end
-      true
-    else
-      false
-    end
-
-  fun request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    requester_id: StepId, requester: InFlightAckRequester,
-    in_flight_ack_waiter: InFlightAckWaiter,
-    leaving_workers: Array[String] val)
-  =>
-    if _data_routes.size() > 0 then
-      for consumer in _data_routes.values() do
-        let request_id = in_flight_ack_waiter.add_consumer_resume_request()
-        consumer.request_in_flight_resume_ack(in_flight_resume_ack_id,
-          request_id, requester_id, requester, leaving_workers)
-      end
-    else
-      in_flight_ack_waiter.try_finish_resume_request_early()
     end
 
 trait val PartitionRouter is (Router & Equatable[PartitionRouter])

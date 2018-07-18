@@ -66,15 +66,6 @@ actor DummyProducer is Producer
   be request_ack() =>
     None
 
-  // InFlightAckRequester
-  be receive_in_flight_ack(request_id: RequestId) =>
-    None
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    None
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    None
-
   // Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     None
