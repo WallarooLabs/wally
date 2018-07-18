@@ -31,6 +31,7 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo_labs/collection_helpers"
 
 class Application
   let _name: String
@@ -157,6 +158,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   let _a: Application
   let _p: Pipeline[In, Out]
+  let _pipeline_state_names: Array[String] = _pipeline_state_names.create()
 
   new create(a: Application, p: Pipeline[In, Out]) =>
     _a = a
@@ -185,6 +187,14 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     s_initializer: StateBuilder[S],
     state_name: String): PipelineBuilder[In, Out, Next]
   =>
+    if ArrayHelpers[String].contains[String](_pipeline_state_names, state_name)
+    then
+      FatalUserError("Wallaroo does not currently support application " +
+        "cycles. You cannot use the same state name twice in the same " +
+        "pipeline.")
+    end
+    _pipeline_state_names.push(state_name)
+
     // TODO: This is a shortcut. Non-partitioned state is being treated as a
     // special case of partitioned state with one partition. This works but is
     // a bit confusing when reading the code.
@@ -194,7 +204,6 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let step_id_map = recover trn Map[Key, StepId] end
 
     step_id_map("key") = step_id_gen()
-
 
     let next_builder = PreStateRunnerBuilder[Last, Next, Last, S](
       s_comp, state_name, SingleStepPartitionFunction[Last],
@@ -222,6 +231,14 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       partition: Partitions[PIn],
       multi_worker: Bool = false): PipelineBuilder[In, Out, Next]
   =>
+    if ArrayHelpers[String].contains[String](_pipeline_state_names, state_name)
+    then
+      FatalUserError("Wallaroo does not currently support application " +
+        "cycles. You cannot use the same state name twice in the same " +
+        "pipeline.")
+    end
+    _pipeline_state_names.push(state_name)
+
     let step_id_gen = StepIdGenerator
     let step_id_map = recover trn Map[Key, U128] end
 
