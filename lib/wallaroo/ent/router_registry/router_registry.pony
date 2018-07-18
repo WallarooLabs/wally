@@ -28,6 +28,7 @@ use "wallaroo/ent/autoscale"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
@@ -1583,7 +1584,7 @@ actor RouterRegistry is (InFlightAckRequester)
               for tid in psd.target_ids().values() do
                 try
                   let target_router =
-                    DirectRouter(_data_router.step_for_id(tid)?)
+                    DirectRouter(tid, _data_router.step_for_id(tid)?)
                   step.register_routes(target_router,
                     psd.forward_route_builder())
                 end

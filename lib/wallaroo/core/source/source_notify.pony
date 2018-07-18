@@ -35,7 +35,7 @@ interface FramedSourceHandler[In: Any val]
   fun decode(data: Array[U8] val): In ?
 
 interface SourceNotify
-  fun ref routes(): Array[Consumer] val
+  fun ref routes(): Map[StepId, Consumer] val
 
   fun ref update_router(router: Router)
 

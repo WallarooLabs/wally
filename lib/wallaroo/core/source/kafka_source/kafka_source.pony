@@ -22,8 +22,10 @@ use "pony-kafka"
 use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/invariant"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/snapshot"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -36,7 +38,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   let _source_id: StepId
   let _auth: AmbientAuth
   let _step_id_gen: StepIdGenerator = StepIdGenerator
-  let _router: Router
+  var _router: Router
   let _routes: MapIs[Consumer, Route] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
@@ -146,8 +148,8 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       end
     _router = new_router
 
-    for (id, consumer) in _router.routes().pairs() do
-      _outputs(id) = consumer
+    for (c_id, consumer) in _router.routes().pairs() do
+      _outputs(c_id) = consumer
       _routes(consumer) =
         _route_builder(_source_id, this, consumer, _metrics_reporter)
     end
@@ -193,15 +195,13 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     for (old_id, outdated_consumer) in
       old_router.routes_not_in(_router).pairs()
     do
-      try
-        if _outputs.contains(old_id) then
-          try
-            _outputs.remove(old_id)?
-            _remove_route_if_no_output(outdated_consumer)
-          end
+      if _outputs.contains(old_id) then
+        try
+          _outputs.remove(old_id)?
+          _remove_route_if_no_output(outdated_consumer)
+        else
+          Fail()
         end
-      else
-        Fail()
       end
     end
     for (c_id, consumer) in _router.routes().pairs() do
@@ -378,7 +378,27 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     _last_flushed_offset = offset
 
 
-  // Log-rotation
+  //////////////
+  // SNAPSHOTS
+  //////////////
+  be initiate_snapshot_barrier(snapshot_id: SnapshotId) =>
+    // TODO: Eventually we might need to snapshot information about the
+    // source here before sending down the barrier.
+    for (o_id, o) in _outputs.pairs() do
+      match o
+      | let ob: OutgoingBoundary =>
+        ob.forward_snapshot_barrier(o_id, _source_id, snapshot_id)
+      else
+        o.receive_snapshot_barrier(_source_id, this, snapshot_id)
+      end
+    end
+
+  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
+  =>
+    // Sources have no inputs on which to receive barriers
+    Fail()
+
   be remote_snapshot_state() =>
     ifdef "trace" then
       @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
@@ -387,6 +407,14 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     let payload = _wb.done()
     _event_log.snapshot_state(_source_id, 0, 0, _last_flushed_seq_id,
       consume payload)
+
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    // !@
+    None
+
+  fun ref snapshot_complete() =>
+    // !@
+    None
 
   be log_flushed(low_watermark: SeqId) =>
     ifdef "trace" then

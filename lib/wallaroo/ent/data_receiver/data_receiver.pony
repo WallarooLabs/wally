@@ -17,6 +17,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
@@ -56,6 +57,9 @@ actor DataReceiver is (Producer & Rerouter)
   // Timer to periodically request acks to prevent deadlock.
   var _timer_init: _TimerInit = _UninitializedTimerInit
   let _timers: Timers = Timers
+
+  // Keep track of point to point connections over the boundary
+  let _boundary_edges: Set[BoundaryEdge] = _boundary_edges.create()
 
   var _processing_phase: _DataReceiverProcessingPhase =
     _DataReceiverNotProcessingPhase
@@ -127,6 +131,14 @@ actor DataReceiver is (Producer & Rerouter)
     // We are finished initializing timer, so set it to _EmptyTimerInit
     // so we don't create two timers.
     _timer_init = _EmptyTimerInit
+
+  be register_producer(input_id: StepId, output_id: StepId) =>
+    _router.register_producer(input_id, output_id, this)
+    _boundary_edges.set(BoundaryEdge(input_id, output_id))
+
+  be unregister_producer(input_id: StepId, output_id: StepId) =>
+    _router.unregister_producer(input_id, output_id, this)
+    _boundary_edges.unset(BoundaryEdge(input_id, output_id))
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
     _watermarker.ack_received(route_id, seq_id)
@@ -216,8 +228,26 @@ actor DataReceiver is (Producer & Rerouter)
       Fail()
     end
 
-  //////////////
+  ///////////////
+  // SNAPSHOTS
+  ///////////////
+  be forward_snapshot_barrier(target_step_id: StepId, origin_step_id: StepId,
+    snapshot_id: SnapshotId)
+  =>
+    _router.forward_snapshot_barrier(target_step_id, origin_step_id, this,
+      snapshot_id)
+
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    // Nothing to do at this point.
+    None
+
+  fun ref snapshot_complete() =>
+    // Nothing to do at this point.
+    None
+
+  ///////////////////////
   // ORIGIN (resilience)
+  ///////////////////////
   fun ref _acker(): Acker =>
     // TODO: I dont think we need this.
     // Need to discuss with John
@@ -246,10 +276,13 @@ actor DataReceiver is (Producer & Rerouter)
     // be sending to.
     // Currently, this behavior should only be called once in the lifecycle
     // of a DataReceiver, so we would only need this if that were to change.
-    //_router.unregister_producer(this, 0)
+    // _router.unregister_producer(this)
 
     _router = router'
-    _router.register_producer(_id, this)
+
+    //!@ We now need to wait for actual steps to contact us to register
+    // them as producers
+    // _router.register_producer(this)
     for id in _router.route_ids().values() do
       _watermarker.add_route(id)
     end
@@ -319,6 +352,10 @@ actor DataReceiver is (Producer & Rerouter)
   be dispose() =>
     @printf[I32]("Shutting down DataReceiver\n".cstring())
     _timers.dispose()
+
+    for edge in _boundary_edges.values() do
+      _router.unregister_producer(edge.input_id, edge.output_id, this)
+    end
     match _latest_conn
     | let conn: DataChannel =>
       try

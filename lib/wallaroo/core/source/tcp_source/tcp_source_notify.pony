@@ -41,7 +41,7 @@ trait TCPSourceNotify is Rerouter
   // on startup. It probably makes more sense to make this
   // available via the source builder that Listener gets
   // and it can then make routes available
-  fun ref routes(): Array[Consumer] val
+  fun ref routes(): Map[StepId, Consumer] val
 
   fun ref update_router(router': Router)
 

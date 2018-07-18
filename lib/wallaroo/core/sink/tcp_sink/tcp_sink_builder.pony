@@ -23,6 +23,8 @@ use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
+
 
 primitive TCPSinkConfigCLIParser
   fun apply(args: Array[String] val): Array[TCPSinkConfigOptions] val ? =>

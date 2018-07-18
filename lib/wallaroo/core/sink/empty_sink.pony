@@ -20,12 +20,13 @@ use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/snapshot"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
-actor EmptySink is Consumer
+actor EmptySink is Sink
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
@@ -34,6 +35,14 @@ actor EmptySink is Consumer
     ifdef "trace" then
       @printf[I32]("Rcvd msg at EmptySink\n".cstring())
     end
+    None
+
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
+  =>
     None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
@@ -84,6 +93,17 @@ actor EmptySink is Consumer
     None
 
   be receive_state(state: ByteSeq val) => Fail()
+
+  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
+  =>
+    None
+
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    None
+
+  fun ref snapshot_complete() =>
+    None
 
   be dispose() =>
     None

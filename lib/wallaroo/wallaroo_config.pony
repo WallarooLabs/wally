@@ -46,6 +46,8 @@ class StartupOptions
   var is_joining: Bool = false
   var a_arg: (String | None) = None
   var stop_the_world_pause: U64 = 2_000_000_000
+  var snapshots_enabled: Bool = true
+  var time_between_snapshots: U64 = 1_000_000_000
   var spike_config: (SpikeConfig | None) = None
 
 primitive WallarooConfig

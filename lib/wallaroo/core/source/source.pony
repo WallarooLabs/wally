@@ -21,6 +21,7 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
@@ -101,6 +102,7 @@ interface tag Source is (DisposableActor & BoundaryUpdateable &
   be reconnect_boundary(target_worker_name: String)
   be mute(c: Consumer)
   be unmute(c: Consumer)
+  be initiate_snapshot_barrier(snapshot_id: SnapshotId)
 
 interface tag SourceListener is (DisposableActor & BoundaryUpdateable)
   be update_router(router: PartitionRouter)
