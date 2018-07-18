@@ -48,6 +48,10 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
+  // _inputs keeps track of all inputs by step id. There might be
+  // duplicate producers in this map (unlike upstreams) since there might be
+  // multiple upstream step ids over a boundary
+  let _inputs: Map[StepId, Producer] = _inputs.create()
   var _mute_outstanding: Bool = false
 
   var _kc: (KafkaClient tag | None) = None
@@ -258,30 +262,44 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   be register_producer(id: StepId, producer: Producer,
     back_edge: Bool = false)
   =>
-    // If we have at least one upstream, then we are involved in snapshotting.
-    if _upstreams.size() == 0 then
+    @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+    // If we have at least one input, then we are involved in snapshotting.
+    if _inputs.size() == 0 then
       _snapshot_initiator.register_sink(this)
     end
 
+    _inputs(id) = producer
     _upstreams.set(producer)
-
-    //!@ Add to input channels
 
   be unregister_producer(id: StepId, producer: Producer,
     back_edge: Bool = false)
   =>
+    @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
 
-    _upstreams.unset(producer)
-
-    // If we have no upstreams, then we are not involved in snapshotting.
-    if _upstreams.size() == 0 then
-      _snapshot_initiator.unregister_sink(this)
+    if _inputs.contains(id) then
+      try
+        _inputs.remove(id)?
+      else
+        Fail()
+      end
     end
 
-    //!@ Remove from input channels
+    var have_input = false
+    for i in _inputs.values() do
+      if i is producer then have_input = true end
+    end
+    if not have_input then
+      _upstreams.unset(producer)
+    end
+
+    // If we have no inputs, then we are not involved in snapshotting.
+    if _inputs.size() == 0 then
+      _snapshot_initiator.unregister_sink(this)
+    end
 
   be report_status(code: ReportStatusCode) =>
     None

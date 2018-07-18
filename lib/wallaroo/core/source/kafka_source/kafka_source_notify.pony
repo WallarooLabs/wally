@@ -72,7 +72,7 @@ class KafkaSourceNotify[In: Any val] is Rerouter
     _router = _runner.clone_router_and_set_input_type(router')
     _metrics_reporter = consume metrics_reporter
 
-  fun routes(): Array[Consumer] val =>
+  fun routes(): Map[StepId, Consumer] val =>
     _router.routes()
 
   fun ref received(source: KafkaSource[In] ref, kafka_msg_value: Array[U8] iso,

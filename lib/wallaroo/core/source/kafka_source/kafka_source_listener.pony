@@ -239,7 +239,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
 
               let source = KafkaSource[In](source_id, _auth, name, this,
                 _notify.build_source(source_id, _env)?, _event_log,
-                _router.routes(), _route_builder, _outgoing_boundary_builders,
+                _router, _route_builder, _outgoing_boundary_builders,
                 _layout_initializer, _metrics_reporter.clone(), topic, part_id,
                 kc, _router_registry, _state_step_creator, _recovering)
               partitions_sources(part_id) = source

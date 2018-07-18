@@ -274,6 +274,9 @@ class val ProxyRouter is (Router & Equatable[ProxyRouter])
   fun proxy_address(): ProxyAddress =>
     _target_proxy_address
 
+  fun target_boundary(): OutgoingBoundary =>
+    _target
+
   fun eq(that: box->ProxyRouter): Bool =>
     (_worker_name == that._worker_name) and
       (_target is that._target) and
@@ -684,8 +687,24 @@ class val StepIdRouter is OmniRouter
 
   fun routes(): Map[StepId, Consumer] val =>
     let m = recover iso Map[StepId, Consumer] end
-    for (id, r) in _data_routes.pairs() do
-      m(id) = r
+    for (id, t) in _step_map.pairs() do
+      match t
+      | let pa: ProxyAddress =>
+        try
+          let target = _outgoing_boundaries(pa.worker)?
+          m(id) = target
+        else
+          Fail()
+        end
+      | let s_id: StepId =>
+        ifdef debug then Invariant(id == s_id) end
+        try
+          let target = _data_routes(id)
+          m(id) = target
+        else
+          Fail()
+        end
+      end
     end
     consume m
 
@@ -711,8 +730,8 @@ class val StepIdRouter is OmniRouter
   fun routes_not_in(router: OmniRouter): Map[StepId, Consumer] val =>
     let m = recover iso Map[StepId, Consumer] end
     let other_routes = router.routes()
-    for (id, r) in _data_routes.pairs() do
-      if not other_routes.contains(id) then m(id) = r end
+    for (id, c) in routes() do
+      if not other_routes.contains(id) then m(id) = c end
     end
     consume m
 
@@ -1099,7 +1118,7 @@ class val DataRouter is Equatable[DataRouter]
       consume new_keyed_routes, consume new_keyed_step_ids,
       consume new_tid_map, consume new_rid_map, consume new_kid_map)
 
-  fun remove_routes_to_consumer(c: Consumer) =>
+  fun remove_routes_to_consumer(id: StepId, c: Consumer) =>
     """
     For all consumers we have routes to, tell them to remove any route to
     the provided consumer.
@@ -1107,7 +1126,7 @@ class val DataRouter is Equatable[DataRouter]
     for consumer in _data_routes.values() do
       match consumer
       | let p: Producer =>
-        p.remove_route_to_consumer(c)
+        p.remove_route_to_consumer(id, c)
       end
     end
 
@@ -1340,6 +1359,13 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
         m(id) = step
       else
         Fail()
+      end
+    end
+    for t in _partition_routes.values() do
+      match t
+      | let pr: ProxyRouter =>
+        let pa = pr.proxy_address()
+        m(pa.step_id) = pr.target_boundary()
       end
     end
     consume m
@@ -1835,12 +1861,10 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       match s
       | let step: Step =>
         m(id) = step
-      //!@ Do we need to include boundaries in the routes? Or do we assume
-      // that steps/sources will have a boundary route already?
-      // | let pr: ProxyRouter =>
-      //   for (r_id, r) in pr.routes().pairs() do
-      //     m(r_id) = r
-      //   end
+      | let pr: ProxyRouter =>
+        for (r_id, r) in pr.routes().pairs() do
+          m(r_id) = r
+        end
       end
     end
 
