@@ -41,14 +41,14 @@ class val StepBuilder
   let _pipeline_name: String
   let _state_name: String
   let _runner_builder: RunnerBuilder
-  let _id: StepId
-  let _pre_state_target_ids: Array[StepId] val
+  let _id: RoutingId
+  let _pre_state_target_ids: Array[RoutingId] val
   let _is_stateful: Bool
 
   new val create(app_name: String, worker_name: String,
-    pipeline_name': String, r: RunnerBuilder, id': StepId,
+    pipeline_name': String, r: RunnerBuilder, id': RoutingId,
     is_stateful': Bool = false,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end)
+    pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -62,8 +62,8 @@ class val StepBuilder
   fun name(): String => _runner_builder.name()
   fun state_name(): String => _state_name
   fun pipeline_name(): String => _pipeline_name
-  fun id(): StepId => _id
-  fun pre_state_target_ids(): Array[StepId] val => _pre_state_target_ids
+  fun id(): RoutingId => _id
+  fun pre_state_target_ids(): Array[RoutingId] val => _pre_state_target_ids
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
@@ -87,18 +87,18 @@ class val StepBuilder
     step
 
 class val SourceData
-  let _id: StepId
+  let _id: RoutingId
   let _pipeline_name: String
   let _name: String
   let _state_name: String
   let _builder: SourceBuilderBuilder
   let _runner_builder: RunnerBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
-  let _pre_state_target_ids: Array[StepId] val
+  let _pre_state_target_ids: Array[RoutingId] val
 
-  new val create(id': StepId, b: SourceBuilderBuilder, r: RunnerBuilder,
+  new val create(id': RoutingId, b: SourceBuilderBuilder, r: RunnerBuilder,
     s: SourceListenerBuilderBuilder,
-    pre_state_target_ids': Array[StepId] val = recover Array[StepId] end)
+    pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end)
   =>
     _id = id'
     _pipeline_name = b.name()
@@ -116,8 +116,8 @@ class val SourceData
   fun name(): String => _name
   fun state_name(): String => _state_name
   fun pipeline_name(): String => _pipeline_name
-  fun id(): StepId => _id
-  fun pre_state_target_ids(): Array[StepId] val => _pre_state_target_ids
+  fun id(): RoutingId => _id
+  fun pre_state_target_ids(): Array[RoutingId] val => _pre_state_target_ids
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
@@ -132,12 +132,12 @@ class val SourceData
 class val EgressBuilder
   let _name: String
   let _pipeline_name: String
-  let _id: StepId
+  let _id: RoutingId
   // None if this is a sink to an external system
   let _proxy_addr: (ProxyAddress | None)
   let _sink_builder: (SinkBuilder | None)
 
-  new val create(pipeline_name': String, id': StepId,
+  new val create(pipeline_name': String, id': RoutingId,
     sink_builder: (SinkBuilder | None) = None,
     proxy_addr: (ProxyAddress | None) = None)
   =>
@@ -157,8 +157,8 @@ class val EgressBuilder
   fun name(): String => _name
   fun state_name(): String => ""
   fun pipeline_name(): String => _pipeline_name
-  fun id(): StepId => _id
-  fun pre_state_target_ids(): Array[StepId] val => recover Array[StepId] end
+  fun id(): RoutingId => _id
+  fun pre_state_target_ids(): Array[RoutingId] val => recover Array[RoutingId] end
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
@@ -197,9 +197,9 @@ class val PreStateData
   let _state_name: String
   let _pre_state_name: String
   let _runner_builder: RunnerBuilder
-  let _target_ids: Array[StepId] val
+  let _target_ids: Array[RoutingId] val
 
-  new val create(runner_builder: RunnerBuilder, t_ids: Array[StepId] val) =>
+  new val create(runner_builder: RunnerBuilder, t_ids: Array[RoutingId] val) =>
     _runner_builder = runner_builder
     _state_name = runner_builder.state_name()
     _pre_state_name = runner_builder.name()
@@ -207,7 +207,7 @@ class val PreStateData
 
   fun state_name(): String => _state_name
   fun pre_state_name(): String => _pre_state_name
-  fun target_ids(): Array[StepId] val => _target_ids
+  fun target_ids(): Array[RoutingId] val => _target_ids
   fun clone_router_and_set_input_type(r: Router): Router =>
     _runner_builder.clone_router_and_set_input_type(r)
 
@@ -225,21 +225,21 @@ class val PreStatelessData
   """
   let _pipeline_name: String
   let _id: U128
-  let partition_id_to_worker: Map[U64, String] val
-  let partition_id_to_step_id: Map[U64, U128] val
-  let worker_to_step_id: Map[String, Array[U128] val] val
+  let partition_idx_to_worker: Map[SeqPartitionIndex, String] val
+  let partition_idx_to_step_id: Map[SeqPartitionIndex, RoutingId] val
+  let worker_to_step_id: Map[String, Array[RoutingId] val] val
   let steps_per_worker: USize
 
-  new val create(pipeline_name': String, step_id': U128,
-    partition_id_to_worker': Map[U64, String] val,
-    partition_id_to_step_id': Map[U64, U128] val,
-    worker_to_step_id': Map[String, Array[U128] val] val,
+  new val create(pipeline_name': String, step_id': RoutingId,
+    partition_idx_to_worker': Map[SeqPartitionIndex, String] val,
+    partition_idx_to_step_id': Map[SeqPartitionIndex, RoutingId] val,
+    worker_to_step_id': Map[String, Array[RoutingId] val] val,
     steps_per_worker': USize)
   =>
     _pipeline_name = pipeline_name'
     _id = step_id'
-    partition_id_to_worker = partition_id_to_worker'
-    partition_id_to_step_id = partition_id_to_step_id'
+    partition_idx_to_worker = partition_idx_to_worker'
+    partition_idx_to_step_id = partition_idx_to_step_id'
     worker_to_step_id = worker_to_step_id'
     steps_per_worker = steps_per_worker'
 
@@ -247,7 +247,7 @@ class val PreStatelessData
   fun state_name(): String => ""
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
-  fun pre_state_target_ids(): Array[StepId] val => recover Array[StepId] end
+  fun pre_state_target_ids(): Array[RoutingId] val => recover Array[RoutingId] end
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false

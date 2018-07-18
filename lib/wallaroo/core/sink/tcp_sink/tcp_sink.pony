@@ -85,7 +85,7 @@ actor TCPSink is Sink
   var _barrier_acker: (BarrierSinkAcker | None) = None
   let _snapshot_initiator: SnapshotInitiator
   // Steplike
-  let _sink_id: StepId
+  let _sink_id: RoutingId
   let _event_log: EventLog
   let _recovering: Bool
   let _name: String
@@ -99,7 +99,7 @@ actor TCPSink is Sink
   // _inputs keeps track of all inputs by step id. There might be
   // duplicate producers in this map (unlike _upstreams) since there might be
   // multiple upstream step ids over a boundary
-  let _inputs: Map[StepId, Producer] = _inputs.create()
+  let _inputs: Map[RoutingId, Producer] = _inputs.create()
   var _mute_outstanding: Bool = false
 
   // TCP
@@ -140,7 +140,7 @@ actor TCPSink is Sink
 
   let _terminus_route: TerminusRoute = TerminusRoute
 
-  new create(sink_id: StepId, sink_name: String, event_log: EventLog,
+  new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: TCPEncoderWrapper,
     metrics_reporter: MetricsReporter iso,
     barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
@@ -203,7 +203,7 @@ actor TCPSink is Sink
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -212,7 +212,7 @@ actor TCPSink is Sink
       latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -262,7 +262,7 @@ actor TCPSink is Sink
     None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -293,7 +293,7 @@ actor TCPSink is Sink
     close()
     _notify.dispose()
 
-  fun inputs(): Map[StepId, Producer] box =>
+  fun inputs(): Map[RoutingId, Producer] box =>
     _inputs
 
   fun ref _unit_finished(number_finished: ISize,
@@ -325,7 +325,7 @@ actor TCPSink is Sink
   be request_ack() =>
     _terminus_route.request_ack()
 
-  be register_producer(id: StepId, producer: Producer) =>
+  be register_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
@@ -335,7 +335,7 @@ actor TCPSink is Sink
     _inputs(id) = producer
     _upstreams.set(producer)
 
-  be unregister_producer(id: StepId, producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
 
     ifdef debug then
@@ -369,7 +369,7 @@ actor TCPSink is Sink
   ///////////////
   // BARRIER
   ///////////////
-  be receive_barrier(step_id: StepId, producer: Producer,
+  be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     @printf[I32]("!@ Receive barrier at TCPSink\n".cstring())

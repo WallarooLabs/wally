@@ -21,13 +21,13 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 
 // (is_watermark, resilient_id, uid, frac_ids, statechange_id, seq_id, payload)
-type LogEntry is (Bool, StepId, U128, FractionalMessageId, U64, U64,
+type LogEntry is (Bool, RoutingId, U128, FractionalMessageId, U64, U64,
   Array[ByteSeq] val)
 
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
 // (resilient_id, uid, frac_ids, statechange_id, seq_id, payload)
-type ReplayEntry is (StepId, U128, FractionalMessageId, U64, U64, ByteSeq val)
+type ReplayEntry is (RoutingId, U128, FractionalMessageId, U64, U64, ByteSeq val)
 
 //////////////////////////////////
 // Helpers for RotatingFileBackend
@@ -144,7 +144,7 @@ class FileBackend is Backend
         // be replayed
         var replay_buffer: Array[ReplayEntry val] ref = replay_buffer.create()
 
-        let watermarks_trn = recover trn Map[StepId, SeqId] end
+        let watermarks_trn = recover trn Map[RoutingId, SeqId] end
 
         //start iterating until we reach original EOF
         while _file.position() < size do
@@ -253,7 +253,7 @@ class FileBackend is Backend
 
   fun ref encode_entry(entry: LogEntry)
   =>
-    (let is_watermark: Bool, let resilient_id: StepId,
+    (let is_watermark: Bool, let resilient_id: RoutingId,
      let uid: U128, let frac_ids: FractionalMessageId,
      let statechange_id: U64, let seq_id: U64,
      let payload: Array[ByteSeq] val) = entry

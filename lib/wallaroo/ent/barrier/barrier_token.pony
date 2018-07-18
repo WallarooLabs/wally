@@ -11,7 +11,7 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
-use "wallaroo/ent/in_flight_acking"
+use "wallaroo/ent/autoscale"
 use "wallaroo/ent/snapshot"
 
 
@@ -32,17 +32,17 @@ primitive InitialBarrierToken is BarrierToken
   fun string(): String =>
     "InitialBarrierToken"
 
-class val InFlightAckBarrierToken is BarrierToken
+class val AutoscaleBarrierToken is BarrierToken
   let _worker: String
-  let _id: InFlightAckId
+  let _id: AutoscaleId
 
-  new val create(worker': String, id': InFlightAckId) =>
+  new val create(worker': String, id': AutoscaleId) =>
     _worker = worker'
     _id = id'
 
   fun eq(that: box->BarrierToken): Bool =>
     match that
-    | let ifa: InFlightAckBarrierToken =>
+    | let ifa: AutoscaleBarrierToken =>
       (_id == ifa._id) and (_worker == ifa._worker)
     else
       false
@@ -51,23 +51,23 @@ class val InFlightAckBarrierToken is BarrierToken
   fun hash(): USize =>
     _id.hash() xor _worker.hash()
 
-  fun id(): InFlightAckId =>
+  fun id(): AutoscaleId =>
     _id
 
   fun string(): String =>
-    "InFlightAckBarrierToken(" + _worker + ", " + _id.string() + ")"
+    "AutoscaleBarrierToken(" + _worker + ", " + _id.string() + ")"
 
-class val InFlightAckResumeBarrierToken is BarrierToken
+class val AutoscaleResumeBarrierToken is BarrierToken
   let _worker: String
-  let _id: InFlightAckId
+  let _id: AutoscaleId
 
-  new val create(worker': String, id': InFlightAckId) =>
+  new val create(worker': String, id': AutoscaleId) =>
     _worker = worker'
     _id = id'
 
   fun eq(that: box->BarrierToken): Bool =>
     match that
-    | let ifa: InFlightAckResumeBarrierToken =>
+    | let ifa: AutoscaleResumeBarrierToken =>
       (_id == ifa._id) and (_worker == ifa._worker)
     else
       false
@@ -76,11 +76,11 @@ class val InFlightAckResumeBarrierToken is BarrierToken
   fun hash(): USize =>
     _id.hash() xor _worker.hash()
 
-  fun id(): InFlightAckId =>
+  fun id(): AutoscaleId =>
     _id
 
   fun string(): String =>
-    "InFlightAckResumeBarrierToken(" + _worker + ", " + _id.string() + ")"
+    "AutoscaleResumeBarrierToken(" + _worker + ", " + _id.string() + ")"
 
 class val SnapshotBarrierToken is BarrierToken
   let id: SnapshotId

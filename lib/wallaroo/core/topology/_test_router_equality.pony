@@ -22,9 +22,9 @@ use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/source"
+use "wallaroo/ent/autoscale"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/in_flight_acking"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -162,11 +162,11 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
         .>add("state", "key1", 1)
     end
 
-    var base_router = DataRouter(consume base_routes, base_partitions,
+    var base_router = DataRouter("w1", consume base_routes, base_partitions,
       base_partition_ids)
 
-    let target_router = DataRouter(consume target_routes, target_partitions,
-      target_partition_ids)
+    let target_router = DataRouter("w1", consume target_routes,
+      target_partitions, target_partition_ids)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
@@ -200,10 +200,10 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
 
     let base_keyed_routes = recover val LocalStatePartitions end
 
-    var base_router = DataRouter(consume base_routes, base_keyed_routes,
+    var base_router = DataRouter("w1", consume base_routes, base_keyed_routes,
       recover LocalStatePartitionIds end)
-    let target_router = DataRouter(consume target_routes, base_keyed_routes,
-      recover LocalStatePartitionIds end)
+    let target_router = DataRouter("w1", consume target_routes,
+      base_keyed_routes, recover LocalStatePartitionIds end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
@@ -215,7 +215,7 @@ primitive _LocalMapGenerator
   fun apply(): Map[U128, Step] val =>
     recover Map[U128, Step] end
 
-primitive _StepIdsGenerator
+primitive _RoutingIdsGenerator
   fun apply(): Map[String, U128] val =>
     recover Map[String, U128] end
 
@@ -243,15 +243,16 @@ primitive _RouterRegistryGenerator
       _ConnectionsGenerator(env, auth), _StateStepCreatorGenerator(auth),
       _DummyRecoveryFileCleaner, 0,
       false, _BarrierInitiatorGenerator(env, auth),
-      _InFlightAckInitiatorGenerator(env, auth))
+      _AutoscaleInitiatorGenerator(env, auth))
 
 primitive _BarrierInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): BarrierInitiator =>
-    BarrierInitiator(auth, "w", _ConnectionsGenerator(env, auth))
+    BarrierInitiator(auth, "w", _ConnectionsGenerator(env, auth),
+      "init")
 
-primitive _InFlightAckInitiatorGenerator
-  fun apply(env: Env, auth: AmbientAuth): InFlightAckInitiator =>
-    InFlightAckInitiator("w", _BarrierInitiatorGenerator(env, auth))
+primitive _AutoscaleInitiatorGenerator
+  fun apply(env: Env, auth: AmbientAuth): AutoscaleInitiator =>
+    AutoscaleInitiator("w", _BarrierInitiatorGenerator(env, auth))
 
 primitive _SnapshotInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): SnapshotInitiator =>
@@ -276,7 +277,7 @@ primitive _RecoveryReplayerGenerator
 
 primitive _StatelessPartitionGenerator
   fun apply(): StatelessPartitionRouter =>
-    LocalStatelessPartitionRouter(0, "", recover Map[U64, U128] end,
+    LocalStatelessPartitionRouter(0, "", recover Map[U64, RoutingId] end,
       recover Map[U64, (Step | ProxyRouter)] end, 1)
 
 primitive _StateStepCreatorGenerator
@@ -284,7 +285,7 @@ primitive _StateStepCreatorGenerator
     StateStepCreator(auth, "app", "worker", _NullMetricsSink, EventLog())
 
 actor _Cluster is Cluster
-  be notify_cluster_of_new_stateful_step(id: StepId, key: Key,
+  be notify_cluster_of_new_stateful_step(id: RoutingId, key: Key,
     state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
   =>

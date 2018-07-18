@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "buffered"
 use "collections"
 use "pony-kafka"
+use "promises"
 use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -36,15 +37,15 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
 actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
-  let _source_id: StepId
+  let _source_id: RoutingId
   let _auth: AmbientAuth
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
   var _router: Router
   let _routes: MapIs[Consumer, Route] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
-  let _outputs: Map[StepId, Consumer] = _outputs.create()
+  let _outputs: Map[RoutingId, Consumer] = _outputs.create()
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
@@ -90,7 +91,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
 
-  new create(source_id: StepId, auth: AmbientAuth, name: String,
+  new create(source_id: RoutingId, auth: AmbientAuth, name: String,
     listen: KafkaSourceListener[In], notify: KafkaSourceNotify[In] iso,
     event_log: EventLog, router: Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
@@ -136,7 +137,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     let new_router =
       match router
       | let pr: PartitionRouter =>
-        pr.update_boundaries(_outgoing_boundaries)
+        pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
@@ -194,13 +195,16 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _notify.update_router(new_router)
     _pending_message_store.process_known_keys(this, _notify, new_router)
 
+  be register_downstreams(action: Promise[Source]) =>
+    action(this)
+
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   =>
     _pending_message_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
 
-  be remove_route_to_consumer(id: StepId, c: Consumer) =>
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
       ifdef debug then
         Invariant(_routes.contains(c))
@@ -208,7 +212,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       _unregister_output(id, c)
     end
 
-  fun ref _register_output(id: StepId, c: Consumer) =>
+  fun ref _register_output(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
       try
         let old_c = _outputs(id)?
@@ -238,7 +242,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       end
     end
 
-  fun ref _unregister_output(id: StepId, c: Consumer) =>
+  fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
       _routes(c)?.unregister_producer(id)
       _outputs.remove(id)?
@@ -287,6 +291,10 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)
+
+  be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+    //!@ Should we fail here?
+    None
 
   be remove_boundary(worker: String) =>
     None

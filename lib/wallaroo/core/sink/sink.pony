@@ -26,7 +26,7 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
 
 trait tag Sink is (Consumer & DisposableActor)
-  fun inputs(): Map[StepId, Producer] box
+  fun inputs(): Map[RoutingId, Producer] box
 
 interface val SinkConfig[Out: Any val]
   fun apply(): SinkBuilder

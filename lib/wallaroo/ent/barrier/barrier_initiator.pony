@@ -11,8 +11,10 @@ the License. You may obtain a copy of the License at
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
+use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/source"
 use "wallaroo/core/source/barrier_source"
@@ -39,28 +41,46 @@ actor BarrierInitiator is Initializable
   messages have been processed).
   """
   let _auth: AmbientAuth
+  let _worker_name: String
+  var _phase: BarrierInitiatorPhase = InitialBarrierInitiatorPhase
+
   let _in_flight_barriers: Map[BarrierToken, BarrierHandler] =
     _in_flight_barriers.create()
-  // !@ This is risky because we need to make sure barriers are sent in
-  // the same order they're received. Better to peek at the top of a queue
-  // probably to determine if we're dealing with the correct barrier.
-  let _pending_barriers: Map[BarrierToken, BarrierResultPromise] =
-    _pending_barriers.create()
-  var _current_barrier_token: BarrierToken = InitialBarrierToken
-  let _worker_name: String
-  var _barrier_handler: BarrierHandler = WaitingBarrierHandler
+
+  let _pending: Array[_Pending] = _pending.create()
+
+  let _active_barriers: ActiveBarriers = ActiveBarriers
+
+  //!@
+  // let _pending_barriers: Map[BarrierToken, BarrierResultPromise] =
+  //   _pending_barriers.create()
+  // var _current_barrier_token: BarrierToken = InitialBarrierToken
+  // var _barrier_handler: BarrierHandler = WaitingBarrierHandler
+
+
   let _connections: Connections
   var _barrier_source: (BarrierSource | None) = None
-  let _sources: Map[StepId, Source] = _sources.create()
-  let _source_ids: Map[USize, StepId] = _source_ids.create()
+  let _sources: Map[RoutingId, Source] = _sources.create()
+  //!@ what's this for?
+  let _source_ids: Map[USize, RoutingId] = _source_ids.create()
   let _sinks: SetIs[BarrierReceiver] = _sinks.create()
   let _workers: _StringSet = _workers.create()
 
-  new create(auth: AmbientAuth, worker_name: String, connections: Connections)
+  // TODO: Currently, we can only inject barriers from one primary worker
+  // in the cluster. This is because otherwise they might be injected in
+  // parallel at different workers and the barrier protocol relies on the
+  // fact that each barrier is injected at all sources before the next
+  // barrier.
+  var _primary_worker: String
+
+  new create(auth: AmbientAuth, worker_name: String, connections: Connections,
+    primary_worker: String)
   =>
     _auth = auth
     _worker_name = worker_name
     _connections = connections
+    _primary_worker = primary_worker
+    _phase = NormalBarrierInitiatorPhase(this)
 
   fun barrier_in_flight(): Bool =>
     _in_flight_barriers.size() > 0
@@ -86,11 +106,11 @@ actor BarrierInitiator is Initializable
   be register_barrier_source(b_source: BarrierSource) =>
     _barrier_source = b_source
 
-  be register_source(source: Source, source_id: StepId) =>
+  be register_source(source: Source, source_id: RoutingId) =>
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
 
-  be unregister_source(source: Source, source_id: StepId) =>
+  be unregister_source(source: Source, source_id: RoutingId) =>
     try
       _sources(source_id)?
       _source_ids(digestof source)?
@@ -100,50 +120,109 @@ actor BarrierInitiator is Initializable
 
   be add_worker(w: String) =>
     @printf[I32]("!@ BarrierInitiator: add_worker %s\n".cstring(), w.cstring())
-    if _barrier_handler.in_progress() then
-      @printf[I32]("add_worker called during %s phase\n"
-        .cstring(), _barrier_handler.name().cstring())
+    if _active_barriers.barrier_in_progress() then
+      @printf[I32]("add_worker called while barrier is in progress\n"
+        .cstring())
       Fail()
     end
     _workers.set(w)
 
   be remove_worker(w: String) =>
     @printf[I32]("!@ BarrierInitiator: remove_worker %s\n".cstring(), w.cstring())
-    if _barrier_handler.in_progress() then
-      @printf[I32]("remove_worker called during %s phase\n"
-        .cstring(), _barrier_handler.name().cstring())
+    if _active_barriers.barrier_in_progress() then
+      @printf[I32]("remove_worker called while barrier is in progress\n"
+        .cstring())
       Fail()
     end
     _workers.unset(w)
 
-  be initiate_barrier(barrier_token: BarrierToken,
+  be initialize_source(s: Source) =>
+    """
+    Before a source can register with its downstreams, we need to make sure
+    there is no in flight barrier since such registration would change the
+    graph and potentially disrupt the barrier protocol.
+    """
+    if _active_barriers.barrier_in_progress() then
+      _pending.push(_PendingSourceInit(s))
+    else
+      let action = Promise[Source]
+      action.next[None](recover this~source_registration_complete() end)
+      s.register_downstreams(action)
+    end
+
+  be source_registration_complete(s: Source) =>
+    _phase.source_registration_complete(s)
+
+  fun ref source_pending_complete(s: Source) =>
+    _phase = NormalBarrierInitiatorPhase(this)
+    next_token()
+
+  be inject_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
-    if _barrier_handler.in_progress() then
-      @printf[I32]("initiate_barrier for %s called during %s phase for %s\n"
-        .cstring(), barrier_token.string().cstring(),
-        _barrier_handler.name().cstring(),
-        _current_barrier_token.string().cstring())
-      Fail()
+    _inject_barrier(barrier_token, result_promise)
+
+  fun ref _inject_barrier(barrier_token: BarrierToken,
+    result_promise: BarrierResultPromise)
+  =>
+    """
+    Called to begin the barrier protocol for a new barrier token.
+    """
+    if _primary_worker == _worker_name then
+      _phase.initiate_barrier(barrier_token, result_promise)
+    else
+      try
+        let msg = ChannelMsgEncoder.forward_inject_barrier(barrier_token,
+          result_promise, _auth)?
+        _connections.send_control(_primary_worker, msg)
+      else
+        Fail()
+      end
     end
+
+  be inject_blocking_barrier(barrier_token: BarrierToken,
+    result_promise: BarrierResultPromise,
+    wait_for_token: BarrierToken)
+  =>
+    """
+    Called when no barriers should be processed after this one
+    is injected. Normal barrier processing is resumed either when
+    this one is complete or, if `wait_for_token` is specified, once
+    the specified token is received.
+    """
+    _phase = BlockingBarrierInitiatorPhase(this, barrier_token,
+      wait_for_token)
+    _phase.initiate_barrier(barrier_token, result_promise)
+
+  fun ref queue_barrier(barrier_token: BarrierToken,
+    result_promise: BarrierResultPromise)
+  =>
+    _pending.push(_PendingBarrier(barrier_token, result_promise))
+
+  fun ref initiate_barrier(barrier_token: BarrierToken,
+    result_promise: BarrierResultPromise)
+  =>
     ifdef debug then
       @printf[I32]("Initiating barrier protocol for %s.\n".cstring(),
         barrier_token.string().cstring())
     end
-    @printf[I32]("!@ OLD TOKEN: %s, setting to: %s\n".cstring(), _current_barrier_token.string().cstring(), barrier_token.string().cstring())
-    _current_barrier_token = barrier_token
-    @printf[I32]("!@ SET TO: %s\n".cstring(), _current_barrier_token.string().cstring())
-    _barrier_handler = PendingBarrierHandler(_worker_name, this,
-      _current_barrier_token, _sinks, _workers, result_promise
-      where primary_worker = _worker_name)
+    //!@
+    // _current_barrier_token = barrier_token
 
-    // !@ Clean up this pending barrier approach to handle multiple at once
-    _pending_barriers(_current_barrier_token) = result_promise
+    let barrier_handler = PendingBarrierHandler(_worker_name, this,
+      barrier_token, _sinks, _workers, result_promise
+      where primary_worker = _worker_name)
+    try
+      _active_barriers.add_barrier(barrier_token, barrier_handler)?
+    else
+      Fail()
+    end
+
     try
       if _workers.size() > 1 then
-        @printf[I32]("!@ Sending remote initiate barrier for %s\n".cstring(), _current_barrier_token.string().cstring())
+        @printf[I32]("!@ Sending remote initiate barrier for %s\n".cstring(), barrier_token.string().cstring())
         let msg = ChannelMsgEncoder.remote_initiate_barrier(_worker_name,
-          _current_barrier_token, _auth)?
+          barrier_token, _auth)?
         for w in _workers.values() do
           if w != _worker_name then _connections.send_control(w, msg) end
         end
@@ -153,60 +232,38 @@ actor BarrierInitiator is Initializable
     else
       Fail()
     end
-    @printf[I32]("!@ About to call worker_ack_barrier_start on handler with %s\n".cstring(), _current_barrier_token.string().cstring())
-    _barrier_handler.worker_ack_barrier_start(_worker_name,
-      _current_barrier_token)
+    @printf[I32]("!@ About to call worker_ack_barrier_start on handler for %s\n".cstring(), barrier_token.string().cstring())
+    _active_barriers.worker_ack_barrier_start(_worker_name, barrier_token)
 
   be remote_initiate_barrier(primary_worker: String,
     barrier_token: BarrierToken)
   =>
     @printf[I32]("!@ remote_initiate_barrier called for %s\n".cstring(), barrier_token.string().cstring())
-    if _barrier_handler.in_progress() then
-      @printf[I32](("remote_initiate_barrier for %s called during %s phase " +
-        "for %s\n").cstring(), barrier_token.string().cstring(),
-        _barrier_handler.name().cstring(),
-        _current_barrier_token.string().cstring())
+
+    let next_handler = PendingBarrierHandler(_worker_name, this,
+      barrier_token, _sinks, _workers, EmptyBarrierResultPromise(),
+      primary_worker)
+    try
+      _active_barriers.add_barrier(barrier_token, next_handler)?
+    else
       Fail()
     end
 
-    // !@ How do we handle this?  Do we use mergable ids to make sure
-    // two don't trigger the same id at different times?
-    _current_barrier_token = barrier_token
-    _barrier_handler = PendingBarrierHandler(_worker_name, this,
-      _current_barrier_token, _sinks, _workers, EmptyBarrierResultPromise(),
-      primary_worker)
-
     try
       let msg = ChannelMsgEncoder.worker_ack_barrier_start(_worker_name,
-        _current_barrier_token, _auth)?
+        barrier_token, _auth)?
       _connections.send_control(primary_worker, msg)
     else
       Fail()
     end
 
     for s in _sources.values() do
-      s.initiate_barrier(_current_barrier_token)
+      s.initiate_barrier(barrier_token)
     end
 
   be worker_ack_barrier_start(w: String, token: BarrierToken) =>
     @printf[I32]("!@ _worker_ack_barrier_start called for %s\n".cstring(), w.cstring())
-    _barrier_handler.worker_ack_barrier_start(w, token)
-
-//!@
-  // fun ref _worker_ack_barrier_start(w: String, token: BarrierToken) =>
-  //   @printf[I32]("!@ _worker_ack_barrier_start called for %s\n".cstring(), w.cstring())
-  //   if not _workers.contains(w) then Fail() end
-  //   _workers_ready.set(w)
-  //   // !@ Eventually we need this on a per-token basis
-  //   if _workers_ready.size() == _workers.size() then
-  //     try
-  //       @printf[I32]("!@ workers ready count: %s\n".cstring(), _workers_ready.size().string().cstring())
-  //       _send_barrier(token, _pending_barriers.remove(token)?._2)
-  //       _workers_ready.clear()
-  //     else
-  //       Fail()
-  //     end
-  //   end
+    _active_barriers.worker_ack_barrier_start(w, token)
 
   fun confirm_start_barrier(barrier_token: BarrierToken) =>
     try
@@ -225,45 +282,48 @@ actor BarrierInitiator is Initializable
     acked_sinks: SetIs[BarrierReceiver] val,
     acked_ws: SetIs[String] val, primary_worker: String)
   =>
-    if primary_worker == _worker_name then
-      _barrier_handler = InProgressPrimaryBarrierHandler(_worker_name, this,
-        barrier_token, acked_sinks, acked_ws, _sinks, _workers,
-        result_promise)
+    let next_handler =
+      if primary_worker == _worker_name then
+        InProgressPrimaryBarrierHandler(_worker_name, this, barrier_token,
+          acked_sinks, acked_ws, _sinks, _workers, result_promise)
+      else
+        InProgressSecondaryBarrierHandler(this, barrier_token, acked_sinks,
+          _sinks, primary_worker)
+      end
+    try
+      _active_barriers.update_handler(barrier_token, next_handler)?
     else
-      _barrier_handler = InProgressSecondaryBarrierHandler(this,
-        barrier_token, acked_sinks, _sinks, primary_worker)
+      Fail()
     end
 
-    //!@ NEEDS WORK!
-    if (_sources.size() == 0) and (_barrier_source is None) then
-      if (_workers.size() == 1) or (_sinks.size() == 0) then
-        @printf[I32]("!@ start_barrier FINISH EARLY\n".cstring())
-        //!@ FINISH EARLY
-        all_workers_acked(_current_barrier_token, result_promise)
-      end
-    else
+    if _barrier_source isnt None then
       try
-        (_barrier_source as BarrierSource).initiate_barrier(
-          _current_barrier_token)
+        (_barrier_source as BarrierSource).initiate_barrier(barrier_token)
       else
-        Fail()
+        Unreachable()
       end
       @printf[I32]("!@ calling initiate_barrier at %s sources\n".cstring(), _sources.size().string().cstring())
       for s in _sources.values() do
-        s.initiate_barrier(_current_barrier_token)
+        s.initiate_barrier(barrier_token)
+      end
+    else
+      ifdef debug then
+        Invariant(_sources.size() == 0)
       end
     end
+    // See if we should finish early
+    _active_barriers.check_for_completion(barrier_token)
 
   be ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken) =>
     """
     Called by sinks when they have received barrier barriers on all
     their inputs.
     """
-    _barrier_handler.ack_barrier(s, barrier_token)
+    _active_barriers.ack_barrier(s, barrier_token)
 
   be worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
     @printf[I32]("!@ Rcvd worker_ack_barrier from %s\n".cstring(), w.cstring())
-    _barrier_handler.worker_ack_barrier(w, barrier_token)
+    _active_barriers.worker_ack_barrier(w, barrier_token)
 
   fun ref all_primary_sinks_acked(barrier_token: BarrierToken,
     workers_acked: SetIs[String] val, result_promise: BarrierResultPromise)
@@ -273,8 +333,15 @@ actor BarrierInitiator is Initializable
     for all worker acks.
     """
     @printf[I32]("!@ Switching to WorkerAcksBarrierHandler\n".cstring())
-    _barrier_handler = WorkerAcksBarrierHandler(this,
-      barrier_token, _workers, workers_acked, result_promise)
+    let next_handler = WorkerAcksBarrierHandler(this, barrier_token, _workers,
+      workers_acked, result_promise)
+    try
+      _active_barriers.update_handler(barrier_token, next_handler)?
+    else
+      Fail()
+    end
+    // Add ourself to ack list
+    _active_barriers.worker_ack_barrier(_worker_name, barrier_token)
 
   fun ref all_secondary_sinks_acked(barrier_token: BarrierToken,
     primary_worker: String)
@@ -289,9 +356,13 @@ actor BarrierInitiator is Initializable
       let msg = ChannelMsgEncoder.worker_ack_barrier(_worker_name,
         barrier_token, _auth)?
       _connections.send_control(primary_worker, msg)
-      _barrier_handler = WaitingBarrierHandler
+      try
+        _active_barriers.remove_barrier(barrier_token)?
+      else
+        Fail()
+      end
       //!@ WHA!?
-      check()
+      // check()
     else
       Fail()
     end
@@ -304,8 +375,11 @@ actor BarrierInitiator is Initializable
     and trigger the BarrierResultPromise.
     """
     @printf[I32]("!@ all_workers_acked\n".cstring())
-    _barrier_handler = WaitingBarrierHandler
-    @printf[I32]("!@ --- Switched to %s\n".cstring(), _barrier_handler.name().cstring())
+    try
+      _active_barriers.remove_barrier(barrier_token)?
+    else
+      Fail()
+    end
     barrier_complete(barrier_token, result_promise)
 
   fun ref barrier_complete(barrier_token: BarrierToken,
@@ -321,17 +395,38 @@ actor BarrierInitiator is Initializable
       Fail()
     end
     try
-      (_barrier_source as BarrierSource).barrier_complete(
-        _current_barrier_token)
+      (_barrier_source as BarrierSource).barrier_complete(barrier_token)
     else
       Fail()
     end
     for s in _sources.values() do
       s.barrier_complete(barrier_token)
     end
-
     //!@
-    check()
+    // _phase.barrier_complete(barrier_token)
+
+  fun ref next_token() =>
+    if _pending.size() > 0 then
+      try
+        let next = _pending.shift()?
+        match next
+        | let p: _PendingSourceInit =>
+          _phase = SourcePendingBarrierInitiatorPhase(this)
+          let action = Promise[Source]
+          action.next[None](recover this~source_registration_complete() end)
+          p.source.register_downstreams(action)
+          return
+        | let p: _PendingBarrier =>
+          _inject_barrier(p.token, p.promise)
+          if (_phase.ready_for_next_token() and (_pending.size() > 0))
+          then
+            next_token()
+          end
+        end
+      else
+        Unreachable()
+      end
+    end
 
   be remote_barrier_complete(barrier_token: BarrierToken) =>
     """
@@ -344,10 +439,10 @@ actor BarrierInitiator is Initializable
     end
 
   //!@
-  be check() =>
-    //!@ What sort of bug is this!?
-    _barrier_handler = WaitingBarrierHandler
-    @printf[I32]("!@ --- STILL? Switched to %s\n".cstring(), _barrier_handler.name().cstring())
+  // be check() =>
+  //   //!@ What sort of bug is this!?
+  //   _barrier_handler = WaitingBarrierHandler
+  //   @printf[I32]("!@ --- STILL? Switched to %s\n".cstring(), _barrier_handler.name().cstring())
 
 /////////////////////////////////////////////////////////////////////////////
 // TODO: Replace using this with the badly named SetIs once we address a bug

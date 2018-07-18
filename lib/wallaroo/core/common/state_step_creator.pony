@@ -29,7 +29,7 @@ actor StateStepCreator is Initializable
   var _keys_to_steps: LocalStatePartitions = _keys_to_steps.create()
   var _keys_to_step_ids: LocalStatePartitionIds = _keys_to_step_ids.create()
 
-  let _step_id_gen: StepIdGenerator = _step_id_gen.create()
+  let _step_id_gen: RoutingIdGenerator = _step_id_gen.create()
 
   let _app_name: String
   let _worker_name: String
@@ -44,9 +44,10 @@ actor StateStepCreator is Initializable
   var _state_runner_builders: Map[StateName, RunnerBuilder] val =
     recover _state_runner_builders.create() end
 
-  var _omni_router: (None | OmniRouter) = None
+  var _target_id_routers: Map[String, TargetIdRouter] =
+    _target_id_routers.create()
 
-  let _pending_steps: MapIs[Step, (String, Key, StepId)] =
+  let _pending_steps: MapIs[Step, (String, Key, RoutingId)] =
     _pending_steps.create()
 
   let _known_state_key: Map[String, Set[Key]] =
@@ -69,10 +70,8 @@ actor StateStepCreator is Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
-  =>
-    _omni_router = omni_router
+  be application_created(initializer: LocalTopologyInitializer) =>
+    initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     initializer.report_ready_to_work(this)
@@ -124,13 +123,14 @@ actor StateStepCreator is Initializable
         end
 
         let id = _step_id_gen()
+        let target_id_router = _target_id_routers(state_name)?
         let state_step = try
           Step(_auth, runner_builder(
             where event_log = _event_log, auth = _auth),
-            consume reporter, id, runner_builder.route_builder(),
-            _event_log, _recovery_replayer as RecoveryReplayer,
+            consume reporter, id, _event_log,
+            _recovery_replayer as RecoveryReplayer,
             _outgoing_boundaries, this
-            where omni_router = (_omni_router as OmniRouter))
+            where target_id_router = target_id_router)
         else
           @printf[I32]("Missing things in StateStepCreator\n".cstring())
           Fail()
@@ -197,7 +197,7 @@ actor StateStepCreator is Initializable
       Fail()
     end
 
-  // OmniRouter updates
+  // TargetIdRouter updates
 
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
     _update_boundaries(boundaries)
@@ -215,9 +215,11 @@ actor StateStepCreator is Initializable
 
     _outgoing_boundaries = consume new_boundaries
 
-  be update_omni_router(omni_router: OmniRouter) =>
-    _omni_router = omni_router
-    _update_boundaries(omni_router.boundaries())
+  be update_target_id_router(state_name: String,
+    target_id_router: TargetIdRouter)
+  =>
+    _target_id_routers(state_name) = target_id_router
+    _update_boundaries(target_id_router.boundaries())
 
   be remove_boundary(worker: String) =>
     let new_boundaries = recover iso Map[String, OutgoingBoundary] end

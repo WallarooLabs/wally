@@ -28,15 +28,13 @@ use "wallaroo/core/topology"
 
 
 actor DataReceiver is (Producer & Rerouter)
-  let _id: StepId
+  let _id: RoutingId
   let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
   let _state_step_creator: StateStepCreator
-  var _sender_step_id: StepId = 0
-  var _router: DataRouter =
-    DataRouter(recover Map[StepId, Consumer] end,
-      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
+  var _sender_step_id: RoutingId = 0
+  var _router: DataRouter
   var _last_id_seen: SeqId = 0
   var _last_id_acked: SeqId = 0
   var _connected: Bool = false
@@ -63,10 +61,17 @@ actor DataReceiver is (Producer & Rerouter)
   let _boundary_edges: Set[BoundaryEdge] = _boundary_edges.create()
 
   // Keep track of register_producer calls that we weren't ready to forward
-  let _queued_register_producers: Array[(StepId, StepId)] =
+  let _queued_register_producers: Array[(RoutingId, RoutingId)] =
     _queued_register_producers.create()
-  let _queued_unregister_producers: Array[(StepId, StepId)] =
+  let _queued_unregister_producers: Array[(RoutingId, RoutingId)] =
     _queued_register_producers.create()
+
+  // A special RoutingId that indicates that a barrier or register_producer
+  // request needs to be forwarded to all known state steps on this worker.
+  let _state_routing_id: RoutingId
+  // Keeps track of all upstreams that produce messages for state steps.
+  let _state_partition_producers: SetIs[RoutingId] =
+    _state_partition_producers.create()
 
   var _processing_phase: _DataReceiverProcessingPhase =
     _DataReceiverNotProcessingPhase
@@ -74,11 +79,14 @@ actor DataReceiver is (Producer & Rerouter)
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     state_step_creator: StateStepCreator, initialized: Bool = false)
   =>
-    _id = StepIdGenerator()
+    _id = RoutingIdGenerator()
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
     _state_step_creator = state_step_creator
+    _state_routing_id = WorkerStateRoutingId(_worker_name)
+    _router = DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
+      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
     if initialized then
       _processing_phase = _DataReceiverAcceptingMessagesPhase(this)
     end
@@ -98,7 +106,7 @@ actor DataReceiver is (Producer & Rerouter)
     _processing_phase = _DataReceiverAcceptingMessagesPhase(this)
     _inform_boundary_to_send_normal_messages()
 
-  be data_connect(sender_step_id: StepId, conn: DataChannel) =>
+  be data_connect(sender_step_id: RoutingId, conn: DataChannel) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
     _processing_phase.data_connect()
@@ -137,18 +145,24 @@ actor DataReceiver is (Producer & Rerouter)
     // so we don't create two timers.
     _timer_init = _EmptyTimerInit
 
-  be register_producer(input_id: StepId, output_id: StepId) =>
+  be register_producer(input_id: RoutingId, output_id: RoutingId) =>
     @printf[I32]("!@ DataReceiver: Register producer %s with %s\n".cstring(), input_id.string().cstring(), output_id.string().cstring())
+    if output_id == _state_routing_id then
+      _state_partition_producers.set(input_id)
+    end
     _router.register_producer(input_id, output_id, this)
     _boundary_edges.set(BoundaryEdge(input_id, output_id))
 
-  fun ref queue_register_producer(input_id: StepId, output_id: StepId) =>
+  fun ref queue_register_producer(input_id: RoutingId, output_id: RoutingId) =>
     _queued_register_producers.push((input_id, output_id))
 
-  fun ref queue_unregister_producer(input_id: StepId, output_id: StepId) =>
+  fun ref queue_unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
     _queued_unregister_producers.push((input_id, output_id))
 
-  be unregister_producer(input_id: StepId, output_id: StepId) =>
+  be unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
+    if output_id == _state_routing_id then
+      _state_partition_producers.unset(input_id)
+    end
     _router.unregister_producer(input_id, output_id, this)
     _boundary_edges.unset(BoundaryEdge(input_id, output_id))
 
@@ -182,7 +196,7 @@ actor DataReceiver is (Producer & Rerouter)
   ///////////////
   // BARRIER
   ///////////////
-  be forward_barrier(target_step_id: StepId, origin_step_id: StepId,
+  be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken)
   =>
     _router.forward_barrier(target_step_id, origin_step_id, this,
@@ -221,23 +235,10 @@ actor DataReceiver is (Producer & Rerouter)
     end
 
   be update_router(router': DataRouter) =>
-    //!@
-    // TODO: This commented line conflicts with invariant downstream. The
-    // idea is to unregister if we've registered but not otherwise.
-    // The invariant says you can only call this method on a step if
-    // you've already registered. If we allow calling it whether or not
-    // you've registered, this will work, but that might cause other
-    // problems. However, otherwise, when updating, we might register twice
-    // with the same step or never unregister with one we'll no longer
-    // be sending to.
-    // Currently, this behavior should only be called once in the lifecycle
-    // of a DataReceiver, so we would only need this if that were to change.
-    // _router.unregister_producer(this)
-
     _router = router'
 
     // If we have pending register_producer calls, then try to process them now
-    var retries = Array[(StepId, StepId)]
+    var retries = Array[(RoutingId, RoutingId)]
     for r in _queued_register_producers.values() do
       retries.push(r)
     end
@@ -247,13 +248,19 @@ actor DataReceiver is (Producer & Rerouter)
     end
     // If we have pending unregister_producer calls, then try to process them
     // now
-    retries = Array[(StepId, StepId)]
+    retries = Array[(RoutingId, RoutingId)]
     for r in _queued_unregister_producers.values() do
       retries.push(r)
     end
     _queued_unregister_producers.clear()
     for (input, output) in retries.values() do
       _router.unregister_producer(input, output, this)
+    end
+
+    // Reregister all state partition producers in case there were more
+    // keys added to this worker.
+    for input_id in _state_partition_producers.values() do
+      _router.register_producer(input_id, _state_routing_id, this)
     end
 
     //!@ We now need to wait for actual steps to contact us to register
@@ -265,7 +272,7 @@ actor DataReceiver is (Producer & Rerouter)
 
     _pending_message_store.process_known_keys(this, this, _router)
 
-  be remove_route_to_consumer(id: StepId, c: Consumer) =>
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     // DataReceiver doesn't have its own routes
     None
 

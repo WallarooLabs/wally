@@ -50,7 +50,7 @@ primitive ChannelMsgEncoder
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)?
 
-  fun migrate_step(step_id: StepId, state_name: String, key: Key,
+  fun migrate_step(step_id: RoutingId, state_name: String, key: Key,
     state: ByteSeq val, worker: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -74,7 +74,7 @@ primitive ChannelMsgEncoder
     """
     _encode(AckMigrationBatchCompleteMsg(worker), auth)?
 
-  fun step_migration_complete(step_id: StepId,
+  fun step_migration_complete(step_id: RoutingId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -139,7 +139,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(UnmuteRequestMsg(originating_worker), auth)?
 
-  fun delivery[D: Any val](target_id: StepId,
+  fun delivery[D: Any val](target_id: RoutingId,
     from_worker_name: String, msg_data: D,
     metric_name: String, auth: AmbientAuth,
     proxy_address: ProxyAddress, msg_uid: MsgId,
@@ -195,7 +195,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(CreateDataChannelListener(workers), auth)?
 
-  fun data_connect(sender_name: String, sender_step_id: StepId,
+  fun data_connect(sender_name: String, sender_step_id: RoutingId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(DataConnectMsg(sender_name, sender_step_id), auth)?
@@ -218,7 +218,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayCompleteMsg(sender_name, boundary_id), auth)?
 
-  fun ack_watermark(sender_name: String, sender_step_id: StepId, seq_id: SeqId,
+  fun ack_watermark(sender_name: String, sender_step_id: RoutingId, seq_id: SeqId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)?
@@ -363,7 +363,7 @@ primitive ChannelMsgEncoder
     """
     _encode(ConnectedToJoiningWorkersMsg(sender), auth)?
 
-  fun announce_new_stateful_step(id: StepId, worker_name: String, key: Key,
+  fun announce_new_stateful_step(id: RoutingId, worker_name: String, key: Key,
     state_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -374,7 +374,7 @@ primitive ChannelMsgEncoder
     _encode(AnnounceNewStatefulStepMsg(id, worker_name, key,
       state_name), auth)?
 
-  fun announce_new_source(worker_name: String, id: StepId,
+  fun announce_new_source(worker_name: String, id: RoutingId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -396,6 +396,12 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReportStatusMsg(code), auth)?
 
+  fun forward_inject_barrier(token: BarrierToken,
+    result_promise: BarrierResultPromise, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+  _encode(ForwardInjectBarrierMsg(token, result_promise), auth)?
+
   fun remote_initiate_barrier(sender: String, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -411,7 +417,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(WorkerAckBarrierMsg(sender, token), auth)?
 
-  fun forward_barrier(target_step_id: StepId, origin_step_id: StepId,
+  fun forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     token: BarrierToken, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token), auth)?
@@ -425,12 +431,12 @@ primitive ChannelMsgEncoder
   =>
     _encode(ResumeTheWorldMsg(sender), auth)?
 
-  fun register_producer(sender: String, source_id: StepId, target_id: StepId,
+  fun register_producer(sender: String, source_id: RoutingId, target_id: RoutingId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(RegisterProducerMsg(sender, source_id, target_id), auth)?
 
-  fun unregister_producer(sender: String, source_id: StepId, target_id: StepId,
+  fun unregister_producer(sender: String, source_id: RoutingId, target_id: RoutingId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(UnregisterProducerMsg(sender, source_id, target_id), auth)?
@@ -577,7 +583,7 @@ trait val StepMigrationMsg is ChannelMsg
 class val KeyedStepMigrationMsg is StepMigrationMsg
   let _state_name: String
   let _key: Key
-  let _step_id: StepId
+  let _step_id: RoutingId
   let _state: ByteSeq val
   let _worker: String
 
@@ -625,7 +631,7 @@ class val UnmuteRequestMsg is ChannelMsg
     originating_worker = worker
 
 class val StepMigrationCompleteMsg is ChannelMsg
-  let step_id: StepId
+  let step_id: RoutingId
 
   new val create(step_id': U128)
   =>
@@ -675,7 +681,7 @@ class val LeavingMigrationAckMsg is ChannelMsg
 
 class val AckWatermarkMsg is ChannelMsg
   let sender_name: String
-  let sender_step_id: StepId
+  let sender_step_id: RoutingId
   let seq_id: SeqId
 
   new val create(sender_name': String, sender_step_id': U128,
@@ -736,20 +742,20 @@ class val ReplayMsg is ChannelMsg
 trait val DeliveryMsg is ChannelMsg
   fun sender_name(): String
   fun val deliver(pipeline_time_spent: U64,
-    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    data_routes: Map[StepId, Consumer] val,
-    target_ids_to_route_ids: Map[StepId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    data_routes: Map[RoutingId, Consumer] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val,
     keys_to_routes: LocalStatePartitions val,
     keys_to_route_ids: StatePartitionRouteIds val
   ): RouteId ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
   fun val replay_deliver(pipeline_time_spent: U64,
-    data_routes: Map[StepId, Consumer] val,
-    target_ids_to_route_ids: Map[StepId, RouteId] val,
-    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
+    data_routes: Map[RoutingId, Consumer] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: LocalStatePartitions val,
     keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
@@ -758,7 +764,7 @@ trait val ReplayableDeliveryMsg is DeliveryMsg
   fun msg_uid(): MsgId
 
 class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
-  let _target_id: StepId
+  let _target_id: RoutingId
   let _sender_name: String
   let _data: D
   let _metric_name: String
@@ -771,7 +777,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun msg_uid(): U128 => _msg_uid
   fun frac_ids(): FractionalMessageId => _frac_ids
 
-  new val create(t_id: StepId, from: String,
+  new val create(t_id: RoutingId, from: String,
     m_data: D, m_name: String, proxy_address: ProxyAddress,
     msg_uid': MsgId, frac_ids': FractionalMessageId)
   =>
@@ -786,11 +792,11 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun sender_name(): String => _sender_name
 
   fun val deliver(pipeline_time_spent: U64,
-    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    data_routes: Map[StepId, Consumer] val,
-    target_ids_to_route_ids: Map[StepId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    data_routes: Map[RoutingId, Consumer] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val,
     keys_to_routes: LocalStatePartitions val,
     keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
   =>
@@ -807,9 +813,9 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     route_id
 
   fun val replay_deliver(pipeline_time_spent: U64,
-    data_routes: Map[StepId, Consumer] val,
-    target_ids_to_route_ids: Map[StepId, RouteId] val,
-    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
+    data_routes: Map[RoutingId, Consumer] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: LocalStatePartitions val,
     keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
@@ -849,11 +855,11 @@ class val ForwardKeyedMsg[D: Any val] is ReplayableDeliveryMsg
   fun sender_name(): String => _sender_name
 
   fun val deliver(pipeline_time_spent: U64,
-    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    data_routes: Map[StepId, Consumer] val,
-    target_ids_to_route_ids: Map[StepId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, StepId] val,
+    data_routes: Map[RoutingId, Consumer] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val,
     keys_to_routes: LocalStatePartitions val,
     keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
   =>
@@ -882,9 +888,9 @@ class val ForwardKeyedMsg[D: Any val] is ReplayableDeliveryMsg
     end
 
   fun val replay_deliver(pipeline_time_spent: U64,
-    data_routes: Map[StepId, Consumer] val,
-    target_ids_to_route_ids: Map[StepId, RouteId] val,
-    producer_id: StepId, producer: Producer ref, seq_id: SeqId,
+    data_routes: Map[RoutingId, Consumer] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     keys_to_routes: LocalStatePartitions val,
     keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
@@ -1049,12 +1055,12 @@ class val AnnounceNewStatefulStepMsg is ChannelMsg
   This message is sent to notify another worker that a new stateful step has
   been created on this worker and that partition routers should be updated.
   """
-  let _step_id: StepId
+  let _step_id: RoutingId
   let _worker_name: String
   let _key: Key
   let _state_name: String
 
-  new val create(id: StepId, worker: String, k: Key, s_name: String) =>
+  new val create(id: RoutingId, worker: String, k: Key, s_name: String) =>
     _step_id = id
     _worker_name = worker
     _key = k
@@ -1070,9 +1076,9 @@ class val AnnounceNewSourceMsg is ChannelMsg
   been created on this worker and that routers should be updated.
   """
   let sender: String
-  let source_id: StepId
+  let source_id: RoutingId
 
-  new val create(sender': String, id: StepId) =>
+  new val create(sender': String, id: RoutingId) =>
     sender = sender'
     source_id = id
 
@@ -1086,6 +1092,14 @@ class val CleanShutdownMsg is ChannelMsg
 
   new val create(m: String) =>
     msg = m
+
+class val ForwardInjectBarrierMsg is ChannelMsg
+  let token: BarrierToken
+  let result_promise: BarrierResultPromise
+
+  new val create(token': BarrierToken, promise: BarrierResultPromise) =>
+    token = token'
+    result_promise = promise
 
 class val RemoteInitiateBarrierMsg is ChannelMsg
   let sender: String
@@ -1112,11 +1126,11 @@ class val WorkerAckBarrierMsg is ChannelMsg
     token = token'
 
 class val ForwardBarrierMsg is ChannelMsg
-  let target_id: StepId
-  let origin_id: StepId
+  let target_id: RoutingId
+  let origin_id: RoutingId
   let token: BarrierToken
 
-  new val create(target_id': StepId, origin_id': StepId, token': BarrierToken)
+  new val create(target_id': RoutingId, origin_id': RoutingId, token': BarrierToken)
   =>
     target_id = target_id'
     origin_id = origin_id'
@@ -1137,10 +1151,10 @@ class val ResumeTheWorldMsg is ChannelMsg
 
 class val RegisterProducerMsg is ChannelMsg
   let sender: String
-  let source_id: StepId
-  let target_id: StepId
+  let source_id: RoutingId
+  let target_id: RoutingId
 
-  new val create(sender': String, source_id': StepId, target_id': StepId)
+  new val create(sender': String, source_id': RoutingId, target_id': RoutingId)
   =>
     sender = sender'
     source_id = source_id'
@@ -1148,10 +1162,10 @@ class val RegisterProducerMsg is ChannelMsg
 
 class val UnregisterProducerMsg is ChannelMsg
   let sender: String
-  let source_id: StepId
-  let target_id: StepId
+  let source_id: RoutingId
+  let target_id: RoutingId
 
-  new val create(sender': String, source_id': StepId, target_id': StepId)
+  new val create(sender': String, source_id': RoutingId, target_id': RoutingId)
   =>
     sender = sender'
     source_id = source_id'

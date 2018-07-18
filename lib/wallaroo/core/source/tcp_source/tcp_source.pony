@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "buffered"
 use "collections"
 use "net"
+use "promises"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -62,15 +63,15 @@ actor TCPSource is Source
   ## Future work
   * Switch to requesting credits via promise
   """
-  let _source_id: StepId
+  let _source_id: RoutingId
   let _auth: AmbientAuth
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
   var _router: Router
   let _routes: MapIs[Consumer, Route] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
-  let _outputs: Map[StepId, Consumer] = _outputs.create()
+  let _outputs: Map[RoutingId, Consumer] = _outputs.create()
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
@@ -115,7 +116,7 @@ actor TCPSource is Source
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
-  new _accept(source_id: StepId, auth: AmbientAuth, listen: TCPSourceListener,
+  new _accept(source_id: RoutingId, auth: AmbientAuth, listen: TCPSourceListener,
     notify: TCPSourceNotify iso, event_log: EventLog,
     router: Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
@@ -165,7 +166,7 @@ actor TCPSource is Source
     let new_router =
       match router
       | let pr: PartitionRouter =>
-        pr.update_boundaries(_outgoing_boundaries)
+        pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
@@ -227,7 +228,7 @@ actor TCPSource is Source
     _notify.update_router(new_router)
     _pending_message_store.process_known_keys(this, _notify, new_router)
 
-  be remove_route_to_consumer(id: StepId, c: Consumer) =>
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
       ifdef debug then
         Invariant(_routes.contains(c))
@@ -235,7 +236,7 @@ actor TCPSource is Source
       _unregister_output(id, c)
     end
 
-  fun ref _register_output(id: StepId, c: Consumer) =>
+  fun ref _register_output(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
       try
         let old_c = _outputs(id)?
@@ -265,7 +266,10 @@ actor TCPSource is Source
       end
     end
 
-  fun ref _unregister_output(id: StepId, c: Consumer) =>
+  be register_downstreams(action: Promise[Source]) =>
+    action(this)
+
+  fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
       _routes(c)?.unregister_producer(id)
       _outputs.remove(id)?
@@ -314,6 +318,10 @@ actor TCPSource is Source
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)
+
+  be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+    //!@ Should we fail here?
+    None
 
   be remove_boundary(worker: String) =>
     _remove_boundary(worker)

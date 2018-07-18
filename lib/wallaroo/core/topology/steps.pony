@@ -61,13 +61,13 @@ actor Step is (Producer & Consumer & Rerouter)
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
-  let _outputs: Map[StepId, Consumer] = _outputs.create()
+  let _outputs: Map[RoutingId, Consumer] = _outputs.create()
   // _routes contains one upstream per producer
   var _upstreams: SetIs[Producer] = _upstreams.create()
   // _inputs keeps track of all inputs by step id. There might be
   // duplicate producers in this map (unlike upstreams) since there might be
   // multiple upstream step ids over a boundary
-  let _inputs: Map[StepId, Producer] = _inputs.create()
+  let _inputs: Map[RoutingId, Producer] = _inputs.create()
 
   // Lifecycle
   var _initializer: (LocalTopologyInitializer | StateStepCreator | None) = None
@@ -211,7 +211,7 @@ actor Step is (Producer & Consumer & Rerouter)
       _register_output(c_id, consumer)
     end
 
-  fun ref _register_output(id: StepId, c: Consumer) =>
+  fun ref _register_output(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
       try
         let old_c = _outputs(id)?
@@ -241,7 +241,7 @@ actor Step is (Producer & Consumer & Rerouter)
       end
     end
 
-  fun ref _unregister_output(id: StepId, c: Consumer) =>
+  fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
       _routes(c)?.unregister_producer(id)
       _outputs.remove(id)?
@@ -259,7 +259,7 @@ actor Step is (Producer & Consumer & Rerouter)
       _unregister_output(id, consumer)
     end
 
-  be remove_route_to_consumer(id: StepId, c: Consumer) =>
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
       ifdef debug then
         Invariant(_routes.contains(c))
@@ -287,6 +287,14 @@ actor Step is (Producer & Consumer & Rerouter)
     end
 
   be update_target_id_router(target_id_router: TargetIdRouter) =>
+    //!@
+    match target_id_router
+    | let s: StateStepRouter =>
+      @printf[I32]("!@ Updating target_id_router StateStepRouter\n".cstring())
+    else
+      @printf[I32]("!@ Updating target_id_router but it's not the right kind!\n".cstring())
+    end
+
     let old_router = _target_id_router
     _target_id_router = target_id_router
     for (old_id, outdated_consumer) in
@@ -297,7 +305,9 @@ actor Step is (Producer & Consumer & Rerouter)
       end
     end
 
+    @printf[I32]("!@ About to try registering %s outputs for target_id_router\n".cstring(), target_id_router.routes().size().string().cstring())
     for (id, consumer) in target_id_router.routes().pairs() do
+      @printf[I32]("!@ Step %s registering with %s using target_id_router\n".cstring(), _id.string().cstring(), id.string().cstring())
       _register_output(id, consumer)
     end
 
@@ -348,7 +358,7 @@ actor Step is (Producer & Consumer & Rerouter)
     end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -360,7 +370,7 @@ actor Step is (Producer & Consumer & Rerouter)
       latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -416,10 +426,10 @@ actor Step is (Producer & Consumer & Rerouter)
         i_route_id, i_seq_id)
     end
 
-  fun inputs(): Map[StepId, Producer] box =>
+  fun inputs(): Map[RoutingId, Producer] box =>
     _inputs
 
-  fun outputs(): Map[StepId, Consumer] box =>
+  fun outputs(): Map[RoutingId, Consumer] box =>
     _outputs
 
   fun ref next_sequence_id(): SeqId =>
@@ -459,7 +469,7 @@ actor Step is (Producer & Consumer & Rerouter)
     MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -535,25 +545,14 @@ actor Step is (Producer & Consumer & Rerouter)
   fun has_route_to(c: Consumer): Bool =>
     _routes.contains(c)
 
-  be register_producer(id: StepId, producer: Producer) =>
+  be register_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
 
     _inputs(id) = producer
     _upstreams.set(producer)
 
-  be unregister_producer(id: StepId, producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Unregistered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
-
-    // TODO: Investigate whether we need this Invariant or why it's sometimes
-    // violated during shrink.
-    // ifdef debug then
-    //   Invariant(_upstreams.contains(producer))
-    // end
-
-    //!@ Commented out just to run tests
-    // ifdef debug then
-      // Invariant(_inputs.contains(id))
-    // end
 
     if _inputs.contains(id) then
       try
@@ -615,32 +614,14 @@ actor Step is (Producer & Consumer & Rerouter)
       end
     end
 
-    //!@
-  // be send_state_to_neighbour(neighbour: Step) =>
-  //   ifdef "autoscale" then
-  //     match _step_message_processor
-  //     | let nmp: NormalStepMessageProcessor =>
-  //       // TODO: Should this be possible?
-  //       StepStateMigrator.send_state_to_neighbour(_runner, neighbour,
-  //         Array[QueuedStepMessage], _auth)
-  //     | let qmp: QueueingStepMessageProcessor =>
-  //       StepStateMigrator.send_state_to_neighbour(_runner, neighbour,
-  //         qmp.messages, _auth)
-  //     end
-  //   end
-
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Key) =>
     ifdef "autoscale" then
       //@!
       // _unregister_all_outputs()
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
-        // TODO: Should this be possible?
         StepStateMigrator.send_state(_runner, _id, boundary, state_name,
-          key, Array[QueuedStepMessage], _auth)
-      | let qmp: QueueingStepMessageProcessor =>
-        StepStateMigrator.send_state(_runner, _id, boundary, state_name,
-          key, qmp.messages, _auth)
+          key, _auth)
       else
         @printf[I32]("!@ WHA?\n".cstring())
         Fail()
@@ -651,7 +632,7 @@ actor Step is (Producer & Consumer & Rerouter)
   //////////////
   // BARRIER
   //////////////
-  be receive_barrier(step_id: StepId, producer: Producer,
+  be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     @printf[I32]("!@ Receive Barrier at Step %s\n".cstring(), _id.string().cstring())
@@ -666,27 +647,6 @@ actor Step is (Producer & Consumer & Rerouter)
             _barrier_forwarder as BarrierStepForwarder)
           _step_message_processor.receive_new_barrier(step_id, producer,
             barrier_token)
-        else
-          Fail()
-        end
-      | let qsmp: QueueingStepMessageProcessor =>
-        match barrier_token
-        | let sbt: SnapshotBarrierToken =>
-          // !@ Handle this more cleanly. We need to make sure we don't lose
-          // queued messages, but should barriers ever be possible when we're in
-          // the queueing state?
-          Fail()
-        | let ifa: InFlightAckResumeBarrierToken =>
-          // Process all queued messages now that we are resuming processing
-          qsmp.flush(_target_id_router)
-          try
-            _step_message_processor = BarrierStepMessageProcessor(this,
-              _barrier_forwarder as BarrierStepForwarder)
-            _step_message_processor.receive_new_barrier(step_id, producer,
-              barrier_token)
-          else
-            Fail()
-          end
         else
           Fail()
         end

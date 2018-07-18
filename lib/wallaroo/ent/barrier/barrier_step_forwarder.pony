@@ -18,31 +18,35 @@ use "wallaroo_labs/mort"
 
 
 class BarrierStepForwarder
-  let _step_id: StepId
+  let _step_id: RoutingId
   let _step: Step ref
   var _barrier_token: BarrierToken = InitialBarrierToken
-  let _inputs_blocking: Map[StepId, Producer] = _inputs_blocking.create()
+  let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
 
   // !@ Perhaps we need to add invariant wherever inputs and outputs can be
   // updated in the encapsulating actor to check if barrier is in progress.
-  new create(step_id: StepId, step: Step ref) =>
+  new create(step_id: RoutingId, step: Step ref) =>
     _step_id = step_id
     _step = step
 
-  fun input_blocking(id: StepId): Bool =>
+  fun input_blocking(id: RoutingId): Bool =>
     _inputs_blocking.contains(id)
 
-  fun ref receive_new_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     _barrier_token = barrier_token
     receive_barrier(step_id, producer, barrier_token)
 
-  fun ref receive_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     @printf[I32]("!@ receive_barrier at Forwarder from %s!\n".cstring(), step_id.string().cstring())
-    if barrier_token != _barrier_token then Fail() end
+    if barrier_token != _barrier_token then
+      @printf[I32]("!@ Received %s when still processing %s\n".cstring(),
+        _barrier_token.string().cstring(), barrier_token.string().cstring())
+      Fail()
+    end
 
     let inputs = _step.inputs()
 

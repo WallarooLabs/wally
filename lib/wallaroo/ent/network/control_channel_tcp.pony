@@ -413,6 +413,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Control Ch: Received Unmute Request from %s\n".cstring(),
           m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
+      | let m: ForwardInjectBarrierMsg =>
+        _barrier_initiator.inject_barrier(m.token, m.result_promise)
       | let m: RemoteInitiateBarrierMsg =>
         _barrier_initiator.remote_initiate_barrier(m.sender, m.token)
       | let m: WorkerAckBarrierStartMsg =>

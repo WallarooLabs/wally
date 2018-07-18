@@ -29,7 +29,7 @@ use "wallaroo_labs/mort"
 
 actor EmptySink is Sink
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -39,7 +39,7 @@ actor EmptySink is Sink
     None
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -47,7 +47,7 @@ actor EmptySink is Sink
     None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer, msg_uid: MsgId,
+    data: D, producer_id: RoutingId, producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -65,10 +65,10 @@ actor EmptySink is Sink
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be register_producer(id: StepId, producer: Producer) =>
+  be register_producer(id: RoutingId, producer: Producer) =>
     None
 
-  be unregister_producer(id: StepId, producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
     None
 
   be report_status(code: ReportStatusCode) =>
@@ -85,7 +85,7 @@ actor EmptySink is Sink
   be dispose() =>
     None
 
-  be receive_barrier(step_id: StepId, producer: Producer,
+  be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     None
@@ -93,6 +93,6 @@ actor EmptySink is Sink
   fun ref barrier_complete(barrier_token: BarrierToken) =>
     None
 
-  fun inputs(): Map[StepId, Producer] box =>
-    Map[StepId, Producer]
+  fun inputs(): Map[RoutingId, Producer] box =>
+    Map[RoutingId, Producer]
 
