@@ -446,7 +446,7 @@ actor OutgoingBoundary is Consumer
 
     _upstreams.set(producer)
 
-    //!@ Add to input channels
+    //!@ Add to input channels??
 
 
   be unregister_producer(id: StepId, producer: Producer,
@@ -461,7 +461,7 @@ actor OutgoingBoundary is Consumer
 
     _upstreams.unset(producer)
 
-    //!@ Remove from input channels
+    //!@ Remove from input channels??
 
   be report_status(code: ReportStatusCode) =>
     _in_flight_ack_waiter.report_status(code)

@@ -256,7 +256,7 @@ actor DataReceiver is (Producer & Rerouter)
 
     _pending_message_store.process_known_keys(this, this, _router)
 
-  be remove_route_to_consumer(c: Consumer) =>
+  be remove_route_to_consumer(id: StepId, c: Consumer) =>
     // DataReceiver doesn't have its own routes
     None
 
