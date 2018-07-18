@@ -28,7 +28,6 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/autoscale"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/in_flight_acking"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
@@ -52,7 +51,7 @@ actor RouterRegistry
   let _state_step_creator: StateStepCreator
   let _recovery_file_cleaner: RecoveryFileCleaner
   let _barrier_initiator: BarrierInitiator
-  let _in_flight_ack_initiator: InFlightAckInitiator
+  let _autoscale_initiator: AutoscaleInitiator
   var _data_router: DataRouter =
     DataRouter(recover Map[StepId, Consumer] end,
       recover LocalStatePartitions end, recover LocalStatePartitionIds end)
@@ -155,7 +154,7 @@ actor RouterRegistry
     state_step_creator: StateStepCreator,
     recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64,
     is_joining: Bool, barrier_initiator: BarrierInitiator,
-    in_flight_ack_initiator: InFlightAckInitiator,
+    autoscale_initiator: AutoscaleInitiator,
     contacted_worker: (String | None) = None)
   =>
     _auth = auth
@@ -167,7 +166,7 @@ actor RouterRegistry
     register_target_id_router_updatable(_state_step_creator)
     _recovery_file_cleaner = recovery_file_cleaner
     _barrier_initiator = barrier_initiator
-    _in_flight_ack_initiator = in_flight_ack_initiator
+    _autoscale_initiator = autoscale_initiator
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
     _id = (digestof this).u128()
@@ -771,7 +770,7 @@ actor RouterRegistry
 
     let action = Promise[None]
     action.next[None](recover this~begin_log_rotation() end)
-    _in_flight_ack_initiator.initiate_in_flight_acks(action)
+    _autoscale_initiator.initiate_autoscale(action)
 
   be begin_log_rotation(n: None) =>
     """
@@ -865,7 +864,7 @@ actor RouterRegistry
 
     let action = Promise[None]
     action.next[None](recover this~initiate_join_migration(new_workers) end)
-    _in_flight_ack_initiator.initiate_in_flight_acks(action)
+    _autoscale_initiator.initiate_autoscale(action)
 
   fun ref stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
     """
@@ -897,7 +896,7 @@ actor RouterRegistry
 
       let action = Promise[None]
       action.next[None](recover this~initiate_autoscale_complete() end)
-      _in_flight_ack_initiator.initiate_in_flight_resume_acks(action)
+      _autoscale_initiator.initiate_autoscale_resume_acks(action)
 
       // We are done with this round of leaving workers
       _leaving_workers = recover Array[String] end
@@ -1272,7 +1271,7 @@ actor RouterRegistry
       let action = Promise[None]
       action.next[None](recover this~announce_leaving_migration(
         remaining_workers, leaving_workers) end)
-      _in_flight_ack_initiator.initiate_in_flight_acks(action)
+      _autoscale_initiator.initiate_autoscale(action)
     end
 
   be prepare_shrink(remaining_workers: Array[String] val,

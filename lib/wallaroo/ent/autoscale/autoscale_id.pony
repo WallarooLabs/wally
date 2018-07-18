@@ -10,4 +10,4 @@ the License. You may obtain a copy of the License at
 
 */
 
-type InFlightAckId is U128
+type AutoscaleId is U128

@@ -146,16 +146,23 @@ actor BarrierInitiator is Initializable
       _pending.push(_PendingSourceInit(s))
     else
       let action = Promise[None]
-      action.next[None](recover this~continue_processing_barriers() end)
-        //!@
-      // s.no_barrier_in_progress(action)
+      action.next[None](recover this~source_registration_complete() end)
+      s.register_downstreams(action)
     end
 
-  be continue_processing_barriers(n: None) =>
-    //!@
-    None
+  be source_registration_complete(n: None) =>
+    _phase.source_registration_complete()
+
+  fun ref source_pending_complete() =>
+    _phase = NormalBarrierInitiatorPhase(this)
+    next_token()
 
   be inject_barrier(barrier_token: BarrierToken,
+    result_promise: BarrierResultPromise)
+  =>
+    _inject_barrier(barrier_token, result_promise)
+
+  fun ref _inject_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
     """
@@ -172,6 +179,17 @@ actor BarrierInitiator is Initializable
         Fail()
       end
     end
+
+  be inject_blocking_barrier(barrier_token: BarrierToken,
+    result_promise: BarrierResultPromise,
+    wait_for_token: BarrierToken)
+  =>
+    """
+    Called when no barriers should be processed after this one
+    is injected. Normal barrier processing is resumed either when
+    this one is complete or, if `wait_for_token` is specified, once
+    the specified token is received.
+    """
 
   fun ref queue_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -381,9 +399,30 @@ actor BarrierInitiator is Initializable
     for s in _sources.values() do
       s.barrier_complete(barrier_token)
     end
+    _phase.barrier_complete(barrier_token)
 
-    //!@
-    // check()
+  fun ref next_token() =>
+    if _pending_barriers.size() > 0 then
+      try
+        let next = _pending.shift()?
+        match next
+        | let p: _PendingSourceInit =>
+          _phase = SourcePendingBarrierInitiatorPhase(this)
+          let action = Promise[None]
+          action.next[None](recover this~source_registration_complete() end)
+          p.source.register_downstreams(action)
+          return
+        | let p: _PendingBarrier =>
+          _inject_barrier(p.token, p.result_promise)
+          if (_phase.ready_for_next_token() and (_pending_barriers.size() > 0)
+          then
+            next_token()
+          end
+        end
+      else
+        Unreachable()
+      end
+    end
 
   be remote_barrier_complete(barrier_token: BarrierToken) =>
     """

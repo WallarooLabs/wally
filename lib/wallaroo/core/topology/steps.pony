@@ -676,7 +676,7 @@ actor Step is (Producer & Consumer & Rerouter)
           // queued messages, but should barriers ever be possible when we're in
           // the queueing state?
           Fail()
-        | let ifa: InFlightAckResumeBarrierToken =>
+        | let ifa: AutoscaleResumeBarrierToken =>
           // Process all queued messages now that we are resuming processing
           qsmp.flush(_target_id_router)
           try
