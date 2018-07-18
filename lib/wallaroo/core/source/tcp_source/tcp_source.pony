@@ -33,6 +33,12 @@ use "net"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/initialization"
+use "wallaroo/core/invariant"
+use "wallaroo/core/metrics"
+use "wallaroo/core/routing"
+use "wallaroo/core/source"
+use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
@@ -40,11 +46,6 @@ use "wallaroo/ent/router_registry"
 use "wallaroo/ent/snapshot"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
-use "wallaroo/core/initialization"
-use "wallaroo/core/invariant"
-use "wallaroo/core/metrics"
-use "wallaroo/core/routing"
-use "wallaroo/core/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -54,7 +55,7 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is (Producer & StatusReporter)
+actor TCPSource is Source
   """
   # TCPSource
 
