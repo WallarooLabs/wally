@@ -245,14 +245,30 @@ actor Step is (Producer & Consumer & Rerouter)
     _route_builder = route_builder
 
   be register_routes(router': Router, route_builder: RouteBuilder) =>
+    @printf[I32]("!@ Registering routes at state step!\n".cstring())
     ifdef debug then
       if _initialized then
         Fail()
       end
     end
 
+    //!@
+    match router
+    | let d: DirectRouter =>
+      @printf[I32]("!@ And this is a direct router\n".cstring())
+    | let pr: PartitionRouter =>
+      @printf[I32]("!@ This is a partition router\n".cstring())
+    | let pr: ProxyRouter =>
+      @printf[I32]("!@ This is a proxy router\n".cstring())
+    | let er: EmptyRouter =>
+      @printf[I32]("!@ This is a empty router\n".cstring())
+    | let mr: MultiRouter =>
+      @printf[I32]("!@ This is a multi router\n".cstring())
+    end
+
     for (c_id, consumer) in router'.routes().pairs() do
       _register_output(c_id, consumer)
+      @printf[I32]("!@ Registered output %s at step %s\n".cstring(), c_id.string().cstring(), _id.string().cstring())
     end
 
   be update_router(router': Router) =>
@@ -355,18 +371,20 @@ actor Step is (Producer & Consumer & Rerouter)
     end
 
   be update_omni_router(omni_router: OmniRouter) =>
-    let old_router = _omni_router
+    //!@
+    // let old_router = _omni_router
     _omni_router = omni_router
-    for (old_id, outdated_consumer) in
-      old_router.routes_not_in(_omni_router).pairs()
-    do
-      if _outputs.contains(old_id) then
-        try
-          _outputs.remove(old_id)?
-          _remove_route_if_no_output(outdated_consumer)
-        end
-      end
-    end
+    //!@
+    // for (old_id, outdated_consumer) in
+    //   old_router.routes_not_in(_omni_router).pairs()
+    // do
+    //   if _outputs.contains(old_id) then
+    //     try
+    //       _outputs.remove(old_id)?
+    //       _remove_route_if_no_output(outdated_consumer)
+    //     end
+    //   end
+    // end
     _add_boundaries(omni_router.boundaries())
 
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
@@ -391,9 +409,11 @@ actor Step is (Producer & Consumer & Rerouter)
     if _outgoing_boundaries.contains(worker) then
       try
         let boundary = _outgoing_boundaries(worker)?
-        _routes(boundary)?.dispose()
-        _routes.remove(boundary)?
         _outgoing_boundaries.remove(worker)?
+        if _routes.contains(boundary) then
+          _routes(boundary)?.dispose()
+          _routes.remove(boundary)?
+        end
       else
         Fail()
       end
@@ -586,6 +606,9 @@ actor Step is (Producer & Consumer & Rerouter)
       None
     end
 
+  fun has_route_to(c: Consumer): Bool =>
+    _routes.contains(c)
+
   be register_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
 
@@ -710,6 +733,7 @@ actor Step is (Producer & Consumer & Rerouter)
   ///////////////
   // GROW-TO-FIT
   be receive_state(state: ByteSeq val) =>
+    // @printf[I32]("!@ Receiving state on %s\n".cstring(), _id.string().cstring())
     ifdef "autoscale" then
       try
         match Serialised.input(InputSerialisedAuth(_auth),

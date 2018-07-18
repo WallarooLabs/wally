@@ -479,6 +479,7 @@ class val StepIdRouter is OmniRouter
   =>
     if _data_routes.contains(target_id) then
       try
+        @printf[I32]("!@ Routing to target id %s\n".cstring(), target_id.string().cstring())
         let target = _data_routes(target_id)?
 
         let might_be_route = producer.route_to(target)
@@ -687,28 +688,18 @@ class val StepIdRouter is OmniRouter
       _outgoing_boundaries, consume new_stateless_partitions, _sources,
       _data_receivers)
 
+  //!@ Probably remove this since we shouldn't be using an OmniRouter as a
+  // source of routes.
   fun routes(): Map[StepId, Consumer] val =>
-    let m = recover iso Map[StepId, Consumer] end
-    for (id, t) in _step_map.pairs() do
-      match t
-      | let pa: ProxyAddress =>
-        try
-          let target = _outgoing_boundaries(pa.worker)?
-          m(id) = target
-        else
-          Fail()
-        end
-      | let s_id: StepId =>
-        ifdef debug then Invariant(id == s_id) end
-        try
-          let target = _data_routes(id)?
-          m(id) = target
-        else
-          Fail()
-        end
-      end
-    end
-    consume m
+    """
+    The StepIdRouter has routing information for every step and boundary on
+    this worker.  However, the encapsulating actor will only have routes to
+    consumers that it actually has outputs to.  On state steps, for example,
+    we explicitly register only those outputs that upstream pre state steps
+    will ask to route messages to.  For this reason, we will not use this
+    method to determine known routes.
+    """
+    recover val Map[StepId, Consumer] end
 
   fun get_outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)] val
   =>
@@ -1376,8 +1367,21 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
       new_p_function)
 
   fun register_routes(router: Router, route_builder': RouteBuilder) =>
-    for step in _local_routes.values() do
-      step.register_routes(router, route_builder')
+    @printf[I32]("!@ PartitionRouter registering routes\n".cstring())
+
+                //!@
+                match router
+                | let er: EmptyRouter =>
+                  @printf[I32]("!@ PR: Somehow target_router is EmptyRouter\n".cstring())
+                | let dr: DirectRouter =>
+                  @printf[I32]("!@ PR: DirectRouter as expected\n".cstring())
+                end
+    for r in _partition_routes.values() do
+      match r
+      | let step: Step =>
+        @printf[I32]("!@ PR: Registering with a step.\n".cstring())
+        step.register_routes(router, route_builder')
+      end
     end
 
   fun routes(): Map[StepId, Consumer] val =>

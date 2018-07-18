@@ -149,6 +149,7 @@ actor TCPSink is Sink
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
+    @printf[I32]("<<---------->>!@ Sink with id: %s\n".cstring(), sink_id.string().cstring())
     _env = env
     _sink_id = sink_id
     _name = sink_name
