@@ -57,12 +57,16 @@ trait RouteLogic
   fun ref dispose()
 
 class _RouteLogic is RouteLogic
+  let _step_id: StepId
   let _step: Producer ref
   let _consumer: Consumer
   var _step_type: String = ""
   var _route_type: String = ""
 
-  new create(step: Producer ref, consumer: Consumer, r_type: String) =>
+  new create(step_id: StepId, step: Producer ref, consumer: Consumer,
+    r_type: String)
+  =>
+    _step_id = step_id
     _step = step
     _consumer = consumer
     _route_type = r_type
@@ -75,7 +79,7 @@ class _RouteLogic is RouteLogic
     """
     Return unused credits to downstream consumer
     """
-    _consumer.unregister_producer(_step)
+    _consumer.unregister_producer(_step_id, _step)
 
   fun ref _report_ready_to_work() =>
     match _step

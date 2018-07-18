@@ -55,9 +55,12 @@ interface tag BoundaryUpdateable
 
 trait tag Consumer is (Runnable & StateReceiver & AckRequester &
   Initializable & InFlightAckResponder & StatusReporter)
-  be register_producer(producer: Producer)
-  be unregister_producer(producer: Producer)
-  be identify_inputs()
+  // TODO: For now, since we do not allow application graph cycles, all back
+  // edges are from DataReceivers. This allows us to simply identify them
+  // directly. Once we allow application cycles, we will need a more
+  // flexible approach.
+  be register_producer(id: StepId, producer: Producer, back_edge: Bool)
+  be unregister_producer(id: StepId, producer: Producer, back_edge: Bool)
 
 trait tag Runnable
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
