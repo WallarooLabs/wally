@@ -45,7 +45,7 @@ trait tag Producer is (Muteable & Ackable & AckRequester &
   fun ref current_sequence_id(): SeqId
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
-  be remove_route_to_consumer(c: Consumer)
+  be remove_route_to_consumer(id: StepId, c: Consumer)
 
 trait tag SnapshotRequester
   fun ref snapshot_state()

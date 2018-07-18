@@ -56,8 +56,18 @@ actor Step is (Producer & Consumer & Rerouter)
 
   var _step_message_processor: StepMessageProcessor = EmptyStepMessageProcessor
 
+  // _routes contains one route per Consumer
   let _routes: MapIs[Consumer, Route] = _routes.create()
+  // _outputs keeps track of all output targets by step id. There might be
+  // duplicate consumers in this map (unlike _routes) since there might be
+  // multiple target step ids over a boundary
+  let _outputs: Map[StepId, Consumer] = _outputs.create()
+  // _routes contains one upstream per producer
   var _upstreams: SetIs[Producer] = _upstreams.create()
+  // _inputs keeps track of all inputs by step id. There might be
+  // duplicate producers in this map (unlike upstreams) since there might be
+  // multiple upstream step ids over a boundary
+  let _inputs: Map[StepId, Producer] = _inputs.create()
 
   // Lifecycle
   var _initializer: (LocalTopologyInitializer | StateStepCreator | None) = None
@@ -109,19 +119,21 @@ actor Step is (Producer & Consumer & Rerouter)
     let initial_router = _runner.clone_router_and_set_input_type(router')
     _update_router(initial_router)
 
-    for consumer in _router.routes().values() do
+    for (id, consumer) in _router.routes().pairs() do
+      _outputs(id) = consumer
       if not _routes.contains(consumer) then
         _routes(consumer) =
           _route_builder(_id, this, consumer, _metrics_reporter)
       end
     end
 
-    for boundary in _outgoing_boundaries.values() do
-      if not _routes.contains(boundary) then
-        _routes(boundary) =
-          _route_builder(_id, this, boundary, _metrics_reporter)
-      end
-    end
+    //!@
+    // for boundary in _outgoing_boundaries.values() do
+    //   if not _routes.contains(boundary) then
+    //     _routes(boundary) =
+    //       _route_builder(_id, this, boundary, _metrics_reporter)
+    //   end
+    // end
 
     for r in _routes.values() do
       ifdef "resilience" then
@@ -147,19 +159,21 @@ actor Step is (Producer & Consumer & Rerouter)
     initializer.report_initialized(this)
 
   fun ref _initialize_routes_boundaries_omni_router(omni_router: OmniRouter) =>
-    for consumer in _router.routes().values() do
+    for (id, consumer) in _router.routes().pairs() do
+      _outputs(id) = consumer
       if not _routes.contains(consumer) then
         _routes(consumer) =
           _route_builder(_id, this, consumer, _metrics_reporter)
       end
     end
 
-    for boundary in _outgoing_boundaries.values() do
-      if not _routes.contains(boundary) then
-        _routes(boundary) =
-          _route_builder(_id, this, boundary, _metrics_reporter)
-      end
-    end
+    //!@
+    // for boundary in _outgoing_boundaries.values() do
+    //   if not _routes.contains(boundary) then
+    //     _routes(boundary) =
+    //       _route_builder(_id, this, boundary, _metrics_reporter)
+    //   end
+    // end
 
     for r in _routes.values() do
       r.application_created()
@@ -225,7 +239,8 @@ actor Step is (Producer & Consumer & Rerouter)
       end
     end
 
-    for consumer in router'.routes().values() do
+    for (c_id, consumer) in router'.routes().pairs() do
+      _outputs(c_id) = consumer
       let next_route = route_builder(_id, this, consumer, _metrics_reporter)
       if not _routes.contains(consumer) then
         _routes(consumer) = next_route
@@ -239,53 +254,77 @@ actor Step is (Producer & Consumer & Rerouter)
     _update_router(router')
 
   fun ref _update_router(router': Router) =>
-    try
-      let old_router = _router
-      _router = router'
-      for outdated_consumer in old_router.routes_not_in(_router).values() do
-        if _routes.contains(outdated_consumer) then
-          let outdated_route = _routes(outdated_consumer)?
-          ifdef "resilience" then
-            _acker_x.remove_route(outdated_route)
+    let old_router = _router
+    _router = router'
+    for (old_id, outdated_consumer) in
+      old_router.routes_not_in(_router).pairs()
+    do
+      try
+        if _outputs.contains(old_id) then
+          try
+            _outputs.remove(old_id)?
+            _remove_route_if_no_output(outdated_consumer)
           end
         end
+      else
+        Fail()
       end
-      for consumer in _router.routes().values() do
-        if not _routes.contains(consumer) then
-          let new_route = _route_builder(_id, this, consumer,
-            _metrics_reporter)
-          ifdef "resilience" then
-            _acker_x.add_route(new_route)
-          end
-          _routes(consumer) = new_route
+    end
+    for (c_id, consumer) in _router.routes().pairs() do
+      _outputs(c_id) = consumer
+      if not _routes.contains(consumer) then
+        let new_route = _route_builder(_id, this, consumer,
+          _metrics_reporter)
+        ifdef "resilience" then
+          _acker_x.add_route(new_route)
         end
+        _routes(consumer) = new_route
       end
       _pending_message_store.process_known_keys(this, this, _router)
     else
       Fail()
     end
 
-  be remove_route_to_consumer(c: Consumer) =>
-    if _routes.contains(c) then
-      try
-        let outdated_route = _routes.remove(c)?._2
-        ifdef "resilience" then
-          _acker_x.remove_route(outdated_route)
-        end
-      else
-        Fail()
+  be remove_route_to_consumer(id: StepId, c: Consumer) =>
+    if _outputs.contains(id) then
+      ifdef debug then
+        Invariant(_routes.contains(c))
       end
+      try
+        _outputs.remove(id)?
+        _remove_route_if_no_output(c)
+      end
+    end
+
+  fun ref _remove_route_if_no_output(c: Consumer) =>
+    var have_output = false
+    for consumer in _outputs.values() do
+      if consumer is c then have_output = true end
+    end
+    if not have_output then
+      _remove_route(c)
+    end
+
+  fun ref _remove_route(c: Consumer) =>
+    try
+      let outdated_route = _routes.remove(c)?._2
+      ifdef "resilience" then
+        _acker_x.remove_route(outdated_route)
+      end
+    else
+      Fail()
     end
 
   be update_omni_router(omni_router: OmniRouter) =>
     let old_router = _omni_router
     _omni_router = omni_router
-    for outdated_consumer in old_router.routes_not_in(_omni_router).values()
+    for (old_id, outdated_consumer) in
+      old_router.routes_not_in(_omni_router).pairs()
     do
-      try
-        let outdated_route = _routes(outdated_consumer)?
-        ifdef "resilience" then
-          _acker_x.remove_route(outdated_route)
+      if _outputs.contains(old_id) then
+        try
+          _outputs.remove(old_id)?
+          _remove_route_if_no_output(outdated_consumer)
         end
       end
     end
@@ -513,9 +552,8 @@ actor Step is (Producer & Consumer & Rerouter)
   =>
     @printf[I32]("!@ Registered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
 
+    _inputs(id) = producer
     _upstreams.set(producer)
-
-    //!@ Add to input channels
 
   be unregister_producer(id: StepId, producer: Producer,
     back_edge: Bool = false)
@@ -527,10 +565,22 @@ actor Step is (Producer & Consumer & Rerouter)
     // ifdef debug then
     //   Invariant(_upstreams.contains(producer))
     // end
-    _upstreams.unset(producer)
 
-    //!@ Remove input channels
+    if _inputs.contains(id) then
+      try
+        _inputs.remove(id)?
+      else
+        Fail()
+      end
+    end
 
+    var have_input = false
+    for i in _inputs.values() do
+      if i is producer then have_input = true end
+    end
+    if not have_input then
+      _upstreams.unset(producer)
+    end
 
   be report_status(code: ReportStatusCode) =>
     match code
