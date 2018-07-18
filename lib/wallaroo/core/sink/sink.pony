@@ -16,14 +16,17 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "collections"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
 
 trait tag Sink is (Consumer & DisposableActor & SnapshotRequester)
+  fun inputs(): Map[StepId, Producer] box
 
 interface val SinkConfig[Out: Any val]
   fun apply(): SinkBuilder
@@ -31,4 +34,5 @@ interface val SinkConfig[Out: Any val]
 interface val SinkBuilder
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
-    snapshot_initiator: SnapshotInitiator, recovering: Bool): Sink
+    barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
+    recovering: Bool): Sink

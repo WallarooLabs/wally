@@ -23,18 +23,18 @@ use "pony-kafka"
 use "pony-kafka/customlogger"
 use "time"
 use "wallaroo/core/common"
-use "wallaroo/core/sink"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
-use "wallaroo/ent/watermarking"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
-
+use "wallaroo/core/sink"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
+use "wallaroo/ent/watermarking"
+use "wallaroo_labs/mort"
 
 actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   // Steplike
@@ -47,6 +47,8 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
   var _initializer: (LocalTopologyInitializer | None) = None
+  let _barrier_initiator: BarrierInitiator
+  var _barrier_acker: (BarrierSinkAcker | None) = None
   let _snapshot_initiator: SnapshotInitiator
 
   // Consumer
@@ -81,7 +83,8 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   new create(sink_id: StepId, name: String, event_log: EventLog,
     recovering: Bool, encoder_wrapper: KafkaEncoderWrapper,
     metrics_reporter: MetricsReporter iso, conf: KafkaConfig val,
-    snapshot_initiator: SnapshotInitiator, auth: TCPConnectionAuth)
+    barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
+    auth: TCPConnectionAuth)
   =>
     _name = name
     _recovering = recovering
@@ -90,6 +93,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _conf = conf
+    _barrier_initiator = barrier_initiator
     _snapshot_initiator = snapshot_initiator
     _auth = auth
 
@@ -101,6 +105,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
              end
 
     _message_processor = NormalSinkMessageProcessor(this)
+    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
 
     // register resilient with event log
     _event_log.register_resilient(this, _sink_id)
@@ -193,6 +198,9 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
         .cstring())
     end
 
+  fun inputs(): Map[StepId, Producer] box =>
+    _inputs
+
   fun ref _kafka_producer_throttled(client: KafkaClient, topic_partitions_throttled: Map[String, Set[KafkaPartitionId]] val)
   =>
     if not _mute_outstanding then
@@ -266,6 +274,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
+      _barrier_initiator.register_sink(this)
       _snapshot_initiator.register_sink(this)
     end
 
@@ -296,25 +305,12 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
 
       // If we have no inputs, then we are not involved in snapshotting.
       if _inputs.size() == 0 then
+        _barrier_initiator.unregister_sink(this)
         _snapshot_initiator.unregister_sink(this)
       end
     end
 
   be report_status(code: ReportStatusCode) =>
-    None
-
-  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
-  =>
-    requester.receive_in_flight_ack(request_id)
-
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    requester.receive_in_flight_resume_ack(request_id)
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -429,6 +425,42 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     end
     // TODO: implement this for resilience/recovery
     Fail()
+
+  ///////////////
+  // BARRIER
+  ///////////////
+  be receive_barrier(step_id: StepId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    if _message_processor.barrier_in_progress() then
+      _message_processor.receive_barrier(step_id, producer,
+        barrier_token)
+    else
+      match _message_processor
+      | let nsmp: NormalSinkMessageProcessor =>
+        try
+           _message_processor = BarrierSinkMessageProcessor(this,
+             _barrier_acker as BarrierSinkAcker)
+           _message_processor.receive_new_barrier(step_id, producer,
+             barrier_token)
+        else
+          Fail()
+        end
+      else
+        Fail()
+      end
+    end
+
+  fun ref barrier_complete(barrier_token: BarrierToken) =>
+    ifdef debug then
+      Invariant(_message_processor.barrier_in_progress())
+    end
+    match barrier_token
+    | let sbt: SnapshotBarrierToken =>
+      snapshot_state(sbt.id)
+    end
+    _message_processor.flush()
+    _message_processor = NormalSinkMessageProcessor(this)
 
   ///////////////
   // SNAPSHOTS

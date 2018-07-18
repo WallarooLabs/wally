@@ -14,17 +14,18 @@ use "net"
 use "collections"
 use "time"
 use "files"
-use "wallaroo_labs/bytes"
-use "wallaroo_labs/hub"
 use "wallaroo"
 use "wallaroo/core/common"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/router_registry"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/hub"
+use "wallaroo_labs/mort"
 
 class ControlChannelListenNotifier is TCPListenNotify
   let _auth: AmbientAuth
@@ -40,6 +41,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
+  let _barrier_initiator: BarrierInitiator
   let _recovery_file: FilePath
   let _event_log: EventLog
   let _recovery_file_cleaner: RecoveryFileCleaner
@@ -49,7 +51,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     initializer: (ClusterInitializer | None) = None,
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
-    recovery_file: FilePath, data_host: String, data_service: String,
+    barrier_initiator: BarrierInitiator, recovery_file: FilePath,
+    data_host: String, data_service: String,
     event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner)
   =>
     _auth = auth
@@ -63,6 +66,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _barrier_initiator = barrier_initiator
     _recovery_file = recovery_file
     _event_log = event_log
     _recovery_file_cleaner = recovery_file_cleaner
@@ -107,7 +111,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_worker_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
-      _router_registry, _d_host, _d_service, _event_log,
+      _router_registry, _barrier_initiator, _d_host, _d_service, _event_log,
       _recovery_file_cleaner)
 
   fun ref closed(listen: TCPListener ref) =>
@@ -122,6 +126,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
+  let _barrier_initiator: BarrierInitiator
   let _d_host: String
   let _d_service: String
   let _event_log: EventLog
@@ -132,6 +137,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     connections: Connections, initializer: (ClusterInitializer | None),
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
+    barrier_initiator: BarrierInitiator,
     data_host: String, data_service: String, event_log: EventLog,
     recovery_file_cleaner: RecoveryFileCleaner)
   =>
@@ -143,6 +149,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _barrier_initiator = barrier_initiator
     _d_host = data_host
     _d_service = data_service
     _event_log = event_log
@@ -406,25 +413,12 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Control Ch: Received Unmute Request from %s\n".cstring(),
           m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
-      | let m: RequestInFlightAckMsg =>
-        _router_registry.remote_request_in_flight_ack(m.sender,
-          m.request_id, m.requester_id)
-      | let m: RequestInFlightResumeAckMsg =>
-        _router_registry.remote_request_in_flight_resume_ack(m.sender,
-          m.in_flight_resume_ack_id, m.request_id, m.requester_id,
-          m.leaving_workers)
-      | let m: InFlightAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received InFlightAckMsg from %s\n".cstring(),
-            m.sender.cstring())
-        end
-        _router_registry.receive_in_flight_ack(m.request_id)
-      | let m: FinishedCompleteAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received FinishedCompleteAckMsg from %s\n".cstring(),
-            m.sender.cstring())
-        end
-        _router_registry.receive_in_flight_resume_ack(m.request_id)
+      | let m: RemoteInitiateBarrierMsg =>
+        _barrier_initiator.remote_initiate_barrier(m.sender, m.token)
+      | let m: WorkerAckBarrierStartMsg =>
+        _barrier_initiator.worker_ack_barrier_start(m.sender, m.token)
+      | let m: WorkerAckBarrierMsg =>
+        _barrier_initiator.worker_ack_barrier(m.sender, m.token)
       | let m: ResumeTheWorldMsg =>
         ifdef "trace" then
           @printf[I32]("Received ResumeTheWorldMsg from %s\n".cstring(),

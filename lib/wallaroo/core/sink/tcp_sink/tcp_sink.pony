@@ -34,6 +34,7 @@ use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/sink"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
@@ -80,6 +81,8 @@ actor TCPSink is Sink
   """
   let _env: Env
   var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
+  let _barrier_initiator: BarrierInitiator
+  var _barrier_acker: (BarrierSinkAcker | None) = None
   let _snapshot_initiator: SnapshotInitiator
   // Steplike
   let _sink_id: StepId
@@ -140,8 +143,8 @@ actor TCPSink is Sink
   new create(sink_id: StepId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: TCPEncoderWrapper,
     metrics_reporter: MetricsReporter iso,
-    snapshot_initiator: SnapshotInitiator, host: String, service: String,
-    initial_msgs: Array[Array[ByteSeq] val] val,
+    barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
+    host: String, service: String, initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
     reconnect_pause: U64 = 10_000_000_000)
   =>
@@ -156,6 +159,7 @@ actor TCPSink is Sink
     _recovering = recovering
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
+    _barrier_initiator = barrier_initiator
     _snapshot_initiator = snapshot_initiator
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
@@ -168,6 +172,7 @@ actor TCPSink is Sink
     _from = from
     _connect_count = 0
     _message_processor = NormalSinkMessageProcessor(this)
+    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
     _mute_upstreams()
 
   //
@@ -288,6 +293,9 @@ actor TCPSink is Sink
     close()
     _notify.dispose()
 
+  fun inputs(): Map[StepId, Producer] box =>
+    _inputs
+
   fun ref _unit_finished(number_finished: ISize,
     number_tracked_finished: ISize,
     tracking_id: (SeqId | None))
@@ -321,6 +329,7 @@ actor TCPSink is Sink
     @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
+      _barrier_initiator.register_sink(this)
       _snapshot_initiator.register_sink(this)
     end
 
@@ -351,6 +360,7 @@ actor TCPSink is Sink
 
       // If we have no inputs, then we are not involved in snapshotting.
       if _inputs.size() == 0 then
+        _barrier_initiator.unregister_sink(this)
         _snapshot_initiator.unregister_sink(this)
       end
     end
@@ -358,19 +368,43 @@ actor TCPSink is Sink
   be report_status(code: ReportStatusCode) =>
     None
 
-  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+  ///////////////
+  // BARRIER
+  ///////////////
+  be receive_barrier(step_id: StepId, producer: Producer,
+    barrier_token: BarrierToken)
   =>
-    requester.receive_in_flight_ack(request_id)
+    @printf[I32]("!@ Receive barrier at TCPSink\n".cstring())
+    if _message_processor.barrier_in_progress() then
+      _message_processor.receive_barrier(step_id, producer,
+        barrier_token)
+    else
+      match _message_processor
+      | let nsmp: NormalSinkMessageProcessor =>
+        try
+           _message_processor = BarrierSinkMessageProcessor(this,
+             _barrier_acker as BarrierSinkAcker)
+           _message_processor.receive_new_barrier(step_id, producer,
+             barrier_token)
+        else
+          Fail()
+        end
+      else
+        Fail()
+      end
+    end
 
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    requester.receive_in_flight_resume_ack(request_id)
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    None
+  fun ref barrier_complete(barrier_token: BarrierToken) =>
+    @printf[I32]("!@ Barrier complete at TCPSink\n".cstring())
+    ifdef debug then
+      Invariant(_message_processor.barrier_in_progress())
+    end
+    match barrier_token
+    | let sbt: SnapshotBarrierToken =>
+      snapshot_state(sbt.id)
+    end
+    _message_processor.flush()
+    _message_processor = NormalSinkMessageProcessor(this)
 
   ///////////////
   // SNAPSHOTS

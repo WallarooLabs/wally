@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/snapshot"
 
 trait StepMessageProcessor
@@ -26,10 +27,26 @@ trait StepMessageProcessor
     data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    Fail()
 
-  fun snapshot_in_progress(): Bool =>
+  fun barrier_in_progress(): Bool =>
     false
 
+  fun ref receive_new_barrier(step_id: StepId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    Fail()
+
+  fun ref receive_barrier(step_id: StepId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    Fail()
+
+  //!@
+  fun snapshot_in_progress(): Bool =>
+    false
+    //!@
   fun ref receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
     snapshot_id: SnapshotId)
   =>
@@ -70,6 +87,19 @@ class NormalStepMessageProcessor is StepMessageProcessor
     end
     None
 
+class NoProcessingStepMessageProcessor is StepMessageProcessor
+  let step: Step ref
+
+  new create(s: Step ref) =>
+    step = s
+
+  fun ref flush(target_id_router: TargetIdRouter) =>
+    ifdef debug then
+      @printf[I32]("Flushing NoProcessingStepMessageProcessor does nothing.\n"
+        .cstring())
+    end
+    None
+
 class QueueingStepMessageProcessor is StepMessageProcessor
   let step: Step ref
   var messages: Array[QueuedStepMessage] = messages.create()
@@ -87,6 +117,10 @@ class QueueingStepMessageProcessor is StepMessageProcessor
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    @printf[I32]("!@ QUEUEING MESSAGE\n".cstring())
+    //!@
+    Fail()
+
     let msg = TypedQueuedStepMessage[D](metric_name, pipeline_time_spent, data,
       i_producer_id, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
       metrics_id, worker_ingress_ts)
@@ -99,6 +133,52 @@ class QueueingStepMessageProcessor is StepMessageProcessor
     end
     messages = Array[QueuedStepMessage]
 
+class BarrierStepMessageProcessor is StepMessageProcessor
+  let step: Step ref
+  let _barrier_forwarder: BarrierStepForwarder
+  var messages: Array[QueuedMessage] = messages.create()
+
+  new create(s: Step ref, barrier_forwarder: BarrierStepForwarder) =>
+    step = s
+    _barrier_forwarder = barrier_forwarder
+
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    if _barrier_forwarder.input_blocking(i_producer_id) then
+      let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
+        data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
+        i_route_id, latest_ts, metrics_id, worker_ingress_ts)
+      messages.push(msg)
+    else
+      step.process_message[D](metric_name, pipeline_time_spent, data,
+        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+        latest_ts, metrics_id, worker_ingress_ts)
+    end
+
+  fun barrier_in_progress(): Bool =>
+    true
+
+  fun ref receive_new_barrier(step_id: StepId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    _barrier_forwarder.receive_new_barrier(step_id, producer, barrier_token)
+
+  fun ref receive_barrier(step_id: StepId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    _barrier_forwarder.receive_barrier(step_id, producer, barrier_token)
+
+  fun ref flush(target_id_router: TargetIdRouter) =>
+    for msg in messages.values() do
+      msg.process_message(step)
+    end
+    messages = Array[QueuedMessage]
+
+
+//!@
 class SnapshotStepMessageProcessor is StepMessageProcessor
   let step: Step ref
   let _snapshot_forwarder: SnapshotBarrierForwarder
