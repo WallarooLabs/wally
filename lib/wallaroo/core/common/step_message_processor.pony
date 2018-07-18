@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/topology"
+use "wallaroo/ent/snapshot"
 
 trait StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
@@ -29,7 +30,7 @@ trait StepMessageProcessor
   fun snapshot_in_progress(): Bool =>
     false
 
-  fun ref receive_snapshot_barrier(sr: SnapshotRequester,
+  fun ref receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
     snapshot_id: SnapshotId)
   =>
     Fail()
@@ -101,7 +102,7 @@ class QueueingStepMessageProcessor is StepMessageProcessor
 class SnapshotStepMessageProcessor is StepMessageProcessor
   let step: Step ref
   let _snapshot_forwarder: SnapshotBarrierForwarder
-  var messages: Array[QueuedStepMessage] = messages.create()
+  var messages: Array[QueuedMessage] = messages.create()
 
   new create(s: Step ref, snapshot_forwarder: SnapshotBarrierForwarder)
   =>
@@ -113,10 +114,10 @@ class SnapshotStepMessageProcessor is StepMessageProcessor
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    if _snapshot_forwarder.input_blocking(i_producer) then
-      let msg = TypedQueuedStepMessage[D](metric_name, pipeline_time_spent,
-        data, i_producer_id, msg_uid, frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
+    if _snapshot_forwarder.input_blocking(i_producer_id, i_producer) then
+      let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
+        data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
+        i_route_id, latest_ts, metrics_id, worker_ingress_ts)
       messages.push(msg)
     else
       step.process_message[D](metric_name, pipeline_time_spent, data,
@@ -127,16 +128,16 @@ class SnapshotStepMessageProcessor is StepMessageProcessor
   fun snapshot_in_progress(): Bool =>
     true
 
-  fun ref receive_snapshot_barrier(sr: SnapshotRequester,
+  fun ref receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
     snapshot_id: SnapshotId)
   =>
-    _snapshot_forwarder.receive_snapshot_barrier(sr, snapshot_id)
+    _snapshot_forwarder.receive_snapshot_barrier(step_id, sr, snapshot_id)
 
   fun ref flush(omni_router: OmniRouter) =>
     for msg in messages.values() do
-      msg.run(step, omni_router)
+      msg.process_message(step)
     end
-    messages = Array[QueuedStepMessage]
+    messages = Array[QueuedMessage]
 
 trait val QueuedStepMessage
   fun run(step: Step ref, omni_router: OmniRouter)
@@ -176,7 +177,7 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
     // migrated queued messages, then we should look up the correct producer
     // that we'll use to send acks to for the case when our upstream is no
     // longer on the same worker.
-    let i_producer =  DummyProducer
+    let i_producer = DummyProducer
     // let i_producer =
     //   try
     //     omni_router.producer_for(i_producer_id)?

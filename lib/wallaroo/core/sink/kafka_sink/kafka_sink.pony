@@ -23,7 +23,9 @@ use "pony-kafka"
 use "pony-kafka/customlogger"
 use "time"
 use "wallaroo/core/common"
+use "wallaroo/core/sink"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
 use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -34,9 +36,10 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
 
-actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
+actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   // Steplike
   let _name: String
+  var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
   let _sink_id: StepId
   let _event_log: EventLog
   var _recovering: Bool
@@ -96,6 +99,8 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
                Fail()
                ""
              end
+
+    _message_processor = NormalSinkMessageProcessor(this)
 
     // register resilient with event log
     _event_log.register_resilient(this, _sink_id)
@@ -259,9 +264,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
     None
 
-  be register_producer(id: StepId, producer: Producer,
-    back_edge: Bool = false)
-  =>
+  be register_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
@@ -271,9 +274,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     _inputs(id) = producer
     _upstreams.set(producer)
 
-  be unregister_producer(id: StepId, producer: Producer,
-    back_edge: Bool = false)
-  =>
+  be unregister_producer(id: StepId, producer: Producer) =>
     @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
 
     ifdef debug then
@@ -286,19 +287,19 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       else
         Fail()
       end
-    end
 
-    var have_input = false
-    for i in _inputs.values() do
-      if i is producer then have_input = true end
-    end
-    if not have_input then
-      _upstreams.unset(producer)
-    end
+      var have_input = false
+      for i in _inputs.values() do
+        if i is producer then have_input = true end
+      end
+      if not have_input then
+        _upstreams.unset(producer)
+      end
 
-    // If we have no inputs, then we are not involved in snapshotting.
-    if _inputs.size() == 0 then
-      _snapshot_initiator.unregister_sink(this)
+      // If we have no inputs, then we are not involved in snapshotting.
+      if _inputs.size() == 0 then
+        _snapshot_initiator.unregister_sink(this)
+      end
     end
 
   be report_status(code: ReportStatusCode) =>
@@ -322,6 +323,16 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _message_processor.process_message[D](metric_name, pipeline_time_spent,
+      data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+      latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, i_producer_id: StepId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     var my_latest_ts: U64 = latest_ts
     var my_metrics_id = ifdef "detailed-metrics" then
@@ -421,13 +432,45 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     // TODO: implement this for resilience/recovery
     Fail()
 
-  // Log-rotation
-  be remote_snapshot_state() =>
-    ifdef "trace" then
-      @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
+  ///////////////
+  // SNAPSHOTS
+  ///////////////
+  be receive_snapshot_barrier(step_id: StepId, sr: SnapshotRequester,
+    snapshot_id: SnapshotId)
+  =>
+    if _message_processor.snapshot_in_progress() then
+      _message_processor.receive_snapshot_barrier(step_id, sr,
+        snapshot_id)
+    else
+      match _message_processor
+      | let nsmp: NormalSinkMessageProcessor =>
+        let sr_inputs = recover iso Map[StepId, SnapshotRequester] end
+        for (sr_id, i) in _inputs.pairs() do
+          sr_inputs(sr_id) = i
+        end
+        _message_processor = SnapshotSinkMessageProcessor(this,
+          SnapshotBarrierAcker(_sink_id, this, consume sr_inputs,
+            _snapshot_initiator, snapshot_id))
+      else
+        Fail()
+      end
     end
-    // TODO: implement this for resilience/recovery
-    Fail()
+
+  be remote_snapshot_state() =>
+    // Nothing to snapshot at this point
+    None
+
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    // Nothing to snapshot at this point
+    None
+
+  fun ref snapshot_complete() =>
+    ifdef debug then
+      Invariant(_message_processor.snapshot_in_progress())
+    end
+    _message_processor.flush()
+    _message_processor = NormalSinkMessageProcessor(this)
+
 
   be log_flushed(low_watermark: SeqId) =>
     ifdef "trace" then
