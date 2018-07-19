@@ -48,7 +48,7 @@ The first element, `rvt.GetVotes()`, is a message that we will send on to our ne
 
 ### State and StateBuilder
 
-We are going to partition by letter. We'll have a separate state object for every letter.
+We are going to partition by letter. Since we know the full set of keys in advance, it's a good idea to create them up front. If the application dynamically creates the keys instead, there will be a slight, but necessary, performance hit. We'll have a separate state object for every letter.
 
 ```go
 type RunningVoteTotal struct {
@@ -167,9 +167,10 @@ That is, while the stateless computation constructor `To` took only a computatio
 
 Partitioning is a key aspect of how work is distributed in Wallaroo. From the application's point of view, what is required is:
 
-* the keys to partition the state objects
 * a partitioning function
 * partition-compatible states - the state should be defined in such a way that each partition can have its own distinct state instance
+
+The keys to partition the state objects are also important, but are optional here. A wallaroo application is able to dynamically create the keys as needed, if required. 
 
 ### Partition
 
@@ -178,7 +179,7 @@ If we were to use partitioning in the alphabet application from the previous sec
 To create this, we use the `MakeLetterPartitions()` function:
 
 ```go
-func LetterPartition() []uint64 {
+func LetterPartition() []byte {
 	letterPartition := make([]byte, 27)
 
 	for i := 0; i < 26; i++ {
