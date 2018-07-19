@@ -51,7 +51,7 @@
     * [Run a Wallaroo Application in Docker](book/getting-started/run-a-wallaroo-application-docker.md)
   * [Installing with Vagrant](book/getting-started/installing-with-vagrant.md)
     * [Setting Up Your Environment](book/getting-started/vagrant-setup.md)
-    * [Run a Wallaroo Application in Docker](book/getting-started/run-a-wallaroo-application-vagrant.md)
+    * [Run a Wallaroo Application in Vagrant](book/getting-started/run-a-wallaroo-application-vagrant.md)
   * [Installing From Source](book/getting-started/installing-from-source.md)
     * [Setting up Your Environment](book/getting-started/setup.md)
       * [Ubuntu Installation](book/getting-started/linux-setup.md)
