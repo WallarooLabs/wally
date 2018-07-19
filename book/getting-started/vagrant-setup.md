@@ -52,6 +52,16 @@ cd wallaroo
 git checkout {{ book.wallaroo_version }}
 ```
 
+## Installing VirtualBox
+
+The Wallaroo Vagrant environment is dependent on the default provider,[VirtualBox](https://www.vagrantup.com/docs/virtualbox/). To install VirtualBox, download a installer or package for your OS [here](https://www.virtualbox.org/wiki/Downloads). Linux users can also use `apt-get` as documented below.
+
+### Linux
+
+```bash
+sudo apt-get install virtualbox
+```
+
 ## Installing Vagrant
 
 ### Linux Ubuntu, MacOS, and Windows
