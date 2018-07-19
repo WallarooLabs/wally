@@ -107,7 +107,7 @@ docker pull ryane/kafkacat
 
 To run `kafkacat` to listen to the `test-out` topic via Docker:
 
-**NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 1.
+**NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 2.
 
 ```bash
 docker run --rm -it ryane/kafkacat -C -b 127.0.0.1:9092 -t test-out -q
@@ -146,7 +146,7 @@ Send data into Kafka. Again, we use `kafakcat`.
 
 Run the following and then type at least 4 characters on each line and hit enter to send in data (only first 4 characters are used/interpreted as a float; the application will throw an error and possibly segfault if less than 4 characters are sent in):
 
-**NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 1.
+**NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 2.
 
 ```bash
 docker run --rm -it ryane/kafkacat -P -b 127.0.0.1:9092 -t test-in
