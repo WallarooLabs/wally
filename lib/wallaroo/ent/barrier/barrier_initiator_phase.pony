@@ -1,5 +1,7 @@
 
 
+use "promises"
+use "wallaroo/core/source"
 use "wallaroo_labs/mort"
 
 
@@ -9,7 +11,7 @@ trait BarrierInitiatorPhase
   =>
     Fail()
 
-  fun ref source_registration_complete() =>
+  fun ref source_registration_complete(s: Source) =>
     Fail()
 
   fun ready_for_next_token(): Bool =>
@@ -46,16 +48,16 @@ class SourcePendingBarrierInitiatorPhase is BarrierInitiatorPhase
   =>
     _initiator.queue_barrier(barrier_token, result_promise)
 
-  fun ref source_registration_complete() =>
-    _initiator.source_pending_complete()
+  fun ref source_registration_complete(s: Source) =>
+    _initiator.source_pending_complete(s)
 
 class BlockingBarrierInitiatorPhase is BarrierInitiatorPhase
   let _initiator: BarrierInitiator ref
   let _initial_token: BarrierToken
-  let _wait_for_token: (BarrierToken | None)
+  let _wait_for_token: BarrierToken
 
   new create(initiator: BarrierInitiator ref, token: BarrierToken,
-    wait_for_token: (BarrierToken | None))
+    wait_for_token: BarrierToken)
   =>
     _initiator = initiator
     _initial_token = token
@@ -64,19 +66,17 @@ class BlockingBarrierInitiatorPhase is BarrierInitiatorPhase
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
-    match barrier_token
-    | let bt: _wait_for_token =>
+    if (barrier_token == _initial_token) or
+      (barrier_token == _wait_for_token)
+    then
       _initiator.initiate_barrier(barrier_token, result_promise)
     else
       _initiator.queue_barrier(barrier_token, result_promise)
     end
 
   fun ref barrier_complete(token: BarrierToken) =>
-    match _wait_for_token
-    | let wt: BarrierToken =>
-      if token == wt then
-        _initiator.next_token()
-      end
+    if token == _wait_for_token then
+      _initiator.next_token()
     else
       _initiator.next_token()
     end

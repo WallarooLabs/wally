@@ -54,7 +54,7 @@ actor Connections is Cluster
   let _init_d_host: String
   let _init_d_service: String
   let _disposables: SetIs[DisposableActor] = _disposables.create()
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
@@ -297,7 +297,7 @@ actor Connections is Cluster
       Fail()
     end
 
-  be notify_cluster_of_new_stateful_step(id: StepId, key: Key,
+  be notify_cluster_of_new_stateful_step(id: RoutingId, key: Key,
     state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
   =>
@@ -319,7 +319,7 @@ actor Connections is Cluster
       Fail()
     end
 
-  be notify_cluster_of_new_source(id: StepId) =>
+  be notify_cluster_of_new_source(id: RoutingId) =>
     try
       let msg = ChannelMsgEncoder.announce_new_source(_worker_name, id,
         _auth)?
@@ -508,7 +508,7 @@ actor Connections is Cluster
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
     tidr_blueprints: Map[String, TargetIdRouterBlueprint] val,
-    local_sinks: Map[StepId, Consumer] val,
+    local_sinks: Map[RoutingId, Consumer] val,
     router_registry: RouterRegistry, lti: LocalTopologyInitializer)
   =>
     // We delegate to router registry through here to ensure that we've

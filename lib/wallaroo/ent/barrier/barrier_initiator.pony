@@ -60,9 +60,9 @@ actor BarrierInitiator is Initializable
 
   let _connections: Connections
   var _barrier_source: (BarrierSource | None) = None
-  let _sources: Map[StepId, Source] = _sources.create()
+  let _sources: Map[RoutingId, Source] = _sources.create()
   //!@ what's this for?
-  let _source_ids: Map[USize, StepId] = _source_ids.create()
+  let _source_ids: Map[USize, RoutingId] = _source_ids.create()
   let _sinks: SetIs[BarrierReceiver] = _sinks.create()
   let _workers: _StringSet = _workers.create()
 
@@ -106,11 +106,11 @@ actor BarrierInitiator is Initializable
   be register_barrier_source(b_source: BarrierSource) =>
     _barrier_source = b_source
 
-  be register_source(source: Source, source_id: StepId) =>
+  be register_source(source: Source, source_id: RoutingId) =>
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
 
-  be unregister_source(source: Source, source_id: StepId) =>
+  be unregister_source(source: Source, source_id: RoutingId) =>
     try
       _sources(source_id)?
       _source_ids(digestof source)?
@@ -145,15 +145,15 @@ actor BarrierInitiator is Initializable
     if _active_barriers.barrier_in_progress() then
       _pending.push(_PendingSourceInit(s))
     else
-      let action = Promise[None]
+      let action = Promise[Source]
       action.next[None](recover this~source_registration_complete() end)
       s.register_downstreams(action)
     end
 
-  be source_registration_complete(n: None) =>
-    _phase.source_registration_complete()
+  be source_registration_complete(s: Source) =>
+    _phase.source_registration_complete(s)
 
-  fun ref source_pending_complete() =>
+  fun ref source_pending_complete(s: Source) =>
     _phase = NormalBarrierInitiatorPhase(this)
     next_token()
 
@@ -190,6 +190,9 @@ actor BarrierInitiator is Initializable
     this one is complete or, if `wait_for_token` is specified, once
     the specified token is received.
     """
+    _phase = BlockingBarrierInitiatorPhase(this, barrier_token,
+      wait_for_token)
+    _phase.initiate_barrier(barrier_token, result_promise)
 
   fun ref queue_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -399,22 +402,23 @@ actor BarrierInitiator is Initializable
     for s in _sources.values() do
       s.barrier_complete(barrier_token)
     end
-    _phase.barrier_complete(barrier_token)
+    //!@
+    // _phase.barrier_complete(barrier_token)
 
   fun ref next_token() =>
-    if _pending_barriers.size() > 0 then
+    if _pending.size() > 0 then
       try
         let next = _pending.shift()?
         match next
         | let p: _PendingSourceInit =>
           _phase = SourcePendingBarrierInitiatorPhase(this)
-          let action = Promise[None]
+          let action = Promise[Source]
           action.next[None](recover this~source_registration_complete() end)
           p.source.register_downstreams(action)
           return
         | let p: _PendingBarrier =>
-          _inject_barrier(p.token, p.result_promise)
-          if (_phase.ready_for_next_token() and (_pending_barriers.size() > 0)
+          _inject_barrier(p.token, p.promise)
+          if (_phase.ready_for_next_token() and (_pending.size() > 0))
           then
             next_token()
           end

@@ -24,7 +24,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
 
 primitive RouteBuilder
-  fun apply(step_id: StepId, step: Producer ref, consumer: Consumer,
+  fun apply(step_id: RoutingId, step: Producer ref, consumer: Consumer,
     metrics_reporter: MetricsReporter ref): Route
   =>
     match consumer

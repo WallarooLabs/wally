@@ -34,13 +34,13 @@ class BoundaryRoute is Route
   // route 0 is used for filtered messages
   let _route_id: U64 = 1 + RouteIdGenerator()
   var _step_type: String = ""
-  let _step_id: StepId
+  let _step_id: RoutingId
   let _step: Producer ref
   let _consumer: OutgoingBoundary
   let _metrics_reporter: MetricsReporter
   var _route: RouteLogic = _EmptyRouteLogic
 
-  new create(step_id: StepId, step: Producer ref, consumer: OutgoingBoundary,
+  new create(step_id: RoutingId, step: Producer ref, consumer: OutgoingBoundary,
     metrics_reporter: MetricsReporter ref)
   =>
     _step_id = step_id
@@ -63,7 +63,7 @@ class BoundaryRoute is Route
     None
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
@@ -93,10 +93,10 @@ class BoundaryRoute is Route
       metric_name,
       worker_ingress_ts)
 
-  fun register_producer(target_id: StepId) =>
+  fun register_producer(target_id: RoutingId) =>
     _consumer.forward_register_producer(_step_id, target_id, _step)
 
-  fun unregister_producer(target_id: StepId) =>
+  fun unregister_producer(target_id: RoutingId) =>
     _consumer.forward_unregister_producer(_step_id, target_id, _step)
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg,

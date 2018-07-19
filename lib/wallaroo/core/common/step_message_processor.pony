@@ -24,7 +24,7 @@ use "wallaroo/ent/snapshot"
 
 trait StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -33,12 +33,12 @@ trait StepMessageProcessor
   fun barrier_in_progress(): Bool =>
     false
 
-  fun ref receive_new_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     Fail()
 
-  fun ref receive_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     Fail()
@@ -47,7 +47,7 @@ trait StepMessageProcessor
 
 class EmptyStepMessageProcessor is StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -63,7 +63,7 @@ class NormalStepMessageProcessor is StepMessageProcessor
     step = s
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -104,7 +104,7 @@ class QueueingStepMessageProcessor is StepMessageProcessor
     end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -134,7 +134,7 @@ class BarrierStepMessageProcessor is StepMessageProcessor
     _barrier_forwarder = barrier_forwarder
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -152,12 +152,12 @@ class BarrierStepMessageProcessor is StepMessageProcessor
   fun barrier_in_progress(): Bool =>
     true
 
-  fun ref receive_new_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     _barrier_forwarder.receive_new_barrier(step_id, producer, barrier_token)
 
-  fun ref receive_barrier(step_id: StepId, producer: Producer,
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     _barrier_forwarder.receive_barrier(step_id, producer, barrier_token)
@@ -175,7 +175,7 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
   let metric_name: String
   let pipeline_time_spent: U64
   let data: D
-  let i_producer_id: StepId
+  let i_producer_id: RoutingId
   let msg_uid: MsgId
   let frac_ids: FractionalMessageId
   let i_seq_id: SeqId
@@ -185,7 +185,7 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
   let worker_ingress_ts: U64
 
   new val create(metric_name': String, pipeline_time_spent': U64,
-    data': D, i_producer_id': StepId, msg_uid': MsgId,
+    data': D, i_producer_id': RoutingId, msg_uid': MsgId,
     frac_ids': FractionalMessageId, i_seq_id': SeqId, i_route_id': RouteId,
     latest_ts': U64, metrics_id': U16, worker_ingress_ts': U64)
   =>

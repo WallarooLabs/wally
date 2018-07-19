@@ -117,7 +117,7 @@ class val TCPSinkBuilder
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
       .cstring())
 
-    let id: StepId = StepIdGenerator()
+    let id: RoutingId = RoutingIdGenerator()
 
     TCPSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
       consume reporter, barrier_initiator, snapshot_initiator, _host, _service,

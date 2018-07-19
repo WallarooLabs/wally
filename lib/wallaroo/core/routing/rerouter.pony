@@ -38,7 +38,7 @@ class val TypedRoutingArguments[D: Any val] is RoutingArguments
   let _metric_name: String
   let _pipeline_time_spent: U64
   let _data: D
-  let _producer_id: StepId
+  let _producer_id: RoutingId
   let _i_msg_uid: MsgId
   let _frac_ids: FractionalMessageId
   let _latest_ts: U64
@@ -46,7 +46,7 @@ class val TypedRoutingArguments[D: Any val] is RoutingArguments
   let _worker_ingress_ts: U64
 
   new val create(metric_name: String, pipeline_time_spent: U64, data: D,
-    producer_id: StepId, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    producer_id: RoutingId, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _metric_name = metric_name
@@ -79,7 +79,7 @@ class val TypedDataRoutingArguments[D: Any val] is RoutingArguments
   let _metric_name: String
   let _pipeline_time_spent: U64
   let _data: D
-  let _producer_id: StepId
+  let _producer_id: RoutingId
   let _seq_id: SeqId
   let _frac_ids: FractionalMessageId
   let _latest_ts: U64
@@ -87,7 +87,7 @@ class val TypedDataRoutingArguments[D: Any val] is RoutingArguments
   let _worker_ingress_ts: U64
 
   new val create(metric_name: String, pipeline_time_spent: U64, data: D,
-    producer_id: StepId, seq_id: SeqId, frac_ids: FractionalMessageId,
+    producer_id: RoutingId, seq_id: SeqId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _metric_name = metric_name
@@ -122,7 +122,7 @@ class val TypedDataReplayRoutingArguments[D: Any val] is RoutingArguments
   let _metric_name: String
   let _pipeline_time_spent: U64
   let _data: D
-  let _producer_id: StepId
+  let _producer_id: RoutingId
   let _seq_id: SeqId
   let _frac_ids: FractionalMessageId
   let _latest_ts: U64
@@ -130,7 +130,7 @@ class val TypedDataReplayRoutingArguments[D: Any val] is RoutingArguments
   let _worker_ingress_ts: U64
 
   new val create(metric_name: String, pipeline_time_spent: U64, data: D,
-    producer_id: StepId, seq_id: SeqId, frac_ids: FractionalMessageId,
+    producer_id: RoutingId, seq_id: SeqId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _metric_name = metric_name

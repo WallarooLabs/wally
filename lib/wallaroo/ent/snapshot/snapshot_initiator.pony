@@ -32,7 +32,7 @@ actor SnapshotInitiator is Initializable
   // var _snapshot_handler: SnapshotHandler = WaitingSnapshotHandler(this)
   var _current_snapshot_id: SnapshotId = 0
   let _connections: Connections
-  let _source_ids: Map[USize, StepId] = _source_ids.create()
+  let _source_ids: Map[USize, RoutingId] = _source_ids.create()
   let _timers: Timers = Timers
 
   new create(connections: Connections, time_between_snapshots: U64,

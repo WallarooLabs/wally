@@ -93,8 +93,8 @@ class val LocalTopology
     data_routes: Map[U128, Consumer tag],
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
-    state_step_creator: StateStepCreator,
-    state_steps: Map[String, Array[Step]]) ?
+    state_steps: Map[String, Array[Step]],
+    state_step_creator: StateStepCreator) ?
   =>
     let subpartition =
       try
@@ -244,7 +244,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _recovering: Bool = false
   let _is_joining: Bool
 
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
 
   // Lifecycle
   var _created: SetIs[Initializable] = _created.create()
@@ -993,7 +993,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               // STATELESS, NON-PRESTATE BUILDER
                 @printf[I32](("----Spinning up " + builder.name() + "----\n")
                   .cstring())
-                let out_ids: Array[StepId] val =
+                let out_ids: Array[RoutingId] val =
                   try
                     _get_output_node_ids(next_node)?
                   else
@@ -1140,6 +1140,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                         else
                           for (r_id, c) in state_comp_target.routes().pairs()
                           do
+                            @printf[I32]("!@!@!@ Adding %s to state step router for state %s\n".cstring(), r_id.string().cstring(), state_name.cstring())
                             ssr = ssr.add_consumer(r_id, c)
                           end
                         end
@@ -1248,7 +1249,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                     recover trn Map[U64, (Step | ProxyRouter)] end
 
                   for (p_id, step_id) in
-                    pre_stateless_data.partition_id_to_step_id.pairs()
+                    pre_stateless_data.partition_idx_to_step_id.pairs()
                   do
                     if local_step_ids.contains(step_id) then
                       match built_stateless_steps(step_id)?
@@ -1261,7 +1262,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                       end
                     else
                       let target_worker =
-                        pre_stateless_data.partition_id_to_worker(p_id)?
+                        pre_stateless_data.partition_idx_to_worker(p_id)?
                       let proxy_address = ProxyAddress(target_worker, step_id)
 
                       partition_routes(p_id) = ProxyRouter(target_worker,
@@ -1272,7 +1273,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
                   let stateless_partition_router =
                     LocalStatelessPartitionRouter(next_node.id, _worker_name,
-                      pre_stateless_data.partition_id_to_step_id,
+                      pre_stateless_data.partition_idx_to_step_id,
                       consume partition_routes,
                       pre_stateless_data.steps_per_worker)
 
@@ -1498,6 +1499,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                         spr.partition_id(), spr)
                     else
                       for (r_id, c) in target_router.routes().pairs() do
+                        @printf[I32]("!@!@!@ Adding %s to state step router for state %s\n".cstring(), r_id.string().cstring(), state_name.cstring())
+
                         ssr = ssr.add_consumer(r_id, c)
                       end
                     end
@@ -1524,7 +1527,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         let sendable_data_routes = consume val data_routes
 
-        let data_router = DataRouter(sendable_data_routes,
+        let data_router = DataRouter(_worker_name, sendable_data_routes,
           keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone())
         _router_registry.set_data_router(data_router)
 
@@ -1569,8 +1572,15 @@ actor LocalTopologyInitializer is LayoutInitializer
         // Register all state steps with RouterRegistry. This will ensure that
         // they always have the latest TargetIdRouter.
         for (state_name, steps) in built_state_steps.pairs() do
-          for s in steps.values() do
-            _router_registry.register_target_id_router_step(state_name, s)
+          try
+            let target_id_router = state_step_routers(state_name)?
+            for s in steps.values() do
+              _router_registry.register_target_id_router_updatable(state_name,
+                s)
+              s.update_target_id_router(target_id_router)
+            end
+          else
+            Fail()
           end
         end
 
@@ -1616,10 +1626,10 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n"
       .cstring())
     try
-      let built_routers = Map[StepId, Router]
-      let local_sinks = recover trn Map[StepId, Consumer] end
-      let data_routes = recover trn Map[StepId, Consumer] end
-      let built_stateless_steps = recover trn Map[StepId, Consumer] end
+      let built_routers = Map[RoutingId, Router]
+      let local_sinks = recover trn Map[RoutingId, Consumer] end
+      let data_routes = recover trn Map[RoutingId, Consumer] end
+      let built_stateless_steps = recover trn Map[RoutingId, Consumer] end
 
       match _topology
       | let t: LocalTopology =>
@@ -1685,7 +1695,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         // We have not yet been assigned any keys by the cluster at this
         // stage, so we use an empty map to represent that.
-        let data_router = DataRouter(consume data_routes,
+        let data_router = DataRouter(_worker_name, consume data_routes,
           recover LocalStatePartitions end, recover LocalStatePartitionIds end)
 
         let state_runner_builders = recover iso Map[String, RunnerBuilder] end
@@ -1710,6 +1720,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         _connections.create_routers_from_blueprints(
+          t.worker_names,
           _partition_router_blueprints,
           _stateless_partition_router_blueprints,
           consume target_id_router_blueprints, consume local_sinks,
@@ -1880,7 +1891,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     else
       @printf[I32]("The same Initializable reported being initialized twice\n"
         .cstring())
-      Fail()
+      //!@ Bring this back and solve bug
+      // Fail()
     end
 
   be report_ready_to_work(initializable: Initializable) =>
@@ -1996,7 +2008,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     is_ready
 
   fun _get_output_node_ids(node: DagNode[StepInitializer] val):
-    Array[StepId] val ?
+    Array[RoutingId] val ?
   =>
     // Make sure this is not a sink or proxy node.
     match node.value
@@ -2006,7 +2018,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       error
     end
 
-    var out_ids = recover iso Array[StepId] end
+    var out_ids = recover iso Array[RoutingId] end
     for out in node.outs() do
       out_ids.push(out.id)
     end

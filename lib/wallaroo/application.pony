@@ -92,7 +92,7 @@ trait BasicPipeline
   fun source_builder(): SourceBuilderBuilder ?
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
   fun val sink_builders(): Array[SinkBuilder] val
-  fun val sink_ids(): Array[StepId] val
+  fun val sink_ids(): Array[RoutingId] val
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder ?
   fun size(): USize
@@ -106,7 +106,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
   var _sink_builders: Array[SinkBuilder] = Array[SinkBuilder]
 
-  var _sink_ids: Array[StepId] = Array[StepId]
+  var _sink_ids: Array[RoutingId] = Array[RoutingId]
   let _is_coalesced: Bool
 
   new create(app_name: String, p_id: USize, n: String,
@@ -139,10 +139,10 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun val sink_builders(): Array[SinkBuilder] val => _sink_builders
 
-  fun val sink_ids(): Array[StepId] val => _sink_ids
+  fun val sink_ids(): Array[RoutingId] val => _sink_ids
 
   fun ref _add_sink_id() =>
-    _sink_ids.push(StepIdGenerator())
+    _sink_ids.push(RoutingIdGenerator())
 
   fun is_coalesced(): Bool => _is_coalesced
 
@@ -192,10 +192,10 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     // TODO: This is a shortcut. Non-partitioned state is being treated as a
     // special case of partitioned state with one partition. This works but is
     // a bit confusing when reading the code.
-    let step_id_gen = StepIdGenerator
+    let step_id_gen = RoutingIdGenerator
     let single_step_partition = Partitions[Last](
       SingleStepPartitionFunction[Last], recover ["key"] end)
-    let step_id_map = recover trn Map[Key, StepId] end
+    let step_id_map = recover trn Map[Key, RoutingId] end
 
     step_id_map("key") = step_id_gen()
 
@@ -229,7 +229,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     end
     _pipeline_state_names.push(state_name)
 
-    let step_id_gen = StepIdGenerator
+    let step_id_gen = RoutingIdGenerator
     let step_id_map = recover trn Map[Key, U128] end
 
     for key in partition.keys().values() do
@@ -237,7 +237,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     end
 
     let next_builder = PreStateRunnerBuilder[Last, Next, PIn, S](
-      s_comp, state_name, partition.function(),
+      s_comp, state_name, partition.function()
       where multi_worker = multi_worker)
 
     _p.add_runner_builder(next_builder)
@@ -245,7 +245,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let state_builder = PartitionedStateRunnerBuilder[PIn, S](_p.name(),
       state_name, consume step_id_map, partition,
       StateRunnerBuilder[S](s_initializer, state_name,
-        s_comp.state_change_builders()),
+        s_comp.state_change_builders())
       where multi_worker = multi_worker)
 
     _a.add_state_builder(state_name, state_builder)

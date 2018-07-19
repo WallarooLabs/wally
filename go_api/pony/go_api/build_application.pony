@@ -152,8 +152,8 @@ class val _Done is _Connection
 
 primitive _ConnectionFactory
   fun apply(connection_j: JsonEzData, env: Env): _Connection ? =>
-    let step_id = connection_j("StepId")?.int()?.u64()
-    let from_step_id = connection_j("FromStepId")?.int()?.u64()
+    let step_id = connection_j("RoutingId")?.int()?.u64()
+    let from_step_id = connection_j("FromRoutingId")?.int()?.u64()
     match connection_j("Class")?.string()?
     | "ToComputation" =>
       let computation_builder_id =

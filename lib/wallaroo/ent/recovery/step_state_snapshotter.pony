@@ -16,7 +16,7 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 primitive StepStateSnapshotter
-  fun apply(runner: Runner, id: StepId, seq_id_generator: StepSeqIdGenerator,
+  fun apply(runner: Runner, id: RoutingId, seq_id_generator: StepSeqIdGenerator,
     event_log: EventLog, wb: Writer = Writer)
   =>
     match runner
@@ -24,8 +24,8 @@ primitive StepStateSnapshotter
       let serialized: ByteSeq val = r.serialize_state()
       wb.write(serialized)
       let payload = wb.done()
-      let oid: StepId = id
-      let uid: StepId = -1
+      let oid: RoutingId = id
+      let uid: RoutingId = -1
       let statechange_id: U64 = -1
       let seq_id: U64 = seq_id_generator.last_id()
       event_log.snapshot_state(oid, uid, statechange_id, seq_id,

@@ -55,7 +55,7 @@ class val EventLogConfig
     suffix = suffix'
 
 actor EventLog
-  let _resilients: Map[StepId, Resilient] = _resilients.create()
+  let _resilients: Map[RoutingId, Resilient] = _resilients.create()
   let _backend: Backend
   let _replay_complete_markers: Map[U64, Bool] =
     _replay_complete_markers.create()
@@ -64,7 +64,7 @@ actor EventLog
   var _flush_waiting: USize = 0
   var _initialized: Bool = false
   var _recovery: (Recovery | None) = None
-  var _resilients_to_snapshot: SetIs[StepId] = _resilients_to_snapshot.create()
+  var _resilients_to_snapshot: SetIs[RoutingId] = _resilients_to_snapshot.create()
   var _router_registry: (RouterRegistry | None) = None
   var _rotating: Bool = false
   var _backend_bytes_after_snapshot: USize
@@ -125,7 +125,7 @@ actor EventLog
       Fail()
     end
 
-  be replay_log_entry(resilient_id: StepId,
+  be replay_log_entry(resilient_id: RoutingId,
     uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq val)
   =>
@@ -138,7 +138,7 @@ actor EventLog
       Fail()
     end
 
-  be initialize_seq_ids(seq_ids: Map[StepId, SeqId] val) =>
+  be initialize_seq_ids(seq_ids: Map[RoutingId, SeqId] val) =>
     for (resilient_id, seq_id) in seq_ids.pairs() do
       try
         _resilients(resilient_id)?.initialize_seq_id_on_recovery(seq_id)
@@ -150,17 +150,17 @@ actor EventLog
       end
     end
 
-  be register_resilient(resilient: Resilient, id: StepId) =>
+  be register_resilient(resilient: Resilient, id: RoutingId) =>
     _resilients(id) = resilient
 
-  be queue_log_entry(resilient_id: StepId, uid: U128,
+  be queue_log_entry(resilient_id: RoutingId, uid: U128,
     frac_ids: FractionalMessageId, statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] val)
   =>
     _queue_log_entry(resilient_id, uid, frac_ids, statechange_id, seq_id,
       payload)
 
-  fun ref _queue_log_entry(resilient_id: StepId, uid: U128,
+  fun ref _queue_log_entry(resilient_id: RoutingId, uid: U128,
     frac_ids: FractionalMessageId,
     statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] val, force_write: Bool = false)
@@ -193,10 +193,10 @@ actor EventLog
       Fail()
     end
 
-  be flush_buffer(resilient_id: StepId, low_watermark: U64) =>
+  be flush_buffer(resilient_id: RoutingId, low_watermark: U64) =>
     _flush_buffer(resilient_id, low_watermark)
 
-  fun ref _flush_buffer(resilient_id: StepId, low_watermark: U64) =>
+  fun ref _flush_buffer(resilient_id: RoutingId, low_watermark: U64) =>
     ifdef "trace" then
       @printf[I32](("flush_buffer for id: " + resilient_id.string() + "\n\n")
         .cstring())
@@ -224,7 +224,7 @@ actor EventLog
       Fail()
     end
 
-  be snapshot_state(resilient_id: StepId, uid: U128,
+  be snapshot_state(resilient_id: RoutingId, uid: U128,
     statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] val)
   =>
@@ -235,7 +235,7 @@ actor EventLog
     if _resilients_to_snapshot.contains(resilient_id) then
       _resilients_to_snapshot.unset(resilient_id)
     else
-      @printf[I32](("Error writing snapshot to logfile. StepId not in set " +
+      @printf[I32](("Error writing snapshot to logfile. RoutingId not in set " +
         "of expected resilients!\n").cstring())
       Fail()
     end

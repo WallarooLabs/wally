@@ -18,7 +18,7 @@ use "wallaroo_labs/mort"
 actor AutoscaleInitiator
   let _worker_name: String
   let _barrier_initiator: BarrierInitiator
-  let _current_autoscale_tokens: AutoscaleTokens
+  var _current_autoscale_tokens: AutoscaleTokens
   var _autoscale_token_in_progress: Bool = false
 
   new create(w_name: String, barrier_initiator: BarrierInitiator) =>
@@ -29,9 +29,9 @@ actor AutoscaleInitiator
   be initiate_autoscale(autoscale_initiate_promise: AutoscaleResultPromise)
   =>
     @printf[I32]("Checking there are no in flight messages.\n".cstring())
-    if _autoscale_in_progress then Fail() end
-    _autoscale_in_progress = true
-    let next_id = _current_autoscale_tokens.id() + 1
+    if _autoscale_token_in_progress then Fail() end
+    _autoscale_token_in_progress = true
+    let next_id = _current_autoscale_tokens.id + 1
     _current_autoscale_tokens = AutoscaleTokens(_worker_name, next_id)
 
     let barrier_promise = Promise[BarrierToken]

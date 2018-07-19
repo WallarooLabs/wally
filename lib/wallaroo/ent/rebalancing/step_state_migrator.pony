@@ -65,7 +65,7 @@ primitive StepStateMigrator
   //     Fail()
   //   end
 
-  fun send_state(runner: Runner, id: StepId, boundary: OutgoingBoundary,
+  fun send_state(runner: Runner, id: RoutingId, boundary: OutgoingBoundary,
     state_name: String, key: Key, p_ms: Array[QueuedStepMessage],
     auth: AmbientAuth)
   =>

@@ -5,7 +5,7 @@ class val TypedQueuedMessage[D: Any val] is QueuedMessage
   let metric_name: String
   let pipeline_time_spent: U64
   let data: D
-  let i_producer_id: StepId
+  let i_producer_id: RoutingId
   let i_producer: Producer
   let msg_uid: MsgId
   let frac_ids: FractionalMessageId
@@ -16,7 +16,7 @@ class val TypedQueuedMessage[D: Any val] is QueuedMessage
   let worker_ingress_ts: U64
 
   new val create(metric_name': String, pipeline_time_spent': U64,
-    data': D, i_producer_id': StepId, i_producer': Producer, msg_uid': MsgId,
+    data': D, i_producer_id': RoutingId, i_producer': Producer, msg_uid': MsgId,
     frac_ids': FractionalMessageId, i_seq_id': SeqId, i_route_id': RouteId,
     latest_ts': U64, metrics_id': U16, worker_ingress_ts': U64)
   =>
