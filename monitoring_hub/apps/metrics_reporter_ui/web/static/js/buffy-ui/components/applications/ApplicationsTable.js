@@ -19,7 +19,6 @@ export default class ApplicationsTable extends React.Component {
 		}
 		return (
 			<div>
-			<VersionAlert />
 			<Table className="applications">
 				<thead>
 					<tr>
