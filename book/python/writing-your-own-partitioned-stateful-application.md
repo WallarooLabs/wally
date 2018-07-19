@@ -6,9 +6,10 @@ In this section, we will go over how to write a partitioned stateful application
 
 Partitioning is a key aspect of how work is distributed in Wallaroo. From the application's point of view, what is required are:
 
-* a list of partition keys
 * a partitioning function
 * partition-compatible states - the state should be defined in such a way that each partition can have its own distinct state instance
+
+A list of partition keys is optional. If included, your application will use these keys. If not included, the application will dynamically create keys as needed. There is a slightly performance penalty to dynamically create keys. 
 
 ## A Partitioned Stateful Application - Alphabet (partitioned)
 

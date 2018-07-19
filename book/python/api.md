@@ -114,7 +114,7 @@ Add a partitioned state computation to the current pipeline.
 
 `partition_function` must be a [Partition](#partition).
 
-`partition_keys` must be a list of strings.
+`partition_keys` is an optional list of strings.
 
 ##### `to_sink(sink_config)`
 
