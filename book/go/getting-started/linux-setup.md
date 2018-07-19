@@ -181,7 +181,7 @@ Due to ponyc's dependence on PIC on Artful Ubuntu, all applications must be comp
 
 
 ```bash
-make build-giles-sender-all build-utils-all
+make build-giles-sender-all build-utils-all PONYCFLAGS="--pic"
 ```
 
 ### Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool on Trusty and Xenial
