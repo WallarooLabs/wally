@@ -27,21 +27,21 @@ verify_branch() {
     ui_version=$(< VERSION)
     docker_version=$(< VERSION)
     docker_url="release\/wallaroo:$docker_version"
-    docker_metrics_ui_url="release\/wallaroo:$ui_version"
+    docker_metrics_ui_url="release\/metrics_ui:$ui_version"
   elif [[ "$BRANCH" == "release" ]]
   then
     remote_branch=release
     ui_version=$(< VERSION)
     docker_version=$(< VERSION)
     docker_url="release\/wallaroo:$docker_version"
-    docker_metrics_ui_url="release\/wallaroo:$ui_version"
+    docker_metrics_ui_url="release\/metrics_ui:$ui_version"
   elif [[ "$BRANCH" == *"release-"* ]]
   then
     remote_branch=rc
     ui_version=$(git describe --tags --always)
     docker_version=$(git describe --tags --always)
     docker_url="dev\/wallaroo:$docker_version"
-    docker_metrics_ui_url="dev\/wallaroo:$ui_version"
+    docker_metrics_ui_url="dev\/metrics_ui:$ui_version"
   else
     echo "No remote repo to push book to. Exiting"
     exit 0
