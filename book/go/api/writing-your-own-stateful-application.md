@@ -179,16 +179,16 @@ If we were to use partitioning in the alphabet application from the previous sec
 To create this, we use the `MakeLetterPartitions()` function:
 
 ```go
-func LetterPartition() []byte {
-	letterPartition := make([]byte, 27)
+func LetterPartition() [][]byte {
+        letterPartition := make([][]byte, 27)
 
-	for i := 0; i < 26; i++ {
-		letterPartition[i] = []byte(i + 'a')
-	}
+        for i := 0; i < 26; i++ {
+                letterPartition[i] = []byte{byte(i + 'a')}
+        }
 
-	letterPartition[26] = '!'
+        letterPartition[26] = []byte{byte('!')}
 
-	return letterPartition
+        return letterPartition
 }
 ```
 
