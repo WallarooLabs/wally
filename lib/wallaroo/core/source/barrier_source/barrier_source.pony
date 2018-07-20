@@ -25,7 +25,6 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 
 actor BarrierSource is Source
@@ -64,7 +63,6 @@ actor BarrierSource is Source
   // !@ Probably remove these
   // !@ Can we do without this? Probably, since we only send barriers.
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-  let _acker_x: Acker = Acker
   ////////////////////
 
   new create(source_id: RoutingId, router_registry: RouterRegistry) =>
@@ -259,7 +257,7 @@ actor BarrierSource is Source
     end
 
   ///////////////////////
-  // STUFF TO BE REMOVED
+  // !@ STUFF TO BE REMOVED
   ///////////////////////
   fun ref route_to(c: Consumer): (Route | None) =>
     None
@@ -269,12 +267,3 @@ actor BarrierSource is Source
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id
-
-  fun ref _acker(): Acker =>
-    _acker_x
-
-  fun ref flush(low_watermark: U64) =>
-    None
-
-  be request_ack() =>
-    None

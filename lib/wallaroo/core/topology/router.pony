@@ -976,9 +976,6 @@ class val DataRouter is Equatable[DataRouter]
         _keyed_routes,
         _keys_to_route_ids
          )?
-      ifdef "resilience" then
-        producer.bookkeeping(route_id, seq_id)
-      end
     else
       // !@ We used to fail here, but the only reason we should get here is
       // is because we couldn't find a route for the key. Maybe we should
@@ -997,9 +994,6 @@ class val DataRouter is Equatable[DataRouter]
         _data_routes, _target_ids_to_route_ids,
         producer_id, producer, seq_id, latest_ts, metrics_id,
         worker_ingress_ts, _keyed_routes, _keys_to_route_ids)?
-      ifdef "resilience" then
-        producer.bookkeeping(route_id, seq_id)
-      end
     else
       // If this is reached it means that there was a message for an unknown
       // key. The StateStepCreator has been notified and will take care of
@@ -1039,16 +1033,6 @@ class val DataRouter is Equatable[DataRouter]
       _keyed_routes.unregister_producer(input_id, producer)
     else
       producer.queue_unregister_producer(input_id, output_id)
-    end
-
-  fun request_ack(r_ids: Array[RouteId]) =>
-    try
-      for r_id in r_ids.values() do
-        let t_id = _route_ids_to_target_ids(r_id)?
-        _data_routes(t_id)?.request_ack()
-      end
-    else
-      Fail()
     end
 
   fun route_ids(): Array[RouteId] =>

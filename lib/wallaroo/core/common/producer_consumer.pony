@@ -29,7 +29,7 @@ use "wallaroo/core/topology"
 trait tag StatusReporter
   be report_status(code: ReportStatusCode)
 
-trait tag Producer is (Muteable & Ackable & AckRequester)
+trait tag Producer is Muteable
   fun ref route_to(c: Consumer): (Route | None)
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
@@ -44,8 +44,8 @@ interface tag BoundaryUpdatable
   be add_boundaries(bs: Map[String, OutgoingBoundary] val)
   be remove_boundary(worker: String)
 
-trait tag Consumer is (Runnable & StateReceiver & AckRequester &
-  Initializable & StatusReporter & Snapshottable & BarrierReceiver)
+trait tag Consumer is (Runnable & StateReceiver & Initializable &
+  StatusReporter & Snapshottable & BarrierReceiver)
   // TODO: For now, since we do not allow application graph cycles, all back
   // edges are from DataReceivers. This allows us to simply identify them
   // directly. Once we allow application cycles, we will need a more
@@ -76,9 +76,6 @@ trait tag Muteable
 
 trait tag StateReceiver
   be receive_state(state: ByteSeq val)
-
-trait tag AckRequester
-  be request_ack()
 
 trait tag Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer)

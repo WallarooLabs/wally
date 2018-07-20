@@ -33,7 +33,6 @@ use "wallaroo/ent/network"
 use "wallaroo/ent/rebalancing"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
-use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
@@ -75,8 +74,6 @@ actor Step is (Producer & Consumer & Rerouter)
   var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
   let _recovery_replayer: RecoveryReplayer
-
-  let _acker_x: Acker = Acker
 
   var _barrier_forwarder: (BarrierStepForwarder | None) = None
 
@@ -122,12 +119,6 @@ actor Step is (Producer & Consumer & Rerouter)
       _register_output(c_id, consumer)
     end
 
-    for r in _routes.values() do
-      ifdef "resilience" then
-        _acker_x.add_route(r)
-      end
-    end
-
     _step_message_processor = NormalStepMessageProcessor(this)
     _barrier_forwarder = BarrierStepForwarder(_id, this)
 
@@ -143,9 +134,6 @@ actor Step is (Producer & Consumer & Rerouter)
   be application_created(initializer: LocalTopologyInitializer) =>
     for r in _routes.values() do
       r.application_created()
-      ifdef "resilience" then
-        _acker_x.add_route(r)
-      end
     end
 
     _initialized = true
@@ -229,9 +217,6 @@ actor Step is (Producer & Consumer & Rerouter)
     if not _routes.contains(c) then
       let new_route = RouteBuilder(_id, this, c, _metrics_reporter)
       _routes(c) = new_route
-      ifdef "resilience" then
-        _acker_x.add_route(new_route)
-      end
       new_route.register_producer(id)
     else
       try
@@ -278,10 +263,7 @@ actor Step is (Producer & Consumer & Rerouter)
 
   fun ref _remove_route(c: Consumer) =>
     try
-      let outdated_route = _routes.remove(c)?._2
-      ifdef "resilience" then
-        _acker_x.remove_route(outdated_route)
-      end
+      _routes.remove(c)?._2
     else
       Fail()
     end
@@ -321,9 +303,6 @@ actor Step is (Producer & Consumer & Rerouter)
       if not _outgoing_boundaries.contains(worker) then
         _outgoing_boundaries(worker) = boundary
         let new_route = RouteBuilder(_id, this, boundary, _metrics_reporter)
-        ifdef "resilience" then
-          _acker_x.add_route(new_route)
-        end
         _routes(boundary) = new_route
       end
     end
@@ -402,12 +381,10 @@ actor Step is (Producer & Consumer & Rerouter)
       _metrics_reporter)
 
     if is_finished then
-      ifdef "resilience" then
-        ifdef "trace" then
-          @printf[I32]("Filtering\n".cstring())
-        end
-        _acker_x.filtered(this, current_sequence_id())
+      ifdef "trace" then
+        @printf[I32]("Filtering\n".cstring())
       end
+
       let end_ts = Time.nanos()
       let time_spent = end_ts - worker_ingress_ts
 
@@ -419,11 +396,6 @@ actor Step is (Producer & Consumer & Rerouter)
       _metrics_reporter.pipeline_metric(metric_name,
         time_spent + pipeline_time_spent)
       _metrics_reporter.worker_metric(metric_name, time_spent)
-    end
-
-    ifdef "resilience" then
-      _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_producer,
-        i_route_id, i_seq_id)
     end
 
   fun inputs(): Map[RoutingId, Producer] box =>
@@ -443,25 +415,6 @@ actor Step is (Producer & Consumer & Rerouter)
   =>
     _pending_message_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)
-
-  fun ref filter_queued_msg(i_producer: Producer, i_route_id: RouteId,
-    i_seq_id: SeqId)
-  =>
-    """
-    When we're in queuing mode, we currently immediately ack all messages that
-    are queued. This can lead to lost messages if there is a worker failure
-    immediately after a stop the world phase. This is a stopgap before we
-    update the watermarking algorithm to migrate watermark information for
-    migrated queued messages during step migration.
-    TODO: Replace this strategy with a strategy for migrating watermark info
-    for migrated queued messages during step migration.
-    """
-    _seq_id_generator.new_incoming_message()
-    ifdef "resilience" then
-      _acker_x.filtered(this, current_sequence_id())
-      _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_producer,
-        i_route_id, i_seq_id)
-    end
 
   ///////////
   // RECOVERY
@@ -485,41 +438,6 @@ actor Step is (Producer & Consumer & Rerouter)
       end
 
       _seq_id_generator.new_incoming_message()
-
-      ifdef "resilience" then
-        _acker_x.filtered(this, current_sequence_id())
-        _acker_x.track_incoming_to_outgoing(current_sequence_id(),
-          i_producer, i_route_id, i_seq_id)
-      end
-    end
-
-  //////////////////////
-  // ORIGIN (resilience)
-  be request_ack() =>
-    _acker_x.request_ack(this)
-    for route in _routes.values() do
-      route.request_ack()
-    end
-
-  fun ref _acker(): Acker =>
-    _acker_x
-
-  fun ref flush(low_watermark: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("flushing at and below: %llu\n".cstring(), low_watermark)
-    end
-    _event_log.flush_buffer(_id, low_watermark)
-
-  be log_replay_finished() => None
-
-  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq val)
-  =>
-    if not _is_duplicate(uid, frac_ids) then
-      ifdef "resilience" then
-        StepLogEntryReplayer(_runner, _deduplication_list, uid, frac_ids,
-          statechange_id, payload, this)
-      end
     end
 
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
@@ -528,12 +446,6 @@ actor Step is (Producer & Consumer & Rerouter)
     end
     _seq_id_generator = StepSeqIdGenerator(seq_id)
     _seq_id_initialized_on_recovery = true
-
-  be clear_deduplication_list() =>
-    _deduplication_list.clear()
-
-  be dispose() =>
-    _unregister_all_outputs()
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
@@ -594,6 +506,9 @@ actor Step is (Producer & Consumer & Rerouter)
     for u in _upstreams.values() do
       u.unmute(c)
     end
+
+  be dispose() =>
+    _unregister_all_outputs()
 
   ///////////////
   // GROW-TO-FIT

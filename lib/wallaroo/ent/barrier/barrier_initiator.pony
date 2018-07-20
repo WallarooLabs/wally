@@ -168,6 +168,7 @@ actor BarrierInitiator is Initializable
     """
     Called to begin the barrier protocol for a new barrier token.
     """
+    @printf[I32]("!@ Injecting barrier %s\n".cstring(), barrier_token.string().cstring())
     if _primary_worker == _worker_name then
       _phase.initiate_barrier(barrier_token, result_promise)
     else
@@ -198,6 +199,7 @@ actor BarrierInitiator is Initializable
     result_promise: BarrierResultPromise)
   =>
     _pending.push(_PendingBarrier(barrier_token, result_promise))
+    @printf[I32]("!@ queue_barrier: new count %s\n".cstring(), _pending.size().string().cstring())
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -402,10 +404,11 @@ actor BarrierInitiator is Initializable
     for s in _sources.values() do
       s.barrier_complete(barrier_token)
     end
-    //!@
-    // _phase.barrier_complete(barrier_token)
+    _phase.barrier_complete(barrier_token)
 
   fun ref next_token() =>
+    @printf[I32]("!@ next_token(): _pending %s\n".cstring(), _pending.size().string().cstring())
+    _phase = NormalBarrierInitiatorPhase(this)
     if _pending.size() > 0 then
       try
         let next = _pending.shift()?

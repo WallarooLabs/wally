@@ -44,8 +44,6 @@ trait Route
   fun register_producer(target_id: RoutingId)
   fun unregister_producer(target_id: RoutingId)
 
-  fun ref request_ack()
-
   fun ref report_status(code: ReportStatusCode)
 
 trait RouteLogic
@@ -103,7 +101,6 @@ class EmptyRoute is Route
 
   fun id(): U64 => _route_id
   fun ref dispose() => None
-  fun ref request_ack() => None
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
