@@ -14,9 +14,9 @@ The inputs of the "Kafka Reverse" application are strings. Here's an example inp
 
 ### Output
 
-The outputs of the application are strings followed by newlines. Here's an example output message, written as a Go string:
+The outputs of the application are strings. Here's an example output message, written as a Go string:
 
-`olleh\n` -- the string `"olleh"` (`"hello"` reversed)
+`olleh` -- the string `"olleh"` (`"hello"` reversed)
 
 ### Processing
 
