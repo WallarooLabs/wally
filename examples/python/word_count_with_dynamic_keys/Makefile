@@ -35,7 +35,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
-WORD_COUNT_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
@@ -46,37 +46,37 @@ integration-tests-examples-python-word_count: word_count_py_test
 clean-examples-python-alphabet: word_count_py_clean
 
 word_count_py_test:
-	cd $(WORD_COUNT_PY_PATH) && \
+	cd $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH) && \
 	integration_test --newline-file-sender count_this.txt \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida --application-module word_count' \
+		--command 'machida --application-module word_count_with_dynamic_keys' \
 		--sink-mode newlines \
 		--sink-expect 482
-	cd $(WORD_COUNT_PY_PATH) && \
+	cd $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH) && \
 	integration_test --newline-file-sender count_this.txt \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida --application-module word_count' \
+		--command 'machida --application-module word_count_with_dynamic_keys' \
 		--sink-mode newlines \
 		--sink-expect 482 \
 		--workers 2
-	cd $(WORD_COUNT_PY_PATH) && \
+	cd $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH) && \
 	integration_test --newline-file-sender count_this.txt \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida --application-module word_count' \
+		--command 'machida --application-module word_count_with_dynamic_keys' \
 		--sink-mode newlines \
 		--sink-expect 482 \
 		--workers 3
 
 word_count_py_clean:
-	$(QUIET)rm -f $(WORD_COUNT_PY_PATH)/received.txt
+	$(QUIET)rm -f $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH)/received.txt
 
 endif

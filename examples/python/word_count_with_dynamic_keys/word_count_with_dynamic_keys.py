@@ -54,7 +54,7 @@ def split(data):
 @wallaroo.state_computation(name="Count Word")
 def count_word(word, word_totals):
     word_totals.update(word)
-    return (word_totals.get_count(word), True)
+    return (word_totals.get_count(), True)
 
 
 class WordTotal(object):
@@ -66,8 +66,8 @@ class WordTotal(object):
         self.word = word
         self.total += 1
 
-    def get_count(self, word):
-        return WordCount(word, self.total)
+    def get_count(self):
+        return WordCount(self.word, self.total)
 
 
 class WordCount(object):
