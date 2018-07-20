@@ -614,32 +614,14 @@ actor Step is (Producer & Consumer & Rerouter)
       end
     end
 
-    //!@
-  // be send_state_to_neighbour(neighbour: Step) =>
-  //   ifdef "autoscale" then
-  //     match _step_message_processor
-  //     | let nmp: NormalStepMessageProcessor =>
-  //       // TODO: Should this be possible?
-  //       StepStateMigrator.send_state_to_neighbour(_runner, neighbour,
-  //         Array[QueuedStepMessage], _auth)
-  //     | let qmp: QueueingStepMessageProcessor =>
-  //       StepStateMigrator.send_state_to_neighbour(_runner, neighbour,
-  //         qmp.messages, _auth)
-  //     end
-  //   end
-
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Key) =>
     ifdef "autoscale" then
       //@!
       // _unregister_all_outputs()
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
-        // TODO: Should this be possible?
         StepStateMigrator.send_state(_runner, _id, boundary, state_name,
-          key, Array[QueuedStepMessage], _auth)
-      | let qmp: QueueingStepMessageProcessor =>
-        StepStateMigrator.send_state(_runner, _id, boundary, state_name,
-          key, qmp.messages, _auth)
+          key, _auth)
       else
         @printf[I32]("!@ WHA?\n".cstring())
         Fail()
@@ -665,27 +647,6 @@ actor Step is (Producer & Consumer & Rerouter)
             _barrier_forwarder as BarrierStepForwarder)
           _step_message_processor.receive_new_barrier(step_id, producer,
             barrier_token)
-        else
-          Fail()
-        end
-      | let qsmp: QueueingStepMessageProcessor =>
-        match barrier_token
-        | let sbt: SnapshotBarrierToken =>
-          // !@ Handle this more cleanly. We need to make sure we don't lose
-          // queued messages, but should barriers ever be possible when we're in
-          // the queueing state?
-          Fail()
-        | let ifa: AutoscaleResumeBarrierToken =>
-          // Process all queued messages now that we are resuming processing
-          qsmp.flush(_target_id_router)
-          try
-            _step_message_processor = BarrierStepMessageProcessor(this,
-              _barrier_forwarder as BarrierStepForwarder)
-            _step_message_processor.receive_new_barrier(step_id, producer,
-              barrier_token)
-          else
-            Fail()
-          end
         else
           Fail()
         end

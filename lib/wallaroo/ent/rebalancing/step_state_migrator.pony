@@ -19,13 +19,10 @@ use "wallaroo_labs/mort"
 
 class val ShippedState
   let state_bytes: ByteSeq val
-  let pending_messages: Array[QueuedStepMessage] val
 
-  new create(state_bytes': ByteSeq val,
-    pending_messages': Array[QueuedStepMessage] val)
+  new create(state_bytes': ByteSeq val)
   =>
     state_bytes = state_bytes'
-    pending_messages = pending_messages'
 
 primitive StepStateMigrator
   fun receive_state(runner: Runner, state: ByteSeq val)
@@ -66,17 +63,11 @@ primitive StepStateMigrator
   //   end
 
   fun send_state(runner: Runner, id: RoutingId, boundary: OutgoingBoundary,
-    state_name: String, key: Key, p_ms: Array[QueuedStepMessage],
-    auth: AmbientAuth)
+    state_name: String, key: Key, auth: AmbientAuth)
   =>
     match runner
     | let r: SerializableStateRunner =>
-      let pending_messages = recover iso Array[QueuedStepMessage] end
-      for m in p_ms.values() do
-        pending_messages.push(m)
-      end
-      let shipped_state = ShippedState(r.serialize_state(),
-        consume pending_messages)
+      let shipped_state = ShippedState(r.serialize_state())
       let shipped_state_bytes =
         try
           Serialised(SerialiseAuth(auth), shipped_state)?
