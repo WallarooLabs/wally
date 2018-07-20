@@ -106,7 +106,8 @@ func (us *UpdateStock) Compute(data interface{}, state interface{}) (interface{}
 
 ### Partition Key
 
-The partition keys for a particular partition do not need to be defined along with the application. If you don't define your keys ahead of time, they will be automatically generated as needed, while your application is running. If you do choose to define your keys in your application, not that the specific details of keys vary between the different language APIs. In the stock example, the partition key would be based on the symbol name (a string). All of the expected stock symbols are passed to the application setup code.
+The partition keys for a particular partition do not need to be defined along with the application. If you choose not to define your keys ahead of time, they will be automatically generated as needed from inputs using the partition function, while your application is running. State partitions will also be generated from these new keys. If you do choose to define your keys in your application, note that the specific details of keys vary between the different language APIs. In the stock example, the partition key would be based on the symbol name (a string). All of the expected stock symbols are passed to the application setup code.
+
 
 ### Partition Function
 
@@ -117,15 +118,14 @@ The partition function takes in message data and returns a partition key. In the
 def partition(data):
     return data.symbol
 {%- language name="Go", type="go" -%}
-func symbolToKey(symbol string) byte {
-    return byte(binary.BigEndian.Uint32([]byte(fmt.Sprintf("%4s", symbol))))
+func symbolToKey(symbol string) []byte {
+	return []byte(fmt.Sprintf("%4s", symbol))
 }
 
 type SymbolPartitionFunction struct {
 }
 
-func (spf *SymbolPartitionFunction) Partition(data interface{}) byte {
-    symbol := data.(SymbolMessage).GetSymbol()
-    return symbolToKey(symbol)
-}
-{%- endcodetabs %}
+func (spf *SymbolPartitionFunction) Partition(data interface{}) []byte {
+	symbol := data.(SymbolMessage).GetSymbol()
+	return symbolToKey(symbol)
+}{%- endcodetabs %}
