@@ -47,17 +47,34 @@ class BarrierSinkAcker
     if barrier_token != _barrier_token then Fail() end
 
     let inputs = _sink.inputs()
-
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
-      @printf[I32]("!@ receive_barrier at TCPSink: %s inputs, %s received\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring())
-      if inputs.size() == _inputs_blocking.size() then
-        _barrier_initiator.ack_barrier(_sink, _barrier_token)
-        _clear()
-        _sink.barrier_complete(barrier_token)
-      end
+      _check_completion(inputs)
     else
       Fail()
+    end
+
+  fun ref remove_input(input_id: RoutingId) =>
+    """
+    Called if an input leaves the system during barrier processing. This should
+    only be possible with Sources that are closed (e.g. when a TCPSource
+    connection is dropped).
+    """
+    if _inputs_blocking.contains(input_id) then
+      try
+        _inputs_blocking.remove(input_id)?
+      else
+        Unreachable()
+      end
+    end
+    _check_completion(_sink.inputs())
+
+  fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
+    @printf[I32]("!@ receive_barrier at TCPSink: %s inputs, %s received\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring())
+    if inputs.size() == _inputs_blocking.size() then
+      _barrier_initiator.ack_barrier(_sink, _barrier_token)
+      _clear()
+      _sink.barrier_complete(_barrier_token)
     end
 
   fun ref _clear() =>
