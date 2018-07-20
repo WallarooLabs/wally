@@ -66,7 +66,7 @@ Add a stateless computation that only returns one message to the current pipelin
 
 Similar to `To`, but the computation can return more than one message.
 
-##### `ToStatePartition(stateComputation wallarooapi.StateComputation, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []byte) *pipelineBuilder`
+##### `ToStatePartitionWithKeys(stateComputation wallarooapi.StateComputation, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []byte) *pipelineBuilder`
 
 Add a partitioned state computation that only returns one message to the pipeline.
 
@@ -78,7 +78,7 @@ Add a partitioned state computation that only returns one message to the pipelin
 
 `partitions` is a list of all of the partitions for the partitioned state.
 
-##### `ToStatePartitionMulti(stateComputation wallarooapi.StateComputationMulti, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []byte) *pipelineBuilder`
+##### `ToStatePartitionMultiWithKeys(stateComputation wallarooapi.StateComputationMulti, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []byte) *pipelineBuilder`
 
 Similar to `ToStatePartition`, but the state computation can return more than one message.
 
@@ -165,7 +165,7 @@ It is important to ensure that data returned is always immutable or unique to av
 
 ### Key
 
-Partition keys are `byte array` values.
+Partition keys are `[]byte` values.
 
 ### wallarooapi.PartitionFunction
 
@@ -173,7 +173,7 @@ A `PartitionFunction` is used to determine which partition should receive a mess
 
 ### `wallarooapi.PartitionFunction` Methods
 
-##### `Partition(data interface{}) byte`
+##### `Partition(data interface{}) []byte`
 
 Return the appropriate [Key](#key) for `data`.
 
@@ -182,17 +182,16 @@ Return the appropriate [Key](#key) for `data`.
 An example that partitions words for a word-count based on their first character and buckets all other cases to the empty string key:
 
 ```go
-type WordPartitionFunction struct {}
+type WordPartitionFunction struct{}
 
-func (wpf *WordPartitionFunction) Partition (data interface{}) []byte {
+func (wpf *WordPartitionFunction) Partition(data interface{}) []byte {
 	word := data.(*string)
 	firstLetter := (*word)[0]
 	if (firstLetter >= 'a') && (firstLetter <= 'z') {
-		return []byte(firstLetter)
+		return []byte{firstLetter}
 	}
-	return []byte('!')
-}
-```
+	return []byte{byte('!')}
+}```
 
 ### wallarooapi.Encoder
 

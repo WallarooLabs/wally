@@ -9,7 +9,7 @@ Partitioning is a key aspect of how work is distributed in Wallaroo. From the ap
 * a partitioning function
 * partition-compatible states - the state should be defined in such a way that each partition can have its own distinct state instance
 
-A list of partition keys is optional. If included, your application will use these keys. If not included, the application will dynamically create keys as needed. There is a slightly performance penalty to dynamically create keys. 
+A list of partition keys is optional. If included, your application will use these keys to set up the initial state partitions in the system. As we encounter new keys derived from messages using the user-defined partition function, we will dynamically create new state partitions. There is a slight performance penalty to dynamically creating state partitions in this way, so if you know all your keys ahead of time, it can be a good idea to provide them here. If not included, the application will dynamically create keys as needed. There is a slightly performance penalty to dynamically create keys. 
 
 ## A Partitioned Stateful Application - Alphabet (partitioned)
 

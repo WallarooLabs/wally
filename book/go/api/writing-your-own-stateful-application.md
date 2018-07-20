@@ -48,7 +48,7 @@ The first element, `rvt.GetVotes()`, is a message that we will send on to our ne
 
 ### State and StateBuilder
 
-We are going to partition by letter. Since we know the full set of keys in advance, it's a good idea to create them up front. If the application dynamically creates the keys instead, there will be a slight, but necessary, performance hit. We'll have a separate state object for every letter.
+We are going to partition by letter. Since we know the full set of keys in advance, it's a good idea to create them up front. If the application dynamically creates state partitions for these keys instead, there will be a slight, but necessary, performance hit. We'll have a separate state object for every letter.
 
 ```go
 type RunningVoteTotal struct {
@@ -170,7 +170,7 @@ Partitioning is a key aspect of how work is distributed in Wallaroo. From the ap
 * a partitioning function
 * partition-compatible states - the state should be defined in such a way that each partition can have its own distinct state instance
 
-The keys to partition the state objects are also important, but are optional here. A wallaroo application is able to dynamically create the keys as needed, if required. 
+The keys to partition the state objects are also important, but are optional here. A Wallaroo application uses the user-defined partition function to extract a key from every message that will be routed to state. If we haven't seen a key before, Wallaroo will dynamically create a new state partition corresponding to it.
 
 ### Partition
 

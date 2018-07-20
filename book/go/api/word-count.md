@@ -92,18 +92,17 @@ After we split our text chunks into words, they get routed to a state partition 
 Note we set up 27 partitions to count our words, one for each letter plus one called "!" which will handle any "word" that doesn't start with a letter:
 
 ```go
-func LetterPartition() []uint64 {
-	letterPartition := make([]byte, 27)
+func LetterPartition() [][]byte {
+	letterPartition := make([][]byte, 27)
 
 	for i := 0; i < 26; i++ {
-		letterPartition[i] = []byte(i + 'a')
+		letterPartition[i] = []byte{byte(i + 'a')}
 	}
 
-	letterPartition[26] = '!'
+	letterPartition[26] = []byte{byte('!')}
 
 	return letterPartition
-}
-```
+}```
 
 ## Splitting Words
 
