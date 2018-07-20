@@ -75,14 +75,6 @@ func (r *Reverse) Compute(data interface{}) interface{} {
 
 type Decoder struct{}
 
-func (d *Decoder) HeaderLength() uint64 {
-	return 4
-}
-
-func (d *Decoder) PayloadLength(b []byte) uint64 {
-	return uint64(binary.BigEndian.Uint32(b[0:4]))
-}
-
 func (d *Decoder) Decode(b []byte) interface{} {
 	x := string(b[:])
 	return &x
@@ -92,7 +84,7 @@ type Encoder struct{}
 
 func (e *Encoder) Encode(data interface{}) ([]byte, []byte, int32) {
 	msg := data.(string)
-	return []byte(msg + "\n"), nil, -1
+	return []byte(msg), nil, -1
 }
 
 const (

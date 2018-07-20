@@ -144,7 +144,7 @@ machida --application-module celsius \
 
 Send data into Kafka. Again, we use `kafakcat`.
 
-Run the following and then type at least 4 characters on each line and hit enter to send in data (only first 4 characters are used/interpreted as a float; the application will throw an error and possibly segfault if less than 4 characters are sent in):
+Run the following and then type numbers (as floating point values) on each line and hit enter to send in celsius temperatures:
 
 **NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 2.
 
