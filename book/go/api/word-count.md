@@ -138,13 +138,13 @@ Did you catch what is going on? Previously, we've seen our stateless computation
 ```go
 type WordPartitionFunction struct {}
 
-func (wpf *WordPartitionFunction) Partition (data interface{}) []byte {
-	word := data.(*string)
-	firstLetter := (*word)[0]
-	if (firstLetter >= 'a') && (firstLetter <= 'z') {
-		return []byte(firstLetter)
-	}
-	return []byte('!')
+func (wpf *WordPartitionFunction) Partition(data interface{}) []byte {
+        word := data.(*string)
+        firstLetter := (*word)[0]
+        if (firstLetter >= 'a') && (firstLetter <= 'z') {
+                return []byte{firstLetter}
+        }
+        return []byte{byte('!')}
 }
 ```
 
