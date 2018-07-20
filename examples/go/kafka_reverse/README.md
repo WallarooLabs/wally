@@ -118,8 +118,10 @@ docker run --rm -it ryane/kafkacat -C -b *IP OUTPUT BY ./cluster up 1 COMMAND*:9
 
 ```bash
 ./kafka_reverse \
-  --kafka_source_topic test-in --kafka_source_brokers 127.0.0.1:9092 \
-  --kafka_sink_topic test-out --kafka_sink_brokers 127.0.0.1:9092 \
+  --kafka_source_topic test-in \
+  --kafka_source_brokers *IP OUTPUT BY ./cluster up 1 COMMAND*:9092 \
+  --kafka_sink_topic test-out \
+  --kafka_sink_brokers *IP OUTPUT BY ./cluster up 1 COMMAND*:9092 \
   --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
@@ -139,7 +141,7 @@ Run the following and then type some characters and hit enter to send in the str
 **NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 2.
 
 ```bash
-docker run --rm -it ryane/kafkacat -P -b 127.0.0.1:9092 -t test-in
+docker run --rm -it ryane/kafkacat -P -b *IP OUTPUT BY ./cluster up 1 COMMAND*:9092 -t test-in
 ```
 
 Note: You can use `ctrl-d` to exit `kafkacat`
