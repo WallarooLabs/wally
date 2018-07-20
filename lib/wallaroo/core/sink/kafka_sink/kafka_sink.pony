@@ -33,7 +33,6 @@ use "wallaroo/core/sink"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
-use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 
 actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
@@ -62,9 +61,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   var _kc: (KafkaClient tag | None) = None
   let _conf: KafkaConfig val
   let _auth: TCPConnectionAuth
-
-  // Producer (Resilience)
-  let _terminus_route: TerminusRoute = TerminusRoute
 
   // variable to hold producer mapping for sending requests to broker
   //  connections
@@ -168,15 +164,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
         error
       end
 
-      // TODO: Resilience: log_flushed here to update low watermark for recovery?
-
-      ifdef "resilience" then
-        match tracking_id
-        | let sent: SeqId =>
-          _terminus_route.receive_ack(sent)
-        end
-      end
-
       let end_ts = Time.nanos()
       _metrics_reporter.step_metric(metric_name, "Kafka send time", metrics_id,
         send_ts, end_ts)
@@ -252,22 +239,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     end
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    None
-
-  be request_ack() =>
-    ifdef "trace" then
-      @printf[I32]("request_ack in %s\n".cstring(), _name.cstring())
-    end
-
-    _terminus_route.request_ack()
-
-  fun ref _next_tracking_id(i_producer: Producer, i_route_id: RouteId,
-    i_seq_id: SeqId): (U64 | None)
-  =>
-    ifdef "resilience" then
-      return _terminus_route.terminate(i_producer, i_route_id, i_seq_id)
-    end
-
     None
 
   be register_producer(id: RoutingId, producer: Producer) =>
@@ -469,13 +440,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     // Nothing to snapshot at this point
     None
-
-  be log_flushed(low_watermark: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("log_flushed in %s\n".cstring(), _name.cstring())
-    end
-    // TODO: implement this for resilience/recovery
-    Fail()
 
   be dispose() =>
     @printf[I32]("Shutting down KafkaSink\n".cstring())

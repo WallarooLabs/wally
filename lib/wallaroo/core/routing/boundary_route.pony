@@ -116,12 +116,5 @@ class BoundaryRoute is Route
       metrics_id,
       worker_ingress_ts)
 
-    ifdef "resilience" then
-      cfp.bookkeeping(_route_id, o_seq_id)
-    end
-
-  fun ref request_ack() =>
-    _consumer.request_ack()
-
   fun ref report_status(code: ReportStatusCode) =>
     _consumer.report_status(code)

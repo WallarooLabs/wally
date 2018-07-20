@@ -17,6 +17,9 @@ trait BarrierInitiatorPhase
   fun ready_for_next_token(): Bool =>
     false
 
+  fun ref barrier_complete(token: BarrierToken) =>
+    Fail()
+
 class InitialBarrierInitiatorPhase is BarrierInitiatorPhase
 
 class NormalBarrierInitiatorPhase is BarrierInitiatorPhase
@@ -32,6 +35,9 @@ class NormalBarrierInitiatorPhase is BarrierInitiatorPhase
 
   fun ready_for_next_token(): Bool =>
     true
+
+  fun ref barrier_complete(token: BarrierToken) =>
+    _initiator.next_token()
 
 class SourcePendingBarrierInitiatorPhase is BarrierInitiatorPhase
   """
@@ -76,8 +82,6 @@ class BlockingBarrierInitiatorPhase is BarrierInitiatorPhase
 
   fun ref barrier_complete(token: BarrierToken) =>
     if token == _wait_for_token then
-      _initiator.next_token()
-    else
       _initiator.next_token()
     end
 

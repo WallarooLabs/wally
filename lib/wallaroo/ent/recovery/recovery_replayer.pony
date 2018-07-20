@@ -184,17 +184,13 @@ actor RecoveryReplayer
   fun ref _end_replay_phase() =>
     @printf[I32]("|~~ - - Replay COMPLETE - - ~~|\n".cstring())
     _replay_phase = _ReadyForNormalProcessing(this)
-    _clear_deduplication_lists()
+    //!@
+    // _clear_deduplication_lists()
     match _recovery
     | let r: Recovery =>
       r.recovery_replay_finished()
     else
       Fail()
-    end
-
-  fun ref _clear_deduplication_lists() =>
-    for s in _steps.values() do
-      s.clear_deduplication_list()
     end
 
 interface _RecoveryReplayer
@@ -206,7 +202,8 @@ interface _RecoveryReplayer
     reconnected_boundaries: Map[String, SetIs[RoutingId]])
   fun ref _start_replay_phase(expected_boundaries: Map[String, USize] box)
   fun ref _end_replay_phase()
-  fun ref _clear_deduplication_lists()
+  //!2
+  // fun ref _clear_deduplication_lists()
 
 trait _ReplayPhase
   fun name(): String
@@ -243,9 +240,11 @@ class _ReadyForNormalProcessing is _ReplayPhase
     None
 
   fun ref add_boundary_replay_complete(worker: String, boundary_id: RoutingId) =>
+    //!@ Do we need this anymore?
+    None
     // If we experience a replay outside recovery, then we can immediately
     // clear deduplication lists when it's complete
-    _replayer._clear_deduplication_lists()
+    // _replayer._clear_deduplication_lists()
 
 class _WaitingForBoundaryCounts is _ReplayPhase
   let _expected_workers: SetIs[String]

@@ -23,7 +23,6 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/snapshot"
-use "wallaroo/ent/watermarking"
 
 
 actor DummyProducer is Producer
@@ -50,20 +49,6 @@ actor DummyProducer is Producer
     None
 
   be unmute(c: Consumer) =>
-    None
-
-  // Ackable
-  fun ref _acker(): Acker =>
-    Acker
-
-  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    None
-
-  fun ref flush(low_watermark: SeqId) =>
-    None
-
-  // AckRequester
-  be request_ack() =>
     None
 
   // Initializable
