@@ -40,12 +40,11 @@ WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LI
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-examples-python-word_count: build-machida
-integration-tests-examples-python-word_count: build-examples-python-word_count
-integration-tests-examples-python-word_count: word_count_py_test
-clean-examples-python-alphabet: word_count_py_clean
+build-examples-python-word_count_with_dynamic_keys: build-machida
+integration-tests-examples-python-word_count_with_dynamic_keys: build-examples-python-word_count_with_dynamic_keys
+integration-tests-examples-python-word_count_with_dynamic_keys: word_count_with_dynamic_keys_py_test
 
-word_count_py_test:
+word_count_with_dynamic_keys_py_test:
 	cd $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH) && \
 	integration_test --newline-file-sender count_this.txt \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
@@ -75,8 +74,5 @@ word_count_py_test:
 		--sink-mode newlines \
 		--sink-expect 482 \
 		--workers 3
-
-word_count_py_clean:
-	$(QUIET)rm -f $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH)/received.txt
 
 endif
