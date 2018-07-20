@@ -39,7 +39,6 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
-use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
@@ -138,7 +137,7 @@ actor TCPSink is Sink
   // Producer (Resilience)
   let _timers: Timers = Timers
 
-  let _terminus_route: TerminusRoute = TerminusRoute
+  var _seq_id: SeqId = 0
 
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: TCPEncoderWrapper,
@@ -230,8 +229,8 @@ actor TCPSink is Sink
     try
       let encoded = _encoder.encode[D](data, _wb)?
 
-      let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
-      _writev(encoded, next_tracking_id)
+      let next_seq_id = (_seq_id = _seq_id + 1)
+      _writev(encoded, next_seq_id)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
@@ -251,15 +250,6 @@ actor TCPSink is Sink
     end
 
     _maybe_mute_or_unmute_upstreams()
-
-  fun ref _next_tracking_id(i_producer: Producer, i_route_id: RouteId,
-    i_seq_id: SeqId): (U64 | None)
-  =>
-    ifdef "resilience" then
-      return _terminus_route.terminate(i_producer, i_route_id, i_seq_id)
-    end
-
-    None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
@@ -295,35 +285,6 @@ actor TCPSink is Sink
 
   fun inputs(): Map[RoutingId, Producer] box =>
     _inputs
-
-  fun ref _unit_finished(number_finished: ISize,
-    number_tracked_finished: ISize,
-    tracking_id: (SeqId | None))
-  =>
-    """
-    Handles book keeping related to resilience. Called when
-    a collection of sends is completed. When backpressure hasn't been applied,
-    this would be called for each send. When backpressure has been applied and
-    there is pending work to send, this would be called once after we finish
-    attempting to catch up on sending pending data.
-    """
-    ifdef debug then
-      Invariant(number_finished > 0)
-      Invariant(number_tracked_finished <= number_finished)
-    end
-    ifdef "trace" then
-      @printf[I32]("Sent %d msgs over sink\n".cstring(), number_finished)
-    end
-
-    ifdef "resilience" then
-      match tracking_id
-      | let sent: SeqId =>
-        _terminus_route.receive_ack(sent)
-      end
-    end
-
-  be request_ack() =>
-    _terminus_route.request_ack()
 
   be register_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
@@ -817,14 +778,7 @@ actor TCPSink is Sink
 
     false
 
-
   fun ref _tracking_finished(num_bytes_sent: USize) =>
-    """
-    Call _unit_finished with:
-      number of sent messages,
-      number of tracked messages sent
-      last tracking_id
-    """
     ifdef "resilience" then
       var num_sent: ISize = 0
       var tracked_sent: ISize = 0
@@ -850,10 +804,6 @@ actor TCPSink is Sink
             // update remaining for this message
             node()? = (bytes_remaining, tracking_id)
           end
-        end
-
-        if num_sent > 0 then
-          _unit_finished(num_sent, tracked_sent, final_pending_sent)
         end
       end
     end

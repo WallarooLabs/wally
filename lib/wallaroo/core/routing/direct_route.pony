@@ -128,12 +128,5 @@ class DirectRoute is Route
         _step_type.cstring())
     end
 
-    ifdef "resilience" then
-      cfp.bookkeeping(_route_id, o_seq_id)
-    end
-
-  fun ref request_ack() =>
-    _consumer.request_ack()
-
   fun ref report_status(code: ReportStatusCode) =>
     _consumer.report_status(code)

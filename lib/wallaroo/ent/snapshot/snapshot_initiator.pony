@@ -64,6 +64,7 @@ actor SnapshotInitiator is Initializable
 
   be initiate_snapshot() =>
     _current_snapshot_id = _current_snapshot_id + 1
+    @printf[I32]("!@ Initiating snapshot %s\n".cstring(), _current_snapshot_id.string().cstring())
     let token = SnapshotBarrierToken(_current_snapshot_id)
     let action = Promise[BarrierToken]
     action.next[None](recover this~snapshot_complete() end)
@@ -74,13 +75,14 @@ actor SnapshotInitiator is Initializable
       match token
       | let st: SnapshotBarrierToken =>
         if st.id != _current_snapshot_id then Fail() end
-        @printf[I32]("!@ SnapshotInitiator: Snapshot is complete!\n".cstring())
+        @printf[I32]("!@ SnapshotInitiator: Snapshot %s is complete!\n".cstring(), st.id.string().cstring())
         //!@ Write snapshot id to disk
 
         //!@ Inform other workers to write snapshot id to disk
         // Prepare for next snapshot
         if _is_active and _is_primary then
           //!@ In reality, we'll need to check if this is allowed
+          @printf[I32]("!@ Creating _InitiateSnapshot timer for future snapshot %s\n".cstring(), (_current_snapshot_id + 1).string().cstring())
           let t = Timer(_InitiateSnapshot(this), _time_between_snapshots)
           _timers(consume t)
         end
@@ -98,5 +100,6 @@ class _InitiateSnapshot is TimerNotify
     _si = si
 
   fun ref apply(timer: Timer, count: U64): Bool =>
+    @printf[I32]("!@ Calling initiate_snapshot from timer\n".cstring())
     _si.initiate_snapshot()
     false
