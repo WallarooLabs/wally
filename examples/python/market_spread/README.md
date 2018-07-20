@@ -66,30 +66,62 @@ You will need six separate shells to run this application. Open each shell and g
 
 ### Shell 1: Metrics
 
-Start up the Metrics UI if you don't already have it running:
+Start up the Metrics UI if you don't already have it running.
+
+Ubuntu users who are using the Metrics UI Docker image:
 
 ```bash
 docker start mui
 ```
 
+Wallaroo in Docker and Wallaroo in Vagrant users:
+
+```bash
+metrics_reporter_ui start
+```
+
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
 
-If you need to restart the UI, run:
+If you need to restart the UI, run the following.
+
+Ubuntu users who are using the Metrics UI Docker image:
 
 ```bash
 docker restart mui
 ```
 
-When it's time to stop the UI, run:
+Wallaroo in Docker and Wallaroo in Vagrant users:
+
+```bash
+metrics_reporter_ui restart
+```
+
+When it's time to stop the UI, run the following.
+
+Ubuntu users who are using the Metrics UI Docker image:
 
 ```bash
 docker stop mui
 ```
 
-If you need to start the UI after stopping it, run:
+Wallaroo in Docker and Wallaroo in Vagrant users:
+
+```bash
+metrics_reporter_ui stop
+```
+
+If you need to start the UI after stopping it, run the following.
+
+Ubuntu users who are using the Metrics UI Docker image:
 
 ```bash
 docker start mui
+```
+
+Wallaroo in Docker and Wallaroo in Vagrant users:
+
+```bash
+metrics_reporter_ui start
 ```
 
 ### Shell 2: Data Receiver
@@ -201,10 +233,16 @@ The sender commands will send data for a long time, so processing never really f
 cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down the Giles Senders and Data Receiver by pressing `Ctrl-c` from their shells.
+You can shut down the Metrics UI with the following command.
 
-You can shut down the Metrics UI with the following command:
+Ubuntu users who are using the Metrics UI Docker image:
 
 ```bash
 docker stop mui
+```
+
+Wallaroo in Docker and Wallaroo in Vagrant users:
+
+```bash
+metrics_reporter_ui stop
 ```
