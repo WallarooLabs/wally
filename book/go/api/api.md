@@ -66,7 +66,7 @@ Add a stateless computation that only returns one message to the current pipelin
 
 Similar to `To`, but the computation can return more than one message.
 
-##### `ToStatePartitionWithKeys(stateComputation wallarooapi.StateComputation, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []byte) *pipelineBuilder`
+##### `ToStatePartitionWithKeys(stateComputation wallarooapi.StateComputation, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions [][]byte) *pipelineBuilder`
 
 Add a partitioned state computation that only returns one message to the pipeline.
 
@@ -79,6 +79,20 @@ Add a partitioned state computation that only returns one message to the pipelin
 `partitions` is a list of all of the partitions for the partitioned state.
 
 ##### `ToStatePartitionMultiWithKeys(stateComputation wallarooapi.StateComputationMulti, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction, partitions []byte) *pipelineBuilder`
+
+Similar to `ToStatePartitionWithKeys`, but the state computation can return more than one message.
+
+##### `ToStatePartition(stateComputation wallarooapi.StateComputation, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction) *pipelineBuilder`
+
+Add a partitioned state computation that only returns one message to the pipeline.
+
+`stateBuilder` builds the state.
+
+`stateName` is a name that the application uses for this state object; any other state computations in the application that use the same `stateName` will use the same object.
+
+`partitionFunction` defines the key to use when partitioning.
+
+##### `ToStatePartitionMulti(stateComputation wallarooapi.StateComputationMulti, stateBuilder wallarooapi.StateBuilder, stateName string, partitionFunction wa.PartitionFunction) *pipelineBuilder`
 
 Similar to `ToStatePartition`, but the state computation can return more than one message.
 
