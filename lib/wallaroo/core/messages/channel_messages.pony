@@ -218,10 +218,10 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayCompleteMsg(sender_name, boundary_id), auth)?
 
-  fun ack_watermark(sender_name: String, sender_step_id: RoutingId, seq_id: SeqId,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun ack_data_received(sender_name: String, sender_step_id: RoutingId,
+    seq_id: SeqId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)?
+    _encode(AckDataReceivedMsg(sender_name, sender_step_id, seq_id), auth)?
 
   fun replay(delivery_bytes: Array[ByteSeq] val, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -679,7 +679,7 @@ class val LeavingMigrationAckMsg is ChannelMsg
   new val create(sender': String) =>
     sender = sender'
 
-class val AckWatermarkMsg is ChannelMsg
+class val AckDataReceivedMsg is ChannelMsg
   let sender_name: String
   let sender_step_id: RoutingId
   let seq_id: SeqId

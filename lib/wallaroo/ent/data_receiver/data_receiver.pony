@@ -19,7 +19,6 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
-use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
@@ -50,8 +49,6 @@ actor DataReceiver is (Producer & Rerouter)
   // to avoid matching on every ack
   var _latest_conn: (DataChannel | None) = None
   var _replay_pending: Bool = false
-
-  let _watermarker: Watermarker = Watermarker
 
   // Timer to periodically request acks to prevent deadlock.
   var _timer_init: _TimerInit = _UninitializedTimerInit
@@ -137,10 +134,13 @@ actor DataReceiver is (Producer & Rerouter)
     end
 
   fun ref init_timer() =>
-    ifdef "resilience" then
-      let t = Timer(_RequestAck(this), 0, 15_000_000)
-      _timers(consume t)
-    end
+    //!@ Do we need this timer stuff anymore?
+
+    //!@
+    // ifdef "resilience" then
+    //   let t = Timer(_RequestAck(this), 0, 15_000_000)
+    //   _timers(consume t)
+    // end
     // We are finished initializing timer, so set it to _EmptyTimerInit
     // so we don't create two timers.
     _timer_init = _EmptyTimerInit
@@ -166,30 +166,6 @@ actor DataReceiver is (Producer & Rerouter)
     _router.unregister_producer(input_id, output_id, this)
     _boundary_edges.unset(BoundaryEdge(input_id, output_id))
 
-  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    _watermarker.ack_received(route_id, seq_id)
-    try
-      let watermark = _watermarker.propose_watermark()
-
-      if watermark > _last_id_acked then
-        ifdef "trace" then
-          @printf[I32]("DataReceiver acking seq_id %lu\n".cstring(),
-            watermark)
-        end
-
-        let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
-          _sender_step_id, watermark, _auth)?
-        _write_on_conn(ack_msg)
-        _last_id_acked = watermark
-      end
-    else
-      @printf[I32]("Error creating ack watermark message\n".cstring())
-    end
-
-  fun ref flush(low_watermark: SeqId) =>
-    """This is not a real Producer, so it doesn't write any State"""
-    None
-
   be report_status(code: ReportStatusCode) =>
     _router.report_status(code)
 
@@ -213,26 +189,6 @@ actor DataReceiver is (Producer & Rerouter)
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     // Nothing to do at this point.
     None
-
-  ///////////////////////
-  // ORIGIN (resilience)
-  ///////////////////////
-  fun ref _acker(): Acker =>
-    // TODO: I dont think we need this.
-    // Need to discuss with John
-    Acker
-
-  fun ref bookkeeping(route_id: RouteId, seq_id: SeqId) =>
-    """
-    Process envelopes and keep track of things
-    """
-    ifdef "trace" then
-      @printf[I32]("Bookkeeping called for DataReceiver route %lu\n".cstring(),
-        route_id)
-    end
-    ifdef "resilience" then
-      _watermarker.sent(route_id, seq_id)
-    end
 
   be update_router(router': DataRouter) =>
     _router = router'
@@ -263,13 +219,6 @@ actor DataReceiver is (Producer & Rerouter)
       _router.register_producer(input_id, _state_routing_id, this)
     end
 
-    //!@ We now need to wait for actual steps to contact us to register
-    // them as producers
-    // _router.register_producer(this)
-    for id in _router.route_ids().values() do
-      _watermarker.add_route(id)
-    end
-
     _pending_message_store.process_known_keys(this, this, _router)
 
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
@@ -291,15 +240,6 @@ actor DataReceiver is (Producer & Rerouter)
       _maybe_ack()
     end
 
-  be request_ack() =>
-    if _last_id_acked < _last_id_seen then
-      _request_ack()
-    end
-
-  fun ref _request_ack() =>
-    _router.request_ack(_watermarker.unacked_route_ids())
-    _last_request = _ack_counter
-
   be replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -310,10 +250,8 @@ actor DataReceiver is (Producer & Rerouter)
     end
 
   fun ref _maybe_ack() =>
-    ifdef not "resilience" then
-      if (_ack_counter % 512) == 0 then
-        _ack_latest()
-      end
+    if (_ack_counter % 512) == 0 then
+      _ack_latest()
     end
 
   fun ref _ack_latest() =>
@@ -324,12 +262,12 @@ actor DataReceiver is (Producer & Rerouter)
             _last_id_seen)
         end
         _last_id_acked = _last_id_seen
-        let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
+        let ack_msg = ChannelMsgEncoder.ack_data_received(_worker_name,
           _sender_step_id, _last_id_seen, _auth)?
         _write_on_conn(ack_msg)
       end
     else
-      @printf[I32]("Error creating ack watermark message\n".cstring())
+      @printf[I32]("Error creating ack data received message\n".cstring())
     end
 
   be dispose() =>
@@ -412,12 +350,13 @@ class _UninitializedTimerInit is _TimerInit
 class _EmptyTimerInit is _TimerInit
   fun apply(d: DataReceiver ref) => None
 
-class _RequestAck is TimerNotify
-  let _d: DataReceiver
+//!@
+// class _RequestAck is TimerNotify
+//   let _d: DataReceiver
 
-  new iso create(d: DataReceiver) =>
-    _d = d
+//   new iso create(d: DataReceiver) =>
+//     _d = d
 
-  fun ref apply(timer: Timer, count: U64): Bool =>
-    _d.request_ack()
-    true
+//   fun ref apply(timer: Timer, count: U64): Bool =>
+//     _d.request_ack()
+//     true

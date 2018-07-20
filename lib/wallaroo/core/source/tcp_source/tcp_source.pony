@@ -45,7 +45,6 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/snapshot"
-use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -111,7 +110,6 @@ actor TCPSource is Source
   let _state_step_creator: StateStepCreator
 
   let _event_log: EventLog
-  let _acker_x: Acker
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
@@ -159,7 +157,6 @@ actor TCPSource is Source
 
     // register resilient with event log
     _event_log.register_resilient(this, _source_id)
-    _acker_x = Acker
 
     _readable = true
 
@@ -190,9 +187,6 @@ actor TCPSource is Source
       // directly. route lifecycle needs to be broken out better from
       // application lifecycle
       r.application_created()
-      ifdef "resilience" then
-        _acker_x.add_route(r)
-      end
     end
 
     for r in _routes.values() do
@@ -254,9 +248,6 @@ actor TCPSource is Source
     if not _routes.contains(c) then
       let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
       _routes(c) = new_route
-      ifdef "resilience" then
-        _acker_x.add_route(new_route)
-      end
       new_route.register_producer(id)
     else
       try
@@ -289,10 +280,7 @@ actor TCPSource is Source
 
   fun ref _remove_route(c: Consumer) =>
     try
-      let outdated_route = _routes.remove(c)?._2
-      ifdef "resilience" then
-        _acker_x.remove_route(outdated_route)
-      end
+      _routes.remove(c)?._2
     else
       Fail()
     end
@@ -313,7 +301,6 @@ actor TCPSource is Source
         _outgoing_boundaries(target_worker_name) = boundary
         let new_route = RouteBuilder(_source_id, this, boundary,
           _metrics_reporter)
-        _acker_x.add_route(new_route)
         _routes(boundary) = new_route
       end
     end
@@ -360,26 +347,6 @@ actor TCPSource is Source
       Fail()
     end
 
-  //////////////
-  // ORIGIN (resilience)
-  be request_ack() =>
-    ifdef "trace" then
-      @printf[I32]("request_ack in TCPSource\n".cstring())
-    end
-    for route in _routes.values() do
-      route.request_ack()
-    end
-
-  be log_replay_finished() => None
-
-  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq)
-  =>
-    ifdef "trace" then
-      @printf[I32]("replaying log entry on recovery: in TCPSource\n".cstring())
-    end
-    None
-
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
     ifdef "trace" then
       @printf[I32](("initializing sequence id on recovery: " + seq_id.string() +
@@ -388,57 +355,11 @@ actor TCPSource is Source
     // update to use correct seq_id for recovery
     _seq_id = seq_id
 
-  fun ref _acker(): Acker =>
-    _acker_x
-
-  // Override these for TCPSource as we are currently
-  // not resilient.
-  fun ref flush(low_watermark: U64) =>
-    ifdef "trace" then
-      @printf[I32]("flushing at and below: %llu in TCPSource\n".cstring(),
-        low_watermark)
-    end
-    _event_log.flush_buffer(_source_id, low_watermark)
-
-  // Log-rotation
   be remote_snapshot_state() =>
     ifdef "trace" then
       @printf[I32]("snapshot_state in TCPSource\n".cstring())
     end
     None
-
-  be log_flushed(low_watermark: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("log_flushed for: %llu in TCPSource\n".cstring(),
-        low_watermark)
-    end
-    _acker().flushed(low_watermark)
-
-  fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32](
-        "Bookkeeping called for route %llu, o_seq_id: %llu in TCPSource\n"
-        .cstring(), o_route_id, o_seq_id)
-    end
-    ifdef "resilience" then
-      _acker().sent(o_route_id, o_seq_id)
-    end
-
-  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("TCPSource received update_watermark\n".cstring())
-    end
-    _update_watermark(route_id, seq_id)
-
-  fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]((
-      "Update watermark called with " +
-      "route_id: " + route_id.string() +
-      "\tseq_id: " + seq_id.string() + " in TCPSource\n\n").cstring())
-    end
-
-    _acker().ack_received(this, route_id, seq_id)
 
   fun ref _unregister_all_outputs() =>
     """

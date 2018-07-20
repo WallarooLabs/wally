@@ -272,12 +272,12 @@ class DataChannelConnectNotifier is DataChannelNotify
         // the current message path for receiving immigrant steps is
         // layout_initializer then router_registry.
         _layout_initializer.ack_migration_batch_complete(m.sender_name)
-      | let aw: AckWatermarkMsg =>
+      | let aw: AckDataReceivedMsg =>
         ifdef "trace" then
-          @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
+          @printf[I32]("Received AckDataReceivedMsg on Data Channel\n"
+            .cstring())
         end
         Fail()
-        // _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
       | let r: ReplayMsg =>
         ifdef "trace" then
           @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())

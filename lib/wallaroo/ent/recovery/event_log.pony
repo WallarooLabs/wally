@@ -21,15 +21,17 @@ use "wallaroo/core/messages"
 use "wallaroo/core/topology"
 
 interface tag Resilient
-  be log_replay_finished()
-  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq)
+  // !@ Do we need this?
   be initialize_seq_id_on_recovery(seq_id: SeqId)
-  be log_flushed(low_watermark: SeqId)
-
   //!@
-  // Log-rotation
-  be remote_snapshot_state()
+  // be log_replay_finished()
+  // be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
+  //   statechange_id: U64, payload: ByteSeq)
+  // be log_flushed(low_watermark: SeqId)
+
+  // //!@
+  // // Log-rotation
+  // be remote_snapshot_state()
 
 
 class val EventLogConfig
@@ -114,29 +116,33 @@ actor EventLog
     _backend.start_log_replay()
 
   be log_replay_finished() =>
-    for r in _resilients.values() do
-      r.log_replay_finished()
-    end
+    None
+    //!@
+    // for r in _resilients.values() do
+    //   r.log_replay_finished()
+    // end
 
-    match _recovery
-    | let r: Recovery =>
-      r.log_replay_finished()
-    else
-      Fail()
-    end
+    // match _recovery
+    // | let r: Recovery =>
+    //   r.log_replay_finished()
+    // else
+    //   Fail()
+    // end
 
   be replay_log_entry(resilient_id: RoutingId,
     uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq val)
   =>
-    try
-      _resilients(resilient_id)?.replay_log_entry(uid, frac_ids,
-        statechange_id, payload)
-    else
-      @printf[I32](("FATAL: Unable to replay event log, because a replay " +
-        "buffer has disappeared").cstring())
-      Fail()
-    end
+    None
+    //!@
+    // try
+    //   _resilients(resilient_id)?.replay_log_entry(uid, frac_ids,
+    //     statechange_id, payload)
+    // else
+    //   @printf[I32](("FATAL: Unable to replay event log, because a replay " +
+    //     "buffer has disappeared").cstring())
+    //   Fail()
+    // end
 
   be initialize_seq_ids(seq_ids: Map[RoutingId, SeqId] val) =>
     for (resilient_id, seq_id) in seq_ids.pairs() do
@@ -202,27 +208,28 @@ actor EventLog
         .cstring())
     end
 
-    try
-      // Add low watermark ack to buffer
-      _backend.encode_entry((true, resilient_id, 0, None, 0, low_watermark,
-        recover Array[ByteSeq] end))
+    //!@
+    // try
+    //   // Add low watermark ack to buffer
+    //   _backend.encode_entry((true, resilient_id, 0, None, 0, low_watermark,
+    //     recover Array[ByteSeq] end))
 
-      num_encoded = num_encoded + 1
-      _flush_waiting = _flush_waiting + 1
-      //write buffer to disk
-      write_log()
+    //   num_encoded = num_encoded + 1
+    //   _flush_waiting = _flush_waiting + 1
+    //   //write buffer to disk
+    //   write_log()
 
-      // if (_flush_waiting % 50) == 0 then
-      //   //sync any written data to disk
-      //   _backend.sync()
-      //   _backend.datasync()
-      // end
+    //   // if (_flush_waiting % 50) == 0 then
+    //   //   //sync any written data to disk
+    //   //   _backend.sync()
+    //   //   _backend.datasync()
+    //   // end
 
-      _resilients(resilient_id)?.log_flushed(low_watermark)
-    else
-      @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
-      Fail()
-    end
+    //   _resilients(resilient_id)?.log_flushed(low_watermark)
+    // else
+    //   @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
+    //   Fail()
+    // end
 
   be snapshot_state(resilient_id: RoutingId, uid: U128,
     statechange_id: U64, seq_id: U64,
@@ -281,10 +288,11 @@ actor EventLog
     for v in _resilients.keys() do
       _resilients_to_snapshot.set(v)
     end
-    for r in _resilients.values() do
-      //!@
-      r.remote_snapshot_state()
-    end
+    //!@
+    // for r in _resilients.values() do
+    //   //!@
+    //   r.remote_snapshot_state()
+    // end
 
   fun ref _rotate_file() =>
     try

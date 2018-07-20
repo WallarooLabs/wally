@@ -31,7 +31,6 @@ use rebalancing = "ent/rebalancing"
 use recovery = "ent/recovery"
 use spike = "ent/spike"
 use topology = "core/topology"
-use watermarking = "ent/watermarking"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -48,4 +47,3 @@ actor Main is TestList
     recovery.Main.make().tests(test)
     spike.Main.make().tests(test)
     topology.Main.make().tests(test)
-    watermarking.Main.make().tests(test)

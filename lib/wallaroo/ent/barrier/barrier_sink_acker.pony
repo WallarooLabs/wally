@@ -44,7 +44,10 @@ class BarrierSinkAcker
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    if barrier_token != _barrier_token then Fail() end
+    if barrier_token != _barrier_token then
+      @printf[I32]("SinkAcker: Expected %s, got %s\n".cstring(), _barrier_token.string().cstring(), barrier_token.string().cstring())
+      Fail()
+    end
 
     let inputs = _sink.inputs()
     if inputs.contains(step_id) then

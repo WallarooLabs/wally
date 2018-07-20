@@ -29,7 +29,6 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/snapshot"
-use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
@@ -52,7 +51,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   var _unregistered: Bool = false
 
   let _event_log: EventLog
-  let _acker_x: Acker
   let _map_seq_id_offset: Map[SeqId, KafkaOffset] = _map_seq_id_offset.create()
 
   var _last_flushed_offset: KafkaOffset = 0
@@ -112,7 +110,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _listen = listen
     _notify = consume notify
     _event_log = event_log
-    _acker_x = Acker
 
     _state_step_creator = state_step_creator
 
@@ -156,10 +153,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       // directly. route lifecycle needs to be broken out better from
       // application lifecycle
       r.application_created()
-      ifdef "resilience" then
-        _acker_x.add_route(r)
-      end
-    end
+     end
 
     for r in _routes.values() do
       r.application_initialized("KafkaSource-" + topic + "-"
@@ -230,9 +224,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     if not _routes.contains(c) then
       let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
       _routes(c) = new_route
-      ifdef "resilience" then
-        _acker_x.add_route(new_route)
-      end
       new_route.register_producer(id)
     else
       try
@@ -262,10 +253,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   fun ref _remove_route(c: Consumer) =>
     try
-      let outdated_route = _routes.remove(c)?._2
-      ifdef "resilience" then
-        _acker_x.remove_route(outdated_route)
-      end
+      _routes.remove(c)?._2
     else
       Fail()
     end
@@ -286,7 +274,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
         _router_registry.register_disposable(boundary)
         let new_route = RouteBuilder(_source_id, this, boundary,
           _metrics_reporter)
-        _acker_x.add_route(new_route)
         _routes(boundary) = new_route
       end
     end
@@ -329,39 +316,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       Fail()
     end
 
-  //////////////
-  // ORIGIN (resilience)
-  be request_ack() =>
-    ifdef "trace" then
-      @printf[I32]("request_ack in %s\n".cstring(), _name.cstring())
-    end
-    for route in _routes.values() do
-      route.request_ack()
-    end
-
-  be log_replay_finished()
-  =>
-    // now that log replay is finished, we are no longer "recovering"
-    _recovering = false
-
-    // try and unmute if downstreams are already unmuted
-    if _muted_downstream.size() == 0 then
-      _unmute()
-    end
-
-  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq)
-  =>
-    _rb.append(payload)
-    _last_processed_offset = try _rb.i64_le()?
-                             else Fail(); _last_processed_offset end
-
-    ifdef "trace" then
-      @printf[I32](("replaying log entry on recovery with last processed" +
-        " offset: %lld in %s\n").cstring(), _last_processed_offset,
-        _name.cstring())
-    end
-
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
     ifdef "trace" then
       @printf[I32](("initializing sequence id on recovery: " + seq_id.string() +
@@ -369,38 +323,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     end
     // update to use correct seq_id for recovery
     _seq_id = seq_id
-
-  fun ref _acker(): Acker =>
-    _acker_x
-
-  fun ref flush(low_watermark: U64) =>
-    ifdef "trace" then
-      @printf[I32]("flushing at and below: %llu in %s\n".cstring(),
-        low_watermark, _name.cstring())
-    end
-
-    (_, let offset) = try _map_seq_id_offset.remove(low_watermark)?
-                      else Fail(); (0, -1) end
-
-    // remove all other lower seq_ids that we're tracking offsets for
-    for s in Range[U64](_last_flushed_seq_id, low_watermark) do
-      if _map_seq_id_offset.contains(s) then
-        try _map_seq_id_offset.remove(s)? else Fail() end
-      end
-    end
-
-    _wb.i64_le(offset)
-    let payload = _wb.done()
-
-    // store offset
-    _event_log.queue_log_entry(_source_id, 0, None, 0, low_watermark,
-      consume payload)
-
-    // store low watermark so it is properly replayed
-    _event_log.flush_buffer(_source_id, low_watermark)
-
-    _last_flushed_seq_id = low_watermark
-    _last_flushed_offset = offset
 
   //////////////
   // BARRIER
@@ -434,41 +356,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     // !@
     None
-
-////////
-// WATERMARKING
-///////
-  be log_flushed(low_watermark: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("log_flushed for: %llu in %s\n".cstring(), low_watermark,
-        _name.cstring())
-    end
-    _acker().flushed(low_watermark)
-
-  fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("Bookkeeping called for route %llu in %s\n".cstring(),
-        o_route_id, _name.cstring())
-    end
-    ifdef "resilience" then
-      _acker().sent(o_route_id, o_seq_id)
-    end
-
-  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef debug then
-      @printf[I32]("%s received update_watermark\n".cstring(), _name.cstring())
-    end
-    _update_watermark(route_id, seq_id)
-
-  fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]((
-      "Update watermark called with " +
-      "route_id: " + route_id.string() +
-      "\tseq_id: " + seq_id.string() + " in %s\n\n").cstring(), _name.cstring())
-    end
-
-    _acker().ack_received(this, route_id, seq_id)
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try

@@ -38,7 +38,6 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
 use "wallaroo/ent/snapshot"
 use "wallaroo/ent/spike"
-use "wallaroo/ent/watermarking"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
@@ -147,9 +146,6 @@ actor OutgoingBoundary is Consumer
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
   var _seq_id: SeqId = 1
-
-  // Producer (Resilience)
-  let _terminus_route: TerminusRoute = TerminusRoute
 
   var _reconnect_pause: U64 = 10_000_000_000
   let _timers: Timers = Timers
@@ -335,11 +331,7 @@ actor OutgoingBoundary is Consumer
       end
 
     try
-      let seq_id = ifdef "resilience" then
-        _terminus_route.terminate(i_producer, i_route_id, i_seq_id)
-      else
-        _seq_id = _seq_id + 1
-      end
+      let seq_id = (_seq_id = _seq_id + 1)
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
@@ -385,10 +377,6 @@ actor OutgoingBoundary is Consumer
     _queue.remove(0, flush_count)
     _maybe_mute_or_unmute_upstreams()
     _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-
-    ifdef "resilience" then
-      _terminus_route.receive_ack(seq_id)
-    end
 
   fun ref receive_connect_ack(last_id_seen: SeqId) =>
     _replay_from(last_id_seen)
@@ -1082,9 +1070,9 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         end
         conn.receive_connect_ack(sn.last_id_seen)
         conn.start_normal_sending()
-      | let aw: AckWatermarkMsg =>
+      | let aw: AckDataReceivedMsg =>
         ifdef "trace" then
-          @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
+          @printf[I32]("Received AckDataReceivedMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
       else
