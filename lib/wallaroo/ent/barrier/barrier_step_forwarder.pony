@@ -49,27 +49,44 @@ class BarrierStepForwarder
     end
 
     let inputs = _step.inputs()
-
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
-      if inputs.size() == _inputs_blocking.size() then
-        @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
-        for (o_id, o) in _step.outputs().pairs() do
-          match o
-          | let ob: OutgoingBoundary =>
-            @printf[I32]("!@ FORWARDING TO BOUNDARY\n".cstring())
-            ob.forward_barrier(o_id, _step_id,
-              _barrier_token)
-          else
-            @printf[I32]("!@ FORWARDING TO NON BOUNDARY\n".cstring())
-            o.receive_barrier(_step_id, _step, _barrier_token)
-          end
-        end
-        _clear()
-        _step.barrier_complete(barrier_token)
-      end
+      _check_completion(inputs)
     else
       Fail()
+    end
+
+  fun ref remove_input(input_id: RoutingId) =>
+    """
+    Called if an input leaves the system during barrier processing. This should
+    only be possible with Sources that are closed (e.g. when a TCPSource
+    connection is dropped).
+    """
+    if _inputs_blocking.contains(input_id) then
+      try
+        _inputs_blocking.remove(input_id)?
+      else
+        Unreachable()
+      end
+    end
+    _check_completion(_step.inputs())
+
+  fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
+    if inputs.size() == _inputs_blocking.size() then
+      @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
+      for (o_id, o) in _step.outputs().pairs() do
+        match o
+        | let ob: OutgoingBoundary =>
+          @printf[I32]("!@ FORWARDING TO BOUNDARY\n".cstring())
+          ob.forward_barrier(o_id, _step_id,
+            _barrier_token)
+        else
+          @printf[I32]("!@ FORWARDING TO NON BOUNDARY\n".cstring())
+          o.receive_barrier(_step_id, _step, _barrier_token)
+        end
+      end
+      _clear()
+      _step.barrier_complete(_barrier_token)
     end
 
   fun ref _clear() =>
