@@ -104,7 +104,7 @@ class val TypedDataRoutingArguments[D: Any val] is RoutingArguments
     rerouter.reroute(producer, this)
 
   fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
-    // !@ this doesn't correctly capture times for calculating latencies,
+    // !@ This doesn't correctly capture times for calculating latencies,
     // so what do we want to do about this?
     match (router, producer, _data)
     | (let data_router: DataRouter, let data_receiver: DataReceiver ref,
