@@ -85,13 +85,15 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _pending_message_store: PendingMessageStore =
     _pending_message_store.create()
 
+  let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
+
   let _topic: String
   let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
 
   new create(source_id: RoutingId, auth: AmbientAuth, name: String,
     listen: KafkaSourceListener[In], notify: KafkaSourceNotify[In] iso,
-    event_log: EventLog, router: Router,
+    event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
@@ -132,13 +134,13 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     end
 
     let new_router =
-      match router
+      match router'
       | let pr: PartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
-        router
+        router'
       end
     _router = new_router
 
@@ -162,15 +164,15 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
     _mute()
 
-  be update_router(router: Router) =>
+  be update_router(router': Router) =>
     let new_router =
-      match router
+      match router'
       | let pr: PartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
-        router
+        router'
       end
 
     let old_router = _router
@@ -186,8 +188,19 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       _register_output(c_id, consumer)
     end
 
-    _notify.update_router(new_router)
-    _pending_message_store.process_known_keys(this, _notify, new_router)
+    _notify.update_router(_router)
+    _pending_message_store.process_known_keys(this, _router)
+    if not _pending_message_store.has_pending() then
+      let bs = Array[BarrierToken]
+      for b in _pending_barriers.values() do
+        bs.push(b)
+      end
+      _pending_barriers.clear()
+      for b in bs.values() do
+        _initiate_barrier(b)
+      end
+      _unmute_local()
+    end
 
   be register_downstreams(action: Promise[Source]) =>
     action(this)
@@ -232,6 +245,9 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
         Unreachable()
       end
     end
+
+  fun router(): Router =>
+    _router
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
@@ -328,14 +344,22 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
+    _initiate_barrier(token)
+
+  fun ref _initiate_barrier(token: BarrierToken) =>
     if not _disposed then
-      for (o_id, o) in _outputs.pairs() do
-        match o
-        | let ob: OutgoingBoundary =>
-          ob.forward_barrier(o_id, _source_id, token)
-        else
-          o.receive_barrier(_source_id, this, token)
+      if not _pending_message_store.has_pending() then
+        for (o_id, o) in _outputs.pairs() do
+          match o
+          | let ob: OutgoingBoundary =>
+            ob.forward_barrier(o_id, _source_id, token)
+          else
+            o.receive_barrier(_source_id, this, token)
+          end
         end
+      else
+        _mute_local()
+        _pending_barriers.push(token)
       end
     end
 
@@ -419,6 +443,17 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     end
 
     _muted = false
+
+  fun ref _mute_local() =>
+    _muted_downstream.set(this)
+    _mute()
+
+  fun ref _unmute_local() =>
+    _muted_downstream.unset(this)
+
+    if _muted_downstream.size() == 0 then
+      _unmute()
+    end
 
   be mute(c: Consumer) =>
     _muted_downstream.set(c)

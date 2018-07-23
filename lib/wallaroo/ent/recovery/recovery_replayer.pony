@@ -178,6 +178,7 @@ actor RecoveryReplayer
   fun ref _start_replay_phase(expected_boundaries: Map[String, USize] box) =>
     @printf[I32]("|~~ - - Replay Phase 3: Message Replay - - ~~|\n".cstring())
     _replay_phase = _Replay(expected_boundaries, this, _data_receivers)
+    //!@
     // Initializing data receivers will trigger replay over the boundaries
     _data_receivers.start_replay_processing()
 

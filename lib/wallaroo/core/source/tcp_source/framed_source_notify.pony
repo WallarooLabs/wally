@@ -81,9 +81,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
 
-  fun router(): Router =>
-    _router
-
   fun ref received(source: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
       try
