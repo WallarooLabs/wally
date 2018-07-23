@@ -1,6 +1,6 @@
 # TCP Decoders and Encoders
 
-Earlier, we spoke of [sources and sinks](/core-concepts/core-concepts.md) and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s. 
+Earlier, we spoke of [sources and sinks](/book/core-concepts/core-concepts.md) and the role they play in Wallaroo. In this section, we are going to dive more into how you work with sources and sinks. We'll be covering two key concepts: `Decoder`s and `Encoder`s.
 
 ## Reviewing our terms
 
@@ -31,7 +31,7 @@ An incoming stream of bytes can represent many things: each byte could be an 8-b
 Decoders are unique to the type of source. `TCPSource`s use a [framed message protocol](https://www.codeproject.com/Articles/37496/TCP-IP-Protocol-Design-Message-Framing). A framed message protocol boils down to:
 
 - We have a fixed size header that tells us how long a message is
-- We have a variable length message payload 
+- We have a variable length message payload
 
 The message payload is what our application cares about. The fixed length header allows us to easily get the size of our payload. With these two pieces of information, we can quickly chop up a stream of incoming bytes into a series of messages.
 
@@ -64,13 +64,13 @@ def decode(self, bs):
     return bs.decode("utf-8")
 ```
 
-`header_length` is the fixed size of our payload field. 
+`header_length` is the fixed size of our payload field.
 
 `length_fmt` is used internally to decode our message header to determine how long the payload is going to be. We rely on the Python `struct` package to decode the bytes. If you aren't familiar with `struct`, you can check out [the documentation](https://docs.python.org/2/library/struct.html) to learn more. Remember, when using `struct`, don't forget to import it!
 
 `decode` takes a series of bytes that represent your payload and turns it into an application message. In this case, our application message is a string, so we take the incoming byte stream `bs` and convert it to UTF-8 Python string.
 
-Here's a slightly more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet). 
+Here's a slightly more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet).
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
@@ -106,7 +106,7 @@ def encode(self, data):
     return data + "\n"
 ```
 
-This is just about the simplest encoder you could have. It's from the [Reverse Word example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/reverse). It takes a string that we want to send to an external system as an input, adds a newline at the end and returns it for sending. 
+This is just about the simplest encoder you could have. It's from the [Reverse Word example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/reverse). It takes a string that we want to send to an external system as an input, adds a newline at the end and returns it for sending.
 
 Here's a more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet):
 
@@ -128,4 +128,4 @@ Let's take a look at what is happening here. First of all, we are once again usi
 | 9 | letter & votes |
 
 If we were encoding the letter "A" and a vote value of "1" our payload would be `'A\x00\x00\x00\x00\x00\x00\x00\x01'`. This along with our framing data can be sent along to another system that expects framed data.
- 
+
