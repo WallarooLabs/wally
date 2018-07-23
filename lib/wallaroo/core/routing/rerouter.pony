@@ -25,13 +25,12 @@ use "wallaroo_labs/mort"
 trait Rerouter
   fun router(): (Router | DataRouter)
 
-  fun ref reroute(producer: Producer ref,
-    route_args: RoutingArguments)
+  fun ref reroute(producer: Producer ref, route_args: RoutingArguments)
   =>
     route_args.route_with(router(), producer)
 
 trait val RoutingArguments
-  fun val apply(rerouter: Rerouter, producer: Producer ref)
+  fun val apply(producer: Producer ref)
   fun val route_with(router: (Router | DataRouter), producer: Producer ref)
 
 class val TypedRoutingArguments[D: Any val] is RoutingArguments
@@ -59,8 +58,8 @@ class val TypedRoutingArguments[D: Any val] is RoutingArguments
     _metrics_id = metrics_id
     _worker_ingress_ts = worker_ingress_ts
 
-  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
-    rerouter.reroute(producer, this)
+  fun val apply(producer: Producer ref) =>
+    producer.reroute(producer, this)
 
   fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
     // !@ this doesn't correctly capture times for calculating latencies,
@@ -100,8 +99,8 @@ class val TypedDataRoutingArguments[D: Any val] is RoutingArguments
     _metrics_id = metrics_id
     _worker_ingress_ts = worker_ingress_ts
 
-  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
-    rerouter.reroute(producer, this)
+  fun val apply(producer: Producer ref) =>
+    producer.reroute(producer, this)
 
   fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
     // !@ This doesn't correctly capture times for calculating latencies,
@@ -143,8 +142,8 @@ class val TypedDataReplayRoutingArguments[D: Any val] is RoutingArguments
     _metrics_id = metrics_id
     _worker_ingress_ts = worker_ingress_ts
 
-  fun val apply(rerouter: Rerouter, producer: Producer ref) =>
-    rerouter.reroute(producer, this)
+  fun val apply(producer: Producer ref) =>
+    producer.reroute(producer, this)
 
   fun val route_with(router: (Router | DataRouter), producer: Producer ref) =>
     // !@ this doesn't correctly capture times for calculating latencies,

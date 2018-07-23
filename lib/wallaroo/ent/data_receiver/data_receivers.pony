@@ -95,10 +95,13 @@ actor DataReceivers
     conn.identify_data_receiver(dr, sender_boundary_id)
     _inform_subscribers(boundary_id, dr)
 
+    //!@
   be start_replay_processing() =>
-    for dr in _data_receivers.values() do
-      dr.start_replay_processing()
-    end
+    None
+    //!@
+    // for dr in _data_receivers.values() do
+    //   dr.start_replay_processing()
+    // end
 
   be start_normal_message_processing() =>
     _initialized = true

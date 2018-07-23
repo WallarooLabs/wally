@@ -29,7 +29,7 @@ use "wallaroo/core/topology"
 trait tag StatusReporter
   be report_status(code: ReportStatusCode)
 
-trait tag Producer is Muteable
+trait tag Producer is (Muteable & Rerouter)
   fun ref route_to(c: Consumer): (Route | None)
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId

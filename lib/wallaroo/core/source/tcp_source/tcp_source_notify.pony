@@ -35,7 +35,7 @@ use "wallaroo/core/messages"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-trait TCPSourceNotify is Rerouter
+trait TCPSourceNotify
   // TODO: CREDITFLOW - this is weird that its here
   // It exists so that a TCPSource can get its routes
   // on startup. It probably makes more sense to make this

@@ -81,6 +81,8 @@ actor TCPSource is Source
   let _pending_message_store: PendingMessageStore =
     _pending_message_store.create()
 
+  let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
+
   // TCP
   let _listen: TCPSourceListener
   let _notify: TCPSourceNotify
@@ -114,9 +116,9 @@ actor TCPSource is Source
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
-  new _accept(source_id: RoutingId, auth: AmbientAuth, listen: TCPSourceListener,
-    notify: TCPSourceNotify iso, event_log: EventLog,
-    router: Router,
+  new _accept(source_id: RoutingId, auth: AmbientAuth,
+    listen: TCPSourceListener, notify: TCPSourceNotify iso,
+    event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     fd: U32, init_size: USize = 64, max_size: USize = 16384,
@@ -161,13 +163,13 @@ actor TCPSource is Source
     _readable = true
 
     let new_router =
-      match router
+      match router'
       | let pr: PartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
-        router
+        router'
       end
     _router = new_router
 
@@ -195,15 +197,15 @@ actor TCPSource is Source
 
     _mute()
 
-  be update_router(router: Router) =>
+  be update_router(router': Router) =>
     let new_router =
-      match router
+      match router'
       | let pr: PartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
-        router
+        router'
       end
 
     let old_router = _router
@@ -219,8 +221,19 @@ actor TCPSource is Source
       _register_output(c_id, consumer)
     end
 
-    _notify.update_router(new_router)
-    _pending_message_store.process_known_keys(this, _notify, new_router)
+    _notify.update_router(_router)
+    _pending_message_store.process_known_keys(this, _router)
+    if not _pending_message_store.has_pending() then
+      let bs = Array[BarrierToken]
+      for b in _pending_barriers.values() do
+        bs.push(b)
+      end
+      _pending_barriers.clear()
+      for b in bs.values() do
+        _initiate_barrier(b)
+      end
+      _unmute_local()
+    end
 
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
@@ -259,6 +272,9 @@ actor TCPSource is Source
 
   be register_downstreams(action: Promise[Source]) =>
     action(this)
+
+  fun router(): Router =>
+    _router
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
@@ -425,15 +441,23 @@ actor TCPSource is Source
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
+    _initiate_barrier(token)
+
+  fun ref _initiate_barrier(token: BarrierToken) =>
     if not _shutdown then
-      @printf[I32]("!@ Source initiate_barrier\n".cstring())
-      for (o_id, o) in _outputs.pairs() do
-        match o
-        | let ob: OutgoingBoundary =>
-          ob.forward_barrier(o_id, _source_id, token)
-        else
-          o.receive_barrier(_source_id, this, token)
+      if not _pending_message_store.has_pending() then
+        @printf[I32]("!@ Source initiate_barrier\n".cstring())
+        for (o_id, o) in _outputs.pairs() do
+          match o
+          | let ob: OutgoingBoundary =>
+            ob.forward_barrier(o_id, _source_id, token)
+          else
+            o.receive_barrier(_source_id, this, token)
+          end
         end
+      else
+        _mute_local()
+        _pending_barriers.push(token)
       end
     end
 
@@ -737,6 +761,17 @@ actor TCPSource is Source
     _muted = false
     if not _reading then
       _pending_reads()
+    end
+
+  fun ref _mute_local() =>
+    _muted_downstream.set(this)
+    _mute()
+
+  fun ref _unmute_local() =>
+    _muted_downstream.unset(this)
+
+    if _muted_downstream.size() == 0 then
+      _unmute()
     end
 
   be mute(c: Consumer) =>
