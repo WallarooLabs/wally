@@ -1343,12 +1343,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             for stopper in stoppers:
                 stopper.join()
                 if stopper.error:
-                    print '\nSinkStopper Error. Runner output below.\n'
-                    for r in runners:
-                        print '==='
-                        print 'Runner: ', r.name
-                        print '---'
-                        print r.get_output()
                     raise stopper.error
         elif sink_await:
             logging.debug('Awaiting {} values at the sinks with a timeout of '
@@ -1363,12 +1357,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             for stopper in stoppers:
                 stopper.join()
                 if stopper.error:
-                    print '\nSinkStopper Error. Runner output below.\n'
-                    for r in runners:
-                        print '==='
-                        print 'Runner: ', r.name
-                        print '---'
-                        print r.get_output()
                     raise stopper.error
 
         elif delay:
