@@ -30,6 +30,9 @@ class BarrierStepForwarder
     _step_id = step_id
     _step = step
 
+  fun barrier_in_progress(): Bool =>
+    _barrier_token != InitialBarrierToken
+
   fun input_blocking(id: RoutingId): Bool =>
     _inputs_blocking.contains(id)
 
@@ -52,7 +55,7 @@ class BarrierStepForwarder
     let inputs = _step.inputs()
     if inputs.contains(step_id) then
       _inputs_blocking(step_id) = producer
-      _check_completion(inputs)
+      check_completion(inputs)
     else
       if not _removed_inputs.contains(step_id) then
         @printf[I32]("!@ %s: Forwarder at %s doesn't know about %s\n".cstring(), barrier_token.string().cstring(), _step_id.string().cstring(), step_id.string().cstring())
@@ -74,10 +77,12 @@ class BarrierStepForwarder
       end
     end
     _removed_inputs.set(input_id)
-    _check_completion(_step.inputs())
+    check_completion(_step.inputs())
 
-  fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
-    if inputs.size() == _inputs_blocking.size() then
+  fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
+    if (inputs.size() == _inputs_blocking.size()) and
+      not _step.has_pending_messages()
+    then
       @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
       for (o_id, o) in _step.outputs().pairs() do
         match o

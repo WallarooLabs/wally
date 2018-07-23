@@ -41,7 +41,7 @@ primitive KafkaSourceNotifyBuilder[In: Any val]
       runner_builder, router, consume metrics_reporter, event_log,
       target_router, pre_state_target_ids)
 
-class KafkaSourceNotify[In: Any val] is Rerouter
+class KafkaSourceNotify[In: Any val]
   let _source_id: RoutingId
   let _env: Env
   let _auth: AmbientAuth
@@ -145,9 +145,6 @@ class KafkaSourceNotify[In: Any val] is Rerouter
         pipeline_time_spent)
       _metrics_reporter.worker_metric(_pipeline_name, time_spent)
     end
-
-  fun router(): Router =>
-    _router
 
   fun ref update_router(router': Router) =>
     _router = router'

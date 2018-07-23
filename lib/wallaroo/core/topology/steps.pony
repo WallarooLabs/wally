@@ -122,9 +122,6 @@ actor Step is (Producer & Consumer & Rerouter)
     _step_message_processor = NormalStepMessageProcessor(this)
     _barrier_forwarder = BarrierStepForwarder(_id, this)
 
-  fun router(): Router =>
-    _router
-
   //
   // Application startup lifecycle event
   //
@@ -197,6 +194,18 @@ actor Step is (Producer & Consumer & Rerouter)
     end
     for (c_id, consumer) in _router.routes().pairs() do
       _register_output(c_id, consumer)
+    end
+    _pending_message_store.process_known_keys(this, _router)
+    // If a barrier is in progress, it might have been blocked by these
+    // pending messages. Check to see if this is true and if we're now
+    // ready to forward the barrier.
+    if not _pending_message_store.has_pending() then
+      match _barrier_forwarder
+      | let bf: BarrierStepForwarder =>
+        if bf.barrier_in_progress() then
+          bf.check_completion(inputs())
+        end
+      end
     end
 
   fun ref _register_output(id: RoutingId, c: Consumer) =>
@@ -404,6 +413,12 @@ actor Step is (Producer & Consumer & Rerouter)
   fun outputs(): Map[RoutingId, Consumer] box =>
     _outputs
 
+  fun router(): Router =>
+    _router
+
+  fun has_pending_messages(): Bool =>
+    _pending_message_store.has_pending()
+
   fun ref next_sequence_id(): SeqId =>
     _seq_id_generator.new_id()
 
@@ -411,7 +426,7 @@ actor Step is (Producer & Consumer & Rerouter)
     _seq_id_generator.latest_for_run()
 
   fun ref unknown_key(state_name: String, key: Key,
-      routing_args: RoutingArguments)
+    routing_args: RoutingArguments)
   =>
     _pending_message_store.add(state_name, key, routing_args)
     _state_step_creator.report_unknown_key(this, state_name, key)

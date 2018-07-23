@@ -26,6 +26,9 @@ use "wallaroo/ent/snapshot"
 
 
 actor DummyProducer is Producer
+  fun router(): Router =>
+    EmptyRouter
+
   // Producer
   fun ref route_to(c: Consumer): (Route | None) =>
     None
