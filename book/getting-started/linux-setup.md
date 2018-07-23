@@ -1,6 +1,6 @@
 # Setting Up Your Ubuntu Environment for Wallaroo
 
-These instructions have been tested for Ubuntu Artful, Trusty, and Xenial releases.
+These instructions have been tested for Ubuntu Artful, Bionic, Trusty, and Xenial releases.
 
 There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
@@ -115,7 +115,7 @@ sudo apt-get -V install pony-stable
 
 Wallaroo's Kakfa support requires `libsnappy` and `liblz` to be installed.
 
-### Artful and Xenial Ubuntu:
+### Xenial Ubuntu and later:
 
 ```bash
 sudo apt-get install -y libsnappy-dev liblz4-dev
@@ -170,7 +170,7 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 
 ### Compiling on Artful
 
-Due to ponyc's dependence on PIC on Artful Ubuntu, all applications must be compiled with the `PONYCFLAGS="--pic"` flag, like so:
+Due to ponyc's dependence on PIC on Artful Ubuntu and later, all applications must be compiled with the `PONYCFLAGS="--pic"` flag, like so:
 
 ```bash
 make PONYCFLAGS="--pic"
@@ -196,7 +196,7 @@ To compile all three, change to the root Wallaroo directory:
 cd ~/wallaroo-tutorial/wallaroo/
 ```
 
-### Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool on Artful
+### Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool on Artful and later
 
 ```bash
 make build-giles-sender-all build-utils-all PONYCFLAGS="--pic"
