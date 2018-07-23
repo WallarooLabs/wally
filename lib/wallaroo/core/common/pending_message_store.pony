@@ -19,18 +19,28 @@ Copyright 2018 The Wallaroo Authors.
 use "collections"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 class PendingMessageStore
   let _data_store: Map[String, Map[Key, Array[RoutingArguments]]] =
     _data_store.create()
+  var _pending_size: USize = 0
+
+  fun has_pending(): Bool =>
+    _pending_size > 0
 
   fun ref add(state_name: String, key: Key, routing_args: RoutingArguments) =>
     """
     Add a data item to the state_name/key array.
     """
     try
-      _data_store.insert_if_absent(state_name, Map[Key, Array[RoutingArguments]])?.
-        insert_if_absent(key, Array[RoutingArguments])?.push(routing_args)
+      _data_store
+        .insert_if_absent(state_name, Map[Key, Array[RoutingArguments]])?
+        .insert_if_absent(key, Array[RoutingArguments])?
+        .push(routing_args)
+      _pending_size = _pending_size + 1
+    else
+      Unreachable()
     end
 
   fun ref retrieve(state_name: String, key: Key): Array[RoutingArguments] ? =>
@@ -39,9 +49,10 @@ class PendingMessageStore
     the key and items from the store.
     """
     (_, let v) = _data_store(state_name)?.remove(key)?
+    _pending_size = _pending_size - 1
     v
 
-  fun ref process_known_keys(producer: Producer ref, rerouter: Rerouter,
+  fun ref process_known_keys(producer: Producer ref,
     router: (Router | DataRouter))
   =>
     for (state_name, keys_routing_args) in _data_store.pairs() do
@@ -49,8 +60,9 @@ class PendingMessageStore
         if router.has_state_partition(state_name, key) then
           try
             keys_routing_args.remove(key)?
+            _pending_size = _pending_size - 1
             for r in route_args.values() do
-              r(rerouter, producer)
+              r(producer)
             end
           end
         end

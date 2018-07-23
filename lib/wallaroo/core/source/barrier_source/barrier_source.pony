@@ -72,15 +72,23 @@ actor BarrierSource is Source
     _source_id = source_id
     _router_registry = router_registry
 
-  be register_pipeline(pipeline_name: String, router: Router) =>
+  fun router(): Router =>
+    let rs = recover iso Array[Router] end
+    for r in _routers.values() do
+      rs.push(r)
+    end
+    MultiRouter(consume rs)
+
+  be register_pipeline(pipeline_name: String, router': Router) =>
     """
     On this worker, we need to keep track of every pipeline that has at least
     one Source. That's because we need to be able to forward barriers to
     everything a Source for that pipeline would forward to on this worker.
     """
-    let p_identifier = _PipelineIdentifierCreator(router)
+    let p_identifier = _PipelineIdentifierCreator(router')
     try
-      _pipeline_outputs.insert_if_absent(pipeline_name, Map[RoutingId, Consumer])?
+      _pipeline_outputs.insert_if_absent(pipeline_name,
+        Map[RoutingId, Consumer])?
       _pipeline_identifiers.insert_if_absent(p_identifier, SetIs[String])?
       _pipeline_identifiers(p_identifier)?.set(pipeline_name)
     else
@@ -88,7 +96,7 @@ actor BarrierSource is Source
     end
 
     // Subscribe to the router if it can be updated over time.
-    match router
+    match router'
     | let pr: PartitionRouter =>
       _router_registry.register_partition_router_subscriber(pr.state_name(),
         this)
@@ -96,26 +104,26 @@ actor BarrierSource is Source
       _router_registry.register_stateless_partition_router_subscriber(
         spr.partition_id(), this)
     end
-    _update_router(pipeline_name, router)
+    _update_router(pipeline_name, router')
 
-  be update_router(router: Router) =>
-    let pid = _PipelineIdentifierCreator(router)
+  be update_router(router': Router) =>
+    let pid = _PipelineIdentifierCreator(router')
     try
       let pipelines = _pipeline_identifiers(pid)?
       for p in pipelines.values() do
-        _update_router(p, router)
+        _update_router(p, router')
       end
     else
       Fail()
     end
 
-  fun ref _update_router(pipeline_name: String, router: Router) =>
+  fun ref _update_router(pipeline_name: String, router': Router) =>
     if _routers.contains(pipeline_name) then
       try
         let old_router = _routers(pipeline_name)?
-        _routers(pipeline_name) = router
+        _routers(pipeline_name) = router'
         for (old_id, outdated_consumer) in
-          old_router.routes_not_in(router).pairs()
+          old_router.routes_not_in(router').pairs()
         do
           _unregister_output(pipeline_name, old_id, outdated_consumer)
         end
@@ -123,9 +131,9 @@ actor BarrierSource is Source
         Unreachable()
       end
     else
-      _routers(pipeline_name) = router
+      _routers(pipeline_name) = router'
     end
-    for (c_id, consumer) in router.routes().pairs() do
+    for (c_id, consumer) in router'.routes().pairs() do
       _register_output(pipeline_name, c_id, consumer)
     end
 

@@ -441,7 +441,8 @@ actor RouterRegistry
   be register_data_receiver(worker: String, dr: DataReceiver) =>
     _data_receiver_map(worker) = dr
 
-  be register_state_step(step: Step, state_name: String, key: Key, step_id: RoutingId) =>
+  be register_state_step(step: Step, state_name: String, key: Key, step_id: RoutingId)
+  =>
     _add_routes_to_state_step(step_id, step, key, state_name)
 
   fun _distribute_data_router() =>
@@ -1545,8 +1546,8 @@ actor RouterRegistry
       Fail()
     end
 
-  fun ref move_proxy_to_stateful_step(id: RoutingId, target: Consumer, key: Key,
-    state_name: String, source_worker: String)
+  fun ref move_proxy_to_stateful_step(id: RoutingId, target: Consumer,
+    key: Key, state_name: String, source_worker: String)
   =>
     """
     Called when a stateful step has been migrated to this worker from another
