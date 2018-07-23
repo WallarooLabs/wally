@@ -93,6 +93,10 @@ actor SnapshotInitiator is Initializable
       Fail()
     end
 
+  be dispose() =>
+    @printf[I32]("Shutting down SnapshotInitiator\n".cstring())
+    _timers.dispose()
+
 class _InitiateSnapshot is TimerNotify
   let _si: SnapshotInitiator
 

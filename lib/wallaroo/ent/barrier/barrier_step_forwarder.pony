@@ -22,6 +22,7 @@ class BarrierStepForwarder
   let _step: Step ref
   var _barrier_token: BarrierToken = InitialBarrierToken
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
+  let _removed_inputs: SetIs[RoutingId] = _removed_inputs.create()
 
   // !@ Perhaps we need to add invariant wherever inputs and outputs can be
   // updated in the encapsulating actor to check if barrier is in progress.
@@ -53,7 +54,10 @@ class BarrierStepForwarder
       _inputs_blocking(step_id) = producer
       _check_completion(inputs)
     else
-      Fail()
+      if not _removed_inputs.contains(step_id) then
+        @printf[I32]("!@ %s: Forwarder at %s doesn't know about %s\n".cstring(), barrier_token.string().cstring(), _step_id.string().cstring(), step_id.string().cstring())
+        Fail()
+      end
     end
 
   fun ref remove_input(input_id: RoutingId) =>
@@ -69,6 +73,7 @@ class BarrierStepForwarder
         Unreachable()
       end
     end
+    _removed_inputs.set(input_id)
     _check_completion(_step.inputs())
 
   fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>

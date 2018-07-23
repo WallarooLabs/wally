@@ -425,13 +425,15 @@ actor TCPSource is Source
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    @printf[I32]("!@ Source initiate_barrier\n".cstring())
-    for (o_id, o) in _outputs.pairs() do
-      match o
-      | let ob: OutgoingBoundary =>
-        ob.forward_barrier(o_id, _source_id, token)
-      else
-        o.receive_barrier(_source_id, this, token)
+    if not _shutdown then
+      @printf[I32]("!@ Source initiate_barrier\n".cstring())
+      for (o_id, o) in _outputs.pairs() do
+        match o
+        | let ob: OutgoingBoundary =>
+          ob.forward_barrier(o_id, _source_id, token)
+        else
+          o.receive_barrier(_source_id, this, token)
+        end
       end
     end
 

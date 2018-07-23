@@ -71,6 +71,8 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
 
   let _topic: String
 
+  var _seq_id: SeqId = 0
+
   // Items in tuple are: metric_name, metrics_id, send_ts, worker_ingress_ts,
   //   pipeline_time_spent, tracking_id
   let _pending_delivery_report: MapIs[Any tag, (String, U16, U64, U64, U64,
@@ -337,7 +339,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
 
         // TODO: Resilience: Write data to event log for recovery purposes
 
-        let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
+        let next_tracking_id = (_seq_id = _seq_id + 1)
         _pending_delivery_report(any) = (metric_name, my_metrics_id,
           my_latest_ts, worker_ingress_ts, pipeline_time_spent,
           next_tracking_id)

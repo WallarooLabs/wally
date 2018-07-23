@@ -321,13 +321,16 @@ actor Startup
 
       let barrier_initiator = BarrierInitiator(auth,
         _startup_options.worker_name, connections, initializer_name)
+      connections.register_disposable(barrier_initiator)
 
       let snapshot_initiator = SnapshotInitiator(connections,
         _startup_options.time_between_snapshots, barrier_initiator,
         _startup_options.snapshots_enabled, _startup_options.is_initializer)
+      connections.register_disposable(snapshot_initiator)
 
       let autoscale_initiator = AutoscaleInitiator(
         _startup_options.worker_name, barrier_initiator)
+      connections.register_disposable(autoscale_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
 
