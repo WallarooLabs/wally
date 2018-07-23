@@ -61,8 +61,6 @@ actor BarrierInitiator is Initializable
   let _connections: Connections
   var _barrier_source: (BarrierSource | None) = None
   let _sources: Map[RoutingId, Source] = _sources.create()
-  //!@ what's this for?
-  let _source_ids: Map[USize, RoutingId] = _source_ids.create()
   let _sinks: SetIs[BarrierReceiver] = _sinks.create()
   let _workers: _StringSet = _workers.create()
 
@@ -108,12 +106,10 @@ actor BarrierInitiator is Initializable
 
   be register_source(source: Source, source_id: RoutingId) =>
     _sources(source_id) = source
-    _source_ids(digestof source) = source_id
 
   be unregister_source(source: Source, source_id: RoutingId) =>
     try
-      _sources(source_id)?
-      _source_ids(digestof source)?
+      _sources.remove(source_id)?
     else
       Fail()
     end
@@ -440,6 +436,10 @@ actor BarrierInitiator is Initializable
     for s in _sources.values() do
       s.barrier_complete(barrier_token)
     end
+
+  be dispose() =>
+    @printf[I32]("Shutting down BarrierInitiator\n".cstring())
+    None
 
   //!@
   // be check() =>

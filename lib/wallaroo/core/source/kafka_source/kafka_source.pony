@@ -328,12 +328,14 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    for (o_id, o) in _outputs.pairs() do
-      match o
-      | let ob: OutgoingBoundary =>
-        ob.forward_barrier(o_id, _source_id, token)
-      else
-        o.receive_barrier(_source_id, this, token)
+    if not _disposed then
+      for (o_id, o) in _outputs.pairs() do
+        match o
+        | let ob: OutgoingBoundary =>
+          ob.forward_barrier(o_id, _source_id, token)
+        else
+          o.receive_barrier(_source_id, this, token)
+        end
       end
     end
 
