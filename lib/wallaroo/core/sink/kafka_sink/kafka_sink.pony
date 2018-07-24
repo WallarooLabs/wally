@@ -403,6 +403,16 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    match barrier_token
+    | let srt: SnapshotRollbackBarrierToken =>
+      if _barrier_acker.higher_priority(srt) then
+        _barrier_acker.clear()
+        _message_processor = NormalSinkMessageProcessor(this)
+        // TODO: If there is any recovery data associated with Sink, then
+        // rollback using it.
+      end
+    end
+
     if _message_processor.barrier_in_progress() then
       _message_processor.receive_barrier(step_id, producer,
         barrier_token)

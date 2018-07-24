@@ -10,45 +10,50 @@ the License. You may obtain a copy of the License at
 
 */
 
+use "promises"
 use "wallaroo/ent/network"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
+use "wallaroo/ent/snapshot"
 
 actor Recovery
   """
   Phases:
-    1) _NotRecovering: Waiting for start_recovery() to be called
-    2) _LogReplay: Wait for EventLog to finish replaying the event logs
-    3) _BoundaryMsgReplay: Wait for RecoveryReplayer to manage message replay
-       from incoming boundaries.
-    4) _NotRecovering: Finished recovery
+    1) _AwaitRecovering: Waiting for start_recovery() to be called
+    2) _BoundariesReconnect: Wait for all boundaries to reconnect.
+    3) _Rollback: Rollback all state to last safe checkpoint.
+    4) _FinishedRecovering: Finished recovery
   """
+  let _self: Recovery tag = this
   let _auth: AmbientAuth
   let _worker_name: String
-  var _recovery_phase: _RecoveryPhase = _NotRecovering
+  var _recovery_phase: _RecoveryPhase = _AwaitRecovering
   var _workers: Array[String] val = recover Array[String] end
 
+  //!@ Can we remove this?
   let _event_log: EventLog
-  let _recovery_replayer: (RecoveryReplayer | None)
+  let _recovery_reconnecter: RecoveryReconnecter
+  let _snapshot_initiator: SnapshotInitiator
   let _connections: Connections
-  var _initializer: (LocalTopologyInitializer | None) =
-    None
+  var _initializer: (LocalTopologyInitializer | None) = None
 
   new create(auth: AmbientAuth, worker_name: String, event_log: EventLog,
-    recovery_replayer: (RecoveryReplayer | None) = None,
-    connections: Connections)
+    recovery_reconnecter: RecoveryReconnecter,
+    snapshot_initiator: SnapshotInitiator, connections: Connections)
   =>
     _auth = auth
     _worker_name = worker_name
     _event_log = event_log
-    _recovery_replayer = recovery_replayer
+    _recovery_reconnecter = recovery_reconnecter
+    _snapshot_initiator = snapshot_initiator
     _connections = connections
 
   be start_recovery(
     initializer: LocalTopologyInitializer,
     workers: Array[String] val)
   =>
+    //!@ Not sure we need to thread workers through anymore
     let other_workers = recover trn Array[String] end
     for w in workers.values() do
       if w != _worker_name then other_workers.push(w) end
@@ -56,58 +61,40 @@ actor Recovery
     _workers = consume other_workers
 
     _initializer = initializer
-    try
-      _recovery_phase.start_recovery(workers, this)?
-    else
-      Fail()
-    end
+    _recovery_phase.start_recovery(_workers, this)
 
-  be log_replay_finished() =>
-    try
-      _recovery_phase.log_replay_finished()?
-    else
-      Fail()
-    end
+  be recovery_reconnect_finished() =>
+    _recovery_phase.recovery_reconnect_finished()
 
-  be recovery_replay_finished() =>
-    try
-      _recovery_phase.msg_replay_finished()?
-    else
-      Fail()
-    end
+  be rollback_complete(snapshot_id: SnapshotId) =>
+    _recovery_phase.rollback_complete(snapshot_id)
 
-  fun ref _start_log_replay(workers: Array[String] val) =>
+  fun ref _start_reconnect(workers: Array[String] val) =>
     ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Log Replay - ~~|\n".cstring())
+      @printf[I32]("|~~ - Recovery Phase: Reconnect - ~~|\n".cstring())
     end
-    _recovery_phase = _LogReplay(workers, this)
-    try
-      _recovery_phase.start_log_replay(_event_log)?
+    _recovery_phase = _BoundariesReconnect(_recovery_reconnecter, workers,
+      this)
+    _recovery_phase.start_reconnect()
+
+  fun ref _initiate_rollback() =>
+    ifdef "resilience" then
+      @printf[I32]("|~~ - Recovery Phase: Rollback - ~~|\n".cstring())
+
+      _recovery_phase = _Rollback(this)
+      let action = Promise[SnapshotId]
+      action.next[None](recover this~rollback_complete() end)
+      _snapshot_initiator.initiate_rollback(action)
     else
-      Fail()
+      _recovery_complete()
     end
 
-  fun ref _end_log_replay(workers: Array[String] val) =>
-    match _initializer
-    | let lti: LocalTopologyInitializer =>
-      _start_msg_replay(workers)
-    else
-      Fail()
+  fun ref _recovery_complete() =>
+    ifdef "resilience" then
+      @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())
     end
-
-  fun ref _start_msg_replay(workers: Array[String] val) =>
-    @printf[I32]("|~~ - Recovery Phase: Recovery Message Replay - ~~|\n"
-      .cstring())
-    _recovery_phase = _BoundaryMsgReplay(workers, _recovery_replayer, this)
-    try
-      _recovery_phase.start_msg_replay()?
-    else
-      Fail()
-    end
-
-  fun ref _end_recovery() =>
-    @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())
-    _recovery_phase = _NotRecovering
+    _recovery_phase = _FinishedRecovering
+    //!@ Do we still want to do this?
     match _initializer
     | let lti: LocalTopologyInitializer =>
       _event_log.start_pipeline_logging(lti)
@@ -116,56 +103,62 @@ actor Recovery
     end
 
 trait _RecoveryPhase
-  fun start_recovery(workers: Array[String] val, recovery: Recovery ref) ? =>
-    error
-  fun start_log_replay(event_log: EventLog) ? =>
-    error
-  fun ref log_replay_finished() ? =>
-    error
-  fun ref start_msg_replay() ? =>
-    error
-  fun ref msg_replay_finished() ? =>
-    error
+  fun name(): String
 
-class _NotRecovering is _RecoveryPhase
-  fun start_recovery(workers: Array[String] val, recovery: Recovery ref) =>
-    recovery._start_log_replay(workers)
+  fun ref start_recovery(workers: Array[String] val, recovery: Recovery ref) =>
+    _invalid_call()
 
-class _LogReplay is _RecoveryPhase
+  fun ref start_reconnect() =>
+    _invalid_call()
+
+  fun ref recovery_reconnect_finished() =>
+    _invalid_call()
+
+  fun ref rollback_complete(snapshot_id: SnapshotId) =>
+    _invalid_call()
+
+  fun _invalid_call() =>
+    @printf[I32]("Invalid call on recovery phase %s\n".cstring(),
+      name().cstring())
+    Fail()
+
+class _AwaitRecovering is _RecoveryPhase
+  fun name(): String => "_AwaitRecovering"
+
+  fun ref start_recovery(workers: Array[String] val, recovery: Recovery ref) =>
+    recovery._start_reconnect(workers)
+
+class _BoundariesReconnect is _RecoveryPhase
+  let _recovery_reconnecter: RecoveryReconnecter
   let _workers: Array[String] val
   let _recovery: Recovery ref
 
-  new create(workers: Array[String] val, recovery: Recovery ref) =>
-    _workers = workers
-    _recovery = recovery
-
-  fun start_log_replay(event_log: EventLog) =>
-    event_log.start_log_replay(_recovery)
-
-  fun ref log_replay_finished() =>
-    _recovery._end_log_replay(_workers)
-
-class _BoundaryMsgReplay is _RecoveryPhase
-  let _workers: Array[String] val
-  let _recovery_replayer: (RecoveryReplayer | None)
-  let _recovery: Recovery ref
-
-  new create(workers: Array[String] val,
-    recovery_replayer: (RecoveryReplayer | None), recovery: Recovery ref)
+  new create(recovery_reconnecter: RecoveryReconnecter,
+    workers: Array[String] val, recovery: Recovery ref)
   =>
+    _recovery_reconnecter = recovery_reconnecter
     _workers = workers
-    _recovery_replayer = recovery_replayer
     _recovery = recovery
 
-  fun ref start_msg_replay() =>
-    match _recovery_replayer
-    | let rr: RecoveryReplayer =>
-      rr.start_recovery_replay(_workers, _recovery)
-    else
-      @printf[I32]("|~~ - - No RecoveryReplayer: Finishing early - - ~~|\n"
-        .cstring())
-      msg_replay_finished()
-    end
+  fun name(): String => "_BoundariesReconnect"
 
-  fun ref msg_replay_finished() =>
-    _recovery._end_recovery()
+  fun ref start_reconnect() =>
+    _recovery_reconnecter.start_recovery_reconnect(_workers, _recovery)
+
+  fun ref recovery_reconnect_finished() =>
+    _recovery._initiate_rollback()
+
+class _Rollback is _RecoveryPhase
+  let _recovery: Recovery ref
+
+  new create(recovery: Recovery ref) =>
+    _recovery = recovery
+
+  fun name(): String => "_Rollback"
+
+  fun ref rollback_complete(snapshot_id: SnapshotId) =>
+    _recovery._recovery_complete()
+
+class _FinishedRecovering is _RecoveryPhase
+  fun name(): String => "_FinishedRecovering"
+

@@ -68,3 +68,7 @@ class PendingMessageStore
         end
       end
     end
+
+  fun ref clear() =>
+    _data_store.clear()
+    _pending_size = 0

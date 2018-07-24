@@ -348,19 +348,19 @@ actor Startup
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
 
-      let recovery_replayer = RecoveryReplayer(auth,
+      let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, data_receivers, router_registry,
         connections, is_recovering)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        event_log, recovery_replayer, connections)
+        event_log, recovery_reconnecter, snapshot_initiator, connections)
 
       let local_topology_initializer =
         LocalTopologyInitializer(
           _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers, event_log, recovery,
-          recovery_replayer, snapshot_initiator, barrier_initiator,
+          recovery_reconnecter, snapshot_initiator, barrier_initiator,
           _local_topology_file, _data_channel_file, _worker_names_file,
           state_step_creator)
 
@@ -398,7 +398,7 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
-          recovery_replayer, router_registry, barrier_initiator,
+          recovery_reconnecter, router_registry, barrier_initiator,
           control_channel_filepath, _startup_options.my_d_host,
           _startup_options.my_d_service, event_log, this)
 
@@ -529,19 +529,19 @@ actor Startup
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
 
-      let recovery_replayer = RecoveryReplayer(auth,
+      let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name,
         data_receivers, router_registry, connections)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        event_log, recovery_replayer, connections)
+        event_log, recovery_reconnecter, snapshot_initiator, connections)
 
       let local_topology_initializer =
         LocalTopologyInitializer(
           _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
-          event_log, recovery, recovery_replayer, snapshot_initiator,
+          event_log, recovery, recovery_reconnecter, snapshot_initiator,
           barrier_initiator, _local_topology_file, _data_channel_file,
           _worker_names_file, state_step_creator where is_joining = true)
 
@@ -591,7 +591,7 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
-          recovery_replayer, router_registry, barrier_initiator,
+          recovery_reconnecter, router_registry, barrier_initiator,
           control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service,
           event_log, this)

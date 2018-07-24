@@ -15,7 +15,8 @@ use "wallaroo/ent/autoscale"
 use "wallaroo/ent/snapshot"
 
 
-trait val BarrierToken is (Hashable & Equatable[BarrierToken])
+trait val BarrierToken is (Hashable & Equatable[BarrierToken] &
+  Comparable[BarrierToken])
   fun string(): String
 
 primitive InitialBarrierToken is BarrierToken
@@ -28,6 +29,17 @@ primitive InitialBarrierToken is BarrierToken
     end
 
   fun hash(): USize => 0
+
+  fun lt(that: box->BarrierToken): Bool =>
+    false
+
+  fun le(that: box->BarrierToken): Bool =>
+    match that
+    | let ifa: InitialBarrierToken =>
+      true
+    else
+      false
+    end
 
   fun string(): String =>
     "InitialBarrierToken"
@@ -54,6 +66,54 @@ class val AutoscaleBarrierToken is BarrierToken
   fun id(): AutoscaleId =>
     _id
 
+  fun lt(that: box->BarrierToken): Bool =>
+    match that
+    | let abt: AutoscaleBarrierToken =>
+      if _id == abt._id then
+        _worker < abt._worker
+      else
+        _id < abt._id
+      end
+    else
+      false
+    end
+
+  fun le(that: box->BarrierToken): Bool =>
+    match that
+    | let abt: AutoscaleBarrierToken =>
+      if _id == abt._id then
+        _worker <= abt._worker
+      else
+        _id <= abt._id
+      end
+    else
+      false
+    end
+
+  fun gt(that: box->BarrierToken): Bool =>
+    match that
+    | let abt: AutoscaleBarrierToken =>
+      if _id == abt._id then
+        _worker > abt._worker
+      else
+        _id > abt._id
+      end
+    else
+      false
+    end
+
+  fun ge(that: box->BarrierToken): Bool =>
+    match that
+    | let abt: AutoscaleBarrierToken =>
+      if _id == abt._id then
+        _worker >= abt._worker
+      else
+        _id >= abt._id
+      end
+    else
+      false
+    end
+
   fun string(): String =>
     "AutoscaleBarrierToken(" + _worker + ", " + _id.string() + ")"
 
@@ -79,6 +139,54 @@ class val AutoscaleResumeBarrierToken is BarrierToken
   fun id(): AutoscaleId =>
     _id
 
+  fun lt(that: box->BarrierToken): Bool =>
+    match that
+    | let abt: AutoscaleResumeBarrierToken =>
+      if _id == abt._id then
+        _worker < abt._worker
+      else
+        _id < abt._id
+      end
+    else
+      false
+    end
+
+  fun le(that: box->BarrierToken): Bool =>
+    match that
+    | let abt: AutoscaleResumeBarrierToken =>
+      if _id == abt._id then
+        _worker <= abt._worker
+      else
+        _id <= abt._id
+      end
+    else
+      false
+    end
+
+  fun gt(that: box->BarrierToken): Bool =>
+    match that
+    | let abt: AutoscaleResumeBarrierToken =>
+      if _id == abt._id then
+        _worker > abt._worker
+      else
+        _id > abt._id
+      end
+    else
+      false
+    end
+
+  fun ge(that: box->BarrierToken): Bool =>
+    match that
+    | let abt: AutoscaleResumeBarrierToken =>
+      if _id == abt._id then
+        _worker >= abt._worker
+      else
+        _id >= abt._id
+      end
+    else
+      false
+    end
+
   fun string(): String =>
     "AutoscaleResumeBarrierToken(" + _worker + ", " + _id.string() + ")"
 
@@ -99,6 +207,91 @@ class val SnapshotBarrierToken is BarrierToken
   fun hash(): USize =>
     id.hash()
 
+  fun lt(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotBarrierToken =>
+      id < sbt.id
+    else
+      false
+    end
+
+  fun le(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotBarrierToken =>
+      id <= sbt.id
+    else
+      false
+    end
+
+  fun gt(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotBarrierToken =>
+      id > sbt.id
+    else
+      false
+    end
+
+  fun ge(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotBarrierToken =>
+      id > sbt.id
+    else
+      false
+    end
+
   fun string(): String =>
     "SnapshotBarrierToken(" + id.string() + ")"
 
+class val SnapshotRollbackBarrierToken is BarrierToken
+  let id: SnapshotId
+
+  new val create(id': SnapshotId) =>
+    id = id'
+
+  fun eq(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotRollbackBarrierToken =>
+      id == sbt.id
+    else
+      false
+    end
+
+  fun hash(): USize =>
+    id.hash()
+
+  fun lt(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotRollbackBarrierToken =>
+      id < sbt.id
+    else
+      false
+    end
+
+  fun le(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotRollbackBarrierToken =>
+      id <= sbt.id
+    else
+      false
+    end
+
+  fun gt(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotRollbackBarrierToken =>
+      id > sbt.id
+    else
+      // A Rollback token is higher priority than any non-Rollback token.
+      true
+    end
+
+  fun ge(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotRollbackBarrierToken =>
+      id > sbt.id
+    else
+      // A Rollback token is higher priority than any non-Rollback token.
+      true
+    end
+
+  fun string(): String =>
+    "SnapshotRollbackBarrierToken(" + id.string() + ")"
