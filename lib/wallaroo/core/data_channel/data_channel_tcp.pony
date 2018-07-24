@@ -58,7 +58,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
   let _metrics_reporter: MetricsReporter
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
   let _joining_existing_cluster: Bool
 
@@ -67,7 +67,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     metrics_reporter: MetricsReporter iso,
     recovery_file: FilePath,
     layout_initializer: LayoutInitializer tag,
-    data_receivers: DataReceivers, recovery_replayer: RecoveryReplayer,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
     router_registry: RouterRegistry, joining: Bool = false)
   =>
     _name = name
@@ -145,7 +145,7 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _metrics_reporter: MetricsReporter
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
 
   // Initial state is an empty DataReceiver wrapper that should never
@@ -161,7 +161,7 @@ class DataChannelConnectNotifier is DataChannelNotify
   new iso create(connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso,
     layout_initializer: LayoutInitializer tag,
-    data_receivers: DataReceivers, recovery_replayer: RecoveryReplayer,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
     router_registry: RouterRegistry)
   =>
     _connections = connections
@@ -301,8 +301,9 @@ class DataChannelConnectNotifier is DataChannelNotify
           @printf[I32]("Received ReplayCompleteMsg on Data Channel\n"
             .cstring())
         end
-        _recovery_replayer.add_boundary_replay_complete(c.sender_name,
-          c.boundary_id)
+        //!@ We should probably be removing this whole message
+        // _recovery_replayer.add_boundary_replay_complete(c.sender_name,
+        //   c.boundary_id)
       | let m: SpinUpLocalTopologyMsg =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
       | let m: ReportStatusMsg =>

@@ -493,6 +493,13 @@ actor OutgoingBoundary is Consumer
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken)
   =>
+    match barrier_token
+    | let srt: SnapshotRollbackBarrierToken =>
+      _queue.clear()
+      //!@ Do something about _lowest_queue_id, such as rollback to the last
+      // one for the last snapshot
+    end
+
     try
       let msg = ChannelMsgEncoder.forward_barrier(target_step_id,
         origin_step_id, barrier_token, _auth)?

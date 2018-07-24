@@ -1521,7 +1521,7 @@ actor RouterRegistry
   /////
   be receive_immigrant_step(subpartition: StateSubpartitions,
     runner_builder: RunnerBuilder, reporter: MetricsReporter iso,
-    recovery_replayer: RecoveryReplayer, msg: StepMigrationMsg)
+    recovery_replayer: RecoveryReconnecter, msg: StepMigrationMsg)
   =>
     let outgoing_boundaries = recover iso Map[String, OutgoingBoundary] end
     for (k, v) in _outgoing_boundaries.pairs() do

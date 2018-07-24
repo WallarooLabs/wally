@@ -36,7 +36,7 @@ actor StateStepCreator is Initializable
   let _metrics_conn: MetricsSink
   let _auth: AmbientAuth
   let _event_log: EventLog
-  var _recovery_replayer: (None | RecoveryReplayer) = None
+  var _recovery_replayer: (None | RecoveryReconnecter) = None
 
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
     recover _outgoing_boundaries.create() end
@@ -128,7 +128,7 @@ actor StateStepCreator is Initializable
           Step(_auth, runner_builder(
             where event_log = _event_log, auth = _auth),
             consume reporter, id, _event_log,
-            _recovery_replayer as RecoveryReplayer,
+            _recovery_replayer as RecoveryReconnecter,
             _outgoing_boundaries, this
             where target_id_router = target_id_router)
         else
@@ -151,7 +151,7 @@ actor StateStepCreator is Initializable
   be initialize_routes_and_builders(initializer: LocalTopologyInitializer,
     keys_to_steps: LocalStatePartitions iso,
     keys_to_step_ids: LocalStatePartitionIds iso,
-    recovery_replayer: RecoveryReplayer,
+    recovery_replayer: RecoveryReconnecter,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_runner_builders: Map[String, RunnerBuilder] val)
   =>
