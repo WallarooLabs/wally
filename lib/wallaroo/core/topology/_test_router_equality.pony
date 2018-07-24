@@ -58,7 +58,7 @@ class iso _TestTargetIdRouterEquality is UnitTest
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
     let event_log = EventLog()
-    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
+    let recovery_replayer = _RecoveryReconnecterGenerator(h.env, auth)
 
     let step1 = _StepGenerator(auth, event_log, recovery_replayer)
     let step2 = _StepGenerator(auth, event_log, recovery_replayer)
@@ -128,7 +128,7 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
     let event_log = EventLog()
-    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
+    let recovery_replayer = _RecoveryReconnecterGenerator(h.env, auth)
 
     let step1 = _StepGenerator(auth, event_log, recovery_replayer)
     let step2 = _StepGenerator(auth, event_log, recovery_replayer)
@@ -186,7 +186,7 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
     let event_log = EventLog()
-    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
+    let recovery_replayer = _RecoveryReconnecterGenerator(h.env, auth)
 
     let step1 = _StepGenerator(auth, event_log, recovery_replayer)
     let step2 = _StepGenerator(auth, event_log, recovery_replayer)
@@ -225,7 +225,7 @@ primitive _PartitionFunctionGenerator
 
 primitive _StepGenerator
   fun apply(auth: AmbientAuth, event_log: EventLog,
-    recovery_replayer: RecoveryReplayer): Step
+    recovery_replayer: RecoveryReconnecter): Step
   =>
     Step(auth, RouterRunner, MetricsReporter("", "", _NullMetricsSink),
       1, event_log, recovery_replayer,
@@ -270,9 +270,9 @@ primitive _ConnectionsGenerator
       _NullMetricsSink, "", "", false, "", false
       where event_log = EventLog())
 
-primitive _RecoveryReplayerGenerator
-  fun apply(env: Env, auth: AmbientAuth): RecoveryReplayer =>
-    RecoveryReplayer(auth, "", _DataReceiversGenerator(env, auth),
+primitive _RecoveryReconnecterGenerator
+  fun apply(env: Env, auth: AmbientAuth): RecoveryReconnecter =>
+    RecoveryReconnecter(auth, "", _DataReceiversGenerator(env, auth),
       _RouterRegistryGenerator(env, auth), _Cluster)
 
 primitive _StatelessPartitionGenerator

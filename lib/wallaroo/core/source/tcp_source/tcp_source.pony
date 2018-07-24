@@ -445,8 +445,13 @@ actor TCPSource is Source
 
   fun ref _initiate_barrier(token: BarrierToken) =>
     if not _shutdown then
+      match token
+      | let srt: SnapshotRollbackBarrierToken =>
+        @printf[I32]("!@ Source clearing pending message store\n".cstring())
+        _pending_message_store.clear()
+      end
       if not _pending_message_store.has_pending() then
-        @printf[I32]("!@ Source initiate_barrier\n".cstring())
+        @printf[I32]("!@ Source initiate_barrier %s\n".cstring(), token.string().cstring())
         for (o_id, o) in _outputs.pairs() do
           match o
           | let ob: OutgoingBoundary =>

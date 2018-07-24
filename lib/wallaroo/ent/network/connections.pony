@@ -160,7 +160,7 @@ actor Connections is Cluster
 
   be create_initializer_data_channel_listener(
     data_receivers: DataReceivers,
-    recovery_replayer: RecoveryReplayer,
+    recovery_replayer: RecoveryReconnecter,
     router_registry: RouterRegistry,
     cluster_initializer: ClusterInitializer, data_channel_file: FilePath,
     layout_initializer: LayoutInitializer tag)

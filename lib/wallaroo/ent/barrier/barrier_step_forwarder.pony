@@ -30,6 +30,9 @@ class BarrierStepForwarder
     _step_id = step_id
     _step = step
 
+  fun ref higher_priority(token: BarrierToken): Bool =>
+    token > _barrier_token
+
   fun barrier_in_progress(): Bool =>
     _barrier_token != InitialBarrierToken
 
@@ -95,10 +98,10 @@ class BarrierStepForwarder
           o.receive_barrier(_step_id, _step, _barrier_token)
         end
       end
-      _clear()
+      clear()
       _step.barrier_complete(_barrier_token)
     end
 
-  fun ref _clear() =>
+  fun ref clear() =>
     _inputs_blocking.clear()
     _barrier_token = InitialBarrierToken

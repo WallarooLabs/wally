@@ -333,7 +333,27 @@ actor TCPSink is Sink
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ Receive barrier at TCPSink\n".cstring())
+    @printf[I32]("!@ Receive barrier %s at TCPSink\n".cstring(), barrier_token.string().cstring())
+
+    match barrier_token
+    | let srt: SnapshotRollbackBarrierToken =>
+      @printf[I32]("!@ Sink checking to clear\n".cstring())
+      try
+        let b_acker = _barrier_acker as BarrierSinkAcker
+        if b_acker.higher_priority(srt) then
+          @printf[I32]("!@ Sink clearing based on %s\n".cstring(), barrier_token.string().cstring())
+          b_acker.clear()
+          _message_processor = NormalSinkMessageProcessor(this)
+          // TODO: If there is any recovery data associated with Sink, then
+          // rollback using it.
+        else
+          @printf[I32]("!@ Sink NOT clearing based on %s\n".cstring(), barrier_token.string().cstring())
+        end
+      else
+        Fail()
+      end
+    end
+
     if _message_processor.barrier_in_progress() then
       _message_processor.receive_barrier(step_id, producer,
         barrier_token)

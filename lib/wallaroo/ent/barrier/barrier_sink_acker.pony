@@ -32,6 +32,9 @@ class BarrierSinkAcker
     _sink = sink
     _barrier_initiator = barrier_initiator
 
+  fun ref higher_priority(token: BarrierToken): Bool =>
+    token > _barrier_token
+
   fun input_blocking(id: RoutingId): Bool =>
     _inputs_blocking.contains(id)
 
@@ -76,10 +79,10 @@ class BarrierSinkAcker
     @printf[I32]("!@ receive_barrier at TCPSink: %s inputs, %s received\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring())
     if inputs.size() == _inputs_blocking.size() then
       _barrier_initiator.ack_barrier(_sink, _barrier_token)
-      _clear()
+      clear()
       _sink.barrier_complete(_barrier_token)
     end
 
-  fun ref _clear() =>
+  fun ref clear() =>
     _inputs_blocking.clear()
     _barrier_token = InitialBarrierToken

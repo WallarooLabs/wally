@@ -71,7 +71,7 @@ class val StepBuilder
     _runner_builder.clone_router_and_set_input_type(r)
 
   fun apply(next: Router, metrics_conn: MetricsSink,
-    event_log: EventLog, recovery_replayer: RecoveryReplayer,
+    event_log: EventLog, recovery_replayer: RecoveryReconnecter,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_step_creator: StateStepCreator,
     router: Router = EmptyRouter,
