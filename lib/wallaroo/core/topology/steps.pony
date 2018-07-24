@@ -73,7 +73,7 @@ actor Step is (Producer & Consumer & Rerouter)
   var _initialized: Bool = false
   var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
 
   var _barrier_forwarder: (BarrierStepForwarder | None) = None
 
@@ -88,7 +88,7 @@ actor Step is (Producer & Consumer & Rerouter)
   new create(auth: AmbientAuth, runner: Runner iso,
     metrics_reporter: MetricsReporter iso,
     id: U128, event_log: EventLog,
-    recovery_replayer: RecoveryReplayer,
+    recovery_replayer: RecoveryReconnecter,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_step_creator: StateStepCreator,
     router': Router = EmptyRouter,
@@ -565,7 +565,25 @@ actor Step is (Producer & Consumer & Rerouter)
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ Receive Barrier at Step %s\n".cstring(), _id.string().cstring())
+    @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
+    match barrier_token
+    | let srt: SnapshotRollbackBarrierToken =>
+      @printf[I32]("!@ Step checking to clear\n".cstring())
+      try
+        if (_barrier_forwarder as BarrierStepForwarder).higher_priority(srt)
+        then
+          @printf[I32]("!@ Step clearing based on %s\n".cstring(), barrier_token.string().cstring())
+          (_barrier_forwarder as BarrierStepForwarder).clear()
+          _pending_message_store.clear()
+          _step_message_processor = NormalStepMessageProcessor(this)
+        else
+          @printf[I32]("!@ Step NOT clearing based on %s\n".cstring(), barrier_token.string().cstring())
+        end
+      else
+        Fail()
+      end
+    end
+
     if _step_message_processor.barrier_in_progress() then
       _step_message_processor.receive_barrier(step_id, producer,
         barrier_token)
@@ -594,6 +612,9 @@ actor Step is (Producer & Consumer & Rerouter)
     match barrier_token
     | let sbt: SnapshotBarrierToken =>
       snapshot_state(sbt.id)
+    | let srbt: SnapshotRollbackBarrierToken =>
+      // !@ read in state and rollback
+      None
     end
     @printf[I32]("!@ barrier_complete reset processor at %s\n".cstring(), _id.string().cstring())
     _step_message_processor = NormalStepMessageProcessor(this)

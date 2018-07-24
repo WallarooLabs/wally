@@ -166,6 +166,15 @@ actor BarrierInitiator is Initializable
     """
     @printf[I32]("!@ Injecting barrier %s\n".cstring(), barrier_token.string().cstring())
     if _primary_worker == _worker_name then
+      match barrier_token
+      | let srt: SnapshotRollbackBarrierToken =>
+        // Check if this rollback token is higher priority than a current
+        // rollback token, in case one is being processed. If it's not, drop
+        // it.
+        if _phase.higher_priority(srt) then
+          _phase = RollbackBarrierInitiatorPhase(this, srt)
+        end
+      end
       _phase.initiate_barrier(barrier_token, result_promise)
     else
       try
@@ -178,8 +187,7 @@ actor BarrierInitiator is Initializable
     end
 
   be inject_blocking_barrier(barrier_token: BarrierToken,
-    result_promise: BarrierResultPromise,
-    wait_for_token: BarrierToken)
+    result_promise: BarrierResultPromise, wait_for_token: BarrierToken)
   =>
     """
     Called when no barriers should be processed after this one
@@ -187,6 +195,7 @@ actor BarrierInitiator is Initializable
     this one is complete or, if `wait_for_token` is specified, once
     the specified token is received.
     """
+    //!@ We need to make sure this gets queued if we're in rollback mode
     _phase = BlockingBarrierInitiatorPhase(this, barrier_token,
       wait_for_token)
     _phase.initiate_barrier(barrier_token, result_promise)

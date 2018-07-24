@@ -87,7 +87,7 @@ class val LocalTopology
   fun update_state_map(state_name: String,
     state_map: Map[String, Router],
     metrics_conn: MetricsSink, event_log: EventLog,
-    recovery_replayer: RecoveryReplayer,
+    recovery_replayer: RecoveryReconnecter,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer tag],
@@ -224,7 +224,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _data_receivers: DataReceivers
   let _event_log: EventLog
   let _recovery: Recovery
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _snapshot_initiator: SnapshotInitiator
   let _barrier_initiator: BarrierInitiator
   var _is_initializer: Bool
@@ -281,7 +281,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
-    recovery_replayer: RecoveryReplayer, snapshot_initiator: SnapshotInitiator,
+    recovery_replayer: RecoveryReconnecter, snapshot_initiator: SnapshotInitiator,
     barrier_initiator: BarrierInitiator,
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, state_step_creator: StateStepCreator,

@@ -93,6 +93,27 @@ actor SnapshotInitiator is Initializable
       Fail()
     end
 
+  be initiate_rollback(action: Promise[SnapshotId]) =>
+    // ASSUMPTION: The initial snapshot was successful, so we can always
+    // at least rollback to it.
+    let rollback_id =
+      if _current_snapshot_id > 1 then
+        _current_snapshot_id - 1
+      else
+        _current_snapshot_id
+      end
+    let token = SnapshotRollbackBarrierToken(rollback_id)
+    let barrier_action = Promise[BarrierToken]
+    barrier_action.next[None]({(t: BarrierToken) =>
+      match t
+      | let srbt: SnapshotRollbackBarrierToken =>
+        action(srbt.id)
+      else
+        Fail()
+      end
+    })
+    _barrier_initiator.inject_barrier(token, barrier_action)
+
   be dispose() =>
     @printf[I32]("Shutting down SnapshotInitiator\n".cstring())
     _timers.dispose()

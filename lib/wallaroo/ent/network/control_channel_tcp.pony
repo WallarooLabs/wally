@@ -39,7 +39,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _layout_initializer: LayoutInitializer
   let _connections: Connections
   let _recovery: Recovery
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
   let _barrier_initiator: BarrierInitiator
   let _recovery_file: FilePath
@@ -50,7 +50,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     connections: Connections, is_initializer: Bool,
     initializer: (ClusterInitializer | None) = None,
     layout_initializer: LayoutInitializer, recovery: Recovery,
-    recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
+    recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
     barrier_initiator: BarrierInitiator, recovery_file: FilePath,
     data_host: String, data_service: String,
     event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner)
@@ -124,7 +124,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _initializer: (ClusterInitializer | None)
   let _layout_initializer: LayoutInitializer
   let _recovery: Recovery
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
   let _barrier_initiator: BarrierInitiator
   let _d_host: String
@@ -136,7 +136,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   new iso create(worker_name: String, auth: AmbientAuth,
     connections: Connections, initializer: (ClusterInitializer | None),
     layout_initializer: LayoutInitializer, recovery: Recovery,
-    recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
+    recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
     barrier_initiator: BarrierInitiator,
     data_host: String, data_service: String, event_log: EventLog,
     recovery_file_cleaner: RecoveryFileCleaner)

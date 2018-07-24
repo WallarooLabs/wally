@@ -182,6 +182,14 @@ actor DataReceiver is (Producer & Rerouter)
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken)
   =>
+    match barrier_token
+    | let srt: SnapshotRollbackBarrierToken =>
+      _pending_message_store.clear()
+      _pending_barriers.clear()
+      //!@ Do something about last seen id, such as rollback to last snapshot
+      // based value
+    end
+
     _forward_barrier(target_step_id, origin_step_id, barrier_token)
 
   fun ref _forward_barrier(target_step_id: RoutingId,
