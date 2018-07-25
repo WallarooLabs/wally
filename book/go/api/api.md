@@ -100,6 +100,10 @@ Similar to `ToStatePartition`, but the state computation can return more than on
 
 Add a sink to the end of a pipeline.
 
+##### `ToSinks(sinkConfigs ...sinkConfig)`
+Add multiple sinks to the end of a pipeline. `sinkConfigs` can be an arbitrary number of `sinkConfig` objects. Currently, the same pipeline output is sent via all sinks.
+
+
 ##### `Done()`
 
 Closes the current pipeline without adding a sink.
@@ -477,7 +481,7 @@ application.NewPipeline("Alphabet", app.MakeTCPSourceConfig("127.0.0.1", "7010",
 
 ### wallaroo.application.TCPSinkConfig
 
-A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `ToSink`.
+A `TCPSinkConfig` object specifies the host, port, and decoder to use for the TCP sink connection when creating an application. The host and port are both represented by strings. This object is provided as an argument to `ToSink` or as one of many arguments passed to `ToSinks`.
 
 #### `wallaroo.application.TCPSinkConfig` constructor
 
