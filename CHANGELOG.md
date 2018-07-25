@@ -2,7 +2,7 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [unreleased] - unreleased
+## [0.5.0] - 2018-07-25
 
 ### Fixed
 
@@ -124,3 +124,4 @@ All notable changes to Wallaroo will be documented in this file.
 
 - Don't report a cluster as ready to work until node connection protocol has completed ([PR #1771](https://github.com/wallaroolabs/wallaroo/pull/1771))
 - Add Env as argument to source/sink builders ([PR #1734](https://github.com/wallaroolabs/wallaroo/pull/1734))
+
