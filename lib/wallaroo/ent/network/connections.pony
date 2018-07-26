@@ -54,7 +54,7 @@ actor Connections is Cluster
   let _init_d_host: String
   let _init_d_service: String
   let _disposables: SetIs[DisposableActor] = _disposables.create()
-  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
@@ -623,7 +623,7 @@ actor Connections is Cluster
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
-    let outgoing_boundary = boundary_builder(_step_id_gen(), target_name)
+    let outgoing_boundary = boundary_builder(_routing_id_gen(), target_name)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
@@ -636,12 +636,12 @@ actor Connections is Cluster
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
     let outgoing_boundary =
-      boundary_builder.build_and_initialize(_step_id_gen(), target_name, li)
+      boundary_builder.build_and_initialize(_routing_id_gen(), target_name, li)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
 
-  be update_boundary_ids(boundary_ids: Map[String, U128] val) =>
+  be update_boundary_ids(boundary_ids: Map[String, RoutingId] val) =>
     for (worker, boundary) in _data_conns.pairs() do
       try
         boundary.register_step_id(boundary_ids(worker)?)
@@ -652,7 +652,7 @@ actor Connections is Cluster
     end
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
-    local_topology: LocalTopology,
+    local_topology: LocalTopology, primary_snapshot_worker: String,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
@@ -676,8 +676,9 @@ actor Connections is Cluster
         let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
           _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
           _metrics_service, consume c_addrs, consume d_addrs,
-          local_topology.worker_names, partition_blueprints,
-          stateless_partition_blueprints, tidr_blueprints, _auth)?
+          local_topology.worker_names, primary_snapshot_worker,
+          partition_blueprints, stateless_partition_blueprints,
+          tidr_blueprints, _auth)?
         conn.writev(inform_msg)
         @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
           "necessary information.***\n").cstring(), worker.cstring())

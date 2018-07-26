@@ -13,6 +13,7 @@ the License. You may obtain a copy of the License at
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/invariant"
 use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
@@ -48,7 +49,19 @@ class BarrierStepForwarder
   fun ref receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    // If this new token is a higher priority token, then the forwarder should
+    // have already been cleared to make way for it.
+    ifdef debug then
+      Invariant(not (barrier_token > _barrier_token))
+    end
+
     @printf[I32]("!@ receive_barrier at Forwarder from %s!\n".cstring(), step_id.string().cstring())
+    // If we're processing a rollback token which is higher priority than
+    // this new one, then we need to drop this new one.
+    if _barrier_token > barrier_token then
+      return
+    end
+
     if barrier_token != _barrier_token then
       @printf[I32]("!@ Received %s when still processing %s\n".cstring(),
         _barrier_token.string().cstring(), barrier_token.string().cstring())

@@ -33,7 +33,7 @@ use "wallaroo_labs/thread_count"
 
 actor ApplicationDistributor is Distributor
   let _auth: AmbientAuth
-  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _application: Application val
 
@@ -121,7 +121,7 @@ actor ApplicationDistributor is Distributor
       let sink_ids: Array[RoutingId] = sink_ids.create()
 
       // Keep track of proxy ids per worker
-      let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
+      let boundary_ids: Map[String, Map[String, RoutingId]] = boundary_ids.create()
 
       // Keep track of workers that cannot be removed during shrink to fit
       let non_shrinkable = recover trn SetIs[String] end
@@ -310,7 +310,7 @@ actor ApplicationDistributor is Distributor
 
         // Create Source Initializer and add it to the graph for the
         // initializer worker.
-        let source_node_id = _step_id_gen()
+        let source_node_id = _routing_id_gen()
         let source_seq_builder = RunnerSequenceBuilder(
           source_runner_builders = recover Array[RunnerBuilder] end)
 
@@ -512,14 +512,14 @@ actor ApplicationDistributor is Distributor
               None
             end
 
-          let local_proxy_ids = Map[String, U128]
-          proxy_ids(worker) = local_proxy_ids
+          let local_boundary_ids = Map[String, RoutingId]
+          boundary_ids(worker) = local_boundary_ids
           if worker != initializer_name then
-            local_proxy_ids(initializer_name) = _step_id_gen()
+            local_boundary_ids(initializer_name) = _routing_id_gen()
           end
           for w in worker_names.values() do
             if worker != w then
-              local_proxy_ids(w) = _step_id_gen()
+              local_boundary_ids(w) = _routing_id_gen()
             end
           end
 
@@ -912,7 +912,7 @@ actor ApplicationDistributor is Distributor
       // For each worker, generate a LocalTopology from its LocalGraph
       for (w, g) in local_graphs.pairs() do
         let p_ids = recover trn Map[String, U128] end
-        for (target, p_id) in proxy_ids(w)?.pairs() do
+        for (target, p_id) in boundary_ids(w)?.pairs() do
           p_ids(target) = p_id
         end
 

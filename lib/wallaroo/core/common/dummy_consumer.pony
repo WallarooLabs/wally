@@ -23,6 +23,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
 
 
@@ -86,3 +87,7 @@ actor DummyConsumer is Consumer
 
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    None
+

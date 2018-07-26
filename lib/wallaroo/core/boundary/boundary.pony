@@ -31,20 +31,22 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
-use "wallaroo_labs/bytes"
-use "wallaroo_labs/time"
 use "wallaroo/core/common"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/network"
-use "wallaroo/ent/snapshot"
-use "wallaroo/ent/spike"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
+use "wallaroo/ent/spike"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
+
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -528,12 +530,16 @@ actor OutgoingBoundary is Consumer
   ///////////////
   // SNAPSHOTS
   ///////////////
-  be remote_snapshot_state() =>
-    // Nothing to snapshot at this point.
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    """
+    Boundaries don't currently write out any data as part of the snapshot.
+    """
     None
 
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    // Nothing to snapshot at this point.
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    """
+    There is nothing for a Boundary to rollback to.
+    """
     None
 
   ///////////

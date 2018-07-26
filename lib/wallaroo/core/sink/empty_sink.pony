@@ -24,6 +24,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
 use "wallaroo_labs/mort"
 
@@ -82,10 +83,18 @@ actor EmptySink is Sink
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     None
 
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    None
+
   be dispose() =>
     None
 
   be receive_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref process_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     None

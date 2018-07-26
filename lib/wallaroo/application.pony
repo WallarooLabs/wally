@@ -192,12 +192,12 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     // TODO: This is a shortcut. Non-partitioned state is being treated as a
     // special case of partitioned state with one partition. This works but is
     // a bit confusing when reading the code.
-    let step_id_gen = RoutingIdGenerator
+    let routing_id_gen = RoutingIdGenerator
     let single_step_partition = Partitions[Last](
       SingleStepPartitionFunction[Last], recover ["key"] end)
     let step_id_map = recover trn Map[Key, RoutingId] end
 
-    step_id_map("key") = step_id_gen()
+    step_id_map("key") = routing_id_gen()
 
     let next_builder = PreStateRunnerBuilder[Last, Next, Last, S](
       s_comp, state_name, SingleStepPartitionFunction[Last])
@@ -229,11 +229,11 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     end
     _pipeline_state_names.push(state_name)
 
-    let step_id_gen = RoutingIdGenerator
+    let routing_id_gen = RoutingIdGenerator
     let step_id_map = recover trn Map[Key, U128] end
 
     for key in partition.keys().values() do
-      step_id_map(key) = step_id_gen()
+      step_id_map(key) = routing_id_gen()
     end
 
     let next_builder = PreStateRunnerBuilder[Last, Next, PIn, S](

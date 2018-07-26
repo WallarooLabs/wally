@@ -40,7 +40,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 
-actor Step is (Producer & Consumer & Rerouter)
+actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   let _auth: AmbientAuth
   var _id: U128
   let _runner: Runner
@@ -97,7 +97,7 @@ actor Step is (Producer & Consumer & Rerouter)
     _auth = auth
     _runner = consume runner
     match _runner
-    | let r: ReplayableRunner => r.set_step_id(id)
+    | let r: RollbackableRunner => r.set_step_id(id)
     end
     _metrics_reporter = consume metrics_reporter
     _target_id_router = target_id_router
@@ -110,7 +110,7 @@ actor Step is (Producer & Consumer & Rerouter)
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
-    _event_log.register_resilient(this, id)
+    _event_log.register_resilient(id, this)
 
     let initial_router = _runner.clone_router_and_set_input_type(router')
     _update_router(initial_router)
@@ -565,15 +565,21 @@ actor Step is (Producer & Consumer & Rerouter)
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    process_barrier(step_id, producer, barrier_token)
+
+  fun ref process_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
     @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
     match barrier_token
     | let srt: SnapshotRollbackBarrierToken =>
       @printf[I32]("!@ Step checking to clear\n".cstring())
       try
-        if (_barrier_forwarder as BarrierStepForwarder).higher_priority(srt)
+        let b_forwarder = _barrier_forwarder as BarrierStepForwarder
+        if b_forwarder.higher_priority(srt)
         then
           @printf[I32]("!@ Step clearing based on %s\n".cstring(), barrier_token.string().cstring())
-          (_barrier_forwarder as BarrierStepForwarder).clear()
+          b_forwarder.clear()
           _pending_message_store.clear()
           _step_message_processor = NormalStepMessageProcessor(this)
         else
@@ -622,14 +628,13 @@ actor Step is (Producer & Consumer & Rerouter)
   //////////////
   // SNAPSHOTS
   //////////////
-  be remote_snapshot_state() =>
-    ifdef "resilience" then
-      StepStateSnapshotter(_runner, _id, _seq_id_generator, _event_log)
-    end
-
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     ifdef "resilience" then
-      None
-      //!@ How do we really snapshot now?
-      // StepStateSnapshotter(_runner, _id, _seq_id_generator, _event_log)
+      StepStateSnapshotter(_runner, _id, snapshot_id, _event_log)
     end
+
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    ifdef "resilience" then
+      StepRollbacker(payload, _runner)
+    end
+    event_log.ack_rollback(_id)

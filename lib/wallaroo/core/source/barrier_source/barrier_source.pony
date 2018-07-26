@@ -24,8 +24,10 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
+use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo_labs/mort"
+
 
 actor BarrierSource is Source
   """
@@ -251,6 +253,9 @@ actor BarrierSource is Source
 
   be barrier_complete(token: BarrierToken) =>
     @printf[I32]("!@ barrier_complete at BarrierSource %s\n".cstring(), _source_id.string().cstring())
+    None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
     None
 
   be report_status(code: ReportStatusCode) =>

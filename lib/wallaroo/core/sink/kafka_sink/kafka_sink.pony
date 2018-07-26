@@ -105,8 +105,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     _message_processor = NormalSinkMessageProcessor(this)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
 
-    // register resilient with event log
-    _event_log.register_resilient(this, _sink_id)
+    _event_log.register_resilient(_sink_id, this)
 
   fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
@@ -400,21 +399,31 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   ///////////////
   // BARRIER
   ///////////////
-  be receive_barrier(step_id: RoutingId, producer: Producer,
+  be receive_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    process_barrier(input_id, producer, barrier_token)
+
+  fun ref process_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     match barrier_token
     | let srt: SnapshotRollbackBarrierToken =>
-      if _barrier_acker.higher_priority(srt) then
-        _barrier_acker.clear()
-        _message_processor = NormalSinkMessageProcessor(this)
-        // TODO: If there is any recovery data associated with Sink, then
-        // rollback using it.
+      try
+        let b_acker = _barrier_acker as BarrierSinkAcker
+        if b_acker.higher_priority(srt) then
+          b_acker.clear()
+          _message_processor = NormalSinkMessageProcessor(this)
+          // TODO: If there is any recovery data associated with Sink, then
+          // rollback using it.
+        end
+      else
+        Fail()
       end
     end
 
     if _message_processor.barrier_in_progress() then
-      _message_processor.receive_barrier(step_id, producer,
+      _message_processor.receive_barrier(input_id, producer,
         barrier_token)
     else
       match _message_processor
@@ -422,7 +431,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
         try
            _message_processor = BarrierSinkMessageProcessor(this,
              _barrier_acker as BarrierSinkAcker)
-           _message_processor.receive_new_barrier(step_id, producer,
+           _message_processor.receive_new_barrier(input_id, producer,
              barrier_token)
         else
           Fail()
@@ -446,12 +455,20 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   ///////////////
   // SNAPSHOTS
   ///////////////
-  be remote_snapshot_state() =>
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    """
+    KafkaSinks don't currently write out any data as part of the snapshot.
+    """
     None
 
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    // Nothing to snapshot at this point
-    None
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    """
+    There is currently nothing for a KafkaSink to rollback to.
+    """
+    event_log.ack_rollback(_sink_id)
+
+
+
 
   be dispose() =>
     @printf[I32]("Shutting down KafkaSink\n".cstring())

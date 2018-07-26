@@ -91,10 +91,12 @@ class NoProcessingStepMessageProcessor is StepMessageProcessor
     end
     None
 
+type _Queued is (QueuedMessage | QueuedBarrier)
+
 class BarrierStepMessageProcessor is StepMessageProcessor
   let step: Step ref
   let _barrier_forwarder: BarrierStepForwarder
-  var messages: Array[QueuedMessage] = messages.create()
+  var _queued: Array[_Queued] = _queued.create()
 
   new create(s: Step ref, barrier_forwarder: BarrierStepForwarder) =>
     step = s
@@ -109,7 +111,7 @@ class BarrierStepMessageProcessor is StepMessageProcessor
       let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
         data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
         i_route_id, latest_ts, metrics_id, worker_ingress_ts)
-      messages.push(msg)
+      _queued.push(msg)
     else
       step.process_message[D](metric_name, pipeline_time_spent, data,
         i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
@@ -119,18 +121,27 @@ class BarrierStepMessageProcessor is StepMessageProcessor
   fun barrier_in_progress(): Bool =>
     true
 
-  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
+  fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _barrier_forwarder.receive_new_barrier(step_id, producer, barrier_token)
+    _barrier_forwarder.receive_new_barrier(input_id, producer, barrier_token)
 
-  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
+  fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _barrier_forwarder.receive_barrier(step_id, producer, barrier_token)
+    if _barrier_forwarder.input_blocking(input_id) then
+      _queued.push(QueuedBarrier(input_id, producer, barrier_token))
+    else
+      _barrier_forwarder.receive_barrier(input_id, producer, barrier_token)
+    end
 
   fun ref flush(target_id_router: TargetIdRouter) =>
-    for msg in messages.values() do
-      msg.process_message(step)
+    for q in _queued.values() do
+      match q
+      | let qm: QueuedMessage =>
+        qm.process_message(step)
+      | let qb: QueuedBarrier =>
+        qb.inject_barrier(step)
+      end
     end
-    messages = Array[QueuedMessage]
+    _queued.clear()

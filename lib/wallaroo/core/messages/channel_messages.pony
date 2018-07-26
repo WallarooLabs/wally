@@ -23,12 +23,14 @@ use "collections"
 use "wallaroo_labs/mort"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/router_registry"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/snapshot"
+
 
 primitive ChannelMsgEncoder
   fun _encode(msg: ChannelMsg, auth: AmbientAuth,
@@ -242,7 +244,7 @@ primitive ChannelMsgEncoder
     l_topology: LocalTopology, metric_host: String,
     metric_service: String, control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
-    worker_names: Array[String] val,
+    worker_names: Array[String] val, primary_snapshot_worker: String,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
@@ -255,8 +257,8 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
       metric_host, metric_service, control_addrs, data_addrs, worker_names,
-      partition_blueprints, stateless_partition_blueprints,
-      target_id_router_blueprints), auth)?
+      primary_snapshot_worker, partition_blueprints,
+      stateless_partition_blueprints, target_id_router_blueprints), auth)?
 
   fun inform_join_error(msg: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -426,6 +428,38 @@ primitive ChannelMsgEncoder
     Array[ByteSeq] val ?
   =>
     _encode(BarrierCompleteMsg(token), auth)?
+
+  fun event_log_initiate_snapshot(snapshot_id: SnapshotId, token: BarrierToken,
+    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(EventLogInitiateSnapshotMsg(snapshot_id, token, sender), auth)?
+
+  fun event_log_ack_snapshot(snapshot_id: SnapshotId, token: BarrierToken,
+    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(EventLogAckSnapshotMsg(snapshot_id, token, sender), auth)?
+
+  fun recovery_initiated(token: SnapshotRollbackBarrierToken,
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(RecoveryInitiatedMsg(token, sender), auth)?
+
+  fun initiate_rollback(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    """
+    Sent to the primary snapshot worker from a recovering worker to initiate
+    rollback during rollback recovery phase.
+    """
+    _encode(InitiateRollbackMsg, auth)?
+
+  fun event_log_initiate_rollback(token: SnapshotRollbackBarrierToken,
+    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(EventLogInitiateRollbackMsg(token, sender), auth)?
+
+  fun event_log_ack_rollback(token: SnapshotRollbackBarrierToken,
+    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(EventLogAckRollbackMsg(token, sender), auth)?
 
   fun resume_the_world(sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -941,6 +975,8 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
   let worker_names: Array[String] val
+  // The worker currently in control of snapshots
+  let primary_snapshot_worker: String
   let partition_router_blueprints: Map[String, PartitionRouterBlueprint] val
   let stateless_partition_router_blueprints:
     Map[U128, StatelessPartitionRouterBlueprint] val
@@ -951,6 +987,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
     c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
     w_names: Array[String] val,
+    p_snapshot_worker: String,
     p_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
     tidr_blueprints: Map[String, TargetIdRouterBlueprint] val)
@@ -963,6 +1000,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
     control_addrs = c_addrs
     data_addrs = d_addrs
     worker_names = w_names
+    primary_snapshot_worker = p_snapshot_worker
     partition_router_blueprints = p_blueprints
     stateless_partition_router_blueprints = stateless_p_blueprints
     target_id_router_blueprints = tidr_blueprints
@@ -1142,6 +1180,56 @@ class val BarrierCompleteMsg is ChannelMsg
   new val create(token': BarrierToken)
   =>
     token = token'
+
+class val EventLogInitiateSnapshotMsg is ChannelMsg
+  let snapshot_id: SnapshotId
+  let token: BarrierToken
+  let sender: WorkerName
+
+  new val create(snapshot_id': SnapshotId, token': BarrierToken,
+    sender': WorkerName)
+  =>
+    snapshot_id = snapshot_id'
+    token = token'
+    sender = sender'
+
+class val EventLogAckSnapshotMsg is ChannelMsg
+  let snapshot_id: SnapshotId
+  let token: BarrierToken
+  let sender: WorkerName
+
+  new val create(snapshot_id': SnapshotId, token': BarrierToken,
+    sender': WorkerName)
+  =>
+    snapshot_id = snapshot_id'
+    token = token'
+    sender = sender'
+
+class val RecoveryInitiatedMsg is ChannelMsg
+  let token: SnapshotRollbackBarrierToken
+  let sender: WorkerName
+
+  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+    token = token'
+    sender = sender'
+
+class val EventLogInitiateRollbackMsg is ChannelMsg
+  let token: SnapshotRollbackBarrierToken
+  let sender: WorkerName
+
+  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+    token = token'
+    sender = sender'
+
+class val EventLogAckRollbackMsg is ChannelMsg
+  let token: SnapshotRollbackBarrierToken
+  let sender: WorkerName
+
+  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+    token = token'
+    sender = sender'
+
+primitive InitiateRollbackMsg is ChannelMsg
 
 class val ResumeTheWorldMsg is ChannelMsg
   let sender: String
