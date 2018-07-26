@@ -38,7 +38,7 @@ use "wallaroo/core/topology"
 actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _source_id: RoutingId
   let _auth: AmbientAuth
-  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   var _router: Router
   let _routes: MapIs[Consumer, Route] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
@@ -120,14 +120,14 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _name = name
 
     // register resilient with event log
-    _event_log.register_resilient(this, _source_id)
+    _event_log.register_resilient(_source_id, this)
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       let new_boundary =
-        builder.build_and_initialize(_step_id_gen(), target_worker_name,
+        builder.build_and_initialize(_routing_id_gen(), target_worker_name,
           _layout_initializer)
       router_registry.register_disposable(new_boundary)
       _outgoing_boundaries(target_worker_name) = new_boundary
@@ -161,6 +161,8 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       r.application_initialized("KafkaSource-" + topic + "-"
         + partition_id.string())
     end
+
+    _event_log.register_resilient(_source_id, this)
 
     _mute()
 
@@ -284,7 +286,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        let boundary = builder.build_and_initialize(_step_id_gen(),
+        let boundary = builder.build_and_initialize(_routing_id_gen(),
           target_worker_name, _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
@@ -348,6 +350,11 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   fun ref _initiate_barrier(token: BarrierToken) =>
     if not _disposed then
+      match token
+      | let srt: SnapshotRollbackBarrierToken =>
+        _pending_message_store.clear()
+      end
+
       if not _pending_message_store.has_pending() then
         for (o_id, o) in _outputs.pairs() do
           match o
@@ -365,23 +372,27 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   be barrier_complete(token: BarrierToken) =>
     // !@ Here's where we could ack finished messages up to snapshot point.
+    // We should also match for rollback token.
     None
 
   //////////////
   // SNAPSHOTS
   //////////////
-  be remote_snapshot_state() =>
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    //!@ We probably need to snapshot info about last seq id for snapshot.
     ifdef "trace" then
       @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
     end
     _wb.i64_le(_last_flushed_offset)
     let payload = _wb.done()
-    _event_log.snapshot_state(_source_id, 0, 0, _last_flushed_seq_id,
-      consume payload)
+    _event_log.snapshot_state(_source_id, snapshot_id, consume payload)
 
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    // !@
-    None
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    //!@ Rollback!
+    event_log.ack_rollback(_source_id)
+
+
+
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try

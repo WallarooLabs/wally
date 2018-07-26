@@ -91,11 +91,13 @@ class _TestDataChannel is DataChannelListenNotify
         where event_log = event_log)
       let ssc = StateStepCreator(auth, app_name, worker_name, metrics_sink, event_log)
       let dr = DataReceivers(auth, conns, worker_name, ssc)
+      let b_initiator = BarrierInitiator(auth, worker_name, conns, "init")
+      let s_initiator = SnapshotInitiator(auth, "", "", conns, 0, event_log,
+        b_initiator)
+      let a_initiator = AutoscaleInitiator(worker_name, b_initiator)
       let rr = RouterRegistry(auth, worker_name, dr, conns, ssc,
-        _DummyRecoveryFileCleaner, 1, false,
-        BarrierInitiator(auth, worker_name, conns, "init"),
-        AutoscaleInitiator(worker_name, BarrierInitiator(auth,
-        worker_name, conns, "init")))
+        _DummyRecoveryFileCleaner, 1, false, "",
+        b_initiator, s_initiator, a_initiator)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))
       h.dispose_when_done(conns)
       h.complete_action("server create")

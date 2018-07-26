@@ -87,7 +87,7 @@ class Autoscale
   let _worker_name: String
   let _router_registry: RouterRegistry ref
   let _connections: Connections
-  var _phase: AutoscalePhase = _EmptyAutoscalePhase
+  var _phase: _AutoscalePhase = _EmptyAutoscalePhase
 
   new create(auth: AmbientAuth, worker_name: String, rr: RouterRegistry ref,
     connections: Connections, is_joining: Bool)
@@ -273,7 +273,7 @@ class Autoscale
 ///////////////////
 // Autoscale Phases
 ///////////////////
-trait AutoscalePhase
+trait _AutoscalePhase
   fun name(): String
 
   fun ref worker_join(conn: TCPConnection, worker: String,
@@ -318,10 +318,10 @@ trait AutoscalePhase
       name().cstring())
     Fail()
 
-class _EmptyAutoscalePhase is AutoscalePhase
+class _EmptyAutoscalePhase is _AutoscalePhase
   fun name(): String => "EmptyAutoscalePhase"
 
-class _WaitingForAutoscale is AutoscalePhase
+class _WaitingForAutoscale is _AutoscalePhase
   let _autoscale: Autoscale ref
 
   new create(autoscale: Autoscale ref) =>
@@ -340,7 +340,7 @@ class _WaitingForAutoscale is AutoscalePhase
 /////////////////////////////////////////////////
 // GROW PHASES
 /////////////////////////////////////////////////
-class _WaitingForJoiners is AutoscalePhase
+class _WaitingForJoiners is _AutoscalePhase
   let _auth: AmbientAuth
   let _autoscale: Autoscale ref
   let _router_registry: RouterRegistry ref
@@ -411,7 +411,7 @@ class _WaitingForJoiners is AutoscalePhase
       Fail()
     end
 
-class _WaitingForJoinerInitialization is AutoscalePhase
+class _WaitingForJoinerInitialization is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _joining_worker_count: USize
   var _initialized_joining_workers: _StringSet
@@ -450,7 +450,7 @@ class _WaitingForJoinerInitialization is AutoscalePhase
       _autoscale.wait_for_connections(new_workers, _current_worker_count)
     end
 
-class _WaitingForConnections is AutoscalePhase
+class _WaitingForConnections is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _new_workers: Array[String] val
   let _connecting_worker_count: USize
@@ -484,7 +484,7 @@ class _WaitingForConnections is AutoscalePhase
       _autoscale.initiate_stop_the_world_for_join_migration(_new_workers)
     end
 
-class _WaitingToConnectToJoiners is AutoscalePhase
+class _WaitingToConnectToJoiners is _AutoscalePhase
   let _auth: AmbientAuth
   let _autoscale: Autoscale ref
   let _worker_name: String
@@ -526,7 +526,7 @@ class _WaitingToConnectToJoiners is AutoscalePhase
       _autoscale.waiting_for_stop_the_world(_joining_workers)
     end
 
-class _WaitingForStopTheWorld is AutoscalePhase
+class _WaitingForStopTheWorld is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _joining_workers: Array[String] val
 
@@ -541,7 +541,7 @@ class _WaitingForStopTheWorld is AutoscalePhase
   fun ref stop_the_world_for_join_migration_initiated() =>
     _autoscale.stop_the_world_for_join_migration(_joining_workers)
 
-class _WaitingForMigration is AutoscalePhase
+class _WaitingForMigration is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _joining_workers: Array[String] val
   //!@
@@ -577,7 +577,7 @@ class _WaitingForMigration is AutoscalePhase
   //     @printf[I32]("!@ but _migration_initiated is false\n".cstring())
   //   end
 
-class _WaitingForJoinMigration is AutoscalePhase
+class _WaitingForJoinMigration is _AutoscalePhase
   """
   During this phase, we've handed off responsibility for join migration to
   the RouterRegistry.
@@ -604,7 +604,7 @@ class _WaitingForJoinMigration is AutoscalePhase
       .cstring())
     _autoscale.send_migration_batch_complete(_joining_workers, _is_coordinator)
 
-class _WaitingForJoinMigrationAcks is AutoscalePhase
+class _WaitingForJoinMigrationAcks is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _auth: AmbientAuth
   let _is_coordinator: Bool
@@ -636,7 +636,7 @@ class _WaitingForJoinMigrationAcks is AutoscalePhase
         _is_coordinator)
     end
 
-class _JoiningWorker is AutoscalePhase
+class _JoiningWorker is _AutoscalePhase
   let _autoscale: Autoscale ref
 
   new create(autoscale: Autoscale ref) =>
@@ -673,7 +673,7 @@ class _JoiningWorker is AutoscalePhase
 /////////////////////////////////////////////////
 // SHRINK PHASES
 /////////////////////////////////////////////////
-class _InitiatingShrink is AutoscalePhase
+class _InitiatingShrink is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _remaining_workers: Array[String] val
   let _leaving_workers: Array[String] val
@@ -704,7 +704,7 @@ class _InitiatingShrink is AutoscalePhase
       _autoscale.all_leaving_workers_finished(_leaving_workers)
     end
 
-class _ShrinkInProgress is AutoscalePhase
+class _ShrinkInProgress is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _remaining_workers: Array[String] val
   let _leaving_workers: Array[String] val
@@ -733,7 +733,7 @@ class _ShrinkInProgress is AutoscalePhase
       _autoscale.all_leaving_workers_finished(_leaving_workers)
     end
 
-class _WaitingForLeavingMigration is AutoscalePhase
+class _WaitingForLeavingMigration is _AutoscalePhase
   """
   Used on a leaving worker. Currently the RouterRegistry handles the migration
   details.
@@ -754,7 +754,7 @@ class _WaitingForLeavingMigration is AutoscalePhase
   fun ref all_step_migration_complete() =>
     _autoscale.wait_for_leaving_migration_acks(_remaining_workers)
 
-class _WaitingForLeavingMigrationAcks is AutoscalePhase
+class _WaitingForLeavingMigrationAcks is _AutoscalePhase
   """
   Wait for remaining workers to ack that we've migrated all steps.
   """
@@ -789,7 +789,7 @@ class _WaitingForLeavingMigrationAcks is AutoscalePhase
 /////////////////////////////////////////////////
 // SHARED PHASES
 /////////////////////////////////////////////////
-class _WaitingForResumeTheWorld is AutoscalePhase
+class _WaitingForResumeTheWorld is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _auth: AmbientAuth
   let _is_coordinator: Bool
@@ -815,7 +815,7 @@ class _WaitingForResumeTheWorld is AutoscalePhase
     end
     _autoscale.mark_autoscale_complete()
 
-class _ShuttingDown is AutoscalePhase
+class _ShuttingDown is _AutoscalePhase
   new create() =>
     @printf[I32]("AUTOSCALE: Shutting down.\n".cstring())
 

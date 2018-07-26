@@ -29,7 +29,7 @@ actor StateStepCreator is Initializable
   var _keys_to_steps: LocalStatePartitions = _keys_to_steps.create()
   var _keys_to_step_ids: LocalStatePartitionIds = _keys_to_step_ids.create()
 
-  let _step_id_gen: RoutingIdGenerator = _step_id_gen.create()
+  let _routing_id_gen: RoutingIdGenerator = _routing_id_gen.create()
 
   let _app_name: String
   let _worker_name: String
@@ -122,7 +122,7 @@ actor StateStepCreator is Initializable
           error
         end
 
-        let id = _step_id_gen()
+        let id = _routing_id_gen()
         let target_id_router = _target_id_routers(state_name)?
         let state_step = try
           Step(_auth, runner_builder(

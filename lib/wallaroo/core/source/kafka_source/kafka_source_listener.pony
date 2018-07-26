@@ -54,7 +54,7 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
       target_router, _ksco, _auth, recovering)
 
 class val KafkaSourceListenerBuilder[In: Any val]
-  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _pipeline_name: String
   let _source_builder: SourceBuilder
   let _router: Router
@@ -119,7 +119,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _env: Env
   let _auth: AmbientAuth
   let _pipeline_name: String
-  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _notify: KafkaSourceListenerNotify[In]
   let _event_log: EventLog
   let _state_step_creator: StateStepCreator

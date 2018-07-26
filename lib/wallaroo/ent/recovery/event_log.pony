@@ -13,26 +13,19 @@ the License. You may obtain a copy of the License at
 use "buffered"
 use "collections"
 use "files"
+use "promises"
 use "wallaroo/core/common"
-use "wallaroo/ent/router_registry"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/snapshot"
+use "wallaroo_labs/mort"
 
-interface tag Resilient
-  // !@ Do we need this?
-  be initialize_seq_id_on_recovery(seq_id: SeqId)
-  //!@
-  // be log_replay_finished()
-  // be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-  //   statechange_id: U64, payload: ByteSeq)
-  // be log_flushed(low_watermark: SeqId)
 
-  // //!@
-  // // Log-rotation
-  // be remote_snapshot_state()
-
+trait tag Resilient
+  be rollback(payload: ByteSeq val, event_log: EventLog)
 
 class val EventLogConfig
   let log_dir: (FilePath | AmbientAuth | None)
@@ -58,33 +51,43 @@ class val EventLogConfig
 
 actor EventLog
   let _resilients: Map[RoutingId, Resilient] = _resilients.create()
-  let _backend: Backend
+  var _backend: Backend = EmptyBackend
   let _replay_complete_markers: Map[U64, Bool] =
     _replay_complete_markers.create()
   let _config: EventLogConfig
   var num_encoded: USize = 0
   var _flush_waiting: USize = 0
+  //!@ I don't think we need this
   var _initialized: Bool = false
   var _recovery: (Recovery | None) = None
-  var _resilients_to_snapshot: SetIs[RoutingId] = _resilients_to_snapshot.create()
+  var _resilients_to_snapshot: SetIs[RoutingId] =
+    _resilients_to_snapshot.create()
   var _router_registry: (RouterRegistry | None) = None
   var _rotating: Bool = false
+  //!@ What do we do with this?
   var _backend_bytes_after_snapshot: USize
+
+  var _phase: _EventLogPhase = _InitialEventLogPhase
 
   new create(event_log_config: EventLogConfig = EventLogConfig()) =>
     _config = event_log_config
+    _backend_bytes_after_snapshot = _backend.bytes_written()
     _backend = match _config.filename
       | let f: String val =>
         try
           if _config.log_rotation then
-            match _config.log_dir
-            | let ld: FilePath =>
-              RotatingFileBackend(ld, f, _config.suffix, this,
-                _config.backend_file_length)?
-            else
-              Fail()
-              DummyBackend(this)
-            end
+            @printf[I32]("Log rotation is not currently supported\n".cstring())
+            Fail()
+            EmptyBackend
+            // TODO: Support log rotation.
+            // match _config.log_dir
+            // | let ld: FilePath =>
+            //   RotatingFileBackend(ld, f, _config.suffix, this,
+            //     _config.backend_file_length)?
+            // else
+            //   Fail()
+            //   DummyBackend(this)
+            // end
           else
             match _config.log_dir
             | let ld: FilePath =>
@@ -102,20 +105,104 @@ actor EventLog
       else
         DummyBackend(this)
       end
-    _backend_bytes_after_snapshot = _backend.bytes_written()
 
   be set_router_registry(router_registry: RouterRegistry) =>
     _router_registry = router_registry
 
-  be start_pipeline_logging(initializer: LocalTopologyInitializer) =>
+  be quick_initialize(initializer: LocalTopologyInitializer) =>
     _initialized = true
     initializer.report_event_log_ready_to_work()
 
-  be start_log_replay(recovery: Recovery) =>
-    _recovery = recovery
-    _backend.start_log_replay()
+  be register_resilient(id: RoutingId, resilient: Resilient) =>
+    _resilients(id) = resilient
+
+  /////////////////
+  // SNAPSHOT
+  /////////////////
+  be initiate_snapshot(snapshot_id: SnapshotId, token: BarrierToken,
+    action: Promise[BarrierToken])
+  =>
+    _phase = _SnapshotEventLogPhase(this, snapshot_id, token, action,
+      _resilients.keys())
+
+  be snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+    payload: Array[ByteSeq] val)
+  =>
+    _phase.snapshot_state(resilient_id, snapshot_id, payload)
+
+  fun ref _snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+    payload: Array[ByteSeq] val)
+  =>
+    _queue_log_entry(resilient_id, snapshot_id, payload)
+
+  fun ref _queue_log_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
+    payload: Array[ByteSeq] val, force_write: Bool = false)
+  =>
+    ifdef "resilience" then
+      // add to backend buffer after encoding
+      // encode right away to amortize encoding cost per entry when received
+      // as opposed to when writing a batch to disk
+      _backend.encode_entry(resilient_id, snapshot_id, payload)
+
+      num_encoded = num_encoded + 1
+
+      if (num_encoded == _config.logging_batch_size) or force_write then
+        //write buffer to disk
+        write_log()
+      end
+    else
+      None
+    end
+
+  fun ref write_snapshot_id(snapshot_id: SnapshotId) =>
+    _backend.encode_snapshot_id(snapshot_id)
+    _phase.snapshot_id_written(snapshot_id)
+
+  fun ref snapshot_complete() =>
+    write_log()
+    _phase = _NormalEventLogPhase(this)
+
+  /////////////////
+  // ROLLBACK
+  /////////////////
+  be initiate_rollback(token: SnapshotRollbackBarrierToken,
+    action: Promise[SnapshotRollbackBarrierToken])
+  =>
+    _phase = _RollbackEventLogPhase(this, token, action,
+      _resilients.keys())
+    _backend.start_rollback(token.id)
+
+  fun ref rollback_from_log_entry(resilient_id: RoutingId,
+    payload: ByteSeq val)
+  =>
+    try
+      _resilients(resilient_id)?.rollback(payload, this)
+    else
+      //!@ Update message
+      @printf[I32](("Can't find resilient for rollback data").cstring())
+      Fail()
+    end
+
+  be ack_rollback(resilient_id: RoutingId) =>
+    _phase.ack_rollback(resilient_id)
+
+  fun ref rollback_complete() =>
+    _phase = _NormalEventLogPhase(this)
+
+
+
+
+  //!@
+  /////////////
+  // STUFF
+  ////////////
+    //!@
+  // be start_log_replay(recovery: Recovery) =>
+  //   _recovery = recovery
+  //   _backend.start_log_replay()
 
   be log_replay_finished() =>
+    //!@
     None
     //!@
     // for r in _resilients.values() do
@@ -145,48 +232,20 @@ actor EventLog
     // end
 
   be initialize_seq_ids(seq_ids: Map[RoutingId, SeqId] val) =>
-    for (resilient_id, seq_id) in seq_ids.pairs() do
-      try
-        _resilients(resilient_id)?.initialize_seq_id_on_recovery(seq_id)
-      else
-        @printf[I32](("Could not initialize seq id " + seq_id.string() +
-          ". Resilient " + resilient_id.string() + " does not exist\n")
-          .cstring())
-        Fail()
-      end
-    end
+    //!@
+    None
+    // for (resilient_id, seq_id) in seq_ids.pairs() do
+    //   try
+    //     _resilients(resilient_id)?.initialize_seq_id_on_recovery(seq_id)
+    //   else
+    //     @printf[I32](("Could not initialize seq id " + seq_id.string() +
+    //       ". Resilient " + resilient_id.string() + " does not exist\n")
+    //       .cstring())
+    //     Fail()
+    //   end
+    // end
 
-  be register_resilient(resilient: Resilient, id: RoutingId) =>
-    _resilients(id) = resilient
 
-  be queue_log_entry(resilient_id: RoutingId, uid: U128,
-    frac_ids: FractionalMessageId, statechange_id: U64, seq_id: U64,
-    payload: Array[ByteSeq] val)
-  =>
-    _queue_log_entry(resilient_id, uid, frac_ids, statechange_id, seq_id,
-      payload)
-
-  fun ref _queue_log_entry(resilient_id: RoutingId, uid: U128,
-    frac_ids: FractionalMessageId,
-    statechange_id: U64, seq_id: U64,
-    payload: Array[ByteSeq] val, force_write: Bool = false)
-  =>
-    ifdef "resilience" then
-      // add to backend buffer after encoding
-      // encode right away to amortize encoding cost per entry when received
-      // as opposed to when writing a batch to disk
-      _backend.encode_entry((false, resilient_id, uid, frac_ids, statechange_id,
-        seq_id, payload))
-
-      num_encoded = num_encoded + 1
-
-      if (num_encoded == _config.logging_batch_size) or force_write then
-        //write buffer to disk
-        write_log()
-      end
-    else
-      None
-    end
 
   fun ref write_log() =>
     try
@@ -199,14 +258,17 @@ actor EventLog
       Fail()
     end
 
-  be flush_buffer(resilient_id: RoutingId, low_watermark: U64) =>
-    _flush_buffer(resilient_id, low_watermark)
 
-  fun ref _flush_buffer(resilient_id: RoutingId, low_watermark: U64) =>
-    ifdef "trace" then
-      @printf[I32](("flush_buffer for id: " + resilient_id.string() + "\n\n")
-        .cstring())
-    end
+  //!@We probably need to be flushing at certain points. Or do we?
+  // be flush_buffer(resilient_id: RoutingId, low_watermark: U64) =>
+  //   _flush_buffer(resilient_id, low_watermark)
+
+  // fun ref _flush_buffer(resilient_id: RoutingId, low_watermark: U64) =>
+  //   ifdef "trace" then
+  //     @printf[I32](("flush_buffer for id: " + resilient_id.string() +
+  //  "\n\n")
+  //       .cstring())
+  //   end
 
     //!@
     // try
@@ -227,37 +289,14 @@ actor EventLog
 
     //   _resilients(resilient_id)?.log_flushed(low_watermark)
     // else
-    //   @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
+    //   @printf[I32]("Errror writing/flushing/syncing ack to disk!\n"
+    //.cstring())
     //   Fail()
     // end
 
-  be snapshot_state(resilient_id: RoutingId, uid: U128,
-    statechange_id: U64, seq_id: U64,
-    payload: Array[ByteSeq] val)
-  =>
-    ifdef "trace" then
-      @printf[I32](("Snapshotting state for resilient " + resilient_id.string()
-        + "\n").cstring())
-    end
-    if _resilients_to_snapshot.contains(resilient_id) then
-      _resilients_to_snapshot.unset(resilient_id)
-    else
-      @printf[I32](("Error writing snapshot to logfile. RoutingId not in set " +
-        "of expected resilients!\n").cstring())
-      Fail()
-    end
 
-    // Note: calling _flush_buffer relies on the assumption that everything
-    // is acked by now, which isn't being validated here.
-    // This should be addressed by
-    // https://github.com/WallarooLabs/wallaroo/issues/1132
-    _flush_buffer(resilient_id, seq_id)
-    _queue_log_entry(resilient_id, uid, None, statechange_id, seq_id,
-      payload, true)
-    if _resilients_to_snapshot.size() == 0 then
-      rotation_complete()
-    end
 
+//!@ Do something with these rotation behaviors
   be start_rotation() =>
     if _rotating then
       @printf[I32](("Event log rotation already ongoing. Rotate log request "
@@ -288,24 +327,21 @@ actor EventLog
     for v in _resilients.keys() do
       _resilients_to_snapshot.set(v)
     end
-    //!@
-    // for r in _resilients.values() do
-    //   //!@
-    //   r.remote_snapshot_state()
-    // end
 
   fun ref _rotate_file() =>
-    try
-      match _backend
-      | let b: RotatingFileBackend => b.rotate_file()?
-      else
-        @printf[I32](("Unsupported operation requested on log Backend: " +
-                      "'rotate_file'. Request ignored.\n").cstring())
-      end
-    else
-      @printf[I32]("Error rotating log file!\n".cstring())
-      Fail()
-    end
+    //!@ What do we do?
+    None
+    // try
+    //   match _backend
+    //   | let b: RotatingFileBackend => b.rotate_file()?
+    //   else
+    //     @printf[I32](("Unsupported operation requested on log Backend: " +
+    //                   "'rotate_file'. Request ignored.\n").cstring())
+    //   end
+    // else
+    //   @printf[I32]("Error rotating log file!\n".cstring())
+    //   Fail()
+    // end
 
   fun ref rotation_complete() =>
     @printf[I32]("Resilients snapshotting to new log file complete.\n"

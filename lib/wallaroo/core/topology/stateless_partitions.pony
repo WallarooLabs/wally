@@ -6,7 +6,7 @@ primitive StatelessPartitions
   fun pre_stateless_data(pipeline_name: String, partition_id: RoutingId,
     workers: Array[String] val, threads_per_worker: USize): PreStatelessData ?
   =>
-    let step_id_gen = RoutingIdGenerator
+    let routing_id_gen = RoutingIdGenerator
 
     // First we calculate the size of the partition and determine
     // where the steps in the partition go in the cluster. We are
@@ -31,7 +31,7 @@ primitive StatelessPartitions
       worker_to_step_id_trn(w) = recover Array[RoutingId] end
     end
     for id in Range[SeqPartitionIndex](0, partition_count.u64()) do
-      let step_id = step_id_gen()
+      let step_id = routing_id_gen()
       partition_idx_to_step_id_trn(id) = step_id
       let w = sorted_workers(id.usize() % worker_count)?
       partition_idx_to_worker_trn(id) = w

@@ -85,3 +85,6 @@ class ActiveBarriers
     else
       Fail()
     end
+
+  fun ref clear() =>
+    _barriers.clear()

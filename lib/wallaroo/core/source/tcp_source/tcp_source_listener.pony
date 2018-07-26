@@ -45,7 +45,7 @@ actor TCPSourceListener is SourceListener
   """
   # TCPSourceListener
   """
-  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
   let _auth: AmbientAuth
   let _pipeline_name: String
@@ -213,7 +213,7 @@ actor TCPSourceListener is SourceListener
     Spawn a new connection.
     """
     try
-      let source_id = _step_id_gen()
+      let source_id = _routing_id_gen()
       let source = TCPSource._accept(source_id, _auth, this,
         _notify_connected(source_id)?, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,

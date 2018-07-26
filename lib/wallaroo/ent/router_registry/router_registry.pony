@@ -42,8 +42,6 @@ type _TargetIdRouterUpdatable is Step
 type _RouterSub is (BoundaryUpdatable & RouterUpdatable)
 
 actor RouterRegistry
-  //!@ TODO: Get {(_: None) => _self~be_call()} to work!
-  // For sending promises with callbacks
   let _self: RouterRegistry tag = this
 
   let _id: RoutingId
@@ -54,6 +52,7 @@ actor RouterRegistry
   let _state_step_creator: StateStepCreator
   let _recovery_file_cleaner: RecoveryFileCleaner
   let _barrier_initiator: BarrierInitiator
+  let _snapshot_initiator: SnapshotInitiator
   let _autoscale_initiator: AutoscaleInitiator
   var _data_router: DataRouter
   var _pre_state_data: (Array[PreStateData] val | None) = None
@@ -63,6 +62,14 @@ actor RouterRegistry
     _stateless_partition_routers.create()
   let _data_receiver_map: Map[String, DataReceiver] =
     _data_receiver_map.create()
+
+  //!@
+  // TODO: Remove this. This is here to be threaded to joining workers as
+  // the primary snapshot initiator worker. We need to enable this role to
+  // shift to other workers, and this means we need our SnapshotInitiator
+  // to add to the information we send to a joining worker (since it will
+  // know who the primary snapshot worker is).
+  let _initializer_name: String
 
   var _local_topology_initializer: (LocalTopologyInitializer | None) = None
 
@@ -160,7 +167,9 @@ actor RouterRegistry
     data_receivers: DataReceivers, c: Connections,
     state_step_creator: StateStepCreator,
     recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64,
-    is_joining: Bool, barrier_initiator: BarrierInitiator,
+    is_joining: Bool, initializer_name: String,
+    barrier_initiator: BarrierInitiator,
+    snapshot_initiator: SnapshotInitiator,
     autoscale_initiator: AutoscaleInitiator,
     contacted_worker: (String | None) = None)
   =>
@@ -173,6 +182,7 @@ actor RouterRegistry
     _all_target_id_router_subs.set(_state_step_creator)
     _recovery_file_cleaner = recovery_file_cleaner
     _barrier_initiator = barrier_initiator
+    _snapshot_initiator = snapshot_initiator
     _autoscale_initiator = autoscale_initiator
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
@@ -182,6 +192,7 @@ actor RouterRegistry
     _data_router = DataRouter(_worker_name,
       recover Map[RoutingId, Consumer] end,
       recover LocalStatePartitions end, recover LocalStatePartitionIds end)
+    _initializer_name = initializer_name
     _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining)
 
   fun _worker_count(): USize =>
@@ -690,8 +701,8 @@ actor RouterRegistry
     end
 
     _connections.inform_joining_worker(conn, worker, local_topology,
-      consume state_blueprints, consume stateless_blueprints,
-      consume tidr_blueprints)
+      _initializer_name, consume state_blueprints,
+      consume stateless_blueprints, consume tidr_blueprints)
 
   be inform_contacted_worker_of_initialization() =>
     _inform_contacted_worker_of_initialization()
@@ -966,6 +977,7 @@ actor RouterRegistry
     // Update BarrierInitiator about new workers
     for w in target_workers.values() do
       _barrier_initiator.add_worker(w)
+      _snapshot_initiator.add_worker(w)
     end
 
     // Inform other current workers to begin migration
@@ -1452,6 +1464,7 @@ actor RouterRegistry
   fun ref all_leaving_workers_finished(leaving_workers: Array[String] val) =>
     for w in leaving_workers.values() do
       _barrier_initiator.remove_worker(w)
+      _snapshot_initiator.remove_worker(w)
     end
     for (state_name, pr) in _partition_routers.pairs() do
       let new_pr = pr.recalculate_hash_partitions_for_shrink(leaving_workers)

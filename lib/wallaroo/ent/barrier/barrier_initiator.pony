@@ -42,21 +42,10 @@ actor BarrierInitiator is Initializable
   """
   let _auth: AmbientAuth
   let _worker_name: String
-  var _phase: BarrierInitiatorPhase = InitialBarrierInitiatorPhase
+  var _phase: _BarrierInitiatorPhase = _InitialBarrierInitiatorPhase
 
-  let _in_flight_barriers: Map[BarrierToken, BarrierHandler] =
-    _in_flight_barriers.create()
-
-  let _pending: Array[_Pending] = _pending.create()
-
+  var _pending: Array[_Pending] = _pending.create()
   let _active_barriers: ActiveBarriers = ActiveBarriers
-
-  //!@
-  // let _pending_barriers: Map[BarrierToken, BarrierResultPromise] =
-  //   _pending_barriers.create()
-  // var _current_barrier_token: BarrierToken = InitialBarrierToken
-  // var _barrier_handler: BarrierHandler = WaitingBarrierHandler
-
 
   let _connections: Connections
   var _barrier_source: (BarrierSource | None) = None
@@ -78,10 +67,7 @@ actor BarrierInitiator is Initializable
     _worker_name = worker_name
     _connections = connections
     _primary_worker = primary_worker
-    _phase = NormalBarrierInitiatorPhase(this)
-
-  fun barrier_in_flight(): Bool =>
-    _in_flight_barriers.size() > 0
+    _phase = _NormalBarrierInitiatorPhase(this)
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
@@ -150,7 +136,7 @@ actor BarrierInitiator is Initializable
     _phase.source_registration_complete(s)
 
   fun ref source_pending_complete(s: Source) =>
-    _phase = NormalBarrierInitiatorPhase(this)
+    _phase = _NormalBarrierInitiatorPhase(this)
     next_token()
 
   be inject_barrier(barrier_token: BarrierToken,
@@ -166,15 +152,22 @@ actor BarrierInitiator is Initializable
     """
     @printf[I32]("!@ Injecting barrier %s\n".cstring(), barrier_token.string().cstring())
     if _primary_worker == _worker_name then
+      // We handle rollback barrier token as a special case. That's because
+      // in the presence of a rollback token, we need to cancel all other
+      // tokens in flight since we are rolling back to an earlier state of
+      // the system. On a successful match here, we transition to the
+      // rollback phase.
       match barrier_token
       | let srt: SnapshotRollbackBarrierToken =>
         // Check if this rollback token is higher priority than a current
         // rollback token, in case one is being processed. If it's not, drop
         // it.
         if _phase.higher_priority(srt) then
-          _phase = RollbackBarrierInitiatorPhase(this, srt)
+          _clear_barriers()
+          _phase = _RollbackBarrierInitiatorPhase(this, srt)
         end
       end
+
       _phase.initiate_barrier(barrier_token, result_promise)
     else
       try
@@ -196,7 +189,7 @@ actor BarrierInitiator is Initializable
     the specified token is received.
     """
     //!@ We need to make sure this gets queued if we're in rollback mode
-    _phase = BlockingBarrierInitiatorPhase(this, barrier_token,
+    _phase = _BlockingBarrierInitiatorPhase(this, barrier_token,
       wait_for_token)
     _phase.initiate_barrier(barrier_token, result_promise)
 
@@ -242,6 +235,28 @@ actor BarrierInitiator is Initializable
     @printf[I32]("!@ About to call worker_ack_barrier_start on handler for %s\n".cstring(), barrier_token.string().cstring())
     _active_barriers.worker_ack_barrier_start(_worker_name, barrier_token)
 
+  fun ref _clear_barriers() =>
+    _clear_active_barriers()
+    _clear_pending_barriers()
+
+  fun ref _clear_active_barriers() =>
+    _active_barriers.clear()
+
+  fun ref _clear_pending_barriers() =>
+    """
+    Called when we're rolling back and we need to clear all pending barriers
+    in the system. We need to keep requests from our sources for
+    initialization.
+    """
+    let only_pending_sources = Array[_Pending]
+    for p in _pending.values() do
+      match p
+      | let psi: _PendingSourceInit =>
+        only_pending_sources.push(psi)
+      end
+    end
+    _pending = only_pending_sources
+
   be remote_initiate_barrier(primary_worker: String,
     barrier_token: BarrierToken)
   =>
@@ -270,7 +285,7 @@ actor BarrierInitiator is Initializable
 
   be worker_ack_barrier_start(w: String, token: BarrierToken) =>
     @printf[I32]("!@ _worker_ack_barrier_start called for %s\n".cstring(), w.cstring())
-    _active_barriers.worker_ack_barrier_start(w, token)
+    _phase.worker_ack_barrier_start(w, token, _active_barriers)
 
   fun confirm_start_barrier(barrier_token: BarrierToken) =>
     try
@@ -326,11 +341,11 @@ actor BarrierInitiator is Initializable
     Called by sinks when they have received barrier barriers on all
     their inputs.
     """
-    _active_barriers.ack_barrier(s, barrier_token)
+    _phase.ack_barrier(s, barrier_token, _active_barriers)
 
   be worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
     @printf[I32]("!@ Rcvd worker_ack_barrier from %s\n".cstring(), w.cstring())
-    _active_barriers.worker_ack_barrier(w, barrier_token)
+    _phase.worker_ack_barrier(w, barrier_token, _active_barriers)
 
   fun ref all_primary_sinks_acked(barrier_token: BarrierToken,
     workers_acked: SetIs[String] val, result_promise: BarrierResultPromise)
@@ -413,13 +428,13 @@ actor BarrierInitiator is Initializable
 
   fun ref next_token() =>
     @printf[I32]("!@ next_token(): _pending %s\n".cstring(), _pending.size().string().cstring())
-    _phase = NormalBarrierInitiatorPhase(this)
+    _phase = _NormalBarrierInitiatorPhase(this)
     if _pending.size() > 0 then
       try
         let next = _pending.shift()?
         match next
         | let p: _PendingSourceInit =>
-          _phase = SourcePendingBarrierInitiatorPhase(this)
+          _phase = _SourcePendingBarrierInitiatorPhase(this)
           let action = Promise[Source]
           action.next[None](recover this~source_registration_complete() end)
           p.source.register_downstreams(action)

@@ -65,7 +65,7 @@ actor DataReceivers
       sub.data_receiver_added(b_id.name, b_id.step_id, dr)
     end
 
-  be request_data_receiver(sender_name: String, sender_boundary_id: U128,
+  be request_data_receiver(sender_name: String, sender_boundary_id: RoutingId,
     conn: DataChannel)
   =>
     """
@@ -79,7 +79,10 @@ actor DataReceivers
       try
         _data_receivers(boundary_id)?
       else
-        let new_dr = DataReceiver(_auth, _worker_name, sender_name,
+        // !@ this should be recoverable
+        let id = RoutingIdGenerator()
+
+        let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
           _state_step_creator, _initialized)
         match _router_registry
         | let rr: RouterRegistry =>
