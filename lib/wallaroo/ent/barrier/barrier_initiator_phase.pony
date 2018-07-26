@@ -6,18 +6,15 @@ use "wallaroo_labs/mort"
 
 
 trait BarrierInitiatorPhase
+  fun name(): String
+
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
-    Fail()
-
-  fun ref initiate_rollback_barrier(barrier_token: BarrierToken,
-    result_promise: BarrierResultPromise)
-  =>
-    Fail()
+    _invalid_call()
 
   fun ref source_registration_complete(s: Source) =>
-    Fail()
+    _invalid_call()
 
   fun ready_for_next_token(): Bool =>
     false
@@ -31,15 +28,24 @@ trait BarrierInitiatorPhase
     end
 
   fun ref barrier_complete(token: BarrierToken) =>
+    _invalid_call()
+
+  fun _invalid_call() =>
+    @printf[I32]("Invalid call on barrier initiator phase %s\n".cstring(),
+      name().cstring())
     Fail()
 
 class InitialBarrierInitiatorPhase is BarrierInitiatorPhase
+  fun name(): String => "InitialBarrierInitiatorPhase"
 
 class NormalBarrierInitiatorPhase is BarrierInitiatorPhase
   let _initiator: BarrierInitiator ref
 
   new create(initiator: BarrierInitiator ref) =>
     _initiator = initiator
+
+  fun name(): String =>
+    "NormalBarrierInitiatorPhase"
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -62,6 +68,9 @@ class SourcePendingBarrierInitiatorPhase is BarrierInitiatorPhase
   new create(initiator: BarrierInitiator ref) =>
     _initiator = initiator
 
+  fun name(): String =>
+    "SourcePendingBarrierInitiatorPhase"
+
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
@@ -81,6 +90,9 @@ class BlockingBarrierInitiatorPhase is BarrierInitiatorPhase
     _initiator = initiator
     _initial_token = token
     _wait_for_token = wait_for_token
+
+  fun name(): String =>
+    "BlockingBarrierInitiatorPhase"
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -106,6 +118,9 @@ class RollbackBarrierInitiatorPhase is BarrierInitiatorPhase
     _initiator = initiator
     _token = token
 
+  fun name(): String =>
+    "RollbackBarrierInitiatorPhase"
+
   fun higher_priority(t: BarrierToken): Bool =>
     t > _token
 
@@ -128,5 +143,3 @@ class RollbackBarrierInitiatorPhase is BarrierInitiatorPhase
     if token == _token then
       _initiator.next_token()
     end
-
-
