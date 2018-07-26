@@ -242,7 +242,8 @@ primitive _RouterRegistryGenerator
     RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
       _ConnectionsGenerator(env, auth), _StateStepCreatorGenerator(auth),
       _DummyRecoveryFileCleaner, 0,
-      false, _BarrierInitiatorGenerator(env, auth),
+      false, "", _BarrierInitiatorGenerator(env, auth),
+      _SnapshotInitiatorGenerator(env, auth),
       _AutoscaleInitiatorGenerator(env, auth))
 
 primitive _BarrierInitiatorGenerator
@@ -256,8 +257,8 @@ primitive _AutoscaleInitiatorGenerator
 
 primitive _SnapshotInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): SnapshotInitiator =>
-    SnapshotInitiator(_ConnectionsGenerator(env, auth), 1,
-      _BarrierInitiatorGenerator(env, auth), false)
+    SnapshotInitiator(auth, "", "", _ConnectionsGenerator(env, auth), 1,
+      EventLog(), _BarrierInitiatorGenerator(env, auth), false)
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>

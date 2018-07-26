@@ -18,18 +18,19 @@ Copyright 2017 The Wallaroo Authors.
 
 use "collections"
 use "wallaroo/core/boundary"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/snapshot"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/snapshot"
 
 
 trait tag StatusReporter
   be report_status(code: ReportStatusCode)
 
-trait tag Producer is (Muteable & Rerouter)
+trait tag Producer is (Muteable & Rerouter & Resilient)
   fun ref route_to(c: Consumer): (Route | None)
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
@@ -45,7 +46,7 @@ interface tag BoundaryUpdatable
   be remove_boundary(worker: String)
 
 trait tag Consumer is (Runnable & StateReceiver & Initializable &
-  StatusReporter & Snapshottable & BarrierReceiver)
+  StatusReporter & Snapshottable & BarrierReceiver & Resilient)
   // TODO: For now, since we do not allow application graph cycles, all back
   // edges are from DataReceivers. This allows us to simply identify them
   // directly. Once we allow application cycles, we will need a more

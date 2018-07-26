@@ -173,7 +173,7 @@ actor TCPSink is Sink
     _message_processor = NormalSinkMessageProcessor(this)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
     _mute_upstreams()
-
+    _event_log.register_resilient(_sink_id, this)
   //
   // Application Lifecycle events
   //
@@ -330,11 +330,15 @@ actor TCPSink is Sink
   ///////////////
   // BARRIER
   ///////////////
-  be receive_barrier(step_id: RoutingId, producer: Producer,
+  be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
     @printf[I32]("!@ Receive barrier %s at TCPSink\n".cstring(), barrier_token.string().cstring())
+    process_barrier(input_id, producer, barrier_token)
 
+  fun ref process_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
     match barrier_token
     | let srt: SnapshotRollbackBarrierToken =>
       @printf[I32]("!@ Sink checking to clear\n".cstring())
@@ -344,8 +348,6 @@ actor TCPSink is Sink
           @printf[I32]("!@ Sink clearing based on %s\n".cstring(), barrier_token.string().cstring())
           b_acker.clear()
           _message_processor = NormalSinkMessageProcessor(this)
-          // TODO: If there is any recovery data associated with Sink, then
-          // rollback using it.
         else
           @printf[I32]("!@ Sink NOT clearing based on %s\n".cstring(), barrier_token.string().cstring())
         end
@@ -355,7 +357,7 @@ actor TCPSink is Sink
     end
 
     if _message_processor.barrier_in_progress() then
-      _message_processor.receive_barrier(step_id, producer,
+      _message_processor.receive_barrier(input_id, producer,
         barrier_token)
     else
       match _message_processor
@@ -363,7 +365,7 @@ actor TCPSink is Sink
         try
            _message_processor = BarrierSinkMessageProcessor(this,
              _barrier_acker as BarrierSinkAcker)
-           _message_processor.receive_new_barrier(step_id, producer,
+           _message_processor.receive_new_barrier(input_id, producer,
              barrier_token)
         else
           Fail()
@@ -388,13 +390,17 @@ actor TCPSink is Sink
   ///////////////
   // SNAPSHOTS
   ///////////////
-  be remote_snapshot_state() =>
-    // Nothing to snapshot at this point
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    """
+    TCPSinks don't currently write out any data as part of the snapshot.
+    """
     None
 
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    // Nothing to snapshot at this point
-    None
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    """
+    There is nothing for a TCPSink to rollback to.
+    """
+    event_log.ack_rollback(_sink_id)
 
   ///////////////
   // TCP

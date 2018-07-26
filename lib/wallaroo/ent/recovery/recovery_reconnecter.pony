@@ -190,7 +190,7 @@ trait _ReconnectPhase
     _invalid_call()
 
   fun _invalid_call() =>
-    @printf[I32]("Invalid call on recovery phase %s\n".cstring(),
+    @printf[I32]("Invalid call on recovery reconnecter phase %s\n".cstring(),
       name().cstring())
     Fail()
 

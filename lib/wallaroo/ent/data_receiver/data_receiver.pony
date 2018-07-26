@@ -15,15 +15,15 @@ use "net"
 use "time"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
+use "wallaroo/core/invariant"
+use "wallaroo/core/messages"
+use "wallaroo/core/routing"
+use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/snapshot"
 use "wallaroo_labs/mort"
-use "wallaroo/core/invariant"
-use "wallaroo/core/messages"
-use "wallaroo/core/routing"
-use "wallaroo/core/topology"
 
 
 actor DataReceiver is (Producer & Rerouter)
@@ -51,7 +51,6 @@ actor DataReceiver is (Producer & Rerouter)
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
   var _latest_conn: (DataChannel | None) = None
-  var _replay_pending: Bool = false
 
 //!@
   // Timer to periodically request acks to prevent deadlock.
@@ -76,10 +75,11 @@ actor DataReceiver is (Producer & Rerouter)
 
   var _phase: _DataReceiverProcessingPhase = _DataReceiverNotProcessingPhase
 
-  new create(auth: AmbientAuth, worker_name: String, sender_name: String,
-    state_step_creator: StateStepCreator, initialized: Bool = false)
+  new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
+    sender_name: String, state_step_creator: StateStepCreator,
+    initialized: Bool = false)
   =>
-    _id = RoutingIdGenerator()
+    _id = id
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
@@ -221,8 +221,18 @@ actor DataReceiver is (Producer & Rerouter)
   // SNAPSHOTS
   ///////////////
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    // Nothing to do at this point.
+    """
+    DataReceivers don't currently write out any data as part of the snapshot.
+    """
     None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    """
+    There is nothing for a DataReceiver to rollback to.
+    """
+    None
+
+
 
   be update_router(router': DataRouter) =>
     _router = router'

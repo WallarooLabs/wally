@@ -80,10 +80,12 @@ class NormalSinkMessageProcessor is SinkMessageProcessor
     end
     None
 
+type _Queued is (QueuedMessage | QueuedBarrier)
+
 class BarrierSinkMessageProcessor is SinkMessageProcessor
   let sink: Sink ref
   let _barrier_acker: BarrierSinkAcker
-  var messages: Array[QueuedMessage] = messages.create()
+  let _queued: Array[_Queued] = _queued.create()
 
   new create(s: Sink ref, barrier_acker: BarrierSinkAcker) =>
     sink = s
@@ -99,7 +101,7 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
       let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
         data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
         i_route_id, latest_ts, metrics_id, worker_ingress_ts)
-      messages.push(msg)
+      _queued.push(msg)
     else
       sink.process_message[D](metric_name, pipeline_time_spent, data,
         i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
@@ -109,18 +111,27 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
   fun barrier_in_progress(): Bool =>
     true
 
-  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
+  fun ref receive_new_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _barrier_acker.receive_new_barrier(step_id, producer, barrier_token)
+    _barrier_acker.receive_new_barrier(input_id, producer, barrier_token)
 
-  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
+  fun ref receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    _barrier_acker.receive_barrier(step_id, producer, barrier_token)
+    if _barrier_acker.input_blocking(input_id) then
+      _queued.push(QueuedBarrier(input_id, producer, barrier_token))
+    else
+      _barrier_acker.receive_barrier(input_id, producer, barrier_token)
+    end
 
   fun ref flush() =>
-    for msg in messages.values() do
-      msg.process_message(sink)
+    for q in _queued.values() do
+      match q
+      | let qm: QueuedMessage =>
+        qm.process_message(sink)
+      | let qb: QueuedBarrier =>
+        qb.inject_barrier(sink)
+      end
     end
-    messages = Array[QueuedMessage]
+    _queued.clear()
