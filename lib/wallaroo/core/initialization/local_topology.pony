@@ -52,11 +52,11 @@ class val LocalTopology
   let _app_name: String
   let _worker_name: String
   let _graph: Dag[StepInitializer] val
-  let _step_map: Map[U128, (ProxyAddress | U128)] val
+  let _step_map: Map[RoutingId, (ProxyAddress | RoutingId)] val
   // _state_builders maps from state_name to StateSubpartitions
   let _state_builders: Map[String, StateSubpartitions] val
   let _pre_state_data: Array[PreStateData] val
-  let _proxy_ids: Map[String, U128] val
+  let _boundary_ids: Map[String, RoutingId] val
   // resilience
   let worker_names: Array[String] val
   // Workers that cannot be removed during shrink to fit
@@ -64,10 +64,10 @@ class val LocalTopology
 
   new val create(name': String, worker_name': String,
     graph': Dag[StepInitializer] val,
-    step_map': Map[U128, (ProxyAddress | U128)] val,
+    step_map': Map[RoutingId, (ProxyAddress | RoutingId)] val,
     state_builders': Map[String, StateSubpartitions] val,
     pre_state_data': Array[PreStateData] val,
-    proxy_ids': Map[String, U128] val,
+    boundary_ids': Map[String, RoutingId] val,
     worker_names': Array[String] val, non_shrinkable': SetIs[String] val)
   =>
     _app_name = name'
@@ -76,7 +76,7 @@ class val LocalTopology
     _step_map = step_map'
     _state_builders = state_builders'
     _pre_state_data = pre_state_data'
-    _proxy_ids = proxy_ids'
+    _boundary_ids = boundary_ids'
     //resilience
     worker_names = worker_names'
     non_shrinkable = non_shrinkable'
@@ -127,7 +127,7 @@ class val LocalTopology
   fun is_empty(): Bool =>
     _graph.is_empty()
 
-  fun proxy_ids(): Map[String, U128] val => _proxy_ids
+  fun boundary_ids(): Map[String, RoutingId] val => _boundary_ids
 
   fun update_proxy_address_for_state_key(state_name: String, key: Key,
     pa: ProxyAddress): LocalTopology ?
@@ -139,7 +139,7 @@ class val LocalTopology
     end
     new_state_builders(state_name) = new_subpartition
     LocalTopology(_app_name, _worker_name, _graph, _step_map,
-      consume new_state_builders, _pre_state_data, _proxy_ids, worker_names,
+      consume new_state_builders, _pre_state_data, _boundary_ids, worker_names,
       non_shrinkable)
 
   fun val add_worker_name(w: String): LocalTopology =>
@@ -157,7 +157,7 @@ class val LocalTopology
       end
 
       LocalTopology(_app_name, _worker_name, _graph, _step_map,
-        consume new_state_builders, _pre_state_data, _proxy_ids,
+        consume new_state_builders, _pre_state_data, _boundary_ids,
         consume new_worker_names, non_shrinkable)
     else
       this
@@ -173,7 +173,7 @@ class val LocalTopology
       end
     end
     LocalTopology(_app_name, _worker_name, _graph, _step_map,
-      _state_builders, _pre_state_data, _proxy_ids, consume new_worker_names,
+      _state_builders, _pre_state_data, _boundary_ids, consume new_worker_names,
       non_shrinkable)
 
   fun val for_new_worker(new_worker: String): LocalTopology ? =>
@@ -194,7 +194,7 @@ class val LocalTopology
     end
 
     LocalTopology(_app_name, new_worker, g.clone()?,
-      _step_map, _state_builders, _pre_state_data, _proxy_ids,
+      _step_map, _state_builders, _pre_state_data, _boundary_ids,
       w_names, non_shrinkable)
 
   fun eq(that: box->LocalTopology): Bool =>
@@ -208,7 +208,7 @@ class val LocalTopology
       MapEquality[String, StateSubpartitions](_state_builders,
         that._state_builders) and
       (_pre_state_data is that._pre_state_data) and
-      MapEquality[String, U128](_proxy_ids, that._proxy_ids) and
+      MapEquality[String, U128](_boundary_ids, that._boundary_ids) and
       ArrayEquality[String](worker_names, that.worker_names)
 
   fun ne(that: box->LocalTopology): Bool => not eq(that)
@@ -244,7 +244,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _recovering: Bool = false
   let _is_joining: Bool
 
-  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
 
   // Lifecycle
   var _created: SetIs[Initializable] = _created.create()
@@ -352,7 +352,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           control_addr._2)
         _connections.create_data_connection_to_joining_worker(w, joining_host,
           data_addr._2, this)
-        let new_boundary_id = _step_id_gen()
+        let new_boundary_id = _routing_id_gen()
         _connections.create_boundary_to_joining_worker(w, new_boundary_id,
           this)
         @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
@@ -464,8 +464,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       _topology = t.add_worker_name(w)
-      //!@ We need this to happen at a certain time. Manage with autoscale.
-      // _barrier_initiator.add_worker(w)
       _save_local_topology()
       _save_worker_names()
     else
@@ -759,6 +757,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         for w in t.worker_names.values() do
           _barrier_initiator.add_worker(w)
+          _snapshot_initiator.add_worker(w)
         end
 
         _router_registry.set_pre_state_data(t.pre_state_data())
@@ -795,7 +794,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         // Update the step ids for all OutgoingBoundaries
         if worker_count > 1 then
-          _connections.update_boundary_ids(t.proxy_ids())
+          _connections.update_boundary_ids(t.boundary_ids())
         end
 
         // Keep track of routers to the steps we've built
@@ -1378,7 +1377,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               // If there is no BarrierSource, we need to create one, since
               // this worker has at least one Source on it.
               if barrier_source is None then
-                let b_source = BarrierSource(_step_id_gen(), _router_registry)
+                let b_source = BarrierSource(_routing_id_gen(), _router_registry)
                 _barrier_initiator.register_barrier_source(b_source)
                 barrier_source = b_source
               end
@@ -1918,7 +1917,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         Fail()
       end
     else
-      _event_log.start_pipeline_logging(this)
+      _event_log.quick_initialize(this)
     end
     _router_registry.application_ready_to_work()
     if _is_joining then

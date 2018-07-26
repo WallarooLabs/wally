@@ -64,7 +64,7 @@ actor TCPSource is Source
   """
   let _source_id: RoutingId
   let _auth: AmbientAuth
-  let _step_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   var _router: Router
   let _routes: MapIs[Consumer, Route] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
@@ -150,7 +150,7 @@ actor TCPSource is Source
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let new_boundary =
-          builder.build_and_initialize(_step_id_gen(), target_worker_name,
+          builder.build_and_initialize(_routing_id_gen(), target_worker_name,
             _layout_initializer)
         router_registry.register_disposable(new_boundary)
         _outgoing_boundaries(target_worker_name) = new_boundary
@@ -158,7 +158,7 @@ actor TCPSource is Source
     end
 
     // register resilient with event log
-    _event_log.register_resilient(this, _source_id)
+    _event_log.register_resilient(_source_id, this)
 
     _readable = true
 
@@ -311,7 +311,7 @@ actor TCPSource is Source
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        let boundary = builder.build_and_initialize(_step_id_gen(),
+        let boundary = builder.build_and_initialize(_routing_id_gen(),
           target_worker_name, _layout_initializer)
         _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
@@ -370,12 +370,6 @@ actor TCPSource is Source
     end
     // update to use correct seq_id for recovery
     _seq_id = seq_id
-
-  be remote_snapshot_state() =>
-    ifdef "trace" then
-      @printf[I32]("snapshot_state in TCPSource\n".cstring())
-    end
-    None
 
   fun ref _unregister_all_outputs() =>
     """
@@ -450,6 +444,7 @@ actor TCPSource is Source
         @printf[I32]("!@ Source clearing pending message store\n".cstring())
         _pending_message_store.clear()
       end
+
       if not _pending_message_store.has_pending() then
         @printf[I32]("!@ Source initiate_barrier %s\n".cstring(), token.string().cstring())
         for (o_id, o) in _outputs.pairs() do
@@ -469,14 +464,23 @@ actor TCPSource is Source
   be barrier_complete(token: BarrierToken) =>
     @printf[I32]("!@ barrier_complete at TCPSource %s\n".cstring(), _source_id.string().cstring())
     // !@ Here's where we could ack finished messages up to snapshot point.
+    // We should also match for rollback token.
     None
 
   //////////////
   // SNAPSHOTS
   //////////////
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    // !@
+    """
+    TCPSources don't currently write out any data as part of the snapshot.
+    """
     None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    """
+    There is nothing for a TCPSource to rollback to.
+    """
+    event_log.ack_rollback(_source_id)
 
   /////////
   // TCP

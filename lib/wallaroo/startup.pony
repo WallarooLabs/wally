@@ -323,9 +323,12 @@ actor Startup
         _startup_options.worker_name, connections, initializer_name)
       connections.register_disposable(barrier_initiator)
 
-      let snapshot_initiator = SnapshotInitiator(connections,
-        _startup_options.time_between_snapshots, barrier_initiator,
-        _startup_options.snapshots_enabled, _startup_options.is_initializer)
+      // TODO: We currently set the primary snapshot initiator worker to the
+      // initializer.
+      let snapshot_initiator = SnapshotInitiator(auth,
+        _startup_options.worker_name, initializer_name, connections,
+        _startup_options.time_between_snapshots, event_log, barrier_initiator,
+        _startup_options.snapshots_enabled)
       connections.register_disposable(snapshot_initiator)
 
       let autoscale_initiator = AutoscaleInitiator(
@@ -343,8 +346,9 @@ actor Startup
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
         connections, state_step_creator, this,
-        _startup_options.stop_the_world_pause, _is_joining, barrier_initiator,
-        autoscale_initiator)
+        _startup_options.stop_the_world_pause, _is_joining, initializer_name,
+        barrier_initiator, snapshot_initiator, autoscale_initiator,
+        initializer_name)
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
 
@@ -399,8 +403,9 @@ actor Startup
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
           recovery_reconnecter, router_registry, barrier_initiator,
-          control_channel_filepath, _startup_options.my_d_host,
-          _startup_options.my_d_service, event_log, this)
+          snapshot_initiator, control_channel_filepath,
+          _startup_options.my_d_host, _startup_options.my_d_service, event_log,
+          this)
 
       // We need to recover connections before creating our control
       // channel listener, since it's at that point that we notify
@@ -506,8 +511,9 @@ actor Startup
       let barrier_initiator = BarrierInitiator(auth,
         _startup_options.worker_name, connections, initializer_name)
 
-      let snapshot_initiator = SnapshotInitiator(connections,
-        _startup_options.time_between_snapshots, barrier_initiator,
+      let snapshot_initiator = SnapshotInitiator(auth,
+        _startup_options.worker_name, m.primary_snapshot_worker, connections,
+        _startup_options.time_between_snapshots, event_log, barrier_initiator,
         _startup_options.snapshots_enabled)
 
       let autoscale_initiator = AutoscaleInitiator(
@@ -524,8 +530,9 @@ actor Startup
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
         connections, state_step_creator, this,
-        _startup_options.stop_the_world_pause, _is_joining, barrier_initiator,
-        autoscale_initiator, m.sender_name)
+        _startup_options.stop_the_world_pause, _is_joining, initializer_name,
+        barrier_initiator, snapshot_initiator, autoscale_initiator,
+        m.sender_name)
       router_registry.set_event_log(event_log)
       event_log.set_router_registry(router_registry)
 
@@ -592,7 +599,7 @@ actor Startup
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
           recovery_reconnecter, router_registry, barrier_initiator,
-          control_channel_filepath,
+          snapshot_initiator, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service,
           event_log, this)
 

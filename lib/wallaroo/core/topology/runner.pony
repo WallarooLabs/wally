@@ -53,9 +53,8 @@ interface SerializableStateRunner
   fun ref serialize_state(): ByteSeq val
   fun ref replace_serialized_state(s: ByteSeq val)
 
-trait ReplayableRunner
-  fun ref replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq val, producer: Producer)
+trait RollbackableRunner
+  fun ref rollback(payload: ByteSeq val)
   fun ref set_step_id(id: U128)
 
 trait val RunnerBuilder
@@ -537,7 +536,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
   =>
     r
 
-class StateRunner[S: State ref] is (Runner & ReplayableRunner &
+class StateRunner[S: State ref] is (Runner & RollbackableRunner &
   SerializableStateRunner)
   var _state: S
   //TODO: this needs to be per-computation, rather than per-runner
@@ -563,24 +562,8 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
   fun ref register_state_change(scb: StateChangeBuilder[S]) : U64 =>
     _state_change_repository.make_and_register(scb)
 
-  fun ref replay_log_entry(msg_uid: MsgId, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq val, producer: Producer)
-  =>
-    if statechange_id == U64.max_value() then
-      replace_serialized_state(payload)
-    else
-      try
-        let sc = _state_change_repository(statechange_id)?
-        _rb.append(payload as Array[U8] val)
-        try
-          sc.read_log_entry(_rb)?
-          sc.apply(_state)
-        end
-      else
-        @printf[I32]("FATAL: could not look up state_change with id %d"
-          .cstring(), statechange_id)
-      end
-    end
+  fun ref rollback(payload: ByteSeq val) =>
+    replace_serialized_state(payload)
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer_id: RoutingId, producer: Producer ref, router: Router,
@@ -619,32 +602,37 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
       metrics_reporter.step_metric(metric_name, sp.name(), latest_metrics_id,
         sc_start_ts, sc_end_ts)
 
+      //!@ This applies the state change but doesn't write it to disk since
+      // that's not currently supported with our new recovery protocol.
       match state_change
       | let sc: StateChange[S] ref =>
-        ifdef "resilience" then
-          sc.write_log_entry(_wb)
-          let payload = _wb.done()
-          match _id
-          | let buffer_id: U128 =>
-            _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
-              sc.id(), producer.current_sequence_id(), consume payload)
-          else
-            @printf[I32]("StateRunner with unassigned EventLogBuffer!"
-              .cstring())
-          end
-        end
+        //!@ StateChange logging not supported
+        // ifdef "resilience" then
+        //   sc.write_log_entry(_wb)
+        //   let payload = _wb.done()
+        //   match _id
+        //   | let buffer_id: U128 =>
+        //     _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
+        //       sc.id(), producer.current_sequence_id(), consume payload)
+        //   else
+        //     @printf[I32]("StateRunner with unassigned EventLogBuffer!"
+        //       .cstring())
+        //   end
+        // end
         sc.apply(_state)
       | let dsc: DirectStateChange =>
-        ifdef "resilience" then
-          // TODO: Replace this with calling provided serialization method
-          match _id
-          | let buffer_id: U128 =>
-            _state.write_log_entry(_wb, _auth)
-            let payload = _wb.done()
-            _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
-              U64.max_value(), producer.current_sequence_id(), consume payload)
-          end
-        end
+        None
+        //!@ StateChange logging not supported
+        // ifdef "resilience" then
+        //   // TODO: Replace this with calling provided serialization method
+        //   match _id
+        //   | let buffer_id: U128 =>
+        //     _state.write_log_entry(_wb, _auth)
+        //     let payload = _wb.done()
+        //     _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
+        //       U64.max_value(), producer.current_sequence_id(), consume payload)
+        //   end
+        // end
       end
 
       (is_finished, last_ts)
