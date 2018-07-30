@@ -249,7 +249,7 @@ func (le *ListEncoder) Encode(data interface{}) []byte {
 
 The `FramedDecoder` is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input connection.
-2. Converting those bytes into an object that the rest of the application can process.
+2. Converting those bytes into an object that the rest of the application can process. `nil` can be returned to completely discard a message.
 
 #### `wallarooapi.FramedDecoder` Methods:
 
@@ -267,13 +267,13 @@ A common encoding used in Wallaroo is a big-endian 32-bit unsinged integer, whic
 
 ##### `Decode(b []byte) interface{}`
 
-Return a Go object of the type the next step in the pipeline expects.
+Return a Go object of the type the next step in the pipeline expects or `nil` in order to filter out the message instead of sending to the next step.
 
 `b` is a `[]byte` of the length returned by `PayloadLength`, and it is up to the developer to turn that into a Go object.
 
 #### Example `FramedDecoder`
 
-A complete `FramedDecoder` example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bit unsigned int in its _payload_:
+A complete `FramedDecoder` example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bit unsigned int in its _payload_. Filters out any data that causes `json.Umarshal` to return an `err` by returning `nil`:
 
 ```go
 type payload struct {
@@ -292,7 +292,12 @@ func (d *Decoder) PayloadLength(b []byte) uint64 {
 }
 
 func (d *Decoder) Decode(b []byte) interface{} {
-	return &payload{string(b[0]), binary.BigEndian.Uint32(b[1:])}
+		var data payload
+		if err := json.Unmarshal(b, &data); err != nil {
+		    return data
+	    } else {
+	        return nil
+	    }
 }
 ```
 
@@ -320,7 +325,7 @@ func encode(data interface{}) ([]byte, []byte) {
 
 ### wallarooapi.Decoder
 
-The `Decoder` is responsible for converting bytes into an object that the next step of the application can process.
+The `Decoder` is responsible for converting bytes into an object that the next step of the application can process. `nil` can be returned to completely discard a message.
 
 If you are using a Kafka source then it will need a `Decoder`.
 
@@ -328,11 +333,11 @@ If you are using a Kafka source then it will need a `Decoder`.
 
 ##### `Decode(b []byte) interface{}`
 
-Return an object of the type the next step in the pipeline expects.
+Return an object of the type the next step in the pipeline expects or `nil` in order to filter out the message instead of sending to the next step.
 
 #### Example `Decoder`
 
-A complete `Decoder` example that decodes messages with a 32-bit unsigned integer as its _payload_:
+A complete `Decoder` example that decodes messages with a 32-bit unsigned integer as its _payload_. Filters out any data that causes `json.Umarshal` to return an `err` by returning `nil`:
 
 ```go
 type payload struct {
@@ -343,7 +348,12 @@ type payload struct {
 type Decoder struct {}
 
 func (d *Decoder) Decode(b []byte) interface{} {
-	return &payload{string(b[0]), binary.BigEndian.Uint32(b[1:])}
+	var data payload
+	if err := json.Unmarshal(b, &data); err != nil {
+	    return data
+    } else {
+        return nil
+    }
 }
 ```
 
