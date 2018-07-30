@@ -4,7 +4,6 @@ import wallaroo
 import time
 
 N_PARTITIONS=4
-MAX=1000
 NoneClass=namedtuple("NoneClass", [])
 
 def application_setup(args):
@@ -18,7 +17,7 @@ def application_setup(args):
     ab.new_pipeline("Parallel test app", tcp_source)
     # Comment out to_stateful to see round-robin
     # Leave it in place to see no round-robin
-    ab.to_stateful(const, NoneClass, "whatever")
+    #ab.to_stateful(const, NoneClass, "whatever")
     ab.to(const_list)
     ab.to_parallel(report_executing_node),
     ab.to_sink(tcp_sink)
@@ -33,8 +32,8 @@ def const_list(_):
     return [1,2,3,4]
 
 @wallaroo.computation(name="Report which node got which record")
-def report_executing_node(rows):
-    report = "%s NODE %s got chunk\n"%(time.clock(), os.getpid())
+def report_executing_node(thing):
+    report = "NODE pid: %s got chunk: %s\n"%(os.getpid(), thing)
     return report
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
