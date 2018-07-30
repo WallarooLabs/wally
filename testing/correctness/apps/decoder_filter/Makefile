@@ -40,7 +40,8 @@ TESTING_DECODER_FILTER_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-tests-testing-correctness-apps-decoder_filter: build-tests-testing-correctness-apps-decoder_filter-validator
+build-tests-testing-correctness-apps-decoder_filter: build-testing-correctness-apps-decoder_filter-validator
+integration-tests-testing-correctness-apps-decoder_filter: build-tests-testing-correctness-apps-decoder_filter
 integration-tests-testing-correctness-apps-decoder_filter: testing_decoder_filter_test
 
 testing_decoder_filter_test:

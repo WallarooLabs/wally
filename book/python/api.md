@@ -436,7 +436,7 @@ The class used to define the properties of a Wallaroo KafkaSink.
 The Source Decoder is responsible for two tasks:
 
 1. Telling Wallaroo _how many bytes to read_ from its input source.
-2. Converting those bytes into an object that the rest of the application can process.
+2. Converting those bytes into an object that the rest of the application can process. `None` can be returned to completely discard a message.
 
 To define a source decoder, use the [@wallaroo.decoder](#@wallaroo.decoder) decorator to decorate a function that takes `bytes` and returns the correct data type for the next step in the pipeline.
 
@@ -452,22 +452,28 @@ The decorator used to define [source decoders](#source-decoder).
 
 ##### Example decoder for a TCPSource
 
-A complete `TCPSource` decoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bit unsigned int in its _payload_:
+A complete `TCPSource` decoder example that decodes messages with a 32-bit unsigned integer _payload_length_ and a character followed by a 32-bit unsigned int in its _payload_. Filters out any input that raises a `struct.error` by returning `None`:
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
-    return struct.unpack('>1sL', bs)
+    try:
+        return struct.unpack('>1sL', bs)
+    except struct.error:
+        return None
 ```
 
 #### Example decoder for a KafkaSource
 
-A complete `KafkaSource` decoder example that decodes messages with a 32-bit unsigned int in its _payload_:
+A complete `KafkaSource` decoder example that decodes messages with a 32-bit unsigned int in its _payload_. Filters out any input that raises a `struct.error` by returning `None`:
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
-    return struct.unpack('>1sL', bs)
+    try:
+        return struct.unpack('>1sL', bs)
+    except struct.error:
+        return None
 ```
 
 ### Inter-worker serialization
