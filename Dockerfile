@@ -6,7 +6,7 @@ RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 
-ENV PONYC_VERSION 0.24.0
+ENV PONYC_VERSION 0.24.4
 ENV PONY_STABLE_VERSION 0.1.4-121.d8a403e
 
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2" && \
