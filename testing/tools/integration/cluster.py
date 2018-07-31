@@ -22,16 +22,21 @@ import time
 import subprocess
 
 
-from control import (SinkExpect,
+from control import (CrashChecker,
+                     SinkExpect,
                      SinkAwaitValue,
-                     try_until_timeout,
-                     wait_for_cluster_to_resume_processing)
+                     TryUntilTimeout,
+                     WaitForClusterToResumeProcessing)
 
 from end_points import (Metrics,
                         Sender,
                         Sink)
 
-from errors import (CrashedWorkerError,
+from errors import (ClusterError,
+                    CrashedWorkerError,
+                    NotEmptyError,
+                    RunnerHasntStartedError,
+                    SinkAwaitTimeoutError,
                     StopError,
                     TimeoutError)
 
@@ -50,7 +55,8 @@ from observability import (cluster_status_query,
 
 from typed_list import TypedList
 
-from validations import (confirm_migration,
+from validations import (validate_migration,
+                         validate_sender_is_flushed,
                          worker_count_matches,
                          worker_has_state_entities)
 
@@ -59,10 +65,6 @@ try:
     basestring
 except:
     basestring = str
-
-
-class ClusterError(StopError):
-    pass
 
 
 SIGNALS = {"SIGHUP": 1,
@@ -128,6 +130,8 @@ class Runner(threading.Thread):
         try:
             logging.log(INFO2, "{}: Running:\n{}".format(self.name,
                                                          self.command))
+            # TODO: Figure out why this hangs sometimes!
+            # Possible clue: https://github.com/dropbox/pyannotate/issues/67
             self.p = subprocess.Popen(args=self.cmd_args,
                                       stdout=self.file,
                                       stderr=subprocess.STDOUT)
@@ -139,27 +143,28 @@ class Runner(threading.Thread):
             raise
 
     def send_signal(self, signal):
-        logging.debug("send_signal(signal={})".format(signal))
+        logging.log(1, "send_signal(signal={})".format(signal))
         self.p.send_signal(signal)
 
     def stop(self):
-        logging.debug("stop()")
+        logging.log(1, "stop()")
         try:
             self.p.terminate()
         except:
             pass
 
     def kill(self):
-        logging.debug("kill()")
+        logging.log(1, "kill()")
         try:
             self.p.kill()
         except:
             pass
 
     def is_alive(self):
-        logging.debug("is_alive()")
+        logging.log(1, "is_alive()")
         if self.p is None:
-            raise ValueError("Runner hasn't started yet.")
+            raise RunnerHasntStartedError("Runner {} failed to start"
+                .format(self.name))
         status = self.p.poll()
         if status is None:
             return True
@@ -167,33 +172,35 @@ class Runner(threading.Thread):
             return False
 
     def poll(self):
-        logging.debug("poll()")
+        logging.log(1, "poll()")
         if self.p is None:
-            raise ValueError("Runner hasn't started yet.")
+            raise RunnerHasntStartedError("Runner {} failed to start"
+                .format(self.name))
         return self.p.poll()
 
     def returncode(self):
-        logging.debug("returncode()")
+        logging.log(1, "returncode()")
         if self.p is None:
-            raise ValueError("Runner hasn't started yet.")
+            raise RunnerHasntStartedError("Runner {} failed to start"
+                .format(self.name))
         return self.p.returncode
 
     def get_output(self, start_from=0):
-        logging.debug("get_output(start_from={})".format(start_from))
+        logging.log(1, "get_output(start_from={})".format(start_from))
         self.file.flush()
         with open(self.file.name, 'rb') as ro:
             ro.seek(start_from)
             return ro.read()
 
     def tell(self):
-        logging.debug("tell()")
+        logging.log(1, "tell()")
         """
         Return the STDOUT file's current position
         """
         return self.file.tell()
 
     def respawn(self):
-        logging.debug("respawn()")
+        logging.log(1, "respawn()")
         return Runner(self.command, self.name, control=self.control,
                       data=self.data, external=self.external)
 
@@ -300,9 +307,13 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
         r.start()
         time.sleep(0.05)
 
-        # check the runners haven't exited with any errors
+
+    # check the runners haven't exited with any errors
+    for idx, r in enumerate(runners):
         try:
             assert(r.is_alive())
+        except RunnerHasntStartedError:
+            raise
         except Exception as err:
             stdout = r.get_output()
             raise ClusterError(
@@ -393,10 +404,13 @@ class Cluster(object):
             is_ready_timeout=30, res_dir=None, runner_data=[]):
         # Create attributes
         self._finalized = False
+        self._exited = False
+        self._raised = False
         self.command = command
         self.host = host
         self.workers = TypedList(types=(Runner,))
         self.dead_workers = TypedList(types=(Runner,))
+        self.restarted_workers = TypedList(types=(Runner,))
         self.runners = TypedList(types=(Runner,))
         self.source_addrs = []
         self.sink_addrs = []
@@ -412,6 +426,9 @@ class Cluster(object):
         else:
             self.res_dir = res_dir
         self.runner_data = runner_data
+        # Run a continuous crash in a background thread
+        self._stoppables = set()
+        self.crash_checker = CrashChecker(self)
 
         # Try to start everything... clean up on exception
         try:
@@ -449,10 +466,12 @@ class Cluster(object):
             self.wait_to_resume_processing(self.is_ready_timeout)
             # make sure `workers` runners are active and listed in the
             # cluster status query
-            logging.debug("Testing cluster size via obs query")
+            logging.log(1, "Testing cluster size via obs query")
             self.query_observability(cluster_status_query,
                                      self.runners[0].external,
                                      tests=[(worker_count_matches, [workers])])
+            # start the crash checker
+            self.crash_checker.start()
         except Exception as err:
             logging.error("Encountered and error when starting up the cluster")
             logging.exception(err)
@@ -464,7 +483,7 @@ class Cluster(object):
     # Autoscale #
     #############
     def grow(self, by=1, timeout=30, with_test=True):
-        logging.debug("grow(by={}, timeout={}, with_test={})".format(
+        logging.log(1, "grow(by={}, timeout={}, with_test={})".format(
             by, timeout, with_test))
         pre_partitions = self.get_partition_data() if with_test else None
         runners = []
@@ -493,11 +512,11 @@ class Cluster(object):
         if with_test:
             workers = {'joining': [w.name for w in runners],
                        'leaving': []}
-            self.confirm_migration(pre_partitions, workers)
+            self.confirm_migration(pre_partitions, workers, timeout=timeout)
         return runners
 
-    def shrink(self, workers=1, with_test=True):
-        logging.debug("shrink(workers={}, with_test={})".format(
+    def shrink(self, workers=1, timeout=30, with_test=True):
+        logging.log(1, "shrink(workers={}, with_test={})".format(
             workers, with_test))
         # pick a worker that's not being shrunk
         if isinstance(workers, basestring):
@@ -523,9 +542,9 @@ class Cluster(object):
         names = ",".join((w.name for w in leaving))
         pre_partitions = self.get_partition_data() if with_test else None
         # send shrink command to non-shrinking worker
-        logging.debug("Sending a shrink command for ({})".format(names))
+        logging.log(1, "Sending a shrink command for ({})".format(names))
         resp = send_shrink_command(address, names)
-        logging.debug("Response was: {}".format(resp))
+        logging.log(1, "Response was: {}".format(resp))
         # no error, so command was successful, update self.workers
         for w in leaving:
             self.workers.remove(w)
@@ -533,17 +552,17 @@ class Cluster(object):
         if with_test:
             workers = {'leaving': [w.name for w in leaving],
                        'joining': []}
-            self.confirm_migration(pre_partitions, workers)
+            self.confirm_migration(pre_partitions, workers, timeout=timeout)
         return leaving
 
     def get_partition_data(self):
-        logging.debug("get_partition_data()")
+        logging.log(1, "get_partition_data()")
         addresses = [(w.name, w.external) for w in self.workers]
         responses = multi_states_query(addresses)
         return coalesce_partition_query_responses(responses)
 
     def confirm_migration(self, pre_partitions, workers, timeout=120):
-        logging.debug("confirm_migration(pre_partitions={}, workers={},"
+        logging.log(1, "confirm_migration(pre_partitions={}, workers={},"
             " timeout={})".format(pre_partitions, workers, timeout))
         def pre_process():
             addresses = [(r.name, r.external) for r in self.workers]
@@ -551,8 +570,16 @@ class Cluster(object):
             post_partitions = coalesce_partition_query_responses(responses)
             return (pre_partitions, post_partitions, workers)
         # retry the test until it passes or a timeout elapses
-        logging.debug("Running pre_process func with try_until")
-        try_until_timeout(confirm_migration, pre_process, timeout=120)
+        logging.log(1, "Running pre_process func with try_until")
+        tut = TryUntilTimeout(validate_migration, pre_process,
+                              timeout=timeout, interval=2)
+        self._stoppables.add(tut)
+        tut.start()
+        tut.join()
+        self._stoppables.discard(tut)
+        if tut.error:
+            raise tut.error
+
 
     #####################
     # Worker management #
@@ -565,10 +592,11 @@ class Cluster(object):
         position in the `workers` list.
         If `worker` is a Runner instance, perform this on that instance.
         """
-        logging.debug("kill_worker(worker={})".format(worker))
+        logging.log(1, "kill_worker(worker={})".format(worker))
         if isinstance(worker, Runner):
             # ref to worker
-            r = self.workers.remove(worker)
+            self.workers.remove(worker)
+            r = worker
         else: # index of worker in self.workers
             r = self.workers.pop(worker)
         r.kill()
@@ -583,7 +611,7 @@ class Cluster(object):
         position in the `workers` list.
         If `worker` is a Runner instance, perform this on that instance.
         """
-        logging.debug("stop_worker(worker={})".format(worker))
+        logging.log(1, "stop_worker(worker={})".format(worker))
         if isinstance(worker, Runner):
             # ref to worker
             r = self.workers.remove(worker)
@@ -595,68 +623,101 @@ class Cluster(object):
 
     def restart_worker(self, worker=-1):
         """
-        Restart a worker via the `respawn` method of a runner, then add the
+        Restart a worker(s) via the `respawn` method of a runner, then add the
         new Runner instance to `workers`.
         If `worker` is an int, perform this on the Runner instance at `worker`
         position in the `dead_workers` list.
         If `worker` is a Runner instance, perform this on that instance.
+        If `worker` is a list of Runners, perform this on each.
+        If `worker` is a slice, perform this on the slice of self.dead_workers
         """
-        logging.debug("restart_worker(worker={})".format(worker))
+        logging.log(1, "restart_worker(worker={})".format(worker))
         if isinstance(worker, Runner):
             # ref to dead worker instance
-            old_r = worker
+            old_rs = [worker]
+        elif isinstance(worker, (list, tuple)):
+            old_rs = worker
+        elif isinstance(worker, slice):
+            old_rs = self.dead_workers[worker]
         else: # index of worker in self.dead_workers
-            old_r = self.dead_workers[worker]
-        r = old_r.respawn()
-        self.workers.append(r)
-        self.runners.append(r)
-        r.start()
-        return r
+            old_rs = [self.dead_workers[worker]]
+        new_rs = []
+        for r in old_rs:
+            new_rs.append(r.respawn())
+        for r in new_rs:
+            r.start()
+        time.sleep(0.05)
+
+        # Wait until all worker processes have started
+        new_rs = tuple(new_rs)
+        def check_alive():
+            [r.is_alive() for r in new_rs]
+
+        tut = TryUntilTimeout(check_alive, timeout=5, interval=0.1)
+        self._stoppables.add(tut)
+        tut.start()
+        tut.join()
+        self._stoppables.discard(tut)
+        if tut.error:
+            logging.error("Bad starters: {}".format(new_rs))
+            raise tut.error
+        logging.debug("All new runners started successfully")
+
+        for r in new_rs:
+            self.restarted_workers.append(r)
+            self.workers.append(r)
+            self.runners.append(r)
+        return new_rs
 
     def stop_workers(self):
-        logging.debug("stop_workers()")
+        logging.log(1, "stop_workers()")
         for r in self.runners:
             r.stop()
         # move all live workers to dead_workers
         self.dead_workers.extend(self.workers)
         self.workers = []
 
-    def get_crashed_workers(self):
-        logging.debug("get_crashed_workers()")
-        return filter(lambda r: r.poll() not in (None, 0,-9,-15), self.runners)
+    def get_crashed_workers(self,
+            func=lambda r: r.poll() not in (None, 0,-9,-15)):
+        logging.log(1, "get_crashed_workers()")
+        return filter(func, self.runners)
 
     #########
     # Sinks #
     #########
     def stop_sinks(self):
-        logging.debug("stop_sinks()")
+        logging.log(1, "stop_sinks()")
         for s in self.sinks:
             s.stop()
 
-    def sink_await(self, values, timeout=30, sink=-1):
-        logging.debug("sink_await(values={}, timeout={}, sink={})".format(
-            values, timeout, sink))
+    def sink_await(self, values, timeout=30, func=lambda x: x, sink=-1):
+        logging.log(1, "sink_await(values={}, timeout={}, func: {}, sink={})"
+            .format(values, timeout, func, sink))
         if isinstance(sink, Sink):
             pass
         else:
             sink = self.sinks[sink]
-        t = SinkAwaitValue(sink, values, timeout)
+        t = SinkAwaitValue(sink, values, timeout, func)
+        self._stoppables.add(t)
         t.start()
         t.join()
+        self._stoppables.discard(t)
         if t.error:
             raise t.error
         return sink
 
     def sink_expect(self, expected, timeout=30, sink=-1):
-        logging.debug("sink_expect(expected={}, timeout={}, sink={})".format(
+        logging.log(1, "sink_expect(expected={}, timeout={}, sink={})".format(
             expected, timeout, sink))
         if isinstance(sink, Sink):
             pass
         else:
             sink = self.sinks[sink]
         t = SinkExpect(sink, expected, timeout)
+        self._stoppables.add(t)
         t.start()
         t.join()
+        self._stoppables.discard(t)
         if t.error:
             raise t.error
         return sink
@@ -665,19 +726,21 @@ class Cluster(object):
     # Senders #
     ###########
     def add_sender(self, sender, start=False):
-        logging.debug("add_sender(sender={}, start={})".format(sender, start))
+        logging.log(1, "add_sender(sender={}, start={})".format(sender, start))
         self.senders.append(sender)
         if start:
             sender.start()
 
     def wait_for_sender(self, sender=-1, timeout=30):
-        logging.debug("wait_for_sender(sender={}, timeout={})"
+        logging.log(1, "wait_for_sender(sender={}, timeout={})"
             .format(sender, timeout))
         if isinstance(sender, Sender):
             pass
         else:
             sender = self.senders[sender]
+        self._stoppables.add(sender)
         sender.join(timeout)
+        self._stoppables.discard(sender)
         if sender.error:
             raise sender.error
         if sender.is_alive():
@@ -685,17 +748,36 @@ class Cluster(object):
                                'period')
 
     def stop_senders(self):
-        logging.debug("stop_senders()")
+        logging.log(1, "stop_senders()")
         for s in self.senders:
             s.stop()
 
     def pause_senders(self):
-        logging.debug("pause_senders()")
+        logging.log(1, "pause_senders()")
         for s in self.senders:
             s.pause()
+        self.wait_for_senders_to_flush()
+
+    def wait_for_senders_to_flush(self, timeout=30):
+        logging.log(1, "wait_for_senders_to_flush({})".format(timeout))
+        awaiters = []
+        for s in self.senders:
+            a = TryUntilTimeout(validate_sender_is_flushed,
+                pre_process=(s,),
+                timeout=timeout, interval=0.1)
+            self._stoppables.add(a)
+            awaiters.append(a)
+            a.start()
+        for a in awaiters:
+            a.join()
+            self._stoppables.discard(a)
+            if a.error:
+                raise a.error
+            else:
+                logging.debug("Sender is fully flushed after pausing.")
 
     def resume_senders(self):
-        logging.debug("resume_senders()")
+        logging.log(1, "resume_senders()")
         for s in self.senders:
             s.resume()
 
@@ -703,12 +785,18 @@ class Cluster(object):
     # Cluster #
     ###########
     def wait_to_resume_processing(self, timeout=30):
-        logging.debug("wait_to_resume_processing(timeout={})"
+        logging.log(1, "wait_to_resume_processing(timeout={})"
             .format(timeout))
-        wait_for_cluster_to_resume_processing(self.workers, timeout=timeout)
+        w = WaitForClusterToResumeProcessing(self.workers, timeout=timeout)
+        self._stoppables.add(w)
+        w.start()
+        w.join()
+        self._stoppables.discard(w)
+        if w.error:
+            raise w.error
 
     def stop_cluster(self):
-        logging.debug("stop_cluster()")
+        logging.log(1, "stop_cluster()")
         self.stop_senders()
         self.stop_workers()
         self.stop_sinks()
@@ -717,12 +805,14 @@ class Cluster(object):
     # Observability queries #
     #########################
     def query_observability(self, query, args, tests, timeout=30, period=2):
-        logging.debug("query_observability(query={}, args={}, tests={}, "
+        logging.log(1, "query_observability(query={}, args={}, tests={}, "
             "timeout={}, period={})".format(
                 query, args, tests, timeout, period))
         obs = ObservabilityNotifier(query, args, tests, timeout, period)
+        self._stoppables.add(obs)
         obs.start()
         obs.join()
+        self._stoppables.discard(obs)
         if obs.error:
             raise obs.error
 
@@ -732,9 +822,32 @@ class Cluster(object):
     def __enter__(self):
         return self
 
+    def stop_background_threads(self, error=None):
+        logging.log(1, "stop_background_threads({})".format(error))
+        for s in self._stoppables:
+            s.stop()
+        self._stoppables.clear()
+
+    def raise_from_error(self, error):
+        logging.log(1, "raise_from_error({})".format(error))
+        if self._raised:
+            return
+        self.stop_background_threads(error)
+        self.__exit__(type(error), error, None)
+        self._raised = True
+
     def __exit__(self, _type, _value, _traceback):
-        logging.debug("__exit__(...)")
+        logging.log(1, "__exit__({}, {}, {})"
+            .format(_type, _value, _traceback))
+        if self._exited:
+            return
         # clean up any remaining runner processes
+        if _type or _value or _traceback:
+            logging.error('An error was raised in the Cluster context',
+                exc_info=(_type, _value, _traceback))
+            self.stop_background_threads(_value)
+        else:
+            self.stop_background_threads()
         try:
             for w in self.workers:
                 w.stop()
@@ -756,7 +869,8 @@ class Cluster(object):
             if alive:
                 alive_names = ', '.join((w.name for w in alive))
                 raise ClusterError("Runners [{}] failed to exit cleanly after"
-                                        " {} seconds.".format(alive_names))
+                                   " {} seconds.".format(alive_names,
+                                       self.worker_join_timeout))
             # check for workes that exited with a non-0 return code
             # note that workers killed in the previous step have code -15
             bad_exit = []
@@ -765,9 +879,6 @@ class Cluster(object):
                 if c not in (0,-9,-15):  # -9: SIGKILL, -15: SIGTERM
                     bad_exit.append(w)
             if bad_exit:
-                for w in bad_exit:
-                    logging.error("Runner {} exited with return code {}"
-                        .format(w.name, w.returncode()))
                 raise ClusterError("The following workers terminated with "
                     "a bad exit code: {}"
                     .format(["(name: {}, pid: {}, code:{})".format(
@@ -780,9 +891,11 @@ class Cluster(object):
                     " the cluster")
                  for e in self.errors:
                      logging.exception(e)
+            self._exited = True
 
     def __finally__(self):
-        logging.debug("__finally__()")
+        logging.log(1, "__finally__()")
+        self.stop_background_threads()
         if self._finalized:
             return
         logging.info("Doing final cleanup")

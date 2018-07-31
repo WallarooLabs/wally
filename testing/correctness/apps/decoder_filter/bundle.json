@@ -6,10 +6,6 @@
     },
     {
       "type": "local",
-      "local-path": "lib"
-    },
-    {
-      "type": "local",
       "local-path": "../../../../go_api/pony"
     },
     {

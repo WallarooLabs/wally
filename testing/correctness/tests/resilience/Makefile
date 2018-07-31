@@ -33,26 +33,24 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
-RECOVERY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
-CUSTOM_PYTHONPATH += $(SEQUENCE_WINDOW_PYTHON_PATH)
+RESILIENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+resilience_tests : CUSTOM_PATH = $(MULTI_PARTITION_DETECTOR_PATH):$(MULTI_PART_VALIDATOR_PATH):$(CLUSTER_SHRINKER_PATH)
 
-build-testing-correctness-tests-recovery: build-testing-correctness-apps-sequence_window
-build-testing-correctness-tests-recovery: build-testing-tools-external_sender
-build-testing-correctness-tests-recovery: build-machida
-integration-tests-testing-correctness-tests-recovery: build-testing-correctness-tests-recovery
-integration-tests-testing-correctness-tests-recovery: recovery_tests
+build-testing-correctness-tests-resilience: build-testing-correctness-apps-multi_partition_detector
+build-testing-correctness-tests-resilience: build-utils-cluster_shrinker
+integration-tests-testing-correctness-tests-resilience: build-testing-correctness-tests-resilience
+integration-tests-testing-correctness-tests-resilience: resilience_tests
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
 ifeq ($(resilience),on)
-recovery_tests:
-	cd $(RECOVERY_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose --exitfirst recovery.py $(pytest_exp)
+resilience_tests:
+	cd $(RESILIENCE_PATH) && \
+	python2 -m pytest -c $(integration_path)/pytest.ini resilience_tests.py $(pytest_exp)
 else
-recovery_tests:
-	$(QUIET)printf "recovery_tests not run.\nRun make with 'resilience=on' to run this test.\n"
+recovery_concurrent_tests:
+	$(QUIET)printf "reseilience tests not run.\nRun make with 'resilience=on' to run this test.\n"
 endif
 
 endif

@@ -14,8 +14,10 @@
 
 from itertools import chain
 
+from errors import NotEmptyError
 
-def confirm_migration(pre_partitions, post_partitions, workers):
+
+def validate_migration(pre_partitions, post_partitions, workers):
     """
     - Test that no "joining" workers are present in the pre set
     - Test that no "leaving" workers are present in the post set
@@ -79,3 +81,11 @@ def worker_has_state_entities(state_entities):
     assert(len(state_entities) > 0)  # There's at least one state partition
     for state_name in state_entities:  # iterate over each partition
         assert(len(state_entities[state_name]) > 0)  # At least one entity
+
+
+def validate_sender_is_flushed(sender):
+    """
+    Test that a sender has flushed its buffer
+    """
+    if sender.batch:
+        raise NotEmptyError

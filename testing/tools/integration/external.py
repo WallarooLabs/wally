@@ -36,6 +36,11 @@ def run_shell_cmd(cmd):
                                       stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
         return ShellCmdResult(False, err.output, err.returncode, err.cmd)
+    except OSError as err:
+        if err.errno == 2:  # no such file or directory
+            return ShellCmdResult(False, str(err), 2, cmd)
+        else:
+            raise
     return ShellCmdResult(True, out, 0, shlex.split(cmd))
 
 
@@ -107,5 +112,5 @@ def send_shrink_command(addr, workers):
         assert(res.success)
     except AssertionError:
         raise AssertionError('External shrink trigger failed with '
-                             'the error:\n{}'.format(res.output))
+                             'the error:\n{}'.format(res))
     return res.output

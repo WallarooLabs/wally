@@ -35,8 +35,8 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
 LOG_ROTATION_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
-CUSTOM_PYTHONPATH += $(SEQUENCE_WINDOW_PYTHON_PATH)
+log_rotation_tests : CUSTOM_PATH = $(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
+log_rotation_tets : CUSTOM_PYTHONPATH = $(SEQUENCE_WINDOW_PYTHON_PATH)
 
 build-testing-correctness-tests-log_rotation: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests-log_rotation: build-testing-tools-external_sender

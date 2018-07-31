@@ -12,6 +12,7 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+import logging
 import threading
 
 class StoppableThread(threading.Thread):
@@ -22,9 +23,14 @@ class StoppableThread(threading.Thread):
         super(StoppableThread, self).__init__()
         self.daemon = True
         self.stop_event = threading.Event()
+        self.error = None
 
-    def stop(self):
+    def stop(self, error=None):
         self.stop_event.set()
+        if error:
+            logging.debug("{} stopped with error".format(self.name))
+            logging.debug(error)
+            self.error = error
 
     def stopped(self):
         return self.stop_event.is_set()

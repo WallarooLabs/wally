@@ -22,6 +22,7 @@ so that it may be unit tested separately from the main application.
 """
 
 
+use "time"
 use "buffered"
 use "collections"
 use "../building_blocks"
@@ -75,4 +76,12 @@ primitive PartitionedU64FramedHandler is FramedSourceHandler[Message]
     let u: Value = Bytes.to_u64(data(0)?, data(1)?, data(2)?, data(3)?,
       data(4)?, data(5)?, data(6)?, data(7)?)
     let k: Key = String.from_array(recover data.slice(8) end)
-    Message(k, u)
+    let m = Message(k, u)
+    ifdef debug then
+        (let sec', let ns') = Time.now()
+        let us' = ns' / 1000
+        let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())
+      @printf[I32]("%s Source decoded: %s\n".cstring(), ts'.cstring(),
+        m.string().cstring())
+    end
+    consume m
