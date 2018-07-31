@@ -34,8 +34,8 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 RESTART_WITHOUT_RESILIENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-CUSTOM_PATH += :$(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
-CUSTOM_PYTHONPATH += $(SEQUENCE_WINDOW_PYTHON_PATH)
+restart_without_resilience_tests : CUSTOM_PATH = $(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
+restart_without_resilience_tests : CUSTOM_PYTHONPATH = $(SEQUENCE_WINDOW_PYTHON_PATH)
 
 build-testing-correctness-tests-restart_without_resilience: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests-restart_without_resilience: build-testing-tools-external_sender

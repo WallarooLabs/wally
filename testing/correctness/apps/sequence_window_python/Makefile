@@ -36,7 +36,7 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
 SEQUENCE_WINDOW_PYTHON_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-
+sequence_window_python_test: CUSTOM_PATH = $(VALIDATOR_PATH)
 
 # standard rules generation makefile
 include $(rules_mk_path)
