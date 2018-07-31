@@ -238,6 +238,17 @@ actor ApplicationDistributor is Distributor
             // We're done putting runners on the source since
             // the stateless partition will not be on the source
             handled_source_runners = true
+
+            // We don't want the parallelized stateless partitions to be
+            // coalesced onto the preceding producer if they are preceded
+            // by another stateless computation (since it's the output of
+            // that computation that should be routed to one of many).
+            if latest_runner_builders.size() > 0 then
+              let seq_builder = RunnerSequenceBuilder(
+                latest_runner_builders = recover Array[RunnerBuilder] end,
+                parallel_stateless)
+              step_runner_builders.push(seq_builder)
+            end
           end
 
           if r_builder.is_stateful() then

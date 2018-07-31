@@ -993,8 +993,6 @@ class val DataRouter is Equatable[DataRouter]
     let id = try
       _keyed_step_ids(state_name, key)?
     else
-      @printf[I32]("!@ `remove_keyed_route('%s', '%s')` FAILED\n".cstring(),
-        state_name.cstring(), key.cstring())
       Fail()
       0
     end
