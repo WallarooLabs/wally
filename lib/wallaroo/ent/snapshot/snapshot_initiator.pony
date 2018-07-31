@@ -67,8 +67,7 @@ actor SnapshotInitiator is Initializable
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     ifdef "resilience" then
       if _is_active and (_worker_name == _primary_worker) then
-        let t = Timer(_InitiateSnapshot(this), _time_between_snapshots)
-        _timers(consume t)
+        initiate_snapshot()
       end
     end
 
@@ -121,7 +120,6 @@ actor SnapshotInitiator is Initializable
         //!@ Inform other workers to write snapshot id to disk
         // Prepare for next snapshot
         if _is_active and (_worker_name == _primary_worker) then
-          //!@ In reality, we'll need to check if this is allowed
           @printf[I32]("!@ Creating _InitiateSnapshot timer for future snapshot %s\n".cstring(), (_current_snapshot_id + 1).string().cstring())
           let t = Timer(_InitiateSnapshot(this), _time_between_snapshots)
           _timers(consume t)
@@ -134,12 +132,18 @@ actor SnapshotInitiator is Initializable
     end
     _phase = _WaitingSnapshotInitiatorPhase
 
-  be initiate_rollback(
-    recovery_action: Promise[SnapshotRollbackBarrierToken])
+  be initiate_rollback(recovery_action: Promise[SnapshotRollbackBarrierToken])
   =>
     if (_primary_worker == _worker_name) then
-      // ASSUMPTION: The initial snapshot was successful, so we can always
-      // at least rollback to it.
+      if _current_snapshot_id == 0 then
+        @printf[I32]("No snapshots were taken!\n".cstring())
+        Fail()
+      end
+
+      // TODO: To increase odds that snapshots were successfully flushed to
+      // disk, we're using the second to last snapshot if one exists. We
+      // should probably change this and address the question of whether a
+      // snapshot was successfully written out directly.
       let rollback_id =
         if _current_snapshot_id > 1 then
           _current_snapshot_id - 1
