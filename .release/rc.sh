@@ -53,7 +53,7 @@ update_version() {
 commit_version_update() {
   # commit VERSION update
   git add VERSION
-  git add .vagrant/bootstrap.sh
+  git add vagrant/bootstrap.sh
   git commit -m "Create candidate for $version release"
 }
 
