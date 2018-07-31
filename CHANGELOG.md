@@ -13,6 +13,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Changed
 
+- Filter none/nil in Decoder for Python/Go API's ([PR #2259](https://github.com/wallaroolabs/wallaroo/pull/2259))
 
 ## [0.5.0] - 2018-07-25
 
