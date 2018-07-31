@@ -5,7 +5,7 @@ set -o nounset
 export DEBIAN_FRONTEND=noninteractive
 
 export WALLAROO_VERSION="release-0.5.1"
-export PONYC_VERSION="0.24.0"
+export PONYC_VERSION="0.24.4"
 export OTP_VERSION="1:20.1-1"
 export ELIXIR_VERSION="1.5.2-1"
 export GO_VERSION="1.9.4"
