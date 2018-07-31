@@ -242,16 +242,21 @@ class ObservabilityNotifier(StoppableThread):
             return (get_func_name(t), t, tuple(), frozenset())
 
     def run(self):
+        logging.log(1, "Starting observabilitynotifier loop")
         started = time.time()
         while not self.stopped():
             try:
+                logging.log(1, "Try query")
                 query_result = self.query_func(*self.query_args)
             except Exception as err:
+                logging.log(1, "Query failed")
+                logging.log(1, err)
                 # sleep and retry but only if timeout hasn't elapsed
                 if (time.time() - started) <= self.timeout:
                     time.sleep(self.period)
                     continue
                 else:  # Timeout has elapsed, return this error!
+                    logging.log(1, "ObservabilityNotifier timed out")
                     self.error = ObservabilityQueryError(
                         "Query function '{}' has experienced an error:\n{}({})"
                         .format(self.query_func_name, type(err).__name__,

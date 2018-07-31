@@ -14,7 +14,15 @@
 
 
 # Error classes
+class StopError(Exception):
+    pass
+
+
 class AutoscaleError(Exception):
+    pass
+
+
+class ClusterError(StopError):
     pass
 
 
@@ -26,11 +34,11 @@ class DuplicateKeyError(MigrationError):
     pass
 
 
-class StopError(Exception):
+class TimeoutError(StopError):
     pass
 
 
-class TimeoutError(StopError):
+class SinkAwaitTimeoutError(TimeoutError):
     pass
 
 
@@ -42,5 +50,13 @@ class PipelineTestError(Exception):
     pass
 
 
-class CrashedWorkerError(PipelineTestError):
+class CrashedWorkerError(StopError):
+    pass
+
+
+class RunnerHasntStartedError(Exception):
+    pass
+
+
+class NotEmptyError(Exception):
     pass

@@ -11,7 +11,6 @@ For example, a failure in the 2nd op of the third cycle of the above example
 will say it failed after the operations [2,-1,2,-1,2,-1].
 """
 
-
 from _autoscale_tests import autoscale_sequence
 
 
