@@ -323,6 +323,7 @@ actor Startup
       let barrier_initiator = BarrierInitiator(auth,
         _startup_options.worker_name, connections, initializer_name)
       connections.register_disposable(barrier_initiator)
+      event_log.set_barrier_initiator(barrier_initiator)
 
       // TODO: We currently set the primary snapshot initiator worker to the
       // initializer.
@@ -351,7 +352,6 @@ actor Startup
         barrier_initiator, snapshot_initiator, autoscale_initiator,
         initializer_name)
       router_registry.set_event_log(event_log)
-      event_log.set_router_registry(router_registry)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, data_receivers, router_registry,
@@ -511,6 +511,7 @@ actor Startup
 
       let barrier_initiator = BarrierInitiator(auth,
         _startup_options.worker_name, connections, initializer_name)
+      event_log.set_barrier_initiator(barrier_initiator)
 
       let snapshot_initiator = SnapshotInitiator(auth,
         _startup_options.worker_name, m.primary_snapshot_worker, connections,
@@ -535,7 +536,6 @@ actor Startup
         barrier_initiator, snapshot_initiator, autoscale_initiator,
         m.sender_name)
       router_registry.set_event_log(event_log)
-      event_log.set_router_registry(router_registry)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name,

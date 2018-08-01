@@ -782,51 +782,6 @@ actor RouterRegistry
     conn.writev(msg)
 
   //////////////
-  // LOG ROTATION
-  //////////////
-  be rotate_log_file() =>
-    """
-    Called when it's time to rotate the log file for the worker.
-    This will mute upstream, ack on all in-flight messages, then initiate a
-    log file rotation, followed by snapshotting of all states on the worker
-    to the new file, before unmuting upstream and resuming processing.
-    """
-    initiate_stop_the_world()
-    _stop_the_world_in_process = true
-    _stop_the_world_for_log_rotation()
-
-    let action = Promise[None]
-    action.next[None]({(_: None) => _self.begin_log_rotation()})
-    _autoscale_initiator.initiate_autoscale(action)
-
-  be begin_log_rotation() =>
-    """
-    Start the log rotation and initiate snapshots.
-    """
-    match _event_log
-    | let e: EventLog =>
-      e.rotate_file()
-    else
-      Fail()
-    end
-
-  be rotation_complete() =>
-    """
-    Called when rotation has completed and we should resume processing
-    """
-    _connections.request_cluster_unmute()
-    _unmute_request(_worker_name)
-
-  fun ref _stop_the_world_for_log_rotation() =>
-    """
-    We currently stop all message processing before perofrming log rotaion.
-    """
-    @printf[I32]("~~~Stopping message processing for log rotation.~~~\n"
-      .cstring())
-    _mute_request(_worker_name)
-    _connections.stop_the_world()
-
-  //////////////
   // NEW WORKER PARTITION MIGRATION
   //////////////
   be report_connected_to_joining_worker(connected_worker: String) =>
