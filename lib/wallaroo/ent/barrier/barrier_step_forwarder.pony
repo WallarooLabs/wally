@@ -52,6 +52,11 @@ class BarrierStepForwarder
     // If this new token is a higher priority token, then the forwarder should
     // have already been cleared to make way for it.
     ifdef debug then
+      //!@
+      if barrier_token > _barrier_token then
+        @printf[I32]("Invariant violation: received barrier %s is greater than current barrier %s \n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring())
+      end
+
       Invariant(not (barrier_token > _barrier_token))
     end
 

@@ -57,7 +57,7 @@ class iso _TestTargetIdRouterEquality is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
-    let event_log = EventLog()
+    let event_log = EventLog("w1")
     let recovery_replayer = _RecoveryReconnecterGenerator(h.env, auth)
 
     let step1 = _StepGenerator(auth, event_log, recovery_replayer)
@@ -127,7 +127,7 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
-    let event_log = EventLog()
+    let event_log = EventLog("w1")
     let recovery_replayer = _RecoveryReconnecterGenerator(h.env, auth)
 
     let step1 = _StepGenerator(auth, event_log, recovery_replayer)
@@ -185,7 +185,7 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
-    let event_log = EventLog()
+    let event_log = EventLog("w1")
     let recovery_replayer = _RecoveryReconnecterGenerator(h.env, auth)
 
     let step1 = _StepGenerator(auth, event_log, recovery_replayer)
@@ -258,7 +258,7 @@ primitive _AutoscaleInitiatorGenerator
 primitive _SnapshotInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): SnapshotInitiator =>
     SnapshotInitiator(auth, "", "", _ConnectionsGenerator(env, auth), 1,
-      EventLog(), _BarrierInitiatorGenerator(env, auth), "", false)
+      EventLog("w1"), _BarrierInitiatorGenerator(env, auth), "", false)
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>
@@ -269,7 +269,7 @@ primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
     Connections("", "", auth, "", "", "", "",
       _NullMetricsSink, "", "", false, "", false
-      where event_log = EventLog())
+      where event_log = EventLog("w1"))
 
 primitive _RecoveryReconnecterGenerator
   fun apply(env: Env, auth: AmbientAuth): RecoveryReconnecter =>
@@ -283,7 +283,7 @@ primitive _StatelessPartitionGenerator
 
 primitive _StateStepCreatorGenerator
   fun apply(auth: AmbientAuth): StateStepCreator =>
-    StateStepCreator(auth, "app", "worker", _NullMetricsSink, EventLog())
+    StateStepCreator(auth, "app", "worker", _NullMetricsSink, EventLog("w1"))
 
 actor _Cluster is Cluster
   be notify_cluster_of_new_stateful_step(id: RoutingId, key: Key,
