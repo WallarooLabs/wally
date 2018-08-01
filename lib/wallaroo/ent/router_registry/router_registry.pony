@@ -265,7 +265,7 @@ actor RouterRegistry
       _source_ids.remove(digestof source)?
       _barrier_initiator.unregister_source(source, source_id)
        _connections.register_disposable(source)
-      // _connections.notify_cluster_of_new_source(source_id)
+      // _connections.notify_cluster_of_source_leaving(source_id)
     else
       Fail()
     end
@@ -452,7 +452,8 @@ actor RouterRegistry
   be register_data_receiver(worker: String, dr: DataReceiver) =>
     _data_receiver_map(worker) = dr
 
-  be register_state_step(step: Step, state_name: String, key: Key, step_id: RoutingId)
+  be register_state_step(step: Step, state_name: String, key: Key,
+    step_id: RoutingId)
   =>
     _add_routes_to_state_step(step_id, step, key, state_name)
 
@@ -545,19 +546,7 @@ actor RouterRegistry
     else
       Fail()
     end
-    //!@
-    // _remove_worker_from_target_id_router(worker)
-
     _distribute_boundary_removal(worker)
-
-    //!@
-  // fun ref _remove_worker_from_target_id_router(worker: String) =>
-  //   match _target_id_router
-  //   | let omnr: TargetIdRouter =>
-  //     _target_id_router = omnr.remove_boundary(worker).remove_data_receiver(worker)
-  //   end
-
-  //   _distribute_target_id_router()
 
   fun ref _distribute_boundary_removal(worker: String) =>
     for subs in _partition_router_subs.values() do
@@ -655,6 +644,174 @@ actor RouterRegistry
     end
     lti.initialize_join_initializables()
 
+  be report_status(code: ReportStatusCode) =>
+    match code
+    | BoundaryCountStatus =>
+      @printf[I32]("RouterRegistry knows about %s boundaries\n"
+        .cstring(), _outgoing_boundaries.size().string().cstring())
+    end
+    for source in _sources.values() do
+      source.report_status(code)
+    end
+    for boundary in _outgoing_boundaries.values() do
+      boundary.report_status(code)
+    end
+
+  fun ref clean_shutdown() =>
+    _recovery_file_cleaner.clean_recovery_files()
+
+  /////////////////////////////////////////////////////////////////////////////
+  // STOP THE WORLD
+  /////////////////////////////////////////////////////////////////////////////
+  fun ref initiate_stop_the_world() =>
+    _initiated_stop_the_world = true
+    _stop_the_world_in_process = true
+
+  fun ref initiate_stop_the_world_for_grow_migration(
+    new_workers: Array[String] val)
+  =>
+    initiate_stop_the_world()
+    try
+      let msg = ChannelMsgEncoder.initiate_stop_the_world_for_join_migration(
+        new_workers, _auth)?
+      _connections.send_control_to_cluster_with_exclusions(msg, new_workers)
+    else
+      Fail()
+    end
+    _stop_the_world_for_grow_migration(new_workers)
+    @printf[I32]("!@ setting up migration action\n".cstring())
+
+    let action = Promise[None]
+    action.next[None]({(_: None) =>
+      _self.initiate_join_migration(new_workers)})
+    _autoscale_initiator.initiate_autoscale(action)
+
+  fun ref stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
+    """
+    Called when new workers join the cluster and we are ready to start
+    the partition migration process. We first check that all
+    in-flight messages have finished processing.
+    """
+    _stop_the_world_in_process = true
+    _stop_the_world_for_grow_migration(new_workers)
+
+  fun ref _stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
+    """
+    We currently stop all message processing before migrating partitions and
+    updating routers/routes.
+    """
+    @printf[I32]("~~~Stopping message processing for state migration.~~~\n"
+      .cstring())
+    _mute_request(_worker_name)
+    _connections.stop_the_world(new_workers)
+
+  fun ref _stop_the_world_for_shrink_migration() =>
+    """
+    We currently stop all message processing before migrating partitions and
+    updating routers/routes.
+    """
+    @printf[I32]("~~~Stopping message processing for leaving workers.~~~\n"
+      .cstring())
+    _mute_request(_worker_name)
+    _connections.stop_the_world()
+
+  fun ref _try_resume_the_world() =>
+    @printf[I32]("!@ _try_resume_the_world\n".cstring())
+    if _initiated_stop_the_world then
+      //!@ Do we need this here? We don't know the state name anymore.
+      // Since we don't need all steps to be up to date on the TargetIdRouter
+      // during migrations, we wait on the worker that initiated stop the
+      // world to distribute it until here to avoid unnecessary messaging.
+      // _distribute_target_id_router()
+
+      let action = Promise[None]
+      action.next[None]({(_: None) => _self.initiate_autoscale_complete()})
+      _autoscale_initiator.initiate_autoscale_resume_acks(action)
+
+      // We are done with this round of leaving workers
+      _leaving_workers = recover Array[String] end
+    else
+      @printf[I32]("!@ but I didn't initiate\n".cstring())
+    end
+
+  be resume_the_world(initiator: String) =>
+    """
+    Stop the world is complete and we're ready to resume message processing
+    """
+    _resume_the_world(initiator)
+
+  fun ref _resume_the_world(initiator: String) =>
+    _initiated_stop_the_world = false
+    _stop_the_world_in_process = false
+    _resume_all_local()
+    @printf[I32]("~~~Resuming message processing.~~~\n".cstring())
+
+  be remote_mute_request(originating_worker: String) =>
+    """
+    A remote worker requests that we mute all sources and data channel.
+    """
+    _mute_request(originating_worker)
+
+  fun ref _mute_request(originating_worker: String) =>
+    _stopped_worker_waiting_list.set(originating_worker)
+    _stop_all_local()
+
+  be remote_unmute_request(originating_worker: String) =>
+    """
+    A remote worker requests that we unmute all sources and data channel.
+    """
+    _unmute_request(originating_worker)
+
+  fun ref _unmute_request(originating_worker: String) =>
+    if _stopped_worker_waiting_list.size() > 0 then
+      _stopped_worker_waiting_list.unset(originating_worker)
+      if (_stopped_worker_waiting_list.size() == 0) then
+        _try_resume_the_world()
+      end
+    end
+
+  fun _stop_all_local() =>
+    """
+    Mute all sources and data channel.
+    """
+    ifdef debug then
+      @printf[I32]("RouterRegistry muting any local sources.\n".cstring())
+    end
+    for source in _sources.values() do
+      source.mute(_dummy_consumer)
+    end
+
+  fun _resume_all_local() =>
+    """
+    Unmute all sources and data channel.
+    """
+    ifdef debug then
+      @printf[I32]("RouterRegistry unmuting any local sources.\n".cstring())
+    end
+    for source in _sources.values() do
+      source.unmute(_dummy_consumer)
+    end
+
+  fun _resume_all_remote() =>
+    try
+      let msg = ChannelMsgEncoder.resume_the_world(_worker_name, _auth)?
+      _connections.send_control_to_cluster(msg)
+    else
+      Fail()
+    end
+
+  fun ref try_to_resume_processing_immediately() =>
+    if _step_waiting_list.size() == 0 then
+      try
+        (_autoscale as Autoscale).all_step_migration_complete()
+      else
+        Fail()
+      end
+    end
+
+  /////////////////////////////////////////////////////////////////////////////
+  // JOINING WORKER
+  /////////////////////////////////////////////////////////////////////////////
   be worker_join(conn: TCPConnection, worker: String,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
@@ -731,104 +888,9 @@ actor RouterRegistry
       source.reconnect_boundary(target_worker)
     end
 
-  be partition_query(conn: TCPConnection) =>
-    let msg = ExternalMsgEncoder.partition_query_response(
-      _partition_routers, _stateless_partition_routers)
-    conn.writev(msg)
-
-  be partition_count_query(conn: TCPConnection) =>
-    let msg = ExternalMsgEncoder.partition_count_query_response(
-      _partition_routers, _stateless_partition_routers)
-    conn.writev(msg)
-
-  be cluster_status_query_not_initialized(conn: TCPConnection) =>
-    let msg = ExternalMsgEncoder.cluster_status_query_reponse_not_initialized()
-    conn.writev(msg)
-
-  be cluster_status_query(worker_names: Array[String] val,
-    conn: TCPConnection)
-  =>
-    let msg = ExternalMsgEncoder.cluster_status_query_response(
-      worker_names.size(), worker_names, _stop_the_world_in_process)
-    conn.writev(msg)
-
-  be source_ids_query(conn: TCPConnection) =>
-    let ids = recover iso Array[String] end
-    for s_id in _source_ids.values() do
-      ids.push(s_id.string())
-    end
-    let msg = ExternalMsgEncoder.source_ids_query_response(
-      consume ids)
-    conn.writev(msg)
-
-  be state_entity_query(conn: TCPConnection) =>
-    let msg = ExternalMsgEncoder.state_entity_query_response(
-      _partition_routers)
-    conn.writev(msg)
-
-  be stateless_partition_query(conn: TCPConnection) =>
-    let msg = ExternalMsgEncoder.stateless_partition_query_response(
-      _stateless_partition_routers)
-    conn.writev(msg)
-
-  be state_entity_count_query(conn: TCPConnection) =>
-    let msg = ExternalMsgEncoder.state_entity_count_query_response(
-      _partition_routers)
-    conn.writev(msg)
-
-  be stateless_partition_count_query(conn: TCPConnection) =>
-    let msg = ExternalMsgEncoder.stateless_partition_count_query_response(
-      _stateless_partition_routers)
-    conn.writev(msg)
-
-  //////////////
-  // LOG ROTATION
-  //////////////
-  be rotate_log_file() =>
-    """
-    Called when it's time to rotate the log file for the worker.
-    This will mute upstream, ack on all in-flight messages, then initiate a
-    log file rotation, followed by snapshotting of all states on the worker
-    to the new file, before unmuting upstream and resuming processing.
-    """
-    initiate_stop_the_world()
-    _stop_the_world_in_process = true
-    _stop_the_world_for_log_rotation()
-
-    let action = Promise[None]
-    action.next[None]({(_: None) => _self.begin_log_rotation()})
-    _autoscale_initiator.initiate_autoscale(action)
-
-  be begin_log_rotation() =>
-    """
-    Start the log rotation and initiate snapshots.
-    """
-    match _event_log
-    | let e: EventLog =>
-      e.rotate_file()
-    else
-      Fail()
-    end
-
-  be rotation_complete() =>
-    """
-    Called when rotation has completed and we should resume processing
-    """
-    _connections.request_cluster_unmute()
-    _unmute_request(_worker_name)
-
-  fun ref _stop_the_world_for_log_rotation() =>
-    """
-    We currently stop all message processing before perofrming log rotaion.
-    """
-    @printf[I32]("~~~Stopping message processing for log rotation.~~~\n"
-      .cstring())
-    _mute_request(_worker_name)
-    _connections.stop_the_world()
-
-  //////////////
+  /////////////////////////////////////////////////////////////////////////////
   // NEW WORKER PARTITION MIGRATION
-  //////////////
+  /////////////////////////////////////////////////////////////////////////////
   be report_connected_to_joining_worker(connected_worker: String) =>
     try
       (_autoscale as Autoscale).worker_connected_to_joining_workers(
@@ -871,67 +933,6 @@ actor RouterRegistry
       end
     end
 
-  fun ref initiate_stop_the_world() =>
-    _initiated_stop_the_world = true
-    _stop_the_world_in_process = true
-
-  fun ref initiate_stop_the_world_for_grow_migration(
-    new_workers: Array[String] val)
-  =>
-    initiate_stop_the_world()
-    try
-      let msg = ChannelMsgEncoder.initiate_stop_the_world_for_join_migration(
-        new_workers, _auth)?
-      _connections.send_control_to_cluster_with_exclusions(msg, new_workers)
-    else
-      Fail()
-    end
-    _stop_the_world_for_grow_migration(new_workers)
-    @printf[I32]("!@ setting up migration action\n".cstring())
-
-    let action = Promise[None]
-    action.next[None]({(_: None) =>
-      _self.initiate_join_migration(new_workers)})
-    _autoscale_initiator.initiate_autoscale(action)
-
-  fun ref stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
-    """
-    Called when new workers join the cluster and we are ready to start
-    the partition migration process. We first check that all
-    in-flight messages have finished processing.
-    """
-    _stop_the_world_in_process = true
-    _stop_the_world_for_grow_migration(new_workers)
-
-  fun ref _stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
-    """
-    We currently stop all message processing before migrating partitions and
-    updating routers/routes.
-    """
-    @printf[I32]("~~~Stopping message processing for state migration.~~~\n"
-      .cstring())
-    _mute_request(_worker_name)
-    _connections.stop_the_world(new_workers)
-
-  fun ref _try_resume_the_world() =>
-    @printf[I32]("!@ _try_resume_the_world\n".cstring())
-    if _initiated_stop_the_world then
-      //!@ Do we need this here? We don't know the state name anymore.
-      // Since we don't need all steps to be up to date on the TargetIdRouter
-      // during migrations, we wait on the worker that initiated stop the
-      // world to distribute it until here to avoid unnecessary messaging.
-      // _distribute_target_id_router()
-
-      let action = Promise[None]
-      action.next[None]({(_: None) => _self.initiate_autoscale_complete()})
-      _autoscale_initiator.initiate_autoscale_resume_acks(action)
-
-      // We are done with this round of leaving workers
-      _leaving_workers = recover Array[String] end
-    else
-      @printf[I32]("!@ but I didn't initiate\n".cstring())
-    end
-
   be initiate_autoscale_complete() =>
     try
       (_autoscale as Autoscale).autoscale_complete()
@@ -947,30 +948,6 @@ actor RouterRegistry
     else
       Fail()
     end
-
-  be resume_the_world(initiator: String) =>
-    """
-    Stop the world is complete and we're ready to resume message processing
-    """
-    _resume_the_world(initiator)
-
-  fun ref _resume_the_world(initiator: String) =>
-    _initiated_stop_the_world = false
-    _stop_the_world_in_process = false
-    _resume_all_local()
-    @printf[I32]("~~~Resuming message processing.~~~\n".cstring())
-
-//!@
-  // be ready_for_join_migration() =>
-  //   """
-  //   Called by a non-coordinator during autoscale protocol to indicate that
-  //   we are ready to begin migration when the coordinator is.
-  //   """
-  //   try
-  //     (_autoscale as Autoscale).ready_for_join_migration()
-  //   else
-  //     Fail()
-  //   end
 
   be initiate_join_migration(target_workers: Array[String] val) =>
     @printf[I32]("!@ initiate_join_migration\n".cstring())
@@ -1029,9 +1006,6 @@ actor RouterRegistry
       end
     end
 
-  fun ref clean_shutdown() =>
-    _recovery_file_cleaner.clean_recovery_files()
-
   fun send_migration_batch_complete_msg(target: String) =>
     """
     Inform migration target that the entire migration batch has been sent.
@@ -1040,44 +1014,6 @@ actor RouterRegistry
       _outgoing_boundaries(target)?.send_migration_batch_complete()
     else
       Fail()
-    end
-
-  be remote_mute_request(originating_worker: String) =>
-    """
-    A remote worker requests that we mute all sources and data channel.
-    """
-    _mute_request(originating_worker)
-
-  fun ref _mute_request(originating_worker: String) =>
-    _stopped_worker_waiting_list.set(originating_worker)
-    _stop_all_local()
-
-  be remote_unmute_request(originating_worker: String) =>
-    """
-    A remote worker requests that we unmute all sources and data channel.
-    """
-    _unmute_request(originating_worker)
-
-  fun ref _unmute_request(originating_worker: String) =>
-    @printf[I32]("!@ _unmute_request for %s with a list of %s\n".cstring(), originating_worker.cstring(), _stopped_worker_waiting_list.size().string().cstring())
-    if _stopped_worker_waiting_list.size() > 0 then
-      _stopped_worker_waiting_list.unset(originating_worker)
-      if (_stopped_worker_waiting_list.size() == 0) then
-        _try_resume_the_world()
-      end
-    end
-
-  be report_status(code: ReportStatusCode) =>
-    match code
-    | BoundaryCountStatus =>
-      @printf[I32]("RouterRegistry knows about %s boundaries\n"
-        .cstring(), _outgoing_boundaries.size().string().cstring())
-    end
-    for source in _sources.values() do
-      source.report_status(code)
-    end
-    for boundary in _outgoing_boundaries.values() do
-      boundary.report_status(code)
     end
 
   be process_migrating_target_ack(target: String) =>
@@ -1128,51 +1064,6 @@ actor RouterRegistry
         new_pr = new_pr.update_hash_partitions(hash_partitions(state_name)?)
         _distribute_partition_router(new_pr)
         _partition_routers(state_name) = new_pr
-      else
-        Fail()
-      end
-    end
-
-  fun _has_local_target(): Bool =>
-    """
-    Do we have at least one Source, Step, or Sink on this worker?
-    """
-    (_sources.size() > 0) or (_data_router.size() > 0)
-
-  fun _stop_all_local() =>
-    """
-    Mute all sources and data channel.
-    """
-    ifdef debug then
-      @printf[I32]("RouterRegistry muting any local sources.\n".cstring())
-    end
-    for source in _sources.values() do
-      source.mute(_dummy_consumer)
-    end
-
-  fun _resume_all_local() =>
-    """
-    Unmute all sources and data channel.
-    """
-    ifdef debug then
-      @printf[I32]("RouterRegistry unmuting any local sources.\n".cstring())
-    end
-    for source in _sources.values() do
-      source.unmute(_dummy_consumer)
-    end
-
-  fun _resume_all_remote() =>
-    try
-      let msg = ChannelMsgEncoder.resume_the_world(_worker_name, _auth)?
-      _connections.send_control_to_cluster(msg)
-    else
-      Fail()
-    end
-
-  fun ref try_to_resume_processing_immediately() =>
-    if _step_waiting_list.size() == 0 then
-      try
-        (_autoscale as Autoscale).all_step_migration_complete()
       else
         Fail()
       end
@@ -1244,9 +1135,9 @@ actor RouterRegistry
   fun ref add_to_step_waiting_list(step_id: RoutingId) =>
     _step_waiting_list.set(step_id)
 
-  /////////////////
-  // Shrink to Fit
-  /////////////////
+  /////////////////////////////////////////////////////////////////////////////
+  // SHRINK TO FIT
+  /////////////////////////////////////////////////////////////////////////////
   be initiate_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val)
   =>
@@ -1323,11 +1214,6 @@ actor RouterRegistry
   fun ref _prepare_shrink(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val)
   =>
-    //!@
-    // for w in leaving_workers.values() do
-    //   _remove_worker_from_target_id_router(w)
-    // end
-
     if not _stop_the_world_in_process then
       _stop_the_world_in_process = true
       _stop_the_world_for_shrink_migration()
@@ -1355,7 +1241,6 @@ actor RouterRegistry
 
     _leaving_workers = leaving_workers
     if _partition_routers.size() == 0 then
-      //no steps have been migrated
       @printf[I32](("No partitions to migrate.\n").cstring())
       try
         (_autoscale as Autoscale).all_step_migration_complete()
@@ -1413,16 +1298,6 @@ actor RouterRegistry
       Fail()
     end
 
-  fun ref _stop_the_world_for_shrink_migration() =>
-    """
-    We currently stop all message processing before migrating partitions and
-    updating routers/routes.
-    """
-    @printf[I32]("~~~Stopping message processing for leaving workers.~~~\n"
-      .cstring())
-    _mute_request(_worker_name)
-    _connections.stop_the_world()
-
   be disconnect_from_leaving_worker(worker: String) =>
     _connections.disconnect_from(worker)
     try
@@ -1475,9 +1350,9 @@ actor RouterRegistry
     _connections.request_cluster_unmute()
     _unmute_request(_worker_name)
 
-  /////
+  /////////////////////////////////////////////////////////////////////////////
   // Step moved off this worker or new step added to another worker
-  /////
+  /////////////////////////////////////////////////////////////////////////////
   fun ref move_stateful_step_to_proxy(id: RoutingId, step: Step,
     proxy_address: ProxyAddress, key: Key, state_name: String)
   =>
@@ -1529,9 +1404,9 @@ actor RouterRegistry
   //     Fail()
   //   end
 
-  /////
+  /////////////////////////////////////////////////////////////////////////////
   // Step moved onto this worker
-  /////
+  /////////////////////////////////////////////////////////////////////////////
   be receive_immigrant_step(subpartition: StateSubpartitions,
     runner_builder: RunnerBuilder, reporter: MetricsReporter iso,
     recovery_replayer: RecoveryReconnecter, msg: StepMigrationMsg)
@@ -1582,28 +1457,6 @@ actor RouterRegistry
         let partition_router =
           _partition_routers(state_name)?.update_route(id, key, step)?
         _distribute_partition_router(partition_router)
-
-        //!@ We shouldn't need this since all this info should have been
-        // passed over in TargetIdRouterBlueprint.
-        // Add routes to state computation targets to state step
-        // match _pre_state_data
-        // | let psds: Array[PreStateData] val =>
-        //   for psd in psds.values() do
-        //     if psd.state_name() == state_name then
-        //       for tid in psd.target_ids().values() do
-        //         try
-        //           !@ We shouldn't register this way. Use TargetIdRouter
-        //           let target_router =
-        //             DirectRouter(tid, _data_router.step_for_id(tid)?)
-        //           step.register_routes(target_router)
-        //         end
-        //       end
-        //     end
-        //   end
-        // else
-        //   Fail()
-        // end
-
         _partition_routers(state_name) = partition_router
       else
         Fail()
@@ -1627,6 +1480,7 @@ actor RouterRegistry
     //   Fail()
     // end
 
+  //!@
   fun ref _outgoing_boundaries_sorted(): Array[(String, OutgoingBoundary)] val
   =>
     let keys = Array[String]
@@ -1646,66 +1500,58 @@ actor RouterRegistry
     end
     consume diff
 
-//!@
-// class MigrationAction is CustomAction
-//   let _registry: RouterRegistry
-//   let _target_workers: Array[String] val
+  /////////////////////////////////////////////////////////////////////////////
+  // EXTERNAL QUERIES
+  /////////////////////////////////////////////////////////////////////////////
+  be partition_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.partition_query_response(
+      _partition_routers, _stateless_partition_routers)
+    conn.writev(msg)
 
-//   new iso create(registry: RouterRegistry, target_workers: Array[String] val)
-//   =>
-//     _registry = registry
-//     _target_workers = target_workers
+  be partition_count_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.partition_count_query_response(
+      _partition_routers, _stateless_partition_routers)
+    conn.writev(msg)
 
-//   fun ref apply() =>
-//     @printf[I32]("!@ MigrationAction triggered!\n".cstring())
-//     _registry.initiate_join_migration(_target_workers)
+  be cluster_status_query_not_initialized(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.cluster_status_query_reponse_not_initialized()
+    conn.writev(msg)
 
-// class ReadyForMigrationAction is CustomAction
-//   let _registry: RouterRegistry
+  be cluster_status_query(worker_names: Array[String] val,
+    conn: TCPConnection)
+  =>
+    let msg = ExternalMsgEncoder.cluster_status_query_response(
+      worker_names.size(), worker_names, _stop_the_world_in_process)
+    conn.writev(msg)
 
-//   new iso create(registry: RouterRegistry)
-//   =>
-//     _registry = registry
+  be source_ids_query(conn: TCPConnection) =>
+    let ids = recover iso Array[String] end
+    for s_id in _source_ids.values() do
+      ids.push(s_id.string())
+    end
+    let msg = ExternalMsgEncoder.source_ids_query_response(
+      consume ids)
+    conn.writev(msg)
 
-//   fun ref apply() =>
-//     _registry.ready_for_join_migration()
+  be state_entity_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.state_entity_query_response(
+      _partition_routers)
+    conn.writev(msg)
 
-// class LeavingMigrationAction is CustomAction
-//   let _auth: AmbientAuth
-//   let _worker_name: String
-//   let _remaining_workers: Array[String] val
-//   let _leaving_workers: Array[String] val
-//   let _connections: Connections
+  be stateless_partition_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.stateless_partition_query_response(
+      _stateless_partition_routers)
+    conn.writev(msg)
 
-//   new iso create(auth: AmbientAuth, worker_name: String,
-//     remaining_workers: Array[String] val, leaving_workers: Array[String] val,
-//     connections: Connections)
-//   =>
-//     _auth = auth
-//     _worker_name = worker_name
-//     _remaining_workers = remaining_workers
-//     _leaving_workers = leaving_workers
-//     _connections = connections
+  be state_entity_count_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.state_entity_count_query_response(
+      _partition_routers)
+    conn.writev(msg)
 
-//   fun ref apply() =>
-//     try
-//       let msg = ChannelMsgEncoder.begin_leaving_migration(_remaining_workers,
-//         _leaving_workers, _auth)?
-//       for w in _leaving_workers.values() do
-//         if w == _worker_name then
-//           // Leaving workers shouldn't be managing the shrink process.
-//           Fail()
-//         else
-//           _connections.send_control(w, msg)?
-//         end
-//       end
-//     else
-//       Fail()
-//     end
-
-
-
-
+  be stateless_partition_count_query(conn: TCPConnection) =>
+    let msg = ExternalMsgEncoder.stateless_partition_count_query_response(
+      _stateless_partition_routers)
+    conn.writev(msg)
 
 /////////////////////////////////////////////////////////////////////////////
 // TODO: Replace using this with the badly named SetIs once we address a bug

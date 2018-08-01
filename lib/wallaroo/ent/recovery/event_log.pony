@@ -50,11 +50,13 @@ class val EventLogConfig
     suffix = suffix'
 
 actor EventLog
+  let _worker_name: WorkerName
   let _resilients: Map[RoutingId, Resilient] = _resilients.create()
   var _backend: Backend = EmptyBackend
   let _replay_complete_markers: Map[U64, Bool] =
     _replay_complete_markers.create()
   let _config: EventLogConfig
+  var _barrier_initiator: (BarrierInitiator | None) = None
   var num_encoded: USize = 0
   var _flush_waiting: USize = 0
   //!@ I don't think we need this
@@ -62,32 +64,32 @@ actor EventLog
   var _recovery: (Recovery | None) = None
   var _resilients_to_snapshot: SetIs[RoutingId] =
     _resilients_to_snapshot.create()
-  var _router_registry: (RouterRegistry | None) = None
   var _rotating: Bool = false
   //!@ What do we do with this?
   var _backend_bytes_after_snapshot: USize
 
   var _phase: _EventLogPhase = _InitialEventLogPhase
 
-  new create(event_log_config: EventLogConfig = EventLogConfig()) =>
+  var _log_rotation_id: LogRotationId = 0
+
+  new create(worker: WorkerName,
+    event_log_config: EventLogConfig = EventLogConfig())
+  =>
+    _worker_name = worker
     _config = event_log_config
     _backend_bytes_after_snapshot = _backend.bytes_written()
     _backend = match _config.filename
       | let f: String val =>
         try
           if _config.log_rotation then
-            @printf[I32]("Log rotation is not currently supported\n".cstring())
-            Fail()
-            EmptyBackend
-            // TODO: Support log rotation.
-            // match _config.log_dir
-            // | let ld: FilePath =>
-            //   RotatingFileBackend(ld, f, _config.suffix, this,
-            //     _config.backend_file_length)?
-            // else
-            //   Fail()
-            //   DummyBackend(this)
-            // end
+            match _config.log_dir
+            | let ld: FilePath =>
+              RotatingFileBackend(ld, f, _config.suffix, this,
+                _config.backend_file_length)?
+            else
+              Fail()
+              DummyBackend(this)
+            end
           else
             match _config.log_dir
             | let ld: FilePath =>
@@ -106,8 +108,8 @@ actor EventLog
         DummyBackend(this)
       end
 
-  be set_router_registry(router_registry: RouterRegistry) =>
-    _router_registry = router_registry
+  be set_barrier_initiator(barrier_initiator: BarrierInitiator) =>
+    _barrier_initiator = barrier_initiator
 
   be quick_initialize(initializer: LocalTopologyInitializer) =>
     _initialized = true
@@ -297,18 +299,24 @@ actor EventLog
     // end
 
 
-
-//!@ Do something with these rotation behaviors
   be start_rotation() =>
+    _start_rotation()
+
+  fun ref _start_rotation() =>
     if _rotating then
       @printf[I32](("Event log rotation already ongoing. Rotate log request "
-        + "ignrored.\n").cstring())
+        + "ignored.\n").cstring())
     elseif _backend.bytes_written() > _backend_bytes_after_snapshot then
       @printf[I32]("Starting event log rotation.\n".cstring())
       _rotating = true
-      match _router_registry
-      | let r: RouterRegistry =>
-        r.rotate_log_file()
+      _log_rotation_id = _log_rotation_id + 1
+      let rotation_action = Promise[BarrierToken]
+      rotation_action.next[None](recover this~rotate_file() end)
+      try
+        (_barrier_initiator as BarrierInitiator).inject_blocking_barrier(
+          LogRotationBarrierToken(_log_rotation_id, _worker_name),
+            rotation_action, LogRotationResumeBarrierToken(_log_rotation_id,
+            _worker_name))
       else
         Fail()
       end
@@ -317,47 +325,49 @@ actor EventLog
         + " ignored.\n").cstring())
     end
 
-  be rotate_file() =>
-    @printf[I32]("Snapshotting %d resilients to new log file.\n".cstring(),
-      _resilients.size())
-    match _router_registry
-    | None =>
+  be rotate_file(token: BarrierToken) =>
+    match token
+    | let lbt: LogRotationBarrierToken =>
+      _rotate_file()
+    else
       Fail()
-    end
-    _rotate_file()
-    _resilients_to_snapshot = _resilients_to_snapshot.create()
-    for v in _resilients.keys() do
-      _resilients_to_snapshot.set(v)
     end
 
   fun ref _rotate_file() =>
-    //!@ What do we do?
-    None
-    // try
-    //   match _backend
-    //   | let b: RotatingFileBackend => b.rotate_file()?
-    //   else
-    //     @printf[I32](("Unsupported operation requested on log Backend: " +
-    //                   "'rotate_file'. Request ignored.\n").cstring())
-    //   end
-    // else
-    //   @printf[I32]("Error rotating log file!\n".cstring())
-    //   Fail()
-    // end
+    try
+      match _backend
+      | let b: RotatingFileBackend =>
+        ifdef debug then
+          @printf[I32]("EventLog: Rotating log file.\n".cstring())
+        end
+        b.rotate_file()?
+      else
+        @printf[I32](("Unsupported operation requested on log Backend: " +
+          "'rotate_file'. Request ignored.\n").cstring())
+      end
+    else
+      @printf[I32]("Error rotating log file!\n".cstring())
+      Fail()
+    end
 
   fun ref rotation_complete() =>
-    @printf[I32]("Resilients snapshotting to new log file complete.\n"
-      .cstring())
+    ifdef debug then
+      @printf[I32]("EventLog: Rotating log file complete.\n".cstring())
+    end
     try
       _backend.sync()?
       _backend.datasync()?
       _backend_bytes_after_snapshot = _backend.bytes_written()
+      let rotation_resume_action = Promise[BarrierToken]
+      try
+        (_barrier_initiator as BarrierInitiator).inject_barrier(
+          LogRotationResumeBarrierToken(_log_rotation_id, _worker_name),
+            rotation_resume_action)
+      else
+        Fail()
+      end
     else
       Fail()
     end
     _rotating = false
-    match _router_registry
-    | let r: RouterRegistry => r.rotation_complete()
-    else
-      Fail()
-    end
+

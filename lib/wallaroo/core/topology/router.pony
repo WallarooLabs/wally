@@ -349,8 +349,8 @@ trait val TargetIdRouter is Equatable[TargetIdRouter]
 
   fun val update_route_to_proxy(id: RoutingId, worker: String): TargetIdRouter
 
-  fun val remove_proxy(id: RoutingId, worker: String, boundary: OutgoingBoundary):
-    TargetIdRouter
+  fun val remove_proxy(id: RoutingId, worker: String,
+    boundary: OutgoingBoundary): TargetIdRouter
 
   fun val update_route_to_consumer(id: RoutingId, step: Consumer): TargetIdRouter
 

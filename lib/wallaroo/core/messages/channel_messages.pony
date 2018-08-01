@@ -398,11 +398,22 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReportStatusMsg(code), auth)?
 
-  fun forward_inject_barrier(token: BarrierToken,
-    result_promise: BarrierResultPromise, auth: AmbientAuth):
+  fun forward_inject_barrier(token: BarrierToken, sender: WorkerName,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+  _encode(ForwardInjectBarrierMsg(token, sender), auth)?
+
+  fun forward_inject_blocking_barrier(token: BarrierToken,
+    wait_for_token: BarrierToken, sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-  _encode(ForwardInjectBarrierMsg(token, result_promise), auth)?
+  _encode(ForwardInjectBlockingBarrierMsg(token, wait_for_token, sender),
+    auth)?
+
+  fun forwarded_inject_barrier_complete(token: BarrierToken,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+  _encode(ForwardedInjectBarrierCompleteMsg(token), auth)?
 
   fun remote_initiate_barrier(sender: String, token: BarrierToken,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -1138,11 +1149,29 @@ class val CleanShutdownMsg is ChannelMsg
 
 class val ForwardInjectBarrierMsg is ChannelMsg
   let token: BarrierToken
-  let result_promise: BarrierResultPromise
+  let sender: WorkerName
 
-  new val create(token': BarrierToken, promise: BarrierResultPromise) =>
+  new val create(token': BarrierToken, sender': WorkerName) =>
     token = token'
-    result_promise = promise
+    sender = sender'
+
+class val ForwardInjectBlockingBarrierMsg is ChannelMsg
+  let token: BarrierToken
+  let wait_for_token: BarrierToken
+  let sender: WorkerName
+
+  new val create(token': BarrierToken, wait_for_token': BarrierToken,
+    sender': WorkerName)
+  =>
+    token = token'
+    wait_for_token = wait_for_token'
+    sender = sender'
+
+class val ForwardedInjectBarrierCompleteMsg is ChannelMsg
+  let token: BarrierToken
+
+  new val create(token': BarrierToken) =>
+    token = token'
 
 class val RemoteInitiateBarrierMsg is ChannelMsg
   let sender: String

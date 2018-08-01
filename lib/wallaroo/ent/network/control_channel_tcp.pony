@@ -420,7 +420,32 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
       | let m: ForwardInjectBarrierMsg =>
-        _barrier_initiator.inject_barrier(m.token, m.result_promise)
+        let promise = Promise[BarrierToken]
+        promise.next[None]({(t: BarrierToken) =>
+          try
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_complete(t,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _barrier_initiator.inject_barrier(m.token, promise)
+      | let m: ForwardInjectBlockingBarrierMsg =>
+        let promise = Promise[BarrierToken]
+        promise.next[None]({(t: BarrierToken) =>
+          try
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_complete(t,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _barrier_initiator.inject_blocking_barrier(m.token, promise,
+          m.wait_for_token)
+      | let m: ForwardedInjectBarrierCompleteMsg =>
+        _barrier_initiator.forwarded_inject_barrier_complete(m.token)
       | let m: RemoteInitiateBarrierMsg =>
         _barrier_initiator.remote_initiate_barrier(m.sender, m.token)
       | let m: WorkerAckBarrierStartMsg =>

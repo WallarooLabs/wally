@@ -293,19 +293,21 @@ actor Startup
 
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(_startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
             where backend_file_length' =
               _startup_options.event_log_file_length,
             suffix' = _event_log_file_suffix, log_rotation' = true))
         else
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(_startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
               _startup_options.event_log_file_length))
         end
       else
-        EventLog()
+        EventLog(_startup_options.worker_name)
       end
       let event_log = _event_log as EventLog
 
@@ -323,6 +325,7 @@ actor Startup
       let barrier_initiator = BarrierInitiator(auth,
         _startup_options.worker_name, connections, initializer_name)
       connections.register_disposable(barrier_initiator)
+      event_log.set_barrier_initiator(barrier_initiator)
 
       // TODO: We currently set the primary snapshot initiator worker to the
       // initializer.
@@ -351,7 +354,6 @@ actor Startup
         barrier_initiator, snapshot_initiator, autoscale_initiator,
         initializer_name)
       router_registry.set_event_log(event_log)
-      event_log.set_router_registry(router_registry)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, data_receivers, router_registry,
@@ -482,19 +484,21 @@ actor Startup
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(_startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
             where backend_file_length' =
               _startup_options.event_log_file_length,
             suffix' = _event_log_file_suffix, log_rotation' = true))
         else
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(_startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
               _startup_options.event_log_file_length))
         end
       else
-        EventLog()
+        EventLog(_startup_options.worker_name)
       end
       let event_log = _event_log as EventLog
 
@@ -511,6 +515,7 @@ actor Startup
 
       let barrier_initiator = BarrierInitiator(auth,
         _startup_options.worker_name, connections, initializer_name)
+      event_log.set_barrier_initiator(barrier_initiator)
 
       let snapshot_initiator = SnapshotInitiator(auth,
         _startup_options.worker_name, m.primary_snapshot_worker, connections,
@@ -535,7 +540,6 @@ actor Startup
         barrier_initiator, snapshot_initiator, autoscale_initiator,
         m.sender_name)
       router_registry.set_event_log(event_log)
-      event_log.set_router_registry(router_registry)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name,
