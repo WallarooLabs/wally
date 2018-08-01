@@ -10,6 +10,6 @@ the License. You may obtain a copy of the License at
 
 */
 
-//!@ Do we need this?
+
 trait tag Snapshottable
   fun ref snapshot_state(snapshot_id: SnapshotId)

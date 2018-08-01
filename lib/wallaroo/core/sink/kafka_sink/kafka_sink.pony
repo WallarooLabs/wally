@@ -105,7 +105,8 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     _message_processor = NormalSinkMessageProcessor(this)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
 
-    _event_log.register_resilient(_sink_id, this)
+    //!@
+    // _event_log.register_resilient(_sink_id, this)
 
   fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)

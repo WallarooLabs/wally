@@ -439,6 +439,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(EventLogAckSnapshotMsg(snapshot_id, token, sender), auth)?
 
+  fun commit_snapshot_id(snapshot_id: SnapshotId, sender: WorkerName,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(CommitSnapshotIdMsg(snapshot_id, sender), auth)?
+
   fun recovery_initiated(token: SnapshotRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1203,6 +1208,14 @@ class val EventLogAckSnapshotMsg is ChannelMsg
   =>
     snapshot_id = snapshot_id'
     token = token'
+    sender = sender'
+
+class val CommitSnapshotIdMsg is ChannelMsg
+  let snapshot_id: SnapshotId
+  let sender: WorkerName
+
+  new val create(snapshot_id': SnapshotId, sender': WorkerName) =>
+    snapshot_id = snapshot_id'
     sender = sender'
 
 class val RecoveryInitiatedMsg is ChannelMsg

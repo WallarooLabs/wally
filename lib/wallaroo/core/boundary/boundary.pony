@@ -469,10 +469,7 @@ actor OutgoingBoundary is Consumer
     producer: Producer)
   =>
     @printf[I32]("!@ Forward UNRegistered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
-    //!@
-    // ifdef debug then
-    //   Invariant(_upstreams.contains(producer))
-    // end
+
     try
       let msg = ChannelMsgEncoder.unregister_producer(_worker_name,
         source_id, target_id, _auth)?
@@ -498,8 +495,6 @@ actor OutgoingBoundary is Consumer
     match barrier_token
     | let srt: SnapshotRollbackBarrierToken =>
       _queue.clear()
-      //!@ Do something about _lowest_queue_id, such as rollback to the last
-      // one for the last snapshot
     end
 
     try

@@ -197,7 +197,6 @@ actor BarrierInitiator is Initializable
     result_promise: BarrierResultPromise)
   =>
     _pending.push(_PendingBarrier(barrier_token, result_promise))
-    @printf[I32]("!@ queue_barrier: new count %s\n".cstring(), _pending.size().string().cstring())
 
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -220,19 +219,21 @@ actor BarrierInitiator is Initializable
 
     try
       if _workers.size() > 1 then
-        @printf[I32]("!@ Sending remote initiate barrier for %s\n".cstring(), barrier_token.string().cstring())
+        // @printf[I32]("!@ Sending remote initiate barrier for %s\n".cstring(), barrier_token.string().cstring())
         let msg = ChannelMsgEncoder.remote_initiate_barrier(_worker_name,
           barrier_token, _auth)?
         for w in _workers.values() do
           if w != _worker_name then _connections.send_control(w, msg) end
         end
       else
-        @printf[I32]("!@ Not sending remote initiate barrier because there's only one worker!\n".cstring())
+        //!@
+        None
+        // @printf[I32]("!@ Not sending remote initiate barrier because there's only one worker!\n".cstring())
       end
     else
       Fail()
     end
-    @printf[I32]("!@ About to call worker_ack_barrier_start on handler for %s\n".cstring(), barrier_token.string().cstring())
+    // @printf[I32]("!@ About to call worker_ack_barrier_start on handler for %s\n".cstring(), barrier_token.string().cstring())
     _active_barriers.worker_ack_barrier_start(_worker_name, barrier_token)
 
   fun ref _clear_barriers() =>
@@ -260,7 +261,7 @@ actor BarrierInitiator is Initializable
   be remote_initiate_barrier(primary_worker: String,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ remote_initiate_barrier called for %s\n".cstring(), barrier_token.string().cstring())
+    // @printf[I32]("!@ remote_initiate_barrier called for %s\n".cstring(), barrier_token.string().cstring())
 
     let next_handler = PendingBarrierHandler(_worker_name, this,
       barrier_token, _sinks, _workers, EmptyBarrierResultPromise(),
@@ -284,7 +285,7 @@ actor BarrierInitiator is Initializable
     end
 
   be worker_ack_barrier_start(w: String, token: BarrierToken) =>
-    @printf[I32]("!@ _worker_ack_barrier_start called for %s\n".cstring(), w.cstring())
+    // @printf[I32]("!@ _worker_ack_barrier_start called for %s\n".cstring(), w.cstring())
     _phase.worker_ack_barrier_start(w, token, _active_barriers)
 
   fun confirm_start_barrier(barrier_token: BarrierToken) =>
@@ -344,7 +345,7 @@ actor BarrierInitiator is Initializable
     _phase.ack_barrier(s, barrier_token, _active_barriers)
 
   be worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
-    @printf[I32]("!@ Rcvd worker_ack_barrier from %s\n".cstring(), w.cstring())
+    // @printf[I32]("!@ Rcvd worker_ack_barrier from %s\n".cstring(), w.cstring())
     _phase.worker_ack_barrier(w, barrier_token, _active_barriers)
 
   fun ref all_primary_sinks_acked(barrier_token: BarrierToken,
@@ -354,7 +355,6 @@ actor BarrierInitiator is Initializable
     On the primary initiator, once all sink have acked, we switch to looking
     for all worker acks.
     """
-    @printf[I32]("!@ Switching to WorkerAcksBarrierHandler\n".cstring())
     let next_handler = WorkerAcksBarrierHandler(this, barrier_token, _workers,
       workers_acked, result_promise)
     try
@@ -373,7 +373,7 @@ actor BarrierInitiator is Initializable
     the primary worker that started this barrier in the first place.
     We are finished processing that barrier.
     """
-    @printf[I32]("!@ all_secondary_sinks_acked for %s\n".cstring(), barrier_token.string().cstring())
+    // @printf[I32]("!@ all_secondary_sinks_acked for %s\n".cstring(), barrier_token.string().cstring())
     try
       let msg = ChannelMsgEncoder.worker_ack_barrier(_worker_name,
         barrier_token, _auth)?
@@ -396,7 +396,7 @@ actor BarrierInitiator is Initializable
     All in flight acks have been received. Revert to waiting state
     and trigger the BarrierResultPromise.
     """
-    @printf[I32]("!@ all_workers_acked\n".cstring())
+    // @printf[I32]("!@ all_workers_acked\n".cstring())
     try
       _active_barriers.remove_barrier(barrier_token)?
     else
@@ -427,7 +427,7 @@ actor BarrierInitiator is Initializable
     _phase.barrier_complete(barrier_token)
 
   fun ref next_token() =>
-    @printf[I32]("!@ next_token(): _pending %s\n".cstring(), _pending.size().string().cstring())
+    // @printf[I32]("!@ next_token(): _pending %s\n".cstring(), _pending.size().string().cstring())
     _phase = _NormalBarrierInitiatorPhase(this)
     if _pending.size() > 0 then
       try

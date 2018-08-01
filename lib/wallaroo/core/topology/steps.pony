@@ -278,14 +278,6 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     end
 
   be update_target_id_router(target_id_router: TargetIdRouter) =>
-    //!@
-    match target_id_router
-    | let s: StateStepRouter =>
-      @printf[I32]("!@ Updating target_id_router StateStepRouter\n".cstring())
-    else
-      @printf[I32]("!@ Updating target_id_router but it's not the right kind!\n".cstring())
-    end
-
     let old_router = _target_id_router
     _target_id_router = target_id_router
     for (old_id, outdated_consumer) in
@@ -296,9 +288,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
       end
     end
 
-    @printf[I32]("!@ About to try registering %s outputs for target_id_router\n".cstring(), target_id_router.routes().size().string().cstring())
     for (id, consumer) in target_id_router.routes().pairs() do
-      @printf[I32]("!@ Step %s registering with %s using target_id_router\n".cstring(), _id.string().cstring(), id.string().cstring())
       _register_output(id, consumer)
     end
 
@@ -321,21 +311,6 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
 
   fun ref _remove_boundary(worker: String) =>
     None
-    //!@
-    // try
-    //   let old_ob = _outgoing_boundaries.remove(worker)?._2
-    //   _routes(old_ob)?.dispose()
-    //   for (id, c) in _outputs.pairs() do
-    //     match c
-    //     | let ob: OutgoingBoundary =>
-    //       if ob is old_ob then
-    //         _unregister_output(id, c)
-    //       end
-    //     end
-    //   end
-    // else
-    //   Fail()
-    // end
 
   be remove_route_for(step: Consumer) =>
     try
@@ -553,7 +528,6 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
         StepStateMigrator.send_state(_runner, _id, boundary, state_name,
           key, _auth)
       else
-        @printf[I32]("!@ WHA?\n".cstring())
         Fail()
       end
       dispose()
@@ -570,7 +544,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   fun ref process_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
+    // @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
     match barrier_token
     | let srt: SnapshotRollbackBarrierToken =>
       @printf[I32]("!@ Step checking to clear\n".cstring())
@@ -611,18 +585,14 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     end
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
-    @printf[I32]("!@ Barrier complete at Step %s\n".cstring(), _id.string().cstring())
+    // @printf[I32]("!@ Barrier complete at Step %s\n".cstring(), _id.string().cstring())
     ifdef debug then
       Invariant(_step_message_processor.barrier_in_progress())
     end
     match barrier_token
     | let sbt: SnapshotBarrierToken =>
       snapshot_state(sbt.id)
-    | let srbt: SnapshotRollbackBarrierToken =>
-      // !@ read in state and rollback
-      None
     end
-    @printf[I32]("!@ barrier_complete reset processor at %s\n".cstring(), _id.string().cstring())
     _step_message_processor = NormalStepMessageProcessor(this)
 
   //////////////

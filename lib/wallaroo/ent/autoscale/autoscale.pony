@@ -160,10 +160,6 @@ class Autoscale
   fun ref waiting_for_migration(joining_workers: Array[String] val) =>
     _phase = _WaitingForMigration(this, joining_workers)
 
-    //!@
-  // fun ref ready_for_join_migration() =>
-  //   _phase.ready_for_join_migration()
-
   fun ref stop_the_world_for_join_migration_initiated(
     joining_workers: Array[String] val)
   =>
@@ -173,7 +169,6 @@ class Autoscale
     _phase.join_migration_initiated()
 
   fun ref begin_join_migration(joining_workers: Array[String] val) =>
-    @printf[I32]("!@ begin_join_migration\n".cstring())
     _phase = _WaitingForJoinMigration(this, _auth, joining_workers
       where is_coordinator = false)
     _router_registry.begin_join_migration(joining_workers)
@@ -293,10 +288,6 @@ trait _AutoscalePhase
 
   fun ref join_migration_initiated() =>
     _invalid_call()
-
-//!@
-  // fun ref ready_for_join_migration() =>
-  //   _invalid_call()
 
   fun ref all_step_migration_complete() =>
     _invalid_call()
@@ -544,9 +535,6 @@ class _WaitingForStopTheWorld is _AutoscalePhase
 class _WaitingForMigration is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _joining_workers: Array[String] val
-  //!@
-  // var _ready_for_migration: Bool = false
-  // var _migration_initiated: Bool = false
 
   new create(autoscale: Autoscale ref, joining_workers: Array[String] val) =>
     _autoscale = autoscale
@@ -557,25 +545,7 @@ class _WaitingForMigration is _AutoscalePhase
   fun name(): String => "WaitingForMigration"
 
   fun ref join_migration_initiated() =>
-    @printf[I32]("!@ join_migration_initiated\n".cstring())
-    //!@
-    // _migration_initiated = true
-    // if _ready_for_migration then
-      _autoscale.begin_join_migration(_joining_workers)
-//!@
-    // else
-    //   @printf[I32]("!@ but _ready_for_migration is false\n".cstring())
-    // end
-
-//!@
-  // fun ref ready_for_join_migration() =>
-  //   @printf[I32]("!@ ready_for_join_migration\n".cstring())
-  //   _ready_for_migration = true
-  //   if _migration_initiated then
-  //     _autoscale.begin_join_migration(_joining_workers)
-  //   else
-  //     @printf[I32]("!@ but _migration_initiated is false\n".cstring())
-  //   end
+    _autoscale.begin_join_migration(_joining_workers)
 
 class _WaitingForJoinMigration is _AutoscalePhase
   """

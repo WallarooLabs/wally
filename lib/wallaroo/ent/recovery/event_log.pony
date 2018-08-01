@@ -128,6 +128,7 @@ actor EventLog
   be snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
   =>
+    // @printf[I32]("!@ EventLog: snapshot_state for Step %s\n".cstring(), resilient_id.string().cstring())
     _phase.snapshot_state(resilient_id, snapshot_id, payload)
 
   fun ref _snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
@@ -155,6 +156,7 @@ actor EventLog
     end
 
   fun ref write_snapshot_id(snapshot_id: SnapshotId) =>
+    // @printf[I32]("!@ EventLog: write_snapshot_id\n".cstring())
     _backend.encode_snapshot_id(snapshot_id)
     _phase.snapshot_id_written(snapshot_id)
 
