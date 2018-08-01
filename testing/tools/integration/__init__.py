@@ -48,7 +48,7 @@ https://github.com/WallarooLabs/wallaroo/examples/python/reverse/_test.py.
 # Add integration utility to PYTHONPATH
 export PYTHONPATH="$PYTHONPATH:~/wallaroo-tutorial/wallaroo/testing/tools"
 # Add wallaroo to PYTHONPATH
-export PYTHONPATH="$PYTHONPATH:~/wallaroo-tutorial/wallaroo/machida:."
+export PYTHONPATH="$PYTHONPATH:~/wallaroo-tutorial/wallaroo/machida/lib:."
 # Add machida to PATH
 export PATH="%PATH:~/wallaroo-tutorial/wallaroo/machida/build"
 

@@ -65,8 +65,8 @@ machida_clean:
 
 wallaroo_unit_tests:
 	cd $(MACHIDA_PATH) && \
-		python2 -m pytest --color=yes --tb=native --verbose --exitfirst wallaroo_test.py && \
-		python3 -m pytest --color=yes --tb=native --verbose --exitfirst wallaroo_test.py
+		python2 -m pytest --color=yes --tb=native --verbose --exitfirst test/wallaroo_test.py && \
+		python3 -m pytest --color=yes --tb=native --verbose --exitfirst test/wallaroo_test.py
 
 machida_build: $(MACHIDA_BUILD)/machida
 
