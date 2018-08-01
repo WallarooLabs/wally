@@ -13,20 +13,12 @@
 #  permissions and limitations under the License.
 
 import inspect
-from copy import copy
 
 class ApplicationBuilder(object):
-
     def __init__(self, name):
-        self._partitioned = None
         self._actions = [("name", name)]
 
     def new_pipeline(self, name, source_config):
-        # self._arrange_partitions() # sort out prior pipeline partitions first
-        # if type(source_config) == list:
-        #     self._partitioned = (source_config, self._actions)
-        #     self._actions = [("new_pipeline", name, None)]
-        # else:
         self._actions.append(("new_pipeline", name,
                               source_config.to_tuple()))
         return self
@@ -68,6 +60,7 @@ class ApplicationBuilder(object):
         return self
 
     def build(self):
+<<<<<<< HEAD
         # self._arrange_partitions()
         self._validate_actions()
         print("built", repr(self._actions))
@@ -85,6 +78,11 @@ class ApplicationBuilder(object):
             self._actions = prior_actions
             self._partitioned = None
 
+=======
+        self._validate_actions()
+        return self._actions
+
+>>>>>>> Refactor base wallaroo.py library into modules
     def _validate_actions(self):
         self._steps = {}
         self._pipelines = {}
@@ -170,10 +168,17 @@ class ApplicationBuilder(object):
 class StateBuilder(object):
     def __init__(self, name, state_cls):
         self._name = name
+<<<<<<< HEAD
         self.state_cls = state_cls
 
     def ____wallaroo_build____(self):
         return self.state_cls()
+=======
+        self._state_cls = state_cls
+
+    def ____wallaroo_build____(self):
+        return self._state_cls()
+>>>>>>> Refactor base wallaroo.py library into modules
 
     def name(self):
         return self._name

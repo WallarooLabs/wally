@@ -13,7 +13,11 @@
 #  permissions and limitations under the License.
 
 from functools import wraps
+<<<<<<< HEAD
 import pickle
+=======
+import cPickle
+>>>>>>> Refactor base wallaroo.py library into modules
 
 from builder import (ApplicationBuilder, _validate_arity_compatability)
 
@@ -48,6 +52,7 @@ from .byoi import (
     parse_input_addrs as byoi_parse_input_addrs,
     parse_output_addrs as byoi_parse_output_addrs,
 )
+
 
 def serialize(o):
     return pickle.dumps(o)
