@@ -10,4 +10,4 @@ the License. You may obtain a copy of the License at
 
 */
 
-type SnapshotId is U128
+type SnapshotId is U64

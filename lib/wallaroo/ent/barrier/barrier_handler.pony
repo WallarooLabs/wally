@@ -86,7 +86,7 @@ class PendingBarrierHandler is BarrierHandler
     """
     If we receive barrier acks in this phase, we hold on to them for later.
     """
-    @printf[I32]("!@ ack sink barrier at PendingBarrierHandler\n".cstring())
+    // @printf[I32]("!@ ack sink barrier at PendingBarrierHandler\n".cstring())
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
@@ -130,7 +130,7 @@ class PendingBarrierHandler is BarrierHandler
     _workers_acked_barrier.set(w)
 
   fun ref check_for_completion() =>
-    @printf[I32]("!@ PendingBarrierHandler _check_for_completion with %s _acked_workers and %s _workers\n".cstring(), _workers_acked_start.size().string().cstring(), _workers.size().string().cstring())
+    // @printf[I32]("!@ PendingBarrierHandler _check_for_completion with %s _acked_workers and %s _workers\n".cstring(), _workers_acked_start.size().string().cstring(), _workers.size().string().cstring())
     if _workers_acked_start.size() == _workers.size() then
       _initiator.confirm_start_barrier(_barrier_token)
       _start_barrier()
@@ -187,7 +187,7 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
     true
 
   fun ref ack_barrier(s: BarrierReceiver) =>
-    @printf[I32]("!@ ack_barrier at InProgressPrimaryBarrierHandler\n".cstring())
+    // @printf[I32]("!@ ack_barrier at InProgressPrimaryBarrierHandler\n".cstring())
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
@@ -205,7 +205,7 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
     _workers_acked.set(w)
 
   fun ref check_for_completion() =>
-    @printf[I32]("!@ InProgressPrimaryBarrierHandler _check_for_completion with %s _acked_sinks and %s _sinks\n".cstring(), _acked_sinks.size().string().cstring(), _sinks.size().string().cstring())
+    // @printf[I32]("!@ InProgressPrimaryBarrierHandler _check_for_completion with %s _acked_sinks and %s _sinks\n".cstring(), _acked_sinks.size().string().cstring(), _sinks.size().string().cstring())
     if _acked_sinks.size() == _sinks.size() then
       let acked_ws = recover iso SetIs[String] end
       for w in _workers_acked.values() do
@@ -284,7 +284,7 @@ class WorkerAcksBarrierHandler is BarrierHandler
     true
 
   fun ref worker_ack_barrier(w: String) =>
-    @printf[I32]("!@ worker_ack_barrier for %s from WorkerAcksBarrierHandler\n".cstring(), w.cstring())
+    // @printf[I32]("!@ worker_ack_barrier for %s from WorkerAcksBarrierHandler\n".cstring(), w.cstring())
     if not SetHelpers[String].contains[String](_workers, w) then Fail() end
 
     _acked_workers.set(w)
@@ -292,8 +292,9 @@ class WorkerAcksBarrierHandler is BarrierHandler
 
   fun ref check_for_completion() =>
     if _acked_workers.size() == _workers.size() then
-      @printf[I32]("!@ All workers are completed for acks!\n".cstring())
+      // @printf[I32]("!@ All workers are completed for acks!\n".cstring())
       _initiator.all_workers_acked(_barrier_token, _result_promise)
     else
-      @printf[I32]("!@ Only %s of %s workers have acked!\n".cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
+      None
+      // @printf[I32]("!@ Only %s of %s workers have acked!\n".cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
     end

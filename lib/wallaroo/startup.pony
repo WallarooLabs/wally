@@ -69,6 +69,7 @@ actor Startup
   var _control_channel_file: String = ""
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
+  var _snapshot_ids_file: String = ""
 
   var _connections: (Connections | None) = None
 
@@ -328,7 +329,7 @@ actor Startup
       let snapshot_initiator = SnapshotInitiator(auth,
         _startup_options.worker_name, initializer_name, connections,
         _startup_options.time_between_snapshots, event_log, barrier_initiator,
-        _startup_options.snapshots_enabled)
+        _snapshot_ids_file, _startup_options.snapshots_enabled)
       connections.register_disposable(snapshot_initiator)
 
       let autoscale_initiator = AutoscaleInitiator(
@@ -514,7 +515,7 @@ actor Startup
       let snapshot_initiator = SnapshotInitiator(auth,
         _startup_options.worker_name, m.primary_snapshot_worker, connections,
         _startup_options.time_between_snapshots, event_log, barrier_initiator,
-        _startup_options.snapshots_enabled)
+        _snapshot_ids_file, _startup_options.snapshots_enabled)
 
       let autoscale_initiator = AutoscaleInitiator(
         _startup_options.worker_name, barrier_initiator)
@@ -664,6 +665,8 @@ actor Startup
       "-" + _startup_options.worker_name + ".workers"
     _connection_addresses_file = _startup_options.resilience_dir + "/" +
       _app_name + "-" + _startup_options.worker_name + ".connection-addresses"
+    _snapshot_ids_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".snapshot_ids"
 
   be clean_recovery_files() =>
     @printf[I32]("Removing recovery files\n".cstring())

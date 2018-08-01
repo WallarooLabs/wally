@@ -55,7 +55,7 @@ class BarrierStepForwarder
       Invariant(not (barrier_token > _barrier_token))
     end
 
-    @printf[I32]("!@ receive_barrier at Forwarder from %s!\n".cstring(), step_id.string().cstring())
+    // @printf[I32]("!@ receive_barrier at Forwarder from %s!\n".cstring(), step_id.string().cstring())
     // If we're processing a rollback token which is higher priority than
     // this new one, then we need to drop this new one.
     if _barrier_token > barrier_token then
@@ -99,20 +99,20 @@ class BarrierStepForwarder
     if (inputs.size() == _inputs_blocking.size()) and
       not _step.has_pending_messages()
     then
-      @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
+      // @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
       for (o_id, o) in _step.outputs().pairs() do
         match o
         | let ob: OutgoingBoundary =>
-          @printf[I32]("!@ FORWARDING TO BOUNDARY\n".cstring())
+          // @printf[I32]("!@ FORWARDING TO BOUNDARY\n".cstring())
           ob.forward_barrier(o_id, _step_id,
             _barrier_token)
         else
-          @printf[I32]("!@ FORWARDING TO NON BOUNDARY\n".cstring())
+          // @printf[I32]("!@ FORWARDING TO NON BOUNDARY\n".cstring())
           o.receive_barrier(_step_id, _step, _barrier_token)
         end
       end
-      clear()
       _step.barrier_complete(_barrier_token)
+      clear()
     end
 
   fun ref clear() =>
