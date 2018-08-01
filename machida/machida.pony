@@ -774,7 +774,7 @@ primitive Machida
       if not ps.is_null() then
         let ret = String.copy_cstring(@PyString_AsString(ps))
         dec_ref(ps)
-	ret
+        ret
       else
         "undefined-name"
       end

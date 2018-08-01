@@ -39,7 +39,7 @@ In two other shells, export the current directories and machida directories to p
 Initializer:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida/lib"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 machida --application-module sequence_window --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
@@ -50,7 +50,7 @@ machida --application-module sequence_window --in 127.0.0.1:7010 \
 Worker:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida/lib"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 machida --application-module sequence_window --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \

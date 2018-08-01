@@ -226,21 +226,6 @@ extern PyObject *partition_function_partition(PyObject *partition_function, PyOb
   return pValue;
 }
 
-extern long partition_function_partition_u64(PyObject *partition_function, PyObject *data)
-{
-  PyObject *pFunc, *pValue;
-
-  pFunc = PyObject_GetAttrString(partition_function, "partition");
-  pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
-  Py_DECREF(pFunc);
-
-  long rtn = PyInt_AsLong(pValue);
-  if (pValue != NULL) {
-    Py_DECREF(pValue);
-  }
-  return rtn;
-}
-
 extern void set_user_serialization_fns(PyObject *module)
 {
   if (PyObject_HasAttrString(module, "deserialize") && PyObject_HasAttrString(module, "serialize"))

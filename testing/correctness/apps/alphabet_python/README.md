@@ -52,7 +52,7 @@ Run Giles Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 Set `PYTHONPATH` to refer to the current directory (where `alphabet.py` is) and the `machida` directory (where `wallaroo.py` is). Set `PATH` to refer to the directory that contains the `machida` executable. Assuming you installed Machida according to the tutorial instructions you would do:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida/lib"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
@@ -70,7 +70,7 @@ machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
 Set `PYTHONPATH` as you did in the previous shell:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida/lib"
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
