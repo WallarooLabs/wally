@@ -173,7 +173,7 @@ Start the Python Market Spread application with the following command:
 ```bash
 cd ~/wallaroo/testing/performance/apps/python/market_spread
 
-sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponythreads=1 --ponypinasio --ponynoblock
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 --ponythreads=1 --ponypinasio --ponynoblock
 ```
 
 ### Start Giles Senders
@@ -298,7 +298,7 @@ Start the Python Market Spread application Initializer with the following comman
 ```bash
 cd ~/wallaroo/testing/performance/apps/python/market_spread
 
-sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 -w 2 --ponythreads=1 --ponypinasio --ponynoblock
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 -w 2 --ponythreads=1 --ponypinasio --ponynoblock
 ```
 
 Start the Python Market Spread application Worker 2 with the following command:
@@ -308,7 +308,7 @@ SSH into `wallaroo-follower-3`
 ```bash
 cd ~/wallaroo/testing/performance/apps/python/market_spread
 
-sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponythreads=1 --ponypinasio --ponynoblock
+sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida/lib" cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/machida/build/machida --application-module market_spread -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 --ponythreads=1 --ponypinasio --ponynoblock
 ```
 
 #### Start Giles Senders

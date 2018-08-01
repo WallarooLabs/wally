@@ -23,13 +23,13 @@ Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate
 Machida uses the `PYTHONPATH` environment variable to find modules that are imported by the application. You will have at least two modules in your `PYTHONPATH`: the application module and the `wallaroo` module. For example, if you have followed the directions for setting up the tutorial then the Wallaroo Python module is in `$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/wallaroo.py` and the "Celsius to Fahrenheit" application module is in `$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius/celsius.py`, so you would export `PYTHONPATH` like this:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
+export PYTHONPATH="$PYTHONPATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
 ```
 
 If you are working your way through the tutorial you might find it easier to set up `PYTHONPATH` to use whatever directory you are in as the search path so that you can run the application that is the current directory. To do this, you would export `PYTHONPATH` like this:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida:."
+export PYTHONPATH="$PYTHONPATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:."
 ```
 
 If you chose to do this while working through the tutorial, you might also find it useful to add the path to the `machida` executable to your `PATH`, which can be done like this:
