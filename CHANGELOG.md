@@ -17,8 +17,11 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Ensure that parallel stateless computations always run independently ([PR #2322](https://github.com/wallaroolabs/wallaroo/pull/2322))
 
 ### Changed
+
+- Filter none/nil in Decoder for Python/Go API's ([PR #2259](https://github.com/wallaroolabs/wallaroo/pull/2259))
 
 
 ## [0.5.0] - 2018-07-25
