@@ -162,8 +162,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
         + partition_id.string())
     end
 
-    _event_log.register_resilient(_source_id, this)
-
     _mute()
 
   be update_router(router': Router) =>
@@ -303,22 +301,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   be remove_boundary(worker: String) =>
     None
-    //!@
-    // try
-    //   let old_ob = _outgoing_boundaries.remove(worker)?._2
-    //   _routes(old_ob)?.dispose()
-    //   for (id, c) in _outputs.pairs() do
-    //     match c
-    //     | let ob: OutgoingBoundary =>
-    //       if ob is old_ob then
-    //         _unregister_output(id, c)
-    //       end
-    //     end
-    //   end
-    // else
-    //   Fail()
-    // end
-    // _notify.update_boundaries(_outgoing_boundaries)
 
   be reconnect_boundary(target_worker_name: String) =>
     try

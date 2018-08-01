@@ -1139,7 +1139,6 @@ actor LocalTopologyInitializer is LayoutInitializer
                         else
                           for (r_id, c) in state_comp_target.routes().pairs()
                           do
-                            @printf[I32]("!@!@!@ Adding %s to state step router for state %s\n".cstring(), r_id.string().cstring(), state_name.cstring())
                             ssr = ssr.add_consumer(r_id, c)
                           end
                         end
@@ -1498,8 +1497,6 @@ actor LocalTopologyInitializer is LayoutInitializer
                         spr.partition_id(), spr)
                     else
                       for (r_id, c) in target_router.routes().pairs() do
-                        @printf[I32]("!@!@!@ Adding %s to state step router for state %s\n".cstring(), r_id.string().cstring(), state_name.cstring())
-
                         ssr = ssr.add_consumer(r_id, c)
                       end
                     end

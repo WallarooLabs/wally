@@ -258,7 +258,7 @@ primitive _AutoscaleInitiatorGenerator
 primitive _SnapshotInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): SnapshotInitiator =>
     SnapshotInitiator(auth, "", "", _ConnectionsGenerator(env, auth), 1,
-      EventLog(), _BarrierInitiatorGenerator(env, auth), false)
+      EventLog(), _BarrierInitiatorGenerator(env, auth), "", false)
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>

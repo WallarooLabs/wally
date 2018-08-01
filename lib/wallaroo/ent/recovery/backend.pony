@@ -120,7 +120,8 @@ class FileBackend is Backend
   let _filepath: FilePath
   let _event_log: EventLog ref
   let _writer: Writer iso
-  let _entry_len: USize = 17 // Bool -- U128
+  let _snapshot_id_entry_len: USize = 9 // Bool -- U64
+  let _log_entry_len: USize = 17 // Bool -- U128
   var _replay_log_exists: Bool
   var _bytes_written: USize = 0
 
@@ -137,7 +138,6 @@ class FileBackend is Backend
   fun bytes_written(): USize =>
     _bytes_written
 
-    //!@ Update to only get the right stuff!
   fun ref start_rollback(snapshot_id: SnapshotId) =>
     if _replay_log_exists then
       @printf[I32](("RESILIENCE: Rolling back to snapshot %s from recovery " +
@@ -161,7 +161,7 @@ class FileBackend is Backend
         var current_snapshot_id: SnapshotId = 0
         if _file.size() > 0 then
           r.append(_file.read(16))
-          current_snapshot_id = r.u128_be()?
+          current_snapshot_id = r.u64_be()?
           // We need to get to the data for the provided snapshot id. We'll
           // keep reading until we find the prior snapshot id, at which point
           // we're lined up with entries for this snapshot.
@@ -169,12 +169,12 @@ class FileBackend is Backend
             let is_watermark = BoolConverter.u8_to_bool(r.u8()?)
             if is_watermark then
               r.append(_file.read(16))
-              current_snapshot_id = r.u128_be()?
+              current_snapshot_id = r.u64_be()?
             else
               // Skip this entry since we're looking for the next snapshot id.
               // We use entry length - 1 since we just read the Bool at the
               // start of this entry.
-              _file.seek(_entry_len.isize() - 1)
+              _file.seek(_log_entry_len.isize() - 1)
             end
           end
           var end_of_snapshot = false
@@ -264,7 +264,7 @@ class FileBackend is Backend
 
     // This is a watermark so write true
     _writer.u8(BoolConverter.bool_to_u8(true))
-    _writer.u128_be(snapshot_id)
+    _writer.u64_be(snapshot_id)
 
   fun ref sync() ? =>
     _file.sync()
