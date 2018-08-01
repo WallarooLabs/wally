@@ -91,7 +91,7 @@ Along with Go, Python 2.7 is our primary focus. As we add features to the Wallar
 
 - C++
 
-C++ is currently unsupported and apps created with the C++ API will not build unless you checkout the `last-working-C++-commit` tag. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
+C++ is currently unsupported and apps created with the C++ API will not build unless you checkout the [last-working-C++-commit](https://github.com/WallarooLabs/wallaroo/tree/last-working-C%2B%2B-commit) tag. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
 
 C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API.
 
