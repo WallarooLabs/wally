@@ -443,6 +443,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _event_log.initiate_snapshot(m.snapshot_id, m.token, promise)
       | let m: EventLogAckSnapshotMsg =>
         _snapshot_initiator.event_log_snapshot_complete(m.sender, m.token)
+      | let m: CommitSnapshotIdMsg =>
+        _snapshot_initiator.commit_snapshot_id(m.snapshot_id, m.sender)
       | let m: RecoveryInitiatedMsg =>
         _recovery.recovery_initiated_at_worker(m.sender, m.token)
       | let m: InitiateRollbackMsg =>

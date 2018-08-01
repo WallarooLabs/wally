@@ -76,11 +76,11 @@ class BarrierSinkAcker
     _check_completion(_sink.inputs())
 
   fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
-    @printf[I32]("!@ receive_barrier at TCPSink: %s inputs, %s received\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring())
+    // @printf[I32]("!@ receive_barrier at TCPSink: %s inputs, %s received\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring())
     if inputs.size() == _inputs_blocking.size() then
       _barrier_initiator.ack_barrier(_sink, _barrier_token)
-      clear()
       _sink.barrier_complete(_barrier_token)
+      clear()
     end
 
   fun ref clear() =>

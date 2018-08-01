@@ -157,8 +157,9 @@ actor TCPSource is Source
       end
     end
 
+    //!@
     // register resilient with event log
-    _event_log.register_resilient(_source_id, this)
+    // _event_log.register_resilient(_source_id, this)
 
     _readable = true
 
@@ -331,23 +332,6 @@ actor TCPSource is Source
 
   fun ref _remove_boundary(worker: String) =>
     None
-    //!@
-    // try
-    //   let old_ob = _outgoing_boundaries.remove(worker)?._2
-    //   _routes(old_ob)?.dispose()
-    //   for (id, c) in _outputs.pairs() do
-    //     match c
-    //     | let ob: OutgoingBoundary =>
-    //       if ob is old_ob then
-    //         @printf[I32]("!@ YO UNREGISTER OB\n".cstring())
-    //         _unregister_output(id, old_ob)
-    //       end
-    //     end
-    //   end
-    // else
-    //   Fail()
-    // end
-    // _notify.update_boundaries(_outgoing_boundaries)
 
   be reconnect_boundary(target_worker_name: String) =>
     try
@@ -462,7 +446,7 @@ actor TCPSource is Source
     end
 
   be barrier_complete(token: BarrierToken) =>
-    @printf[I32]("!@ barrier_complete at TCPSource %s\n".cstring(), _source_id.string().cstring())
+    // @printf[I32]("!@ barrier_complete at TCPSource %s\n".cstring(), _source_id.string().cstring())
     // !@ Here's where we could ack finished messages up to snapshot point.
     // We should also match for rollback token.
     None

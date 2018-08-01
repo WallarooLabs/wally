@@ -173,7 +173,9 @@ actor TCPSink is Sink
     _message_processor = NormalSinkMessageProcessor(this)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
     _mute_upstreams()
-    _event_log.register_resilient(_sink_id, this)
+
+    //!@
+    // _event_log.register_resilient(_sink_id, this)
   //
   // Application Lifecycle events
   //
@@ -333,7 +335,7 @@ actor TCPSink is Sink
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ Receive barrier %s at TCPSink\n".cstring(), barrier_token.string().cstring())
+    // @printf[I32]("!@ Receive barrier %s at TCPSink\n".cstring(), barrier_token.string().cstring())
     process_barrier(input_id, producer, barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
@@ -376,7 +378,7 @@ actor TCPSink is Sink
     end
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
-    @printf[I32]("!@ Barrier complete at TCPSink\n".cstring())
+    // @printf[I32]("!@ Barrier complete at TCPSink\n".cstring())
     ifdef debug then
       Invariant(_message_processor.barrier_in_progress())
     end

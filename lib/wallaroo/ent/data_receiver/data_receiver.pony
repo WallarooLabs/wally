@@ -52,11 +52,6 @@ actor DataReceiver is (Producer & Rerouter)
   // to avoid matching on every ack
   var _latest_conn: (DataChannel | None) = None
 
-//!@
-  // Timer to periodically request acks to prevent deadlock.
-  // var _timer_init: _TimerInit = _UninitializedTimerInit
-  // let _timers: Timers = Timers
-
   // Keep track of point to point connections over the boundary
   let _boundary_edges: Set[BoundaryEdge] = _boundary_edges.create()
 
@@ -139,19 +134,6 @@ actor DataReceiver is (Producer & Rerouter)
       Fail()
     end
 
-//!@
-  // fun ref init_timer() =>
-    //!@ Do we need this timer stuff anymore?
-
-    //!@
-    // ifdef "resilience" then
-    //   let t = Timer(_RequestAck(this), 0, 15_000_000)
-    //   _timers(consume t)
-    // end
-    // We are finished initializing timer, so set it to _EmptyTimerInit
-    // so we don't create two timers.
-    // _timer_init = _EmptyTimerInit
-
   be register_producer(input_id: RoutingId, output_id: RoutingId) =>
     @printf[I32]("!@ DataReceiver: Register producer %s with %s\n".cstring(), input_id.string().cstring(), output_id.string().cstring())
     if output_id == _state_routing_id then
@@ -186,8 +168,6 @@ actor DataReceiver is (Producer & Rerouter)
     | let srt: SnapshotRollbackBarrierToken =>
       _pending_message_store.clear()
       _pending_barriers.clear()
-      //!@ Do something about last seen id, such as rollback to last snapshot
-      // based value
     end
 
     _forward_barrier(target_step_id, origin_step_id, barrier_token)
@@ -298,8 +278,6 @@ actor DataReceiver is (Producer & Rerouter)
   fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    //!@
-    // _timer_init(this)
     ifdef "trace" then
       @printf[I32]("Rcvd pipeline msg at DataReceiver\n".cstring())
     end
@@ -356,8 +334,6 @@ actor DataReceiver is (Producer & Rerouter)
 
   be dispose() =>
     @printf[I32]("Shutting down DataReceiver\n".cstring())
-    //!@
-    // _timers.dispose()
 
     for edge in _boundary_edges.values() do
       _router.unregister_producer(edge.input_id, edge.output_id, this)
@@ -399,25 +375,3 @@ actor DataReceiver is (Producer & Rerouter)
     | let conn: DataChannel =>
       conn.unmute(c)
     end
-
-//!@
-// trait _TimerInit
-//   fun apply(d: DataReceiver ref)
-
-// class _UninitializedTimerInit is _TimerInit
-//   fun apply(d: DataReceiver ref) =>
-//     d.init_timer()
-
-// class _EmptyTimerInit is _TimerInit
-//   fun apply(d: DataReceiver ref) => None
-
-//!@
-// class _RequestAck is TimerNotify
-//   let _d: DataReceiver
-
-//   new iso create(d: DataReceiver) =>
-//     _d = d
-
-//   fun ref apply(timer: Timer, count: U64): Bool =>
-//     _d.request_ack()
-//     true
