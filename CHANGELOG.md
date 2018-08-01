@@ -2,14 +2,11 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [unreleased] - unreleased
+## [0.5.1] - 2018-08-01
 
 ### Fixed
 
 - Ensure that parallel stateless computations always run independently ([PR #2322](https://github.com/wallaroolabs/wallaroo/pull/2322))
-
-### Added
-
 
 ### Changed
 
