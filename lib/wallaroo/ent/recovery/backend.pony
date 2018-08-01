@@ -223,7 +223,7 @@ class FileBackend is Backend
         @printf[I32]("Cannot recover state from eventlog\n".cstring())
       end
     else
-      @printf[I32]("RESILIENCE: Could not find log file to replay.\n"
+      @printf[I32]("RESILIENCE: Could not find log file to rollback from.\n"
         .cstring())
       Fail()
     end
@@ -282,80 +282,93 @@ class FileBackend is Backend
       error
     end
 
-// !@ Manage this with new snapshot approach.
-// class RotatingFileBackend is Backend
-//   // _basepath identifies the worker
-//   // For unique file identifier, we use the sum of payload sizes saved as a
-//   // U64 encoded in hex. This is maintained with _offset and
-//   // _backend.bytes_written()
-//   var _backend: FileBackend
-//   let _base_dir: FilePath
-//   let _base_name: String
-//   let _suffix: String
-//   let _event_log: EventLog
-//   let _file_length: (USize | None)
-//   var _offset: U64
-//   var _rotate_requested: Bool = false
+//!@ Manage this with new snapshot approach.
+class RotatingFileBackend is Backend
+  // _basepath identifies the worker
+  // For unique file identifier, we use the sum of payload sizes saved as a
+  // U64 encoded in hex. This is maintained with _offset and
+  // _backend.bytes_written()
+  var _backend: FileBackend
+  let _base_dir: FilePath
+  let _base_name: String
+  let _suffix: String
+  let _event_log: EventLog ref
+  let _file_length: (USize | None)
+  var _offset: U64
+  var _rotate_requested: Bool = false
 
-//   new create(base_dir: FilePath, base_name: String, suffix: String = ".evlog",
-//     event_log: EventLog, file_length: (USize | None)) ?
-//   =>
-//     _base_dir = base_dir
-//     _base_name = base_name
-//     _suffix = suffix
-//     _file_length = file_length
-//     _event_log = event_log
+  new create(base_dir: FilePath, base_name: String, suffix: String = ".evlog",
+    event_log: EventLog ref, file_length: (USize | None)) ?
+  =>
+    _base_dir = base_dir
+    _base_name = base_name
+    _suffix = suffix
+    _file_length = file_length
+    _event_log = event_log
 
-//     // scan existing files matching _base_path, and identify the latest one
-//     // based on the hex offset
-//     _offset = try
-//       let last_file_path = LastLogFilePath(_base_name, _suffix, _base_dir)?
-//       let parts = last_file_path.path.split("-.")
-//       let offset_str = parts(parts.size()-2)?
-//       HexOffset.u64(offset_str)?
-//     else // create a new file with offset 0
-//       0
-//     end
-//     let p = _base_name + "-" + HexOffset(_offset) + _suffix
-//     let fp = FilePath(_base_dir, p)?
-//     _backend = FileBackend(fp, _event_log)
+    // scan existing files matching _base_path, and identify the latest one
+    // based on the hex offset
+    _offset = try
+      let last_file_path = LastLogFilePath(_base_name, _suffix, _base_dir)?
+      let parts = last_file_path.path.split("-.")
+      let offset_str = parts(parts.size()-2)?
+      HexOffset.u64(offset_str)?
+    else // create a new file with offset 0
+      0
+    end
+    let p = _base_name + "-" + HexOffset(_offset) + _suffix
+    let fp = FilePath(_base_dir, p)?
+    _backend = FileBackend(fp, _event_log)
 
-//   fun bytes_written(): USize => _backend.bytes_written()
+  fun bytes_written(): USize => _backend.bytes_written()
 
-//   fun ref sync() ? => _backend.sync()?
+  fun ref sync() ? => _backend.sync()?
 
-//   fun ref datasync() ? => _backend.datasync()?
+  fun ref datasync() ? => _backend.datasync()?
 
-//   fun ref start_rollback() => _backend.start_rollback()
+  fun ref start_rollback(snapshot_id: SnapshotId) =>
+    _backend.start_rollback(snapshot_id)
 
-//   fun ref write(): USize ? =>
-//     let bytes_written' = _backend.write()?
-//     match _file_length
-//     | let l: USize =>
-//       if bytes_written' >= l then
-//         if not _rotate_requested then
-//           _rotate_requested = true
-//           _event_log.start_rotation()
-//         end
-//       end
-//     end
-//     bytes_written'
+  fun ref write(): USize ? =>
+    let bytes_written' = _backend.write()?
+    match _file_length
+    | let l: USize =>
+      if bytes_written' >= l then
+        if not _rotate_requested then
+          _rotate_requested = true
+          _event_log._start_rotation()
+        end
+      end
+    end
+    bytes_written'
 
-//   fun ref encode_entry(entry: LogEntry) => _backend.encode_entry(consume entry)
+  fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
+    payload: Array[ByteSeq] val)
+  =>
+    _backend.encode_entry(resilient_id, snapshot_id, payload)
 
-//   fun ref rotate_file() ? =>
-//     // only do this if current backend has actually written anything
-//     if _backend.bytes_written() > 0 then
-//       // 1. sync/datasync the current backend to ensure everything is written
-//       _backend.sync()?
-//       _backend.datasync()?
-//       // 2. close the file by disposing the backend
-//       _backend.dispose()
-//       // 3. update _offset
-//       _offset = _offset + _backend.bytes_written().u64()
-//       // 4. open new backend with new file set to new offset.
-//       let p = _base_name + "-" + HexOffset(_offset) + _suffix
-//       let fp = FilePath(_base_dir, p)?
-//       _backend = FileBackend(fp, _event_log)
-//     end
-//     _rotate_requested = false
+  fun ref encode_snapshot_id(snapshot_id: SnapshotId) =>
+    _backend.encode_snapshot_id(snapshot_id)
+
+  fun ref rotate_file() ? =>
+    // only do this if current backend has actually written anything
+    if _backend.bytes_written() > 0 then
+      // 1. sync/datasync the current backend to ensure everything is written
+      _backend.sync()?
+      _backend.datasync()?
+      // 2. close the file by disposing the backend
+      _backend.dispose()
+      // 3. update _offset
+      _offset = _offset + _backend.bytes_written().u64()
+      // 4. open new backend with new file set to new offset.
+      let p = _base_name + "-" + HexOffset(_offset) + _suffix
+      let fp = FilePath(_base_dir, p)?
+      _backend = FileBackend(fp, _event_log)
+    else
+      ifdef debug then
+        @printf[I32]("Trying to rotate file but no bytes have been written\n"
+          .cstring())
+      end
+    end
+    _event_log.rotation_complete()
+    _rotate_requested = false

@@ -53,6 +53,11 @@ actor BarrierInitiator is Initializable
   let _sinks: SetIs[BarrierReceiver] = _sinks.create()
   let _workers: _StringSet = _workers.create()
 
+  // When we send barriers to a different primary worker, we use this map
+  // to call the correct action when those barriers are complete.
+  let _pending_actions: Map[BarrierToken, Promise[BarrierToken]] =
+    _pending_actions.create()
+
   // TODO: Currently, we can only inject barriers from one primary worker
   // in the cluster. This is because otherwise they might be injected in
   // parallel at different workers and the barrier protocol relies on the
@@ -170,9 +175,10 @@ actor BarrierInitiator is Initializable
 
       _phase.initiate_barrier(barrier_token, result_promise)
     else
+      _pending_actions(barrier_token) = result_promise
       try
         let msg = ChannelMsgEncoder.forward_inject_barrier(barrier_token,
-          result_promise, _auth)?
+          _worker_name, _auth)?
         _connections.send_control(_primary_worker, msg)
       else
         Fail()
@@ -188,10 +194,30 @@ actor BarrierInitiator is Initializable
     this one is complete or, if `wait_for_token` is specified, once
     the specified token is received.
     """
-    //!@ We need to make sure this gets queued if we're in rollback mode
-    _phase = _BlockingBarrierInitiatorPhase(this, barrier_token,
-      wait_for_token)
-    _phase.initiate_barrier(barrier_token, result_promise)
+    @printf[I32]("!@ Injecting blocking barrier %s\n".cstring(), barrier_token.string().cstring())
+    if _primary_worker == _worker_name then
+      //!@ We need to make sure this gets queued if we're in rollback mode
+      _phase = _BlockingBarrierInitiatorPhase(this, barrier_token,
+        wait_for_token)
+      _phase.initiate_barrier(barrier_token, result_promise)
+    else
+      _pending_actions(barrier_token) = result_promise
+      try
+        let msg = ChannelMsgEncoder.forward_inject_blocking_barrier(
+          barrier_token, wait_for_token, _worker_name, _auth)?
+        _connections.send_control(_primary_worker, msg)
+      else
+        Fail()
+      end
+    end
+
+  be forwarded_inject_barrier_complete(barrier_token: BarrierToken) =>
+    try
+      let action = _pending_actions.remove(barrier_token)?._2
+      action(barrier_token)
+    else
+      Fail()
+    end
 
   fun ref queue_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
@@ -310,6 +336,7 @@ actor BarrierInitiator is Initializable
         InProgressPrimaryBarrierHandler(_worker_name, this, barrier_token,
           acked_sinks, acked_ws, _sinks, _workers, result_promise)
       else
+        @printf[I32]("!@ Phase transition to SecondaryBarrierHandler with primary worker being %s\n".cstring(), primary_worker.cstring())
         InProgressSecondaryBarrierHandler(this, barrier_token, acked_sinks,
           _sinks, primary_worker)
       end
@@ -373,7 +400,7 @@ actor BarrierInitiator is Initializable
     the primary worker that started this barrier in the first place.
     We are finished processing that barrier.
     """
-    // @printf[I32]("!@ all_secondary_sinks_acked for %s\n".cstring(), barrier_token.string().cstring())
+    @printf[I32]("!@ all_secondary_sinks_acked for %s\n".cstring(), barrier_token.string().cstring())
     try
       let msg = ChannelMsgEncoder.worker_ack_barrier(_worker_name,
         barrier_token, _auth)?
@@ -416,14 +443,18 @@ actor BarrierInitiator is Initializable
     else
       Fail()
     end
-    try
-      (_barrier_source as BarrierSource).barrier_complete(barrier_token)
-    else
-      Fail()
+
+    if _barrier_source isnt None then
+      try
+        (_barrier_source as BarrierSource).barrier_complete(barrier_token)
+      else
+        Fail()
+      end
     end
     for s in _sources.values() do
       s.barrier_complete(barrier_token)
     end
+
     _phase.barrier_complete(barrier_token)
 
   fun ref next_token() =>

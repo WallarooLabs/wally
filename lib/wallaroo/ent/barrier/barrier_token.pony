@@ -13,10 +13,11 @@ the License. You may obtain a copy of the License at
 use "collections"
 use "wallaroo/ent/autoscale"
 use "wallaroo/ent/snapshot"
+use "wallaroo_labs/partial_order"
 
 
 trait val BarrierToken is (Hashable & Equatable[BarrierToken] &
-  Comparable[BarrierToken])
+  PartialComparable[BarrierToken])
   fun string(): String
 
 primitive InitialBarrierToken is BarrierToken
@@ -32,14 +33,8 @@ primitive InitialBarrierToken is BarrierToken
 
   fun lt(that: box->BarrierToken): Bool =>
     false
-
-  fun le(that: box->BarrierToken): Bool =>
-    match that
-    | let ifa: InitialBarrierToken =>
-      true
-    else
-      false
-    end
+  fun gt(that: box->BarrierToken): Bool =>
+    false
 
   fun string(): String =>
     "InitialBarrierToken"
@@ -78,18 +73,6 @@ class val AutoscaleBarrierToken is BarrierToken
       false
     end
 
-  fun le(that: box->BarrierToken): Bool =>
-    match that
-    | let abt: AutoscaleBarrierToken =>
-      if _id == abt._id then
-        _worker <= abt._worker
-      else
-        _id <= abt._id
-      end
-    else
-      false
-    end
-
   fun gt(that: box->BarrierToken): Bool =>
     match that
     | let abt: AutoscaleBarrierToken =>
@@ -97,18 +80,6 @@ class val AutoscaleBarrierToken is BarrierToken
         _worker > abt._worker
       else
         _id > abt._id
-      end
-    else
-      false
-    end
-
-  fun ge(that: box->BarrierToken): Bool =>
-    match that
-    | let abt: AutoscaleBarrierToken =>
-      if _id == abt._id then
-        _worker >= abt._worker
-      else
-        _id >= abt._id
       end
     else
       false
@@ -151,18 +122,6 @@ class val AutoscaleResumeBarrierToken is BarrierToken
       false
     end
 
-  fun le(that: box->BarrierToken): Bool =>
-    match that
-    | let abt: AutoscaleResumeBarrierToken =>
-      if _id == abt._id then
-        _worker <= abt._worker
-      else
-        _id <= abt._id
-      end
-    else
-      false
-    end
-
   fun gt(that: box->BarrierToken): Bool =>
     match that
     | let abt: AutoscaleResumeBarrierToken =>
@@ -170,18 +129,6 @@ class val AutoscaleResumeBarrierToken is BarrierToken
         _worker > abt._worker
       else
         _id > abt._id
-      end
-    else
-      false
-    end
-
-  fun ge(that: box->BarrierToken): Bool =>
-    match that
-    | let abt: AutoscaleResumeBarrierToken =>
-      if _id == abt._id then
-        _worker >= abt._worker
-      else
-        _id >= abt._id
       end
     else
       false
@@ -215,23 +162,7 @@ class val SnapshotBarrierToken is BarrierToken
       false
     end
 
-  fun le(that: box->BarrierToken): Bool =>
-    match that
-    | let sbt: SnapshotBarrierToken =>
-      id <= sbt.id
-    else
-      false
-    end
-
   fun gt(that: box->BarrierToken): Bool =>
-    match that
-    | let sbt: SnapshotBarrierToken =>
-      id > sbt.id
-    else
-      false
-    end
-
-  fun ge(that: box->BarrierToken): Bool =>
     match that
     | let sbt: SnapshotBarrierToken =>
       id > sbt.id
@@ -267,30 +198,12 @@ class val SnapshotRollbackBarrierToken is BarrierToken
       false
     end
 
-  fun le(that: box->BarrierToken): Bool =>
-    match that
-    | let sbt: SnapshotRollbackBarrierToken =>
-      id <= sbt.id
-    else
-      false
-    end
-
   fun gt(that: box->BarrierToken): Bool =>
     match that
     | let sbt: SnapshotRollbackBarrierToken =>
       id > sbt.id
     else
-      // A Rollback token is higher priority than any non-Rollback token.
-      true
-    end
-
-  fun ge(that: box->BarrierToken): Bool =>
-    match that
-    | let sbt: SnapshotRollbackBarrierToken =>
-      id > sbt.id
-    else
-      // A Rollback token is higher priority than any non-Rollback token.
-      true
+      false
     end
 
   fun string(): String =>
