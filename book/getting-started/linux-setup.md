@@ -168,7 +168,7 @@ Machida is the program that runs Wallaroo Python applications. Change to the `ma
 cd ~/wallaroo-tutorial/wallaroo/machida
 ```
 
-### Compiling on Artful
+### Compiling on Artful and later
 
 Due to ponyc's dependence on PIC on Artful Ubuntu and later, all applications must be compiled with the `PONYCFLAGS="--pic"` flag, like so:
 

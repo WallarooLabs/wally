@@ -22,9 +22,9 @@ You'll need Bash on Ubuntu on Windows to build and run Wallaroo applications. Th
 
 Once you've installed Bash/WSL and can successfully start `bash` from a Command Prompt or Powershell, please follow the Ubuntu setup [instructions](linux-setup.md).
 
-Run `lsb_release -a` inside of a `bash` shell in order to determine your release version. if the release output is 14.04 you are running Ubuntu Trusty and if it's 16.04 you are running Xenial. Make sure to follow the proper instructions for the release you are running.
+Run `lsb_release -a` inside of a `bash` shell in order to determine your release version. if the release output is 14.04 you are running Ubuntu Trusty, if it's 16.04 you are running Xenial, and if it's 18.04 you are running Bionic. Make sure to follow the proper instructions for the release you are running.
 
-Since you have setup Docker on Windows, do ignore any Docker related setup instructions for Linux.
+Since you have setup Docker on Windows, ignore any Docker related setup instructions for Linux.
 
 ## Conclusion
 
