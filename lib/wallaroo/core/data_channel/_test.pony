@@ -81,7 +81,7 @@ class _TestDataChannel is DataChannelListenNotify
       let app_name = "app_name"
       let worker_name = "worker_name"
       let auth = h.env.root as AmbientAuth
-      let event_log = EventLog()
+      let event_log = EventLog(worker_name)
       let metrics_sink = _NullMetricsSink
       let conns = Connections(app_name, worker_name, auth,
         "127.0.0.1", "0",

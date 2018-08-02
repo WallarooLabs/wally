@@ -293,19 +293,21 @@ actor Startup
 
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(_startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
             where backend_file_length' =
               _startup_options.event_log_file_length,
             suffix' = _event_log_file_suffix, log_rotation' = true))
         else
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(_startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
               _startup_options.event_log_file_length))
         end
       else
-        EventLog()
+        EventLog(_startup_options.worker_name)
       end
       let event_log = _event_log as EventLog
 
@@ -482,19 +484,21 @@ actor Startup
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(_startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
             where backend_file_length' =
               _startup_options.event_log_file_length,
             suffix' = _event_log_file_suffix, log_rotation' = true))
         else
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(_startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
               _startup_options.event_log_file_length))
         end
       else
-        EventLog()
+        EventLog(_startup_options.worker_name)
       end
       let event_log = _event_log as EventLog
 

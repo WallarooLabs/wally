@@ -50,6 +50,7 @@ class val EventLogConfig
     suffix = suffix'
 
 actor EventLog
+  let _worker_name: WorkerName
   let _resilients: Map[RoutingId, Resilient] = _resilients.create()
   var _backend: Backend = EmptyBackend
   let _replay_complete_markers: Map[U64, Bool] =
@@ -69,7 +70,12 @@ actor EventLog
 
   var _phase: _EventLogPhase = _InitialEventLogPhase
 
-  new create(event_log_config: EventLogConfig = EventLogConfig()) =>
+  var _log_rotation_id: LogRotationId = 0
+
+  new create(worker: WorkerName,
+    event_log_config: EventLogConfig = EventLogConfig())
+  =>
+    _worker_name = worker
     _config = event_log_config
     _backend_bytes_after_snapshot = _backend.bytes_written()
     _backend = match _config.filename
@@ -303,12 +309,14 @@ actor EventLog
     elseif _backend.bytes_written() > _backend_bytes_after_snapshot then
       @printf[I32]("Starting event log rotation.\n".cstring())
       _rotating = true
+      _log_rotation_id = _log_rotation_id + 1
       let rotation_action = Promise[BarrierToken]
       rotation_action.next[None](recover this~rotate_file() end)
       try
         (_barrier_initiator as BarrierInitiator).inject_blocking_barrier(
-          LogRotationBarrierToken, rotation_action,
-          LogRotationResumeBarrierToken)
+          LogRotationBarrierToken(_log_rotation_id, _worker_name),
+            rotation_action, LogRotationResumeBarrierToken(_log_rotation_id,
+            _worker_name))
       else
         Fail()
       end
@@ -353,7 +361,8 @@ actor EventLog
       let rotation_resume_action = Promise[BarrierToken]
       try
         (_barrier_initiator as BarrierInitiator).inject_barrier(
-          LogRotationResumeBarrierToken, rotation_resume_action)
+          LogRotationResumeBarrierToken(_log_rotation_id, _worker_name),
+            rotation_resume_action)
       else
         Fail()
       end

@@ -201,7 +201,7 @@ actor SnapshotInitiator is Initializable
 
   fun ref _save_snapshot_id(snapshot_id: SnapshotId) =>
     try
-      // @printf[I32]("!@ Saving SnapshotId %s\n".cstring(), snapshot_id.string().cstring())
+      @printf[I32]("!@ Saving SnapshotId %s\n".cstring(), snapshot_id.string().cstring())
       let filepath = FilePath(_auth, _snapshot_id_file)?
       // TODO: We'll need to rotate this file since it will grow rapidly.
       let file = File(filepath)
