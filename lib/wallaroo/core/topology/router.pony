@@ -890,19 +890,20 @@ class val DataRouter is Equatable[DataRouter]
   let _target_ids_to_route_ids: Map[RoutingId, RouteId] val
   let _route_ids_to_target_ids: Map[RouteId, RoutingId] val
   let _keys_to_route_ids: StatePartitionRouteIds val
-  // A special RoutingId that indicates that a barrier or register_producer
-  // request needs to be forwarded to all known state steps on this worker.
-  let _state_routing_id: RoutingId
+  // Special RoutingIds that indicates that a barrier or register_producer
+  // request needs to be forwarded to all known state steps on this workes.
+  let _state_routing_ids: Map[RoutingId, StateName] val
 
   new val create(worker: String, data_routes: Map[RoutingId, Consumer] val,
     keyed_routes: LocalStatePartitions val,
-    keyed_step_ids: LocalStatePartitionIds val)
+    keyed_step_ids: LocalStatePartitionIds val,
+    state_routing_ids: Map[RoutingId, StateName] val)
   =>
     _worker_name = worker
     _data_routes = data_routes
     _keyed_routes = keyed_routes
     _keyed_step_ids = keyed_step_ids
-    _state_routing_id = WorkerStateRoutingId(_worker_name)
+    _state_routing_ids = state_routing_ids
 
     var route_id: RouteId = 0
     let ids: Array[RoutingId] = ids.create()
@@ -940,7 +941,8 @@ class val DataRouter is Equatable[DataRouter]
     keyed_step_ids: LocalStatePartitionIds val,
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, RoutingId] val,
-    keys_to_route_ids: StatePartitionRouteIds val)
+    keys_to_route_ids: StatePartitionRouteIds val,
+    state_routing_ids: Map[StateName, RoutingId] val)
   =>
     _worker_name = worker
     _data_routes = data_routes
@@ -949,7 +951,7 @@ class val DataRouter is Equatable[DataRouter]
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
     _keys_to_route_ids = keys_to_route_ids
-    _state_routing_id = WorkerStateRoutingId(_worker_name)
+    _state_routing_ids = state_routing_ids
 
   fun size(): USize =>
     _data_routes.size()
@@ -1014,13 +1016,13 @@ class val DataRouter is Equatable[DataRouter]
       else
         Unreachable()
       end
-    elseif output_id == _state_routing_id then
+    elseif _state_routing_ids.contains(output_id) then
       _keyed_routes.register_producer(input_id, producer)
     else
       producer.queue_register_producer(input_id, output_id)
     end
 
-  fun unregister_producer(input_id: RoutingId, output_id: RoutingId,
+  fun unregister_producer(input_id: Rout6ingId, output_id: RoutingId,
     producer: DataReceiver ref)
   =>
 
@@ -1247,6 +1249,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
   let _hashed_node_routes: Map[String, HashedProxyRouter] val
   let _hash_partitions: HashPartitions
   let _partition_function: PartitionFunction[In] val
+  let _state_routing_ids: Map[WorkerName, RoutingId] val
 
   new val create(state_name': String,
     worker_name: String,
@@ -1254,7 +1257,8 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     s_ids: Map[Key, RoutingId] val,
     hashed_node_routes: Map[String, HashedProxyRouter] val,
     hash_partitions': HashPartitions,
-    partition_function: PartitionFunction[In] val)
+    partition_function: PartitionFunction[In] val,
+    state_routing_ids: Map[WorkerName, RoutingId] val)
   =>
     _state_name = state_name'
     _worker_name = worker_name
@@ -1263,6 +1267,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     _hashed_node_routes = hashed_node_routes
     _hash_partitions = hash_partitions'
     _partition_function = partition_function
+    _state_routing_ids = state_routing_ids
 
   fun local_size(): USize =>
     _local_routes.size()
@@ -1357,7 +1362,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
   =>
     LocalPartitionRouter[NewIn, S](_state_name, _worker_name,
       _local_routes, _step_ids, _hashed_node_routes, _hash_partitions,
-      new_p_function)
+      new_p_function, _state_routing_ids)
 
   fun routes(): Map[RoutingId, Consumer] val =>
     let m = recover iso Map[RoutingId, Consumer] end
@@ -1371,7 +1376,11 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
       end
     end
     for (w, hpr) in _hashed_node_routes.pairs() do
-      m(WorkerStateRoutingId(w)) = hpr.target_boundary()
+      try
+        m(_state_routing_ids(w)?) = hpr.target_boundary()
+      else
+        Fail()
+      end
     end
     consume m
 
@@ -1406,7 +1415,8 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
 
     LocalPartitionRouter[In, S](_state_name, _worker_name,
       consume new_local_routes, consume new_local_step_ids,
-      _hashed_node_routes, _hash_partitions, _partition_function)
+      _hashed_node_routes, _hash_partitions, _partition_function,
+      _state_routing_ids)
 
   fun update_boundaries(auth: AmbientAuth,
     ob: box->Map[String, OutgoingBoundary]): PartitionRouter
@@ -1422,7 +1432,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
 
     LocalPartitionRouter[In, S](_state_name, _worker_name,
       _local_routes, _step_ids, consume new_hashed_node_routes,
-      _hash_partitions, _partition_function)
+      _hash_partitions, _partition_function, _state_routing_ids)
 
   fun recalculate_hash_partitions_for_join(auth: AmbientAuth,
     joining_workers: Array[String] val,
@@ -1450,7 +1460,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
 
     LocalPartitionRouter[In, S](_state_name, _worker_name,
       _local_routes, _step_ids, consume new_hashed_node_routes,
-      new_hash_partitions, _partition_function)
+      new_hash_partitions, _partition_function, _state_routing_ids)
 
   fun recalculate_hash_partitions_for_shrink(
     leaving_workers: Array[String] val): PartitionRouter
@@ -1471,14 +1481,15 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
 
     LocalPartitionRouter[In, S](_state_name, _worker_name,
       _local_routes, _step_ids, consume new_hashed_node_routes,
-      new_hash_partitions, _partition_function)
+      new_hash_partitions, _partition_function, _state_routing_ids)
 
   fun hash_partitions(): HashPartitions =>
     _hash_partitions
 
   fun update_hash_partitions(hp: HashPartitions): PartitionRouter =>
     LocalPartitionRouter[In, S](_state_name, _worker_name,
-      _local_routes, _step_ids, _hashed_node_routes, hp, _partition_function)
+      _local_routes, _step_ids, _hashed_node_routes, hp, _partition_function,
+      _state_routing_ids)
 
   fun rebalance_steps_grow(auth: AmbientAuth,
     target_workers: Array[(String, OutgoingBoundary)] val,
@@ -1565,7 +1576,8 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
 
     let new_router = LocalPartitionRouter[In, S](_state_name,
       _worker_name, consume new_local_routes, consume new_step_ids,
-      consume new_hashed_node_routes, new_hash_partitions, _partition_function)
+      consume new_hashed_node_routes, new_hash_partitions, _partition_function,
+      _state_routing_ids)
     (new_router, had_steps_to_migrate)
 
   fun rebalance_steps_shrink(
@@ -1650,7 +1662,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
 
   fun blueprint(): PartitionRouterBlueprint =>
     LocalPartitionRouterBlueprint[In, S](_state_name, _step_ids,
-      _hash_partitions, _partition_function)
+      _hash_partitions, _partition_function, _state_routing_ids)
 
   fun distribution_digest(): Map[String, Array[String] val] val =>
     // Return a map of form {worker_name: step_ids_as_strings}
@@ -1729,15 +1741,18 @@ class val LocalPartitionRouterBlueprint[In: Any val, S: State ref]
   let _step_ids: Map[Key, RoutingId] val
   let _hash_partitions: HashPartitions
   let _partition_function: PartitionFunction[In] val
+  let _state_routing_ids: Map[WorkerName, RoutingId] val
 
   new val create(state_name: String,
     s_ids: Map[Key, RoutingId] val, hash_partitions: HashPartitions,
-    partition_function: PartitionFunction[In] val)
+    partition_function: PartitionFunction[In] val,
+    state_routing_ids: Map[WorkerName, RoutingId] val)
   =>
     _state_name = state_name
     _step_ids = s_ids
     _hash_partitions = hash_partitions
     _partition_function = partition_function
+    _state_routing_ids = state_routing_ids
 
   fun build_router(worker_name: String, workers: Array[String] val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
@@ -1768,7 +1783,7 @@ class val LocalPartitionRouterBlueprint[In: Any val, S: State ref]
 
     LocalPartitionRouter[In, S](_state_name, worker_name,
       recover val Map[Key, Step] end, _step_ids, consume hashed_node_routes,
-      new_hash_partitions, _partition_function)
+      new_hash_partitions, _partition_function, _state_routing_ids)
 
 trait val StatelessPartitionRouter is Router
   fun partition_id(): RoutingId

@@ -144,7 +144,8 @@ actor DataReceiver is (Producer & Rerouter)
   fun ref queue_register_producer(input_id: RoutingId, output_id: RoutingId) =>
     _queued_register_producers.push((input_id, output_id))
 
-  fun ref queue_unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
+  fun ref queue_unregister_producer(input_id: RoutingId, output_id: RoutingId)
+  =>
     _queued_unregister_producers.push((input_id, output_id))
 
   be unregister_producer(input_id: RoutingId, output_id: RoutingId) =>

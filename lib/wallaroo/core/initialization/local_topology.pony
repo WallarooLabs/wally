@@ -94,7 +94,8 @@ class val LocalTopology
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
     state_steps: Map[String, Array[Step]],
-    state_step_creator: StateStepCreator) ?
+    state_step_creator: StateStepCreator,
+    state_routing_ids: Map[WorkerName, RoutingId] val) ?
   =>
     let subpartition =
       try
@@ -111,7 +112,7 @@ class val LocalTopology
       state_map(state_name) = subpartition.build(_app_name, _worker_name,
          metrics_conn, auth, event_log, recovery_replayer, outgoing_boundaries,
          initializables, data_routes, keyed_data_routes, keyed_step_ids,
-         state_steps, state_step_creator)
+         state_steps, state_step_creator, state_routing_ids)
     end
 
   fun graph(): Dag[StepInitializer] val => _graph
@@ -818,6 +819,13 @@ actor LocalTopologyInitializer is LayoutInitializer
         // for some reason, as when TCPSources disconnect).
         var barrier_source: (BarrierSource | None) = None
 
+        // Since a worker doesn't know the specific routing ids of state
+        // steps on other workers (it only knows that certain keys are handled
+        // by certain workers), we need a more general way to route things
+        // like barriers to downstream state steps. To enable this, we create
+        // a RoutingId for each (state name, worker name) pair.
+        let state_routing_ids = Map[String, Map[WorkerName, RoutingId] val]
+
         /////////
         // Initialize based on DAG
         //
@@ -925,12 +933,20 @@ actor LocalTopologyInitializer is LayoutInitializer
                     state_step_routers.insert_if_absent(state_name,
                       StateStepRouter.from_boundaries(_worker_name,
                         _outgoing_boundaries))?
+                    let next_routing_ids_iso =
+                      recover iso Map[WorkerName, RoutingId] end
+                    for w in t.worker_names.values() do
+                      let next_state_routing_id = _routing_id_gen()
+                      next_routing_ids_iso(w) = next_state_routing_id
+                    end
+                    let next_routing_ids = consume next_routing_ids_iso
+                    state_routing_ids(state_name) = next_routing_ids
                     t.update_state_map(state_name, state_map,
                       _metrics_conn, _event_log, _recovery_replayer, _auth,
                       _outgoing_boundaries, _initializables,
                       data_routes_ref, keyed_data_routes_ref,
                       keyed_step_ids_ref, built_state_steps,
-                      _state_step_creator)?
+                      _state_step_creator, next_routing_ids)?
                   else
                     @printf[I32]("Failed to update state_map\n".cstring())
                     error
