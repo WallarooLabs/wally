@@ -198,5 +198,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun ref closed(source: TCPSource ref) =>
     @printf[I32]("TCPSource connection closed\n".cstring())
+    source.dispose()
 
   // TODO: implement connect_failed

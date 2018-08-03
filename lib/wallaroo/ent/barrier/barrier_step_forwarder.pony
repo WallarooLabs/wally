@@ -98,11 +98,14 @@ class BarrierStepForwarder
       end
     end
     _removed_inputs.set(input_id)
+    if _inputs_blocking.contains(input_id) then
+      try _inputs_blocking.remove(input_id)? else Unreachable() end
+    end
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
-    if (inputs.size() == _inputs_blocking.size()) and
-      not _step.has_pending_messages()
+    if (inputs.size() == (_inputs_blocking.size() + _removed_inputs.size()))
+      and not _step.has_pending_messages()
     then
       // @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
       for (o_id, o) in _step.outputs().pairs() do
@@ -122,4 +125,5 @@ class BarrierStepForwarder
 
   fun ref clear() =>
     _inputs_blocking.clear()
+    _removed_inputs.clear()
     _barrier_token = InitialBarrierToken
