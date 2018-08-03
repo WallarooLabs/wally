@@ -158,7 +158,8 @@ trait val StateSubpartitions is Equatable[StateSubpartitions]
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
     state_steps: Map[String, Array[Step]],
-    state_step_creator: StateStepCreator): PartitionRouter
+    state_step_creator: StateStepCreator,
+    state_routing_ids: Map[WorkerName, RoutingId] val): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions ?
   fun add_worker_name(worker: String): StateSubpartitions
   fun runner_builder(): RunnerBuilder
@@ -198,7 +199,8 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
     state_steps: Map[String, Array[Step]],
-    state_step_creator: StateStepCreator):
+    state_step_creator: StateStepCreator,
+    state_routing_ids: Map[WorkerName, RoutingId] val):
     LocalPartitionRouter[PIn, S] val
   =>
     let hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
@@ -213,6 +215,7 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
       if c == worker_name then
         try
           let keys = _key_distribution.workers_to_keys()(c)?
+          keyed_data_routes.add_state(_state_name)
           for key in keys.values() do
             try
               let id = _id_map(key)?
@@ -257,7 +260,8 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
 
     LocalPartitionRouter[PIn, S](_state_name, worker_name,
       consume m, _id_map, consume hashed_node_routes,
-      _key_distribution.hash_partitions(), _partition_function)
+      _key_distribution.hash_partitions(), _partition_function,
+      state_routing_ids)
 
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions =>
     let kpa = _key_distribution.update_key(key, pa)
@@ -328,42 +332,76 @@ primitive _Contains
     end
 
 class LocalStatePartitions
-  let _info: Map[String, Map[Key, Step]]
+  let _info: Map[StateName, Map[Key, Step]]
 
   new create() =>
     _info = _info.create()
 
-  fun apply(state_name: String, key: box->Key!): this->Step ? =>
+  fun apply(state_name: StateName, key: box->Key!): this->Step ? =>
     _info(state_name)?(key)?
 
-  fun ref add(state_name: String, key: Key, step: Step) =>
+  //!@
+  fun size(): USize =>
+    @printf[I32]("!@ LocalStatePartitions: _info\n".cstring())
+    for k in _info.keys() do
+      @printf[I32]("!@ -- %s\n".cstring(), k.cstring())
+    end
+    _info.size()
+
+  fun ref add_state(state_name: StateName) =>
+    if not _info.contains(state_name) then
+      _info(state_name) = Map[Key, Step]
+    end
+
+  fun ref add(state_name: StateName, key: Key, step: Step) =>
     try
       _info.insert_if_absent(state_name, Map[Key, Step])?(key) = step
     else
       Unreachable()
     end
 
-  fun contains(state_name: String, key: Key): Bool =>
+  fun contains(state_name: StateName, key: Key): Bool =>
     _Contains[Step](_info, state_name, key)
 
   fun is_empty(): Bool =>
     _info.size() == 0
 
-  fun register_producer(input_id: RoutingId, producer: Producer) =>
-    for step in unique_steps().values() do
-      step.register_producer(input_id, producer)
-    end
-
-  fun unregister_producer(input_id: RoutingId, producer: Producer) =>
-    for step in unique_steps().values() do
-      step.unregister_producer(input_id, producer)
-    end
-
-  fun receive_barrier(origin_step_id: RoutingId, producer: Producer,
-    barrier_token: BarrierToken)
+  fun register_producer(state_name: StateName, input_id: RoutingId,
+    producer: Producer)
   =>
-    for step in unique_steps().values() do
-      step.receive_barrier(origin_step_id, producer, barrier_token)
+    try
+      for step in _info(state_name)?.values() do
+        step.register_producer(input_id, producer)
+      end
+    else
+      @printf[I32]("!@ LocalStatePartitions: Can't find %s\n".cstring(), state_name.cstring())
+      //!@
+      // Fail()
+    end
+
+  fun unregister_producer(state_name: StateName, input_id: RoutingId,
+    producer: Producer)
+  =>
+    try
+      for step in _info(state_name)?.values() do
+        step.unregister_producer(input_id, producer)
+      end
+    else
+      Fail()
+    end
+
+  fun receive_barrier(state_name: StateName, origin_step_id: RoutingId,
+    producer: Producer, barrier_token: BarrierToken)
+  =>
+    try
+      for step in _info(state_name)?.values() do
+        step.receive_barrier(origin_step_id, producer, barrier_token)
+      end
+    else
+      //!@
+      None
+      //!@
+      // Fail()
     end
 
   fun clone(): LocalStatePartitions iso^ =>
@@ -377,24 +415,17 @@ class LocalStatePartitions
 
     c
 
-  fun triples(): Iter[(String, String, Step)] =>
+  fun triples(): Iter[(StateName, Key, Step)] =>
     """
     Return an iterator over tuples where the first two values are the state name
     and the key, and the last value is the info value.
     """
-    Iter[(String, Map[String, Step] box)](_info.pairs()).
-      flat_map[(String, (String, Step))](
-        { (k_m) => Iter[String].repeat_value(k_m._1)
-          .zip[(String, Step)](k_m._2.pairs()) }).
-      map[(String, String, Step)](
+    Iter[(StateName, Map[Key, Step] box)](_info.pairs()).
+      flat_map[(StateName, (Key, Step))](
+        { (k_m) => Iter[StateName].repeat_value(k_m._1)
+          .zip[(Key, Step)](k_m._2.pairs()) }).
+      map[(StateName, Key, Step)](
         { (x) => (x._1, x._2._1, x._2._2) })
-
-  fun unique_steps(): SetIs[Step] =>
-    let u = SetIs[Step]
-    for (_, _, step) in triples() do
-      u.set(step)
-    end
-    u
 
 class LocalStatePartitionIds
   let _info: Map[String, Map[Key, RoutingId]]

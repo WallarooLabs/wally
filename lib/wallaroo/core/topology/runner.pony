@@ -281,7 +281,7 @@ trait val PartitionsBuilder
 
 class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
   (PartitionsBuilder & RunnerBuilder)
-  let _id: RoutingId
+  let _state_id: RoutingId
   let _pipeline_name: String
   let _state_name: String
   let _state_runner_builder: StateRunnerBuilder[S] val
@@ -294,7 +294,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
     state_runner_builder: StateRunnerBuilder[S] val,
     multi_worker: Bool = false)
   =>
-    _id = state_runner_builder.id()
+    _state_id = RoutingIdGenerator()
     _state_name = state_name'
     _pipeline_name = pipeline_name
     _state_runner_builder = state_runner_builder
@@ -314,7 +314,7 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
   fun name(): String => _state_name
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
-  fun id(): RoutingId => _id
+  fun id(): RoutingId => _state_id
   fun step_id_map(): Map[Key, U128] val => _step_id_map
   fun is_multi(): Bool => _multi_worker
 

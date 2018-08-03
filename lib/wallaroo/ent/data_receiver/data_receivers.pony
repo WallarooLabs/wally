@@ -49,7 +49,8 @@ actor DataReceivers
     _state_step_creator = state_step_creator
     _data_router =
       DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
-        recover LocalStatePartitions end, recover LocalStatePartitionIds end)
+        recover LocalStatePartitions end, recover LocalStatePartitionIds end,
+        recover Map[RoutingId, StateName] end)
     if not is_recovering then
       _initialized = true
     end
@@ -82,8 +83,13 @@ actor DataReceivers
         // !@ this should be recoverable
         let id = RoutingIdGenerator()
 
+        @printf[I32]("!@ DataReceivers calling ll:\n".cstring())
+        //!@
+        _data_router.ll()
+        @printf[I32]("!@ Called!  Now creating DataReceiver!!\n".cstring())
+
         let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
-          _state_step_creator, _initialized)
+          _data_router, _state_step_creator, _initialized)
         match _router_registry
         | let rr: RouterRegistry =>
           rr.register_data_receiver(sender_name, new_dr)
@@ -114,6 +120,10 @@ actor DataReceivers
 
   be update_data_router(dr: DataRouter) =>
     _data_router = dr
+    @printf[I32]("!@ DataReceivers: updated _data_router and calling ll\n".cstring())
+    //!@
+    _data_router.ll()
+    @printf[I32]("!@ Called!\n".cstring())
     for data_receiver in _data_receivers.values() do
       data_receiver.update_router(_data_router)
     end

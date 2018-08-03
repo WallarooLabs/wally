@@ -440,15 +440,20 @@ primitive ChannelMsgEncoder
   =>
     _encode(BarrierCompleteMsg(token), auth)?
 
-  fun event_log_initiate_snapshot(snapshot_id: SnapshotId, token: BarrierToken,
-    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  fun event_log_initiate_snapshot(snapshot_id: SnapshotId, sender: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(EventLogInitiateSnapshotMsg(snapshot_id, token, sender), auth)?
+    _encode(EventLogInitiateSnapshotMsg(snapshot_id, sender), auth)?
 
-  fun event_log_ack_snapshot(snapshot_id: SnapshotId, token: BarrierToken,
-    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  fun event_log_write_snapshot_id(snapshot_id: SnapshotId, sender: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(EventLogAckSnapshotMsg(snapshot_id, token, sender), auth)?
+    _encode(EventLogWriteSnapshotIdMsg(snapshot_id, sender), auth)?
+
+  fun event_log_ack_snapshot(snapshot_id: SnapshotId, sender: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(EventLogAckSnapshotMsg(snapshot_id, sender), auth)?
 
   fun commit_snapshot_id(snapshot_id: SnapshotId, sender: WorkerName,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -1217,26 +1222,26 @@ class val BarrierCompleteMsg is ChannelMsg
 
 class val EventLogInitiateSnapshotMsg is ChannelMsg
   let snapshot_id: SnapshotId
-  let token: BarrierToken
   let sender: WorkerName
 
-  new val create(snapshot_id': SnapshotId, token': BarrierToken,
-    sender': WorkerName)
-  =>
+  new val create(snapshot_id': SnapshotId, sender': WorkerName) =>
     snapshot_id = snapshot_id'
-    token = token'
+    sender = sender'
+
+class val EventLogWriteSnapshotIdMsg is ChannelMsg
+  let snapshot_id: SnapshotId
+  let sender: WorkerName
+
+  new val create(snapshot_id': SnapshotId, sender': WorkerName) =>
+    snapshot_id = snapshot_id'
     sender = sender'
 
 class val EventLogAckSnapshotMsg is ChannelMsg
   let snapshot_id: SnapshotId
-  let token: BarrierToken
   let sender: WorkerName
 
-  new val create(snapshot_id': SnapshotId, token': BarrierToken,
-    sender': WorkerName)
-  =>
+  new val create(snapshot_id': SnapshotId, sender': WorkerName) =>
     snapshot_id = snapshot_id'
-    token = token'
     sender = sender'
 
 class val CommitSnapshotIdMsg is ChannelMsg

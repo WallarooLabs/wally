@@ -105,9 +105,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     _message_processor = NormalSinkMessageProcessor(this)
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
 
-    //!@
-    // _event_log.register_resilient(_sink_id, this)
-
   fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
   =>
@@ -248,6 +245,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
       _barrier_initiator.register_sink(this)
+      _event_log.register_resilient(_sink_id, this)
     end
 
     _inputs(id) = producer
@@ -278,6 +276,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       // If we have no inputs, then we are not involved in snapshotting.
       if _inputs.size() == 0 then
         _barrier_initiator.unregister_sink(this)
+        _event_log.unregister_resilient(_sink_id, this)
       end
     end
 
@@ -460,15 +459,14 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     """
     KafkaSinks don't currently write out any data as part of the snapshot.
     """
-    None
+    _event_log.snapshot_state(_sink_id, snapshot_id,
+      recover val Array[ByteSeq] end)
 
   be rollback(payload: ByteSeq val, event_log: EventLog) =>
     """
     There is currently nothing for a KafkaSink to rollback to.
     """
     event_log.ack_rollback(_sink_id)
-
-
 
 
   be dispose() =>
