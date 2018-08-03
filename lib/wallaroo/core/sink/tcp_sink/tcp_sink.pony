@@ -174,8 +174,6 @@ actor TCPSink is Sink
     _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
     _mute_upstreams()
 
-    //!@
-    // _event_log.register_resilient(_sink_id, this)
   //
   // Application Lifecycle events
   //
@@ -293,6 +291,8 @@ actor TCPSink is Sink
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
       _barrier_initiator.register_sink(this)
+                @printf[I32]("!@!! register_resilient: TCPSink\n".cstring())
+      _event_log.register_resilient(_sink_id, this)
     end
 
     _inputs(id) = producer
@@ -323,6 +323,7 @@ actor TCPSink is Sink
       // If we have no inputs, then we are not involved in snapshotting.
       if _inputs.size() == 0 then
         _barrier_initiator.unregister_sink(this)
+        _event_log.unregister_resilient(_sink_id, this)
       end
     end
 
@@ -335,7 +336,7 @@ actor TCPSink is Sink
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ Receive barrier %s at TCPSink\n".cstring(), barrier_token.string().cstring())
+    @printf[I32]("!@ Receive barrier %s at TCPSink\n".cstring(), barrier_token.string().cstring())
     process_barrier(input_id, producer, barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
@@ -396,7 +397,8 @@ actor TCPSink is Sink
     """
     TCPSinks don't currently write out any data as part of the snapshot.
     """
-    None
+    _event_log.snapshot_state(_sink_id, snapshot_id,
+      recover val Array[ByteSeq] end)
 
   be rollback(payload: ByteSeq val, event_log: EventLog) =>
     """

@@ -455,19 +455,23 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: BarrierCompleteMsg =>
         _barrier_initiator.remote_barrier_complete(m.token)
       | let m: EventLogInitiateSnapshotMsg =>
-        let promise = Promise[BarrierToken]
-        promise.next[None]({(t: BarrierToken) =>
+        let promise = Promise[SnapshotId]
+        promise.next[None]({(s_id: SnapshotId) =>
           try
-            let msg = ChannelMsgEncoder.event_log_ack_snapshot(m.snapshot_id,
-              t, _worker_name, _auth)?
+            let msg = ChannelMsgEncoder.event_log_ack_snapshot(s_id,
+              _worker_name, _auth)?
             _connections.send_control(m.sender, msg)
           else
             Fail()
           end
         })
-        _event_log.initiate_snapshot(m.snapshot_id, m.token, promise)
+        _event_log.initiate_snapshot(m.snapshot_id, promise)
+      | let m: EventLogWriteSnapshotIdMsg =>
+        _event_log.write_snapshot_id(m.snapshot_id)
       | let m: EventLogAckSnapshotMsg =>
-        _snapshot_initiator.event_log_snapshot_complete(m.sender, m.token)
+        @printf[I32]("!@ Rcvd EventLogAckSnapshotMsg!!!\n".cstring())
+        _snapshot_initiator.event_log_snapshot_complete(m.sender,
+          m.snapshot_id)
       | let m: CommitSnapshotIdMsg =>
         _snapshot_initiator.commit_snapshot_id(m.snapshot_id, m.sender)
       | let m: RecoveryInitiatedMsg =>

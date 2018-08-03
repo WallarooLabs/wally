@@ -573,7 +573,8 @@ actor Startup
         DataRouter(_startup_options.worker_name,
           recover Map[RoutingId, Consumer] end,
           recover LocalStatePartitions end,
-          recover LocalStatePartitionIds end))
+          recover LocalStatePartitionIds end,
+          recover Map[RoutingId, StateName] end))
       local_topology_initializer.update_topology(m.local_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)
