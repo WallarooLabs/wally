@@ -110,6 +110,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
+                @printf[I32]("!@!! register_resilient: Step\n".cstring())
     _event_log.register_resilient(id, this)
 
     let initial_router = _runner.clone_router_and_set_input_type(router')
@@ -506,6 +507,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     end
 
   be dispose() =>
+    _event_log.unregister_resilient(_id, this)
     _unregister_all_outputs()
 
   ///////////////
@@ -547,7 +549,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ Step %s received barrier from %s\n".cstring(), _id.string().cstring(), step_id.string().cstring())
+    @printf[I32]("!@ Step %s received barrier from %s\n".cstring(), _id.string().cstring(), step_id.string().cstring())
     process_barrier(step_id, producer, barrier_token)
 
   fun ref process_barrier(step_id: RoutingId, producer: Producer,

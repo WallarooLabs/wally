@@ -71,17 +71,20 @@ actor DataReceiver is (Producer & Rerouter)
   var _phase: _DataReceiverProcessingPhase = _DataReceiverNotProcessingPhase
 
   new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
-    sender_name: String, state_step_creator: StateStepCreator,
-    initialized: Bool = false)
+    sender_name: String, data_router: DataRouter,
+    state_step_creator: StateStepCreator, initialized: Bool = false)
   =>
+    @printf[I32]("!@ Creating DataReceiver!!!\n".cstring())
+    //!@
+    data_router.ll()
+
     _id = id
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
     _state_step_creator = state_step_creator
     _state_routing_id = WorkerStateRoutingId(_worker_name)
-    _router = DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
-      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
+    _router = data_router
     if initialized then
       _phase = _NormalDataReceiverProcessingPhase(this)
     end

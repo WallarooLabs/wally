@@ -163,10 +163,11 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     end
 
     var base_router = DataRouter("w1", consume base_routes, base_partitions,
-      base_partition_ids)
+      base_partition_ids, recover Map[RoutingId, StateName] end)
 
     let target_router = DataRouter("w1", consume target_routes,
-      target_partitions, target_partition_ids)
+      target_partitions, target_partition_ids,
+      recover Map[RoutingId, StateName] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 
@@ -201,9 +202,11 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     let base_keyed_routes = recover val LocalStatePartitions end
 
     var base_router = DataRouter("w1", consume base_routes, base_keyed_routes,
-      recover LocalStatePartitionIds end)
+      recover LocalStatePartitionIds end,
+      recover Map[RoutingId, StateName] end)
     let target_router = DataRouter("w1", consume target_routes,
-      base_keyed_routes, recover LocalStatePartitionIds end)
+      base_keyed_routes, recover LocalStatePartitionIds end,
+      recover Map[RoutingId, StateName] end)
 
     h.assert_eq[Bool](false, base_router == target_router)
 

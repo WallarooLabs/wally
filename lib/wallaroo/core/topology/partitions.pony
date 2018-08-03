@@ -159,7 +159,7 @@ trait val StateSubpartitions is Equatable[StateSubpartitions]
     keyed_step_ids: LocalStatePartitionIds,
     state_steps: Map[String, Array[Step]],
     state_step_creator: StateStepCreator,
-    state_routing_ids: Map[WorkerName, RoutingId]): PartitionRouter
+    state_routing_ids: Map[WorkerName, RoutingId] val): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions ?
   fun add_worker_name(worker: String): StateSubpartitions
   fun runner_builder(): RunnerBuilder
@@ -200,7 +200,7 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
     keyed_step_ids: LocalStatePartitionIds,
     state_steps: Map[String, Array[Step]],
     state_step_creator: StateStepCreator,
-    state_routing_ids: Map[WorkerName, RoutingId]):
+    state_routing_ids: Map[WorkerName, RoutingId] val):
     LocalPartitionRouter[PIn, S] val
   =>
     let hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
@@ -215,6 +215,7 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
       if c == worker_name then
         try
           let keys = _key_distribution.workers_to_keys()(c)?
+          keyed_data_routes.add_state(_state_name)
           for key in keys.values() do
             try
               let id = _id_map(key)?
@@ -339,6 +340,19 @@ class LocalStatePartitions
   fun apply(state_name: StateName, key: box->Key!): this->Step ? =>
     _info(state_name)?(key)?
 
+  //!@
+  fun size(): USize =>
+    @printf[I32]("!@ LocalStatePartitions: _info\n".cstring())
+    for k in _info.keys() do
+      @printf[I32]("!@ -- %s\n".cstring(), k.cstring())
+    end
+    _info.size()
+
+  fun ref add_state(state_name: StateName) =>
+    if not _info.contains(state_name) then
+      _info(state_name) = Map[Key, Step]
+    end
+
   fun ref add(state_name: StateName, key: Key, step: Step) =>
     try
       _info.insert_if_absent(state_name, Map[Key, Step])?(key) = step
@@ -360,7 +374,9 @@ class LocalStatePartitions
         step.register_producer(input_id, producer)
       end
     else
-      Fail()
+      @printf[I32]("!@ LocalStatePartitions: Can't find %s\n".cstring(), state_name.cstring())
+      //!@
+      // Fail()
     end
 
   fun unregister_producer(state_name: StateName, input_id: RoutingId,
@@ -382,7 +398,10 @@ class LocalStatePartitions
         step.receive_barrier(origin_step_id, producer, barrier_token)
       end
     else
-      Fail()
+      //!@
+      None
+      //!@
+      // Fail()
     end
 
   fun clone(): LocalStatePartitions iso^ =>

@@ -935,6 +935,10 @@ class val DataRouter is Equatable[DataRouter]
     end
     _keys_to_route_ids = consume kid_map
 
+  //!@
+  fun ll() =>
+    @printf[I32]("!@ DataRouter: LocalStatePartitions size: %s\n".cstring(), _keyed_routes.size().string().cstring())
+
   new val with_route_ids(worker: String,
     data_routes: Map[RoutingId, Consumer] val,
     keyed_routes: LocalStatePartitions val,
@@ -942,7 +946,7 @@ class val DataRouter is Equatable[DataRouter]
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, RoutingId] val,
     keys_to_route_ids: StatePartitionRouteIds val,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[RoutingId, StateName] val)
   =>
     _worker_name = worker
     _data_routes = data_routes
@@ -1017,23 +1021,34 @@ class val DataRouter is Equatable[DataRouter]
         Unreachable()
       end
     elseif _state_routing_ids.contains(output_id) then
-      _keyed_routes.register_producer(input_id, producer)
+      try
+        let state_name = _state_routing_ids(output_id)?
+        @printf[I32]("!@ DataRouter: register_producer on LocalStatePartitions, which currently is of size %s\n".cstring(), _keyed_routes.size().string().cstring())
+        _keyed_routes.register_producer(state_name, input_id, producer)
+        @printf[I32]("!@ DataRouter: success\n".cstring())
+      else
+        Unreachable()
+      end
     else
       producer.queue_register_producer(input_id, output_id)
     end
 
-  fun unregister_producer(input_id: Rout6ingId, output_id: RoutingId,
+  fun unregister_producer(input_id: RoutingId, output_id: RoutingId,
     producer: DataReceiver ref)
   =>
-
     if _data_routes.contains(output_id) then
       try
         _data_routes(output_id)?.unregister_producer(input_id, producer)
       else
-        Fail()
+        Unreachable()
       end
-    elseif output_id == _state_routing_id then
-      _keyed_routes.unregister_producer(input_id, producer)
+    elseif _state_routing_ids.contains(output_id) then
+      try
+        let state_name = _state_routing_ids(output_id)?
+        _keyed_routes.unregister_producer(state_name, input_id, producer)
+      else
+        Unreachable()
+      end
     else
       producer.queue_unregister_producer(input_id, output_id)
     end
@@ -1109,10 +1124,11 @@ class val DataRouter is Equatable[DataRouter]
 
     DataRouter.with_route_ids(_worker_name, consume new_data_routes,
       consume new_keyed_routes, consume new_keyed_step_ids,
-      consume new_tid_map, consume new_rid_map, consume new_kid_map)
+      consume new_tid_map, consume new_rid_map, consume new_kid_map,
+      _state_routing_ids)
 
-  fun add_keyed_route(id: RoutingId, state_name: String, key: Key, target: Step):
-    DataRouter
+  fun add_keyed_route(id: RoutingId, state_name: String, key: Key,
+    target: Step): DataRouter
   =>
     // TODO: Using persistent maps for our fields would make this much more
     // efficient
@@ -1157,7 +1173,8 @@ class val DataRouter is Equatable[DataRouter]
 
     DataRouter.with_route_ids(_worker_name, consume new_data_routes,
       consume new_keyed_routes, consume new_keyed_step_ids,
-      consume new_tid_map, consume new_rid_map, consume new_kid_map)
+      consume new_tid_map, consume new_rid_map, consume new_kid_map,
+      _state_routing_ids)
 
   fun remove_routes_to_consumer(id: RoutingId, c: Consumer) =>
     """
@@ -1184,9 +1201,16 @@ class val DataRouter is Equatable[DataRouter]
       else
         Unreachable()
       end
-    elseif target_step_id == _state_routing_id then
-      _keyed_routes.receive_barrier(origin_step_id, producer, barrier_token)
+    elseif _state_routing_ids.contains(target_step_id) then
+      try
+        let state_name = _state_routing_ids(target_step_id)?
+        _keyed_routes.receive_barrier(state_name, origin_step_id, producer,
+          barrier_token)
+      else
+        Unreachable()
+      end
     else
+      @printf[I32]("!@ Failed to route to routing_id %s\n".cstring(), target_step_id.string().cstring())
       Fail()
     end
 
@@ -2146,7 +2170,6 @@ class val HashedProxyRouter is Router
   let _target: OutgoingBoundary
   let _target_state_name: String
   let _auth: AmbientAuth
-  let _state_routing_id: RoutingId
 
   new val create(target_worker: String, target: OutgoingBoundary,
     target_state_name: String, auth: AmbientAuth)
@@ -2155,7 +2178,6 @@ class val HashedProxyRouter is Router
     _target = target
     _target_state_name = target_state_name
     _auth = auth
-    _state_routing_id = WorkerStateRoutingId(_target_worker_name)
 
   fun build_msg[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, producer_id: RoutingId, producer: Producer ref,
@@ -2202,16 +2224,10 @@ class val HashedProxyRouter is Router
     end
 
   fun routes(): Map[RoutingId, Consumer] val =>
-    let m = recover iso Map[RoutingId, Consumer] end
-    m(_state_routing_id) = _target
-    consume m
+    recover val Map[RoutingId, Consumer] end
 
   fun routes_not_in(router: Router): Map[RoutingId, Consumer] val =>
-    let m = recover iso Map[RoutingId, Consumer] end
-    if not router.routes().contains(_state_routing_id) then
-      m(_state_routing_id) = _target
-    end
-    consume m
+    recover val Map[RoutingId, Consumer] end
 
   fun has_state_partition(state_name: String, key: Key): Bool =>
     false

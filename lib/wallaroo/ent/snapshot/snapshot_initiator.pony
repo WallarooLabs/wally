@@ -92,21 +92,22 @@ actor SnapshotInitiator is Initializable
 
   be initiate_snapshot() =>
     _current_snapshot_id = _current_snapshot_id + 1
-    let token = SnapshotBarrierToken(_current_snapshot_id)
     @printf[I32]("!@ Initiating snapshot %s\n".cstring(), _current_snapshot_id.string().cstring())
 
-    let event_log_action = Promise[BarrierToken]
+    let event_log_action = Promise[SnapshotId]
     event_log_action.next[None](
       recover this~event_log_snapshot_complete(_worker_name) end)
-    _event_log.initiate_snapshot(_current_snapshot_id, token, event_log_action)
+    _event_log.initiate_snapshot(_current_snapshot_id, event_log_action)
 
     try
       let msg = ChannelMsgEncoder.event_log_initiate_snapshot(
-        _current_snapshot_id, token, _worker_name, _auth)?
+        _current_snapshot_id, _worker_name, _auth)?
       _connections.send_control_to_cluster(msg)
     else
       Fail()
     end
+
+    let token = SnapshotBarrierToken(_current_snapshot_id)
 
     let barrier_action = Promise[BarrierToken]
     barrier_action.next[None](recover this~snapshot_barrier_complete() end)
@@ -121,12 +122,24 @@ actor SnapshotInitiator is Initializable
     end
     _phase.snapshot_barrier_complete(token)
 
-  be event_log_snapshot_complete(worker: WorkerName, token: BarrierToken) =>
+  be event_log_snapshot_complete(worker: WorkerName, snapshot_id: SnapshotId)
+  =>
     ifdef debug then
-      @printf[I32]("Snapshot_Initiator: Event Log Snapshot %s Complete\n"
-        .cstring(), token.string().cstring())
+      @printf[I32]("Snapshot_Initiator: Event Log SnapshotId %s Complete\n"
+        .cstring(), snapshot_id.string().cstring())
     end
-    _phase.event_log_snapshot_complete(worker, token)
+    _phase.event_log_snapshot_complete(worker, snapshot_id)
+
+  fun ref event_log_write_snapshot_id(snapshot_id: SnapshotId) =>
+    _event_log.write_snapshot_id(snapshot_id)
+
+    try
+      let msg = ChannelMsgEncoder.event_log_write_snapshot_id(
+        snapshot_id, _worker_name, _auth)?
+      _connections.send_control_to_cluster(msg)
+    else
+      Fail()
+    end
 
   fun ref snapshot_complete(token: BarrierToken) =>
     ifdef "resilience" then

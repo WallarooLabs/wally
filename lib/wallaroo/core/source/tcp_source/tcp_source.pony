@@ -157,10 +157,6 @@ actor TCPSource is Source
       end
     end
 
-    //!@
-    // register resilient with event log
-    // _event_log.register_resilient(_source_id, this)
-
     _readable = true
 
     let new_router =
@@ -435,6 +431,10 @@ actor TCPSource is Source
 
       if not _pending_message_store.has_pending() then
         @printf[I32]("!@ Source initiate_barrier %s\n".cstring(), token.string().cstring())
+        match token
+        | let sbt: SnapshotBarrierToken =>
+          snapshot_state(sbt.id)
+        end
         for (o_id, o) in _outputs.pairs() do
           match o
           | let ob: OutgoingBoundary =>
@@ -462,7 +462,8 @@ actor TCPSource is Source
     """
     TCPSources don't currently write out any data as part of the snapshot.
     """
-    None
+    _event_log.snapshot_state(_source_id, snapshot_id,
+      recover val Array[ByteSeq] end)
 
   be rollback(payload: ByteSeq val, event_log: EventLog) =>
     """

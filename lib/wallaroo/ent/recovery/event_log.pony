@@ -116,21 +116,27 @@ actor EventLog
     initializer.report_event_log_ready_to_work()
 
   be register_resilient(id: RoutingId, resilient: Resilient) =>
+    @printf[I32]("!@ EventLog register_resilient %s\n".cstring(), id.string().cstring())
     _resilients(id) = resilient
+
+  be unregister_resilient(id: RoutingId, resilient: Resilient) =>
+    @printf[I32]("!@ EventLog unregister_resilient %s\n".cstring(), id.string().cstring())
+    try
+      _resilients.remove(id)?
+    else
+      @printf[I32]("Attempted to unregister non-registered resilient\n"
+        .cstring())
+    end
 
   /////////////////
   // SNAPSHOT
   /////////////////
-  be initiate_snapshot(snapshot_id: SnapshotId, token: BarrierToken,
-    action: Promise[BarrierToken])
-  =>
-    _phase = _SnapshotEventLogPhase(this, snapshot_id, token, action,
-      _resilients.keys())
+  be initiate_snapshot(snapshot_id: SnapshotId, action: Promise[SnapshotId]) =>
+    _phase = _SnapshotEventLogPhase(this, snapshot_id, action)
 
   be snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
   =>
-    // @printf[I32]("!@ EventLog: snapshot_state for Step %s\n".cstring(), resilient_id.string().cstring())
     _phase.snapshot_state(resilient_id, snapshot_id, payload)
 
   fun ref _snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
@@ -157,12 +163,16 @@ actor EventLog
       None
     end
 
-  fun ref write_snapshot_id(snapshot_id: SnapshotId) =>
-    // @printf[I32]("!@ EventLog: write_snapshot_id\n".cstring())
+  be write_snapshot_id(snapshot_id: SnapshotId) =>
+    _phase.write_snapshot_id(snapshot_id)
+
+  fun ref _write_snapshot_id(snapshot_id: SnapshotId) =>
+    @printf[I32]("!@ EventLog: write_snapshot_id\n".cstring())
     _backend.encode_snapshot_id(snapshot_id)
     _phase.snapshot_id_written(snapshot_id)
 
   fun ref snapshot_complete() =>
+    @printf[I32]("!@ EventLog: snapshot_complete()\n".cstring())
     write_log()
     _phase = _NormalEventLogPhase(this)
 
@@ -174,7 +184,14 @@ actor EventLog
   =>
     _phase = _RollbackEventLogPhase(this, token, action,
       _resilients.keys())
-    _backend.start_rollback(token.id)
+
+    // If we have no resilients on this worker for some reason, then we
+    // should abort rollback early.
+    if _resilients.size() > 0 then
+      _backend.start_rollback(token.id)
+    else
+      _phase.complete_early()
+    end
 
   fun ref rollback_from_log_entry(resilient_id: RoutingId,
     payload: ByteSeq val)

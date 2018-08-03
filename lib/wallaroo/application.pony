@@ -36,8 +36,8 @@ use "wallaroo_labs/collection_helpers"
 class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
-  // _state_builders maps from state_name to StateSubpartitions
-  let _state_builders: Map[String, PartitionsBuilder] = _state_builders.create()
+  let _state_builders: Map[StateName, PartitionsBuilder] =
+    _state_builders.create()
   var sink_count: USize = 0
 
   new create(name': String) =>
@@ -56,7 +56,7 @@ class Application
   fun ref add_pipeline(p: BasicPipeline) =>
     pipelines.push(p)
 
-  fun ref add_state_builder(state_name: String,
+  fun ref add_state_builder(state_name: StateName,
     state_partition: PartitionsBuilder)
   =>
     _state_builders(state_name) = state_partition
@@ -64,11 +64,11 @@ class Application
   fun ref increment_sink_count() =>
     sink_count = sink_count + 1
 
-  fun state_builder(state_name: String): PartitionsBuilder ? =>
+  fun state_builder(state_name: StateName): PartitionsBuilder ? =>
     _state_builders(state_name)?
 
-  fun state_builders(): Map[String, PartitionsBuilder] val =>
-    let builders = recover trn Map[String, PartitionsBuilder] end
+  fun state_builders(): Map[StateName, PartitionsBuilder] val =>
+    let builders = recover trn Map[StateName, PartitionsBuilder] end
     for (k, v) in _state_builders.pairs() do
       builders(k) = v
     end
@@ -179,9 +179,10 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   fun ref to_stateful[Next: Any val, S: State ref](
     s_comp: StateComputation[Last, Next, S] val,
     s_initializer: StateBuilder[S],
-    state_name: String): PipelineBuilder[In, Out, Next]
+    state_name: StateName): PipelineBuilder[In, Out, Next]
   =>
-    if ArrayHelpers[String].contains[String](_pipeline_state_names, state_name)
+    if ArrayHelpers[StateName]
+      .contains[StateName](_pipeline_state_names, state_name)
     then
       FatalUserError("Wallaroo does not currently support application " +
         "cycles. You cannot use the same state name twice in the same " +
@@ -217,11 +218,12 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     S: State ref](
       s_comp: StateComputation[Last, Next, S] val,
       s_initializer: StateBuilder[S],
-      state_name: String,
+      state_name: StateName,
       partition: Partitions[PIn],
       multi_worker: Bool = false): PipelineBuilder[In, Out, Next]
   =>
-    if ArrayHelpers[String].contains[String](_pipeline_state_names, state_name)
+    if ArrayHelpers[StateName]
+      .contains[StateName](_pipeline_state_names, state_name)
     then
       FatalUserError("Wallaroo does not currently support application " +
         "cycles. You cannot use the same state name twice in the same " +
