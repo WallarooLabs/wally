@@ -332,7 +332,8 @@ actor Startup
       let snapshot_initiator = SnapshotInitiator(auth,
         _startup_options.worker_name, initializer_name, connections,
         _startup_options.time_between_snapshots, event_log, barrier_initiator,
-        _snapshot_ids_file, _startup_options.snapshots_enabled)
+        _snapshot_ids_file, _startup_options.snapshots_enabled
+        where is_recovering = is_recovering)
       connections.register_disposable(snapshot_initiator)
 
       let autoscale_initiator = AutoscaleInitiator(

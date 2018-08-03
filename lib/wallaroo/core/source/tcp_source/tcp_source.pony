@@ -360,8 +360,11 @@ actor TCPSource is Source
     This method should only be called if we are removing this source from the
     active graph (or on dispose())
     """
+    let outputs_to_remove = Map[RoutingId, Consumer]
     for (id, consumer) in _outputs.pairs() do
-      // @printf[I32]("!@ -- _unregister_all_outputs\n".cstring())
+      outputs_to_remove(id) = consumer
+    end
+    for (id, consumer) in outputs_to_remove.pairs() do
       _unregister_output(id, consumer)
     end
 
@@ -370,8 +373,8 @@ actor TCPSource is Source
     - Close the connection gracefully.
     """
     if not _disposed then
-      _unregister_all_outputs()
       _router_registry.unregister_source(this, _source_id)
+      _unregister_all_outputs()
       @printf[I32]("Shutting down TCPSource\n".cstring())
       for b in _outgoing_boundaries.values() do
         b.dispose()
@@ -419,6 +422,7 @@ actor TCPSource is Source
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
+    @printf[I32]("!@ TCPSource received initiate_barrier\n".cstring())
     _initiate_barrier(token)
 
   fun ref _initiate_barrier(token: BarrierToken) =>

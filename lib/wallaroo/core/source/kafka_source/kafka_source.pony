@@ -488,7 +488,11 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     This method should only be called if we are removing this source from the
     active graph (or on dispose())
     """
+    let outputs_to_remove = Map[RoutingId, Consumer]
     for (id, consumer) in _outputs.pairs() do
+      outputs_to_remove(id) = consumer
+    end
+    for (id, consumer) in outputs_to_remove.pairs() do
       _unregister_output(id, consumer)
     end
 
