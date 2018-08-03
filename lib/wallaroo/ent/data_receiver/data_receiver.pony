@@ -135,7 +135,6 @@ actor DataReceiver is (Producer & Rerouter)
     end
 
   be register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    @printf[I32]("!@ DataReceiver: Register producer %s with %s\n".cstring(), input_id.string().cstring(), output_id.string().cstring())
     if output_id == _state_routing_id then
       _state_partition_producers.set(input_id)
     end

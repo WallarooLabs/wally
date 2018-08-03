@@ -99,6 +99,7 @@ actor BarrierInitiator is Initializable
     _sources(source_id) = source
 
   be unregister_source(source: Source, source_id: RoutingId) =>
+    @printf[I32]("!@ BarrierInitiator: Unregistering source\n".cstring())
     try
       _sources.remove(source_id)?
     else
@@ -336,7 +337,7 @@ actor BarrierInitiator is Initializable
         InProgressPrimaryBarrierHandler(_worker_name, this, barrier_token,
           acked_sinks, acked_ws, _sinks, _workers, result_promise)
       else
-        @printf[I32]("!@ Phase transition to SecondaryBarrierHandler with primary worker being %s\n".cstring(), primary_worker.cstring())
+        @printf[I32]("!@ Phase transition to SecondaryBarrierHandler for token %s with primary worker being %s\n".cstring(), barrier_token.string().cstring(), primary_worker.cstring())
         InProgressSecondaryBarrierHandler(this, barrier_token, acked_sinks,
           _sinks, primary_worker)
       end
@@ -348,6 +349,7 @@ actor BarrierInitiator is Initializable
 
     if _barrier_source isnt None then
       try
+        @printf[I32]("!@ calling initiate_barrier at BarrierSource\n".cstring())
         (_barrier_source as BarrierSource).initiate_barrier(barrier_token)
       else
         Unreachable()

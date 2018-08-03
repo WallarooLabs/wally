@@ -1023,6 +1023,7 @@ class val DataRouter is Equatable[DataRouter]
   fun unregister_producer(input_id: RoutingId, output_id: RoutingId,
     producer: DataReceiver ref)
   =>
+
     if _data_routes.contains(output_id) then
       try
         _data_routes(output_id)?.unregister_producer(input_id, producer)

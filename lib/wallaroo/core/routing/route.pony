@@ -70,10 +70,7 @@ class _RouteLogic is RouteLogic
     _report_ready_to_work()
 
   fun ref dispose() =>
-    """
-    Return unused credits to downstream consumer
-    """
-    _consumer.unregister_producer(_step_id, _step)
+    None
 
   fun ref _report_ready_to_work() =>
     match _step
