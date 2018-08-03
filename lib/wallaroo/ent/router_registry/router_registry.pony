@@ -191,7 +191,8 @@ actor RouterRegistry
     _contacted_worker = contacted_worker
     _data_router = DataRouter(_worker_name,
       recover Map[RoutingId, Consumer] end,
-      recover LocalStatePartitions end, recover LocalStatePartitionIds end)
+      recover LocalStatePartitions end, recover LocalStatePartitionIds end,
+      recover Map[RoutingId, StateName] end)
     _initializer_name = initializer_name
     _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining)
 

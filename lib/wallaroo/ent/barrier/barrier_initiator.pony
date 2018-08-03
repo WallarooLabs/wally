@@ -48,7 +48,7 @@ actor BarrierInitiator is Initializable
   let _active_barriers: ActiveBarriers = ActiveBarriers
 
   let _connections: Connections
-  var _barrier_source: (BarrierSource | None) = None
+  var _barrier_sources: SetIs[BarrierSource] = _barrier_sources.create()
   let _sources: Map[RoutingId, Source] = _sources.create()
   let _sinks: SetIs[BarrierReceiver] = _sinks.create()
   let _workers: _StringSet = _workers.create()
@@ -93,7 +93,7 @@ actor BarrierInitiator is Initializable
     _sinks.unset(sink)
 
   be register_barrier_source(b_source: BarrierSource) =>
-    _barrier_source = b_source
+    _barrier_sources.set(b_source)
 
   be register_source(source: Source, source_id: RoutingId) =>
     _sources(source_id) = source
@@ -347,22 +347,16 @@ actor BarrierInitiator is Initializable
       Fail()
     end
 
-    if _barrier_source isnt None then
-      try
-        @printf[I32]("!@ calling initiate_barrier at BarrierSource\n".cstring())
-        (_barrier_source as BarrierSource).initiate_barrier(barrier_token)
-      else
-        Unreachable()
-      end
-      @printf[I32]("!@ calling initiate_barrier at %s sources\n".cstring(), _sources.size().string().cstring())
-      for s in _sources.values() do
-        s.initiate_barrier(barrier_token)
-      end
-    else
-      ifdef debug then
-        Invariant(_sources.size() == 0)
-      end
+    @printf[I32]("!@ calling initiate_barrier at %s BarrierSources\n".cstring(), _barrier_sources.size().string().cstring())
+    for b_source in _barrier_sources.values() do
+      b_source.initiate_barrier(barrier_token)
     end
+
+    @printf[I32]("!@ calling initiate_barrier at %s sources\n".cstring(), _sources.size().string().cstring())
+    for s in _sources.values() do
+      s.initiate_barrier(barrier_token)
+    end
+
     // See if we should finish early
     _active_barriers.check_for_completion(barrier_token)
 
@@ -446,12 +440,8 @@ actor BarrierInitiator is Initializable
       Fail()
     end
 
-    if _barrier_source isnt None then
-      try
-        (_barrier_source as BarrierSource).barrier_complete(barrier_token)
-      else
-        Fail()
-      end
+    for b_source in _barrier_sources.values() do
+      b_source.barrier_complete(barrier_token)
     end
     for s in _sources.values() do
       s.barrier_complete(barrier_token)

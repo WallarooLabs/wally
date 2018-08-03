@@ -16,10 +16,16 @@ trait _EventLogPhase
   =>
     _invalid_call()
 
+  fun ref write_snapshot_id(snapshot_id: SnapshotId) =>
+    _invalid_call()
+
   fun ref snapshot_id_written(snapshot_id: SnapshotId) =>
     _invalid_call()
 
   fun ref ack_rollback(resilient_id: RoutingId) =>
+    _invalid_call()
+
+  fun ref complete_early() =>
     _invalid_call()
 
   fun _invalid_call() =>
@@ -41,27 +47,22 @@ class _NormalEventLogPhase is _EventLogPhase
 class _SnapshotEventLogPhase is _EventLogPhase
   let _event_log: EventLog ref
   let _snapshot_id: SnapshotId
-  let _token: BarrierToken
-  let _action: Promise[BarrierToken]
-  let _resilients_pending: SetIs[RoutingId] = _resilients_pending.create()
+  let _action: Promise[SnapshotId]
 
   new create(event_log: EventLog ref, snapshot_id: SnapshotId,
-    token: BarrierToken, action: Promise[BarrierToken],
-    resilients: Iterator[RoutingId])
+    action: Promise[SnapshotId])
   =>
     _event_log = event_log
     _snapshot_id = snapshot_id
-    _token = token
     _action = action
-    for r in resilients do
-      _resilients_pending.set(r)
-    end
 
   fun name(): String => "_SnapshotEventLogPhase"
 
   fun ref snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
   =>
+    @printf[I32]("!@ _SnapshotEventLogPhase: snapshot_state()\n".cstring())
+
     ifdef debug then
       Invariant(snapshot_id == _snapshot_id)
     end
@@ -69,23 +70,23 @@ class _SnapshotEventLogPhase is _EventLogPhase
       @printf[I32](("Snapshotting state for resilient " + resilient_id.string()
         + "\n").cstring())
     end
-    if _resilients_pending.contains(resilient_id) then
-      _resilients_pending.unset(resilient_id)
-    else
-      @printf[I32](("Error writing snapshot to logfile. RoutingId not in " +
-        "set of expected resilients!\n").cstring())
-      Fail()
-    end
-    _event_log._snapshot_state(resilient_id, snapshot_id, payload)
-    if _resilients_pending.size() == 0 then
-      _event_log.write_snapshot_id(snapshot_id)
+
+    if payload.size() > 0 then
+      _event_log._snapshot_state(resilient_id, snapshot_id, payload)
     end
 
-  fun ref snapshot_id_written(snapshot_id: SnapshotId) =>
+  fun ref write_snapshot_id(snapshot_id: SnapshotId) =>
     ifdef debug then
       Invariant(snapshot_id == _snapshot_id)
     end
-    _action(_token)
+    _event_log._write_snapshot_id(snapshot_id)
+
+  fun ref snapshot_id_written(snapshot_id: SnapshotId) =>
+    @printf[I32]("!@ _SnapshotEventLogPhase: snapshot_id_written()\n".cstring())
+    ifdef debug then
+      Invariant(snapshot_id == _snapshot_id)
+    end
+    _action(snapshot_id)
     _event_log.snapshot_complete()
 
 class _RollbackEventLogPhase is _EventLogPhase
@@ -113,8 +114,12 @@ class _RollbackEventLogPhase is _EventLogPhase
     end
     _resilients_pending.unset(resilient_id)
     if _resilients_pending.size() == 0 then
-      _action(_token)
-      _event_log.rollback_complete()
+      _complete()
     end
 
+  fun ref complete_early() =>
+    _complete()
 
+  fun ref _complete() =>
+    _action(_token)
+    _event_log.rollback_complete()

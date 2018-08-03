@@ -26,6 +26,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/snapshot"
 use "wallaroo_labs/mort"
 
 
@@ -47,6 +48,7 @@ actor BarrierSource is Source
     _pipeline_identifiers.create()
 
   let _router_registry: RouterRegistry
+  let _event_log: EventLog
 
 ////////
   // Map from pipeline name to outputs for sources in that pipeline.
@@ -67,12 +69,15 @@ actor BarrierSource is Source
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
   ////////////////////
 
-  new create(source_id: RoutingId, router_registry: RouterRegistry) =>
+  new create(source_id: RoutingId, router_registry: RouterRegistry,
+    event_log: EventLog)
+  =>
     """
     A new connection accepted on a server.
     """
     _source_id = source_id
     _router_registry = router_registry
+    _event_log = event_log
 
   fun router(): Router =>
     let rs = recover iso Array[Router] end
@@ -241,7 +246,11 @@ actor BarrierSource is Source
     None
 
   be initiate_barrier(token: BarrierToken) =>
-    @printf[I32]("!@ BarrierSource initiate_barrier\n".cstring())
+    @printf[I32]("!@ BarrierSource initiate_barrier. Forwarding to %s outputs\n".cstring(), _outputs.size().string().cstring())
+    match token
+    | let sbt: SnapshotBarrierToken =>
+      snapshot_state(sbt.id)
+    end
     for (o_id, o) in _outputs.pairs() do
       match o
       | let ob: OutgoingBoundary =>
@@ -255,9 +264,6 @@ actor BarrierSource is Source
     @printf[I32]("!@ barrier_complete at BarrierSource %s\n".cstring(), _source_id.string().cstring())
     None
 
-  be rollback(payload: ByteSeq val, event_log: EventLog) =>
-    None
-
   be report_status(code: ReportStatusCode) =>
     None
 
@@ -268,6 +274,22 @@ actor BarrierSource is Source
       @printf[I32]("Shutting down BarrierSource\n".cstring())
       _disposed = true
     end
+
+  //////////////
+  // SNAPSHOTS
+  //////////////
+  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+    """
+    BarrierSources don't currently write out any data as part of the snapshot.
+    """
+    _event_log.snapshot_state(_source_id, snapshot_id,
+      recover val Array[ByteSeq] end)
+
+  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+    """
+    There is nothing for a BarrierSource to rollback to.
+    """
+    event_log.ack_rollback(_source_id)
 
   ///////////////////////
   // !@ STUFF TO BE REMOVED

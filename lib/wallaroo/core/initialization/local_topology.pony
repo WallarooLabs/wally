@@ -50,25 +50,27 @@ use "wallaroo_labs/queue"
 
 class val LocalTopology
   let _app_name: String
-  let _worker_name: String
+  let _worker_name: WorkerName
   let _graph: Dag[StepInitializer] val
   let _step_map: Map[RoutingId, (ProxyAddress | RoutingId)] val
   // _state_builders maps from state_name to StateSubpartitions
-  let _state_builders: Map[String, StateSubpartitions] val
+  let _state_builders: Map[StateName, StateSubpartitions] val
   let _pre_state_data: Array[PreStateData] val
-  let _boundary_ids: Map[String, RoutingId] val
-  // resilience
-  let worker_names: Array[String] val
+  let _boundary_ids: Map[WorkerName, RoutingId] val
+  let state_routing_ids: Map[StateName, Map[WorkerName, RoutingId] val] val
+  let worker_names: Array[WorkerName] val
   // Workers that cannot be removed during shrink to fit
-  let non_shrinkable: SetIs[String] val
+  let non_shrinkable: SetIs[WorkerName] val
 
-  new val create(name': String, worker_name': String,
+  new val create(name': String, worker_name': WorkerName,
     graph': Dag[StepInitializer] val,
     step_map': Map[RoutingId, (ProxyAddress | RoutingId)] val,
-    state_builders': Map[String, StateSubpartitions] val,
+    state_builders': Map[StateName, StateSubpartitions] val,
     pre_state_data': Array[PreStateData] val,
-    boundary_ids': Map[String, RoutingId] val,
-    worker_names': Array[String] val, non_shrinkable': SetIs[String] val)
+    boundary_ids': Map[WorkerName, RoutingId] val,
+    worker_names': Array[WorkerName] val,
+    non_shrinkable': SetIs[WorkerName] val,
+    state_routing_ids': Map[StateName, Map[WorkerName, RoutingId] val] val)
   =>
     _app_name = name'
     _worker_name = worker_name'
@@ -77,23 +79,24 @@ class val LocalTopology
     _state_builders = state_builders'
     _pre_state_data = pre_state_data'
     _boundary_ids = boundary_ids'
-    //resilience
     worker_names = worker_names'
     non_shrinkable = non_shrinkable'
+    state_routing_ids = state_routing_ids'
 
-  fun state_builders(): Map[String, StateSubpartitions] val =>
+  fun state_builders(): Map[StateName, StateSubpartitions] val =>
     _state_builders
 
-  fun update_state_map(state_name: String,
-    state_map: Map[String, Router],
+  fun update_state_map(state_name: StateName,
+    state_map: Map[StateName, Router],
     metrics_conn: MetricsSink, event_log: EventLog,
     recovery_replayer: RecoveryReconnecter,
-    auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    auth: AmbientAuth,
+    outgoing_boundaries: Map[WorkerName, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer tag],
+    data_routes: Map[RoutingId, Consumer tag],
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
-    state_steps: Map[String, Array[Step]],
+    state_steps: Map[StateName, Array[Step]],
     state_step_creator: StateStepCreator) ?
   =>
     let subpartition =
@@ -108,28 +111,34 @@ class val LocalTopology
     if not state_map.contains(state_name) then
       @printf[I32](("----Creating state steps for " + state_name + "----\n")
         .cstring())
-      state_map(state_name) = subpartition.build(_app_name, _worker_name,
-         metrics_conn, auth, event_log, recovery_replayer, outgoing_boundaries,
-         initializables, data_routes, keyed_data_routes, keyed_step_ids,
-         state_steps, state_step_creator)
+      try
+        let local_state_routing_ids = state_routing_ids(state_name)?
+        state_map(state_name) = subpartition.build(_app_name, _worker_name,
+          metrics_conn, auth, event_log, recovery_replayer,
+          outgoing_boundaries, initializables, data_routes, keyed_data_routes,
+          keyed_step_ids, state_steps, state_step_creator,
+          local_state_routing_ids)
+      else
+        Fail()
+      end
     end
 
   fun graph(): Dag[StepInitializer] val => _graph
 
   fun pre_state_data(): Array[PreStateData] val => _pre_state_data
 
-  fun step_map(): Map[U128, (ProxyAddress | U128)] val => _step_map
+  fun step_map(): Map[RoutingId, (ProxyAddress | RoutingId)] val => _step_map
 
   fun name(): String => _app_name
 
-  fun worker_name(): String => _worker_name
+  fun worker_name(): WorkerName => _worker_name
 
   fun is_empty(): Bool =>
     _graph.is_empty()
 
-  fun boundary_ids(): Map[String, RoutingId] val => _boundary_ids
+  fun boundary_ids(): Map[WorkerName, RoutingId] val => _boundary_ids
 
-  fun update_proxy_address_for_state_key(state_name: String, key: Key,
+  fun update_proxy_address_for_state_key(state_name: StateName, key: Key,
     pa: ProxyAddress): LocalTopology ?
   =>
     let new_subpartition = _state_builders(state_name)?.update_key(key, pa)?
@@ -140,9 +149,9 @@ class val LocalTopology
     new_state_builders(state_name) = new_subpartition
     LocalTopology(_app_name, _worker_name, _graph, _step_map,
       consume new_state_builders, _pre_state_data, _boundary_ids, worker_names,
-      non_shrinkable)
+      non_shrinkable, state_routing_ids)
 
-  fun val add_worker_name(w: String): LocalTopology =>
+  fun val add_worker_name(w: WorkerName): LocalTopology =>
     if not worker_names.contains(w) then
       let new_worker_names = recover trn Array[String] end
       for n in worker_names.values() do
@@ -150,7 +159,8 @@ class val LocalTopology
       end
       new_worker_names.push(w)
 
-      let new_state_builders = recover iso Map[String, StateSubpartitions] end
+      let new_state_builders =
+        recover iso Map[StateName, StateSubpartitions] end
 
       for (state_name, state_subpartitions) in _state_builders.pairs() do
         new_state_builders(state_name) = state_subpartitions.add_worker_name(w)
@@ -158,25 +168,25 @@ class val LocalTopology
 
       LocalTopology(_app_name, _worker_name, _graph, _step_map,
         consume new_state_builders, _pre_state_data, _boundary_ids,
-        consume new_worker_names, non_shrinkable)
+        consume new_worker_names, non_shrinkable, state_routing_ids)
     else
       this
     end
 
-  fun val remove_worker_names(ws: Array[String] val,
+  fun val remove_worker_names(ws: Array[WorkerName] val,
     barrier_initiator: BarrierInitiator): LocalTopology
   =>
-    let new_worker_names = recover trn Array[String] end
+    let new_worker_names = recover trn Array[WorkerName] end
     for w in worker_names.values() do
-      if not ArrayHelpers[String].contains[String](ws, w) then
+      if not ArrayHelpers[WorkerName].contains[WorkerName](ws, w) then
         new_worker_names.push(w)
       end
     end
     LocalTopology(_app_name, _worker_name, _graph, _step_map,
-      _state_builders, _pre_state_data, _boundary_ids, consume new_worker_names,
-      non_shrinkable)
+      _state_builders, _pre_state_data, _boundary_ids,
+      consume new_worker_names, non_shrinkable, state_routing_ids)
 
-  fun val for_new_worker(new_worker: String): LocalTopology ? =>
+  fun val for_new_worker(new_worker: WorkerName): LocalTopology ? =>
     let w_names =
       if not worker_names.contains(new_worker) then
         add_worker_name(new_worker).worker_names
@@ -195,7 +205,7 @@ class val LocalTopology
 
     LocalTopology(_app_name, new_worker, g.clone()?,
       _step_map, _state_builders, _pre_state_data, _boundary_ids,
-      w_names, non_shrinkable)
+      w_names, non_shrinkable, state_routing_ids)
 
   fun eq(that: box->LocalTopology): Bool =>
     // This assumes that _graph and _pre_state_data never change over time
@@ -1376,8 +1386,12 @@ actor LocalTopologyInitializer is LayoutInitializer
               // If there is no BarrierSource, we need to create one, since
               // this worker has at least one Source on it.
               if barrier_source is None then
-                let b_source = BarrierSource(_routing_id_gen(), _router_registry)
+                let b_source_id = _routing_id_gen()
+                let b_source = BarrierSource(b_source_id, _router_registry,
+                  _event_log)
                 _barrier_initiator.register_barrier_source(b_source)
+                @printf[I32]("!@!! register_resilient: BarrierSource\n".cstring())
+                _event_log.register_resilient(b_source_id, b_source)
                 barrier_source = b_source
               end
               try
@@ -1523,9 +1537,31 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         let sendable_data_routes = consume val data_routes
 
+        let data_router_state_routing_ids =
+          recover iso Map[RoutingId, StateName] end
+
+        for (s_name, ws) in t.state_routing_ids.pairs() do
+          for (w, r_id) in ws.pairs() do
+            @printf[I32]("!@ State Routing Id: %s:%s -> %s\n".cstring(), s_name.cstring(), w.cstring(), r_id.string().cstring())
+            @printf[I32]("!@ Comparing %s to our name %s\n".cstring(), w.cstring(), _worker_name.cstring())
+            if w == _worker_name then
+              @printf[I32]("!@ Comparison successful\n".cstring())
+              data_router_state_routing_ids(r_id) = s_name
+            //!@
+            else
+                @printf[I32]("!@ Comparison unsuccessful\n".cstring())
+            end
+          end
+        end
+
+        @printf[I32]("!@ data_router_state_routing_ids size: %s\n".cstring(), data_router_state_routing_ids.size().string().cstring())
+        @printf[I32]("!@ keyed_data_routes_ref size: %s\n".cstring(), keyed_data_routes_ref.size().string().cstring())
+
         let data_router = DataRouter(_worker_name, sendable_data_routes,
-          keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone())
+          keyed_data_routes_ref.clone(), keyed_step_ids_ref.clone(),
+          consume data_router_state_routing_ids)
         _router_registry.set_data_router(data_router)
+        _data_receivers.update_data_router(data_router)
 
         let state_runner_builders = recover iso Map[String, RunnerBuilder] end
 
@@ -1692,7 +1728,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         // We have not yet been assigned any keys by the cluster at this
         // stage, so we use an empty map to represent that.
         let data_router = DataRouter(_worker_name, consume data_routes,
-          recover LocalStatePartitions end, recover LocalStatePartitionIds end)
+          recover LocalStatePartitions end, recover LocalStatePartitionIds end,
+          recover Map[RoutingId, StateName] end)
 
         let state_runner_builders = recover iso Map[String, RunnerBuilder] end
 

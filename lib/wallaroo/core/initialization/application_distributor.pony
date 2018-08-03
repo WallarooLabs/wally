@@ -108,10 +108,23 @@ actor ApplicationDistributor is Distributor
         unbuilt_edges(w) = Array[(U128, U128)]
       end
 
+      // Since a worker doesn't know the specific routing ids of state
+      // steps on other workers (it only knows that certain keys are handled
+      // by certain workers), we need a more general way to route things
+      // like barriers to downstream state steps. To enable this, we create
+      // a RoutingId for each (state name, worker name) pair.
+      let state_routing_ids =
+        recover iso Map[StateName, Map[WorkerName, RoutingId] val] end
+
       // Create StateSubpartitions
 
       let ssb_trn = recover trn Map[String, StateSubpartitions] end
       for (s_name, p_builder) in application.state_builders().pairs() do
+        let worker_routing_ids = recover iso Map[WorkerName, RoutingId] end
+        for w in worker_names.values() do
+          worker_routing_ids(w) = RoutingIdGenerator()
+        end
+        state_routing_ids(s_name) = consume worker_routing_ids
         ssb_trn(s_name) = p_builder.state_subpartition(all_workers)
       end
       let state_subpartitions: Map[String, StateSubpartitions] val =
@@ -908,6 +921,7 @@ actor ApplicationDistributor is Distributor
       end
 
       let non_shrinkable_to_send = consume val non_shrinkable
+      let state_routing_ids_to_send = consume val state_routing_ids
 
       // For each worker, generate a LocalTopology from its LocalGraph
       for (w, g) in local_graphs.pairs() do
@@ -920,7 +934,8 @@ actor ApplicationDistributor is Distributor
           try
             LocalTopology(application.name(), w, g.clone()?,
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
-              consume p_ids, all_workers, non_shrinkable_to_send)
+              consume p_ids, all_workers, non_shrinkable_to_send,
+              state_routing_ids_to_send)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

@@ -338,6 +338,10 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       end
 
       if not _pending_message_store.has_pending() then
+        match token
+        | let sbt: SnapshotBarrierToken =>
+          snapshot_state(sbt.id)
+        end
         for (o_id, o) in _outputs.pairs() do
           match o
           | let ob: OutgoingBoundary =>
