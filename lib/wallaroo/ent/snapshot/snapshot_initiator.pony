@@ -115,11 +115,17 @@ actor SnapshotInitiator is Initializable
     _phase = _ActiveSnapshotInitiatorPhase(token, this, _workers)
 
   be snapshot_barrier_complete(token: BarrierToken) =>
-    @printf[I32]("S_Init: Snapshot Barrier Complete\n".cstring())
+    ifdef debug then
+      @printf[I32]("Snapshot_Initiator: Snapshot Barrier %s Complete\n"
+        .cstring(), token.string().cstring())
+    end
     _phase.snapshot_barrier_complete(token)
 
   be event_log_snapshot_complete(worker: WorkerName, token: BarrierToken) =>
-    @printf[I32]("S_Init: Event Log Snapshot Complete\n".cstring())
+    ifdef debug then
+      @printf[I32]("Snapshot_Initiator: Event Log Snapshot %s Complete\n"
+        .cstring(), token.string().cstring())
+    end
     _phase.event_log_snapshot_complete(worker, token)
 
   fun ref snapshot_complete(token: BarrierToken) =>

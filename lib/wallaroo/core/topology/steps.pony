@@ -249,7 +249,11 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     This method should only be called if we are removing this step from the
     active graph (or on dispose())
     """
+    let outputs_to_remove = Map[RoutingId, Consumer]
     for (id, consumer) in _outputs.pairs() do
+      outputs_to_remove(id) = consumer
+    end
+    for (id, consumer) in outputs_to_remove.pairs() do
       _unregister_output(id, consumer)
     end
 
@@ -459,9 +463,13 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     if _inputs.contains(id) then
       try
         _inputs.remove(id)?
-      else
-        Fail()
-      end
+      else Fail() end
+      try
+        let b_forwarder = _barrier_forwarder as BarrierStepForwarder
+        if b_forwarder.barrier_in_progress() then
+          b_forwarder.remove_input(id)
+        end
+      else Fail() end
 
       var have_input = false
       for i in _inputs.values() do
@@ -539,49 +547,56 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    // @printf[I32]("!@ Step %s received barrier from %s\n".cstring(), _id.string().cstring(), step_id.string().cstring())
     process_barrier(step_id, producer, barrier_token)
 
   fun ref process_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
-    match barrier_token
-    | let srt: SnapshotRollbackBarrierToken =>
-      @printf[I32]("!@ Step checking to clear\n".cstring())
-      try
-        let b_forwarder = _barrier_forwarder as BarrierStepForwarder
-        if b_forwarder.higher_priority(srt)
-        then
-          @printf[I32]("!@ Step clearing based on %s\n".cstring(), barrier_token.string().cstring())
-          b_forwarder.clear()
-          _pending_message_store.clear()
-          _step_message_processor = NormalStepMessageProcessor(this)
-        else
-          @printf[I32]("!@ Step NOT clearing based on %s\n".cstring(), barrier_token.string().cstring())
-        end
-      else
-        Fail()
-      end
-    end
-
-    if _step_message_processor.barrier_in_progress() then
-      _step_message_processor.receive_barrier(step_id, producer,
-        barrier_token)
-    else
-      match _step_message_processor
-      | let nsmp: NormalStepMessageProcessor =>
+    if _inputs.contains(step_id) then
+      // @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
+      match barrier_token
+      | let srt: SnapshotRollbackBarrierToken =>
+        @printf[I32]("!@ Step checking to clear\n".cstring())
         try
-          _step_message_processor = BarrierStepMessageProcessor(this,
-            _barrier_forwarder as BarrierStepForwarder)
-          _step_message_processor.receive_new_barrier(step_id, producer,
-            barrier_token)
+          let b_forwarder = _barrier_forwarder as BarrierStepForwarder
+          if b_forwarder.higher_priority(srt)
+          then
+            @printf[I32]("!@ Step clearing based on %s\n".cstring(), barrier_token.string().cstring())
+            b_forwarder.clear()
+            _pending_message_store.clear()
+            _step_message_processor = NormalStepMessageProcessor(this)
+          else
+            @printf[I32]("!@ Step NOT clearing based on %s\n".cstring(), barrier_token.string().cstring())
+          end
         else
           Fail()
         end
-      else
-        // !@ Should barriers be possible in other states?
-        Fail()
       end
+
+      if _step_message_processor.barrier_in_progress() then
+        _step_message_processor.receive_barrier(step_id, producer,
+          barrier_token)
+      else
+        match _step_message_processor
+        | let nsmp: NormalStepMessageProcessor =>
+          try
+            _step_message_processor = BarrierStepMessageProcessor(this,
+              _barrier_forwarder as BarrierStepForwarder)
+            _step_message_processor.receive_new_barrier(step_id, producer,
+              barrier_token)
+          else
+            Fail()
+          end
+        else
+          // !@ Should barriers be possible in other states?
+          Fail()
+        end
+      end
+    else
+      @printf[I32](("Received barrier from unregistered input %s at step " +
+        "%s. \n").cstring(), step_id.string().cstring(),
+        _id.string().cstring())
     end
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
