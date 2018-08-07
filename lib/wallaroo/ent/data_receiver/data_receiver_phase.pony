@@ -4,39 +4,51 @@ use "wallaroo/core/messages"
 use "wallaroo/ent/barrier"
 use "wallaroo_labs/mort"
 
-trait _DataReceiverProcessingPhase
+trait _DataReceiverPhase
+  fun name(): String
+
   fun has_pending(): Bool =>
     false
+
+  fun ref flush(): Array[_Queued]
 
   fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    Fail()
+    _invalid_call()
 
   fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    Fail()
+    _invalid_call()
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken)
   =>
-    Fail()
+    _invalid_call()
 
   fun data_connect() =>
+    _invalid_call()
+
+  fun _invalid_call() =>
+    @printf[I32]("Invalid call on Data Receiver phase %s\n".cstring(),
+      name().cstring())
     Fail()
+
+class _DataReceiverNotProcessingPhase is _DataReceiverPhase
+  fun name(): String => "_DataReceiverNotProcessingPhase"
 
   fun ref flush(): Array[_Queued] =>
-    Fail()
     Array[_Queued]
 
-class _DataReceiverNotProcessingPhase is _DataReceiverProcessingPhase
-
-class _NormalDataReceiverProcessingPhase is _DataReceiverProcessingPhase
+class _NormalDataReceiverPhase is _DataReceiverPhase
   let _data_receiver: DataReceiver ref
 
   new create(dr: DataReceiver ref) =>
     _data_receiver = dr
+
+  fun name(): String =>
+    "_NormalDataReceiverPhase"
 
   fun has_pending(): Bool =>
     false
@@ -64,12 +76,15 @@ class _NormalDataReceiverProcessingPhase is _DataReceiverProcessingPhase
   fun ref flush(): Array[_Queued] =>
     Array[_Queued]
 
-class _QueuingDataReceiverProcessingPhase is _DataReceiverProcessingPhase
+class _QueuingDataReceiverPhase is _DataReceiverPhase
   let _data_receiver: DataReceiver ref
   var _queued: Array[_Queued] = _queued.create()
 
   new create(dr: DataReceiver ref) =>
     _data_receiver = dr
+
+  fun name(): String =>
+    "_QueuingDataReceiverPhase"
 
   fun has_pending(): Bool =>
     _queued.size() == 0
@@ -151,7 +166,7 @@ class _QueuedReplayableDeliveryMessage
     dr.replay_process_message(msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
-// class _DataReceiverAcceptingReplaysPhase is _DataReceiverProcessingPhase
+// class _DataReceiverAcceptingReplaysPhase is _DataReceiverPhase
 //   let _data_receiver: DataReceiver ref
 
 //   new create(dr: DataReceiver ref) =>
@@ -160,7 +175,7 @@ class _QueuedReplayableDeliveryMessage
 //   fun data_connect() =>
 //     _data_receiver._ack_data_connect()
 
-// class _DataReceiverAcceptingMessagesPhase is _DataReceiverProcessingPhase
+// class _DataReceiverAcceptingMessagesPhase is _DataReceiverPhase
 //   let _data_receiver: DataReceiver ref
 
 //   new create(dr: DataReceiver ref) =>
