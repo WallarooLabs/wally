@@ -1,5 +1,5 @@
 <p align="center"><a href="https://www.wallaroolabs.com/"><img src="wallaroo-logo.png" alt="WallarooLabs logo" width="400"/></a></p>
-<h2 align="center">Build and scale real-time data applications as easily as writing a script</h2>
+<h2 align="center">Build and scale real-time applications as easily as writing a script</h2>
 
 ---
 [![CircleCI](https://circleci.com/gh/WallarooLabs/wallaroo.svg?style=shield)](https://circleci.com/gh/WallarooLabs/wallaroo)
@@ -8,7 +8,7 @@
 [![IRC][irc-badge]][irc-link]
 [![Groups.io][group-badge]][group-link]
 
-Wallaroo is a fast, elastic data processing engine that rapidly takes you from prototype to production by eliminating infrastructure complexity.
+Wallaroo is a fast, stream processing framework that rapidly takes you from prototype to production by eliminating infrastructure complexity. Infinitely scalable and backed by a highly durable key-value store.
 
 ## What is Wallaroo?
 
@@ -17,6 +17,7 @@ When we set out to build Wallaroo, we had several high-level goals in mind:
 - Create a dependable and resilient distributed computing framework
 - Take care of the complexities of distributed computing "plumbing," allowing developers to focus on their business logic
 - Provide high-performance & low-latency data processing
+- Language agnostic
 - Be portable (i.e., run on-prem or any cloud)
 - Manage in-memory state for the application
 - Allow applications to scale as needed, even when they are live and up-and-running
@@ -25,17 +26,44 @@ You can learn more about [Wallaroo][home-page] from our ["Hello Wallaroo!" blog 
 
 ### What makes Wallaroo unique
 
-TODO
+Wallaroo is a little different than most stream processing tools. While most require the JVM, Wallaroo can be deployed as a separate binary. This means no more jar files. Wallaroo also isn't locked to just using [Kafka](kafka-link) as a source, use any source you like.
 
 ## Getting Started
 
-Wallaroo can either be installed via [Docker, Vagrant][docker-link] or on Linux, complied from [source][source-install-instructions].
+Wallaroo can either be installed via [Docker, Vagrant][docker-link] or (on Linux) complied from [source][source-install-instructions].
+
+As easy as:
+
+```sh
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.5.1
+```
 
 ## Usage
 
-Once you've installed Wallaroo, we recommend trying the [reverse][reverse] or [market spread][market-spread] examples.
+Once you've installed Wallaroo, Take a look at some of our examples [reverse][reverse] or [market spread][market-spread] examples in either [Python](python-examples) or [Go](go-examples).
 
-TODO: Possibly add a couple snippets of the reverse example?
+```python
+"""
+This is an example application that receives strings as input and outputs the
+reversed strings.
+"""
+
+def application_setup(args):
+  # see ./examples/python/reverse
+
+@wallaroo.decoder(header_length=4, length_fmt=">I")
+def decoder(bs):
+    return bs.decode("utf-8")
+
+@wallaroo.computation(name="reverse")
+def reverse(data):
+    return data[::-1]
+
+@wallaroo.encoder
+def encoder(data):
+    # data is a string
+    return data + "\n"
+```
 
 ## Documentation
 
@@ -43,7 +71,7 @@ Are you the sort who just wants to get going? Dive right into our [documentation
 
 More information is also on our [blog][blog-link]. There you can find more insight into what we are working on and industry use-cases.
 
-TODO: Link to a markdown file explaining the monorepo structure
+> Wallaroo currently exists as a mono-repo. All the source that is Wallaroo is located in this repo
 
 ## Need Help?
 
