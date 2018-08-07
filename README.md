@@ -10,6 +10,8 @@
 
 Wallaroo is a fast, stream processing framework that rapidly takes you from prototype to production by eliminating infrastructure complexity. Infinitely scalable and backed by a highly durable key-value store.
 
+Answer our [30-second survey][survey-link], and be entered to win a Wallaroo T-Shirt.
+
 ## What is Wallaroo?
 
 When we set out to build Wallaroo, we had several high-level goals in mind:
@@ -18,7 +20,7 @@ When we set out to build Wallaroo, we had several high-level goals in mind:
 - Take care of the complexities of distributed computing "plumbing," allowing developers to focus on their business logic
 - Provide high-performance & low-latency data processing
 - Language agnostic
-- Be portable (i.e., run on-prem or any cloud)
+- Be portable and deploy easily (i.e., run on-prem or any cloud)
 - Manage in-memory state for the application
 - Allow applications to scale as needed, even when they are live and up-and-running
 
@@ -49,7 +51,7 @@ reversed strings.
 """
 
 def application_setup(args):
-  # see ./examples/python/reverse
+  # see ./examples/python/reverse/ for the full example and how to run it
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
@@ -71,11 +73,11 @@ Are you the sort who just wants to get going? Dive right into our [documentation
 
 More information is also on our [blog][blog-link]. There you can find more insight into what we are working on and industry use-cases.
 
-> Wallaroo currently exists as a mono-repo. All the source that is Wallaroo is located in this repo
+> Wallaroo currently exists as a mono-repo. All the source that is Wallaroo is located in this repo. See [application structure][application-structure-link] for more information.
 
 ## Need Help?
 
-Trying to figure out how to get started? Drop us a line on:
+Trying to figure out how to get started? Drop us a line:
 
 - [IRC][irc-link]
 - [Mailing List][group-link]
@@ -98,21 +100,26 @@ The [Wallaroo Community License][wallaroo-community-license] is based on [Apache
 - Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license to run on more than 3 servers or 24 cpus in a production environment.
 
 [apache-2-license]: https://www.apache.org/licenses/LICENSE-2.0
+[application-structure-link]: MONOREPO.md
 [blog-link]: https://blog.wallaroolabs.com/
 [cla]: https://gist.github.com/WallarooLabsTeam/e06d4fed709e0e7035fdaa7249bf88fb
 [contact-us-email]: mailto:hello@wallaroolabs.com
 [contribution-guide]: CONTRIBUTING.md
 [docker-link]: https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html
 [documentation]: https://docs.wallaroolabs.com/
+[go-examples]: examples/go/
 [group-badge]: https://img.shields.io/badge/mailing%20list-join%20%E2%86%92-%23551A8B.svg
 [group-link]: https://groups.io/g/wallaroo
 [hello-wallaroo-post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
 [home-page]: https://www.wallaroolabs.com/
 [irc-badge]: https://img.shields.io/badge/IRC-join%20chat%20%E2%86%92-blue.svg
 [irc-link]: https://webchat.freenode.net/?channels=#wallaroo
+[kafka-link]: https://kafka.apache.org/
 [market-spread]: examples/python/market_spread/
 [overview-video]: https://vimeo.com/234753585
+[python-examples]: examples/python/
 [reverse]: examples/python/reverse/
 [source-install-instructions]: https://docs.wallaroolabs.com/book/getting-started/linux-setup.html
+[survey-link]: https://wallaroolabs.typeform.com/to/HS6azY?source=wallaroo_readme
 [wallaroo-community-license-readme]: #license
 [wallaroo-community-license]: LICENSE.md
