@@ -68,7 +68,7 @@ actor DataReceiver is (Producer & Rerouter)
   let _state_partition_producers: SetIs[RoutingId] =
     _state_partition_producers.create()
 
-  var _phase: _DataReceiverProcessingPhase = _DataReceiverNotProcessingPhase
+  var _phase: _DataReceiverPhase = _DataReceiverNotProcessingPhase
 
   new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
     sender_name: String, data_router: DataRouter,
@@ -86,7 +86,7 @@ actor DataReceiver is (Producer & Rerouter)
     _state_routing_id = WorkerStateRoutingId(_worker_name)
     _router = data_router
     if initialized then
-      _phase = _NormalDataReceiverProcessingPhase(this)
+      _phase = _NormalDataReceiverPhase(this)
     end
 
   fun router(): DataRouter =>
@@ -103,7 +103,7 @@ actor DataReceiver is (Producer & Rerouter)
     // end
 
   be start_normal_message_processing() =>
-    _phase = _NormalDataReceiverProcessingPhase(this)
+    _phase = _NormalDataReceiverPhase(this)
     _inform_boundary_to_send_normal_messages()
 
   be data_connect(sender_step_id: RoutingId, conn: DataChannel) =>
@@ -189,9 +189,9 @@ actor DataReceiver is (Producer & Rerouter)
     else
       _pending_barriers.push((target_step_id, origin_step_id, barrier_token))
       match _phase
-      | let qdr: _QueuingDataReceiverProcessingPhase => None
+      | let qdr: _QueuingDataReceiverPhase => None
       else
-        _phase = _QueuingDataReceiverProcessingPhase(this)
+        _phase = _QueuingDataReceiverPhase(this)
       end
     end
 
@@ -249,7 +249,7 @@ actor DataReceiver is (Producer & Rerouter)
     _pending_message_store.process_known_keys(this, _router)
     if not _pending_message_store.has_pending() then
       let resend = _phase.flush()
-      _phase = _NormalDataReceiverProcessingPhase(this)
+      _phase = _NormalDataReceiverPhase(this)
       for m in resend.values() do
         match m
         | let qdm: _QueuedDeliveryMessage =>
