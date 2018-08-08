@@ -42,7 +42,7 @@ docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.5.1
 
 ## Usage
 
-Once you've installed Wallaroo, Take a look at some of our examples [reverse][reverse] or [market spread][market-spread] examples in either [Python](python-examples) or [Go](go-examples).
+Once you've installed Wallaroo, Take a look at some of our examples. A great place to start are our [reverse][reverse] or [market spread][market-spread] examples in either [Python](python-examples) or [Go](go-examples).
 
 ```python
 """
