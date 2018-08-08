@@ -24,12 +24,15 @@ Our release process features a few primary steps
 * Building and releasing artifacts including:
   * Building and releasing the Wallaroo source archive and Metrics UI AppImage to Bintray
   * Building and releasing the Wallaroo and Metrics UI Docker images on Bintray
+  * Building and publishing a publicly accesible AMI
   * Building and pushing Documentation Gitbook
+
 * Post release process
 
 - Release issue creation is documented in [RELEASE_ISSUE.md](RELEASE_ISSUE.md)
 - Release Notes creation is documented in [RELEASE_NOTES.md](RELEASE_NOTES.md)
 - Release candidate branch creation is documented in [RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md).
 - Promoting a release candidate to a release is documented in [RELEASE_PROMOTION.md](RELEASE_PROMOTION.md).
-- Building and releasing RC artifacts [UPDATE_RELEASE_ARTIFACTS.md](UPDATE_RELEASE_ARTIFACTS.md).
-- Post release process is documented in [POST_RELEASE.md](POST_RELEASE.md).
+- Building and publishing the AMI is documented in [AMI_RELEASE.md](AMI_RELEASE.md)
+- Building and releasing the Wallaroo and Metrics UI Docker images on Bintray is documented in [DOCKER_RELEASE.md](DOCKER_RELEASE.md).
+- Post release process is documented in [POST_RELEASE.md](POST_RELEASE.md)
