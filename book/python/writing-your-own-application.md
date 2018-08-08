@@ -16,7 +16,7 @@ Let's start with the computation, because that's the purpose of the application:
 
 ```python
 @wallaroo.computation(name='reverse'):
-def reverse(self, data):
+def reverse(data):
     print "compute", data
     return data[::-1]
 ```
@@ -31,7 +31,7 @@ Next, we are going to define how the output gets constructed for the sink. It is
 
 ```python
 @wallaroo.encoder
-def encode(self, data):
+def encode(data):
     # data is a string
     print "encode", data
     return data + "\n"
@@ -43,7 +43,7 @@ Now, we also need to decode the incoming bytes of the source.
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decode(self, bs):
+def decode(bs):
     print "decode", bs
     return bs.decode("utf-8")
 ```
