@@ -8,7 +8,7 @@
 [![IRC][irc-badge]][irc-link]
 [![Groups.io][group-badge]][group-link]
 
-Wallaroo is a fast, stream processing framework that rapidly takes you from prototype to production by eliminating infrastructure complexity. Infinitely scalable and backed by a highly durable key-value store.
+A fast, stream-processing framework. Wallaroo makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
 
 Answer our [30-second survey][survey-link], and be entered to win a Wallaroo T-Shirt.
 
@@ -28,11 +28,11 @@ You can learn more about [Wallaroo][home-page] from our ["Hello Wallaroo!" blog 
 
 ### What makes Wallaroo unique
 
-Wallaroo is a little different than most stream processing tools. While most require the JVM, Wallaroo can be deployed as a separate binary. This means no more jar files. Wallaroo also isn't locked to just using [Kafka](kafka-link) as a source, use any source you like.
+Wallaroo is a little different than most stream processing tools. While most require the JVM, Wallaroo can be deployed as a separate binary. This means no more jar files. Wallaroo also isn't locked to just using [Kafka](kafka-link) as a source, use any source you like. Application logic can be written in either Python 2, Go, or Pony; with more coming soon.
 
 ## Getting Started
 
-Wallaroo can either be installed via [Docker, Vagrant][docker-link] or (on Linux) complied from [source][source-install-instructions].
+Wallaroo can either be installed via [Docker, Vagrant][docker-link] or (on Linux) compiled from [source][source-install-instructions].
 
 As easy as:
 
@@ -77,11 +77,14 @@ More information is also on our [blog][blog-link]. There you can find more insig
 
 ## Need Help?
 
-Trying to figure out how to get started? Drop us a line:
+Trying to figure out how to get started?
 
-- [IRC][irc-link]
-- [Mailing List][group-link]
-- [Commercial Support][contact-us-email]
+ - Check out the [FAQ][faq]
+
+ - Drop us a line:
+    - [IRC][irc-link]
+    - [Mailing List][group-link]
+    - [Commercial Support][contact-us-email]
 
 ## Contributing
 
@@ -123,3 +126,4 @@ The [Wallaroo Community License][wallaroo-community-license] is based on [Apache
 [survey-link]: https://wallaroolabs.typeform.com/to/HS6azY?source=wallaroo_readme
 [wallaroo-community-license-readme]: #license
 [wallaroo-community-license]: LICENSE.md
+[faq]: FAQ.md
