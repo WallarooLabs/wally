@@ -1,0 +1,3 @@
+#!/bin/sh
+
+python source.py --host 127.0.0.1:7010
