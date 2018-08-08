@@ -13,7 +13,7 @@
 #  permissions and limitations under the License.
 
 from functools import wraps
-import cPickle
+import pickle
 
 from builder import (ApplicationBuilder, _validate_arity_compatability)
 
@@ -42,11 +42,11 @@ from .kafka import (
 
 
 def serialize(o):
-    return cPickle.dumps(o)
+    return pickle.dumps(o)
 
 
 def deserialize(bs):
-    return cPickle.loads(bs)
+    return pickle.loads(bs)
 
 
 def computation(name):
