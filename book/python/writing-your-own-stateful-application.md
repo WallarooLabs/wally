@@ -127,7 +127,6 @@ That is, while the stateless computation constructor `to` took only a computatio
 This module needs its imports:
 ```python
 import struct
-import pickle
 
 import wallaroo
 ```

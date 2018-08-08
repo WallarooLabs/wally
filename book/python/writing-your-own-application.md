@@ -67,7 +67,7 @@ In our case:
 
 ### Application Setup
 
-So now that we have input decoding, computation, and output decoding defined, how do we build it all into an application?
+So now that we have input decoding, computation, and output encoding defined, how do we build it all into an application?
 For this, two things are needed:
 1. An entry point for Wallaroo to create the application. This is the function `application_setup` that you need to define.
 2. The actual topology `application_setup` is going to return for Wallaroo to create the application.
@@ -93,7 +93,7 @@ ab.to(reverse)
 And finally, we add the sink, using a `TCPSinkConfig`:
 
 ```python
-ab.to_sink(wallaroo.TCPSinkConfig("localhost", "7010", encoder))
+ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
 ```
 
 ### The `application_setup` Entry Point
