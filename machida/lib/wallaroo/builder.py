@@ -13,14 +13,20 @@
 #  permissions and limitations under the License.
 
 import inspect
+from copy import copy
 
 class ApplicationBuilder(object):
+
     def __init__(self, name):
+        self._partitioned = None
         self._actions = [("name", name)]
 
-    # TODO: This is where we need to replicate the source for each partition
-    # if it's labelled as such.
     def new_pipeline(self, name, source_config):
+        # self._arrange_partitions() # sort out prior pipeline partitions first
+        # if type(source_config) == list:
+        #     self._partitioned = (source_config, self._actions)
+        #     self._actions = [("new_pipeline", name, None)]
+        # else:
         self._actions.append(("new_pipeline", name,
                               source_config.to_tuple()))
         return self
@@ -62,8 +68,22 @@ class ApplicationBuilder(object):
         return self
 
     def build(self):
+        # self._arrange_partitions()
         self._validate_actions()
+        print("built", repr(self._actions))
         return self._actions
+
+    def _arrange_partitions(self):
+        if self._partitioned:
+            (source, prior_actions) = self._partitioned
+            for idx, partition in enumerate(source):
+                actions = copy(self._actions)
+                actions[0] = copy(actions[0])
+                pipeline_name = actions[0][1] + "({})".format(idx)
+                actions[0] = ("new_pipeline", pipeline_name, partition)
+                prior_actions.extend(actions)
+            self._actions = prior_actions
+            self._partitioned = None
 
     def _validate_actions(self):
         self._steps = {}
@@ -150,10 +170,10 @@ class ApplicationBuilder(object):
 class StateBuilder(object):
     def __init__(self, name, state_cls):
         self._name = name
-        self._state_cls = state_cls
+        self.state_cls = state_cls
 
     def ____wallaroo_build____(self):
-        return self._state_cls()
+        return self.state_cls()
 
     def name(self):
         return self._name
