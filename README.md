@@ -91,7 +91,7 @@ Along with Go, Python 2.7 is our primary focus. As we add features to the Wallar
 
 - Python 3
 
-We are currently working with a client who needs Python 3 bindings. We plan to introduce Python 3 bindings in early 2018.
+We are currently working with a client who needs Python 3 bindings. We plan to introduce Python 3 bindings in late 2018.
 
 - C++
 
