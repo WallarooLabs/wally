@@ -126,7 +126,6 @@ Wallaroo provides the convenience functions `tcp_parse_input_addrs` and `tcp_par
 Of course, no Python module is complete without its imports. In this case, only two imports are required:
 
 ```python
-import struct
 import wallaroo
 ```
 
