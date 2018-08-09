@@ -1,6 +1,6 @@
 # Go API Introduction
 
-The Wallaroo Go API can be used to write Wallaroo applications using Go. 
+The Wallaroo Go API can be used to write Wallaroo applications using Go on 64-bit platforms.
 
 In order to write a Wallaroo application in Go, the developer creates a series of functions and types that provide methods expected by Wallaroo (see [Wallaroo Go API Classes](api/api.md) for more detail). Additionally, the developer writes an entry point function that Wallaroo uses to lay out the application.
 
