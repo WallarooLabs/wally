@@ -89,6 +89,10 @@ Wallaroo is primarily written in Pony. As such, Pony is the first language to re
 
 Along with Go, Python 2.7 is our primary focus. As we add features to the Wallaroo, we will be adding corresponding Python APIs and documentation.
 
+- Python 3
+
+While this is not supported yet, we plan to add support for Python 3. If Python 3 support is holding you back from using Wallaroo. Please [contact us][contact us email] and let us know.
+
 - C++
 
 C++ is currently unsupported and apps created with the C++ API will not build unless you checkout the [last-working-C++-commit](https://github.com/WallarooLabs/wallaroo/tree/last-working-C%2B%2B-commit) tag. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
