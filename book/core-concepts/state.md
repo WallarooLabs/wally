@@ -14,7 +14,7 @@ Wallaroo doesn't have transactions in the traditional database sense. However, w
 
 The simplest thing we could do to make it easy to reason about state is to lock all the state in your application. Only allowing a single update or read at a time. It would make Wallaroo applications very easy to reason about. It would also make them incredibly slow.
 
-What we've done instead is to allow you to break your state down into more discrete entities we call "state objects". All reads/writes of a given state object are guaranteed to happen in a serial fashion. No more than one thread will ever access a given state object at a time. 
+What we've done instead is to allow you to break your state down into more discrete entities we call "state objects". All reads/writes of a given state object are guaranteed to happen in a serial fashion. No more than one thread will ever access a given state object at a time.
 
 This makes it easy to reason about state within Wallaroo. All the wonderful reasoning benefits we get from transactions apply in Wallaroo, except that rather than being across an entire database, it's across individual state objects.
 
@@ -38,7 +38,7 @@ State objects can be arbitrarily complex. Our example is two fields. If your app
 
 ## Wallaroo, state, and parallelization
 
-In our stock market example, we can read from and write to each state object independently. Our state objects are a unit of parallelization. If we have 3,000 different state objects and 3,000 CPUS then we can update all our state objects concurrently. Odds are, we are going to have more state objects than we have CPUs. Wallaroo handles all parallelization and routing of messages to state objects. 
+In our stock market example, we can read from and write to each state object independently. Our state objects are a unit of parallelization. If we have 3,000 different state objects and 3,000 CPUS then we can update all our state objects concurrently. Odds are, we are going to have more state objects than we have CPUs. Wallaroo handles all parallelization and routing of messages to state objects.
 
 The Wallaroo API features a concept called a "partitioning function" that allows you to examine a message indicate how it should be routed. For example, imagine a message in our stock market application is:
 
@@ -53,4 +53,4 @@ Our partitioning function would take a message as input and return `IBM` as outp
 
 ## Conclusion
 
-Wallaroo gives you serialized access to state. by properly partitioning your state along transactional boundaries you can parallelize access to independent pieces of state. Wallaroo takes care of this parallelization for you, all you have to do is give it a function that can tell it which pieces of state should be accessed for a particular message.
+Wallaroo gives you serialized access to state. By properly partitioning your state along transactional boundaries, you can parallelize access to independent pieces of state. Wallaroo takes care of this parallelization for you, all you have to do is give it a function that can tell it which pieces of state should be accessed for a particular message.
