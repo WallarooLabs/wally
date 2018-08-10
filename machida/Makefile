@@ -45,7 +45,6 @@ include $(rules_mk_path)
 # machida directory.
 MACHIDA_PATH = $(wallaroo_path)/machida
 MACHIDA_BUILD = $(MACHIDA_PATH)/build
-MACHIDA_CPP = $(MACHIDA_PATH)/cpp
 WALLAROO_LIB =  $(wallaroo_path)/lib
 
 # Our top level Makefile has 3 rules that would have been generated for us if
