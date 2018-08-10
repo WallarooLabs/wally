@@ -1,12 +1,12 @@
 # Choosing an Installation Option for Wallaroo
 
-For MacOS and Windows users, we provide two different ways for you to install Wallaroo:
+For 64-bit MacOS and Windows users, we provide two different ways for you to install Wallaroo:
 - [Wallaroo in Docker](/book/getting-started/docker-setup.md)
 - [Wallaroo in Vagrant](/book/getting-started-vagrant-setup.md)
 
-If you are unsure about which solution is right for you, a breakdown of each is provided below.
+If you are unsure about which solution is right for you, a breakdown of each is provided below. (NOTE: Wallaroo does not support 32-bit platforms.)
 
-For Linux users, we provide three different ways for you to install Wallaroo:
+For 64-bit Linux users, we provide three different ways for you to install Wallaroo:
 - [Wallaroo in Docker](/book/getting-started/docker-setup.md)
 - [Wallaroo in Vagrant](/book/getting-started-vagrant-setup.md)
 - [Installing from Source](/book/getting-started/linux-setup.md)
