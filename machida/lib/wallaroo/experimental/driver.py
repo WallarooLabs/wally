@@ -19,7 +19,8 @@ import time
 
 class SourceDriver(object):
 
-    def __init__(self):
+    def __init__(self, encoder):
+        self._encoder = encoder
         self._conn = None
 
     def connect(self, host, port):
@@ -39,30 +40,31 @@ class SourceDriver(object):
     def write(self, message):
         if self._conn == None:
             raise RuntimeError("Please call connect before writing")
-        bytes = len(message)
-        payload = struct.pack('>I', bytes) + message
+        payload = self._encoder(message)
         self._conn.sendall(payload)
 
 
 class SinkDriver(object):
 
-    def __init__(self, host, port, backlog = 0):
+    def __init__(self, host, port, decoder, backlog = 0):
         acceptor = socket.socket()
         acceptor.bind((host, port))
         acceptor.listen(backlog)
         self._acceptor = acceptor
-    
+        self._decoder = decoder
+
     def accept(self):
         conn, addr = self._acceptor.accept()
-        SinkDriverConnection(self, conn, addr)
+        return SinkDriverConnection(self, conn, addr, self._decoder)
 
 
 class SinkDriverConnection(object):
 
-    def __init__(self, driver, conn, from_addr):
+    def __init__(self, driver, conn, from_addr, decoder):
         self.driver = driver
         self._conn = conn
         self._from_addr = from_addr
+        self._decoder = decoder
 
     def read(self):
         # These waits should be buffered but there is tuning involved here
@@ -70,7 +72,10 @@ class SinkDriverConnection(object):
         header = self._conn.recv(4, socket.MSG_WAITALL)
         if not header: return None
         expected = struct.unpack('>I', header)[0]
-        return self._conn.recv(expected, socket.MSG_WAITALL)
+        data = self._conn.recv(expected, socket.MSG_WAITALL)
+        # TODO: consider a better way to conditionally unwrap the frame
+        # since we're manually managing the frame with the socket.
+        return self._decoder._message_decoder(data)
 
 
 class Session(object):

@@ -8,5 +8,5 @@ if [ ! -d _env ]; then
 fi
 . _env/bin/activate
 
-export PYTHONPATH=../../machida/lib:$PWD:$PYTHONPATH
-python source.py
+export PYTHONPATH=../../../machida/lib:$PWD:$PYTHONPATH
+python kafka_consumer.py

@@ -17,54 +17,55 @@ import struct
 from wallaroo.builder import _validate_arity_compatability
 
 
-class StreamDescription(object):
-    """
-    This offers a description of a given stream. Construct it using:
+# TODO: rethink some of this API around partitioning discussion
+# class StreamDescription(object):
+#     """
+#     This offers a description of a given stream. Construct it using:
 
-       ... TODO EXAMPLE HERE ...
-    
-    Customization can be done by subclassing this type and is the recommended
-    way to provide computed descriptions (instead of passing computed values
-    to the constructor). On the other hand, if you have fixed values, the base
-    constructor is recommend.
-    """
-    
-    def __init__(self, **kwargs):
-        self._partitions = kwargs['partitions']
-        self._durability = kwargs['durability']
-        self._sequencing = kwargs['sequencing']
-        self._decoder = kwargs['decoder'] or identity_decoder
-        self._encoder = kwargs['encoder'] or identity_encoder
+#        ... TODO EXAMPLE HERE ...
 
-    def partitions(self):
-        """
-        Explain partitions
-        """
-        return self._partitions
+#     Customization can be done by subclassing this type and is the recommended
+#     way to provide computed descriptions (instead of passing computed values
+#     to the constructor). On the other hand, if you have fixed values, the base
+#     constructor is recommend.
+#     """
 
-    def durability(self):
-        """
-        Explain durability
-        """
-        return self._durability
+#     def __init__(self, **kwargs):
+#         self._partitions = kwargs['partitions']
+#         self._durability = kwargs['durability']
+#         self._sequencing = kwargs['sequencing']
+#         self._decoder = kwargs['decoder'] or identity_decoder
+#         self._encoder = kwargs['encoder'] or identity_encoder
 
-    def sequencing(self):
-        """
-        Explain sequencing
-        """
-        return self._sequencing
+#     def partitions(self):
+#         """
+#         Explain partitions
+#         """
+#         return self._partitions
 
-    def encoder(self):
-        """
-        Explain encoder
-        """
-        return self._encoder
+#     def durability(self):
+#         """
+#         Explain durability
+#         """
+#         return self._durability
 
-    def decoder(self):
-        """
-        Expplain decoder
-        """
-        return self._decoder
+#     def sequencing(self):
+#         """
+#         Explain sequencing
+#         """
+#         return self._sequencing
+
+#     def encoder(self):
+#         """
+#         Explain encoder
+#         """
+#         return self._encoder
+
+#     def decoder(self):
+#         """
+#         Expplain decoder
+#         """
+#         return self._decoder
 
 
 # A decorator class used because we use decode rather than call in machida and
@@ -78,7 +79,7 @@ class stream_message_decoder(object):
 
     def header_length(self):
         return 4
-    
+
     def payload_length(self, bytes):
         return struct.unpack(">I", bytes)[0]
 
@@ -91,13 +92,14 @@ class stream_message_decoder(object):
 
 # A decorator class used because we use encode rather than call in machida.
 class stream_message_encoder(object):
-    
+
     def __init__(self, encoder):
         _validate_arity_compatability(encoder, 1)
         self._message_encoder = encoder
-    
+
     def encode(self, data):
-        return self._message_encoder(data)
+        encoded = self._message_encoder(data)
+        return struct.pack('>I', len(encoded)) + encoded
 
     def __call__(self, *args):
         return self._message_encoder(*args)
@@ -118,4 +120,4 @@ def identity_encoder(message):
         raise StreamDecoderError(
             "Unable to decode message type: {}".format(type(message)))
     # wallaroo does not currently frame outgoing messages for us
-    return struct.pack('>I', len(message)) + message
+    return message

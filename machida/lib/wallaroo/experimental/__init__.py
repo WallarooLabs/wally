@@ -13,9 +13,10 @@
 #  permissions and limitations under the License.
 
 from .stream import (
-    StreamDescription,
+    # StreamDescription,
     stream_message_decoder,
-    stream_message_encoder
+    stream_message_encoder,
+    StreamDecoderError
 )
 from .builder import ExternalSource, ExternalSink
 from .driver import SourceDriver, SinkDriver, Session
