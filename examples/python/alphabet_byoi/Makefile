@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../Makefile
+include ../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -35,52 +35,31 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 
+ALPHABET_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 # standard rules generation makefile
 include $(rules_mk_path)
 
+build-examples-python-alphabet: build-machida
+integration-tests-examples-python-alphabet: build-examples-python-alphabet
 
-# Set up our machida specific paths. We don't know what directory make was
-# run from, so we get an absolute path based on $(wallaroo_path). This will work
-# whether make was run from the top level of Wallaroo or from within the
-# machida directory.
-MACHIDA_PATH = $(wallaroo_path)/machida
-MACHIDA_BUILD = $(MACHIDA_PATH)/build
-MACHIDA_CPP = $(MACHIDA_PATH)/cpp
-WALLAROO_LIB =  $(wallaroo_path)/lib
+integration-tests-examples-python-alphabet: alphabet_py_test
 
-# Our top level Makefile has 3 rules that would have been generated for us if
-# we hadn't turned them off at the top of the Makefile. Here we recreate them
-# with our own custom rules. This allows the top level commands like
-# "make test" to work.
-build-machida: machida_build
-unit-tests-machida: build-machida
-unit-tests-machida: wallaroo_unit_tests
-clean-machida: machida_clean
+alphabet_py_test:
+	cd $(ALPHABET_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida --application-module alphabet' \
+		--sink-mode newlines \
+		--sink-expect 1000
 
-machida_clean:
-	$(QUIET)rm -rf $(MACHIDA_BUILD)
-	$(QUIET)rm -f $(MACHIDA_PATH)/machida.d
-	$(QUIET)rm -rf $(MACHIDA_PATH)/.deps
+clean-examples-python-alphabet: alphabet_py_clean
 
+alphabet_py_clean:
+	$(QUIET)rm -f $(ALPHABET_PY_PATH)/_test.txt $(ALPHABET_PY_PATH)/_expected.json
 
-wallaroo_unit_tests:
-	cd $(MACHIDA_PATH) && \
-		python2 -m pytest --color=yes --tb=native --verbose test/wallaroo_test.py && \
-		python3 -m pytest --color=yes --tb=native --verbose --exitfirst test/wallaroo_test.py
-
-machida_build: $(MACHIDA_BUILD)/machida
-
--include $(MACHIDA_PATH)/machida.d
-$(MACHIDA_BUILD)/machida: EXTRA_PONYCFLAGS= --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD)
-$(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a
-	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
-
-$(MACHIDA_BUILD)/libpython-wallaroo.a: $(MACHIDA_BUILD)/python-wallaroo.o
-	$(QUIET)ar rvs $(MACHIDA_BUILD)/libpython-wallaroo.a $(MACHIDA_BUILD)/python-wallaroo.o
-
-$(MACHIDA_BUILD)/python-wallaroo.o: $(MACHIDA_CPP)/python-wallaroo.c
-	$(QUIET)mkdir -p $(MACHIDA_BUILD)
-	$(QUIET)cc -g -o $(MACHIDA_BUILD)/python-wallaroo.o -c $(MACHIDA_CPP)/python-wallaroo.c
-
-# end of prevent rules from being evaluated/included multiple times
 endif

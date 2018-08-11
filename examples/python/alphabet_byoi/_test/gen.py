@@ -1,4 +1,4 @@
-# Copyright 2018 The Wallaroo Authors.
+# Copyright 2017 The Wallaroo Authors.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,11 +12,24 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-from .stream import (
-    # StreamDescription,
-    stream_message_decoder,
-    stream_message_encoder,
-    StreamDecoderError
-)
-from .builder import ExternalSource, ExternalSink
-from .extension import SourceExtension, SinkExtension
+
+from json import dumps
+from random import choice, randrange
+from string import lowercase
+from struct import pack
+
+# Construct input data list, and total votes as a dict
+expected = {}
+data = []
+for x in xrange(1000):
+    c = choice(lowercase)
+    v = randrange(1,10000)
+    data.append(pack(">IsI",5, c, v))
+    expected[c] = expected.get(c, 0) + v
+
+with open("_test.txt", "wb") as fin:
+    for v in data:
+        fin.write(v)
+
+with open("_expected.json", "wb") as fout:
+    fout.write(dumps(expected))

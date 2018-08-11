@@ -25,6 +25,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/source/byoi_source"
 use "wallaroo/core/topology"
 
 class BoundaryRoute is Route
@@ -75,7 +76,7 @@ class BoundaryRoute is Route
   =>
     ifdef debug then
       match _step
-      | let source: TCPSource ref =>
+      | let source: (TCPSource ref | BYOISource ref) =>
         Invariant(not source.is_muted())
       end
     end
