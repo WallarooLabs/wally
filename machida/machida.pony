@@ -23,9 +23,11 @@ use "net"
 
 use "wallaroo"
 use "wallaroo/core/sink"
+use "wallaroo/core/sink/byoi_sink"
 use "wallaroo/core/sink/kafka_sink"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
+use "wallaroo/core/source/byoi_source"
 use "wallaroo/core/source/kafka_source"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
@@ -449,6 +451,44 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
     Machida.dec_ref(out_and_key_and_part_id)
 
     (consume out, consume key, part_id)
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_sink_encoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_sink_encoder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _sink_encoder = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_sink_encoder)
+
+class PyBYOIEncoder is BYOISinkEncoder[PyData val]
+  var _sink_encoder: Pointer[U8] val
+
+  new create(sink_encoder: Pointer[U8] val) =>
+    _sink_encoder = sink_encoder
+
+  fun apply(data: PyData val, wb: Writer): Array[ByteSeq] val =>
+    let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
+    if not Machida.is_py_none(byte_buffer) then
+      let byte_string = @PyString_AsString(byte_buffer)
+
+      if not byte_string.is_null() then
+        let arr = recover val
+          // create a temporary Array[U8] wrapper for the C array, then clone it
+          Array[U8].from_cpointer(@PyString_AsString(byte_buffer),
+            @PyString_Size(byte_buffer)).clone()
+        end
+        Machida.dec_ref(byte_buffer)
+        wb.write(arr)
+      else
+        Machida.print_errors()
+        Fail()
+      end
+    end
+    wb.done()
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_sink_encoder)
@@ -888,6 +928,22 @@ primitive _SourceConfig
       end
 
       KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
+    | "byoi" =>
+      let host = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+      end
+
+      let port = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 2)))
+      end
+
+      let decoder = recover val
+        let d = @PyTuple_GetItem(source_config_tuple, 3)
+        Machida.inc_ref(d)
+        PyFramedSourceHandler(d)?
+      end
+
+      BYOISourceConfig[(PyData val | None)](decoder, host, port)
     else
       error
     end
@@ -972,6 +1028,22 @@ primitive _SinkConfig
       end
 
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
+    | "byoi" =>
+      let host = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 1)))
+      end
+
+      let port = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 2)))
+      end
+
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
+      Machida.inc_ref(encoderp)
+      let encoder = recover val
+        PyBYOIEncoder(encoderp)
+      end
+
+      BYOISinkConfig[PyData val](encoder, host, port)
     else
       error
     end

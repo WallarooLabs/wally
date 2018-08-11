@@ -13,20 +13,12 @@
 #  permissions and limitations under the License.
 
 import inspect
-from copy import copy
 
 class ApplicationBuilder(object):
-
     def __init__(self, name):
-        self._partitioned = None
         self._actions = [("name", name)]
 
     def new_pipeline(self, name, source_config):
-        # self._arrange_partitions() # sort out prior pipeline partitions first
-        # if type(source_config) == list:
-        #     self._partitioned = (source_config, self._actions)
-        #     self._actions = [("new_pipeline", name, None)]
-        # else:
         self._actions.append(("new_pipeline", name,
                               source_config.to_tuple()))
         return self
@@ -68,22 +60,9 @@ class ApplicationBuilder(object):
         return self
 
     def build(self):
-        # self._arrange_partitions()
         self._validate_actions()
         print("built", repr(self._actions))
         return self._actions
-
-    def _arrange_partitions(self):
-        if self._partitioned:
-            (source, prior_actions) = self._partitioned
-            for idx, partition in enumerate(source):
-                actions = copy(self._actions)
-                actions[0] = copy(actions[0])
-                pipeline_name = actions[0][1] + "({})".format(idx)
-                actions[0] = ("new_pipeline", pipeline_name, partition)
-                prior_actions.extend(actions)
-            self._actions = prior_actions
-            self._partitioned = None
 
     def _validate_actions(self):
         self._steps = {}
@@ -200,4 +179,3 @@ def _validate_arity_compatability(obj, arity):
 
 class WallarooParameterError(Exception):
     pass
-
