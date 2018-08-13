@@ -22,6 +22,9 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 
     python \
     python-dev \
     python-pip \
+    python3 \
+    python3-dev \
+    python3-pip \
     wget
 
 # install MonHub dependencies
@@ -41,9 +44,13 @@ RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 
-# python testing dependencies
+# python2 testing dependencies
 RUN python2 -m pip install --upgrade pip enum34 \
   && python2 -m pip install pytest==3.2.2
+
+# python3 testing dependencies
+RUN python3 -m pip install --upgrade pip enum34 \
+  && python3 -m pip install pytest==3.7.1
 
 # install go
 RUN wget https://dl.google.com/go/go1.9.2.linux-amd64.tar.gz \
