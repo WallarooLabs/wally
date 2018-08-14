@@ -40,6 +40,14 @@ from .kafka import (
     encoder as kafka_encoder,
 )
 
+from .byoi import (
+    SourceConfig as BYOISourceConfig,
+    SinkConfig as BYOISinkConfig,
+    decoder,
+    encoder,
+    parse_input_addrs as byoi_parse_input_addrs,
+    parse_output_addrs as byoi_parse_output_addrs,
+)
 
 def serialize(o):
     return pickle.dumps(o)
