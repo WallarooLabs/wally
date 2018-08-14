@@ -48,6 +48,8 @@ MACHIDA3_BUILD = $(MACHIDA3_PATH)/build
 MACHIDA3_CPP = $(MACHIDA3_PATH)/cpp
 WALLAROO_LIB =  $(wallaroo_path)/lib
 
+PYTHON3_INCLUDES = $(shell python3-config --includes)
+
 # Our top level Makefile has 3 rules that would have been generated for us if
 # we hadn't turned them off at the top of the Makefile. Here we recreate them
 # with our own custom rules. This allows the top level commands like
@@ -71,7 +73,7 @@ wallaroo_unit_tests:
 machida3_build: $(MACHIDA3_BUILD)/machida3
 
 -include $(MACHIDA3_PATH)/machida.d
-$(MACHIDA3_BUILD)/machida3: EXTRA_PONYCFLAGS= --output=$(MACHIDA3_BUILD) --path=$(MACHIDA3_BUILD)
+$(MACHIDA3_BUILD)/machida3: EXTRA_PONYCFLAGS= --output=$(MACHIDA3_BUILD) --path=$(MACHIDA3_BUILD) --linker '$(CC) $(shell python3-config --libs)'
 $(MACHIDA3_BUILD)/machida3: $(MACHIDA3_BUILD)/libpython-wallaroo.a
 	$(call PONYC,$(abspath $(MACHIDA3_PATH:%/=%)))
 
@@ -80,7 +82,7 @@ $(MACHIDA3_BUILD)/libpython-wallaroo.a: $(MACHIDA3_BUILD)/python-wallaroo.o
 
 $(MACHIDA3_BUILD)/python-wallaroo.o: $(MACHIDA3_CPP)/python-wallaroo.c
 	$(QUIET)mkdir -p $(MACHIDA3_BUILD)
-	$(QUIET)cc -g -o $(MACHIDA3_BUILD)/python-wallaroo.o -c $(MACHIDA3_CPP)/python-wallaroo.c
+	$(QUIET)cc -g -o $(MACHIDA3_BUILD)/python-wallaroo.o $(PYTHON3_INCLUDES) -c $(MACHIDA3_CPP)/python-wallaroo.c
 
 # end of prevent rules from being evaluated/included multiple times
 endif
