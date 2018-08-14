@@ -26,7 +26,7 @@ extern PyObject *load_module(char *module_name)
 {
   PyObject *pName, *pModule;
 
-  pName = PyString_FromString(module_name);
+  pName = PyBytes_FromString(module_name);
   /* Error checking of pName left out */
 
   pModule = PyImport_Import(pName);
@@ -59,7 +59,7 @@ extern PyObject *get_application_setup_item(PyObject *list, size_t idx)
 extern char *get_application_setup_action(PyObject *item)
 {
   PyObject *action = PyTuple_GetItem(item, 0);
-  char * rtn = PyString_AsString(action);
+  char * rtn = PyBytes_AsString(action);
   Py_DECREF(action);
   return rtn;
 }
@@ -71,7 +71,7 @@ extern size_t source_decoder_header_length(PyObject *source_decoder)
   pFunc = PyObject_GetAttrString(source_decoder, "header_length");
   pValue = PyObject_CallFunctionObjArgs(pFunc, NULL);
 
-  size_t sz = PyInt_AsSsize_t(pValue);
+  size_t sz = PyLong_AsSsize_t(pValue);
   Py_XDECREF(pFunc);
   Py_DECREF(pValue);
   if (sz > 0 && sz < SIZE_MAX) {
@@ -89,7 +89,7 @@ extern size_t source_decoder_payload_length(PyObject *source_decoder, char *byte
   pBytes = PyBytes_FromStringAndSize(bytes, size);
   pValue = PyObject_CallFunctionObjArgs(pFunc, pBytes, NULL);
 
-  size_t sz = PyInt_AsSsize_t(pValue);
+  size_t sz = PyLong_AsSsize_t(pValue);
 
   Py_XDECREF(pFunc);
   Py_XDECREF(pBytes);
@@ -226,7 +226,7 @@ extern long partition_function_partition_u64(PyObject *partition_function, PyObj
   pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
   Py_DECREF(pFunc);
 
-  long rtn = PyInt_AsLong(pValue);
+  long rtn = PyLong_AsLong(pValue);
   if (pValue != NULL) {
     Py_DECREF(pValue);
   }
@@ -273,7 +273,7 @@ extern size_t user_serialization_get_size(PyObject *o)
   // This will be null if there was an exception.
   if (user_bytes)
   {
-    size_t size = PyString_Size(user_bytes);
+    size_t size = PyBytes_Size(user_bytes);
     Py_DECREF(user_bytes);
 
     // return the size of the buffer plus the 4 bytes needed to record that size.
@@ -290,7 +290,7 @@ extern void user_serialization(PyObject *o, char *bytes)
   // This will be null if there was an exception.
   if (user_bytes)
   {
-    size_t size = PyString_Size(user_bytes);
+    size_t size = PyBytes_Size(user_bytes);
 
     unsigned char *ubytes = (unsigned char *) bytes;
 
@@ -299,7 +299,7 @@ extern void user_serialization(PyObject *o, char *bytes)
     ubytes[2] = (unsigned char)(size >> 8);
     ubytes[3] = (unsigned char)(size);
 
-    memcpy(bytes + 4, PyString_AsString(user_bytes), size);
+    memcpy(bytes + 4, PyBytes_AsString(user_bytes), size);
 
     Py_DECREF(user_bytes);
   }
