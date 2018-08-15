@@ -60,29 +60,10 @@ class ApplicationBuilder(object):
         return self
 
     def build(self):
-<<<<<<< HEAD
-        # self._arrange_partitions()
         self._validate_actions()
         print("built", repr(self._actions))
         return self._actions
 
-    def _arrange_partitions(self):
-        if self._partitioned:
-            (source, prior_actions) = self._partitioned
-            for idx, partition in enumerate(source):
-                actions = copy(self._actions)
-                actions[0] = copy(actions[0])
-                pipeline_name = actions[0][1] + "({})".format(idx)
-                actions[0] = ("new_pipeline", pipeline_name, partition)
-                prior_actions.extend(actions)
-            self._actions = prior_actions
-            self._partitioned = None
-
-=======
-        self._validate_actions()
-        return self._actions
-
->>>>>>> Refactor base wallaroo.py library into modules
     def _validate_actions(self):
         self._steps = {}
         self._pipelines = {}

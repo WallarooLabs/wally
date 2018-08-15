@@ -11,4 +11,4 @@ driver.connect('127.0.0.1', 7100)
 
 print("Consuming topic 'text'")
 for message in consumer:
-    driver.write(message.value)
+    driver.write(message.value, partition=message.partition, sequence=message.sequence)
