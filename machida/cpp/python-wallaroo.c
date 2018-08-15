@@ -16,7 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-#include <python3.5m/Python.h>
+#include <Python.h>
 
 
 PyObject *g_user_deserialization_fn;
