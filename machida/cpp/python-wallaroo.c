@@ -26,7 +26,7 @@ extern PyObject *load_module(char *module_name)
 {
   PyObject *pName, *pModule;
 
-  pName = PyBytes_FromString(module_name);
+  pName = PyUnicode_FromString(module_name);
   /* Error checking of pName left out */
 
   pModule = PyImport_Import(pName);
@@ -59,7 +59,8 @@ extern PyObject *get_application_setup_item(PyObject *list, size_t idx)
 extern char *get_application_setup_action(PyObject *item)
 {
   PyObject *action = PyTuple_GetItem(item, 0);
-  char * rtn = PyBytes_AsString(action);
+
+  char * rtn = PyUnicode_AsUTF8(action);
   Py_DECREF(action);
   return rtn;
 }
