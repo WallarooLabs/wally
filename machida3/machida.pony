@@ -90,7 +90,8 @@ use @PyErr_print[None]()
 use @PyTuple_GetItem[Pointer[U8] val](t: Pointer[U8] val, idx: USize)
 use @PyBytes_Size[USize](str: Pointer[U8] box)
 use @PyBytes_AsString[Pointer[U8]](str: Pointer[U8] box)
-use @PyBytes_FromStringAndSize[Pointer[U8]](str: Pointer[U8] tag, size: USize)
+use @PyUnicode_AsUTF8[Pointer[U8]](str: Pointer[U8] box)
+use @PyUnicode_FromStringAndSize[Pointer[U8]](str: Pointer[U8] tag, size: USize)
 use @PyList_New[Pointer[U8] val](size: USize)
 use @PyList_Size[USize](l: Pointer[U8] box)
 use @PyList_GetItem[Pointer[U8] val](l: Pointer[U8] box, i: USize)
@@ -513,7 +514,7 @@ primitive Machida
       let action = String.copy_cstring(action_p)
       if action == "name" then
         let name = recover val
-          String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(item, 1)))
+          String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(item, 1)))
         end
         app = Application(name)
         break
@@ -533,7 +534,7 @@ primitive Machida
       match action
       | "new_pipeline" =>
         let name = recover val
-          String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(item, 1)))
+          String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(item, 1)))
         end
 
         let source_config = recover val
@@ -571,7 +572,7 @@ primitive Machida
         end
 
         let state_name = recover val
-          String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(item, 3)))
+          String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(item, 3)))
         end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to_stateful[PyData val, PyState](state_computation,
@@ -590,7 +591,7 @@ primitive Machida
         end
 
         let state_name = recover val
-          String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(item, 3)))
+          String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(item, 3)))
         end
 
         let partition_functionp = @PyTuple_GetItem(item, 4)
@@ -764,7 +765,7 @@ primitive Machida
   =>
     let l = @PyList_New(args.size())
     for (i, v) in args.pairs() do
-      @PyList_SetItem(l, i, @PyBytes_FromStringAndSize(v.cstring(), v.size()))
+      @PyList_SetItem(l, i, @PyUnicode_FromStringAndSize(v.cstring(), v.size()))
     end
     l
 
@@ -772,7 +773,7 @@ primitive Machida
     let ps = @get_name(o)
     recover
       if not ps.is_null() then
-        let ret = String.copy_cstring(@PyBytes_AsString(ps))
+        let ret = String.copy_cstring(@PyUnicode_AsUTF8(ps))
         dec_ref(ps)
 	ret
       else
@@ -843,17 +844,17 @@ primitive _SourceConfig
     SourceConfig[PyData val] ?
   =>
     let name = recover val
-      String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(source_config_tuple, 0)))
+      String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(source_config_tuple, 0)))
     end
 
     match name
     | "tcp" =>
       let host = recover val
-        String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+        String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(source_config_tuple, 1)))
       end
 
       let port = recover val
-        String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(source_config_tuple, 2)))
+        String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(source_config_tuple, 2)))
       end
 
       let decoder = recover val
@@ -865,7 +866,7 @@ primitive _SourceConfig
       TCPSourceConfig[(PyData val | None)](decoder, host, port)
     | "kafka-internal" =>
       let kafka_source_name = recover val
-        String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+        String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(source_config_tuple, 1)))
       end
 
       let ksclip = KafkaSourceConfigCLIParser(env.out, kafka_source_name)
@@ -894,7 +895,7 @@ primitive _SourceConfig
 
   fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaConfigOptions iso^ =>
     let topic = recover val
-      String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+      String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(source_config_tuple, 1)))
     end
 
     let brokers_list = @PyTuple_GetItem(source_config_tuple, 2)
@@ -905,9 +906,9 @@ primitive _SourceConfig
 
       for i in Range(0, num_brokers) do
         let broker = @PyList_GetItem(brokers_list, i)
-        let host = recover val String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(broker, 0))) end
+        let host = recover val String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(broker, 0))) end
         let port = try
-          String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(broker, 1))).i32()?
+          String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(broker, 1))).i32()?
         else
           9092
         end
@@ -917,7 +918,7 @@ primitive _SourceConfig
     end
 
     let log_level = recover val
-      String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(source_config_tuple, 3)))
+      String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(source_config_tuple, 3)))
     end
 
     KafkaConfigOptions("Wallaroo Kafka Source", KafkaConsumeOnly, topic, brokers, log_level)
@@ -927,17 +928,17 @@ primitive _SinkConfig
     SinkConfig[PyData val] ?
   =>
     let name = recover val
-      String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(sink_config_tuple, 0)))
+      String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(sink_config_tuple, 0)))
     end
 
     match name
     | "tcp" =>
       let host = recover val
-        String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(sink_config_tuple, 1)))
+        String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(sink_config_tuple, 1)))
       end
 
       let port = recover val
-        String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(sink_config_tuple, 2)))
+        String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(sink_config_tuple, 2)))
       end
 
       let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
@@ -949,7 +950,7 @@ primitive _SinkConfig
       TCPSinkConfig[PyData val](encoder, host, port)
     | "kafka-internal" =>
       let kafka_sink_name = recover val
-        String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(sink_config_tuple, 1)))
+        String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(sink_config_tuple, 1)))
       end
 
       let encoderp = @PyTuple_GetItem(sink_config_tuple, 2)
@@ -978,7 +979,7 @@ primitive _SinkConfig
 
   fun _kafka_config_options(source_config_tuple: Pointer[U8] val): KafkaConfigOptions iso^ =>
     let topic = recover val
-      String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+      String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(source_config_tuple, 1)))
     end
 
     let brokers_list = @PyTuple_GetItem(source_config_tuple, 2)
@@ -989,9 +990,9 @@ primitive _SinkConfig
 
       for i in Range(0, num_brokers) do
         let broker = @PyList_GetItem(brokers_list, i)
-        let host = recover val String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(broker, 0))) end
+        let host = recover val String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(broker, 0))) end
         let port = try
-          String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(broker, 1))).i32()?
+          String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(broker, 1))).i32()?
         else
           9092
         end
@@ -1001,7 +1002,7 @@ primitive _SinkConfig
     end
 
     let log_level = recover val
-      String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(source_config_tuple, 3)))
+      String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(source_config_tuple, 3)))
     end
 
     let max_produce_buffer_ms = @PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 4)).u64()
