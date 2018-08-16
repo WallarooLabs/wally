@@ -73,7 +73,7 @@ wallaroo_unit_tests:
 machida_build: $(MACHIDA_BUILD)/machida
 
 -include $(MACHIDA_PATH)/machida.d
-$(MACHIDA_BUILD)/machida: EXTRA_PONYCFLAGS= --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD)
+$(MACHIDA_BUILD)/machida: EXTRA_PONYCFLAGS= --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD) --linker '$(CC) $(shell python3-config --libs)'
 $(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a
 	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
 

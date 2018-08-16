@@ -25,7 +25,6 @@ use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 
-use "lib:python3.5m"
 use "lib:python-wallaroo"
 
 actor Main
