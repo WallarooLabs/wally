@@ -12,9 +12,17 @@ export GO_VERSION="1.9.4"
 
 
 install_ponyc() {
+  # to allow apt to use HTTPS repos
+  sudo apt-get install \
+     apt-transport-https \
+     ca-certificates \
+     curl \
+     gnupg2 \
+     software-properties-common
+
   echo "** Installing ponyc $PONYC_VERSION"
-  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "8756 C4F7 65C9 AC3C B6B8  5D62 379C E192 D401 AB61"
-  echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list.d/pony-language.list
+  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
+  sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
   sudo apt-get update
 
   sudo apt-get -V install ponyc=$PONYC_VERSION
@@ -25,8 +33,8 @@ install_ponyc() {
 install_pony_stable() {
   echo "** Installing pony-stable"
 
-  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
-  echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list.d/pony-stable-debian.list
+  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
+  sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
   sudo apt-get update
   sudo apt-get -V -y install pony-stable
 

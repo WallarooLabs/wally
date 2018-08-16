@@ -48,12 +48,20 @@ update_version() {
   echo "VERSION set to $version"
   echo "Replacing Wallaroo version in Vagrant bootstrap.sh with $version"
   find vagrant -name "bootstrap.sh" -exec sed -i -- "/WALLAROO_VERSION/ s/=\"[^\"][^\"]*\"/=\"$version\"/" {} \;
+  echo "Updating wallaroo-up.sh for $version"
+  # default wallaroo-up.sh to this latest release
+  rc_suffix=$(git show -s --oneline | cut -f1 -d ' ')
+  sed -i "s/^WALLAROO_VERSION_DEFAULT=.*/WALLAROO_VERSION_DEFAULT=${version}-${rc_suffix}/" misc/wallaroo-up.sh
+  PONYC_VERSION=$(grep -Po '(?<=PONYC_VERSION=").*(?=")' .release/bootstrap.sh)
+  # add version to wallaroo-up.sh map
+  sed -i "s/WALLAROO_PONYC_MAP=\"/WALLAROO_PONYC_MAP=\"\nW${version}-${rc_suffix}=${PONYC_VERSION}/" misc/wallaroo-up.sh
 }
 
 commit_version_update() {
   # commit VERSION update
   git add VERSION
   git add vagrant/bootstrap.sh
+  git add misc/wallaroo-up.sh
   git commit -m "Create candidate for $version release"
 }
 

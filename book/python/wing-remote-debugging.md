@@ -11,7 +11,7 @@ Let's get Wing IDE set up for remote debugging. We'll set up a remote host for B
 First, let's head over to our `reverse` example inside of bash
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/examples/python/reverse
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/reverse
 ```
 
 We'll want to copy over the `wingdbstub.py` file (created when Wing IDE installed the remote agent in our initial setup in your WINGHOME location) to our current directory.
@@ -74,13 +74,13 @@ In this section, we'll run through setting up our Reverse example so you can ver
 
 ### Reverse Example Setup
 
-Now that our project is setup, let's open the `~/wallaroo-tutorial/wallaroo/examples/python/reverse/wingdbstub.py` file via Wing's `File -> Open Remote File`.
+Now that our project is setup, let's open the `~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/reverse/wingdbstub.py` file via Wing's `File -> Open Remote File`.
 
 We'll modify the `kEmbedded` config from `0` to `1` and save.
 
 ![Wing kEmbedded](/book/python/images/remote-debugging/wing-kembedded.png)
 
-We'll also open the `~/wallaroo-tutorial/wallaroo/examples/python/reverse/reverse.py` file via Wing's `File -> Open Remote File`
+We'll also open the `~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/reverse/reverse.py` file via Wing's `File -> Open Remote File`
 
 We'll add `import wingdbstub` in order to use our debugger and we'll also set a breakpoint within our `compute` function on the `print "compute", data` line.
 

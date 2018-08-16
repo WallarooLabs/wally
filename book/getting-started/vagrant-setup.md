@@ -44,11 +44,11 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
+This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-git clone https://github.com/WallarooLabs/wallaroo
-cd wallaroo
+git clone https://github.com/WallarooLabs/wallaroo wallaroo-{{ book.wallaroo_version }}
+cd wallaroo-{{ book.wallaroo_version }}
 git checkout {{ book.wallaroo_version }}
 ```
 
@@ -75,7 +75,7 @@ Provisioning should take about 10 to 15 minutes. When it finishes, you will have
 To provision, run the following commands:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/vagrant
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
 vagrant up
 ```
 
@@ -98,7 +98,7 @@ vagrant up
 You can shut down the Vagrant Box by running the following on your host machine:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/vagrant
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
 vagrant halt
 ```
 

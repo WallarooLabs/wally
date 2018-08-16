@@ -52,6 +52,8 @@
   * [Installing with Vagrant](book/getting-started/installing-with-vagrant.md)
     * [Setting Up Your Environment](book/getting-started/vagrant-setup.md)
     * [Run a Wallaroo Application in Vagrant](book/getting-started/run-a-wallaroo-application-vagrant.md)
+  * [Installing with Wallaroo Up](book/getting-started/wallaroo-up.md)
+    * [Run a Wallaroo Application with Wallaroo Up](book/getting-started/run-a-wallaroo-application-wallaroo-up.md)
   * [Installing From Source](book/getting-started/installing-from-source.md)
     * [Setting up Your Environment](book/getting-started/setup.md)
       * [Ubuntu Installation](book/getting-started/linux-setup.md)
@@ -74,8 +76,11 @@
 * [Go API Introduction](book/go/intro.md)
 
 * [Setting up Your Environment](book/go/getting-started/setting-up-your-environment.md)
-  * [Setting up Your Environment](book/go/getting-started/setup.md)
-    * [Ubuntu Installation](book/go/getting-started/linux-setup.md)
+  * [Choosing an Installation Option](book/go/getting-started/choosing-an-installation-option.md)
+  * [Installing with Wallaroo Up](book/go/getting-started/wallaroo-up.md)
+  * [Installing From Source](book/go/getting-started/installing-from-source.md)
+    * [Setting up Your Environment](book/go/getting-started/setup.md)
+      * [Ubuntu Installation](book/go/getting-started/linux-setup.md)
   * [Run a Wallaroo Go Application](book/go/getting-started/run-a-wallaroo-go-application.md)
   * [Conclusion](book/go/getting-started/conclusion.md)
 

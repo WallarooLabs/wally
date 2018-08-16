@@ -53,7 +53,7 @@ docker start mui
 We'll use Data Receiver to listen for data from our Wallaroo application.
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/utils/data_receiver
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/utils/data_receiver
 ./data_receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
 ```
 
@@ -64,13 +64,13 @@ Data Receiver will start up and receive data without creating any output. By def
 First, we will need to set up the `PYTHONPATH` environment variable. Machida needs to be able to find the `wallaroo` Python module, which is in a file called `wallaroo.py` in the `machida` directory. It also needs to be able to find the module that defines the application. In order to do that, set and export the `PYTHONPATH` environment variable like this:
 
 ```bash
-export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo/machida:$HOME/wallaroo-tutorial/wallaroo/examples/python/celsius"
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
 ```
 
 Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/machida
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida
 ./build/machida --application-module celsius --in 127.0.0.1:7000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
@@ -86,10 +86,10 @@ We will be sending in 25,000,000 messages using a pre-generated data file. The d
 You will now be able to start the `sender` with the following command:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/giles/sender
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/giles/sender
 ./sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
   --repeat --no-write --msg-size 8 --ponythreads=1 --ponynoblock \
-  --file ~/wallaroo-tutorial/wallaroo/examples/python/celsius/celsius.msg
+  --file ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
@@ -127,7 +127,7 @@ Feel free to click around and get a feel for how the Metrics UI is setup and how
 You can shut down the cluster with this command at any time:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/utils/cluster_shutdown
 ./cluster_shutdown 127.0.0.1:5050
 ```
 
