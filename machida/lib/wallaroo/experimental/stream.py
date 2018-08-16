@@ -81,10 +81,14 @@ class stream_message_decoder(object):
         return 4
 
     def payload_length(self, bytes):
-        return struct.unpack(">I", bytes)[0]
+        return struct.unpack("<I", bytes)[0]
 
     def decode(self, data):
-        return self._message_decoder(data)
+        meta_len = struct.unpack_from('<H', data)
+        # We dropping the metadata on the floor for now, slice out the
+        # remaining data for message decoding.
+        message_data = data[struct.calcsize('<H') + meta_len :]
+        return self._message_decoder(message_data)
 
     def __call__(self, *args):
         return self._message_decoder(*args)
@@ -97,11 +101,26 @@ class stream_message_encoder(object):
         _validate_arity_compatability(encoder, 1)
         self._message_encoder = encoder
 
-    def encode(self, data):
+    def encode(self, data, partition=None, sequence=None):
         encoded = self._message_encoder(data)
-        return struct.pack('>I', len(encoded)) + encoded
+        if partition:
+            part = str(partition)
+        else:
+            part = ''
+        if sequence:
+            seq = int(sequence)
+        else:
+            seq = -1
+        meta = struct.pack('<H', len(part) + struct.calcsize('<q')) + part + struct.pack('<q', seq)
+        return struct.pack('<I', len(meta) + len(encoded)) + meta + encoded
 
     def __call__(self, *args):
+        # NOTE: I'm not sure when we use these __call__ forms. We may have
+        # them in place so applications may call their functions. We should
+        # be careful to avoid using this ourselves since it lacks the metadata
+        # section of the payload and proper framing.
+        # Longer term, the framing and metadata serializatoin will all be in
+        # Pony so this decorator can be removed entirely.
         return self._message_encoder(*args)
 
 

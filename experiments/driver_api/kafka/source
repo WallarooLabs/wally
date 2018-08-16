@@ -9,4 +9,4 @@ fi
 . _env/bin/activate
 
 export PYTHONPATH=../../../machida/lib:$PWD:$PYTHONPATH
-python kafka_consumer.py
+python kafka_consumer.py --topic=text --text-stream 127.0.0.1:7100

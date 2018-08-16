@@ -25,10 +25,13 @@ import wallaroo.experimental
 import text_documents
 import counts
 
+
 def application_setup(args):
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
+    # New style
+    text_addr = text_documents.parse_text_stream_addr(args)
+    text_stream = text_documents.TextStream(*text_addr)
+    # Old style
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
-    text_stream = text_documents.TextStream(host=in_host, base_port=in_port)
     count_stream = counts.CountStream(host=out_host, port=out_port)
 
     ab = wallaroo.ApplicationBuilder("Word Count Application")

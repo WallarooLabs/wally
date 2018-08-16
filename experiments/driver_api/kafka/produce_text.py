@@ -4,7 +4,6 @@ import time
 import sys
 
 from kafka import KafkaProducer
-
 project = os.path.dirname(__file__)
 bill_path = os.path.join(project, "../data/bill_of_rights.txt")
 with open(bill_path, 'r') as file:

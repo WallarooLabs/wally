@@ -1,13 +1,15 @@
 from __future__ import print_function
-import time
+import sys
 
+from wallaroo.contrib.kafka import parse_kafka_params
 from wallaroo.experimental import SourceDriver
 from kafka import KafkaConsumer
-from text_documents import TextStream, text_encoder
+from text_documents import TextStream, text_encoder, parse_text_stream_addr
 
-consumer = KafkaConsumer('test', bootstrap_servers='127.0.0.1:9092', group_id='experiment')
-driver = SourceDriver(text_encoder)
-driver.connect('127.0.0.1', 7100)
+params = parse_kafka_params(sys.argv)
+consumer = KafkaConsumer(params.topics, bootstrap_servers=params.bootstrap_broker, group_id=params.consumer_group)
+text_stream_addr = parse_text_stream_addr(sys.argv)
+driver = TextStream(*text_stream_addr).driver()
 
 print("Consuming topic 'text'")
 for message in consumer:
