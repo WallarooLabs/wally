@@ -156,6 +156,10 @@ EOF
       sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "cd metrics_ui.AppDir/usr && tar -xvzf ../../monitoring_hub/apps/metrics_reporter_ui/_build/prod/rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz"
 
       # build appimage
+      sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "ARCH=x86_64 ./squashfs-root/AppRun --appdir metrics_ui.AppDir --custom-apprun=AppRun --desktop-file=metrics_ui.desktop --icon-file=metrics_ui.png"
+      ## temporary hack; remove once linuxdeploy works correctly
+      sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "mv metrics_ui.AppDir/usr/lib/libcrypto.so.10 metrics_ui.AppDir/usr/lib/crypto-4.1/priv/lib/"
+
       sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "ARCH=x86_64 ./squashfs-root/AppRun --appdir metrics_ui.AppDir --custom-apprun=AppRun --desktop-file=metrics_ui.desktop --icon-file=metrics_ui.png --output appimage"
 
       rm linuxdeploy-x86_64.AppImage
