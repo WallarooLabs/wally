@@ -65,7 +65,7 @@ Set `PATH` to refer to the directory that contains the `data_receiver` executabl
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
 ```
 
 Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
@@ -82,8 +82,8 @@ Set `PATH` to refer to the directory that contains the `machida` executable. Set
 **Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
-export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
+export PYTHONPATH="$PYTHONPATH:.:$PWD/../../../machida"
 ```
 
 Run `machida` with `--application-module word_count_with_dynamic_keys`:
@@ -103,8 +103,9 @@ Set `PATH` to refer to the directory that contains the `sender`  executable. Ass
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
 ```
+
 Send messages:
 
 ```bash
@@ -124,7 +125,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
 ```
 
 You can shut down the Wallaroo cluster with this command once processing has finished:

@@ -5,9 +5,14 @@ ENV PONY_STABLE_VERSION 0.1.4-121.d8a403e
 ENV OTP_VERSION 1:20.2.2
 ENV ELIXIR_VERSION 1.5.2-1
 
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2" \
-  && echo "deb http://dl.bintray.com/pony-language/ponyc-debian pony-language main" >> /etc/apt/sources.list \
-  && echo "deb http://dl.bintray.com/pony-language/pony-stable-debian /" >> /etc/apt/sources.list \
+RUN apt-get install -y \
+     apt-transport-https \
+     ca-certificates \
+     curl \
+     gnupg2 \
+     software-properties-common \
+  && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA" \
+  && add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main" \
   && apt-get update \
   && apt-get install -y \
     build-essential \

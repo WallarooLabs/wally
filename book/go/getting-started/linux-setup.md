@@ -6,7 +6,7 @@ There are a few applications/tools which are required to be installed before you
 
 ## Memory requirements
 
-In order to compile the Wallaroo example applications, your system will need to have approximately 6 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
+In order to compile the Wallaroo example applications, your system will need to have approximately 3 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
 
 
 ## Installing git
@@ -27,11 +27,11 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
+This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-git clone https://github.com/WallarooLabs/wallaroo
-cd wallaroo
+git clone https://github.com/WallarooLabs/wallaroo wallaroo-{{ book.wallaroo_version }}
+cd wallaroo-{{ book.wallaroo_version }}
 git checkout {{ book.wallaroo_version }}
 ```
 
@@ -93,7 +93,18 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
 In order to install `ponyc` and `pony-stable` via `apt-get` the following keyserver must be added to the APT key management utility.
 
 ```bash
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
+```
+
+The following packages need to be installed to allow `apt` to use a repository over HTTPS:
+
+```bash
+sudo apt-get install \
+     apt-transport-https \
+     ca-certificates \
+     curl \
+     gnupg2 \
+     software-properties-common
 ```
 
 ### Installing ponyc
@@ -101,7 +112,7 @@ sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61
 Now you need to install Pony compiler `ponyc`. Run:
 
 ```bash
-echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
+sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
 sudo apt-get update
 sudo apt-get -V install ponyc=0.24.4
 ```
@@ -111,7 +122,7 @@ sudo apt-get -V install ponyc=0.24.4
 Next, you need to install `pony-stable`, a Pony dependency management library. Navigate to a directory where you will put the `pony-stable` repo and execute the following commands:
 
 ```bash
-echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list
+sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
 sudo apt-get update
 sudo apt-get -V install pony-stable
 ```
@@ -159,7 +170,7 @@ All of the Docker commands throughout the rest of this manual assume that you ha
 sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_metrics_ui_url }}
 ```
 
-## Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool
+## Compiling Giles Sender, Data Receiver, Cluster Shutdown, and Cluster Shrinker tools
 
 Giles Sender is used to supply data to Wallaroo applications over TCP, and Data Receiver is used as a fast TCP Sink that can write the messages it receives to STDOUT. The two together are useful when developing and testing applications that use TCP Sources and a TCP Sink.
 
@@ -167,26 +178,10 @@ The Cluster Shutdown tool is used to instruct the cluster to shutdown cleanly, c
 
 The Cluster Shrinker tool is used to tell a running cluster to reduce the number of workers in the cluster and to query the cluster for information about how many workers are eligible for removal.
 
-## Compiling Giles Sender, Data Receiver, Cluster Shutdown, and Cluster Shrinker tools
-
-Change to the root Wallaroo directory:
+To compile all of the tools, change to the root Wallaroo directory:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/
-```
-
-### Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool on Artful and Bionic
-
-Due to ponyc's dependence on PIC on Artful Ubuntu, all applications must be compiled with the `PONYCFLAGS="--pic"` flag, like so:
-
-
-```bash
-make build-giles-sender-all build-utils-all PONYCFLAGS="--pic"
-```
-
-### Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool on Trusty and Xenial
-
-```bash
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
 make build-giles-sender-all build-utils-all
 ```
 

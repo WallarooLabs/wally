@@ -52,7 +52,7 @@ docker start mui
 We'll use Data Receiver to listen for data from our Wallaroo application.
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/utils/data_receiver
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/utils/data_receiver
 ./data_receiver --listen 127.0.0.1:5555 --no-write
 ```
 
@@ -63,23 +63,14 @@ Data Receiver will start up and receive data without creating any output. By def
 First, we need to build the application.
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius
 make
-```
-
-### Compiling for Artful Ubuntu
-
-Due to ponyc's dependence on PIC on Artful Ubuntu, all applications must be compiled with the `PONYCFLAGS="--pic"` flag, like so:
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
-make PONYCFLAGS="--pic"
 ```
 
 Now start up the "Celsius to Fahrenheit" application.
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/examples/go/celsius
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius
 ./celsius --in 127.0.0.1:7000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
@@ -95,10 +86,10 @@ We will be sending in 25,000,000 messages using a pre-generated data file. The d
 You will now be able to start the `sender` with the following command:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/giles/sender
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/giles/sender
 ./sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
   --repeat --no-write --msg-size 8 --ponythreads=1 --ponynoblock \
-  --file ~/wallaroo-tutorial/wallaroo/examples/go/celsius/celsius.msg
+  --file ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
@@ -136,7 +127,7 @@ Feel free to click around and get a feel for how the Metrics UI is setup and how
 You can shut down the cluster with this command at any time:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/utils/cluster_shutdown
 ./cluster_shutdown 127.0.0.1:5050
 ```
 

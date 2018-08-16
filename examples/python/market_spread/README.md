@@ -131,7 +131,7 @@ Set `PATH` to refer to the directory that contains the `data_receiver` executabl
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
 ```
 
 Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
@@ -148,8 +148,8 @@ Set `PATH` to refer to the directory that contains the `machida` executable. Set
 **Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
-export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
+export PYTHONPATH="$PYTHONPATH:.:$PWD/../../../machida"
 ```
 
 Run `machida` with `--application-module market_spread`:
@@ -169,7 +169,7 @@ Set `PATH` to refer to the directory that contains the `sender`  executable. Ass
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
 ```
 
 First prime the market data state with these initial messages, sent in via Giles Sender:
@@ -203,7 +203,7 @@ Set `PATH` to refer to the directory that contains the `sender`  executable. Ass
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
 ```
 
 To send order messages, run this command:
@@ -224,7 +224,7 @@ Set `PATH` to refer to the directory that contains the `cluster_shutdown` execut
 **Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
 
 ```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
+export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
 ```
 
 The sender commands will send data for a long time, so processing never really finishes. When you are ready to shut down the cluster you can run this command:

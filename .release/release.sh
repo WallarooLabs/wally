@@ -62,6 +62,14 @@ update_version() {
   echo "VERSION set to $for_version"
   echo "Replacing Wallaroo version in Vagrant bootstrap.sh with $for_version"
   find vagrant -name "bootstrap.sh" -exec sed -i -- "/WALLAROO_VERSION/ s/=\"[^\"][^\"]*\"/=\"$for_version\"/" {} \;
+  echo "Updating wallaroo-up.sh for $for_version"
+  # default wallaroo-up.sh to this latest release
+  sed -i "s/^WALLAROO_VERSION_DEFAULT=.*/WALLAROO_VERSION_DEFAULT=$for_version/" misc/wallaroo-up.sh
+  # add version to wallaroo-up.sh map
+  PONYC_VERSION=$(grep -Po '(?<=PONYC_VERSION=").*(?=")' .release/bootstrap.sh)
+  sed -i "s/WALLAROO_PONYC_MAP=\"/WALLAROO_PONYC_MAP=\"\nW${for_version}=${PONYC_VERSION}/" misc/wallaroo-up.sh
+  # remove old release candidate versions from wallaroo-up.sh map
+  sed -i "/Wrelease-/d" misc/wallaroo-up.sh
 }
 
 commit_version_update() {
@@ -69,6 +77,7 @@ commit_version_update() {
   # commit VERSION update
   git add VERSION
   git add vagrant/bootstrap.sh
+  git add misc/wallaroo-up.sh
   git commit -m "Update version for $for_version release"
 }
 
@@ -140,6 +149,7 @@ tag_and_push() {
 
 if [ $# -lt 2 ]; then
   echo "release candidate branch and version arguments required"
+  exit 1
 fi
 
 set -eu
