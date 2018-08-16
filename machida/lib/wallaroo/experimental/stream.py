@@ -17,57 +17,6 @@ import struct
 from wallaroo.builder import _validate_arity_compatability
 
 
-# TODO: rethink some of this API around partitioning discussion
-# class StreamDescription(object):
-#     """
-#     This offers a description of a given stream. Construct it using:
-
-#        ... TODO EXAMPLE HERE ...
-
-#     Customization can be done by subclassing this type and is the recommended
-#     way to provide computed descriptions (instead of passing computed values
-#     to the constructor). On the other hand, if you have fixed values, the base
-#     constructor is recommend.
-#     """
-
-#     def __init__(self, **kwargs):
-#         self._partitions = kwargs['partitions']
-#         self._durability = kwargs['durability']
-#         self._sequencing = kwargs['sequencing']
-#         self._decoder = kwargs['decoder'] or identity_decoder
-#         self._encoder = kwargs['encoder'] or identity_encoder
-
-#     def partitions(self):
-#         """
-#         Explain partitions
-#         """
-#         return self._partitions
-
-#     def durability(self):
-#         """
-#         Explain durability
-#         """
-#         return self._durability
-
-#     def sequencing(self):
-#         """
-#         Explain sequencing
-#         """
-#         return self._sequencing
-
-#     def encoder(self):
-#         """
-#         Explain encoder
-#         """
-#         return self._encoder
-
-#     def decoder(self):
-#         """
-#         Expplain decoder
-#         """
-#         return self._decoder
-
-
 # A decorator class used because we use decode rather than call in machida and
 # also require header_length and payload_length even though those are fixed in
 # this specific implementation now.

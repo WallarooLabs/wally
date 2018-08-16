@@ -149,17 +149,10 @@ class ApplicationBuilder(object):
 class StateBuilder(object):
     def __init__(self, name, state_cls):
         self._name = name
-<<<<<<< HEAD
         self.state_cls = state_cls
 
     def ____wallaroo_build____(self):
         return self.state_cls()
-=======
-        self._state_cls = state_cls
-
-    def ____wallaroo_build____(self):
-        return self._state_cls()
->>>>>>> Refactor base wallaroo.py library into modules
 
     def name(self):
         return self._name
@@ -186,4 +179,3 @@ def _validate_arity_compatability(obj, arity):
 
 class WallarooParameterError(Exception):
     pass
-

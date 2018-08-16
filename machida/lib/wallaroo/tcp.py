@@ -53,31 +53,3 @@ def parse_output_addrs(args):
     output_addrs = parser.parse_known_args(args)[0].output_addrs
     # split H1:P1,H2:P2... into [(H1, P1), (H2, P2), ...]
     return [tuple(x.split(':')) for x in output_addrs.split(',')]
-
-
-def decoder(header_length, length_fmt):
-    def wrapped(decoder_function):
-        _validate_arity_compatability(decoder_function, 1)
-        @wraps(decoder_function)
-        class C:
-            def header_length(self):
-                return header_length
-            def payload_length(self, bs):
-                return struct.unpack(length_fmt, bs)[0]
-            def decode(self, bs):
-                return decoder_function(bs)
-            def __call__(self, *args):
-                return self
-        return C()
-    return wrapped
-
-
-def encoder(encoder_function):
-    _validate_arity_compatability(encoder_function, 1)
-    @wraps(encoder_function)
-    class C:
-        def encode(self, data):
-            return encoder_function(data)
-        def __call__(self, *args):
-            return self
-    return C()

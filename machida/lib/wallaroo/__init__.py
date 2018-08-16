@@ -12,12 +12,18 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+<<<<<<< HEAD
 from functools import wraps
 <<<<<<< HEAD
 import pickle
 =======
 import cPickle
 >>>>>>> Refactor base wallaroo.py library into modules
+=======
+import pickle
+import struct
+import sys
+>>>>>>> Fix merge with master
 
 from builder import (ApplicationBuilder, _validate_arity_compatability)
 
@@ -27,8 +33,6 @@ from builder import (ApplicationBuilder, _validate_arity_compatability)
 from .tcp import (
     SourceConfig as TCPSourceConfig,
     SinkConfig as TCPSinkConfig,
-    decoder,
-    encoder,
     parse_input_addrs as tcp_parse_input_addrs,
     parse_output_addrs as tcp_parse_output_addrs,
 )
@@ -62,85 +66,11 @@ def deserialize(bs):
     return pickle.loads(bs)
 
 
-def computation(name):
-    def wrapped(computation_function):
-        _validate_arity_compatability(computation_function, 1)
-        @wraps(computation_function)
-        class C:
-            def name(self):
-                return name
-            def compute(self, data):
-                return computation_function(data)
-            def __call__(self, *args):
-                return self
-        return C()
-    return wrapped
-
-
-def state_computation(name):
-    def wrapped(computation_function):
-        _validate_arity_compatability(computation_function, 2)
-        @wraps(computation_function)
-        class C:
-            def name(self):
-                return name
-            def compute(self, data, state):
-                return computation_function(data, state)
-            def __call__(self, *args):
-                return self
-        return C()
-    return wrapped
-
-
-def computation_multi(name):
-    def wrapped(computation_function):
-        _validate_arity_compatability(computation_function, 1)
-        @wraps(computation_function)
-        class C:
-            def name(self):
-                return name
-            def compute_multi(self, data):
-                return computation_function(data)
-            def __call__(self, *args):
-                return self
-        return C()
-    return wrapped
-
-
-def state_computation_multi(name):
-    def wrapped(computation_function):
-        _validate_arity_compatability(computation_function, 2)
-        @wraps(computation_function)
-        class C:
-            def name(self):
-                return name
-            def compute_multi(self, data, state):
-                return computation_function(data, state)
-            def __call__(self, *args):
-                return self
-        return C()
-    return wrapped
-
-
-def partition(fn):
-    _validate_arity_compatability(fn, 1)
-    @wraps(fn)
-    class C:
-        def partition(self, data):
-            return fn(data)
-        def __call__(self, *args):
-            return self
-    return C()
-
-
-
-def attach_to_module(cls, cls_name, func):
+def _attach_to_module(cls, cls_name, func):
     # Do some scope mangling to create a uniquely named class based on
     # the decorated function's name and place it in the wallaroo module's
     # namespace so that pickle can find it.
-
     name = cls_name + '__' + func.__name__
-
     # Python2: use __name__
     if sys.version_info.major == 2:
         cls.__name__ = name
@@ -152,10 +82,9 @@ def attach_to_module(cls, cls_name, func):
     return globals()[name]
 
 
-
 def _wallaroo_wrap(name, func, base_cls, **kwargs):
     # Case 1: Computations
-    if issubclass(base_cls, Computation):
+    if issubclass(base_cls, _Computation):
         # Create the appropriate computation signature
         if base_cls._is_state:
             def comp(self, data, state):
@@ -179,20 +108,20 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         else:
             C.compute = comp
 
-    # Case 2: Partition
-    elif base_cls is Partition:
+    # Case 2: _Partition
+    elif base_cls is _Partition:
         class C(base_cls):
             def partition(self, data):
                 return func(data)
 
     # Case 3: Encoder
-    elif base_cls is Encoder:
+    elif base_cls is _Encoder:
         class C(base_cls):
             def encode(self, data):
                 return func(data)
 
     # Case 4: Decoder
-    elif base_cls is Decoder:
+    elif base_cls is _Decoder:
         header_length = kwargs['header_length']
         length_fmt = kwargs['length_fmt']
         class C(base_cls):
@@ -204,104 +133,92 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                 return func(bs)
 
     # Attach the new class to the module's global namespace and return it
-    return attach_to_module(C, base_cls.__name__, func)
+    return _attach_to_module(C, base_cls.__name__, func)
 
 
-class BaseWrapped(object):
+class _BaseWrapped(object):
     def __call__(self, *args):
         return self
 
 
-class Computation(BaseWrapped):
+class _Computation(_BaseWrapped):
     _is_multi = False
     _is_state = False
-
-
-class ComputationMulti(Computation):
-    _is_multi = True
-
-
-class StateComputation(Computation):
-    _is_state = True
-
-
-class StateComputationMulti(StateComputation):
-    _is_multi = True
-
-
-class Partition(BaseWrapped):
-    pass
-
-
-class Decoder(BaseWrapped):
-    pass
-
-
-class Encoder(BaseWrapped):
-    pass
 
 
 def computation(name):
     def wrapped(func):
         _validate_arity_compatability(func, 1)
-        C = _wallaroo_wrap(name, func, Computation)
+        C = _wallaroo_wrap(name, func, _StateComputation)
         return C()
     return wrapped
+
+
+class _StateComputation(_Computation):
+    _is_state = True
 
 
 def state_computation(name):
     def wrapped(func):
         _validate_arity_compatability(func, 2)
-        C = _wallaroo_wrap(name, func, StateComputation)
+        C = _wallaroo_wrap(name, func, _StateComputation)
         return C()
     return wrapped
+
+
+class _ComputationMulti(_Computation):
+    _is_multi = True
 
 
 def computation_multi(name):
     def wrapped(func):
         _validate_arity_compatability(func, 1)
-        C = _wallaroo_wrap(name, func, ComputationMulti)
+        C = _wallaroo_wrap(name, func, _ComputationMulti)
         return C()
     return wrapped
+
+
+class _StateComputationMulti(_StateComputation):
+    _is_multi = True
 
 
 def state_computation_multi(name):
     def wrapped(func):
         _validate_arity_compatability(func, 2)
-        C = _wallaroo_wrap(name, func, StateComputationMulti)
+        C = _wallaroo_wrap(name, func, _StateComputationMulti)
         return C()
     return wrapped
 
 
-class StateBuilder(object):
-    def __init__(self, name, state_cls):
-        self.name = name
-        self.state_cls = state_cls
-
-    def ____wallaroo_build____(self):
-        return self.state_cls()
-
-    def name(self):
-        return self.name
-
-
-def partition(func):
-    _validate_arity_compatability(func, 1)
-    C = _wallaroo_wrap(func.__name__, func, Partition)
-    return C()
+class _Decoder(_BaseWrapped):
+    pass
 
 
 def decoder(header_length, length_fmt):
     def wrapped(func):
         _validate_arity_compatability(func, 1)
-        C = _wallaroo_wrap(func.__name__, func, Decoder,
+        C = _wallaroo_wrap(func.__name__, func, _Decoder,
                            header_length = header_length,
                            length_fmt = length_fmt)
         return C()
     return wrapped
 
 
+class _Encoder(_BaseWrapped):
+    pass
+
+
 def encoder(func):
     _validate_arity_compatability(func, 1)
-    C = _wallaroo_wrap(func.__name__, func, Encoder)
+    C = _wallaroo_wrap(func.__name__, func, _Encoder)
+    return C()
+
+
+class _Partition(_BaseWrapped):
+    pass
+
+
+def partition(func):
+    _validate_arity_compatability(func, 1)
+    C = _wallaroo_wrap(func.__name__, func, _Partition)
     return C()
