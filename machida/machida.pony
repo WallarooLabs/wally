@@ -514,7 +514,7 @@ primitive Machida
       let action = String.copy_cstring(action_p)
       if action == "name" then
         let name = recover val
-          String.copy_cstring(@PyBytes_AsString(@PyTuple_GetItem(item, 1)))
+          String.copy_cstring(@PyUnicode_AsUTF8(@PyTuple_GetItem(item, 1)))
         end
         app = Application(name)
         break
@@ -773,7 +773,7 @@ primitive Machida
     let ps = @get_name(o)
     recover
       if not ps.is_null() then
-        let ret = String.copy_cstring(@PyBytes_AsString(ps))
+        let ret = String.copy_cstring(@PyUnicode_AsUTF8(ps))
         dec_ref(ps)
 	ret
       else
