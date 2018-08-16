@@ -32,7 +32,7 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 
     htop \
     numactl \
     python-dev \
-    python-pip && \
+    python-pip  \
     python3-dev \
     python3-pip && \
     pip2 install virtualenv virtualenvwrapper && \
