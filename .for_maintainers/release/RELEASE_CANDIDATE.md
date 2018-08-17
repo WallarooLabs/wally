@@ -2,7 +2,7 @@
 
 This document is aimed at members of the Wallaroo team who might be creating a Wallaroo release candidate. It serves as a checklist that can take your through the creation process step-by-step.
 
-To learn more about our release process, see [RELEASE.md].
+To learn more about our release process, see [RELEASE.md](RELEASE.md).
 
 ## Prerequisites for creating any release candidate
 
