@@ -394,6 +394,7 @@ check_wallaroo_dest() {
 
 configure_wallaroo() {
   if [ "$BACKUP_WALLAROO_UP_DEST" == "true" ]; then
+    INSTALL_TYPE=subsequent
     DATETIME=$(date +%Y%m%d%H%M%S)
     if [ "$PREVIEW_COMMANDS" != "true" ]; then
       log "Backing up existing '${WALLAROO_UP_DEST}/${WALLAROO_VERSION_DIRECTORY}' to '${WALLAROO_UP_DEST}/${WALLAROO_VERSION_DIRECTORY}.$DATETIME'..."
@@ -437,7 +438,8 @@ configure_wallaroo() {
   fi
 
   ## download/untar wallaroo release tgz from bintray
-  run_cmd "wget $QUIET -O $wallaroo_source_archive https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${wallaroo_source_archive} $REDIRECT"
+  WGET_URL_SUFFIX="?source=${WALLAROO_UP_SOURCE:-wallaroo-up}&install=${INSTALL_TYPE:-initial}&install_type=${WALLAROO_UP_INSTALL_TYPE}"
+  run_cmd "wget $QUIET -O $wallaroo_source_archive https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${wallaroo_source_archive}${WGET_URL_SUFFIX} $REDIRECT"
   run_cmd "mkdir ${WALLAROO_VERSION_DIRECTORY} $REDIRECT"
   run_cmd "tar -C ${WALLAROO_VERSION_DIRECTORY} --strip-components=1 -xzf $wallaroo_source_archive $REDIRECT"
   run_cmd "rm $wallaroo_source_archive $REDIRECT"
@@ -474,7 +476,7 @@ configure_wallaroo() {
   fi
 
   ## download/install monhub appImage
-  run_cmd "wget $QUIET -O $metrics_ui_appimage https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${metrics_ui_appimage} $REDIRECT"
+  run_cmd "wget $QUIET -O $metrics_ui_appimage https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${metrics_ui_appimage}${WGET_URL_SUFFIX} $REDIRECT"
   run_cmd "chmod +x $metrics_ui_appimage $REDIRECT"
 
   # extract the appimage because metrics_ui likes to be able to write to it's directories and also because appimages don't work in docker
@@ -487,14 +489,14 @@ configure_wallaroo() {
     log "Compiling Wallaroo tools..."
   fi
 
-  run_cmd "make $WALLAROO_TOOLS_TO_BUILD $REDIRECT"
+  run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} $WALLAROO_TOOLS_TO_BUILD $REDIRECT"
 
   if [ "$PYTHON_INSTALL" == "true" ]; then
     if [ "$PREVIEW_COMMANDS" != "true" ]; then
       log "Compiling Machida for running Python Wallaroo Applications..."
     fi
 
-    run_cmd "make build-machida-all $REDIRECT"
+    run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all $REDIRECT"
   fi
 
   run_cmd "cp utils/data_receiver/data_receiver bin $REDIRECT"

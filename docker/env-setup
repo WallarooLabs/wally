@@ -20,4 +20,5 @@ if [ -d /src/python-virtualenv ]; then
 fi
 cd /src
 (cat ~/.bashrc; echo "PS1=\"$PS1\"") > /.prompt
+echo "source /src/wallaroo/bin/activate" >> /.prompt
 exec bash --rcfile /.prompt

@@ -9,6 +9,7 @@ wallaroo_up() {
   cd /tmp
   curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/${WALLAROO_VERSION}/misc/wallaroo-up.sh -o wallaroo-up.sh -J -L
   chmod +x wallaroo-up.sh
+  export WALLAROO_UP_SOURCE=vagrant
   ./wallaroo-up.sh -t all 
 }
 

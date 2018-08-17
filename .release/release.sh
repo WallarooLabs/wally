@@ -62,12 +62,14 @@ update_version() {
   echo "VERSION set to $for_version"
   echo "Replacing Wallaroo version in Vagrant bootstrap.sh with $for_version"
   find vagrant -name "bootstrap.sh" -exec sed -i -- "/WALLAROO_VERSION/ s/=\"[^\"][^\"]*\"/=\"$for_version\"/" {} \;
+  echo "Updating Dockerfile for $for_version"
+  sed -i "s/^ENV WALLAROO_VERSION .*/ENV WALLAROO_VERSION ${for_version}/" Dockerfile
   echo "Updating wallaroo-up.sh for $for_version"
   # default wallaroo-up.sh to this latest release
   sed -i "s/^WALLAROO_VERSION_DEFAULT=.*/WALLAROO_VERSION_DEFAULT=$for_version/" misc/wallaroo-up.sh
   # update GO Version in wallaroo-up.sh
   GO_VERSION=$(grep -Po '(?<=GO_VERSION=").*(?=")' .release/bootstrap.sh)
-  sed -i 's/^GOLANG_VERSION=.*/GOLANG_VERSION=${GO_VERSION}/' misc/wallaroo-up.sh
+  sed -i "s/^GOLANG_VERSION=.*/GOLANG_VERSION=${GO_VERSION}/" misc/wallaroo-up.sh
   # add version to wallaroo-up.sh map
   PONYC_VERSION=$(grep -Po '(?<=PONYC_VERSION=").*(?=")' .release/bootstrap.sh)
   sed -i "s/WALLAROO_PONYC_MAP=\"/WALLAROO_PONYC_MAP=\"\nW${for_version}=${PONYC_VERSION}/" misc/wallaroo-up.sh
