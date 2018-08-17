@@ -76,7 +76,7 @@ update_version() {
   # update activate script for latest release
   sed -i "s@^WALLAROO_ROOT=.*@WALLAROO_ROOT=\"\${HOME}/wallaroo-tutorial/wallaroo-${for_version}\"@" misc/activate
   # update activate script for golang version
-  sed -i "s@^export GOROOT=.*@export GOROOT=$WALLAROO_ROOT/bin/go${GO_VERSION}@" misc/activate
+  sed -i "s@^export GOROOT=.*@export GOROOT=\$WALLAROO_ROOT/bin/go${GO_VERSION}@" misc/activate
 }
 
 commit_version_update() {
