@@ -9,7 +9,26 @@ ENV LANGUAGE en_US:en
 ENV WALLAROO_VERSION release-0.5.2
 
 RUN apt-get install -y \
-     curl && \
+    curl \
+    man \
+    netcat-openbsd \
+    curl \
+    wget \
+    less \
+    dnsutils \
+    net-tools \
+    vim \
+    sysstat \
+    htop \
+    numactl \
+    python-dev \
+    python-pip && \
+    python3-dev \
+    python3-pip && \
+    pip2 install virtualenv virtualenvwrapper && \
+    pip2 install --upgrade pip && \
+    pip3 install virtualenv virtualenvwrapper && \
+    pip3 install --upgrade pip && \
     cd /tmp && \
     curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/${WALLAROO_VERSION}/misc/wallaroo-up.sh -o wallaroo-up.sh -J -L && \
     chmod +x wallaroo-up.sh && \
@@ -25,7 +44,10 @@ RUN apt-get install -y \
     make target_cpu=x86-64 build-machida-all resilience=on && \
     cp machida/build/machida bin/machida-resilience && \
     make clean && \
-    mkdir /src
+    mkdir /src && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get -y autoremove --purge && \
+    apt-get -y clean
 
 VOLUME /src/wallaroo
 
