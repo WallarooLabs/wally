@@ -1,8 +1,8 @@
 ## stolen from python virtualenv
-WALLAROO_ROOT="${HOME}/wallaroo-tutorial/wallaroo-0.5.1"
+WALLAROO_ROOT="${HOME}/wallaroo-tutorial/wallaroo-release-0.5.2"
 export WALLAROO_ROOT
 
-export GOROOT=$WALLAROO_ROOT/bin/go1.9.7
+export GOROOT=$WALLAROO_ROOT/bin/go1.9.4
 
 PATH="$WALLAROO_ROOT/bin:$GOROOT/bin:$PATH"
 export PATH
