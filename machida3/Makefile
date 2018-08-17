@@ -55,8 +55,6 @@ PYTHON3_INCLUDES = $(shell python3-config --includes)
 # with our own custom rules. This allows the top level commands like
 # "make test" to work.
 build-machida3: machida3_build
-unit-tests-machida3: build3-machida
-unit-tests-machida3: wallaroo_unit_tests
 clean-machida3: machida3_clean
 
 machida3_clean:
@@ -64,11 +62,6 @@ machida3_clean:
 	$(QUIET)rm -f $(MACHIDA3_PATH)/machida.d
 	$(QUIET)rm -rf $(MACHIDA3_PATH)/.deps
 
-
-wallaroo_unit_tests:
-	cd $(MACHIDA3_PATH) && \
-		python2 -m pytest --color=yes --tb=native --verbose --exitfirst wallaroo_test.py && \
-		python3 -m pytest --color=yes --tb=native --verbose --exitfirst wallaroo_test.py
 
 machida3_build: $(MACHIDA3_BUILD)/machida3
 
