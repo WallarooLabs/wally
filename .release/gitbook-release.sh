@@ -28,6 +28,7 @@ verify_branch() {
     docker_version=$(< VERSION)
     docker_url="release\/wallaroo:$docker_version"
     docker_metrics_ui_url="release\/metrics_ui:$ui_version"
+    bintray_repo_url="https://wallaroo-labs.bintray.com/wallaroolabs-ftp"
   elif [[ "$BRANCH" == "release" ]]
   then
     remote_branch=release
@@ -35,6 +36,7 @@ verify_branch() {
     docker_version=$(< VERSION)
     docker_url="release\/wallaroo:$docker_version"
     docker_metrics_ui_url="release\/metrics_ui:$ui_version"
+    bintray_repo_url="https://wallaroo-labs.bintray.com/wallaroolabs-ftp"
   elif [[ "$BRANCH" == *"release-"* ]]
   then
     remote_branch=rc
@@ -42,6 +44,7 @@ verify_branch() {
     docker_version=$(git describe --tags --always)
     docker_url="dev\/wallaroo:$docker_version"
     docker_metrics_ui_url="dev\/metrics_ui:$ui_version"
+    bintray_repo_url="https://wallaroo-labs.bintray.com/wallaroolabs-rc"
   else
     echo "No remote repo to push book to. Exiting"
     exit 0
@@ -72,6 +75,11 @@ update_versions_in_gitbook() {
   find book -name '*.md' -exec sed -i -- "s/{{ docker_metrics_ui_url }}/$docker_metrics_ui_url/g" {} \;
   echo "Replacing {{ docker_version_url }}"
   find book -name '*.md' -exec sed -i -- "s/{{ docker_version_url }}/$docker_url/g" {} \;
+  echo "Replacing {{ book.bintray_repo_url }}"
+  find book -name '*.md' -exec sed -i -- "s/{{ book.bintray_repo_url }}/$bintray_repo_url/g" {} \;
+  GO_VERSION=$(grep -Po '(?<=GO_VERSION=").*(?=")' .release/bootstrap.sh)
+  echo "Replacing {{ book.golang_version }}"
+  find book -name '*.md' -exec sed -i -- "s/{{ book.golang_version }}/$GO_VERSION/g" {} \;
 }
 
 install_gitbook_deps() {

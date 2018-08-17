@@ -65,11 +65,18 @@ update_version() {
   echo "Updating wallaroo-up.sh for $for_version"
   # default wallaroo-up.sh to this latest release
   sed -i "s/^WALLAROO_VERSION_DEFAULT=.*/WALLAROO_VERSION_DEFAULT=$for_version/" misc/wallaroo-up.sh
+  # update GO Version in wallaroo-up.sh
+  GO_VERSION=$(grep -Po '(?<=GO_VERSION=").*(?=")' .release/bootstrap.sh)
+  sed -i 's/^GOLANG_VERSION=.*/GOLANG_VERSION=${GO_VERSION}/' misc/wallaroo-up.sh
   # add version to wallaroo-up.sh map
   PONYC_VERSION=$(grep -Po '(?<=PONYC_VERSION=").*(?=")' .release/bootstrap.sh)
   sed -i "s/WALLAROO_PONYC_MAP=\"/WALLAROO_PONYC_MAP=\"\nW${for_version}=${PONYC_VERSION}/" misc/wallaroo-up.sh
   # remove old release candidate versions from wallaroo-up.sh map
   sed -i "/Wrelease-/d" misc/wallaroo-up.sh
+  # update activate script for latest release
+  sed -i "s@^WALLAROO_ROOT=.*@WALLAROO_ROOT=\"\${HOME}/wallaroo-tutorial/wallaroo-${for_version}\"@" misc/activate
+  # update activate script for golang version
+  sed -i "s@^export GOROOT=.*@export GOROOT=$WALLAROO_ROOT/bin/go${GO_VERSION}@" misc/activate
 }
 
 commit_version_update() {
@@ -78,6 +85,7 @@ commit_version_update() {
   git add VERSION
   git add vagrant/bootstrap.sh
   git add misc/wallaroo-up.sh
+  git add misc/activate
   git commit -m "Update version for $for_version release"
 }
 

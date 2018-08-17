@@ -28,19 +28,11 @@ The `decoder` function creates a `Votes` object with the letter being voted on a
 
 In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
-You will need five separate shells to run this application. Open each shell and go to the `examples/python/alphabet` directory.
+You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details depending on your installation choice). Open each shell and go to the `examples/python/alphabet` directory.
 
 ### Shell 1: Metrics
 
 Start up the Metrics UI if you don't already have it running.
-
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker start mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
 
 ```bash
 metrics_reporter_ui start
@@ -50,27 +42,11 @@ You can verify it started up correctly by visiting [http://localhost:4000](http:
 
 If you need to restart the UI, run the following.
 
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker restart mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
-
 ```bash
 metrics_reporter_ui restart
 ```
 
 When it's time to stop the UI, run the following.
-
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker stop mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
 
 ```bash
 metrics_reporter_ui stop
@@ -78,27 +54,11 @@ metrics_reporter_ui stop
 
 If you need to start the UI after stopping it, run the following.
 
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker start mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
-
 ```bash
 metrics_reporter_ui start
 ```
 
 ### Shell 2: Data Receiver
-
-Set `PATH` to refer to the directory that contains the `data_receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
-```
 
 Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 
@@ -111,13 +71,6 @@ data_receiver --ponythreads=1 --ponynoblock \
 
 Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `alphabet.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
 
-**Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
-export PYTHONPATH="$PYTHONPATH:.:$PWD/../../../machida"
-```
-
 Run `machida` with `--application-module alphabet`:
 
 ```bash
@@ -129,14 +82,6 @@ machida --application-module alphabet --in 127.0.0.1:7010 \
 
 ### Shell 4: Sender
 
-Set `PATH` to refer to the directory that contains the `sender`  executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
-```
-
 Send messages:
 
 ```bash
@@ -147,14 +92,6 @@ sender --host 127.0.0.1:7010 --file votes.msg \
 
 ## Shell 5: Shutdown
 
-Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
-```
-
 You can shut down the Wallaroo cluster with this command once processing has finished:
 
 ```bash
@@ -164,14 +101,6 @@ cluster_shutdown 127.0.0.1:5050
 You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their respective shells.
 
 You can shut down the Metrics UI with the following command.
-
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker stop mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
 
 ```bash
 metrics_reporter_ui stop

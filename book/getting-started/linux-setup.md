@@ -34,12 +34,14 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
+This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-git clone https://github.com/WallarooLabs/wallaroo wallaroo-{{ book.wallaroo_version }}
+wget -q -O wallaroo-{{ book.wallaroo_version }}.tar.gz {{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/{{ book.wallaroo_version }}.tar.gz
+mkdir wallaroo-{{ book.wallaroo_version }}
+tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
+rm wallaroo-{{ book.wallaroo_version }}.tar.gz
 cd wallaroo-{{ book.wallaroo_version }}
-git checkout {{ book.wallaroo_version }}
 ```
 
 ## Install make
@@ -157,27 +159,29 @@ sudo make install
 sudo apt-get install -y python-dev
 ```
 
-## Install Docker
-
-You'll need Docker (CE or EE) to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/engine/installation/linux/ubuntu/) for getting Docker up and running on Ubuntu on the [Docker website](https://docs.docker.com/engine/installation/linux/ubuntu/).
-
-Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/engine/installation/linux/linux-postinstall/#configure-docker-to-start-on-boot).
-
-All of the Docker commands throughout the rest of this manual assume that you have permission to run Docker commands as a non-root user. Follow the [Manage Docker as a non-root user](https://docs.docker.com/engine/installation/linux/linux-postinstall/#manage-docker-as-a-non-root-user) instructions to set that up. If you don't want to allow a non-root user to run Docker commands, you'll need to run `sudo docker` anywhere you see `docker` for a command.
-
-## Download the Metrics UI
+## Download and configure the Metrics UI
 
 ```bash
-sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_metrics_ui_url }}
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
+mkdir bin
+wget -q -O Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage {{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
+chmod +x Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
+./Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage --appimage-extract
+mv squashfs-root bin/metrics_ui
+sed -i 's/sleep 4/sleep 0/' bin/metrics_ui/AppRun
+rm Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
+ln -s metrics_ui/AppRun bin/metrics_reporter_ui
 ```
 
 ## Compiling Machida
 
-Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
+Machida is the program that runs Wallaroo Python applications. Change to the Wallaroo directory:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida
-make
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
+make build-machida-all
+cp machida/build/machida bin
+cp machida/wallaroo.py bin
 ```
 
 ## Compiling Giles Sender, Data Receiver, Cluster Shutdown, and Cluster Shrinker tools
@@ -193,6 +197,20 @@ To compile all of the tools, change to the root Wallaroo directory:
 ```bash
 cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
 make build-giles-sender-all build-utils-all
+cp utils/data_receiver/data_receiver bin
+cp utils/cluster_shrinker/cluster_shrinker bin
+cp utils/cluster_shutdown/cluster_shutdown bin
+cp giles/sender/sender bin
+```
+
+## Set up activate file for setting environment variables
+
+The `activate` file sets up the environment for running Wallaroo examples when it is sourced
+
+The following command copies it into the correct location:
+
+```
+cp misc/activate bin/
 ```
 
 ## Register

@@ -55,7 +55,7 @@ vagrant up
 
 ## What's Included in the Wallaroo Vagrant Box
 
-* **Machida**: runs Wallaroo Python applications.
+* ** Go Compiler**: for compiling Wallaroo Go applications.
 
 * **Giles Sender**: supplies data to Wallaroo applications over TCP.
 
@@ -65,7 +65,7 @@ vagrant up
 
 * **Metrics UI**: receives and displays metrics for running Wallaroo applications.
 
-* **Wallaroo Source Code**: full Wallaroo source code is provided, including Python example applications.
+* **Wallaroo Source Code**: full Wallaroo source code is provided, including Go example applications.
 
 ## Shutdown the Vagrant Box
 

@@ -1,0 +1,22 @@
+## stolen from python virtualenv
+WALLAROO_ROOT="${HOME}/wallaroo-tutorial/wallaroo-0.5.1"
+export WALLAROO_ROOT
+
+export GOROOT=$WALLAROO_ROOT/bin/go1.9.7
+
+PATH="$WALLAROO_ROOT/bin:$GOROOT/bin:$PATH"
+export PATH
+
+PYTHONPATH=".:$WALLAROO_ROOT/bin:$PYTHONPATH"
+export PYTHONPATH
+
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US:en
+export LC_ALL=en_US.UTF-8
+
+# This should detect bash and zsh, which have a hash command that must
+# be called to get it to forget past commands.  Without forgetting
+# past commands the $PATH changes we made may not be respected
+if [ -n "${BASH-}" ] || [ -n "${ZSH_VERSION-}" ] ; then
+    hash -r 2>/dev/null
+fi

@@ -1,30 +1,27 @@
-# Run a Wallaroo Application
+# Run a Wallaroo Go Application in Vagrant
 
-In this section, we're going to run an example Wallaroo application. By the time you are finished, you'll have validated that your environment has been set up correctly by Wallaroo Up.
+In this section, we're going to run an example Wallaroo application. By the time you are finished, you'll have validated that your environment is set up and working correctly. If you haven't already completed the Vagrant setup [instructions](/book/go/getting-started/vagrant-setup.md), please do so before continuing. This guide assumes that the Wallaroo Vagrant Box is up and running.
 
 There are a few Wallaroo support applications that you'll be interacting with for the first time:
 
 - Our Metrics UI allows you to monitor the performance and health of your applications.
 - Data receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
-- Machida, our program for running Wallaroo Python applications.
 
 You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
 
-The Metrics UI process will be run in the background via Docker.  The other three processes (data_receiver, sender, and Wallaroo) will run in the foreground.  We recommend that you run each process in a separate terminal.
+The Metrics UI process will be run in the background. The other three processes (data_receiver, sender, and Wallaroo) will run in the foreground. We recommend that you run each process in a separate terminal.
+
+For each Shell you're expected to setup, you'd have to run the following to access the Vagrant Box:
+
+```bash
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
+vagrant ssh
+```
 
 Let's get started!
 
 Since Wallaroo is a distributed application, its components need to run separately, and concurrently, so that they may connect to one another to form the application cluster. For this example, you will need 5 separate terminal shells to run the metrics UI, run a source, run a sink, run the Celsius application, and eventually, to send a cluster shutdown command.
-
-## All Shells: Set up environment
-
-Run the following to source the `activate` file set up by Wallaroo Up. This file sets some standard variables for running the various applications and tools.
-
-```bash
-cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}
-source bin/activate
-```
 
 ## Shell 1: Start the Metrics UI
 
@@ -66,16 +63,18 @@ Data Receiver will start up and receive data without creating any output. By def
 
 ## Shell 3: Run the "Celsius to Fahrenheit" Application
 
-First, we will need to set up the `PYTHONPATH` environment variable. Machida needs to be able to find the `wallaroo` Python module, which is in a file called `wallaroo.py` in the `machida` directory. It also needs to be able to find the module that defines the application. In order to do that, set and export the `PYTHONPATH` environment variable like this:
+First, we need to build the application.
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius
+make
 ```
 
-Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
+Now that we have set up the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
 
 ```bash
-machida --application-module celsius --in 127.0.0.1:7000 \
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius
+./celsius --in 127.0.0.1:7000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
   --cluster-initializer --ponythreads=1 --ponynoblock
@@ -92,7 +91,7 @@ You will now be able to start the `sender` with the following command:
 ```bash
 sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
   --repeat --no-write --msg-size 8 --ponythreads=1 --ponynoblock \
-  --file ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius/celsius.msg
+  --file ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
@@ -121,7 +120,7 @@ You can then click into one of the elements within a category to get to a detail
 
 ![Computation Detailed Metrics page](/book/metrics/images/computation-detailed-metrics-page.png)
 
-Feel free to click around and get a feel for how the Metrics UI is setup and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
+Feel free to click around and get a feel for how the Metrics UI is set up and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
 
 ## Shutdown
 

@@ -10,25 +10,10 @@ At this point we assume you've made your way through the [Setting Up Your Enviro
 
 ## Getting Started with the Metrics UI
 
-### In Docker
-
-You should already have Docker installed if you have followed the `Setup` instructions in the [Setting Up Your Environment for Wallaroo](/book/getting-started/setup.md) section of the documentation.
-
-#### Running the Metrics UI
-
-NOTE: You might need to run with sudo depending on how you set up Docker.
-
-Once you have Docker setup, you can grab the Metrics UI image by running:
-
-```
-docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_metrics_ui_url }}
-```
-
-To start the Metrics UI you will run:
+### Running the Metrics UI
 
 ```bash
-docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
-  wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_metrics_ui_url }}
+metrics_reporter_ui start
 ```
 
 If you are running locally, open [http://localhost:4000](http://localhost:4000)
@@ -37,17 +22,17 @@ in your browser to verify the Metrics UI is up and running.
 To restart and stop the Metrics UI you can run the following:
 
 ```bash
-docker restart mui
+metrics_reporter_ui restart
 ```
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```
 
 If you'd like to start the Metrics UI back up after it has been stopped run:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 ## What are Wallaroo Metrics?
