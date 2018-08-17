@@ -69,17 +69,17 @@ update_versions_in_gitbook() {
   echo "Sliding version number into book content with sed magic..."
   version=$(< VERSION)
   echo "Replacing {{ book.wallaroo_version }}"
-  find book -name '*.md' -exec sed -i -- "s/{{ book.wallaroo_version }}/$version/g" {} \;
-  find -name 'intro.md' -exec sed -i -- "s/{{ book.wallaroo_version }}/$version/g" {} \;
+  find book -name '*.md' -exec sed -i -- "s@{{ book.wallaroo_version }}@$version@g" {} \;
+  find -name 'intro.md' -exec sed -i -- "s@{{ book.wallaroo_version }}@$version@g" {} \;
   echo "Replacing {{ docker_metrics_ui_url }}"
-  find book -name '*.md' -exec sed -i -- "s/{{ docker_metrics_ui_url }}/$docker_metrics_ui_url/g" {} \;
+  find book -name '*.md' -exec sed -i -- "s@{{ docker_metrics_ui_url }}@$docker_metrics_ui_url@g" {} \;
   echo "Replacing {{ docker_version_url }}"
-  find book -name '*.md' -exec sed -i -- "s/{{ docker_version_url }}/$docker_url/g" {} \;
+  find book -name '*.md' -exec sed -i -- "s@{{ docker_version_url }}@$docker_url@g" {} \;
   echo "Replacing {{ book.bintray_repo_url }}"
-  find book -name '*.md' -exec sed -i -- "s/{{ book.bintray_repo_url }}/$bintray_repo_url/g" {} \;
+  find book -name '*.md' -exec sed -i -- "s@{{ book.bintray_repo_url }}@$bintray_repo_url@g" {} \;
   GO_VERSION=$(grep -Po '(?<=GO_VERSION=").*(?=")' .release/bootstrap.sh)
   echo "Replacing {{ book.golang_version }}"
-  find book -name '*.md' -exec sed -i -- "s/{{ book.golang_version }}/$GO_VERSION/g" {} \;
+  find book -name '*.md' -exec sed -i -- "s@{{ book.golang_version }}@$GO_VERSION@g" {} \;
 }
 
 install_gitbook_deps() {
