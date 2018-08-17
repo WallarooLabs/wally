@@ -13,13 +13,13 @@ Prior to starting the release process, it is expected that you have successfully
 Our release process features a few primary steps
 
 * Creation of a release candidate branch
-* Building and releasing the Wallaroo and Metrics UI RC Docker images on Bintray
 * Building and releasing the Wallaroo RC source archive and Metrics UI RC AppImage to Bintray
+* Building and releasing the Wallaroo and Metrics UI RC Docker images on Bintray
 * Building and pushing RC Documentation Gitbook
 * Testing of the release candidate
 * Promoting of a release candidate to a release
-* Building and releasing the Wallaroo and Metrics UI Docker images on Bintray
 * Building and releasing the Wallaroo source archive and Metrics UI AppImage to Bintray
+* Building and releasing the Wallaroo and Metrics UI Docker images on Bintray
 * Building and pushing Documentation Gitbook
 * Post release process
 

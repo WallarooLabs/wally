@@ -25,7 +25,7 @@ VERBOSE_REDIRECT=" 2>&1 | tee -a $LOG_FILE"
 VERBOSE=
 
 MIN_GOLANG_MAJOR_VERSION=9
-GOLANG_VERSION=${GO_VERSION}
+GOLANG_VERSION=1.9.4
 GOLANG_DL_URL=https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz
 
 # sample wallaroo version to ponyc version map entry: W0.4.3=0.21.0
