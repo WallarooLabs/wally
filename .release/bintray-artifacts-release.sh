@@ -199,9 +199,9 @@ build_wallaroo_source_archive() {
 
   # only include the specific testing data files in use by examples
   rm -r testing
-  git checkout -- testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg \
-  git checkout -- testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg \
-  git checkout -- testing/data/market_spread/orders/350-symbols_orders-fixish.msg \
+  git checkout -- testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg
+  git checkout -- testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg
+  git checkout -- testing/data/market_spread/orders/350-symbols_orders-fixish.msg
 
   tar --transform "flags=r;s|^|wallaroo/|" -czf "$wallaroo_source_archive" *
 }
