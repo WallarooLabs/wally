@@ -43,44 +43,44 @@ include $(rules_mk_path)
 # run from, so we get an absolute path based on $(wallaroo_path). This will work
 # whether make was run from the top level of Wallaroo or from within the
 # machida directory.
-MACHIDA_PATH = $(wallaroo_path)/machida
-MACHIDA_BUILD = $(MACHIDA_PATH)/build
-MACHIDA_CPP = $(MACHIDA_PATH)/cpp
+MACHIDA3_PATH = $(wallaroo_path)/machida3
+MACHIDA3_BUILD = $(MACHIDA3_PATH)/build
+MACHIDA3_CPP = $(MACHIDA3_PATH)/cpp
 WALLAROO_LIB =  $(wallaroo_path)/lib
 
 # Our top level Makefile has 3 rules that would have been generated for us if
 # we hadn't turned them off at the top of the Makefile. Here we recreate them
 # with our own custom rules. This allows the top level commands like
 # "make test" to work.
-build-machida: machida_build
-unit-tests-machida: build-machida
-unit-tests-machida: wallaroo_unit_tests
-clean-machida: machida_clean
+build-machida3: machida3_build
+unit-tests-machida3: build3-machida
+unit-tests-machida3: wallaroo_unit_tests
+clean-machida3: machida3_clean
 
-machida_clean:
-	$(QUIET)rm -rf $(MACHIDA_BUILD)
-	$(QUIET)rm -f $(MACHIDA_PATH)/machida.d
-	$(QUIET)rm -rf $(MACHIDA_PATH)/.deps
+machida3_clean:
+	$(QUIET)rm -rf $(MACHIDA3_BUILD)
+	$(QUIET)rm -f $(MACHIDA3_PATH)/machida.d
+	$(QUIET)rm -rf $(MACHIDA3_PATH)/.deps
 
 
 wallaroo_unit_tests:
-	cd $(MACHIDA_PATH) && \
+	cd $(MACHIDA3_PATH) && \
 		python2 -m pytest --color=yes --tb=native --verbose --exitfirst wallaroo_test.py && \
 		python3 -m pytest --color=yes --tb=native --verbose --exitfirst wallaroo_test.py
 
-machida_build: $(MACHIDA_BUILD)/machida
+machida3_build: $(MACHIDA3_BUILD)/machida3
 
--include $(MACHIDA_PATH)/machida.d
-$(MACHIDA_BUILD)/machida: EXTRA_PONYCFLAGS= --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD)
-$(MACHIDA_BUILD)/machida: $(MACHIDA_BUILD)/libpython-wallaroo.a
-	$(call PONYC,$(abspath $(MACHIDA_PATH:%/=%)))
+-include $(MACHIDA3_PATH)/machida.d
+$(MACHIDA3_BUILD)/machida3: EXTRA_PONYCFLAGS= --output=$(MACHIDA3_BUILD) --path=$(MACHIDA3_BUILD)
+$(MACHIDA3_BUILD)/machida3: $(MACHIDA3_BUILD)/libpython-wallaroo.a
+	$(call PONYC,$(abspath $(MACHIDA3_PATH:%/=%)))
 
-$(MACHIDA_BUILD)/libpython-wallaroo.a: $(MACHIDA_BUILD)/python-wallaroo.o
-	$(QUIET)ar rvs $(MACHIDA_BUILD)/libpython-wallaroo.a $(MACHIDA_BUILD)/python-wallaroo.o
+$(MACHIDA3_BUILD)/libpython-wallaroo.a: $(MACHIDA3_BUILD)/python-wallaroo.o
+	$(QUIET)ar rvs $(MACHIDA3_BUILD)/libpython-wallaroo.a $(MACHIDA3_BUILD)/python-wallaroo.o
 
-$(MACHIDA_BUILD)/python-wallaroo.o: $(MACHIDA_CPP)/python-wallaroo.c
-	$(QUIET)mkdir -p $(MACHIDA_BUILD)
-	$(QUIET)cc -g -o $(MACHIDA_BUILD)/python-wallaroo.o -c $(MACHIDA_CPP)/python-wallaroo.c
+$(MACHIDA3_BUILD)/python-wallaroo.o: $(MACHIDA3_CPP)/python-wallaroo.c
+	$(QUIET)mkdir -p $(MACHIDA3_BUILD)
+	$(QUIET)cc -g -o $(MACHIDA3_BUILD)/python-wallaroo.o -c $(MACHIDA3_CPP)/python-wallaroo.c
 
 # end of prevent rules from being evaluated/included multiple times
 endif
