@@ -94,7 +94,7 @@ commit_version_update() {
 update_version_in_changelog() {
   echo "Updating version in CHANGELOG..."
   ## Updates the unreleased section to the version provided
-  changelog-tool release CHANGELOG.md $for_version -e
+  changelog-tool release CHANGELOG.md "$for_version" -e
 }
 
 commit_changelog_update() {
@@ -126,7 +126,7 @@ merge_rc_branch_into_release() {
   merge_result=$(git merge "origin/$rc_branch_name")
   if ! $merge_result; then
     printf "There was a merge conflict, please resolve manually and push to"
-    printf "the `release` branch once resolved."
+    printf "the \`release\` branch once resolved."
     exit 1
   fi
 }

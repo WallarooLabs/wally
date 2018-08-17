@@ -40,8 +40,8 @@ verify_branch() {
   elif [[ "$BRANCH" == *"release-"* ]]
   then
     remote_branch=rc
-    ui_version=$(git describe --tags --always)
-    docker_version=$(git describe --tags --always)
+    ui_version=$(< VERSION)-$(git log -n 1 --oneline | cut -d' ' -f1)
+    docker_version=$(< VERSION)-$(git log -n 1 --oneline | cut -d' ' -f1)
     docker_url="dev\/wallaroo:$docker_version"
     docker_metrics_ui_url="dev\/metrics_ui:$ui_version"
     bintray_repo_url="https://wallaroo-labs.bintray.com/wallaroolabs-rc"
@@ -53,7 +53,7 @@ verify_branch() {
 
 verify_commit_on_branch() {
   echo "Verfying commit $commit is on branch: $BRANCH..."
-  if ! git branch --contains $commit | grep $BRANCH
+  if ! git branch --contains "$commit" | grep "$BRANCH"
   then
     echo "Commit $commit is not on branch: $BRANCH"
     exit 1
@@ -62,7 +62,7 @@ verify_commit_on_branch() {
 
 checkout_to_commit() {
 
-  git checkout $commit
+  git checkout "$commit"
 }
 
 update_versions_in_gitbook() {
@@ -117,8 +117,8 @@ git_clean() {
   git clean -fd
   git remote rm doc-site
   echo "Checking out to $BRANCH"
-  git reset --hard origin/$BRANCH
-  git checkout $BRANCH
+  git reset --hard "origin/$BRANCH"
+  git checkout "$BRANCH"
 }
 
 if [ $# -lt 2 ]; then
