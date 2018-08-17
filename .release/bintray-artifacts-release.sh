@@ -18,7 +18,7 @@ verify_branch() {
   then
     ## Sets repo to rc for Wallaroo bintray repo
     wallaroo_bintray_artifacts_repo=wallaroolabs-rc
-    bintray_artifacts_version=${for_version}-${commit}
+    bintray_artifacts_version=${for_version}
   else
     echo "The bintray release can only be run for the release/release-* branches. You are running this script on the following branch: $BRANCH"
     exit 1

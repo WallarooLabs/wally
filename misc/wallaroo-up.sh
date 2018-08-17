@@ -25,7 +25,7 @@ VERBOSE_REDIRECT=" 2>&1 | tee -a $LOG_FILE"
 VERBOSE=
 
 MIN_GOLANG_MAJOR_VERSION=9
-GOLANG_VERSION=1.10.3
+GOLANG_VERSION=1.9.7
 GOLANG_DL_URL=https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz
 
 # sample wallaroo version to ponyc version map entry: W0.4.3=0.21.0
@@ -498,6 +498,7 @@ configure_wallaroo() {
 
   run_cmd "cp utils/data_receiver/data_receiver bin $REDIRECT"
   run_cmd "cp utils/cluster_shutdown/cluster_shutdown bin $REDIRECT"
+  run_cmd "cp utils/cluster_shrinker/cluster_shrinker bin $REDIRECT"
   run_cmd "cp giles/sender/sender bin $REDIRECT"
   run_cmd "ln -s metrics_ui/AppRun bin/metrics_reporter_ui $REDIRECT"
 
@@ -575,34 +576,9 @@ user_permission() {
 }
 
 create_env_file() {
-  log "Creating environment setup file..."
   cd "${WALLAROO_UP_DEST}/${WALLAROO_VERSION_DIRECTORY}"
-  cat << EOF > bin/activate
-## stolen from python virtualenv
-WALLAROO_UP_ENV="$PWD"
-export WALLAROO_UP_ENV
+  cp misc/activate bin/
 
-export GOROOT=\$WALLAROO_UP_ENV/bin/go${GOLANG_VERSION}
-
-PATH="\$WALLAROO_UP_ENV/bin:\$GOROOT/bin:\$PATH"
-export PATH
-
-PYTHONPATH="\$WALLAROO_UP_ENV/bin:\$PYTHONPATH"
-export PYTHONPATH
-
-export LANG=en_US.UTF-8
-export LANGUAGE=en_US:en
-export LC_ALL=en_US.UTF-8
-
-# This should detect bash and zsh, which have a hash command that must
-# be called to get it to forget past commands.  Without forgetting
-# past commands the \$PATH changes we made may not be respected
-if [ -n "\${BASH-}" ] || [ -n "\${ZSH_VERSION-}" ] ; then
-    hash -r 2>/dev/null
-fi
-EOF
-
-  log "Created environment setup file."
   log "Please use \"source bin/activate\" in '${WALLAROO_UP_DEST}/${WALLAROO_VERSION_DIRECTORY}' to set up environment for wallaroo."
 }
 

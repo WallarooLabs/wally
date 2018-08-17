@@ -28,19 +28,11 @@ You will also need access to a Kafka cluster. This example assumes that there is
 
 **NOTE:** If running in Docker, the kafkfa cluster and kafkacat should be run from your host and not within the Docker container.
 
-You will need five separate shells to run this application. Open each shell and go to the `examples/python/celsius-kafka` directory.
+You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details depending on your installation choice). Open each shell and go to the `examples/python/celsius-kafka` directory.
 
 ### Shell 1: Metrics
 
 Start up the Metrics UI if you don't already have it running.
-
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker start mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
 
 ```bash
 metrics_reporter_ui start
@@ -50,41 +42,17 @@ You can verify it started up correctly by visiting [http://localhost:4000](http:
 
 If you need to restart the UI, run the following.
 
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker restart mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
-
 ```bash
 metrics_reporter_ui restart
 ```
 
 When it's time to stop the UI, run the following.
 
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker stop mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
-
 ```bash
 metrics_reporter_ui stop
 ```
 
 If you need to start the UI after stopping it, run the following.
-
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker start mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
 
 ```bash
 metrics_reporter_ui start
@@ -147,15 +115,6 @@ docker run --rm -it ryane/kafkacat -C -b *IP OUTPUT BY ./cluster up 1 COMMAND*:9
 
 ### Shell 3: Celsius-kafka
 
-Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `celsius.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
-export PYTHONPATH="$PYTHONPATH:.:$PWD/../../../machida"
-```
-
 Run `machida` with `--application-module celsius`:
 
 ```bash
@@ -188,14 +147,6 @@ Note: You can use `ctrl-d` to exit `kafkacat`
 
 ## Shell 5: Shutdown
 
-Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$PWD/../../../machida/build:$PWD/../../../giles/sender:$PWD/../../../utils/data_receiver:$PWD/../../../utils/cluster_shutdown"
-```
-
 You can shut down the Wallaroo cluster with this command:
 
 ```bash
@@ -218,14 +169,6 @@ cd /tmp/local-kafka-cluster
 ```
 
 You can shut down the Metrics UI with the following command.
-
-Ubuntu users who are using the Metrics UI Docker image:
-
-```bash
-docker stop mui
-```
-
-Wallaroo in Docker and Wallaroo in Vagrant users:
 
 ```bash
 metrics_reporter_ui stop

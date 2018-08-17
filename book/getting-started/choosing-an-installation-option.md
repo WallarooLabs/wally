@@ -26,7 +26,7 @@ The Docker environment has limited customizability due to the nature of a contai
 
 We recommend this process if you're looking to get started quickly and want a more customizable and long living environment for development. This process is also recommended if you do not want to install or use Docker.
 
-Installing with Vagrant provides the benefit of needing to install only two system dependencies: git and Vagrant. Once Vagrant is set up and you have a copy of the Wallaroo repository, you will only need to run a `vagrant up` command from the `vagrant` directory and you will have Wallaroo and all of its support tools available within the Wallaroo Vagrant Box.
+Installing with Vagrant provides the benefit of needing to install only two system dependencies: Virtualbox and Vagrant. Once Vagrant is set up and you have a copy of the Wallaroo codebase, you will only need to run a `vagrant up` command from the `vagrant` directory and you will have Wallaroo and all of its support tools available within the Wallaroo Vagrant Box.
 
 ## Wallaroo Up
 
