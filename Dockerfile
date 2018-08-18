@@ -22,7 +22,7 @@ RUN apt-get install -y \
     htop \
     numactl \
     python-dev \
-    python-pip && \
+    python-pip \
     python3-dev \
     python3-pip && \
     pip2 install virtualenv virtualenvwrapper && \
