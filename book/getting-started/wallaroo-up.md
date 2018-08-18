@@ -16,7 +16,7 @@ chmod +x wallaroo-up.sh
 
 ## Run the Wallaroo Up script
 
-The `-t python` argument is required for a Python environment installation. The `-p <PATH>` argument is optional and can be used to control where the Wallaroo tutorial is installed into (the default is `~/wallaroo-tutorial/wallaroo`).
+The `-t python` argument is required for a Python environment installation. The `-p <PATH>` argument is optional and can be used to control where the Wallaroo tutorial is installed into (the default is `~/wallaroo-tutorial`).
 
 The script will require superuser privileges via `sudo` and will throw an error if `sudo` is not available. The script will prompt you prior to making any changes. It can optionally print out the commands it will run.
 

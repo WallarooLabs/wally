@@ -70,7 +70,9 @@ case "$OS" in
     echo "This script has only been tested on Linux. Wallaroo can be "
     echo "installed on non-Linux environments using Docker. Please visit: "
     echo "https://docs.wallaroolabs.com/book/getting-started/docker-setup.html"
-    echo "for instructions."
+    echo "for instructions for a Python environment or please visit: "
+    echo "https://docs.wallaroolabs.com/book/getting-started/docker-setup.html"
+    echo "for instructions for a Go environment."
     exit 1
     ;;
 esac

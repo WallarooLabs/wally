@@ -42,11 +42,11 @@ docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }
 
 * **Metrics UI**: receives and displays metrics for running Wallaroo applications.
 
-* **Wallaroo Source Code**: full Wallaroo source code is provided, including Python example applications.
+* **Wallaroo Source Code**: full Wallaroo source code is provided, including Go example applications.
 
 ## Additional Windows Setup
 
-There are a few extra recommended steps that Windows users should make before continuing on to starting the Wallaroo Docker image. These steps are needed in order to persist the Wallaroo source code and Python virtual environment using [virtualenv](https://virtualenv.pypa.io/en/stable/) onto your local machine from within the Wallaroo Docker container. This will allow code changes and installed Python modules to persist beyond the lifecycle of a Docker container.
+There are a few extra recommended steps that Windows users should make before continuing on to starting the Wallaroo Docker image. These steps are needed in order to persist the Wallaroo source code onto your local machine from within the Wallaroo Docker container. This will allow code changes to persist beyond the lifecycle of a Docker container.
 
 These steps are optional, but will require the removal of the `-v` options when starting the Wallaroo Docker image if you choose to opt out.
 
