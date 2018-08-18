@@ -10,11 +10,11 @@ wallaroo_up() {
   curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/${WALLAROO_VERSION}/misc/wallaroo-up.sh -o wallaroo-up.sh -J -L
   chmod +x wallaroo-up.sh
   export WALLAROO_UP_SOURCE=vagrant
-  ./wallaroo-up.sh -t all 
+  echo y | ./wallaroo-up.sh -t all
 }
 
 add_activate_to_bashrc() {
-  echo "source /home/vagrant/wallaroo-tutorial/wallaroo-${WALLAROO_VERSION}/bin/activate >> /home/vagrant/.bashrc
+  echo "source /home/vagrant/wallaroo-tutorial/wallaroo-${WALLAROO_VERSION}/bin/activate" >> /home/vagrant/.bashrc
 }
 
 ## clone and build Wallaroo
