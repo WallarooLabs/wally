@@ -242,6 +242,23 @@ get_distribution_version() {
         fi
       ;;
 
+      debian)
+        if [ -r /etc/os-release ]; then
+          dist_version="$(. /etc/os-release && echo "${VERSION_ID:-$(cat /etc/debian_version | cut -d'/' -f1)}")"
+          case "$dist_version" in
+            10)
+              dist_version="buster"
+            ;;
+            9)
+              dist_version="stretch"
+            ;;
+            8)
+              dist_version="jessie"
+            ;;
+          esac
+        fi
+      ;;
+
       *)
         if [ -r /etc/os-release ]; then
           dist_version="$(. /etc/os-release && echo "$VERSION_ID")"
