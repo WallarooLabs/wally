@@ -55,7 +55,7 @@ vagrant up
 
 ## What's Included in the Wallaroo Vagrant Box
 
-* ** Go Compiler**: for compiling Wallaroo Go applications.
+* **Go Compiler**: for compiling Wallaroo Go applications.
 
 * **Giles Sender**: supplies data to Wallaroo applications over TCP.
 
