@@ -80,6 +80,9 @@ update_versions_in_gitbook() {
   GO_VERSION=$(grep -Po '(?<=GO_VERSION=").*(?=")' .release/bootstrap.sh)
   echo "Replacing {{ book.golang_version }}"
   find book -name '*.md' -exec sed -i -- "s@{{ book.golang_version }}@$GO_VERSION@g" {} \;
+  PONYC_VERSION=$(grep -Po '(?<=PONYC_VERSION=").*(?=")' .release/bootstrap.sh)
+  echo "Replacing {{ book.ponyc_version }}"
+  find book -name '*.md' -exec sed -i -- "s@{{ book.ponyc_version }}@$PONYC_VERSION@g" {} \;
 }
 
 install_gitbook_deps() {

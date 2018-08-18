@@ -111,7 +111,7 @@ Now you need to install Pony compiler `ponyc`. Run:
 ```bash
 sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
 sudo apt-get update
-sudo apt-get -V install ponyc=0.24.4
+sudo apt-get -V install ponyc={{ book.ponyc_version }}
 ```
 
 ## Installing pony-stable
