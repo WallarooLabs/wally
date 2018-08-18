@@ -352,7 +352,7 @@ install_required_dependencies() {
         run_cmd "apt-get install -y $PREREQS_TO_INSTALL $REDIRECT" root
       fi
       if ! apt-cache policy 2>&1 | grep pony-language/ponylang-debian > /dev/null 2>&1; then
-        run_cmd "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 'E04F0923 B3B48BDA' $REDIRECT" root
+        run_cmd "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys E04F0923 B3B48BDA $REDIRECT" root
         run_cmd "add-apt-repository 'deb https://dl.bintray.com/pony-language/ponylang-debian ${dist_version} main' $REDIRECT" root
       fi
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL libssl-dev make pony-stable libsnappy-dev liblz4-dev"
