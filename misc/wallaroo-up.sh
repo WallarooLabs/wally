@@ -1,5 +1,7 @@
 #!/bin/bash
 
+MD5="9995b27a9b6dca8f5749b30ccec67eef  -"
+
 set -eEuo pipefail
 
 WALLAROO_UP_DEST_DEFAULT=~/wallaroo-tutorial
@@ -76,6 +78,12 @@ case "$OS" in
     exit 1
     ;;
 esac
+
+CALCULATED_MD5="$(tail -n +5 $0 | md5sum)"
+if [[ "$CALCULATED_MD5" != "$MD5" ]]; then
+  echo "Checksum error in '$0'! Script is corrupted! Please re-download." >&2
+  exit 1
+fi
 
 run_cmd() {
   if [ "${2:-}" == "root" ]; then
@@ -351,6 +359,14 @@ install_required_dependencies() {
         run_cmd "apt-get update $REDIRECT" root
         run_cmd "apt-get install -y $PREREQS_TO_INSTALL $REDIRECT" root
       fi
+      case "$dist_version" in
+        jessie|trusty)
+          if ! apt-cache policy 2>&1 | grep wallaroolabs-debian > /dev/null 2>&1; then
+            run_cmd "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61 $REDIRECT" root
+            run_cmd "add-apt-repository 'deb https://wallaroo-labs.bintray.com/wallaroolabs-debian ${dist_version} main' $REDIRECT" root
+          fi
+        ;;
+      esac
       if ! apt-cache policy 2>&1 | grep pony-language/ponylang-debian > /dev/null 2>&1; then
         run_cmd "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys E04F0923 B3B48BDA $REDIRECT" root
         run_cmd "add-apt-repository 'deb https://dl.bintray.com/pony-language/ponylang-debian ${dist_version} main' $REDIRECT" root
@@ -366,7 +382,7 @@ install_required_dependencies() {
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-devel"
       fi
       if [ "$PONYC_VERSION" != "" ]; then
-        PKGS_TO_INSTALL="$PKGS_TO_INSTALL ponyc-${PONYC_VERSION}"
+        PKGS_TO_INSTALL="ponyc-${PONYC_VERSION} $PKGS_TO_INSTALL"
       fi
       if ! yum list installed -q yum-plugin-copr > /dev/null 2>&1; then
         run_cmd "yum makecache -y $REDIRECT" root
@@ -377,7 +393,10 @@ install_required_dependencies() {
       fi
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL pony-stable make gcc-c++ snappy-devel openssl-devel lz4-devel"
       run_cmd "yum makecache -y $REDIRECT" root
-      run_cmd "yum install -y $PKGS_TO_INSTALL $REDIRECT" root
+      ## install one at a time or else yum doesn't throw an error for missing packages
+      for pkg in $PKGS_TO_INSTALL; do
+        run_cmd "yum install -y $pkg $REDIRECT" root
+      done
     ;;
 
     fedora)

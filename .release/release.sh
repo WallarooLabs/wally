@@ -79,6 +79,9 @@ update_version() {
   sed -i "s@^WALLAROO_ROOT=.*@WALLAROO_ROOT=\"\${HOME}/wallaroo-tutorial/wallaroo-${for_version}\"@" misc/activate
   # update activate script for golang version
   sed -i "s@^export GOROOT=.*@export GOROOT=\$WALLAROO_ROOT/bin/go${GO_VERSION}@" misc/activate
+  # update checksum in wallaroo-up.sh
+  WALLAROO_UP_CHECKSUM_COMMAND=$(grep -Po '(?<=^CALCULATED_MD5="\$\().*(?=\)")' misc/wallaroo-up.sh | sed 's@\$0@misc/wallaroo-up.sh@')
+  sed -i "s@^MD5=.*@MD5=\"$(eval $WALLAROO_UP_CHECKSUM_COMMAND)\"@" misc/wallaroo-up.sh
 }
 
 commit_version_update() {
