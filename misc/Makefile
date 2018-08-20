@@ -1,3 +1,10 @@
+build-misc-all:
+unit-tests-misc-all:
+integration-tests-misc-all:
+push-docker-misc-all:
+build-docker-misc-all:
+clean-misc-all:
+
 ifeq ($(wallaroo_path),)
   WALLAROO_UP_PATH := $(CURDIR)
 else
