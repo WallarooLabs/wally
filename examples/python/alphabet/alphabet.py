@@ -63,6 +63,7 @@ class AllVotes(object):
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     (letter, vote_count) = struct.unpack(">sI", bs)
+    letter = letter.decode("utf-8")  # for Python3 comptibility
     return Votes(letter, vote_count)
 
 

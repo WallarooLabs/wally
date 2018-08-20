@@ -24,6 +24,8 @@ example, all votes for the letter "A" are handled by the same partition.
 import string
 import struct
 
+import logging
+
 import wallaroo
 
 
@@ -68,6 +70,8 @@ class Votes(object):
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     (letter, vote_count) = struct.unpack(">sI", bs)
+    letter = letter.decode("utf-8") # For Python3 compatibility
+    print("\ndecoded successfully")
     return Votes(letter, vote_count)
 
 
