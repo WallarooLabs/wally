@@ -41,8 +41,10 @@ WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LI
 include $(rules_mk_path)
 
 build-examples-python-word_count_with_dynamic_keys: build-machida
+build-examples-python-word_count_with_dynamic_keys: build-machida3
 integration-tests-examples-python-word_count_with_dynamic_keys: build-examples-python-word_count_with_dynamic_keys
 integration-tests-examples-python-word_count_with_dynamic_keys: word_count_with_dynamic_keys_py_test
+integration-tests-examples-python-word_count_with_dynamic_keys: word_count_with_dynamic_keys_py3_test
 
 word_count_with_dynamic_keys_py_test:
 	cd $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH) && \
@@ -71,6 +73,37 @@ word_count_with_dynamic_keys_py_test:
 		--batch-size 1 \
 		--output 'received.txt' \
 		--command 'machida --application-module word_count_with_dynamic_keys' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 3
+
+word_count_with_dynamic_keys_py3_test:
+	cd $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module word_count_with_dynamic_keys' \
+		--sink-mode newlines \
+		--sink-expect 482
+	cd $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module word_count_with_dynamic_keys' \
+		--sink-mode newlines \
+		--sink-expect 482 \
+		--workers 2
+	cd $(WORD_COUNT_WITH_DYNAMIC_KEYS_PY_PATH) && \
+	integration_test --newline-file-sender count_this.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 1 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module word_count_with_dynamic_keys' \
 		--sink-mode newlines \
 		--sink-expect 482 \
 		--workers 3

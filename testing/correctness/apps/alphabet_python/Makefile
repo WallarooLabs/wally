@@ -41,9 +41,12 @@ TESTING_ALPHABET_PYTHON_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-testing-correctness-apps-alphabet_python: build-machida
+build-testing-correctness-apps-alphabet_python: build-machida3
 integration-tests-testing-correctness-apps-alphabet_python: build-testing-correctness-apps-alphabet_python
 integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python_test
 integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python_test_toparallel
+integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python3_test
+integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python3_test_toparallel
 
 testing_alphabet_python_test:
 	cd $(TESTING_ALPHABET_PYTHON_PATH) && \
@@ -74,4 +77,35 @@ testing_alphabet_python_test_toparallel:
 		--command 'machida --application-module alphabet --to-parallel' \
 		--workers 10 \
 		--sink-expect 4000
+
+testing_alphabet_python3_test:
+	cd $(TESTING_ALPHABET_PYTHON_PATH) && \
+	integration_test \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--validation-cmd 'python validate.py --expected output.json --repetitions 4 --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module alphabet' \
+		--workers 10 \
+		--sink-expect 4000
+
+testing_alphabet_python3_test_toparallel:
+	cd $(TESTING_ALPHABET_PYTHON_PATH) && \
+	integration_test \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--framed-file-sender input.msg \
+		--validation-cmd 'python validate.py --expected output.json --repetitions 4 --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module alphabet --to-parallel' \
+		--workers 10 \
+		--sink-expect 4000
+
 endif
