@@ -41,9 +41,11 @@ REVERSE_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-examples-python-reverse: build-machida
+build-examples-python-reverse: build-machida3
 integration-tests-examples-python-reverse: build-examples-python-reverse
 
 integration-tests-examples-python-reverse: reverse_py_test
+integration-tests-examples-python-reverse: reverse_py3_test
 
 reverse_py_test:
 	cd $(REVERSE_PY_PATH) && \
@@ -52,6 +54,15 @@ reverse_py_test:
 	  --expected-csv '4321,8765,2121,1111' \
 		--log-level error \
 		--command 'machida --application-module reverse' \
+		--sink-expect 4
+
+reverse_py3_test:
+	cd $(REVERSE_PY_PATH) && \
+	integration_test --csv-sender '1234,5678,1212,1111' \
+	  --validation-cmp --sink-mode 'newlines' \
+	  --expected-csv '4321,8765,2121,1111' \
+		--log-level error \
+		--command 'machida3 --application-module reverse' \
 		--sink-expect 4
 
 endif
