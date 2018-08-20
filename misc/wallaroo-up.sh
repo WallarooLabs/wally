@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="0207c72f302701b79161c5219b10dfe8  -"
+MD5="9ed08a26f9ff0625495bab93504450ec  -"
 
 set -eEuo pipefail
 
@@ -682,10 +682,12 @@ configure_wallaroo() {
       log "Compiling Machida for running Python Wallaroo Applications..."
     fi
 
-    run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all resilience=on $REDIRECT"
+    run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all build-machida3-all resilience=on $REDIRECT"
     run_cmd "mv machida/build/machida bin/machida-resilience $REDIRECT"
-    run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all $REDIRECT"
+    run_cmd "mv machida3/build/machida3 bin/machida3-resilience $REDIRECT"
+    run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all build-machida3-all $REDIRECT"
     run_cmd "cp machida/build/machida bin $REDIRECT"
+    run_cmd "cp machida3/build/machida3 bin $REDIRECT"
     run_cmd "cp -r machida/lib bin/pylib $REDIRECT"
   fi
 

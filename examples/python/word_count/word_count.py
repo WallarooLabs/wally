@@ -65,7 +65,7 @@ class WordTotals(object):
         self.word_totals = {}
 
     def update(self, word):
-        if self.word_totals.has_key(word):
+        if word in self.word_totals:
             self.word_totals[word] = self.word_totals[word] + 1
         else:
             self.word_totals[word] = 1

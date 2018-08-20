@@ -12,7 +12,7 @@ Wallaroo](/book/getting-started/setup.md).
 Build the program.
 
 ```bash
-make build-machida
+make build-machida3
 ```
 
 ## Next Steps
