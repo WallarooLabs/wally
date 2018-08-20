@@ -23,6 +23,13 @@ function cleanup {
 
 trap cleanup SIGINT SIGTERM EXIT
 
+LANG_TO_TEST=${1:-}
+
+if [[ "$LANG_TO_TEST" == "" ]]; then
+  echo "ERROR! Please pass language to run examples for as argument 1!"
+  exit 1
+fi
+
 HERE=$(dirname "$(readlink -f "${0}")")
 SOURCE_ACTIVATE="source $(readlink -f "${HERE}/../bin/activate")"
 BASH_HEADER="#!/bin/bash -ex"
@@ -32,7 +39,7 @@ TESTING_TMP="${TMPDIR:-/tmp}/wally-up-testing"
 rm -rf "$TESTING_TMP"
 mkdir -p "$TESTING_TMP"
 
-for dir in $(ls -d $(readlink -f "${HERE}/../examples")/*/*/ | grep -v kafka | grep -v pony); do
+for dir in $(ls -d $(readlink -f "${HERE}/../examples")/${LANG_TO_TEST}/*/ | grep -v kafka | grep -v pony); do
   CHANGE_DIRECTORY="cd $dir"
   rm -f ${HERE}/../bin/metrics_ui/usr/var/log/*
   rm -f /tmp/$(basename "$dir")-*

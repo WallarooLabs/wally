@@ -22,4 +22,4 @@ test-wallaroo-up-%:
 		-v $(WALLAROO_UP_PATH):/v \
 		-w /v \
 		$(subst -,:,$*) \
-		sh -c '(echo y | /v/wallaroo-up.sh -t all || (tail -n 100 /v/wallaroo-up.log && exit 1)) && ~/wallaroo-tutorial/wallaroo*/misc/example-tester.bash' && docker rmi $(subst -,:,$*)
+		sh -c '(echo y | /v/wallaroo-up.sh -t all || (tail -n 100 /v/wallaroo-up.log && exit 1)) && ~/wallaroo-tutorial/wallaroo*/misc/example-tester.bash python && ~/wallaroo-tutorial/wallaroo*/misc/example-tester.bash go' && docker rmi $(subst -,:,$*)
