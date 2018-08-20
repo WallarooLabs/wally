@@ -19,7 +19,7 @@ cd ~/wallaroo-tutorial
 This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-wget -q -O wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/{{ book.wallaroo_version }}.tar.gz?source=manualvagrant&install=unknown&install_type=python'
+wget -q -O wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/{{ book.wallaroo_version }}.tar.gz'
 mkdir wallaroo-{{ book.wallaroo_version }}
 tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
 rm wallaroo-{{ book.wallaroo_version }}.tar.gz

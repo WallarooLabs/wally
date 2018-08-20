@@ -476,7 +476,7 @@ configure_wallaroo() {
   fi
 
   ## download/untar wallaroo release tgz from bintray
-  WGET_URL_SUFFIX="?source=${WALLAROO_UP_SOURCE:-wallaroo-up}&install=${INSTALL_TYPE:-initial}&install_type=${WALLAROO_UP_INSTALL_TYPE}"
+#  WGET_URL_SUFFIX="?source=${WALLAROO_UP_SOURCE:-wallaroo-up}&install=${INSTALL_TYPE:-initial}&install_type=${WALLAROO_UP_INSTALL_TYPE}"
   run_cmd "wget $QUIET -O $wallaroo_source_archive 'https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${wallaroo_source_archive}${WGET_URL_SUFFIX}' $REDIRECT"
   run_cmd "mkdir ${WALLAROO_VERSION_DIRECTORY} $REDIRECT"
   run_cmd "tar -C ${WALLAROO_VERSION_DIRECTORY} --strip-components=1 -xzf $wallaroo_source_archive $REDIRECT"
