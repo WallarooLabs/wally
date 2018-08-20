@@ -41,9 +41,11 @@ ALPHABET_PARTITIONED_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-examples-python-alphabet_partitioned: build-machida
+build-examples-python-alphabet_partitioned: build-machida3
 integration-tests-examples-python-alphabet_partitioned: build-examples-python-alphabet_partitioned
 
 integration-tests-examples-python-alphabet_partitioned: alphabet_partitioned_py_test
+integration-tests-examples-python-alphabet_partitioned: alphabet_partitioned_py3_test
 
 
 alphabet_partitioned_py_test:
@@ -77,6 +79,41 @@ alphabet_partitioned_py_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command 'machida --application-module alphabet_partitioned' \
+		--sink-mode newlines \
+		--sink-expect 1000 \
+		--workers 3
+
+alphabet_partitioned_py3_test:
+	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module alphabet_partitioned' \
+		--sink-mode newlines \
+		--sink-expect 1000 \
+		--workers 1
+	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module alphabet_partitioned' \
+		--sink-mode newlines \
+		--sink-expect 1000 \
+		--workers 2
+	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module alphabet_partitioned' \
 		--sink-mode newlines \
 		--sink-expect 1000 \
 		--workers 3
