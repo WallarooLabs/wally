@@ -13,7 +13,7 @@
 #  permissions and limitations under the License.
 
 
-from string import lowercase
+from string import ascii_lowercase as lowercase
 import struct
 import pickle
 

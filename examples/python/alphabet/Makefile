@@ -41,9 +41,11 @@ ALPHABET_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-examples-python-alphabet: build-machida
+build-examples-python-alphabet: build-machida3
 integration-tests-examples-python-alphabet: build-examples-python-alphabet
 
 integration-tests-examples-python-alphabet: alphabet_py_test
+integration-tests-examples-python-alphabet: alphabet_py3_test
 
 alphabet_py_test:
 	cd $(ALPHABET_PY_PATH) && \
@@ -54,6 +56,18 @@ alphabet_py_test:
 		--batch-size 10 \
 		--output 'received.txt' \
 		--command 'machida --application-module alphabet' \
+		--sink-mode newlines \
+		--sink-expect 1000
+
+alphabet_py3_test:
+	cd $(ALPHABET_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida3 --application-module alphabet' \
 		--sink-mode newlines \
 		--sink-expect 1000
 
