@@ -13,34 +13,6 @@
 ## Wallaroo Language Support
 * [Wallaroo Languages Supported](book/language_support.md)
 
-<!--
-### Wallaroo C++ API
-* [C++ API Introduction](book/cpp/intro.md)
-* [C++ Sample Application](book/cpp/sample-application.md)
-* [Building a C++ Application](book/cpp/building.md)
-* C++ Supplemental Info
-   * [C++ Best Practices](book/cpp/best-practices.md)
-   * [C++ Memory Mangement](book/cpp/memory-management.md)
-   * [C++ Serialization](book/cpp/serialization.md)
-* C++ API Classes
-   * [Application](book/cpp/api/application.md)
-   * [Computation](book/cpp/api/computation.md)
-   * [Data](book/cpp/api/data.md)
-   * [Key](book/cpp/api/key.md)
-   * [Partition](book/cpp/api/partition.md)
-   * [PartitionU64](book/cpp/api/partition-u64.md)
-   * [PartitionFunction](book/cpp/api/partition-function.md)
-   * [PartitionFunctionU64](book/cpp/api/partition-function-u64.md)
-   * [SinkEncoder](book/cpp/api/sink-encoder.md)
-   * [SourceDecoder](book/cpp/api/source-decoder.md)
-   * [StateBuilder](book/cpp/api/state-builder.md)
-   * [StateChange](book/cpp/api/state-change.md)
-   * [StateChangeBuilder](book/cpp/api/state-change-builder.md)
-   * [StateComputation](book/cpp/api/state-computation.md)
-   * [State](book/cpp/api/state.md)
-   * [UserFunctions](book/cpp/api/user-functions.md)
--->
-
 ### Wallaroo with Python
 * [Wallaroo with Python Introduction](book/python/intro.md)
 
