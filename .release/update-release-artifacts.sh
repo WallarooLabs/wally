@@ -14,7 +14,7 @@ commit=$2
 
 ## Verifies that the release artifacts are being built for the provided args for
 ## version and commit
-echo "Creating bintray releases for version $for_version with commit $commit"
+echo "Creating artifacts for version $for_version with commit $commit"
 while true; do
   read -rp "Is this correct (y/n)?" yn
   case $yn in
