@@ -57,7 +57,7 @@ install_ponyc() {
       sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
       sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
       sudo apt-get update
-      sudo apt-get -V install ponyc=$PONYC_VERSION
+      sudo apt-get -V install libpcre2-dev ponyc=$PONYC_VERSION
 
     ;;
 

@@ -126,7 +126,7 @@ Use `data` to perform a computation and return a new output. `data` is the objec
 
 A computation that doubles an integer:
 
-```python
+```go
 type Double struct {}
 
 func (d *Double) Name() string {
@@ -159,7 +159,7 @@ Use `data` to perform a computation and return a new output. `data` is the objec
 
 A computation that doubles an integer and returns the original integer and the doubled value:
 
-```python
+```go
 type Double struct {}
 
 func (d *Double) Name() string {

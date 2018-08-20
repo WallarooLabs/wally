@@ -5,7 +5,8 @@ ENV PONY_STABLE_VERSION 0.1.4
 ENV OTP_VERSION 1:20.2.2
 ENV ELIXIR_VERSION 1.5.2-1
 
-RUN apt-get install -y \
+RUN apt-get update \
+  && apt-get install -y \
      apt-transport-https \
      ca-certificates \
      curl \

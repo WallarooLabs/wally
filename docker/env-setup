@@ -17,6 +17,8 @@ if [ -d /src/python-virtualenv ]; then
   echo "====== WARNING: Any software installed via apt-get will not be persistent ======"
   echo "====== WARNING: Please make sure to use pip/easy_install instead ======"
   . bin/activate
+else
+  echo "====== WARNING: Any software installed via apt-get will not be persistent ======"
 fi
 cd /src
 (cat ~/.bashrc; echo "PS1=\"$PS1\"") > /.prompt

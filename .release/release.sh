@@ -79,6 +79,9 @@ update_version() {
   sed -i "s@^WALLAROO_ROOT=.*@WALLAROO_ROOT=\"\${HOME}/wallaroo-tutorial/wallaroo-${for_version}\"@" misc/activate
   # update activate script for golang version
   sed -i "s@^export GOROOT=.*@export GOROOT=\$WALLAROO_ROOT/bin/go${GO_VERSION}@" misc/activate
+  # update checksum in wallaroo-up.sh
+  WALLAROO_UP_CHECKSUM_COMMAND=$(grep -Po '(?<=^CALCULATED_MD5="\$\().*(?=\)")' misc/wallaroo-up.sh | sed 's@\$0@misc/wallaroo-up.sh@')
+  sed -i "s@^MD5=.*@MD5=\"$(eval $WALLAROO_UP_CHECKSUM_COMMAND)\"@" misc/wallaroo-up.sh
 }
 
 commit_version_update() {
@@ -94,7 +97,7 @@ commit_version_update() {
 update_version_in_changelog() {
   echo "Updating version in CHANGELOG..."
   ## Updates the unreleased section to the version provided
-  changelog-tool release CHANGELOG.md $for_version -e
+  changelog-tool release CHANGELOG.md "$for_version" -e
 }
 
 commit_changelog_update() {
@@ -126,7 +129,7 @@ merge_rc_branch_into_release() {
   merge_result=$(git merge "origin/$rc_branch_name")
   if ! $merge_result; then
     printf "There was a merge conflict, please resolve manually and push to"
-    printf "the `release` branch once resolved."
+    printf "the \`release\` branch once resolved."
     exit 1
   fi
 }

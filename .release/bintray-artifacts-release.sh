@@ -28,7 +28,7 @@ verify_branch() {
 verify_wallaroo_dir() {
   ## Verifies that the script is being run from the wallaroo root directory
   echo "Verifying script is being run from the wallaroo root directory..."
-  if [[ `basename $PWD` != "wallaroo" ]]
+  if [[ "$(basename "$PWD")" != "wallaroo" ]]
   then
     echo "The $0 script must be run from the root wallaroo directory."
     exit 1
@@ -45,7 +45,7 @@ verify_version() {
 
 verify_commit_on_branch() {
   echo "Verfying commit $commit is on branch: $BRANCH..."
-  if ! git branch --contains $commit 2> /dev/null | grep $BRANCH
+  if ! git branch --contains "$commit" 2> /dev/null | grep "$BRANCH"
   then
     echo "Commit $commit is not on branch: $BRANCH"
     exit 1
@@ -67,7 +67,7 @@ verify_args() {
 }
 
 verify_no_local_changes() {
-  if ! git diff --exit-code --quiet $BRANCH origin/$BRANCH
+  if ! git diff --exit-code --quiet "$BRANCH" "origin/$BRANCH"
   then
     echo "ERROR! There are local-only changes on branch '$BRANCH'!"
     exit 1
@@ -82,7 +82,7 @@ verify_no_local_changes() {
 
 checkout_to_commit() {
   echo "Checking out to commit: $commit ..."
-  git checkout $commit
+  git checkout "$commit"
 }
 
 set_artifact_names() {
@@ -96,6 +96,7 @@ set_artifact_names() {
   metrics_ui_appimage="Wallaroo_Metrics_UI-${bintray_artifacts_version}-x86_64.AppImage"
 }
 
+# shellcheck disable=SC2120
 build_metrics_ui_appimage() {
   ## Conditional check for whether the current Metrics UI appimage exists in bintray, does not
   ## re-upload appimage if so. Otherwise uploads to Bintray.
@@ -126,6 +127,7 @@ Terminal=true
 Categories=Development;
 EOF
 
+# shellcheck disable=SC2009
   cat > ./AppRun <<\EOF
 #!/bin/sh
 HERE=$(dirname "$(readlink -f "${0}")")
@@ -178,7 +180,7 @@ EOF
 
   sudo make clean
 
-  mv Wallaroo_Metrics_UI-x86_64.AppImage $metrics_ui_appimage
+  mv Wallaroo_Metrics_UI-x86_64.AppImage "$metrics_ui_appimage"
 }
 
 build_wallaroo_source_archive() {
@@ -203,7 +205,7 @@ build_wallaroo_source_archive() {
   git checkout -- testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg
   git checkout -- testing/data/market_spread/orders/350-symbols_orders-fixish.msg
 
-  tar --transform "flags=r;s|^|wallaroo/|" -czf "$wallaroo_source_archive" *
+  tar --transform "flags=r;s|^|wallaroo/|" -czf "$wallaroo_source_archive" ./*
 }
 
 push_wallaroo_bintray_artifacts() {
@@ -213,7 +215,7 @@ push_wallaroo_bintray_artifacts() {
   fi
 
   # push the wallaroo source archive
-  if ./jfrog bt u --override --publish $wallaroo_source_archive ${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version} ${wallaroo_bintray_package}/${bintray_artifacts_version}/
+  if ./jfrog bt u --override --publish "$wallaroo_source_archive" "${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version}" "${wallaroo_bintray_package}/${bintray_artifacts_version}/"
   then
     echo "Uploaded wallaroo source archive $wallaroo_source_archive to bintray successfully."
   else
@@ -221,7 +223,7 @@ push_wallaroo_bintray_artifacts() {
   fi
 
   # push the metrcis appimage
-  if ./jfrog bt u --override --publish $metrics_ui_appimage ${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version} ${wallaroo_bintray_package}/${bintray_artifacts_version}/
+  if ./jfrog bt u --override --publish "$metrics_ui_appimage" "${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version}" "${wallaroo_bintray_package}/${bintray_artifacts_version}/"
   then
     echo "Uploaded $metrics_ui_appimage to bintray successfully."
   else
@@ -236,7 +238,7 @@ push_wallaroo_bintray_artifacts() {
 git_reset() {
   git clean -df
   git reset --hard HEAD
-  git checkout $BRANCH
+  git checkout "$BRANCH"
 }
 
 if [ $# -lt 2 ]; then
@@ -257,6 +259,7 @@ verify_no_local_changes
 checkout_to_commit
 set_artifact_names
 build_wallaroo_source_archive
+# shellcheck disable=SC2119
 build_metrics_ui_appimage
 push_wallaroo_bintray_artifacts
 git_reset
