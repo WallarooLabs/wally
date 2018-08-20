@@ -12,7 +12,7 @@ function cleanup {
     fi
     pkill run_erl
     pkill epmd
-    PIDS_TO_KILL="$(ps fj | grep -v 'ps fj$' | grep -v "$0$" | grep -v grep | awk '{print $2 " " $3}' | grep " $$$" | awk '{print $1}' | tr '\n' ' ')"
+    PIDS_TO_KILL="$(ps fj | grep -v 'ps fj$' | grep -v "$0$" | grep -v grep | grep -v awk | awk '{print $2 " " $3}' | grep " $$$" | awk '{print $1}' | grep -v "$$" | tr '\n' ' ')"
     if [[ "$PIDS_TO_KILL" == "" ]]; then
       break
     fi
@@ -138,7 +138,7 @@ for dir in $(ls -d $(readlink -f "${HERE}/../examples")/*/*/ | grep -v kafka | g
   done
   if [[ "$(pgrep -P $$)" != "" ]]; then
     echo "Cleaning up errant child processes..."
-    PIDS_TO_KILL=$(ps aux | grep -v bash | grep -v grep | grep -v awk | grep -v PID | grep -vF 'ps aux' | awk '{print $2}')
+    PIDS_TO_KILL="$(ps fj | grep -v 'ps fj$' | grep -v "$0$" | grep -v grep | grep -v awk | awk '{print $2 " " $3}' | grep " $$$" | awk '{print $1}' | grep -v "$$" | tr '\n' ' ')"
     # send sigterm to have them exit nicely
     kill -15 $PIDS_TO_KILL
     # wait for sigterm to do its thing and for child processes to exit cleanly
@@ -151,7 +151,7 @@ for dir in $(ls -d $(readlink -f "${HERE}/../examples")/*/*/ | grep -v kafka | g
       kill -9 $PIDS_TO_KILL
       if [[ "$(pgrep -P $$)" != "" ]]; then
         echo "WARNING: Not all processes ended between examples!!!"
-        ps aux
+        ps fj | grep "$$"
       fi
     fi
   fi
