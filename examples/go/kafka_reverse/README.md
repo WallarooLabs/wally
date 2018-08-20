@@ -157,7 +157,7 @@ The output will be printed to the console in the first shell. Each line should b
 You can shut down the cluster with this command at any time:
 
 ```bash
-cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down the kafkacat producer by pressing Ctrl-d from its shell.
