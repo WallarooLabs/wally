@@ -930,12 +930,14 @@ actor ApplicationDistributor is Distributor
           p_ids(target) = p_id
         end
 
+        let barrier_source_id = _routing_id_gen()
+
         let local_topology =
           try
             LocalTopology(application.name(), w, g.clone()?,
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
               consume p_ids, all_workers, non_shrinkable_to_send,
-              state_routing_ids_to_send)
+              state_routing_ids_to_send, barrier_source_id)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

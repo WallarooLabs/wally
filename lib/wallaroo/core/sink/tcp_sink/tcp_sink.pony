@@ -291,7 +291,7 @@ actor TCPSink is Sink
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
       _barrier_initiator.register_sink(this)
-                @printf[I32]("!@!! register_resilient: TCPSink\n".cstring())
+                @printf[I32]("!@!! register_resilient: TCPSink %s\n".cstring(), _sink_id.string().cstring())
       _event_log.register_resilient(_sink_id, this)
     end
 

@@ -160,14 +160,11 @@ class FileBackend is Backend
         _file.seek(1)
         r.append(_file.read(8))
         current_snapshot_id = try r.u64_be()? else Fail(); 0 end
-        @printf[I32]("!@ Found watermark %s\n".cstring(), current_snapshot_id.string().cstring())
 
         // We need to get to the data for the provided snapshot id. We'll
         // keep reading until we find the prior snapshot id, at which point
         // we're lined up with entries for this snapshot.
         while current_snapshot_id < (snapshot_id - 1) do
-          @printf[I32]("!@ Looking for snapshot_id %s. Currently at %s\n".cstring(), snapshot_id.string().cstring(), current_snapshot_id.string().cstring())
-
           r.append(_file.read(1))
           let is_watermark = BoolConverter.u8_to_bool(
             try r.u8()? else Fail(); 0 end)
@@ -175,16 +172,13 @@ class FileBackend is Backend
           if is_watermark then
             r.append(_file.read(8))
             current_snapshot_id = try r.u64_be()? else Fail(); 0 end
-            @printf[I32]("!@ Found watermark %s\n".cstring(), current_snapshot_id.string().cstring())
           else
-            @printf[I32]("!@ Skipping entry\n".cstring())
             // Skip this entry since we're looking for the next snapshot id.
             // First skip resilient_id
             _file.seek(16)
             // Read payload size
             r.append(_file.read(4))
             let size = try r.u32_be()? else Fail(); 0 end
-            @printf[I32]("!@ Skipping payload of size %s\n".cstring(), size.string().cstring())
             // Skip payload
             _file.seek(size.isize())
           end
@@ -268,7 +262,6 @@ class FileBackend is Backend
     for p in payload.values() do
       payload_size = payload_size + p.size()
     end
-    @printf[I32]("!@ PAYLOAD SIZE: %s\n".cstring(), payload_size.string().cstring())
 
     // This is not a watermark so write false
     _writer.u8(BoolConverter.bool_to_u8(false))

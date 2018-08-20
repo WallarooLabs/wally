@@ -74,10 +74,6 @@ actor DataReceiver is (Producer & Rerouter)
     sender_name: String, data_router: DataRouter,
     state_step_creator: StateStepCreator, initialized: Bool = false)
   =>
-    @printf[I32]("!@ Creating DataReceiver!!!\n".cstring())
-    //!@
-    data_router.ll()
-
     _id = id
     _auth = auth
     _worker_name = worker_name

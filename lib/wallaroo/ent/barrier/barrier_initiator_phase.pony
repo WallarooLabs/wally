@@ -190,7 +190,11 @@ class _BlockingBarrierInitiatorPhase is _BarrierInitiatorPhase
       _initiator.initiate_barrier(barrier_token, result_promise)
     else
       @printf[I32]("!@ BlockPhase: Queuing barrier %s!\n".cstring(), barrier_token.string().cstring())
-      _initiator.queue_barrier(barrier_token, result_promise)
+      // !@ We need to ensure that we don't queue snapshots when we're
+      // rolling back. This is a crude way to test that.
+      if not (_wait_for_token > barrier_token) then
+        _initiator.queue_barrier(barrier_token, result_promise)
+      end
     end
 
   fun ref barrier_complete(token: BarrierToken) =>

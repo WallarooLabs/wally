@@ -233,7 +233,9 @@ actor SnapshotInitiator is Initializable
       // snapshot was successfully written out directly.
       let token = SnapshotRollbackBarrierToken(rollback_id,
         _last_complete_snapshot_id)
-      _current_snapshot_id = _last_complete_snapshot_id
+      if _current_snapshot_id < _last_complete_snapshot_id then
+        _current_snapshot_id = _last_complete_snapshot_id
+      end
       let barrier_action = Promise[BarrierToken]
       barrier_action.next[None]({(t: BarrierToken) =>
         match t
@@ -244,7 +246,10 @@ actor SnapshotInitiator is Initializable
           Fail()
         end
       })
-      _barrier_initiator.inject_barrier(token, barrier_action)
+      let resume_token = SnapshotRollbackResumeBarrierToken(_last_rollback_id,
+        _last_complete_snapshot_id)
+      _barrier_initiator.inject_blocking_barrier(token, barrier_action,
+        resume_token)
     else
       try
         let msg = ChannelMsgEncoder.initiate_rollback(_worker_name, _auth)?
