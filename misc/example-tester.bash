@@ -5,7 +5,7 @@ set -eEuo pipefail
 function cleanup {
   set +e
   while true; do
-    PSAUX=$(ps aux | grep -v bash | tail -n +2 | grep -v tail)
+    PSAUX=$(ps fj | grep -v 'ps fj$' | grep -v "$0$" | grep -v grep | grep -v awk | awk '{print $2 " " $3}' | grep " $$$" | awk '{print $1}' | grep -v "$$")
     PSAUX=$(printf "$PSAUX" | wc -l)
     if [[ "$PSAUX" == "0" ]]; then
       break
