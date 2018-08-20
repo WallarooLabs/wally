@@ -20,7 +20,7 @@ install_ponyc() {
 
   echo "** Installing latest ponyc ${PONYC_VERSION} from bintray"
 
-  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
+  sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "E04F0923 B3B48BDA"
   sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
   sudo apt-get update
 
@@ -32,7 +32,7 @@ install_ponyc() {
 install_pony_stable() {
   echo "** Installing pony-stable"
 
-  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
+  sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "E04F0923 B3B48BDA"
   sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
   sudo apt-get update
   sudo apt-get -V -y install pony-stable

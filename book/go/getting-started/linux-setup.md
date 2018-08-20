@@ -103,7 +103,7 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
 In order to install `ponyc` and `pony-stable` via `apt-get` the following keyserver must be added to the APT key management utility.
 
 ```bash
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
+sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "E04F0923 B3B48BDA"
 ```
 
 The following packages need to be installed to allow `apt` to use a repository over HTTPS:

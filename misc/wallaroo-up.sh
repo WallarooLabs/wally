@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MD5="d31393b05eea008672e4aee76a3c5bd3  -"
+MD5="a8628454beece623ad6b3a85925d2f64  -"
 
 set -eEuo pipefail
 
@@ -362,13 +362,13 @@ install_required_dependencies() {
       case "$dist_version" in
         jessie|trusty)
           if ! apt-cache policy 2>&1 | grep wallaroolabs-debian > /dev/null 2>&1; then
-            run_cmd "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61 $REDIRECT" root
+            run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 379CE192D401AB61 $REDIRECT" root
             run_cmd "add-apt-repository 'deb https://wallaroo-labs.bintray.com/wallaroolabs-debian ${dist_version} main' $REDIRECT" root
           fi
         ;;
       esac
       if ! apt-cache policy 2>&1 | grep pony-language/ponylang-debian > /dev/null 2>&1; then
-        run_cmd "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys E04F0923 B3B48BDA $REDIRECT" root
+        run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E04F0923 B3B48BDA $REDIRECT" root
         run_cmd "add-apt-repository 'deb https://dl.bintray.com/pony-language/ponylang-debian ${dist_version} main' $REDIRECT" root
       fi
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL libssl-dev make pony-stable libsnappy-dev liblz4-dev"
