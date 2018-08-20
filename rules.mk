@@ -418,6 +418,9 @@ clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += clean-$(s
 clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))):
 	$(QUIET)rm -rf $(abspath $1)/node_modules
 	$(QUIET)rm -rf $(abspath $1)/_build
+	$(QUIET)rm -rf $(abspath $1)/priv/static
+	$(QUIET)rm -rf $(abspath $1)/../../deps
+	$(QUIET)rm -rf $(abspath $1)/../../_build
 .PHONY: clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
