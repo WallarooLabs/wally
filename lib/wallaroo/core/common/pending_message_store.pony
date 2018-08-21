@@ -22,28 +22,46 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 class PendingMessageStore
-  let _data_store: Map[String, Map[Key, Array[RoutingArguments]]] =
+  let _data_store: Map[StateName, Map[Key, Array[RoutingArguments]]] =
     _data_store.create()
   var _pending_size: USize = 0
 
   fun has_pending(): Bool =>
     _pending_size > 0
 
-  fun ref add(state_name: String, key: Key, routing_args: RoutingArguments) =>
+  fun has_pending_state_key(state_name: StateName, key: Key): Bool =>
+    if _data_store.contains(state_name) then
+      try
+        _data_store(state_name)?.contains(key)
+      else
+        Unreachable()
+        false
+      end
+    else
+      false
+    end
+
+  fun ref add(state_name: StateName, key: Key, routing_args: RoutingArguments)
+  =>
     """
     Add a data item to the state_name/key array.
     """
     try
+      if not has_pending_state_key(state_name, key) then
+        _pending_size = _pending_size + 1
+      end
+
       _data_store
         .insert_if_absent(state_name, Map[Key, Array[RoutingArguments]])?
         .insert_if_absent(key, Array[RoutingArguments])?
         .push(routing_args)
-      _pending_size = _pending_size + 1
     else
       Unreachable()
     end
 
-  fun ref retrieve(state_name: String, key: Key): Array[RoutingArguments] ? =>
+  fun ref retrieve(state_name: StateName, key: Key):
+    Array[RoutingArguments] ?
+  =>
     """
     Return the array of data items associated with the state_name/key and remove
     the key and items from the store.
@@ -58,6 +76,7 @@ class PendingMessageStore
     for (state_name, keys_routing_args) in _data_store.pairs() do
       for (key, route_args) in keys_routing_args.pairs() do
         if router.has_state_partition(state_name, key) then
+          @printf[I32]("!@ PendingMessageStore: Router has pending state/key %s/%s. Clearing.\n".cstring(), state_name.cstring(), key.cstring())
           try
             keys_routing_args.remove(key)?
             _pending_size = _pending_size - 1
@@ -65,6 +84,9 @@ class PendingMessageStore
               r(producer)
             end
           end
+        //!@
+        else
+          @printf[I32]("!@ PendingMessageStore: Router DOES NOT HAVE pending state/key %s/%s. NOT Clearing.\n".cstring(), state_name.cstring(), key.cstring())
         end
       end
     end

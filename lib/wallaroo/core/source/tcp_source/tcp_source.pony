@@ -219,7 +219,9 @@ actor TCPSource is Source
     end
 
     _notify.update_router(_router)
+
     _pending_message_store.process_known_keys(this, _router)
+
     if not _pending_message_store.has_pending() then
       let bs = Array[BarrierToken]
       for b in _pending_barriers.values() do
@@ -395,8 +397,10 @@ actor TCPSource is Source
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   =>
+    if not _pending_message_store.has_pending_state_key(state_name, key) then
+      _state_step_creator.report_unknown_key(this, state_name, key)
+    end
     _pending_message_store.add(state_name, key, routing_args)
-    _state_step_creator.report_unknown_key(this, state_name, key)
 
   be report_status(code: ReportStatusCode) =>
     match code
@@ -425,12 +429,12 @@ actor TCPSource is Source
     if not _shutdown then
       match token
       | let srt: SnapshotRollbackBarrierToken =>
-        @printf[I32]("!@ Source clearing pending message store\n".cstring())
+        @printf[I32]("!@ TCPSource clearing pending message store\n".cstring())
         _pending_message_store.clear()
       end
 
       if not _pending_message_store.has_pending() then
-        @printf[I32]("!@ Source initiate_barrier %s\n".cstring(), token.string().cstring())
+        @printf[I32]("!@ TCPSource initiate_barrier %s\n".cstring(), token.string().cstring())
         match token
         | let sbt: SnapshotBarrierToken =>
           snapshot_state(sbt.id)
@@ -462,6 +466,7 @@ actor TCPSource is Source
     """
     TCPSources don't currently write out any data as part of the snapshot.
     """
+    @printf[I32]("!@ TCPSource %s calling EventLog.snapshot_state()\n".cstring(), _source_id.string().cstring())
     _event_log.snapshot_state(_source_id, snapshot_id,
       recover val Array[ByteSeq] end)
 
