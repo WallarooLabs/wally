@@ -282,8 +282,10 @@ actor BarrierSource is Source
     """
     BarrierSources don't currently write out any data as part of the snapshot.
     """
-    _event_log.snapshot_state(_source_id, snapshot_id,
-      recover val Array[ByteSeq] end)
+    None
+    // @printf[I32]("!@ BarrierSource %s calling EventLog.snapshot_state()\n".cstring(), _source_id.string().cstring())
+    // _event_log.snapshot_state(_source_id, snapshot_id,
+    //   recover val Array[ByteSeq] end)
 
   be rollback(payload: ByteSeq val, event_log: EventLog) =>
     """
