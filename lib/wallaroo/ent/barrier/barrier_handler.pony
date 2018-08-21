@@ -97,9 +97,6 @@ class PendingBarrierHandler is BarrierHandler
     _acked_sinks.set(s)
 
   fun ref worker_ack_barrier_start(w: String) =>
-    """
-    If we receive worker acks in this phase, we hold on to them for later.
-    """
     @printf[I32]("worker_ack_barrier_start from PendingBarrierHandler\n".cstring())
     ifdef debug then
       Invariant(if _is_primary() then
@@ -289,7 +286,7 @@ class WorkerAcksBarrierHandler is BarrierHandler
     true
 
   fun ref worker_ack_barrier(w: String) =>
-    // @printf[I32]("!@ worker_ack_barrier for %s from WorkerAcksBarrierHandler\n".cstring(), w.cstring())
+    @printf[I32]("!@ worker_ack_barrier for %s from WorkerAcksBarrierHandler\n".cstring(), w.cstring())
     if not SetHelpers[String].contains[String](_workers, w) then Fail() end
 
     _acked_workers.set(w)
