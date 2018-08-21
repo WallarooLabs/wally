@@ -141,6 +141,7 @@ actor EventLog
   // SNAPSHOT
   /////////////////
   be initiate_snapshot(snapshot_id: SnapshotId, action: Promise[SnapshotId]) =>
+    @printf[I32]("!@ EventLog: initiate_snapshot\n".cstring())
     _phase.initiate_snapshot(snapshot_id, action, this)
 
   be snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
@@ -204,7 +205,10 @@ actor EventLog
     // If we have no resilients on this worker for some reason, then we
     // should abort rollback early.
     if _resilients.size() > 0 then
-      _backend.start_rollback(token.snapshot_id)
+      let entries = _backend.start_rollback(token.snapshot_id)
+      if entries == 0 then
+        _phase.complete_early()
+      end
     else
       _phase.complete_early()
     end
