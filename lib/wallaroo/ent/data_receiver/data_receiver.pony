@@ -63,9 +63,10 @@ actor DataReceiver is (Producer & Rerouter)
 
   // A special RoutingId that indicates that a barrier or register_producer
   // request needs to be forwarded to all known state steps on this worker.
-  let _state_routing_id: RoutingId
+  var _state_routing_ids: Map[RoutingId, StateName] val
   // Keeps track of all upstreams that produce messages for state steps.
-  let _state_partition_producers: SetIs[RoutingId] =
+  // The map is from state routing id to a set of upstream ids.
+  let _state_partition_producers: Map[RoutingId, SetIs[RoutingId]] =
     _state_partition_producers.create()
 
   var _phase: _DataReceiverPhase = _DataReceiverNotProcessingPhase
@@ -79,18 +80,18 @@ actor DataReceiver is (Producer & Rerouter)
     _worker_name = worker_name
     _sender_name = sender_name
     _state_step_creator = state_step_creator
-    _state_routing_id = WorkerStateRoutingId(_worker_name)
     _router = data_router
-    //!@
-    // if initialized then
-      _phase = _NormalDataReceiverPhase(this)
-    // end
+    _state_routing_ids = _router.state_routing_ids()
+    _phase = _NormalDataReceiverPhase(this)
 
   fun router(): DataRouter =>
     _router
 
   be update_router(router': DataRouter) =>
+    @printf[I32]("!@ DataReceiver: update_router!\n".cstring())
     _router = router'
+
+    _state_routing_ids = _router.state_routing_ids()
 
     // If we have pending register_producer calls, then try to process them now
     var retries = Array[(RoutingId, RoutingId)]
@@ -114,8 +115,11 @@ actor DataReceiver is (Producer & Rerouter)
 
     // Reregister all state partition producers in case there were more
     // keys added to this worker.
-    for input_id in _state_partition_producers.values() do
-      _router.register_producer(input_id, _state_routing_id, this)
+    for (state_r_id, producer_ids) in _state_partition_producers.pairs() do
+      for producer_id in producer_ids.values() do
+        @printf[I32]("!@ DataReceiver: registering known producer %s with router again\n".cstring(), producer_id.string().cstring())
+        _router.register_producer(producer_id, state_r_id, this)
+      end
     end
 
     _pending_message_store.process_known_keys(this, _router)
@@ -303,8 +307,13 @@ actor DataReceiver is (Producer & Rerouter)
   // REGISTER PRODUCERS
   /////////////////////////////////////////////////////////////////////////////
   be register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    if output_id == _state_routing_id then
-      _state_partition_producers.set(input_id)
+    if _state_routing_ids.contains(output_id) then
+      try
+        _state_partition_producers.insert_if_absent(output_id,
+          SetIs[RoutingId])?.set(input_id)
+      else
+        Fail()
+      end
     end
     _router.register_producer(input_id, output_id, this)
     _boundary_edges.set(BoundaryEdge(input_id, output_id))
@@ -317,8 +326,13 @@ actor DataReceiver is (Producer & Rerouter)
     _queued_unregister_producers.push((input_id, output_id))
 
   be unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
-    if output_id == _state_routing_id then
-      _state_partition_producers.unset(input_id)
+    if _state_routing_ids.contains(output_id) then
+      try
+        let set = _state_partition_producers(output_id)?
+        set.unset(input_id)
+      else
+        Unreachable()
+      end
     end
     _router.unregister_producer(input_id, output_id, this)
     _boundary_edges.unset(BoundaryEdge(input_id, output_id))
