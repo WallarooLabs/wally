@@ -456,6 +456,7 @@ actor RouterRegistry
   be register_state_step(step: Step, state_name: String, key: Key,
     step_id: RoutingId)
   =>
+    @printf[I32]("!@ RouterRegistry: register_state_step, key: %s\n".cstring(), key.cstring())
     _add_routes_to_state_step(step_id, step, key, state_name)
 
   fun _distribute_data_router() =>
