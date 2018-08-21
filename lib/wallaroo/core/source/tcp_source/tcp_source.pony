@@ -128,6 +128,7 @@ actor TCPSource is Source
     """
     A new connection accepted on a server.
     """
+    @printf[I32]("!@ Spinning up TCPSource %s\n".cstring(), source_id.string().cstring())
     _source_id = source_id
     _auth = auth
     _event_log = event_log

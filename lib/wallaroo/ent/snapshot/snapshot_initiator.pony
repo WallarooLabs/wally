@@ -170,6 +170,7 @@ actor SnapshotInitiator is Initializable
     _phase.event_log_snapshot_complete(worker, snapshot_id)
 
   fun ref event_log_write_snapshot_id(snapshot_id: SnapshotId) =>
+    @printf[I32]("!@ SnapshotInitiator: event_log_write_snapshot_id()\n".cstring())
     _event_log.write_snapshot_id(snapshot_id)
 
     try

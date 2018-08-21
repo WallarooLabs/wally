@@ -25,9 +25,11 @@ primitive StepStateSnapshotter
       let serialized: ByteSeq val = r.serialize_state()
       wb.write(serialized)
       let payload = wb.done()
+      @printf[I32]("!@ State Step %s calling EventLog.snapshot_state()\n".cstring(), id.string().cstring())
       event_log.snapshot_state(id, snapshot_id, consume payload)
     else
       // Currently, non-state steps don't have anything to snapshot.
+      @printf[I32]("!@ Stateless Step %s calling EventLog.snapshot_state()\n".cstring(), id.string().cstring())
       event_log.snapshot_state(id, snapshot_id,
         recover val Array[ByteSeq] end)
     end

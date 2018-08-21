@@ -68,7 +68,8 @@ primitive LastLogFilePath
 trait Backend
   fun ref sync() ?
   fun ref datasync() ?
-  fun ref start_rollback(snapshot_id: SnapshotId)
+  // Rollback from recovery file and return number of entries replayed.
+  fun ref start_rollback(snapshot_id: SnapshotId): USize
   fun ref write(): USize ?
   fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
@@ -78,7 +79,7 @@ trait Backend
 class EmptyBackend is Backend
   fun ref sync() => Fail()
   fun ref datasync() => Fail()
-  fun ref start_rollback(snapshot_id: SnapshotId) => Fail()
+  fun ref start_rollback(snapshot_id: SnapshotId): USize => Fail(); 0
   fun ref write(): USize => Fail(); 0
   fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
@@ -95,8 +96,7 @@ class DummyBackend is Backend
 
   fun ref sync() => None
   fun ref datasync() => None
-  fun ref start_rollback(snapshot_id: SnapshotId) =>
-    _event_log.rollback_complete()
+  fun ref start_rollback(snapshot_id: SnapshotId): USize => 0
   fun ref write(): USize => 0
   fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
@@ -136,7 +136,7 @@ class FileBackend is Backend
   fun bytes_written(): USize =>
     _bytes_written
 
-  fun ref start_rollback(snapshot_id: SnapshotId) =>
+  fun ref start_rollback(snapshot_id: SnapshotId): USize =>
     if _filepath.exists() then
       @printf[I32](("RESILIENCE: Rolling back to snapshot %s from recovery " +
         "log file: \n").cstring(), snapshot_id.string().cstring(),
@@ -183,9 +183,10 @@ class FileBackend is Backend
             _file.seek(size.isize())
           end
         end
-        var end_of_snapshot = false
-        // Skip our watermark:false byte
-        _file.seek(1)
+        @printf[I32]("!@ Backend: Found end of entries for snapshot %s.\n".cstring(), current_snapshot_id.string().cstring())
+        r.append(_file.read(1))
+        var end_of_snapshot = BoolConverter.u8_to_bool(
+          try r.u8()? else Fail(); 0 end)
         while not end_of_snapshot do
           r.append(_file.read(20))
           let resilient_id = try r.u128_be()? else Fail(); 0 end
@@ -225,14 +226,16 @@ class FileBackend is Backend
         _event_log.rollback_from_log_entry(entry._1, entry._2)
       end
 
+      _file.seek_end(0)
+
       @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
         "file.\n").cstring(), num_replayed)
-
-      _file.seek_end(0)
+      num_replayed
     else
       @printf[I32]("RESILIENCE: Could not find log file to rollback from.\n"
         .cstring())
       Fail()
+      0
     end
 
   fun ref write(): USize ?
@@ -339,7 +342,7 @@ class RotatingFileBackend is Backend
 
   fun ref datasync() ? => _backend.datasync()?
 
-  fun ref start_rollback(snapshot_id: SnapshotId) =>
+  fun ref start_rollback(snapshot_id: SnapshotId): USize =>
     _backend.start_rollback(snapshot_id)
 
   fun ref write(): USize ? =>
