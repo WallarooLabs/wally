@@ -408,8 +408,10 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   =>
+    if not _pending_message_store.has_pending_state_key(state_name, key) then
+      _state_step_creator.report_unknown_key(this, state_name, key)
+    end
     _pending_message_store.add(state_name, key, routing_args)
-    _state_step_creator.report_unknown_key(this, state_name, key)
 
   ///////////
   // RECOVERY
