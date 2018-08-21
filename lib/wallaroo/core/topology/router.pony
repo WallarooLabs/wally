@@ -897,13 +897,13 @@ class val DataRouter is Equatable[DataRouter]
   new val create(worker: String, data_routes: Map[RoutingId, Consumer] val,
     keyed_routes: LocalStatePartitions val,
     keyed_step_ids: LocalStatePartitionIds val,
-    state_routing_ids: Map[RoutingId, StateName] val)
+    state_routing_ids': Map[RoutingId, StateName] val)
   =>
     _worker_name = worker
     _data_routes = data_routes
     _keyed_routes = keyed_routes
     _keyed_step_ids = keyed_step_ids
-    _state_routing_ids = state_routing_ids
+    _state_routing_ids = state_routing_ids'
 
     var route_id: RouteId = 0
     let ids: Array[RoutingId] = ids.create()
@@ -942,7 +942,7 @@ class val DataRouter is Equatable[DataRouter]
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, RoutingId] val,
     keys_to_route_ids: StatePartitionRouteIds val,
-    state_routing_ids: Map[RoutingId, StateName] val)
+    state_routing_ids': Map[RoutingId, StateName] val)
   =>
     _worker_name = worker
     _data_routes = data_routes
@@ -951,10 +951,13 @@ class val DataRouter is Equatable[DataRouter]
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
     _keys_to_route_ids = keys_to_route_ids
-    _state_routing_ids = state_routing_ids
+    _state_routing_ids = state_routing_ids'
 
   fun size(): USize =>
     _data_routes.size()
+
+  fun state_routing_ids(): Map[RoutingId, StateName] val =>
+    _state_routing_ids
 
   fun step_for_id(id: RoutingId): Consumer ? =>
     _data_routes(id)?
