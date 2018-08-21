@@ -1395,8 +1395,9 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let b_source = BarrierSource(t.barrier_source_id,
                   _router_registry, _event_log)
                 _barrier_initiator.register_barrier_source(b_source)
-                @printf[I32]("!@!! register_resilient: BarrierSource %s\n".cstring(), t.barrier_source_id.string().cstring())
-                _event_log.register_resilient(t.barrier_source_id, b_source)
+                // @printf[I32]("!@!! register_resilient: BarrierSource %s\n".cstring(), t.barrier_source_id.string().cstring())
+                //!@
+                // _event_log.register_resilient(t.barrier_source_id, b_source)
                 barrier_source = b_source
               end
               try
