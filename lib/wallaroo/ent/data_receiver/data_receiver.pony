@@ -212,8 +212,10 @@ actor DataReceiver is (Producer & Rerouter)
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   =>
+    if not _pending_message_store.has_pending_state_key(state_name, key) then
+      _state_step_creator.report_unknown_key(this, state_name, key)
+    end
     _pending_message_store.add(state_name, key, routing_args)
-    _state_step_creator.report_unknown_key(this, state_name, key)
 
   fun ref _maybe_ack() =>
     if (_ack_counter % 512) == 0 then
