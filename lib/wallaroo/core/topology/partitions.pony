@@ -56,20 +56,30 @@ primitive SingleStepPartitionFunction[In: Any val] is
 
 class val KeyDistribution is Equatable[KeyDistribution]
   let _hash_partitions: HashPartitions
-  let _workers_to_keys: Map[String, Array[Key] val] val
+  let _workers_to_keys: Map[WorkerName, Array[Key] val] val
 
-  new val create(hp: HashPartitions, wtk: Map[String, Array[Key] val] val) =>
+  new val create(hp: HashPartitions,
+    wtk: Map[WorkerName, Array[Key] val] val)
+  =>
     _hash_partitions = hp
     _workers_to_keys = wtk
 
-  fun claimants(): Iterator[String] =>
+  fun claimants(): Iterator[WorkerName] =>
     _hash_partitions.claimants()
 
   fun hash_partitions(): HashPartitions =>
     _hash_partitions
 
-  fun workers_to_keys(): Map[String, Array[Key] val] val =>
+  fun workers_to_keys(): Map[WorkerName, Array[Key] val] val =>
     _workers_to_keys
+
+  fun local_keys(w: WorkerName): Array[Key] val =>
+    try
+      _workers_to_keys(w)?
+    else
+      Fail()
+      recover val Array[Key] end
+    end
 
   fun update_key(key: Key, pa: ProxyAddress): KeyDistribution val =>
     let new_workers_to_keys = recover trn Map[String, Array[Key] val] end
@@ -148,34 +158,36 @@ class KeyedStateAddresses
     consume ss
 
 trait val StateSubpartitions is Equatable[StateSubpartitions]
-  fun build(app_name: String, worker_name: String,
-    metrics_conn: MetricsSink,
+  fun build(app_name: String, worker_name: WorkerName,
+    worker_names: Array[WorkerName] val, metrics_conn: MetricsSink,
     auth: AmbientAuth, event_log: EventLog,
+    all_local_keys: Map[StateName, Map[Key, RoutingId] val] val,
     recovery_replayer: RecoveryReconnecter,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    outgoing_boundaries: Map[WorkerName, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
-    data_routes: Map[U128, Consumer],
+    data_routes: Map[RoutingId, Consumer],
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
-    state_steps: Map[String, Array[Step]],
+    state_steps: Map[StateName, Array[Step]],
     state_step_creator: StateStepCreator,
     state_routing_ids: Map[WorkerName, RoutingId] val): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions ?
   fun add_worker_name(worker: String): StateSubpartitions
+  fun initial_local_keys(w: WorkerName): Map[Key, RoutingId] val
   fun runner_builder(): RunnerBuilder
 
 class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
   StateSubpartitions
-  let _state_name: String
+  let _state_name: StateName
   let _key_distribution: KeyDistribution
-  let _id_map: Map[Key, U128] val
+  let _id_map: Map[Key, RoutingId] val
   let _partition_function: PartitionFunction[PIn] val
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
 
-  new val create(state_name': String,
+  new val create(state_name': StateName,
     key_distribution': KeyDistribution,
-    id_map': Map[Key, U128] val, runner_builder': RunnerBuilder,
+    id_map': Map[Key, RoutingId] val, runner_builder': RunnerBuilder,
     partition_function': PartitionFunction[PIn] val,
     pipeline_name': String)
   =>
@@ -189,21 +201,22 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
   fun runner_builder(): RunnerBuilder =>
     _runner_builder
 
-  fun build(app_name: String, worker_name: String,
-    metrics_conn: MetricsSink,
+  fun build(app_name: String, worker_name: WorkerName,
+    worker_names: Array[WorkerName] val, metrics_conn: MetricsSink,
     auth: AmbientAuth, event_log: EventLog,
+    all_local_keys: Map[StateName, Map[Key, RoutingId] val] val,
     recovery_replayer: RecoveryReconnecter,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    outgoing_boundaries: Map[WorkerName, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[RoutingId, Consumer],
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
-    state_steps: Map[String, Array[Step]],
+    state_steps: Map[StateName, Array[Step]],
     state_step_creator: StateStepCreator,
     state_routing_ids: Map[WorkerName, RoutingId] val):
     LocalPartitionRouter[PIn, S] val
   =>
-    let hashed_node_routes = recover trn Map[String, HashedProxyRouter] end
+    let hashed_node_routes = recover trn Map[WorkerName, HashedProxyRouter] end
 
     let m = recover trn Map[Key, Step] end
 
@@ -211,44 +224,38 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
 
     let new_state_steps = Array[Step]
 
-    for c in _key_distribution.claimants() do
-      if c == worker_name then
-        try
-          let keys = _key_distribution.workers_to_keys()(c)?
-          keyed_data_routes.add_state(_state_name)
-          for key in keys.values() do
-            try
-              let id = _id_map(key)?
-              let reporter = MetricsReporter(app_name, worker_name,
-                metrics_conn)
-              let next_state_step = Step(auth, _runner_builder(
-                where event_log = event_log, auth = auth),
-                consume reporter, id, event_log, recovery_replayer,
-                outgoing_boundaries, state_step_creator)
+    try
+      let local_keys = all_local_keys(_state_name)?
+      keyed_data_routes.add_state(_state_name)
+      for (key, id) in local_keys.pairs() do
+        let reporter = MetricsReporter(app_name, worker_name,
+          metrics_conn)
+        let next_state_step = Step(auth, _runner_builder(
+          where event_log = event_log, auth = auth),
+          consume reporter, id, event_log, recovery_replayer,
+          outgoing_boundaries, state_step_creator)
 
-              new_state_steps.push(next_state_step)
-              initializables.set(next_state_step)
-              data_routes(id) = next_state_step
-              keyed_data_routes.add(_state_name, key, next_state_step)
-              keyed_step_ids.add(_state_name, key, id)
-              m(key) = next_state_step
-              partition_count = partition_count + 1
-            else
-              @printf[I32](("Missing step id for " + key + "!\n").cstring())
-            end
-          end
-        else
-          @printf[I32](("Could not find keys for %s!\n").cstring(),
-            c.cstring())
-          Fail()
-        end
-      else
+        new_state_steps.push(next_state_step)
+        initializables.set(next_state_step)
+        data_routes(id) = next_state_step
+        keyed_data_routes.add(_state_name, key, next_state_step)
+        keyed_step_ids.add(_state_name, key, id)
+        m(key) = next_state_step
+        partition_count = partition_count + 1
+      end
+    else
+      @printf[I32]("No local keys for state %s\n".cstring(),
+        _state_name.cstring())
+    end
+
+    for w in worker_names.values() do
+      if w != worker_name then
         try
-          let boundary = outgoing_boundaries(c)?
-          hashed_node_routes(c) = HashedProxyRouter(c, boundary,
+          let boundary = outgoing_boundaries(w)?
+          hashed_node_routes(w) = HashedProxyRouter(w, boundary,
             _state_name, auth)
         else
-          @printf[I32](("Missing proxy for " + c + "!\n").cstring())
+          @printf[I32](("Missing proxy for %s!\n").cstring(), w.cstring())
         end
       end
     end
@@ -272,6 +279,22 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
     let kd = _key_distribution.add_worker_name(worker)
     KeyedStateSubpartitions[PIn, S](_state_name, kd, _id_map,
       _runner_builder, _partition_function, _pipeline_name)
+
+  fun initial_local_keys(w: WorkerName): Map[Key, RoutingId] val =>
+    """
+    The keys local to worker w when the application first started up.
+    """
+    let ks = _key_distribution.local_keys(w)
+    let lks = recover iso Map[Key, RoutingId] end
+    for k in ks.values() do
+      try
+        let r_id = _id_map(k)?
+        lks(k) = r_id
+      else
+        Fail()
+      end
+    end
+    consume lks
 
   fun eq(that: box->StateSubpartitions): Bool =>
     match that
