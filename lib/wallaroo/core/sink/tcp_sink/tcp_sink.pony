@@ -397,6 +397,7 @@ actor TCPSink is Sink
     """
     TCPSinks don't currently write out any data as part of the snapshot.
     """
+    @printf[I32]("!@ TCPSink %s calling EventLog.snapshot_state()\n".cstring(), _sink_id.string().cstring())
     _event_log.snapshot_state(_sink_id, snapshot_id,
       recover val Array[ByteSeq] end)
 
