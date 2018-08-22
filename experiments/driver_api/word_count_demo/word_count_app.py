@@ -18,25 +18,25 @@ as a source (multiple pubsub topics for text) and sink (counts as key-value
 pairs).
 """
 
-import cPickle
 import string
-import struct
-
 import wallaroo
 import wallaroo.experimental
-from partitioned_redis_stream import TextStream
+
+import text_documents
+import word_counts
+
 
 def application_setup(args):
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
-    text_stream = TextStream(host = in_host, base_port = in_port)
-    count_storage = wallaroo.experimental.ExternalSink(out_host, out_port, encoder)
+    text_addr = text_documents.parse_text_stream_addr(args)
+    text_stream = text_documents.TextStream(*text_addr)
+    count_addr = word_counts.parse_count_stream_addr(args)
+    count_stream = word_counts.CountStream(*count_addr)
 
     ab = wallaroo.ApplicationBuilder("Word Count Application")
     ab.new_pipeline("Split and Count", text_stream.source())
     ab.to_parallel(split)
     ab.to_state_partition(count_word, WordTotal, "word totals", partition)
-    ab.to_sink(count_storage)
+    ab.to_sink(count_stream.sink())
     return ab.build()
 
 
@@ -60,6 +60,7 @@ def count_word(word, word_totals):
 
 class WordTotal(object):
     def __init__(self):
+        print("word total")
         self.word = ""
         self.total = 0
 
@@ -80,14 +81,3 @@ class WordCount(object):
 @wallaroo.partition
 def partition(data):
     return data
-
-
-@wallaroo.experimental.stream_message_decoder
-def decoder(bs):
-    return bs.decode("utf-8")
-
-
-@wallaroo.experimental.stream_message_encoder
-def encoder(data):
-    output = (data.word, data.count)
-    return cPickle.dumps(output)

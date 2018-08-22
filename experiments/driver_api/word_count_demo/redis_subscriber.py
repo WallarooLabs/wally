@@ -1,16 +1,12 @@
 from __future__ import print_function
-import time
-import socket
-import struct
+import sys
 
 from redis import Redis
-from wallaroo.experimental import SourceDriver, Session, StreamDescription
+from text_documents import TextStream, parse_text_stream_addr
 
 redis = Redis()
-
-driver = SourceDriver()
-# TODO: switch this to use the StreamDescription we can share
-driver.connect('127.0.0.1', 7010)
+text_stream_addr = parse_text_stream_addr(sys.argv)
+driver = TextStream(*text_stream_addr).driver()
 
 print("Subscribing to 'text'")
 pubsub = redis.pubsub()

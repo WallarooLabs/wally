@@ -1,3 +1,4 @@
+import argparse
 import cPickle
 import wallaroo.experimental
 
@@ -14,6 +15,18 @@ class CountStream(object):
             port = self.port,
             encoder = count_encoder)
 
+    def driver(self):
+        driver = wallaroo.experimental.SinkDriver(count_decoder)
+        driver.listen('127.0.0.1', 7200, backlog=16)
+        return driver
+
+
+def parse_count_stream_addr(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--count-stream', dest="output_addr")
+    output_addr = parser.parse_known_args(args)[0].output_addr
+    return tuple(output_addr.split(':'))
+
 
 @wallaroo.experimental.stream_message_decoder
 def count_decoder(message):
@@ -22,4 +35,4 @@ def count_decoder(message):
 
 @wallaroo.experimental.stream_message_encoder
 def count_encoder(message):
-    return cPickle.dumps((message.word.encode("utf-8"), message.count))
+    return cPickle.dumps((message.word.encode("utf-8"), message.count), -1)

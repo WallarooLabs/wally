@@ -9,4 +9,4 @@ fi
 . _env/bin/activate
 
 export PYTHONPATH=../../../machida/lib:$PWD:$PYTHONPATH
-python kafka_publisher.py
+python seed_redis.py

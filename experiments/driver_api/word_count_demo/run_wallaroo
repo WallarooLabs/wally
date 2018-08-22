@@ -9,8 +9,8 @@ fi
 . _env/bin/activate
 
 export PYTHONPATH=../../../machida/lib:$PWD:$PYTHONPATH
-../../../machida/build/machida --application-module word_count \
-  --text-stream 127.0.0.1:7100 --out 127.0.0.1:7200 \
+../../../machida/build/machida --application-module word_count_app \
+  --text-stream 127.0.0.1:7100 --count-stream 127.0.0.1:7200 \
   --external 127.0.0.1:5000 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --cluster-initializer --ponythreads=1

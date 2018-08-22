@@ -46,12 +46,15 @@ class SourceDriver(object):
 
 class SinkDriver(object):
 
-    def __init__(self, host, port, decoder, backlog = 0):
+    def __init__(self, decoder):
+        self._decoder = decoder
+        self._acceptor = None
+
+    def listen(self, host, port, backlog = 0):
         acceptor = socket.socket()
         acceptor.bind((host, port))
         acceptor.listen(backlog)
         self._acceptor = acceptor
-        self._decoder = decoder
 
     def accept(self):
         conn, addr = self._acceptor.accept()

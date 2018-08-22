@@ -9,4 +9,4 @@ fi
 . _env/bin/activate
 
 export PYTHONPATH=../../../machida/lib:$PWD:$PYTHONPATH
-python produce_text.py
+python kafka_producer.py --topic counts --count-stream 127.0.0.1:7200

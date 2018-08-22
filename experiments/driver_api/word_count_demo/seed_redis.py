@@ -8,7 +8,7 @@ from redis import Redis
 redis = Redis()
 
 project = os.path.dirname(__file__)
-bill_path = os.path.join(project, "../data/bill_of_rights.txt")
+bill_path = os.path.join(project, "data/bill_of_rights.txt")
 with open(bill_path, 'r') as file:
     bill = file.read()
 
