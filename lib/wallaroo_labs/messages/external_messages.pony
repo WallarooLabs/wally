@@ -103,7 +103,7 @@ primitive ExternalMsgEncoder
     wb: Writer = Writer): Array[ByteSeq] val
   =>
     let digest_map = _partition_digest(state_routers, stateless_routers)
-    let pqr = PartitionQueryEncoder.state_and_stateless(digest_map)
+    let pqr = PartitionQueryStateAndStatelessIdsEncoder(digest_map)
     _encode(_PartitionQueryResponse(), pqr, wb)
 
   fun cluster_status_query(wb: Writer = Writer): Array[ByteSeq] val =>
@@ -139,7 +139,7 @@ primitive ExternalMsgEncoder
     wb: Writer = Writer): Array[ByteSeq] val
   =>
     let digest_map = _partition_digest(state_routers, stateless_routers)
-    let pqr = PartitionQueryEncoder.state_and_stateless_by_count(digest_map)
+    let pqr = PartitionQueryStateAndStatelessCountsEncoder(digest_map)
     _encode(_PartitionCountQueryResponse(), pqr, wb)
 
   fun source_ids_query(wb: Writer = Writer): Array[ByteSeq] val =>
@@ -217,7 +217,7 @@ primitive ExternalMsgEncoder
 
   fun _partition_digest(state_routers: Map[StateName, PartitionRouter],
     stateless_routers: Map[U128, StatelessPartitionRouter]):
-    Map[String, Map[String, Map[String, Array[String] val] val] val]
+    Map[String, Map[String, Map[String, Array[String] val] val] val] val
   =>
     let state_ps =
       recover iso Map[String, Map[WorkerName, Array[String] val] val] end
@@ -232,10 +232,12 @@ primitive ExternalMsgEncoder
       stateless_ps(k.string()) = v.distribution_digest()
     end
     let digest_map =
-      Map[String, Map[String, Map[WorkerName, Array[String] val] val] val]
+      recover trn
+        Map[String, Map[String, Map[WorkerName, Array[String] val] val] val]
+      end
     digest_map("state_partitions") = consume state_ps
     digest_map("stateless_partitions") = consume stateless_ps
-    digest_map
+    consume digest_map
 
   fun _state_entity_digest(local_keys: Map[StateName, SetIs[Key]]):
     Map[String, Array[String] val] val
@@ -309,7 +311,7 @@ primitive ExternalMsgDecoder
     | (_SourceIdsQuery(), let s: String) =>
       ExternalSourceIdsQueryMsg
     | (_SourceIdsQueryResponse(), let s: String) =>
-      SourceIdsQueryJsonDecoder.response(s)
+      SourceIdsQueryJsonDecoder.response(s)?
     | (_ReportStatus(), let s: String) =>
       ExternalReportStatusMsg(s)
     | (_StateEntityQuery(), let s: String) =>
@@ -511,9 +513,11 @@ primitive ExternalSourceIdsQueryMsg is ExternalMsg
 
 class val ExternalSourceIdsQueryResponseMsg is ExternalMsg
   let source_ids: Array[String] val
+  let json: String
 
-  new val create(m: Array[String] val) =>
-    source_ids = m
+  new val create(source_ids': Array[String] val, json': String val) =>
+    source_ids = source_ids'
+    json = json'
 
 class val ExternalReportStatusMsg is ExternalMsg
   let code: String

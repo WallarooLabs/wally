@@ -16,10 +16,12 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "ponytest"
+use "../collection_helpers"
 use "collections"
 use "debug"
-use "../collection_helpers"
+use "itertools"
+use "json"
+use "ponytest"
 
 actor Main is TestList
   new create(env: Env) => PonyTest(env, this)
@@ -27,100 +29,51 @@ actor Main is TestList
   new make() => None
 
   fun tag tests(test: PonyTest) =>
-    test(_TestEncodeDecodeState)
+    test(_TestEncodeDecodeClusterStatus)
+    test(_TestSourceIdsEncodeDecode)
+    test(_TestStateEntityEncode)
 
-class iso _TestEncodeDecodeState is UnitTest
-  fun name(): String => "query_json/encode_decode_state"
+class iso _TestSourceIdsEncodeDecode is UnitTest
+  fun name(): String => "query_json/test_source_ids_encode_decode"
 
   fun apply(h: TestHelper) ? =>
-    let m = recover iso Map[String, Map[String, Array[String] val]] end
-    var submap = recover iso Map[String, Array[String] val] end
-    let a1 = recover val ["1"] end
-    let a2 = recover val ["12";"23"] end
-    let a3 = recover val ["1";"2";"3"] end
-    let a4 = recover val ["134";"234";"334";"434"] end
-    let a5 = recover val ["3";"6";"9";"12";"15"] end
-    let a6 = recover val ["20";"40";"60";"80";"100"] end
-
-    let k1 = "key1"
-    let k2 = "key2"
-    let k3 = "third_key"
-    let k4 = "sleutel_vier"
-
-    let w1 = "w1"
-    let w2 = "worker2"
-    let w3 = "initializer"
-
-    submap(w1) = a1
-    submap(w2) = a4
-    submap(w3) = a6
-    m(k1) = (submap = recover iso Map[String, Array[String] val] end)
-
-    submap(w1) = a2
-    submap(w2) = a3
-    submap(w3) = a5
-    m(k2) = (submap = recover iso Map[String, Array[String] val] end)
-
-    submap(w1) = a1
-    submap(w2) = a6
-    submap(w3) = a2
-    m(k3) = (submap = recover iso Map[String, Array[String] val] end)
-
-    submap(w1) = a2
-    submap(w2) = a4
-    submap(w3) = a5
-    m(k4) = (submap = recover iso Map[String, Array[String] val] end)
-
-    let prep_map =
-      recover iso Map[String, Map[String, Array[String] val] val] end
-    for (k, v) in (consume val m).pairs() do
-      let prep_submap = recover iso Map[String, Array[String] val] end
-      for (subk, subv) in v.pairs() do
-        prep_submap(subk) = subv
-      end
-      prep_map(k) = consume prep_submap
+    let source_ids: Array[String] val = ["a";"b";"c"]
+    let encoded = SourceIdsQueryEncoder.response(source_ids)
+    let response = SourceIdsQueryJsonDecoder.response(encoded)?
+    for i in Range(0, source_ids.size()) do
+      h.assert_eq[String](response.source_ids(i)?, source_ids(i)?)
     end
 
-    let map_val = consume val prep_map
+class iso _TestStateEntityEncode is UnitTest
+  fun name(): String => "query_json/test_state_entity_encode"
 
-    let json = PartitionQueryEncoder.partitions(map_val)
+  fun apply(h: TestHelper) ? =>
+    let source_ids_a: Array[String] val = ["a";"b";"c"]
+    let source_ids_b: Array[String] val = ["x";"y";"z"]
+    let e = recover trn Map[String, Array[String] val] end
+    e.update("worker_a", source_ids_a)
+    e.update("worker_b", source_ids_b)
+    let encoded = StateEntityQueryEncoder.state_entity_keys(consume e)
 
-    let new_map = PartitionQueryDecoder.partitions(json)
+    let d = JsonDoc
+    d.parse(encoded)?
+    let o = d.data as JsonObject
+    let worker_a : JsonArray = o.data("worker_a")? as JsonArray
+    let worker_b : JsonArray = o.data("worker_b")? as JsonArray
 
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k1)?(w1)?,
-      new_map(k1)?(w1)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k1)?(w2)?,
-      new_map(k1)?(w2)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k1)?(w3)?,
-      new_map(k1)?(w3)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k2)?(w1)?,
-      new_map(k2)?(w1)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k2)?(w2)?,
-      new_map(k2)?(w2)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k2)?(w3)?,
-      new_map(k2)?(w3)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k3)?(w1)?,
-      new_map(k3)?(w1)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k3)?(w2)?,
-      new_map(k3)?(w2)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k3)?(w3)?,
-      new_map(k3)?(w3)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k4)?(w1)?,
-      new_map(k4)?(w1)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k4)?(w2)?,
-      new_map(k4)?(w2)?))
-    h.assert_eq[Bool](true, ArrayHelpers[String].eq[String](map_val(k4)?(w3)?,
-      new_map(k4)?(w3)?))
+    _AssertJsonArrayEq(h, worker_a, source_ids_a)?
+
 
 class iso _TestEncodeDecodeClusterStatus is UnitTest
   fun name(): String => "query_json/encode_decode_cluster_status"
 
   fun apply(h: TestHelper) ? =>
-    var is_processing = true
+    var stop_the_world_in_process = false
+    var is_processing = not stop_the_world_in_process
     var worker_count: U64 = 3
     var worker_names = recover val ["w1"; "w2"; "w3"] end
     let json1 = ClusterStatusQueryJsonEncoder.response(worker_count,
-      worker_names, is_processing)
+      worker_names, stop_the_world_in_process)
     let decoded1 = ClusterStatusQueryJsonDecoder.response(json1)?
     h.assert_eq[Bool](is_processing, decoded1.processing_messages)
     h.assert_eq[U64](worker_count, decoded1.worker_count)
@@ -128,14 +81,67 @@ class iso _TestEncodeDecodeClusterStatus is UnitTest
       h.assert_eq[String](worker_names(i)?, decoded1.worker_names(i)?)
     end
 
-    is_processing = false
+    stop_the_world_in_process = true
+    is_processing = not stop_the_world_in_process
     worker_count = 5
     worker_names = recover val ["w1"; "w2"; "w3"; "w4"; "w5"] end
     let json2 = ClusterStatusQueryJsonEncoder.response(worker_count,
-      worker_names, is_processing)
+      worker_names, stop_the_world_in_process)
     let decoded2 = ClusterStatusQueryJsonDecoder.response(json2)?
     h.assert_eq[Bool](is_processing, decoded2.processing_messages)
     h.assert_eq[U64](worker_count, decoded2.worker_count)
     for i in Range(0, worker_count.usize()) do
       h.assert_eq[String](worker_names(i)?, decoded2.worker_names(i)?)
     end
+
+primitive _AssertJsonArrayEq
+  fun apply(h: TestHelper, json_arr: JsonArray, arr: Array[String] val) ? =>
+    for i in Range(0, json_arr.data.size()) do
+      h.assert_eq[String](json_arr.data(i)? as String, arr(i)?)
+    end
+
+primitive JsonEq
+  fun parsed(s: String, t: String): Bool ? =>
+    let s' = JsonDoc
+    let t' = JsonDoc
+    s'.parse(s) ?
+    t'.parse(t) ?
+    JsonEq(s'.data, t'.data)
+
+  fun apply(v1: JsonType, v2: JsonType) : Bool =>
+    match (v1,v2)
+    | (None, None) => true
+    | (let s: F64, let t: F64) => s == t
+    | (let s: I64, let t: I64) => s == t
+    | (let s: Bool, let t: Bool) => s == t
+    | (let s: String, let t: String) => s == t
+    | (let s: JsonArray, let t: JsonArray) =>
+       (s.data.size() == t.data.size()) and
+       Iter[JsonType](s.data.values())
+         .zip[JsonType](t.data.values())
+        .all({(xy) => JsonEq(xy._1, xy._2)})
+    | (let s: JsonObject, let t: JsonObject) =>
+      _equal_keys(s, t) and _all_s_vals_equal_in_t(s,t)
+    else
+      false
+    end
+
+  fun _equal_keys(s: JsonObject, t: JsonObject) : Bool =>
+    let skeys: Set[String] =
+      Iter[String](s.data.keys())
+      .fold[Set[String]](Set[String], {(s, el) => s.add(el)})
+    let tkeys: Set[String] =
+      Iter[String](t.data.keys())
+      .fold[Set[String]](Set[String], {(s, el) => s.add(el)})
+    skeys == tkeys
+
+  fun _all_s_vals_equal_in_t(s: JsonObject, t: JsonObject) : Bool =>
+    var res = true
+    for (s_key, s_val) in s.data.pairs() do
+      try
+        if not JsonEq(s_val, t.data(s_key)?) then res = false; break end
+      else // key doesn't exist in t
+        res = false; break
+      end
+    end
+    res

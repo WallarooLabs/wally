@@ -60,19 +60,25 @@ actor Main
             @printf[I32](
               """
               PARAMETERS:
-              -----------------------------------------------------------------------------------
-              --json/-j [Output JSON format when avaiable]
-              --external/-e [Specifies address to send message to]
-              --type/-t [Specifies message type]
+              -----------------------------------------------------------------
+              --json/-j                 [Output JSON format when avaiable]
+
+              --external/-e <HOST:PORT> [Specifies address to send message to]
+
+              --type/-t                 [Specifies message type]
                   clean-shutdown | rotate-log | partition-query |
                   partition-count-query | cluster-status-query |
-                  source-ids-query | boundary-count-status | print
-              --message/-m [Specifies message contents to send]
+                  source-ids-query | boundary-count-status |
+                  state-entity-query | state-entity-count-query |
+                  stateless-partition-query | stateless-partition-count-query |
+                  print
+
+              --message/-m              [Specifies message contents to send]
                   rotate-log
                       Node name to rotate log files
                   clean-shutdown | print
                       Text to embed in the message
-              -----------------------------------------------------------------------------------
+              -----------------------------------------------------------------
               """.cstring())
             return
           end
@@ -194,10 +200,11 @@ class ExternalSenderConnectNotifier is TCPConnectionNotify
           end
           _env.out.print(m.msg)
           conn.dispose()
-        | let m: ExternalSourceIdsQueryResponseMsg =>
-          _env.out.print("Source Ids:")
-          for s_id in m.source_ids.values() do
-            _env.out.print(". " + s_id.string())
+          | let m: ExternalSourceIdsQueryResponseMsg =>
+          if not _json then
+            _env.out.print("Source Ids:" + "".join(m.source_ids.values()))
+          else
+            _env.out.print(m.json)
           end
           conn.dispose()
         | let m: ExternalStateEntityQueryResponseMsg =>
