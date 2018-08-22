@@ -106,16 +106,6 @@ class DummyBackend is Backend
   fun bytes_written(): USize => 0
 
 class FileBackend is Backend
-  //a record looks like this:
-  // - is_watermark boolean
-  // - producer id
-  // - seq id (low watermark record ends here)
-  // - uid
-  // - size of fractional id list
-  // - fractional id list (may be empty)
-  // - statechange id
-  // - payload
-
   let _file: File iso
   let _filepath: FilePath
   let _event_log: EventLog ref
