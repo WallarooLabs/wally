@@ -222,7 +222,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
+    target_id_router: TargetIdRouter)
   =>
     _mute_upstreams()
 

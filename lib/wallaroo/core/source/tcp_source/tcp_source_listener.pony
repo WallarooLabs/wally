@@ -51,7 +51,6 @@ actor TCPSourceListener is SourceListener
   let _pipeline_name: String
   var _router: Router
   let _router_registry: RouterRegistry
-  let _route_builder: RouteBuilder
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
   var _fd: U32
@@ -67,9 +66,8 @@ actor TCPSourceListener is SourceListener
   let _state_step_creator: StateStepCreator
   let _target_router: Router
 
-  new create(env: Env, source_builder: SourceBuilder,
-    router: Router, router_registry: RouterRegistry,
-    route_builder: RouteBuilder,
+  new create(env: Env, source_builder: SourceBuilder, router: Router,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
@@ -87,7 +85,6 @@ actor TCPSourceListener is SourceListener
     _pipeline_name = pipeline_name
     _router = router
     _router_registry = router_registry
-    _route_builder = route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _layout_initializer = layout_initializer
     _event = @pony_os_listen_tcp[AsioEventID](this,
@@ -215,7 +212,7 @@ actor TCPSourceListener is SourceListener
       let source_id = _step_id_gen()
       let source = TCPSource._accept(source_id, _auth, this,
         _notify_connected(source_id)?, _event_log, _router,
-        _route_builder, _outgoing_boundary_builders, _layout_initializer,
+        _outgoing_boundary_builders, _layout_initializer,
         ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry,
         _state_step_creator)
 

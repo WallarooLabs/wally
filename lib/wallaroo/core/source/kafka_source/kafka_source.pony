@@ -44,7 +44,6 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
   let _outputs: Map[StepId, Consumer] = _outputs.create()
-  let _route_builder: RouteBuilder
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
@@ -92,7 +91,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
   new create(source_id: StepId, auth: AmbientAuth, name: String,
     listen: KafkaSourceListener[In], notify: KafkaSourceNotify[In] iso,
-    event_log: EventLog, router: Router, route_builder: RouteBuilder,
+    event_log: EventLog, router: Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
@@ -124,8 +123,6 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
-
-    _route_builder = route_builder
 
     _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
 
@@ -237,7 +234,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
 
     _outputs(id) = c
     if not _routes.contains(c) then
-      let new_route = _route_builder(_source_id, this, c, _metrics_reporter)
+      let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
       _routes(c) = new_route
       ifdef "resilience" then
         _acker_x.add_route(new_route)
@@ -284,7 +281,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
           target_worker_name, _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
-        let new_route = _route_builder(_source_id, this, boundary,
+        let new_route = RouteBuilder(_source_id, this, boundary,
           _metrics_reporter)
         _acker_x.add_route(new_route)
         _routes(boundary) = new_route

@@ -35,7 +35,7 @@ trait StepMessageProcessor
   =>
     Fail()
 
-  fun ref flush(omni_router: OmniRouter)
+  fun ref flush(target_id_router: TargetIdRouter)
 
 class EmptyStepMessageProcessor is StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
@@ -45,7 +45,7 @@ class EmptyStepMessageProcessor is StepMessageProcessor
   =>
     Fail()
 
-  fun ref flush(omni_router: OmniRouter) =>
+  fun ref flush(target_id_router: TargetIdRouter) =>
     Fail()
 
 class NormalStepMessageProcessor is StepMessageProcessor
@@ -63,7 +63,7 @@ class NormalStepMessageProcessor is StepMessageProcessor
       i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
       latest_ts, metrics_id, worker_ingress_ts)
 
-  fun ref flush(omni_router: OmniRouter) =>
+  fun ref flush(target_id_router: TargetIdRouter) =>
     ifdef debug then
       @printf[I32]("Flushing NormalStepMessageProcessor does nothing.\n"
         .cstring())
@@ -93,9 +93,9 @@ class QueueingStepMessageProcessor is StepMessageProcessor
     messages.push(msg)
     step.filter_queued_msg(i_producer, i_route_id, i_seq_id)
 
-  fun ref flush(omni_router: OmniRouter) =>
+  fun ref flush(target_id_router: TargetIdRouter) =>
     for msg in messages.values() do
-      msg.run(step, omni_router)
+      msg.run(step, target_id_router)
     end
     messages = Array[QueuedStepMessage]
 
@@ -133,14 +133,14 @@ class SnapshotStepMessageProcessor is StepMessageProcessor
   =>
     _snapshot_forwarder.receive_snapshot_barrier(step_id, sr, snapshot_id)
 
-  fun ref flush(omni_router: OmniRouter) =>
+  fun ref flush(target_id_router: TargetIdRouter) =>
     for msg in messages.values() do
       msg.process_message(step)
     end
     messages = Array[QueuedMessage]
 
 trait val QueuedStepMessage
-  fun run(step: Step ref, omni_router: OmniRouter)
+  fun run(step: Step ref, target_id_router: TargetIdRouter)
 
 class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
   let metric_name: String
@@ -172,7 +172,7 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
     metrics_id = metrics_id'
     worker_ingress_ts = worker_ingress_ts'
 
-  fun run(step: Step ref, omni_router: OmniRouter) =>
+  fun run(step: Step ref, target_id_router: TargetIdRouter) =>
     // TODO: When we develop a strategy for migrating watermark information for
     // migrated queued messages, then we should look up the correct producer
     // that we'll use to send acks to for the case when our upstream is no
@@ -180,7 +180,7 @@ class val TypedQueuedStepMessage[D: Any val] is QueuedStepMessage
     let i_producer = DummyProducer
     // let i_producer =
     //   try
-    //     omni_router.producer_for(i_producer_id)?
+    //     target_id_router.producer_for(i_producer_id)?
     //   else
     //     DummyProducer
     //   end

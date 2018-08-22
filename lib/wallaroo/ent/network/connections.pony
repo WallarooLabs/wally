@@ -575,15 +575,15 @@ actor Connections is Cluster
   be create_routers_from_blueprints(workers: Array[String] val,
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    omr_blueprint: OmniRouterBlueprint, local_sinks: Map[StepId, Consumer] val,
+    omr_blueprint: TargetIdRouterBlueprint, local_sinks: Map[StepId, Consumer] val,
     router_registry: RouterRegistry, lti: LocalTopologyInitializer)
   =>
     // We delegate to router registry through here to ensure that we've
     // already sent the outgoing boundaries to the router registry when
     // create_connections was called.
 
-    // We must create the omni_router first
-    router_registry.create_omni_router_from_blueprint(omr_blueprint,
+    // We must create the target_id_router first
+    router_registry.create_target_id_router_from_blueprint(omr_blueprint,
       local_sinks, lti)
     router_registry.create_partition_routers_from_blueprints(workers,
       pr_blueprints)
@@ -723,7 +723,7 @@ actor Connections is Cluster
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
-    omr_blueprint: OmniRouterBlueprint)
+    omr_blueprint: TargetIdRouterBlueprint)
   =>
     _register_disposable(conn)
     if not _control_addrs.contains(worker) then

@@ -34,7 +34,7 @@ use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/query"
 
-type _OmniRouterUpdatable is (Step | StateStepCreator)
+type _TargetIdRouterUpdatable is (Step | StateStepCreator)
 
 actor RouterRegistry is (InFlightAckRequester)
   let _id: StepId
@@ -58,7 +58,7 @@ actor RouterRegistry is (InFlightAckRequester)
 
   var _local_topology_initializer: (LocalTopologyInitializer | None) = None
 
-  var _omni_router: (OmniRouter | None) = None
+  var _target_id_router: (TargetIdRouter | None) = None
 
   var _application_ready_to_work: Bool = false
 
@@ -68,15 +68,15 @@ actor RouterRegistry is (InFlightAckRequester)
   // Subscribers
   // All steps that have a PartitionRouter, registered by partition
   // state name
-  let _partition_router_subs: Map[String, SetIs[RouterUpdateable]] =
+  let _partition_router_subs: Map[String, SetIs[RouterUpdatable]] =
       _partition_router_subs.create()
   // All steps that have a StatelessPartitionRouter, registered by
   // partition id
   let _stateless_partition_router_subs:
-    Map[U128, SetIs[RouterUpdateable]] =
+    Map[U128, SetIs[RouterUpdatable]] =
       _stateless_partition_router_subs.create()
   // All steps that have an OmniRouter
-  let _omni_router_updatables: SetIs[_OmniRouterUpdatable] = _omni_router_updatables.create()
+  let _target_id_router_updatables: SetIs[_TargetIdRouterUpdatable] = _target_id_router_updatables.create()
   //
   ////////////////
 
@@ -145,7 +145,7 @@ actor RouterRegistry is (InFlightAckRequester)
     _connections = c
     _state_step_creator = state_step_creator
     _state_step_creator.set_router_registry(this)
-    register_omni_router_updatable(_state_step_creator)
+    register_target_id_router_updatable(_state_step_creator)
     _recovery_file_cleaner = recovery_file_cleaner
     _snapshot_initiator = snapshot_initiator
     _stop_the_world_pause = stop_the_world_pause
@@ -180,21 +180,12 @@ actor RouterRegistry is (InFlightAckRequester)
   =>
     _stateless_partition_routers(partition_id) = pr
 
-  be set_omni_router(o: OmniRouter) =>
-    _set_omni_router(o)
+  be set_target_id_router(state_name: String, t: TargetIdRouter) =>
+    _set_target_id_router(state_name, t)
 
-  fun ref _set_omni_router(o: OmniRouter) =>
-    var omn = o
-    for (w, dr) in _data_receiver_map.pairs() do
-      omn = o.add_data_receiver(w, dr)
-    end
-    for (w, ob) in _outgoing_boundaries.pairs() do
-      omn = o.add_boundary(w, ob)
-    end
-    for (s_id, s) in _sources.pairs() do
-      omn = o.add_source(s_id, s)
-    end
-    _omni_router = omn
+  fun ref _set_target_id_router(state_name: String, t: TargetIdRouter) =>
+    var new_router = t.update_boundaries(_outgoing_boundaries)
+    _target_id_router = new_router
 
   be set_event_log(e: EventLog) =>
     _event_log = e
@@ -215,25 +206,25 @@ actor RouterRegistry is (InFlightAckRequester)
     if not _stop_the_world_in_process and _application_ready_to_work then
       source.unmute(_dummy_consumer)
     end
-    match _omni_router
-    | let omnr: OmniRouter =>
-      _omni_router = omnr.add_source(source_id, source)
+    match _target_id_router
+    | let omnr: TargetIdRouter =>
+      _target_id_router = omnr.add_source(source_id, source)
     else
       Fail()
     end
-    _distribute_omni_router()
+    _distribute_target_id_router()
     _connections.register_disposable(source)
     _connections.notify_cluster_of_new_source(source_id)
 
   be register_remote_source(sender: String, source_id: StepId) =>
-    match _omni_router
-    | let omnr: OmniRouter =>
-      _omni_router = omnr.add_source(source_id, ProxyAddress(sender,
+    match _target_id_router
+    | let omnr: TargetIdRouter =>
+      _target_id_router = omnr.add_source(source_id, ProxyAddress(sender,
         source_id))
     else
       Fail()
     end
-    _distribute_omni_router()
+    _distribute_target_id_router()
 
   be register_source_listener(source_listener: SourceListener) =>
     _source_listeners.set(source_listener)
@@ -262,18 +253,18 @@ actor RouterRegistry is (InFlightAckRequester)
     _data_channels.set(dc)
 
   be register_partition_router_subscriber(state_name: String,
-    sub: RouterUpdateable)
+    sub: RouterUpdatable)
   =>
     _register_partition_router_subscriber(state_name, sub)
 
   fun ref _register_partition_router_subscriber(state_name: String,
-    sub: RouterUpdateable)
+    sub: RouterUpdatable)
   =>
     try
       if _partition_router_subs.contains(state_name) then
         _partition_router_subs(state_name)?.set(sub)
       else
-        _partition_router_subs(state_name) = SetIs[RouterUpdateable]
+        _partition_router_subs(state_name) = SetIs[RouterUpdatable]
         _partition_router_subs(state_name)?.set(sub)
       end
     else
@@ -281,7 +272,7 @@ actor RouterRegistry is (InFlightAckRequester)
     end
 
   be unregister_partition_router_subscriber(state_name: String,
-    sub: RouterUpdateable)
+    sub: RouterUpdatable)
   =>
     Invariant(_partition_router_subs.contains(state_name))
     try
@@ -291,19 +282,19 @@ actor RouterRegistry is (InFlightAckRequester)
     end
 
   be register_stateless_partition_router_subscriber(partition_id: U128,
-    sub: RouterUpdateable)
+    sub: RouterUpdatable)
   =>
     _register_stateless_partition_router_subscriber(partition_id, sub)
 
   fun ref _register_stateless_partition_router_subscriber(
-    partition_id: U128, sub: RouterUpdateable)
+    partition_id: U128, sub: RouterUpdatable)
   =>
     try
       if _stateless_partition_router_subs.contains(partition_id) then
         _stateless_partition_router_subs(partition_id)?.set(sub)
       else
         _stateless_partition_router_subs(partition_id) =
-          SetIs[RouterUpdateable]
+          SetIs[RouterUpdatable]
         _stateless_partition_router_subs(partition_id)?.set(sub)
       end
     else
@@ -311,7 +302,7 @@ actor RouterRegistry is (InFlightAckRequester)
     end
 
   be unregister_stateless_partition_router_subscriber(partition_id: U128,
-    sub: RouterUpdateable)
+    sub: RouterUpdatable)
   =>
     Invariant(_stateless_partition_router_subs.contains(partition_id))
     try
@@ -320,11 +311,11 @@ actor RouterRegistry is (InFlightAckRequester)
       Fail()
     end
 
-  be register_omni_router_updatable(s: _OmniRouterUpdatable) =>
-    _register_omni_router_updatable(s)
+  be register_target_id_router_updatable(s: _TargetIdRouterUpdatable) =>
+    _register_target_id_router_updatable(s)
 
-  fun ref _register_omni_router_updatable(s: _OmniRouterUpdatable) =>
-    _omni_router_updatables.set(s)
+  fun ref _register_target_id_router_updatable(s: _TargetIdRouterUpdatable) =>
+    _target_id_router_updatables.set(s)
 
   be register_boundaries(bs: Map[String, OutgoingBoundary] val,
     bbs: Map[String, OutgoingBoundaryBuilder] val)
@@ -356,7 +347,7 @@ actor RouterRegistry is (InFlightAckRequester)
         end
       end
     end
-    for updatable in _omni_router_updatables.values() do
+    for updatable in _target_id_router_updatables.values() do
       updatable.add_boundaries(new_boundaries_sendable)
     end
     for step in _data_router.routes().values() do
@@ -396,10 +387,10 @@ actor RouterRegistry is (InFlightAckRequester)
 
   be register_data_receiver(worker: String, dr: DataReceiver) =>
     _data_receiver_map(worker) = dr
-    match _omni_router
-    | let omnr: OmniRouter =>
-      _omni_router = omnr.add_data_receiver(worker, dr)
-      _distribute_omni_router()
+    match _target_id_router
+    | let omnr: TargetIdRouter =>
+      _target_id_router = omnr.add_data_receiver(worker, dr)
+      _distribute_target_id_router()
     end
 
   be register_state_step(step: Step, state_name: String, key: Key, step_id: StepId) =>
@@ -408,14 +399,14 @@ actor RouterRegistry is (InFlightAckRequester)
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
 
-  fun _distribute_omni_router() =>
+  fun _distribute_target_id_router() =>
     try
-      for updatable in _omni_router_updatables.values() do
-        updatable.update_omni_router(_omni_router as OmniRouter)
+      for updatable in _target_id_router_updatables.values() do
+        updatable.update_target_id_router(_target_id_router as TargetIdRouter)
       end
       match _local_topology_initializer
       | let lti: LocalTopologyInitializer =>
-        lti.update_omni_router(_omni_router as OmniRouter)
+        lti.update_target_id_router(_target_id_router as TargetIdRouter)
       else
         Fail()
       end
@@ -428,7 +419,7 @@ actor RouterRegistry is (InFlightAckRequester)
 
     try
       if not _partition_router_subs.contains(state_name) then
-        _partition_router_subs(state_name) = SetIs[RouterUpdateable]
+        _partition_router_subs(state_name) = SetIs[RouterUpdatable]
       end
       for sub in _partition_router_subs(state_name)?.values() do
         sub.update_router(partition_router)
@@ -445,7 +436,7 @@ actor RouterRegistry is (InFlightAckRequester)
     try
       if not _stateless_partition_router_subs.contains(partition_id) then
         _stateless_partition_router_subs(partition_id) =
-          SetIs[RouterUpdateable]
+          SetIs[RouterUpdatable]
       end
       for sub in
         _stateless_partition_router_subs(partition_id)?.values()
@@ -455,14 +446,14 @@ actor RouterRegistry is (InFlightAckRequester)
     else
       Fail()
     end
-    match _omni_router
-    | let omni: OmniRouter =>
-      _omni_router = omni.update_stateless_partition_router(partition_id,
+    match _target_id_router
+    | let omni: TargetIdRouter =>
+      _target_id_router = omni.update_stateless_partition_router(partition_id,
         partition_router)
     else
       Fail()
     end
-    _distribute_omni_router()
+    _distribute_target_id_router()
 
   fun ref _remove_worker(worker: String) =>
     try
@@ -470,22 +461,22 @@ actor RouterRegistry is (InFlightAckRequester)
     else
       Fail()
     end
-    _remove_worker_from_omni_router(worker)
+    _remove_worker_from_target_id_router(worker)
     _distribute_boundary_removal(worker)
 
-  fun ref _remove_worker_from_omni_router(worker: String) =>
-    match _omni_router
-    | let omnr: OmniRouter =>
-      _omni_router = omnr.remove_boundary(worker).remove_data_receiver(worker)
+  fun ref _remove_worker_from_target_id_router(worker: String) =>
+    match _target_id_router
+    | let omnr: TargetIdRouter =>
+      _target_id_router = omnr.remove_boundary(worker).remove_data_receiver(worker)
     end
 
-    _distribute_omni_router()
+    _distribute_target_id_router()
 
   fun ref _distribute_boundary_removal(worker: String) =>
     for subs in _partition_router_subs.values() do
       for sub in subs.values() do
         match sub
-        | let r: BoundaryUpdateable =>
+        | let r: BoundaryUpdatable =>
           r.remove_boundary(worker)
         end
       end
@@ -493,12 +484,12 @@ actor RouterRegistry is (InFlightAckRequester)
     for subs in _stateless_partition_router_subs.values() do
       for sub in subs.values() do
         match sub
-        | let r: BoundaryUpdateable =>
+        | let r: BoundaryUpdatable =>
           r.remove_boundary(worker)
         end
       end
     end
-    for updatable in _omni_router_updatables.values() do
+    for updatable in _target_id_router_updatables.values() do
       updatable.remove_boundary(worker)
     end
 
@@ -557,8 +548,8 @@ actor RouterRegistry is (InFlightAckRequester)
       _stateless_partition_routers(id) = next_router
     end
 
-  be create_omni_router_from_blueprint(
-    omni_router_blueprint: OmniRouterBlueprint,
+  be create_target_id_router_from_blueprint(
+    target_id_router_blueprint: TargetIdRouterBlueprint,
     local_sinks: Map[StepId, Consumer] val,
     lti: LocalTopologyInitializer)
   =>
@@ -567,10 +558,10 @@ actor RouterRegistry is (InFlightAckRequester)
       obs_trn(w) = ob
     end
     let obs = consume val obs_trn
-    let new_omni_router = omni_router_blueprint.build_router(_worker_name,
+    let new_target_id_router = target_id_router_blueprint.build_router(_worker_name,
       obs, local_sinks)
-    _set_omni_router(new_omni_router)
-    lti.set_omni_router(new_omni_router)
+    _set_target_id_router(new_target_id_router)
+    lti.set_target_id_router(new_target_id_router)
     lti.initialize_join_initializables()
 
   be worker_join(conn: TCPConnection, worker: String,
@@ -613,18 +604,18 @@ actor RouterRegistry is (InFlightAckRequester)
       stateless_blueprints(id) = r.blueprint()
     end
 
-    let omni_router_blueprint =
-      match _omni_router
-      | let omr: OmniRouter =>
+    let target_id_router_blueprint =
+      match _target_id_router
+      | let omr: TargetIdRouter =>
         omr.blueprint()
       else
         Fail()
-        EmptyOmniRouterBlueprint
+        EmptyTargetIdRouterBlueprint
       end
 
     _connections.inform_joining_worker(conn, worker, local_topology,
       consume state_blueprints, consume stateless_blueprints,
-      omni_router_blueprint)
+      target_id_router_blueprint)
 
   be inform_contacted_worker_of_initialization() =>
     _inform_contacted_worker_of_initialization()
@@ -831,10 +822,10 @@ actor RouterRegistry is (InFlightAckRequester)
 
   fun ref _try_resume_the_world() =>
     if _initiated_stop_the_world then
-      // Since we don't need all steps to be up to date on the OmniRouter
+      // Since we don't need all steps to be up to date on the TargetIdRouter
       // during migrations, we wait on the worker that initiated stop the
       // world to distribute it until here to avoid unnecessary messaging.
-      _distribute_omni_router()
+      _distribute_target_id_router()
       let in_flight_resume_ack_id = _in_flight_ack_waiter
         .initiate_resume_request(ResumeTheWorldAction(this))
       _request_in_flight_resume_acks(in_flight_resume_ack_id,
@@ -1003,12 +994,12 @@ actor RouterRegistry is (InFlightAckRequester)
       AckFinishedCompleteAction(_auth, _worker_name, originating_worker,
         request_id, _connections))
     then
-      // We need to ensure that all steps have the correct OmniRouter before
+      // We need to ensure that all steps have the correct TargetIdRouter before
       // we can propagate the in_flight_resume request. On the workers that
-      // did not initiate stop the world, we wait to distribute the OmniRouter
+      // did not initiate stop the world, we wait to distribute the TargetIdRouter
       // until this point since we don't need it to be up-to-date everywhere
       // during migration.
-      _distribute_omni_router()
+      _distribute_target_id_router()
       _request_in_flight_resume_acks(in_flight_resume_ack_id,
         leaving_workers)
     end
@@ -1347,7 +1338,7 @@ actor RouterRegistry is (InFlightAckRequester)
     leaving_workers: Array[String] val)
   =>
     for w in leaving_workers.values() do
-      _remove_worker_from_omni_router(w)
+      _remove_worker_from_target_id_router(w)
     end
 
     if not _stop_the_world_in_process then
@@ -1500,7 +1491,7 @@ actor RouterRegistry is (InFlightAckRequester)
     Called when a step has been migrated off this worker to another worker
     """
     _remove_step_from_data_router(state_name, key)
-    _add_proxy_to_omni_router(id, proxy_address)
+    _add_proxy_to_target_id_router(id, proxy_address)
 
   be add_state_proxy(id: StepId, proxy_address: ProxyAddress, key: Key,
     state_name: String)
@@ -1508,19 +1499,19 @@ actor RouterRegistry is (InFlightAckRequester)
     """
     Called when a stateful step has been added to another worker
     """
-    _add_proxy_to_omni_router(id, proxy_address)
+    _add_proxy_to_target_id_router(id, proxy_address)
 
   fun ref _remove_step_from_data_router(state_name: String, key: Key) =>
     let new_data_router = _data_router.remove_keyed_route(state_name, key)
     _data_router = new_data_router
     _distribute_data_router()
 
-  fun ref _add_proxy_to_omni_router(id: U128,
+  fun ref _add_proxy_to_target_id_router(id: StepId,
     proxy_address: ProxyAddress)
   =>
-    match _omni_router
-    | let o: OmniRouter =>
-      _omni_router = o.update_route_to_proxy(id, proxy_address)
+    match _target_id_router
+    | let o: TargetIdRouter =>
+      _target_id_router = o.update_route_to_proxy(id, proxy_address.worker)
     else
       Fail()
     end
@@ -1539,13 +1530,13 @@ actor RouterRegistry is (InFlightAckRequester)
 
     match _event_log
     | let event_log: EventLog =>
-      match _omni_router
-      | let omnr: OmniRouter =>
+      match _target_id_router
+      | let omnr: TargetIdRouter =>
         let step = Step(_auth, runner_builder(where event_log = event_log,
           auth = _auth), consume reporter, msg.step_id(),
-          runner_builder.route_builder(), event_log, recovery_replayer,
+          event_log, recovery_replayer,
           consume outgoing_boundaries, _state_step_creator
-          where omni_router = omnr)
+          where target_id_router = omnr)
         step.receive_state(msg.state())
         msg.update_router_registry(this, step)
       else
@@ -1572,7 +1563,7 @@ actor RouterRegistry is (InFlightAckRequester)
     try
       match target
       | let step: Step =>
-        _register_omni_router_updatable(step)
+        _register_target_id_router_updatable(step)
         _data_router = _data_router.add_keyed_route(id, state_name, key, step)
         _distribute_data_router()
 
@@ -1585,8 +1576,7 @@ actor RouterRegistry is (InFlightAckRequester)
                 try
                   let target_router =
                     DirectRouter(tid, _data_router.step_for_id(tid)?)
-                  step.register_routes(target_router,
-                    psd.forward_route_builder())
+                  step.register_routes(target_router)
                 end
               end
             end
@@ -1613,9 +1603,9 @@ actor RouterRegistry is (InFlightAckRequester)
     """
     Called when a step has been migrated to this worker from another worker
     """
-    match _omni_router
-    | let o: OmniRouter =>
-      _omni_router = o.update_route_to_step(id, target)
+    match _target_id_router
+    | let o: TargetIdRouter =>
+      _target_id_router = o.update_route_to_consumer(id, target)
     else
       Fail()
     end

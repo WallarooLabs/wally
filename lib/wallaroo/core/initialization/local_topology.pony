@@ -241,7 +241,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _step_id_gen: StepIdGenerator = StepIdGenerator
 
   // Lifecycle
-  var _omni_router: (OmniRouter | None) = None
+  var _target_id_router: (TargetIdRouter | None) = None
   var _created: SetIs[Initializable] = _created.create()
   var _initialized: SetIs[Initializable] = _initialized.create()
   var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
@@ -256,7 +256,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _stateless_partition_router_blueprints:
     Map[U128, StatelessPartitionRouterBlueprint] val =
       recover Map[U128, StatelessPartitionRouterBlueprint] end
-  var _omni_router_blueprint: OmniRouterBlueprint = EmptyOmniRouterBlueprint
+  var _target_id_router_blueprint: TargetIdRouterBlueprint = EmptyTargetIdRouterBlueprint
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once EventLog signals we're ready
@@ -568,20 +568,20 @@ actor LocalTopologyInitializer is LayoutInitializer
     """
     _connections.quick_initialize_data_connections(this)
 
-  be set_omni_router(omr: OmniRouter) =>
-    _omni_router = omr
+  be set_target_id_router(omr: TargetIdRouter) =>
+    _target_id_router = omr
 
   be set_partition_router_blueprints(
     pr_blueprints: Map[String, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    omr_blueprint: OmniRouterBlueprint)
+    omr_blueprint: TargetIdRouterBlueprint)
   =>
     _partition_router_blueprints = pr_blueprints
     _stateless_partition_router_blueprints = spr_blueprints
-    _omni_router_blueprint = omr_blueprint
+    _target_id_router_blueprint = omr_blueprint
 
-  be update_omni_router(omni_router: OmniRouter) =>
-    _omni_router_blueprint = omni_router.blueprint()
+  be update_target_id_router(target_id_router: TargetIdRouter) =>
+    _target_id_router_blueprint = target_id_router.blueprint()
 
   be recover_and_initialize(ws: Array[String] val,
     cluster_initializer: (ClusterInitializer | None) = None)
@@ -790,10 +790,15 @@ actor LocalTopologyInitializer is LayoutInitializer
         // Keep track of all stateless partition routers we've built
         let stateless_partition_routers = Map[U128, StatelessPartitionRouter]
 
-        // Keep track of steps we've built that we'll use for the OmniRouter.
+        // Keep track of steps we've built that we'll use for the TargetIdRouter.
         // Unlike data_routes, these will not include state steps, which will
         // never be direct targets for state computation outputs.
         let built_stateless_steps = recover trn Map[U128, Consumer] end
+
+        // Keep track of routes we can actually use for messages arriving at
+        // state steps (this depends on the state steps' upstreams across
+        // pipelines). Map from state name to router.
+        let state_step_routers = Map[String, StateStepRouter]
 
         /////////
         // Initialize based on DAG
@@ -898,7 +903,11 @@ actor LocalTopologyInitializer is LayoutInitializer
                 // Create the state partition if it doesn't exist
                 if builder.state_name() != "" then
                   try
-                    t.update_state_map(builder.state_name(), state_map,
+                    let state_name = builder.state_name()
+                    state_step_routers.insert_if_absent(state_name,
+                      StateStepRouter.from_boundaries(_worker_name,
+                        _outgoing_boundaries))
+                    t.update_state_map(state_name, state_map,
                       _metrics_conn, _event_log, _recovery_replayer, _auth,
                       _outgoing_boundaries, _initializables,
                       data_routes_ref, keyed_data_routes_ref,
@@ -1101,8 +1110,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                     let pre_state_router = DirectRouter(b.id(), pre_state_step)
                     built_routers(b.id()) = pre_state_router
 
-                    state_step.register_routes(state_comp_target,
-                      b.forward_route_builder())
+                    state_step.register_routes(state_comp_target)
 
                     // Add ins to this prestate node to the frontier
                     for in_in_node in in_node.ins() do
@@ -1341,7 +1349,6 @@ actor LocalTopologyInitializer is LayoutInitializer
                   source_data.pre_state_target_ids(), t.worker_name(),
                   source_reporter.clone()),
                 out_router, _router_registry,
-                source_data.route_builder(),
                 _outgoing_boundary_builders,
                 _event_log, _auth, pipeline_name,
                 this,  consume source_reporter, _recovering))
@@ -1432,7 +1439,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   @printf[I32]("!@ DirectRouter as expected\n".cstring())
                 end
                   @printf[I32]("!@ Registering router to %s\n".cstring(), tid.string().cstring())
-                pr.register_routes(target_router, psd.forward_route_builder())
+                pr.register_routes(target_router)
                 @printf[I32](("Registered routes on state steps for " +
                   psd.pre_state_name() + "\n").cstring())
               end
@@ -1497,14 +1504,14 @@ actor LocalTopologyInitializer is LayoutInitializer
           _router_registry.set_stateless_partition_router(id, pr)
         end
 
-        let omni_router = StepIdRouter(_worker_name,
+        let target_id_router = StepIdRouter(_worker_name,
           sendable_data_routes, t.step_map(), _outgoing_boundaries,
           consume stateless_partition_routers_trn,
           recover Map[StepId, (ProxyAddress | Source)] end,
           recover Map[String, DataReceiver] end)
-        _router_registry.set_omni_router(omni_router)
+        _router_registry.set_target_id_router(target_id_router)
 
-        _omni_router = omni_router
+        _target_id_router = target_id_router
         for i in _initializables.values() do
           i.application_begin_reporting(this)
         end
@@ -1625,7 +1632,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         _connections.create_routers_from_blueprints(t.worker_names,
           _partition_router_blueprints,
-          _stateless_partition_router_blueprints, _omni_router_blueprint,
+          _stateless_partition_router_blueprints, _target_id_router_blueprint,
           consume local_sinks, _router_registry, this)
 
         _save_local_topology()
@@ -1765,8 +1772,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   be report_created(initializable: Initializable) =>
     if not _created.contains(initializable) then
-      match _omni_router
-      | let o_router: OmniRouter =>
+      match _target_id_router
+      | let o_router: TargetIdRouter =>
         _created.set(initializable)
         if _created.size() == _initializables.size() then
           @printf[I32]("|~~ INIT PHASE I: Application is created! ~~|\n"
@@ -1776,7 +1783,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             i.application_created(this, o_router)
             match i
             | let s: Step =>
-              _router_registry.register_omni_router_updatable(s)
+              _router_registry.register_target_id_router_step(s)
             end
           end
         end

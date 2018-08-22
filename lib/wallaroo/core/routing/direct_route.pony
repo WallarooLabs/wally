@@ -26,7 +26,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 
-class TypedRoute[In: Any val] is Route
+class DirectRoute is Route
   """
   Relationship between a single producer and a single consumer.
   """
@@ -72,15 +72,9 @@ class TypedRoute[In: Any val] is Route
       @printf[I32]("--Rcvd msg at Route (%s)\n".cstring(),
         _step_type.cstring())
     end
-    match data
-    | let input: In =>
-      _send_message_on_route(metric_name, pipeline_time_spent, input, cfp_id,
-        cfp, msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
-      true
-    else
-      Fail()
-      true
-    end
+
+    _send_message_on_route[D](metric_name, pipeline_time_spent, data, cfp_id,
+      cfp, msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,
@@ -89,7 +83,6 @@ class TypedRoute[In: Any val] is Route
   =>
     // Forward should never be called on a TypedRoute
     Fail()
-    true
 
   fun register_producer(target_id: StepId) =>
     _consumer.register_producer(_step_id, _step)
@@ -97,10 +90,10 @@ class TypedRoute[In: Any val] is Route
   fun unregister_producer(target_id: StepId) =>
     _consumer.unregister_producer(_step_id, _step)
 
-  fun ref _send_message_on_route(metric_name: String, pipeline_time_spent: U64,
-    input: In, cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+  fun ref _send_message_on_route[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, cfp_id: StepId, cfp: Producer ref,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
@@ -119,9 +112,9 @@ class TypedRoute[In: Any val] is Route
         metrics_id
       end
 
-    _consumer.run[In](metric_name,
+    _consumer.run[D](metric_name,
       pipeline_time_spent,
-      input,
+      data,
       cfp_id,
       cfp,
       msg_uid,

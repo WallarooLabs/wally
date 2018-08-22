@@ -576,7 +576,7 @@ actor Startup
       local_topology_initializer.quick_initialize_data_connections()
       local_topology_initializer.set_partition_router_blueprints(
         m.partition_router_blueprints,
-        m.stateless_partition_router_blueprints, m.omni_router_blueprint)
+        m.stateless_partition_router_blueprints, m.target_id_router_blueprint)
 
       // Dispose of temporary listener
       match _joining_listener

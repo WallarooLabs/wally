@@ -36,22 +36,22 @@ actor _TestRouterEquality is TestList
     None
 
   fun tag tests(test: PonyTest) =>
-    test(_TestOmniRouterEquality)
+    test(_TestTargetIdRouterEquality)
     test(_TestDataRouterEqualityAfterRemove)
     test(_TestDataRouterEqualityAfterAdd)
     test(_TestLatestAfterNew)
     test(_TestLatestWithoutNew)
 
-class iso _TestOmniRouterEquality is UnitTest
+class iso _TestTargetIdRouterEquality is UnitTest
   """
-  Test that updating OmniRouter creates the expected changes
+  Test that updating TargetIdRouter creates the expected changes
 
   Move step id 1 from worker w1 to worker w2.
   Move step id 2 from worker w2 to worker w1 (and point to step2)
   Add new boundary to worker 3
   """
   fun name(): String =>
-    "topology/OmniRouterEquality"
+    "topology/TargetIdRouterEquality"
 
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
@@ -95,13 +95,13 @@ class iso _TestOmniRouterEquality is UnitTest
     target_stateless_partitions(1) = _StatelessPartitionGenerator()
     target_stateless_partitions(2) = _StatelessPartitionGenerator()
 
-    var base_router: OmniRouter = StepIdRouter("w1",
+    var base_router: TargetIdRouter = StepIdRouter("w1",
       consume base_data_routes, consume base_step_map,
       consume base_boundaries, consume base_stateless_partitions,
       recover Map[StepId, (ProxyAddress | Source)] end,
       recover Map[String, DataReceiver] end)
 
-    let target_router: OmniRouter = StepIdRouter("w1",
+    let target_router: TargetIdRouter = StepIdRouter("w1",
       consume target_data_routes, consume target_step_map,
       consume target_boundaries, consume target_stateless_partitions,
       recover Map[StepId, (ProxyAddress | Source)] end,
@@ -109,9 +109,10 @@ class iso _TestOmniRouterEquality is UnitTest
 
     h.assert_eq[Bool](false, base_router == target_router)
 
-    base_router = base_router.update_route_to_proxy(1, ProxyAddress("w2", 1))
-    base_router = base_router.update_route_to_step(2, step2)
-    base_router = base_router.add_boundary("w3", boundary3)
+    base_router = base_router.update_route_to_proxy(1, "w2")
+    base_router = base_router.update_route_to_consumer(2, step2)
+    //!@
+    // base_router = base_router.add_boundary("w3", boundary3)
 
     h.assert_eq[Bool](true, base_router == target_router)
 
@@ -227,7 +228,7 @@ primitive _StepGenerator
     recovery_replayer: RecoveryReplayer): Step
   =>
     Step(auth, RouterRunner, MetricsReporter("", "", _NullMetricsSink),
-      1, BoundaryOnlyRouteBuilder, event_log, recovery_replayer,
+      1, event_log, recovery_replayer,
       recover Map[String, OutgoingBoundary] end,
       _StateStepCreatorGenerator(auth))
 

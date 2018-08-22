@@ -109,7 +109,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
 
 interface StateAddresses
   fun apply(key: Any val): (Step tag | ProxyRouter | None)
-  fun register_routes(router: Router, route_builder: RouteBuilder)
+  fun register_routes(router: Router)
   fun steps(): Array[Consumer] val
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
@@ -130,12 +130,12 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
       None
     end
 
-  fun register_routes(router: Router, route_builder: RouteBuilder) =>
+  fun register_routes(router: Router) =>
     @printf[I32]("!@ KeyedStateAddresses register routes\n".cstring())
     for s in _addresses.values() do
       match s
       | let step: Step =>
-        step.register_routes(router, route_builder)
+        step.register_routes(router)
       end
     end
 
@@ -210,8 +210,8 @@ class val KeyedStateSubpartition[PIn: Any val,
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
           let next_state_step = Step(auth, _runner_builder(where event_log =
             event_log, auth=auth),
-            consume reporter, id, _runner_builder.route_builder(),
-              event_log, recovery_replayer, outgoing_boundaries)
+            consume reporter, id, event_log, recovery_replayer,
+            outgoing_boundaries)
 
           initializables.set(next_state_step)
           data_routes(id) = next_state_step

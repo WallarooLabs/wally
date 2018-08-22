@@ -81,7 +81,7 @@ actor DummyConsumer is Consumer
     None
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
+    target_id_router: TargetIdRouter)
   =>
     None
 

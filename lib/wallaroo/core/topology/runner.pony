@@ -41,7 +41,7 @@ interface Runner
   // the computation
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer_id: StepId, producer: Producer ref, router: Router,
-    omni_router: OmniRouter,
+    target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
@@ -73,9 +73,6 @@ trait val RunnerBuilder
   fun is_stateless_parallel(): Bool => false
   fun is_multi(): Bool => false
   fun id(): StepId
-  fun route_builder(): RouteBuilder
-  fun forward_route_builder(): RouteBuilder
-  fun in_route_builder(): (RouteBuilder | None) => None
   fun clone_router_and_set_input_type(r: Router): Router
   =>
     r
@@ -83,8 +80,6 @@ trait val RunnerBuilder
 class val RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder] val
   let _id: StepId
-  var _forward_route_builder: RouteBuilder
-  var _in_route_builder: (RouteBuilder | None)
   var _state_name: String
   let _parallelized: Bool
 
@@ -97,19 +92,6 @@ class val RunnerSequenceBuilder is RunnerBuilder
         bs(0)?.id()
       else
         StepIdGenerator()
-      end
-    _forward_route_builder =
-      try
-        _runner_builders(_runner_builders.size() - 1)?.forward_route_builder()
-      else
-        BoundaryOnlyRouteBuilder
-      end
-
-    _in_route_builder =
-      try
-        _runner_builders(_runner_builders.size() - 1)?.in_route_builder()
-      else
-        None
       end
 
     _state_name =
@@ -169,14 +151,6 @@ class val RunnerSequenceBuilder is RunnerBuilder
       false
     end
   fun id(): StepId => _id
-  fun route_builder(): RouteBuilder =>
-    try
-      _runner_builders(_runner_builders.size() - 1)?.route_builder()
-    else
-      BoundaryOnlyRouteBuilder
-    end
-  fun forward_route_builder(): RouteBuilder => _forward_route_builder
-  fun in_route_builder(): (RouteBuilder | None) => _in_route_builder
   fun clone_router_and_set_input_type(r: Router): Router
   =>
     try
@@ -189,15 +163,12 @@ class val RunnerSequenceBuilder is RunnerBuilder
 class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   let _comp_builder: ComputationBuilder[In, Out]
   let _id: U128
-  let _route_builder: RouteBuilder
   let _parallelized: Bool
 
-  new val create(comp_builder: ComputationBuilder[In, Out],
-    route_builder': RouteBuilder, id': U128 = 0,
+  new val create(comp_builder: ComputationBuilder[In, Out], id': StepId = 0,
     parallelized': Bool = false)
   =>
     _comp_builder = comp_builder
-    _route_builder = route_builder'
     _id = if id' == 0 then GuidGenerator.u128() else id' end
     _parallelized = parallelized'
 
@@ -220,36 +191,24 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun is_stateful(): Bool => false
   fun is_stateless_parallel(): Bool => _parallelized
   fun id(): StepId => _id
-  fun route_builder(): RouteBuilder => _route_builder
-  fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
 
 class val PreStateRunnerBuilder[In: Any val, Out: Any val,
   PIn: Any val, S: State ref] is RunnerBuilder
   let _state_comp: StateComputation[In, Out, S] val
   let _state_name: String
-  let _route_builder: RouteBuilder
   let _partition_function: PartitionFunction[PIn] val
-  let _forward_route_builder: RouteBuilder
-  let _in_route_builder: (RouteBuilder | None)
   let _id: StepId
   let _is_multi: Bool
 
   new val create(state_comp: StateComputation[In, Out, S] val,
-    state_name': String,
-    partition_function': PartitionFunction[PIn] val,
-    route_builder': RouteBuilder,
-    forward_route_builder': RouteBuilder,
-    in_route_builder': (RouteBuilder | None) = None,
+    state_name': String, partition_function': PartitionFunction[PIn] val,
     multi_worker: Bool = false)
   =>
     _state_comp = state_comp
     _state_name = state_name'
-    _route_builder = route_builder'
     _partition_function = partition_function'
     _id = StepIdGenerator()
     _is_multi = multi_worker
-    _forward_route_builder = forward_route_builder'
-    _in_route_builder = in_route_builder'
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
@@ -266,10 +225,6 @@ class val PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun is_stateful(): Bool => true
   fun is_multi(): Bool => _is_multi
   fun id(): StepId => _id
-  fun route_builder(): RouteBuilder => _route_builder
-  fun forward_route_builder(): RouteBuilder => _forward_route_builder
-  fun in_route_builder(): (RouteBuilder | None) =>
-    _in_route_builder
   fun clone_router_and_set_input_type(r: Router): Router
   =>
     match r
@@ -283,18 +238,15 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
   let _state_builder: StateBuilder[S]
   let _state_name: String
   let _state_change_builders: Array[StateChangeBuilder[S]] val
-  let _route_builder: RouteBuilder
   let _id: U128
 
   new val create(state_builder: StateBuilder[S],
     state_name': String,
-    state_change_builders: Array[StateChangeBuilder[S]] val,
-    route_builder': RouteBuilder = BoundaryOnlyRouteBuilder)
+    state_change_builders: Array[StateChangeBuilder[S]] val)
   =>
     _state_builder = state_builder
     _state_name = state_name'
     _state_change_builders = state_change_builders
-    _route_builder = route_builder'
     _id = StepIdGenerator()
 
   fun apply(event_log: EventLog,
@@ -314,8 +266,6 @@ class val StateRunnerBuilder[S: State ref] is RunnerBuilder
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
   fun id(): StepId => _id
-  fun route_builder(): RouteBuilder => _route_builder
-  fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
 
 trait val PartitionsBuilder
   // These two methods need to be deterministic at the moment since they
@@ -334,18 +284,13 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
   let _state_runner_builder: StateRunnerBuilder[S] val
   let _step_id_map: Map[Key, U128] val
   let _partition: Partitions[PIn] val
-  let _route_builder: RouteBuilder
-  let _forward_route_builder: RouteBuilder
   let _id: U128
   let _multi_worker: Bool
 
   new val create(pipeline_name: String, state_name': String,
     step_id_map': Map[Key, U128] val, partition': Partitions[PIn] val,
     state_runner_builder: StateRunnerBuilder[S] val,
-    route_builder': RouteBuilder,
-    forward_route_builder': RouteBuilder,
-    id': U128 = 0,
-    multi_worker: Bool = false)
+    id': StepId = 0, multi_worker: Bool = false)
   =>
     _id = if id' == 0 then StepIdGenerator() else id' end
     _state_name = state_name'
@@ -353,8 +298,6 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
     _state_runner_builder = state_runner_builder
     _step_id_map = step_id_map'
     _partition = partition'
-    _route_builder = route_builder'
-    _forward_route_builder = forward_route_builder'
     _multi_worker = multi_worker
 
   fun apply(event_log: EventLog,
@@ -371,8 +314,6 @@ class val PartitionedStateRunnerBuilder[PIn: Any val, S: State ref] is
   fun is_stateful(): Bool => true
   fun id(): StepId => _id
   fun step_id_map(): Map[Key, U128] val => _step_id_map
-  fun route_builder(): RouteBuilder => _route_builder
-  fun forward_route_builder(): RouteBuilder => _forward_route_builder
   fun is_multi(): Bool => _multi_worker
 
   fun state_subpartition(workers: (String | Array[String] val)):
@@ -433,7 +374,7 @@ class ComputationRunner[In: Any val, Out: Any val]
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer_id: StepId, producer: Producer ref, router: Router,
-    omni_router: OmniRouter,
+    target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
@@ -459,7 +400,7 @@ class ComputationRunner[In: Any val, Out: Any val]
         | None => (true, computation_end)
         | let output: Out =>
           _next.run[Out](metric_name, pipeline_time_spent, output, producer_id,
-            producer, router, omni_router,
+            producer, router, target_id_router,
             i_msg_uid, frac_ids,
             computation_end, new_metrics_id, worker_ingress_ts,
             metrics_reporter)
@@ -486,7 +427,7 @@ class ComputationRunner[In: Any val, Out: Any val]
 
             (let f, let ts) = _next.run[Out](metric_name,
               pipeline_time_spent, output, producer_id, producer,
-              router, omni_router,
+              router, target_id_router,
               i_msg_uid, o_frac_ids,
               computation_end, new_metrics_id, worker_ingress_ts,
               metrics_reporter)
@@ -545,7 +486,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer_id: StepId, producer: Producer ref, router: Router,
-    omni_router: OmniRouter,
+    target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
@@ -640,7 +581,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer_id: StepId, producer: Producer ref, router: Router,
-    omni_router: OmniRouter,
+    target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
@@ -655,7 +596,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
           metrics_id + 1
         end
 
-      let result = sp(_state, _state_change_repository, omni_router,
+      let result = sp(_state, _state_change_repository, target_id_router,
         metric_name, pipeline_time_spent, producer_id, producer,
         i_msg_uid, frac_ids, latest_ts, new_metrics_id, worker_ingress_ts)
       let is_finished = result._1
@@ -745,7 +686,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner &
 class iso RouterRunner
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer_id: StepId, producer: Producer ref, router: Router,
-    omni_router: OmniRouter,
+    target_id_router: TargetIdRouter,
     i_msg_uid: MsgId, frac_ids: FractionalMessageId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
