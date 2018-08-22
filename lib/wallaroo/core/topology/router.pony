@@ -265,7 +265,7 @@ class val ProxyRouter is Router
         @printf[I32]("ProxyRouter found Route\n".cstring())
       end
       let delivery_msg = ForwardMsg[D](
-        _target_proxy_address.step_id,
+        _target_proxy_address.routing_id,
         _worker_name, data, metric_name,
         _target_proxy_address,
         i_msg_uid, frac_ids)
@@ -285,15 +285,15 @@ class val ProxyRouter is Router
 
   fun routes(): Map[RoutingId, Consumer] val =>
     let m = recover iso Map[RoutingId, Consumer] end
-    m(_target_proxy_address.step_id) = _target
+    m(_target_proxy_address.routing_id) = _target
     consume m
 
   fun routes_not_in(router: Router): Map[RoutingId, Consumer] val =>
     let m = recover iso Map[RoutingId, Consumer] end
-    if router.routes().contains(_target_proxy_address.step_id) then
+    if router.routes().contains(_target_proxy_address.routing_id) then
       consume m
     else
-      m(_target_proxy_address.step_id) = _target
+      m(_target_proxy_address.routing_id) = _target
       consume m
     end
 
@@ -553,7 +553,7 @@ class val StateStepRouter is TargetIdRouter
                 @printf[I32](("StateStepRouter found Route to " +
                   " OutgoingBoundary\n").cstring())
               end
-              let delivery_msg = ForwardMsg[D](pa.step_id,
+              let delivery_msg = ForwardMsg[D](pa.routing_id,
                 _worker_name, data, metric_name,
                 pa, msg_uid, frac_ids)
 
@@ -1708,10 +1708,10 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     //     | let pr: ProxyRouter =>
     //       let pa = pr.proxy_address()
     //       if others.contains(pa.worker) then
-    //         others(pa.worker)?.push(pa.step_id.string())
+    //         others(pa.worker)?.push(pa.routing_id.string())
     //       else
     //         let next = Array[String]
-    //         next.push(pa.step_id.string())
+    //         next.push(pa.routing_id.string())
     //         others(pa.worker) = next
     //       end
     //     end
@@ -2068,10 +2068,10 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
         | let pr: ProxyRouter =>
           let pa = pr.proxy_address()
           if others.contains(pa.worker) then
-            others(pa.worker)?.push(pa.step_id.string())
+            others(pa.worker)?.push(pa.routing_id.string())
           else
             let next = Array[String]
-            next.push(pa.step_id.string())
+            next.push(pa.routing_id.string())
             others(pa.worker) = next
           end
         end

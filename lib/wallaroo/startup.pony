@@ -65,6 +65,7 @@ actor Startup
   var _event_log_file_basename: String = ""
   var _event_log_file_suffix: String = ""
   var _local_topology_file: String = ""
+  var _local_keys_file: String = ""
   var _data_channel_file: String = ""
   var _control_channel_file: String = ""
   var _worker_names_file: String = ""
@@ -236,6 +237,12 @@ actor Startup
         existing_files.set(local_topology_filepath.path)
       end
 
+      let local_keys_filepath: FilePath = FilePath(auth,
+        _local_keys_file)?
+      if local_keys_filepath.exists() then
+        existing_files.set(local_keys_filepath.path)
+      end
+
       let data_channel_filepath: FilePath = FilePath(auth,
         _data_channel_file)?
       if data_channel_filepath.exists() then
@@ -258,6 +265,12 @@ actor Startup
         _connection_addresses_file)?
       if connection_addresses_filepath.exists() then
         existing_files.set(connection_addresses_filepath.path)
+      end
+
+      let snapshot_ids_filepath: FilePath = FilePath(auth,
+        _snapshot_ids_file)?
+      if snapshot_ids_filepath.exists() then
+        existing_files.set(snapshot_ids_filepath.path)
       end
 
       let required_files: Set[String] = Set[String]
@@ -380,7 +393,7 @@ actor Startup
           _startup_options.is_initializer, data_receivers, event_log, recovery,
           recovery_reconnecter, snapshot_initiator, barrier_initiator,
           _local_topology_file, _data_channel_file, _worker_names_file,
-          state_step_creator)
+          local_keys_filepath, state_step_creator)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -468,6 +481,9 @@ actor Startup
     try
       let auth = _env.root as AmbientAuth
       _set_recovery_file_names(auth)
+
+      let local_keys_filepath: FilePath = FilePath(auth,
+        _local_keys_file)?
 
       // TODO: Replace this with the name of this worker, whatever it
       // happens to be.
@@ -567,7 +583,8 @@ actor Startup
           _startup_options.is_initializer, data_receivers,
           event_log, recovery, recovery_reconnecter, snapshot_initiator,
           barrier_initiator, _local_topology_file, _data_channel_file,
-          _worker_names_file, state_step_creator where is_joining = true)
+          _worker_names_file, local_keys_filepath, state_step_creator
+          where is_joining = true)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -677,6 +694,8 @@ actor Startup
     @printf[I32]("!@ Startup: _event_log_file: %s\n".cstring(), _event_log_file.string().cstring())
     _local_topology_file = _startup_options.resilience_dir + "/" + _app_name +
       "-" + _startup_options.worker_name + ".local-topology"
+    _local_keys_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".local-keys"
     _data_channel_file = _startup_options.resilience_dir + "/" + _app_name +
       "-" + _startup_options.worker_name + ".tcp-data"
     _control_channel_file = _startup_options.resilience_dir + "/" + _app_name +
@@ -692,10 +711,12 @@ actor Startup
     @printf[I32]("Removing recovery files\n".cstring())
     _remove_file(_event_log_file)
     _remove_file(_local_topology_file)
+    _remove_file(_local_keys_file)
     _remove_file(_data_channel_file)
     _remove_file(_control_channel_file)
     _remove_file(_worker_names_file)
     _remove_file(_connection_addresses_file)
+    _remove_file(_snapshot_ids_file)
 
     try
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
