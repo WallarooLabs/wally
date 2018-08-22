@@ -624,4 +624,5 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     ifdef "resilience" then
       StepRollbacker(payload, _runner)
     end
+    @printf[I32]("!@ Step %s acking rollback\n".cstring(), _id.string().cstring())
     event_log.ack_rollback(_id)

@@ -283,7 +283,7 @@ class DataChannelConnectNotifier is DataChannelNotify
           @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
         end
         try
-          match r.data_msg(_auth)?
+          match r.msg(_auth)?
           | let data_msg: DataMsg =>
             _metrics_reporter.step_metric(data_msg.metric_name,
               "Before replay receive on data channel (network time)",
@@ -292,6 +292,8 @@ class DataChannelConnectNotifier is DataChannelNotify
               data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
               data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
               my_latest_ts)
+          | let fbm: ForwardBarrierMsg =>
+            _receiver.forward_barrier(fbm.target_id, fbm.origin_id, fbm.token)
           end
         else
           Fail()

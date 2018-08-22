@@ -30,20 +30,25 @@ trait _RecoveryPhase
     recovery: Recovery ref)
   =>
     _invalid_call()
+    Fail()
 
   fun ref start_reconnect() =>
     _invalid_call()
+    Fail()
 
   fun ref recovery_reconnect_finished() =>
     _invalid_call()
+    Fail()
 
   fun ref rollback_prep_complete(token: SnapshotRollbackBarrierToken) =>
     _invalid_call()
+    Fail()
 
   fun ref rollback_complete(worker: WorkerName,
     token: SnapshotRollbackBarrierToken)
   =>
     _invalid_call()
+    Fail()
 
   fun ref try_override_recovery(worker: WorkerName,
     token: SnapshotRollbackBarrierToken, recovery: Recovery ref)
@@ -53,7 +58,6 @@ trait _RecoveryPhase
   fun _invalid_call() =>
     @printf[I32]("Invalid call on recovery phase %s\n".cstring(),
       name().cstring())
-    Fail()
 
 class _AwaitRecovering is _RecoveryPhase
   fun name(): String => "_AwaitRecovering"

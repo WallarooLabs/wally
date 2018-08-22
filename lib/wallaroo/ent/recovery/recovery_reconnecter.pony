@@ -180,19 +180,21 @@ trait _ReconnectPhase
   fun name(): String
   fun ref add_expected_boundary_count(worker: String, count: USize) =>
     _invalid_call()
+    Fail()
 
   fun ref add_reconnected_boundary(worker: String, boundary_id: RoutingId) ? =>
     _invalid_call()
+    Fail()
 
   fun ref add_boundary_reconnect_complete(worker: String,
     boundary_id: RoutingId)
   =>
     _invalid_call()
+    Fail()
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on recovery reconnecter phase %s\n".cstring(),
       name().cstring())
-    Fail()
 
 class _EmptyReconnectPhase is _ReconnectPhase
   fun name(): String => "Empty Reconnect Phase"

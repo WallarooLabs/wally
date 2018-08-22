@@ -8,13 +8,18 @@ use "wallaroo_labs/mort"
 trait _BarrierInitiatorPhase
   fun name(): String
 
+  fun ref pending_rollback_barrier_acks(): PendingRollbackBarrierAcks =>
+    PendingRollbackBarrierAcks
+
   fun ref initiate_barrier(barrier_token: BarrierToken,
     result_promise: BarrierResultPromise)
   =>
     _invalid_call()
+    Fail()
 
   fun ref source_registration_complete(s: Source) =>
     _invalid_call()
+    Fail()
 
   fun ready_for_next_token(): Bool =>
     false
@@ -49,11 +54,11 @@ trait _BarrierInitiatorPhase
 
   fun ref barrier_complete(token: BarrierToken) =>
     _invalid_call()
+    Fail()
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on barrier initiator phase %s\n".cstring(),
       name().cstring())
-    Fail()
 
 class _InitialBarrierInitiatorPhase is _BarrierInitiatorPhase
   fun name(): String => "_InitialBarrierInitiatorPhase"
@@ -77,6 +82,67 @@ class _NormalBarrierInitiatorPhase is _BarrierInitiatorPhase
 
   fun ref barrier_complete(token: BarrierToken) =>
     _initiator.next_token()
+
+class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
+  let _initiator: BarrierInitiator ref
+  let _pending_rollback_barrier_acks: PendingRollbackBarrierAcks =
+    _pending_rollback_barrier_acks.create()
+
+  new create(initiator: BarrierInitiator ref) =>
+    _initiator = initiator
+
+  fun name(): String =>
+    "_RecoveringBarrierInitiatorPhase"
+
+  fun ref pending_rollback_barrier_acks(): PendingRollbackBarrierAcks =>
+    _pending_rollback_barrier_acks
+
+  fun ref initiate_barrier(barrier_token: BarrierToken,
+    result_promise: BarrierResultPromise)
+  =>
+    match barrier_token
+    | let rbt: SnapshotRollbackBarrierToken =>
+      _initiator.initiate_barrier(barrier_token, result_promise)
+    else
+      @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
+        "barrier\n").cstring())
+    end
+
+  fun ref ack_barrier(s: BarrierReceiver, barrier_token: BarrierToken,
+    active_barriers: ActiveBarriers)
+  =>
+    match barrier_token
+    | let rbt: SnapshotRollbackBarrierToken =>
+      _pending_rollback_barrier_acks.ack_barrier(s, rbt)
+    else
+      @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
+        "ack_barrier\n").cstring())
+    end
+
+  fun ref worker_ack_barrier_start(w: String, barrier_token: BarrierToken,
+    active_barriers: ActiveBarriers)
+  =>
+    match barrier_token
+    | let rbt: SnapshotRollbackBarrierToken =>
+      _pending_rollback_barrier_acks.worker_ack_barrier_start(w, rbt)
+    else
+      @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
+        "worker_ack_barrier_start\n").cstring())
+    end
+
+  fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken,
+    active_barriers: ActiveBarriers)
+  =>
+    match barrier_token
+    | let rbt: SnapshotRollbackBarrierToken =>
+      _pending_rollback_barrier_acks.worker_ack_barrier(w, rbt)
+    else
+      @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
+        "worker_ack_barrier\n").cstring())
+    end
+
+  fun ready_for_next_token(): Bool =>
+    true
 
 class _SourcePendingBarrierInitiatorPhase is _BarrierInitiatorPhase
   """

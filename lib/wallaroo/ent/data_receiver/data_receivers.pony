@@ -90,13 +90,14 @@ actor DataReceivers
 
         let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
           _data_router, _state_step_creator, _initialized)
+        //!@
+        // new_dr.update_router(_data_router)
         match _router_registry
         | let rr: RouterRegistry =>
           rr.register_data_receiver(sender_name, new_dr)
         else
           Fail()
         end
-        new_dr.update_router(_data_router)
         _data_receivers(boundary_id) = new_dr
         _connections.register_disposable(new_dr)
         new_dr

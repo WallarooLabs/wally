@@ -21,6 +21,7 @@ class ActiveBarriers
 
   fun ref add_barrier(barrier_token: BarrierToken, handler: BarrierHandler) ?
   =>
+    @printf[I32]("!@ ActiveBarriers: Adding barrier %s\n".cstring(), barrier_token.string().cstring())
     if _barriers.contains(barrier_token) then
       try
         let old_handler = _barriers(barrier_token)?
@@ -62,6 +63,7 @@ class ActiveBarriers
     try
       _barriers(barrier_token)?.ack_barrier(s)
     else
+      @printf[I32]("!@ ACTIVE_BARRIERS: ack_barrier on unknown %s\n".cstring(), barrier_token.string().cstring())
       Fail()
     end
 

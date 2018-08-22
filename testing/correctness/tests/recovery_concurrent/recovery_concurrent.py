@@ -54,7 +54,6 @@ def test_recovery_concurrent_pony():
     command = 'multi_partition_detector --depth 1'
     _test_recovery(command, base_workers=2, first=1, delay=5, second=1)
 
-
 ##################
 # Helper Functions
 ##################
@@ -190,6 +189,10 @@ def _test_recovery_main(command, base_workers=2, first=1, delay=1, second=0):
             pause_sender_and_sink_await(sender, msg, sink)
 
             logging.info("!@ !!!!!!!!!--Killing first worker--")
+
+            time.sleep(delay)
+
+            print("!@ !!!!!!!!!--Killing first worker--")
 
             # crash the first batch
             first_killed = []

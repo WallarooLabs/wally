@@ -455,22 +455,33 @@ primitive ChannelMsgEncoder
   =>
     _encode(EventLogAckSnapshotMsg(snapshot_id, sender), auth)?
 
-  fun commit_snapshot_id(snapshot_id: SnapshotId, sender: WorkerName,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun commit_snapshot_id(snapshot_id: SnapshotId, rollback_id: RollbackId,
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(CommitSnapshotIdMsg(snapshot_id, sender), auth)?
+    _encode(CommitSnapshotIdMsg(snapshot_id, rollback_id, sender), auth)?
 
   fun recovery_initiated(token: SnapshotRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(RecoveryInitiatedMsg(token, sender), auth)?
 
-  fun initiate_rollback(auth: AmbientAuth): Array[ByteSeq] val ? =>
+  fun initiate_rollback(sender: WorkerName, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
     """
     Sent to the primary snapshot worker from a recovering worker to initiate
     rollback during rollback recovery phase.
     """
-    _encode(InitiateRollbackMsg, auth)?
+    _encode(InitiateRollbackMsg(sender), auth)?
+
+  fun rollback_complete(token: SnapshotRollbackBarrierToken,
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    Sent from the primary snapshot worker to the recovering worker to indicate
+    that rollback is complete.
+    """
+    _encode(RollbackCompleteMsg(token, sender), auth)?
 
   fun event_log_initiate_rollback(token: SnapshotRollbackBarrierToken,
     sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
@@ -482,9 +493,15 @@ primitive ChannelMsgEncoder
   =>
     _encode(EventLogAckRollbackMsg(token, sender), auth)?
 
-  fun resume_the_world(sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  fun resume_snapshot(sender: WorkerName, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
-    _encode(ResumeTheWorldMsg(sender), auth)?
+    _encode(ResumeSnapshotMsg(sender), auth)?
+
+  fun resume_processing(sender: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(ResumeProcessingMsg(sender), auth)?
 
   fun register_producer(sender: String, source_id: RoutingId, target_id: RoutingId,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -771,7 +788,7 @@ class val ReplayMsg is ChannelMsg
   new val create(db: Array[ByteSeq] val) =>
     data_bytes = db
 
-  fun data_msg(auth: AmbientAuth): DataMsg ? =>
+  fun msg(auth: AmbientAuth): (DataMsg | ForwardBarrierMsg) ? =>
     var size: USize = 0
     for bytes in data_bytes.values() do
       size = size + bytes.size()
@@ -788,6 +805,8 @@ class val ReplayMsg is ChannelMsg
     match ChannelMsgDecoder(consume buffer, auth)
     | let r: DataMsg =>
       r
+    | let fbm: ForwardBarrierMsg =>
+      fbm
     else
       @printf[I32]("Trouble reconstituting replayed data msg\n".cstring())
       error
@@ -1246,10 +1265,14 @@ class val EventLogAckSnapshotMsg is ChannelMsg
 
 class val CommitSnapshotIdMsg is ChannelMsg
   let snapshot_id: SnapshotId
+  let rollback_id: RollbackId
   let sender: WorkerName
 
-  new val create(snapshot_id': SnapshotId, sender': WorkerName) =>
+  new val create(snapshot_id': SnapshotId, rollback_id': RollbackId,
+    sender': WorkerName)
+  =>
     snapshot_id = snapshot_id'
+    rollback_id = rollback_id'
     sender = sender'
 
 class val RecoveryInitiatedMsg is ChannelMsg
@@ -1276,9 +1299,27 @@ class val EventLogAckRollbackMsg is ChannelMsg
     token = token'
     sender = sender'
 
-primitive InitiateRollbackMsg is ChannelMsg
+class val InitiateRollbackMsg is ChannelMsg
+  let sender: WorkerName
 
-class val ResumeTheWorldMsg is ChannelMsg
+  new val create(sender': WorkerName) =>
+    sender = sender'
+
+class val RollbackCompleteMsg is ChannelMsg
+  let token: SnapshotRollbackBarrierToken
+  let sender: WorkerName
+
+  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+    token = token'
+    sender = sender'
+
+class val ResumeSnapshotMsg is ChannelMsg
+  let sender: String
+
+  new val create(sender': String) =>
+    sender = sender'
+
+class val ResumeProcessingMsg is ChannelMsg
   let sender: String
 
   new val create(sender': String) =>

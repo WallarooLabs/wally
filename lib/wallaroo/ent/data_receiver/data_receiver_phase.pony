@@ -16,27 +16,36 @@ trait _DataReceiverPhase
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _invalid_call()
+    Fail()
 
   fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _invalid_call()
+    Fail()
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken)
   =>
     _invalid_call()
+    Fail()
 
   fun data_connect() =>
     _invalid_call()
+    Fail()
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on Data Receiver phase %s\n".cstring(),
       name().cstring())
-    Fail()
 
 class _DataReceiverNotProcessingPhase is _DataReceiverPhase
   fun name(): String => "_DataReceiverNotProcessingPhase"
+
+  fun data_connect() =>
+    // If we're not processing, then we need to wait for DataReceivers to be
+    // initialized.
+    @printf[I32](("DataReceiver: data_connect received, but still waiting " +
+      "for DataReceivers to initialize.\n").cstring())
 
   fun ref flush(): Array[_Queued] =>
     Array[_Queued]
