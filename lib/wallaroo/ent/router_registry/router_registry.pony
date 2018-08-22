@@ -457,6 +457,12 @@ actor RouterRegistry
     step_id: RoutingId)
   =>
     @printf[I32]("!@ RouterRegistry: register_state_step, key: %s\n".cstring(), key.cstring())
+    try
+      (_local_topology_initializer as LocalTopologyInitializer)
+        .register_state_step(state_name, key, step_id)
+    else
+      Fail()
+    end
     _add_routes_to_state_step(step_id, step, key, state_name)
 
   fun _distribute_data_router() =>
@@ -1388,13 +1394,19 @@ actor RouterRegistry
     end
     _data_router.remove_routes_to_consumer(id, step)
 
-  fun ref _move_step_to_proxy(id: U128, state_name: String, key: Key,
+  fun ref _move_step_to_proxy(id: RoutingId, state_name: String, key: Key,
     proxy_address: ProxyAddress)
   =>
     """
     Called when a step has been migrated off this worker to another worker
     """
     _remove_step_from_data_router(state_name, key)
+    try
+      (_local_topology_initializer as LocalTopologyInitializer)
+        .unregister_state_step(state_name, key)
+    else
+      Fail()
+    end
     //!@
     // _add_proxy_to_target_id_router(id, proxy_address)
 

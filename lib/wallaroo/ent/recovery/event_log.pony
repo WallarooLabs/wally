@@ -223,7 +223,8 @@ actor EventLog
       _resilients(resilient_id)?.rollback(payload, this)
     else
       //!@ Update message
-      @printf[I32](("Can't find resilient for rollback data").cstring())
+      @printf[I32](("Can't find resilient for rollback data\n").cstring())
+      @printf[I32](("!@ Can't find resilient %s for rollback data\n").cstring(), resilient_id.string().cstring())
       Fail()
     end
 

@@ -25,6 +25,7 @@ use "serialise"
 use "wallaroo"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/keys"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/cluster_manager"
@@ -93,6 +94,7 @@ class val LocalTopology
   fun update_state_map(state_name: StateName,
     state_map: Map[StateName, Router],
     metrics_conn: MetricsSink, event_log: EventLog,
+    all_local_keys: Map[StateName, Map[Key, RoutingId] val] val,
     recovery_replayer: RecoveryReconnecter,
     auth: AmbientAuth,
     outgoing_boundaries: Map[WorkerName, OutgoingBoundary] val,
@@ -118,9 +120,9 @@ class val LocalTopology
       try
         let local_state_routing_ids = state_routing_ids(state_name)?
         state_map(state_name) = subpartition.build(_app_name, _worker_name,
-          metrics_conn, auth, event_log, recovery_replayer,
-          outgoing_boundaries, initializables, data_routes, keyed_data_routes,
-          keyed_step_ids, state_steps, state_step_creator,
+          worker_names, metrics_conn, auth, event_log, all_local_keys,
+          recovery_replayer, outgoing_boundaries, initializables, data_routes,
+          keyed_data_routes, keyed_step_ids, state_steps, state_step_creator,
           local_state_routing_ids)
       else
         Fail()
@@ -254,6 +256,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _cluster_initializer: (ClusterInitializer | None) = None
   let _data_channel_file: String
   let _worker_names_file: String
+  let _local_keys_file: LocalKeysFile
   var _topology_initialized: Bool = false
   var _recovered_worker_names: Array[String] val =
     recover val Array[String] end
@@ -300,7 +303,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     recovery_replayer: RecoveryReconnecter,
     snapshot_initiator: SnapshotInitiator, barrier_initiator: BarrierInitiator,
     local_topology_file: String, data_channel_file: String,
-    worker_names_file: String, state_step_creator: StateStepCreator,
+    worker_names_file: String, local_keys_filepath: FilePath,
+    state_step_creator: StateStepCreator,
     cluster_manager: (ClusterManager | None) = None,
     is_joining: Bool = false)
   =>
@@ -321,6 +325,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _local_topology_file = local_topology_file
     _data_channel_file = data_channel_file
     _worker_names_file = worker_names_file
+    _local_keys_file = LocalKeysFile(local_keys_filepath)
     _cluster_manager = cluster_manager
     _is_joining = is_joining
     _router_registry.register_local_topology_initializer(this)
@@ -643,6 +648,12 @@ actor LocalTopologyInitializer is LayoutInitializer
       @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
 
+  be register_state_step(state_name: StateName, key: Key, r_id: RoutingId) =>
+    _local_keys_file.add_key(state_name, key, r_id)
+
+  be unregister_state_step(state_name: StateName, key: Key) =>
+    _local_keys_file.remove_key(state_name, key)
+
   fun ref _save_worker_names()
   =>
     """
@@ -781,6 +792,31 @@ actor LocalTopologyInitializer is LayoutInitializer
         _save_local_topology()
         _save_worker_names()
 
+        // Determine local keys for all state collections
+        let local_keys: Map[StateName, Map[Key, RoutingId] val] val =
+          if not _recovering then
+            let lks = recover iso Map[StateName, Map[Key, RoutingId] val] end
+            for (s_name, subp) in t.state_builders().pairs() do
+              lks(s_name) = subp.initial_local_keys(_worker_name)
+            end
+            let lks_val = consume val lks
+
+            // Populate local keys file
+            for (s_name, keys) in lks_val.pairs() do
+              for (k, r_id) in keys.pairs() do
+                _local_keys_file.add_key(s_name, k, r_id)
+              end
+            end
+
+            lks_val
+          else
+            @printf[I32]("Reading local keys from file.\n".cstring())
+            _local_keys_file.read_local_keys()
+            @printf[I32]("!@ Successfully read local keys from file.\n"
+              .cstring())
+          end
+
+        //!@ This needs to take account of keys
         if t.is_empty() then
           @printf[I32]("----This worker has no steps----\n".cstring())
         end
@@ -942,7 +978,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       StateStepRouter.from_boundaries(_worker_name,
                         _outgoing_boundaries))?
                     t.update_state_map(state_name, state_map,
-                      _metrics_conn, _event_log, _recovery_replayer, _auth,
+                      _metrics_conn, _event_log, local_keys,
+                      _recovery_replayer, _auth,
                       _outgoing_boundaries, _initializables,
                       data_routes_ref, keyed_data_routes_ref,
                       keyed_step_ids_ref, built_state_steps,
@@ -1321,7 +1358,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                     StateStepRouter.from_boundaries(_worker_name,
                       _outgoing_boundaries))?
                   t.update_state_map(state_name, state_map,
-                    _metrics_conn, _event_log, _recovery_replayer, _auth,
+                    _metrics_conn, _event_log, local_keys,
+                    _recovery_replayer, _auth,
                     _outgoing_boundaries, _initializables,
                     data_routes_ref, keyed_data_routes_ref,
                     keyed_step_ids_ref, built_state_steps,
@@ -1472,7 +1510,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                   StateStepRouter.from_boundaries(_worker_name,
                     _outgoing_boundaries))?
                 t.update_state_map(state_name, state_map,
-                  _metrics_conn, _event_log, _recovery_replayer, _auth,
+                  _metrics_conn, _event_log, local_keys,
+                  _recovery_replayer, _auth,
                   _outgoing_boundaries, _initializables,
                   data_routes_ref, keyed_data_routes_ref,
                   keyed_step_ids_ref, built_state_steps,
