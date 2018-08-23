@@ -100,7 +100,7 @@ docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
 
 **Note:** The `./cluster up 1` command outputs `Host IP used for Kafka Brokers is <YOUR_HOST_IP>`.
 
-#### Set up a listener to monitor the Kafka topic to which you would the application to publish results. We usually use `kafkacat`.
+#### Set up a listener to monitor the Kafka topic the application will publish results to. We usually use `kafkacat`.
 
 `kafkacat` can be installed via:
 

@@ -96,7 +96,6 @@ set_artifact_names() {
   metrics_ui_appimage="Wallaroo_Metrics_UI-${bintray_artifacts_version}-x86_64.AppImage"
 }
 
-# shellcheck disable=SC2120
 build_metrics_ui_appimage() {
   ## Conditional check for whether the current Metrics UI appimage exists in bintray, does not
   ## re-upload appimage if so. Otherwise uploads to Bintray.
@@ -113,72 +112,11 @@ build_metrics_ui_appimage() {
   ## delete the existing file if it exists
   rm -f "$metrics_ui_appimage"
 
-  ## Build Metrics UI if not already built
-  mkdir -p metrics_ui.AppDir/usr/
+  sudo make clean-monitoring_hub
 
-  cat > ./metrics_ui.desktop <<\EOF
-[Desktop Entry]
-Name=Wallaroo Metrics UI
-Icon=metrics_ui
-Type=Application
-NoDisplay=true
-Exec=metrics_reporter_ui
-Terminal=true
-Categories=Development;
-EOF
+  make build-metrics-ui-appimage
 
-# shellcheck disable=SC2009
-  cat > ./AppRun <<\EOF
-#!/bin/sh
-HERE=$(dirname "$(readlink -f "${0}")")
-"${HERE}"/usr/bin/metrics_reporter_ui $@
-if [ "$1" = "start" ]; then
-  sleep 4
-fi
-if [ "$1" = "stop" ]; then
-  PID_TO_KILL=$(ps aux | grep '/usr/erts-9.1/bin/epmd' | grep -v grep | awk '{print $2}')
-  if [ "$PID_TO_KILL" != "" ]; then
-    kill $PID_TO_KILL
-  fi
-fi
-EOF
-
-  chmod a+x ./AppRun
-
-  curl https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -o linuxdeploy-x86_64.AppImage -J -L
-  chmod +x linuxdeploy-x86_64.AppImage
-
-  # set up icon/logo for appimage
-  cp .release/metrics_ui_appimage_icon.png metrics_ui.png
-
-  # remove any existing build artifacts
-  sudo make clean
-
-  # can't run appimages in docker; need to extract and then run
-  sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "./linuxdeploy-x86_64.AppImage --appimage-extract"
-
-  # need to run in CentOS 7 docker image
-  sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "make release-monitoring_hub-apps-metrics_reporter_ui"
-
-  # put files into AppDir
-  sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "cd metrics_ui.AppDir/usr && tar -xvzf ../../monitoring_hub/apps/metrics_reporter_ui/_build/prod/rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz"
-
-  # build appimage
-  sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "ARCH=x86_64 ./squashfs-root/AppRun --appdir metrics_ui.AppDir --custom-apprun=AppRun --desktop-file=metrics_ui.desktop --icon-file=metrics_ui.png"
-
-  ## temporary hack; remove once linuxdeploy works correctly
-  sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "mv metrics_ui.AppDir/usr/lib/libcrypto.so.10 metrics_ui.AppDir/usr/lib/crypto-4.1/priv/lib/"
-
-  sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "ARCH=x86_64 ./squashfs-root/AppRun --appdir metrics_ui.AppDir --custom-apprun=AppRun --desktop-file=metrics_ui.desktop --icon-file=metrics_ui.png --output appimage"
-
-  rm linuxdeploy-x86_64.AppImage
-  sudo rm -rf squashfs-root
-  sudo rm -rf metrics_ui.AppDir
-  rm AppRun
-  rm metrics_ui.desktop
-  rm metrics_ui.png
-
-  sudo make clean
+  sudo make clean-monitoring_hub
 
   mv Wallaroo_Metrics_UI-x86_64.AppImage "$metrics_ui_appimage"
 }
@@ -205,7 +143,9 @@ build_wallaroo_source_archive() {
   git checkout -- testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg
   git checkout -- testing/data/market_spread/orders/350-symbols_orders-fixish.msg
 
-  tar --transform "flags=r;s|^|wallaroo/|" -czf "$wallaroo_source_archive" ./*
+  make build-wallaroo-source-archive
+
+  mv wallaroo.tgz "$wallaroo_source_archive"
 }
 
 push_wallaroo_bintray_artifacts() {
@@ -259,7 +199,6 @@ verify_no_local_changes
 checkout_to_commit
 set_artifact_names
 build_wallaroo_source_archive
-# shellcheck disable=SC2119
 build_metrics_ui_appimage
 push_wallaroo_bintray_artifacts
 git_reset

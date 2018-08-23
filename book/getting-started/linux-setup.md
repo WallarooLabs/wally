@@ -37,7 +37,7 @@ cd ~/wallaroo-tutorial
 This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-wget -q -O wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/{{ book.wallaroo_version }}.tar.gz'
+wget -q -O wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/wallaroo-{{ book.wallaroo_version }}.tar.gz'
 mkdir wallaroo-{{ book.wallaroo_version }}
 tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
 rm wallaroo-{{ book.wallaroo_version }}.tar.gz
@@ -90,7 +90,7 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
 In order to install `ponyc` and `pony-stable` via `apt-get` the following keyserver must be added to the APT key management utility.
 
 ```bash
-sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "E04F0923 B3B48BDA"
+sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E04F0923 B3B48BDA
 ```
 
 The following packages need to be installed to allow `apt` to use a repository over HTTPS:
