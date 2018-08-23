@@ -37,7 +37,7 @@ cd ~/wallaroo-tutorial
 This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-wget -O wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/wallaroo-{{ book.wallaroo_version }}.tar.gz'
+curl -L -o wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/wallaroo-{{ book.wallaroo_version }}.tar.gz'
 mkdir wallaroo-{{ book.wallaroo_version }}
 tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
 rm wallaroo-{{ book.wallaroo_version }}.tar.gz
@@ -146,7 +146,7 @@ Trusty Ubuntu has an outdated `liblz4` package. You will need to install from so
 
 ```bash
 cd ~/
-wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
+curl -L -o liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
 tar zxvf liblz4-1.7.5.tar.gz
 cd lz4-1.7.5
 make
@@ -164,7 +164,7 @@ sudo apt-get install -y python-dev
 ```bash
 cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
 mkdir bin
-wget -O Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage'
+curl -L -o Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage'
 chmod +x Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
 ./Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage --appimage-extract
 mv squashfs-root bin/metrics_ui
