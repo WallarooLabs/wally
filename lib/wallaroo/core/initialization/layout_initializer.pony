@@ -17,14 +17,16 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core/messages"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/snapshot"
 
 trait tag LayoutInitializer
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
-    recovering: Bool)
+    snapshot_target: (SnapshotId | None) = None)
 
   be report_created(initializable: Initializable)
 
@@ -42,3 +44,5 @@ trait tag LayoutInitializer
     cluster_initializer: (ClusterInitializer | None) = None)
 
   be ack_migration_batch_complete(sender: String)
+
+  be rollback_topology_graph(snapshot_id: SnapshotId, action: Promise[None])

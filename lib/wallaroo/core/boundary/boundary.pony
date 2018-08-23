@@ -403,6 +403,36 @@ actor OutgoingBoundary is Consumer
     try
       var cur_id = _lowest_queue_id
       for msg in _queue.values() do
+        //!@
+        var count: USize = 1
+        let next = recover iso Array[U8] end
+        for x in msg.values() do
+          if count > 4 then
+            match x
+            | let s: String =>
+              for b in s.values() do
+                next.push(b)
+              end
+            | let a: Array[U8] val =>
+              for b in a.values() do
+                next.push(b)
+              end
+            end
+          else
+            count = count + 1
+          end
+        end
+        match ChannelMsgDecoder(consume next, _auth)
+        | let r: ReplayMsg =>
+          try
+            match r.msg(_auth)?
+            | let fbm: ForwardBarrierMsg =>
+              @printf[I32]("!@ Boundary %s: ForwardBarrierMsg %s\n".cstring(), _step_id.string().cstring(), fbm.token.string().cstring())
+            end
+          end
+        end
+
+        @printf[I32]("!@ Boundary %s: replaying message!\n".cstring(), _step_id.string().cstring())
         if cur_id >= idx then
           _writev(ChannelMsgEncoder.replay(msg, _auth)?)
         end
@@ -547,7 +577,15 @@ actor OutgoingBoundary is Consumer
     """
     None
 
-  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+  be prepare_for_rollback() =>
+    """
+    There is nothing for a Boundary to rollback to.
+    """
+    None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    snapshot_id: SnapshotId)
+  =>
     """
     There is nothing for a Boundary to rollback to.
     """

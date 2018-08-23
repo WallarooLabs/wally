@@ -87,6 +87,9 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
+  // Snapshot
+  var _next_snapshot_id: SnapshotId = 1
+
   let _topic: String
   let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
@@ -209,7 +212,8 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     routing_args: RoutingArguments)
   =>
     if not _pending_message_store.has_pending_state_key(state_name, key) then
-      _state_step_creator.report_unknown_key(this, state_name, key)
+      _state_step_creator.report_unknown_key(this, state_name, key,
+        _next_snapshot_id)
     end
     _pending_message_store.add(state_name, key, routing_args)
 
@@ -336,7 +340,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     if not _disposed then
       match token
       | let srt: SnapshotRollbackBarrierToken =>
-        _pending_message_store.clear()
+        _prepare_for_rollback()
       end
 
       if not _pending_message_store.has_pending() then
@@ -371,12 +375,22 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     ifdef "trace" then
       @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
     end
+    _next_snapshot_id = snapshot_id + 1
     _wb.i64_le(_last_flushed_offset)
     let payload = _wb.done()
     _event_log.snapshot_state(_source_id, snapshot_id, consume payload)
 
-  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+  be prepare_for_rollback() =>
+    _prepare_for_rollback()
+
+  fun ref _prepare_for_rollback() =>
+    _pending_message_store.clear()
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    snapshot_id: SnapshotId)
+  =>
     //!@ Rollback!
+    _next_snapshot_id = snapshot_id + 1
     event_log.ack_rollback(_source_id)
 
 
@@ -508,6 +522,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     if not _disposed then
       _unregister_all_outputs()
       _router_registry.unregister_source(this, _source_id)
+      _event_log.unregister_resilient(_source_id, this)
       for b in _outgoing_boundaries.values() do
         b.dispose()
       end
