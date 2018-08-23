@@ -50,6 +50,60 @@ class _DataReceiverNotProcessingPhase is _DataReceiverPhase
   fun ref flush(): Array[_Queued] =>
     Array[_Queued]
 
+class _RecoveringDataReceiverPhase is _DataReceiverPhase
+  let _data_receiver: DataReceiver ref
+
+  new create(dr: DataReceiver ref) =>
+    _data_receiver = dr
+
+  fun name(): String =>
+    "_RecoveringDataReceiverPhase"
+
+  fun has_pending(): Bool =>
+    false
+
+  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    // Drop non-barriers
+    ifdef debug then
+      @printf[I32]("Recovering DataReceiver dropping non-rollback-barrier\n"
+        .cstring())
+    end
+    None
+
+  fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    // Drop non-barriers
+    ifdef debug then
+      @printf[I32]("Recovering DataReceiver dropping non-rollback-barrier\n"
+        .cstring())
+    end
+    None
+
+  fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
+    token: BarrierToken)
+  =>
+    // Drop anything that's not related to rollback
+    match token
+    | let srt: SnapshotRollbackBarrierToken =>
+      _data_receiver.send_barrier(input_id, output_id, token)
+    | let srt: SnapshotRollbackResumeBarrierToken =>
+      _data_receiver.send_barrier(input_id, output_id, token)
+    else
+      ifdef debug then
+        @printf[I32]("Recovering DataReceiver dropping non-rollback barrier\n"
+          .cstring())
+      end
+    end
+
+  fun data_connect() =>
+    _data_receiver._inform_boundary_to_send_normal_messages()
+
+  fun ref flush(): Array[_Queued] =>
+    Array[_Queued]
+
 class _NormalDataReceiverPhase is _DataReceiverPhase
   let _data_receiver: DataReceiver ref
 

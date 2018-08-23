@@ -29,6 +29,7 @@ actor DataReceivers
   let _connections: Connections
   let _worker_name: String
 
+  var _is_recovering: Bool
   var _initialized: Bool = false
 
   let _data_receivers: Map[BoundaryId, DataReceiver] =
@@ -51,7 +52,8 @@ actor DataReceivers
       DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
         recover LocalStatePartitions end, recover LocalStatePartitionIds end,
         recover Map[RoutingId, StateName] end)
-    if not is_recovering then
+    _is_recovering = is_recovering
+    if not _is_recovering then
       _initialized = true
     end
 
@@ -84,7 +86,7 @@ actor DataReceivers
         let id = RoutingIdGenerator()
 
         let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
-          _data_router, _state_step_creator, _initialized)
+          _data_router, _state_step_creator, _initialized, _is_recovering)
         //!@
         // new_dr.update_router(_data_router)
         match _router_registry
@@ -119,3 +121,10 @@ actor DataReceivers
     for data_receiver in _data_receivers.values() do
       data_receiver.update_router(_data_router)
     end
+
+  be rollback_barrier_complete(recovery: Recovery) =>
+    _is_recovering = false
+    for dr in _data_receivers.values() do
+      dr.rollback_barrier_complete()
+    end
+    recovery.data_receivers_ack()

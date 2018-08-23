@@ -383,11 +383,45 @@ class LocalStatePartitions
       Unreachable()
     end
 
+  fun ref remove_key(state_name: StateName, key: Key): Step ? =>
+    _info(state_name)?.remove(key)?._2
+
   fun contains(state_name: StateName, key: Key): Bool =>
     _Contains[Step](_info, state_name, key)
 
   fun is_empty(): Bool =>
     _info.size() == 0
+
+  fun ref key_diff(new_keys: Map[StateName, Map[Key, RoutingId] val] val):
+    (Map[StateName, Map[Key, RoutingId]], Map[StateName, SetIs[Key]])
+  =>
+    """
+    Check new keys to see which keys we're missing and which keys we have
+    that need to be removed. Return a tuple with keys to add as first element
+    and keys to remove as second.
+    """
+    let keys_to_add = Map[StateName, Map[Key, RoutingId]]
+    let keys_to_remove = Map[StateName, SetIs[Key]]
+    try
+      for (state, keys) in new_keys.pairs() do
+        keys_to_add(state) = Map[Key, RoutingId]
+        keys_to_remove(state) = SetIs[Key]
+        let next = _info.insert_if_absent(state, Map[Key, Step])?
+        for (k, r_id) in keys.pairs() do
+          if not next.contains(k) then
+            keys_to_add(state)?(k) = r_id
+          end
+        end
+        for k in next.keys() do
+          if not new_keys(state)?.contains(k) then
+            keys_to_remove(state)?.set(k)
+          end
+        end
+      end
+    else
+      Fail()
+    end
+    (keys_to_add, keys_to_remove)
 
   fun register_producer(state_name: StateName, input_id: RoutingId,
     producer: Producer)
@@ -463,6 +497,9 @@ class LocalStatePartitionIds
     else
       Unreachable()
     end
+
+  fun ref remove_key(state_name: StateName, key: Key): RoutingId ? =>
+    _info(state_name)?.remove(key)?._2
 
   fun contains(state_name: String, key: Key): Bool =>
     _Contains[RoutingId](_info, state_name, key)
