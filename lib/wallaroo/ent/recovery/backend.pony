@@ -213,7 +213,7 @@ class FileBackend is Backend
       _event_log.expect_rollback_count(replay_buffer.size())
       for entry in replay_buffer.values() do
         num_replayed = num_replayed + 1
-        _event_log.rollback_from_log_entry(entry._1, entry._2)
+        _event_log.rollback_from_log_entry(entry._1, entry._2, snapshot_id)
       end
 
       _file.seek_end(0)

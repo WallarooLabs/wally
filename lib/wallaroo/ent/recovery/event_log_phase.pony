@@ -54,13 +54,33 @@ class _InitialEventLogPhase is _EventLogPhase
   fun name(): String => "_InitialEventLogPhase"
 
 class _NormalEventLogPhase is _EventLogPhase
+  let _next_snapshot_id: SnapshotId
   let _event_log: EventLog ref
 
-  new create(event_log: EventLog ref) =>
+  new create(next_snapshot_id: SnapshotId, event_log: EventLog ref) =>
+    _next_snapshot_id = next_snapshot_id
     _event_log = event_log
 
   fun ref write_initial_snapshot_id(snapshot_id: SnapshotId) =>
     _event_log._write_snapshot_id(snapshot_id)
+
+  fun ref snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+    payload: Array[ByteSeq] val)
+  =>
+    @printf[I32]("!@ _NormalEventLogPhase: snapshot_state() for snapshot_id %s\n".cstring(), snapshot_id.string().cstring())
+
+    ifdef debug then
+      Invariant(snapshot_id == _next_snapshot_id)
+    end
+    ifdef "trace" then
+      @printf[I32]("Snapshotting state for resilient %s, snapshot id %s\n"
+        .cstring(), resilient_id.string().cstring(),
+        _next_snapshot_id.string().cstring())
+    end
+
+    if payload.size() > 0 then
+      _event_log._snapshot_state(resilient_id, snapshot_id, payload)
+    end
 
   fun ref snapshot_id_written(snapshot_id: SnapshotId) =>
     None
@@ -110,8 +130,9 @@ class _SnapshotEventLogPhase is _EventLogPhase
       Invariant(snapshot_id == _snapshot_id)
     end
     ifdef "trace" then
-      @printf[I32](("Snapshotting state for resilient " + resilient_id.string()
-        + "\n").cstring())
+      @printf[I32]("Snapshotting state for resilient %s, snapshot id %s\n"
+        .cstring(), resilient_id.string().cstring(),
+        _snapshot_id.string().cstring())
     end
 
     if payload.size() > 0 then
@@ -130,7 +151,7 @@ class _SnapshotEventLogPhase is _EventLogPhase
       Invariant(snapshot_id == _snapshot_id)
     end
     _action(snapshot_id)
-    _event_log.snapshot_complete()
+    _event_log.snapshot_complete(snapshot_id)
 
 class _RollbackEventLogPhase is _EventLogPhase
   let _event_log: EventLog ref
@@ -169,4 +190,4 @@ class _RollbackEventLogPhase is _EventLogPhase
 
   fun ref _complete() =>
     _action(_token)
-    _event_log.rollback_complete()
+    _event_log.rollback_complete(_token.snapshot_id)

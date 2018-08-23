@@ -25,7 +25,9 @@ use "wallaroo_labs/mort"
 
 
 trait tag Resilient
-  be rollback(payload: ByteSeq val, event_log: EventLog)
+  be prepare_for_rollback()
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    snapshot_id: SnapshotId)
 
 class val EventLogConfig
   let log_dir: (FilePath | AmbientAuth | None)
@@ -114,7 +116,7 @@ actor EventLog
       if _config.is_recovering then
         _RecoveringEventLogPhase(this)
       else
-        _NormalEventLogPhase(this)
+        _NormalEventLogPhase(1, this)
       end
 
   be set_barrier_initiator(barrier_initiator: BarrierInitiator) =>
@@ -189,14 +191,27 @@ actor EventLog
     _backend.encode_snapshot_id(snapshot_id)
     _phase.snapshot_id_written(snapshot_id)
 
-  fun ref snapshot_complete() =>
+  fun ref snapshot_complete(snapshot_id: SnapshotId) =>
     @printf[I32]("!@ EventLog: snapshot_complete()\n".cstring())
     write_log()
-    _phase = _NormalEventLogPhase(this)
+    _phase = _NormalEventLogPhase(snapshot_id + 1, this)
 
   /////////////////
   // ROLLBACK
   /////////////////
+  be prepare_for_rollback(origin: (Recovery | Promise[None])) =>
+    for r in _resilients.values() do
+      r.prepare_for_rollback()
+    end
+    match origin
+    | let r: Recovery =>
+      //!@ Currently we are immediately moving on without checking for other
+      //worker acks. Is this ok?
+      r.rollback_prep_complete()
+    | let p: Promise[None] =>
+      p(None)
+    end
+
   be initiate_rollback(token: SnapshotRollbackBarrierToken,
     action: Promise[SnapshotRollbackBarrierToken])
   =>
@@ -217,10 +232,10 @@ actor EventLog
     _phase.expect_rollback_count(count)
 
   fun ref rollback_from_log_entry(resilient_id: RoutingId,
-    payload: ByteSeq val)
+    payload: ByteSeq val, snapshot_id: SnapshotId)
   =>
     try
-      _resilients(resilient_id)?.rollback(payload, this)
+      _resilients(resilient_id)?.rollback(payload, this, snapshot_id)
     else
       //!@ Update message
       @printf[I32](("Can't find resilient for rollback data\n").cstring())
@@ -231,8 +246,8 @@ actor EventLog
   be ack_rollback(resilient_id: RoutingId) =>
     _phase.ack_rollback(resilient_id)
 
-  fun ref rollback_complete() =>
-    _phase = _NormalEventLogPhase(this)
+  fun ref rollback_complete(snapshot_id: SnapshotId) =>
+    _phase = _NormalEventLogPhase(snapshot_id + 1, this)
 
 
 

@@ -17,13 +17,31 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/snapshot"
 use "wallaroo_labs/mort"
+
+class _PendingStep
+  let state_name: StateName
+  let key: Key
+  let routing_id: RoutingId
+  // If this is a step being created during normal operation (i.e. not during
+  // recovery), then we need to mark which snapshot it belongs to.
+  let snapshot_id: (SnapshotId | None)
+
+  new create(s: StateName, k: Key, r_id: RoutingId,
+    s_id: (SnapshotId | None) = None)
+  =>
+    state_name = s
+    key = k
+    routing_id = r_id
+    snapshot_id = s_id
 
 actor StateStepCreator is Initializable
   var _keys_to_steps: LocalStatePartitions = _keys_to_steps.create()
@@ -47,8 +65,7 @@ actor StateStepCreator is Initializable
   var _target_id_routers: Map[String, TargetIdRouter] =
     _target_id_routers.create()
 
-  let _pending_steps: MapIs[Step, (String, Key, RoutingId)] =
-    _pending_steps.create()
+  let _pending_steps: MapIs[Step, _PendingStep] = _pending_steps.create()
 
   let _known_state_key: Map[String, Set[Key]] =
     _known_state_key.create()
@@ -98,7 +115,9 @@ actor StateStepCreator is Initializable
       Unreachable()
     end
 
-  be report_unknown_key(producer: Producer, state_name: String, key: Key) =>
+  be report_unknown_key(producer: Producer, state_name: String, key: Key,
+    snapshot_id: SnapshotId)
+  =>
     """
     Creates a new step to handle a previously unknown key if a step does not
     already exist for that key. If a step already exists for the key then
@@ -108,41 +127,8 @@ actor StateStepCreator is Initializable
     to see if any of them can be handled by the new router.
     """
     if not _state_key_is_known(state_name, key) then
-      _state_key_known(state_name, key)
-
-      try
-        let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
-
-        let runner_builder = try
-          _state_runner_builders(state_name)?
-        else
-          @printf[I32]("Could not find runner_builder for state '%s'\n".cstring(),
-            state_name.cstring())
-          Fail()
-          error
-        end
-
-        let id = _routing_id_gen()
-        let target_id_router = _target_id_routers(state_name)?
-        let state_step = try
-          Step(_auth, runner_builder(
-            where event_log = _event_log, auth = _auth),
-            consume reporter, id, _event_log,
-            _recovery_replayer as RecoveryReconnecter,
-            _outgoing_boundaries, this
-            where target_id_router = target_id_router)
-        else
-          @printf[I32]("Missing things in StateStepCreator\n".cstring())
-          Fail()
-          error
-        end
-
-        _pending_steps(state_step) = (state_name, key, id)
-        state_step.quick_initialize(this)
-      else
-        @printf[I32]("Failed to create new step\n".cstring())
-        Fail()
-      end
+      let id = _routing_id_gen()
+      _create_state_step(state_name, key, id, snapshot_id)
     end
 
   be set_router_registry(router_registry: RouterRegistry) =>
@@ -176,15 +162,16 @@ actor StateStepCreator is Initializable
         @printf[I32](("Got a message that a step is ready!\n").cstring())
       end
 
-      (_, (let state_name, let key, let id)) =
-        _pending_steps.remove(step)?
+      (_, let pending_step) = _pending_steps.remove(step)?
 
-      _keys_to_steps.add(state_name, key, step)
-      _keys_to_step_ids.add(state_name, key, id)
+      _keys_to_steps.add(pending_step.state_name, pending_step.key, step)
+      _keys_to_step_ids.add(pending_step.state_name, pending_step.key,
+        pending_step.routing_id)
 
       try
         (_router_registry as RouterRegistry).register_state_step(step,
-          state_name, key, id)
+          pending_step.state_name, pending_step.key,
+          pending_step.routing_id, pending_step.snapshot_id)
       else
         @printf[I32]("StateStepCreator must have a RouterRegistry.\n"
           .cstring())
@@ -194,6 +181,62 @@ actor StateStepCreator is Initializable
     else
       @printf[I32](("StateStepCreator received report_ready_to_work from " +
         "an unknown step.\n").cstring())
+      Fail()
+    end
+
+  be rollback_state_steps(
+    rollback_keys: Map[StateName, Map[Key, RoutingId] val] val,
+    promise: Promise[None])
+  =>
+    _pending_steps.clear()
+    (let keys_to_add, let keys_to_remove) =
+      _keys_to_steps.key_diff(rollback_keys)
+
+    for (state_name, keys) in keys_to_add.pairs() do
+      for (key, r_id) in keys.pairs() do
+        _create_state_step(state_name, key, r_id)
+      end
+    end
+    for (state_name, keys) in keys_to_remove.pairs() do
+      for key in keys.values() do
+        try
+          let step = _keys_to_steps.remove_key(state_name, key)?
+          let step_id = _keys_to_step_ids.remove_key(state_name, key)?
+          (_router_registry as RouterRegistry)
+            .unregister_state_step(state_name, key, step_id, step)
+        else
+          Fail()
+        end
+      end
+    end
+    //!@ We should prove the updates are done before fulfilling
+    @printf[I32]("!@ StateStepCreator: fulfilling rollback topology promise\n".cstring())
+    promise(None)
+
+  fun ref _create_state_step(state_name: StateName, key: Key, id: RoutingId,
+    snapshot_id: (SnapshotId | None) = None)
+  =>
+    _state_key_known(state_name, key)
+
+    try
+      let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
+
+      let runner_builder = _state_runner_builders(state_name)?
+
+      let target_id_router = _target_id_routers(state_name)?
+      let state_step =
+        Step(_auth, runner_builder(
+          where event_log = _event_log, auth = _auth),
+          consume reporter, id, _event_log,
+          _recovery_replayer as RecoveryReconnecter,
+          _outgoing_boundaries, this
+          where target_id_router = target_id_router)
+
+      _pending_steps(state_step) =
+        _PendingStep(state_name, key, id, snapshot_id)
+      state_step.quick_initialize(this)
+    else
+      @printf[I32]("Failed to create new step\n".cstring())
       Fail()
     end
 

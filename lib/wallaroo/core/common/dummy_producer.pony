@@ -72,6 +72,11 @@ actor DummyProducer is Producer
   fun ref snapshot_state(snapshot_id: SnapshotId) =>
     None
 
-  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+  be prepare_for_rollback() =>
+    None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    snapshot_id: SnapshotId)
+  =>
     None
 

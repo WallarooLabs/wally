@@ -29,6 +29,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/snapshot"
 use "wallaroo/ent/spike"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
@@ -378,13 +379,17 @@ actor Connections is Cluster
       Fail()
     end
 
+  // TODO: Passing in snapshot target here is a hack because we currently
+  // do recovery initialization at the point boundary updates are complete.
+  // We need to move this out to another place.
   be update_boundaries(layout_initializer: LayoutInitializer,
-    recovering: Bool = false)
+    snapshot_target: (SnapshotId | None) = None)
   =>
-    _update_boundaries(layout_initializer, recovering)
+    _update_boundaries(layout_initializer, snapshot_target)
 
   fun _update_boundaries(layout_initializer: LayoutInitializer,
-    recovering: Bool = false, router_registry: (RouterRegistry | None) = None)
+    snapshot_target: (SnapshotId | None) = None,
+    router_registry: (RouterRegistry | None) = None)
   =>
     let out_bs_trn = recover trn Map[String, OutgoingBoundary] end
 
@@ -415,8 +420,13 @@ actor Connections is Cluster
     // boundaries should trigger initialization, but this is the point
     // at which initialization is possible for a joining or recovering
     // worker in a multiworker cluster.
-    if _is_joining or recovering then
-      layout_initializer.initialize(where recovering = recovering)
+    if _is_joining then
+      layout_initializer.initialize()
+    else
+      match snapshot_target
+      | let s_id: SnapshotId => layout_initializer.initialize(
+        where snapshot_target = s_id)
+      end
     end
 
   be create_connections(
@@ -523,7 +533,8 @@ actor Connections is Cluster
     router_registry.create_stateless_partition_routers_from_blueprints(
       spr_blueprints)
 
-  be recover_connections(layout_initializer: LayoutInitializer)
+  be recover_connections(layout_initializer: LayoutInitializer,
+    snapshot_target: SnapshotId)
   =>
     var addresses: Map[String, Map[String, (String, String)]] val =
       recover val Map[String, Map[String, (String, String)]] end
@@ -564,7 +575,8 @@ actor Connections is Cluster
         end
       end
 
-      _update_boundaries(layout_initializer where recovering = true)
+      _update_boundaries(layout_initializer
+        where snapshot_target = snapshot_target)
 
       @printf[I32]((_worker_name +
         ": Interconnections with other workers created.\n").cstring())

@@ -36,7 +36,7 @@ actor AutoscaleInitiator
 
     let barrier_promise = Promise[BarrierToken]
     barrier_promise
-      .next[None](recover this~autoscale_complete() end)
+      .next[None](recover this~autoscale_barrier_complete() end)
       .next[None]({(_: None) => autoscale_initiate_promise(None)})
 
     _barrier_initiator.inject_blocking_barrier(
@@ -57,7 +57,7 @@ actor AutoscaleInitiator
     _barrier_initiator.inject_barrier(_current_autoscale_tokens.resume_token,
       barrier_promise)
 
-  be autoscale_complete(barrier_token: BarrierToken) =>
+  be autoscale_barrier_complete(barrier_token: BarrierToken) =>
     if barrier_token != _current_autoscale_tokens.initial_token then Fail() end
     _autoscale_token_in_progress = false
 
