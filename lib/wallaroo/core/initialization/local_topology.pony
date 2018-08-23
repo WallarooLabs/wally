@@ -616,7 +616,15 @@ actor LocalTopologyInitializer is LayoutInitializer
   =>
     _target_id_router_blueprints(state_name) = target_id_router.blueprint()
 
+  be rollback_topology_graph(snapshot_id: SnapshotId, action: Promise[None])
+  =>
+    @printf[I32]("Rolling back topology graph.\n".cstring())
+    let local_keys = _local_keys_file.read_local_keys_and_truncate(
+      snapshot_id)
+    _router_registry.rollback_state_steps(local_keys, action)
+
   be recover_and_initialize(ws: Array[String] val,
+    target_snapshot_id: SnapshotId,
     cluster_initializer: (ClusterInitializer | None) = None)
   =>
     _recovering = true
@@ -648,11 +656,25 @@ actor LocalTopologyInitializer is LayoutInitializer
       @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
 
-  be register_state_step(state_name: StateName, key: Key, r_id: RoutingId) =>
-    _local_keys_file.add_key(state_name, key, r_id)
+  be register_state_step(state_name: StateName, key: Key, r_id: RoutingId,
+    snapshot_id: (SnapshotId | None) = None)
+  =>
+    // We only add an entry to the local keys file if this is part of a
+    // snapshot.
+    match snapshot_id
+    | let s_id: SnapshotId =>
+      _local_keys_file.add_key(state_name, key, r_id, s_id)
+    end
 
-  be unregister_state_step(state_name: StateName, key: Key) =>
-    _local_keys_file.remove_key(state_name, key)
+  be unregister_state_step(state_name: StateName, key: Key,
+    snapshot_id: (SnapshotId | None) = None)
+  =>
+    // We only add an entry to the local keys file if this is part of a
+    // snapshot.
+    match snapshot_id
+    | let s_id: SnapshotId =>
+      _local_keys_file.remove_key(state_name, key, s_id)
+    end
 
   fun ref _save_worker_names()
   =>
@@ -723,8 +745,17 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
-    recovering: Bool = false)
+    snapshot_target: (SnapshotId | None) = None)
   =>
+    _recovering =
+      match snapshot_target
+      | let id: SnapshotId =>
+        _recovery.update_snapshot_id(id)
+        true
+      else
+        false
+      end
+
     if _topology_initialized then
       ifdef debug then
         // Currently, recovery in a single worker cluster is a special case.
@@ -740,8 +771,6 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
       return
     end
-
-    _recovering = recovering
 
     if _is_joining then
       _initialize_joining_worker()
@@ -804,16 +833,20 @@ actor LocalTopologyInitializer is LayoutInitializer
             // Populate local keys file
             for (s_name, keys) in lks_val.pairs() do
               for (k, r_id) in keys.pairs() do
-                _local_keys_file.add_key(s_name, k, r_id)
+                _local_keys_file.add_key(s_name, k, r_id, 1)
               end
             end
 
             lks_val
           else
             @printf[I32]("Reading local keys from file.\n".cstring())
-            _local_keys_file.read_local_keys()
-            @printf[I32]("!@ Successfully read local keys from file.\n"
-              .cstring())
+            try
+              _local_keys_file.read_local_keys_and_truncate(
+                snapshot_target as SnapshotId)
+            else
+              Fail()
+              recover val Map[StateName, Map[Key, RoutingId] val] end
+            end
           end
 
         //!@ This needs to take account of keys
@@ -1632,7 +1665,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               error
             end
 
-          if not recovering then
+          if not _recovering then
             _connections.send_control("initializer", topology_ready_msg)
           end
         end

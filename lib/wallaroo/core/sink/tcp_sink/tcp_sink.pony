@@ -349,8 +349,7 @@ actor TCPSink is Sink
         let b_acker = _barrier_acker as BarrierSinkAcker
         if b_acker.higher_priority(srt) then
           @printf[I32]("!@ Sink clearing based on %s\n".cstring(), barrier_token.string().cstring())
-          b_acker.clear()
-          _message_processor = NormalSinkMessageProcessor(this)
+          _prepare_for_rollback()
         else
           @printf[I32]("!@ Sink NOT clearing based on %s\n".cstring(), barrier_token.string().cstring())
         end
@@ -401,7 +400,20 @@ actor TCPSink is Sink
     _event_log.snapshot_state(_sink_id, snapshot_id,
       recover val Array[ByteSeq] end)
 
-  be rollback(payload: ByteSeq val, event_log: EventLog) =>
+  be prepare_for_rollback() =>
+    _prepare_for_rollback()
+
+  fun ref _prepare_for_rollback() =>
+    try
+      (_barrier_acker as BarrierSinkAcker).clear()
+    else
+      Fail()
+    end
+    _message_processor = NormalSinkMessageProcessor(this)
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    snapshot_id: SnapshotId)
+  =>
     """
     There is nothing for a TCPSink to rollback to.
     """

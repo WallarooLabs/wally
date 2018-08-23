@@ -13,6 +13,7 @@ the License. You may obtain a copy of the License at
 use "buffered"
 use "collections"
 use "files"
+use "net"
 use "promises"
 use "time"
 use "wallaroo/core/common"
@@ -104,6 +105,9 @@ actor SnapshotInitiator is Initializable
     @printf[I32]("!@ SnapshotInitiator: remove_worker %s\n".cstring(), w.cstring())
     _workers.unset(w)
 
+  be lookup_next_snapshot_id(p: Promise[SnapshotId]) =>
+    p(_last_complete_snapshot_id + 1)
+
   be initiate_snapshot() =>
     _initiate_snapshot()
 
@@ -164,10 +168,22 @@ actor SnapshotInitiator is Initializable
   be event_log_snapshot_complete(worker: WorkerName, snapshot_id: SnapshotId)
   =>
     ifdef debug then
-      @printf[I32]("Snapshot_Initiator: Event Log SnapshotId %s Complete\n"
-        .cstring(), snapshot_id.string().cstring())
+      @printf[I32](("Snapshot_Initiator: Event Log SnapshotId %s complete " +
+        "for worker %s\n").cstring(), snapshot_id.string().cstring(),
+        worker.cstring())
     end
     _phase.event_log_snapshot_complete(worker, snapshot_id)
+
+  be inform_recovering_worker(w: WorkerName, conn: TCPConnection) =>
+    try
+      @printf[I32]("Sending recovery data to %\n".cstring(),
+        w.cstring())
+      let msg = ChannelMsgEncoder.inform_recovering_worker(_worker_name,
+        _last_complete_snapshot_id, _auth)?
+      conn.writev(msg)
+    else
+      Fail()
+    end
 
   fun ref event_log_write_snapshot_id(snapshot_id: SnapshotId) =>
     @printf[I32]("!@ SnapshotInitiator: event_log_write_snapshot_id()\n".cstring())
@@ -214,7 +230,6 @@ actor SnapshotInitiator is Initializable
 
   be initiate_rollback(recovery_action: Promise[SnapshotRollbackBarrierToken])
   =>
-    @printf[I32]("!@ !!!!SnapshotInitiator: initiate_rollback!!!!\n".cstring())
     if (_primary_worker == _worker_name) then
       if _current_snapshot_id == 0 then
         @printf[I32]("No snapshots were taken!\n".cstring())
@@ -228,10 +243,8 @@ actor SnapshotInitiator is Initializable
       let rollback_id = _last_rollback_id + 1
       _last_rollback_id = rollback_id
 
-      // TODO: To increase odds that snapshots were successfully flushed to
-      // disk, we're using the second to last snapshot if one exists. We
-      // should probably change this and address the question of whether a
-      // snapshot was successfully written out directly.
+      @printf[I32]("!@ !!!!SnapshotInitiator: initiate_rollback %s!!!!\n".cstring(), rollback_id.string().cstring())
+
       let token = SnapshotRollbackBarrierToken(rollback_id,
         _last_complete_snapshot_id)
       if _current_snapshot_id < _last_complete_snapshot_id then
@@ -247,13 +260,14 @@ actor SnapshotInitiator is Initializable
           Fail()
         end
       })
-      let resume_token = SnapshotRollbackResumeBarrierToken(_last_rollback_id,
+      let resume_token = SnapshotRollbackResumeBarrierToken(rollback_id,
         _last_complete_snapshot_id)
       _barrier_initiator.inject_blocking_barrier(token, barrier_action,
         resume_token)
     else
       try
-        let msg = ChannelMsgEncoder.initiate_rollback(_worker_name, _auth)?
+        let msg = ChannelMsgEncoder.initiate_rollback_barrier(_worker_name,
+          _auth)?
         _connections.send_control(_primary_worker, msg)
       else
         Fail()

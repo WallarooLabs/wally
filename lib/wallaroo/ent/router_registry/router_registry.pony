@@ -450,20 +450,32 @@ actor RouterRegistry
       source.add_boundary_builders(new_boundary_builders_sendable)
     end
 
-  be register_data_receiver(worker: String, dr: DataReceiver) =>
+  be register_data_receiver(worker: WorkerName, dr: DataReceiver) =>
     _data_receiver_map(worker) = dr
 
-  be register_state_step(step: Step, state_name: String, key: Key,
-    step_id: RoutingId)
+  be register_state_step(step: Step, state_name: StateName, key: Key,
+    step_id: RoutingId, snapshot_id: (SnapshotId | None) = None)
   =>
     @printf[I32]("!@ RouterRegistry: register_state_step, key: %s\n".cstring(), key.cstring())
     try
       (_local_topology_initializer as LocalTopologyInitializer)
-        .register_state_step(state_name, key, step_id)
+        .register_state_step(state_name, key, step_id, snapshot_id)
     else
       Fail()
     end
     _add_routes_to_state_step(step_id, step, key, state_name)
+
+  be unregister_state_step(state_name: StateName, key: Key, id: RoutingId,
+    step: Step, snapshot_id: (SnapshotId | None) = None)
+  =>
+    @printf[I32]("!@ RouterRegistry: unregister_state_step, key: %s\n".cstring(), key.cstring())
+    try
+      (_local_topology_initializer as LocalTopologyInitializer)
+        .unregister_state_step(state_name, key, snapshot_id)
+    else
+      Fail()
+    end
+    move_stateful_step_to_proxy(id, step, key, state_name, snapshot_id)
 
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
@@ -716,7 +728,7 @@ actor RouterRegistry
 
     let action = Promise[None]
     action.next[None]({(_: None) =>
-      _self.initiate_join_migration(new_workers)})
+      _self.prepare_join_migration(new_workers)})
     _autoscale_initiator.initiate_autoscale(action)
 
   fun ref stop_the_world_for_grow_migration(
@@ -837,6 +849,15 @@ actor RouterRegistry
     end
 
   /////////////////////////////////////////////////////////////////////////////
+  // ROLLBACK
+  /////////////////////////////////////////////////////////////////////////////
+  be rollback_state_steps(
+    rollback_keys: Map[StateName, Map[Key, RoutingId] val] val,
+    promise: Promise[None])
+  =>
+    _state_step_creator.rollback_state_steps(rollback_keys, promise)
+
+  /////////////////////////////////////////////////////////////////////////////
   // JOINING WORKER
   /////////////////////////////////////////////////////////////////////////////
   be worker_join(conn: TCPConnection, worker: String,
@@ -943,7 +964,9 @@ actor RouterRegistry
       Fail()
     end
 
-  be remote_join_migration_request(joining_workers: Array[String] val) =>
+  be remote_join_migration_request(joining_workers: Array[String] val,
+    snapshot_id: SnapshotId)
+  =>
     """
     Only one worker is contacted by all joining workers to indicate that a
     join is requested. That worker, when it's ready to begin step migration,
@@ -954,7 +977,8 @@ actor RouterRegistry
     if not ArrayHelpers[String].contains[String](joining_workers, _worker_name)
     then
       try
-        (_autoscale as Autoscale).join_migration_initiated(joining_workers)
+        (_autoscale as Autoscale).join_migration_initiated(joining_workers,
+          snapshot_id)
       else
         Fail()
       end
@@ -976,8 +1000,19 @@ actor RouterRegistry
       Fail()
     end
 
-  be initiate_join_migration(target_workers: Array[String] val) =>
+  be prepare_join_migration(target_workers: Array[String] val) =>
+    @printf[I32]("!@ prepare_join_migration\n".cstring())
+
+    let lookup_next_snapshot_id = Promise[SnapshotId]
+    lookup_next_snapshot_id.next[None](
+      _self~initiate_join_migration(target_workers))
+    _snapshot_initiator.lookup_next_snapshot_id(lookup_next_snapshot_id)
+
+  be initiate_join_migration(target_workers: Array[String] val,
+    next_snapshot_id: SnapshotId)
+  =>
     @printf[I32]("!@ initiate_join_migration\n".cstring())
+
     // Update BarrierInitiator about new workers
     for w in target_workers.values() do
       _barrier_initiator.add_worker(w)
@@ -987,14 +1022,17 @@ actor RouterRegistry
     // Inform other current workers to begin migration
     try
       let msg =
-        ChannelMsgEncoder.initiate_join_migration(target_workers, _auth)?
+        ChannelMsgEncoder.initiate_join_migration(target_workers,
+          next_snapshot_id, _auth)?
       _connections.send_control_to_cluster_with_exclusions(msg, target_workers)
     else
       Fail()
     end
-    begin_join_migration(target_workers)
+    begin_join_migration(target_workers, next_snapshot_id)
 
-  fun ref begin_join_migration(target_workers: Array[String] val) =>
+  fun ref begin_join_migration(target_workers: Array[String] val,
+    next_snapshot_id: SnapshotId)
+  =>
     """
     Begin partition migration to joining workers
     """
@@ -1011,7 +1049,8 @@ actor RouterRegistry
     var had_steps_to_migrate = false
     for state_name in _partition_routers.keys() do
       let had_steps_to_migrate_for_this_state =
-        _migrate_partition_steps(state_name, target_workers)
+        _migrate_partition_steps(state_name, target_workers,
+          next_snapshot_id)
       if had_steps_to_migrate_for_this_state then
         had_steps_to_migrate = true
       end
@@ -1104,7 +1143,7 @@ actor RouterRegistry
     _connections.ack_migration_batch_complete(sender_name)
 
   fun ref _migrate_partition_steps(state_name: String,
-    target_workers: Array[String] val): Bool
+    target_workers: Array[String] val, next_snapshot_id: SnapshotId): Bool
   =>
     """
     Called to initiate migrating partition steps to a target worker in order
@@ -1129,7 +1168,8 @@ actor RouterRegistry
       // step migration. We get the new router back as well as a Bool
       // indicating whether any steps were migrated.
       (let new_partition_router, let had_steps_to_migrate) =
-        partition_router.rebalance_steps_grow(_auth, consume tws, this)
+        partition_router.rebalance_steps_grow(_auth, consume tws, this,
+          next_snapshot_id)
       // TODO: It could be if had_steps_to_migrate is false then we don't
       // need to distribute the router because it didn't change. Investigate.
       _distribute_partition_router(new_partition_router)
@@ -1378,15 +1418,15 @@ actor RouterRegistry
   /////////////////////////////////////////////////////////////////////////////
   // Step moved off this worker or new step added to another worker
   /////////////////////////////////////////////////////////////////////////////
-  fun ref move_stateful_step_to_proxy(id: RoutingId, step: Step,
-    proxy_address: ProxyAddress, key: Key, state_name: String)
+  fun ref move_stateful_step_to_proxy(id: RoutingId, step: Step, key: Key,
+    state_name: StateName, snapshot_id: (SnapshotId | None) = None)
   =>
     """
     Called when a stateful step has been migrated off this worker to another
     worker
     """
     _remove_all_routes_to_step(id, step)
-    _move_step_to_proxy(id, state_name, key, proxy_address)
+    _move_step_to_proxy(id, state_name, key)
 
   fun ref _remove_all_routes_to_step(id: RoutingId, step: Step) =>
     for source in _sources.values() do
@@ -1394,8 +1434,8 @@ actor RouterRegistry
     end
     _data_router.remove_routes_to_consumer(id, step)
 
-  fun ref _move_step_to_proxy(id: RoutingId, state_name: String, key: Key,
-    proxy_address: ProxyAddress)
+  fun ref _move_step_to_proxy(id: RoutingId, state_name: StateName, key: Key,
+    snapshot_id: (SnapshotId | None) = None)
   =>
     """
     Called when a step has been migrated off this worker to another worker
@@ -1403,12 +1443,10 @@ actor RouterRegistry
     _remove_step_from_data_router(state_name, key)
     try
       (_local_topology_initializer as LocalTopologyInitializer)
-        .unregister_state_step(state_name, key)
+        .unregister_state_step(state_name, key, snapshot_id)
     else
       Fail()
     end
-    //!@
-    // _add_proxy_to_target_id_router(id, proxy_address)
 
   be add_state_proxy(id: RoutingId, proxy_address: ProxyAddress, key: Key,
     state_name: String)
