@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MD5="a8628454beece623ad6b3a85925d2f64  -"
+MD5="61e4ac6f602bc7b69948e6950b1ad18b  -"
 
 set -eEuo pipefail
 
@@ -47,7 +47,8 @@ python
 VALID_DISTRO_VERSIONS="
 centos-7
 rhel-7
-#ol-7
+ol-7
+amzn-2
 fedora-26
 fedora-27
 fedora-28
@@ -70,11 +71,11 @@ case "$OS" in
 
     *)
     echo "This script has only been tested on Linux. Wallaroo can be "
-    echo "installed on non-Linux environments using Docker. Please visit: "
-    echo "https://docs.wallaroolabs.com/book/getting-started/docker-setup.html"
-    echo "for instructions for a Python environment or please visit: "
-    echo "https://docs.wallaroolabs.com/book/getting-started/docker-setup.html"
-    echo "for instructions for a Go environment."
+    echo "installed on non-Linux environments using Docker or Vagrant. Please visit: "
+    echo "https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html"
+    echo "for instructions for a Python Wallaroo environment or please visit: "
+    echo "https://docs.wallaroolabs.com/book/go/getting-started/choosing-an-installation-option.html"
+    echo "for instructions for a Go Wallaroo environment."
     exit 1
     ;;
 esac
@@ -215,7 +216,7 @@ else
   WALLAROO_VERSION_DIRECTORY="wallaroo-${WALLAROO_VERSION}"
 fi
 
-WALLAROO_UP_DEST=$(readlink -f "${WALLAROO_UP_DEST_ARG}")
+WALLAROO_UP_DEST=$(readlink -m "${WALLAROO_UP_DEST_ARG}")
 
 get_distribution() {
   if [ -r /etc/upstream-release/lsb-release ]; then
@@ -355,6 +356,9 @@ install_required_dependencies() {
       if ! dpkg -l | grep -q '\Wgnupg2\W'; then
         PREREQS_TO_INSTALL="$PREREQS_TO_INSTALL gnupg2"
       fi
+      if ! dpkg -l | grep -q '\Wdirmngr\W'; then
+        PREREQS_TO_INSTALL="$PREREQS_TO_INSTALL dirmngr"
+      fi
       if [ "$PREREQS_TO_INSTALL" != "" ]; then
         run_cmd "apt-get update $REDIRECT" root
         run_cmd "apt-get install -y $PREREQS_TO_INSTALL $REDIRECT" root
@@ -362,12 +366,14 @@ install_required_dependencies() {
       case "$dist_version" in
         jessie|trusty)
           if ! apt-cache policy 2>&1 | grep wallaroolabs-debian > /dev/null 2>&1; then
+            # TODO: apt-key sometimes fails for transient reasons... make it re-try a few times before erroring out
             run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 379CE192D401AB61 $REDIRECT" root
             run_cmd "add-apt-repository 'deb https://wallaroo-labs.bintray.com/wallaroolabs-debian ${dist_version} main' $REDIRECT" root
           fi
         ;;
       esac
       if ! apt-cache policy 2>&1 | grep pony-language/ponylang-debian > /dev/null 2>&1; then
+        # TODO: apt-key sometimes fails for transient reasons... make it re-try a few times before erroring out
         run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E04F0923 B3B48BDA $REDIRECT" root
         run_cmd "add-apt-repository 'deb https://dl.bintray.com/pony-language/ponylang-debian ${dist_version} main' $REDIRECT" root
       fi
@@ -376,13 +382,19 @@ install_required_dependencies() {
       run_cmd "apt-get install -y $PKGS_TO_INSTALL $REDIRECT" root
     ;;
 
-    centos|rhel|ol)
+    centos|rhel|ol|amzn)
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL which"
       if [ "$PYTHON_INSTALL" == "true" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-devel"
       fi
       if [ "$PONYC_VERSION" != "" ]; then
         PKGS_TO_INSTALL="ponyc-${PONYC_VERSION} $PKGS_TO_INSTALL"
+      fi
+      if [ "$dist" == "amzn" ]; then
+        PKGS_TO_INSTALL="$PKGS_TO_INSTALL tar"
+      fi
+      if [ "$dist" == "ol" ]; then
+        run_cmd "yum-config-manager --enable ol7_optional_latest $REDIRECT" root
       fi
       if ! yum list installed -q yum-plugin-copr > /dev/null 2>&1; then
         run_cmd "yum makecache -y $REDIRECT" root
@@ -417,6 +429,11 @@ install_required_dependencies() {
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL pony-stable make gcc-c++ snappy-devel openssl-devel lz4-devel"
       run_cmd "dnf makecache -y $REDIRECT" root
       run_cmd "dnf install -y $PKGS_TO_INSTALL $REDIRECT" root
+    ;;
+
+    *)
+      echo "ERROR! Unknown distribution: $dist with version $dist_version"
+      exit 1
     ;;
 
   esac
@@ -478,7 +495,16 @@ configure_wallaroo() {
   ## download/untar wallaroo release tgz from bintray
   WGET_URL_SUFFIX="?source=${WALLAROO_UP_SOURCE:-wallaroo-up}&install=${INSTALL_TYPE:-initial}&install_type=${WALLAROO_UP_INSTALL_TYPE}"
   WGET_URL_SUFFIX=
-  run_cmd "wget $QUIET -O $wallaroo_source_archive 'https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${wallaroo_source_archive}${WGET_URL_SUFFIX}' $REDIRECT"
+  WALLAROO_SOURCE_TGZ_URL="https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${wallaroo_source_archive}${WGET_URL_SUFFIX}"
+  if [[ "${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}" == "" ]]; then
+    run_cmd "wget $QUIET -O $wallaroo_source_archive '${WALLAROO_SOURCE_TGZ_URL}' $REDIRECT"
+  else
+    if [[ "${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}" == "http://"* ]] ; then
+      run_cmd "wget $QUIET -O $wallaroo_source_archive '${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}' $REDIRECT"
+    else
+      run_cmd "cp ${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-} $wallaroo_source_archive $REDIRECT"
+    fi
+  fi
   run_cmd "mkdir ${WALLAROO_VERSION_DIRECTORY} $REDIRECT"
   run_cmd "tar -C ${WALLAROO_VERSION_DIRECTORY} --strip-components=1 -xzf $wallaroo_source_archive $REDIRECT"
   run_cmd "rm $wallaroo_source_archive $REDIRECT"
@@ -515,12 +541,26 @@ configure_wallaroo() {
   fi
 
   ## download/install monhub appImage
-  run_cmd "wget $QUIET -O $metrics_ui_appimage 'https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${metrics_ui_appimage}${WGET_URL_SUFFIX}' $REDIRECT"
+  WALLAROO_METRICS_UI_APPIMAGE_URL="https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${metrics_ui_appimage}${WGET_URL_SUFFIX}"
+  if [[ "${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}" == "" ]]; then
+    run_cmd "wget $QUIET -O $metrics_ui_appimage '${WALLAROO_METRICS_UI_APPIMAGE_URL}' $REDIRECT"
+  else
+    if [[ "${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}" == "http://"* ]] ; then
+      run_cmd "wget $QUIET -O $metrics_ui_appimage '${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}' $REDIRECT"
+    else
+      run_cmd "cp ${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-} $metrics_ui_appimage $REDIRECT"
+    fi
+  fi
   run_cmd "chmod +x $metrics_ui_appimage $REDIRECT"
 
   # extract the appimage because metrics_ui likes to be able to write to it's directories and also because appimages don't work in docker
   run_cmd "./$metrics_ui_appimage --appimage-extract $REDIRECT"
   run_cmd "mv squashfs-root bin/metrics_ui $REDIRECT"
+  if [[ "$dist" != "fedora" ]]; then
+    if [[ "$dist_version" != "buster" ]]; then
+      run_cmd "rm bin/metrics_ui/usr/lib/libtinfo.so.5"
+    fi
+  fi
   run_cmd "sed -i 's/sleep 4/sleep 0/' bin/metrics_ui/AppRun"
   run_cmd "rm $metrics_ui_appimage $REDIRECT"
 
