@@ -12,6 +12,7 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+from select import select
 import socket
 import struct
 import time
@@ -49,33 +50,41 @@ class SinkExtension(object):
     def __init__(self, decoder):
         self._decoder = decoder
         self._acceptor = None
+        self._connections = []
 
     def listen(self, host, port, backlog = 0):
         acceptor = socket.socket()
         acceptor.bind((host, port))
         acceptor.listen(backlog)
         self._acceptor = acceptor
+        self._connections.append(acceptor)
 
-    def accept(self):
-        conn, addr = self._acceptor.accept()
-        return SinkExtensionConnection(self, conn, addr, self._decoder)
+    def read(self, timeout=None):
+        while True:
+            readable, _, exceptional = select(self._connections, [], self._connections, timeout)
+            for socket in exceptional:
+                if socket is self._acceptor:
+                    socket.close()
+                    raise UnexpectedSocketError()
+                else:
+                    self._connections.remove(socket)
+                    socket.close()
+            for socket in readable:
+                if socket is self._acceptor:
+                    conn, _addr = socket.accept()
+                    conn.setblocking(0)
+                    self._connections.append(conn)
+                else:
+                    header = socket.recv(self._decoder.header_length())
+                    if not header:
+                        socket.close()
+                        self._connections.remove(socket)
+                        return None
+                    expected = self._decoder.payload_length(header)
+                    # TODO: implement partial recv buffers.
+                    data = socket.recv(expected)
+                    return self._decoder._message_decoder(data)
 
 
-class SinkExtensionConnection(object):
-
-    def __init__(self, driver, conn, from_addr, decoder):
-        self.driver = driver
-        self._conn = conn
-        self._from_addr = from_addr
-        self._decoder = decoder
-
-    def read(self):
-        # These waits should be buffered but there is tuning involved here
-        # and it might be better to move this to python 3's asyncio anyway
-        header = self._conn.recv(4, socket.MSG_WAITALL)
-        if not header: return None
-        expected = struct.unpack('>I', header)[0]
-        data = self._conn.recv(expected, socket.MSG_WAITALL)
-        # TODO: consider a better way to conditionally unwrap the frame
-        # since we're manually managing the frame with the socket.
-        return self._decoder._message_decoder(data)
+class UnexpectedSocketError(Exception):
+    pass

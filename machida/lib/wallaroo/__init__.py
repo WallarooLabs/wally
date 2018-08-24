@@ -12,18 +12,9 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-<<<<<<< HEAD
-from functools import wraps
-<<<<<<< HEAD
-import pickle
-=======
-import cPickle
->>>>>>> Refactor base wallaroo.py library into modules
-=======
 import pickle
 import struct
 import sys
->>>>>>> Fix merge with master
 
 from builder import (ApplicationBuilder, _validate_arity_compatability)
 
@@ -46,15 +37,6 @@ from .kafka import (
     parse_sink_options as parse_kafka_sink_options,
     decoder as kafka_decoder,
     encoder as kafka_encoder,
-)
-
-from .byoi import (
-    SourceConfig as BYOISourceConfig,
-    SinkConfig as BYOISinkConfig,
-    decoder,
-    encoder,
-    parse_input_addrs as byoi_parse_input_addrs,
-    parse_output_addrs as byoi_parse_output_addrs,
 )
 
 
