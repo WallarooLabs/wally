@@ -28,11 +28,11 @@ def parse_count_stream_addr(args):
     return tuple(output_addr.split(':'))
 
 
-@wallaroo.experimental.stream_message_decoder
+@wallaroo.experimental.streaming_message_decoder
 def count_decoder(message):
     return cPickle.loads(message)
 
 
-@wallaroo.experimental.stream_message_encoder
+@wallaroo.experimental.streaming_message_encoder
 def count_encoder(message):
     return cPickle.dumps((message.word.encode("utf-8"), message.count), -1)
