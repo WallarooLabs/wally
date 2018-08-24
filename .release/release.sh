@@ -91,6 +91,7 @@ commit_version_update() {
   git add vagrant/bootstrap.sh
   git add misc/wallaroo-up.sh
   git add misc/activate
+  git add Dockerfile
   git commit -m "Update version for $for_version release"
 }
 
