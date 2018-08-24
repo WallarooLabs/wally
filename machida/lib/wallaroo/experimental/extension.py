@@ -17,7 +17,7 @@ import struct
 import time
 
 
-class SourceDriver(object):
+class SourceExtension(object):
 
     def __init__(self, encoder):
         self._encoder = encoder
@@ -44,7 +44,7 @@ class SourceDriver(object):
         self._conn.sendall(payload)
 
 
-class SinkDriver(object):
+class SinkExtension(object):
 
     def __init__(self, decoder):
         self._decoder = decoder
@@ -58,10 +58,10 @@ class SinkDriver(object):
 
     def accept(self):
         conn, addr = self._acceptor.accept()
-        return SinkDriverConnection(self, conn, addr, self._decoder)
+        return SinkExtensionConnection(self, conn, addr, self._decoder)
 
 
-class SinkDriverConnection(object):
+class SinkExtensionConnection(object):
 
     def __init__(self, driver, conn, from_addr, decoder):
         self.driver = driver
@@ -79,11 +79,3 @@ class SinkDriverConnection(object):
         # TODO: consider a better way to conditionally unwrap the frame
         # since we're manually managing the frame with the socket.
         return self._decoder._message_decoder(data)
-
-
-class Session(object):
-    # TODO: port over some kind of state management to this revision using
-    # sqlite or some kind of simple pickle file until a plan is made for
-    # managing this within wallaroo itself. For now we'll keep this empty
-    # since it's not required for our current demonstration needs.
-    pass

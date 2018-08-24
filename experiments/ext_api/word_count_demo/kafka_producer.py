@@ -15,11 +15,11 @@ def publish_counts(conn, producer, topic):
         producer.send(topic, key=word, value=count)
 
 count_stream_addr = parse_count_stream_addr(sys.argv)
-driver = CountStream(*count_stream_addr).driver()
+extension = CountStream(*count_stream_addr).extension()
 params = parse_kafka_params(sys.argv)
 producer = KafkaProducer(bootstrap_servers=params.bootstrap_broker)
 
 while True:
-    conn = driver.accept()
+    conn = extension.accept()
     thread = threading.Thread(target=publish_counts, args=(conn, producer, params.topics[0]))
     thread.start()

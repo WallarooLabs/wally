@@ -8,8 +8,8 @@ from text_documents import TextStream, parse_text_stream_addr
 params = parse_kafka_params(sys.argv)
 consumer = KafkaConsumer(params.topics, bootstrap_servers=params.bootstrap_broker, group_id=params.consumer_group)
 text_stream_addr = parse_text_stream_addr(sys.argv)
-driver = TextStream(*text_stream_addr).driver()
+extension = TextStream(*text_stream_addr).extension()
 
 print("Consuming topic 'text'")
 for message in consumer:
-    driver.write(message.value, partition=message.partition, sequence=message.sequence)
+    extension.write(message.value, partition=message.partition, sequence=message.sequence)

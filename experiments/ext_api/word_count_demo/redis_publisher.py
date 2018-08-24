@@ -14,10 +14,10 @@ def publish_counts(conn, redis):
 
 
 count_stream_addr = parse_count_stream_addr(sys.argv)
-driver = CountStream(*count_stream_addr).driver()
+extension = CountStream(*count_stream_addr).extension()
 redis = Redis()
 
 while True:
-    conn = driver.accept()
+    conn = extension.accept()
     thread = threading.Thread(target=publish_counts, args=(conn, redis))
     thread.start()

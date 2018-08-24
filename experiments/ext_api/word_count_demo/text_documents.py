@@ -16,10 +16,10 @@ class TextStream(object):
             port=self.port,
             decoder=text_decoder)
 
-    def driver(self):
-        driver = wallaroo.experimental.SourceDriver(text_encoder)
-        driver.connect(self.host, self.port)
-        return driver
+    def extension(self):
+        extension = wallaroo.experimental.SourceExtension(text_encoder)
+        extension.connect(self.host, self.port)
+        return extension
 
 
 def parse_text_stream_addr(args):

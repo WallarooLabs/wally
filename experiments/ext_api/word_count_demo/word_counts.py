@@ -15,10 +15,10 @@ class CountStream(object):
             port = self.port,
             encoder = count_encoder)
 
-    def driver(self):
-        driver = wallaroo.experimental.SinkDriver(count_decoder)
-        driver.listen('127.0.0.1', 7200, backlog=16)
-        return driver
+    def extension(self):
+        extension = wallaroo.experimental.SinkExtension(count_decoder)
+        extension.listen('127.0.0.1', 7200, backlog=16)
+        return extension
 
 
 def parse_count_stream_addr(args):

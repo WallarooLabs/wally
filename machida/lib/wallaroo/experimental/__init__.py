@@ -19,4 +19,4 @@ from .stream import (
     StreamDecoderError
 )
 from .builder import ExternalSource, ExternalSink
-from .driver import SourceDriver, SinkDriver, Session
+from .extension import SourceExtension, SinkExtension
