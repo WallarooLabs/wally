@@ -8,12 +8,14 @@ import random
 import re
 import struct
 
-from integration import (ex_validate,
-                         files_generator,
-                         iter_generator,
-                         pipeline_test,
-                         sequence_generator,
-                         set_logging)
+from cluster import runner_data_format
+from external import ex_validate
+from end_points import (files_generator,
+                        iter_generator,
+                        sequence_generator)
+from integration import pipeline_test
+from logger import (INFO2,
+                    set_logging)
 
 set_logging(name='integration', level=logging.DEBUG)
 
@@ -532,10 +534,8 @@ def CLI():
                 logging.info("Validation command '%s' completed successfully",
                              ' '.join(cmd))
         else:
-            outputs = [(o[0], o[1]) for o in outputs]
-            outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
-            logging.error("Application outputs:\n===\n{}\n===\n"
-                          .format(outputs))
+            outputs = runner_data_format(outputs)
+            logging.error("Application outputs:\n{}".format(outputs))
             logging.error("Validation command '%s' failed with the output:\n"
                           "--\n%s\nThe application output is shown above.\n",
                           ' '.join(cmd), out)

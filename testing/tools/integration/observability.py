@@ -19,12 +19,23 @@ import logging
 import time
 from types import FunctionType
 from functools import partial
+import re
 import traceback
 import sys
+import time
 
-from integration import (ex_validate,
-               StoppableThread,
-               TimeoutError)
+from errors import (DuplicateKeyError,
+                    TimeoutError)
+from external import ex_validate
+from logger import INFO2
+from stoppable_thread import StoppableThread
+
+
+# Make string instance checking py2 and py3 compatible below
+try:
+    basestring
+except:
+    basestring = str
 
 
 class ObservabilityTimeoutError(TimeoutError):
@@ -46,13 +57,13 @@ QUERY_TYPES = {
     'state-entity-query': 'state-entity-query'}
 
 
-def external_sender_query(host, port, query_type):
+def external_sender_query(addr, query_type):
     """
     Use external_sender to query the cluster for observability data.
     """
     t = QUERY_TYPES[query_type]
-    cmd = ('external_sender --external {}:{} --type {} --json'
-           .format(host, port, t))
+    cmd = ('external_sender --external {} --type {} --json'
+           .format(addr, t))
     success, stdout, retcode, cmd = ex_validate(cmd)
     try:
         assert(success)
@@ -62,12 +73,12 @@ def external_sender_query(host, port, query_type):
     return stdout
 
 
-def partitions_query(host, port):
+def partitions_query(addr):
     """
     Query the worker at the given address for its partition routing
     information.
     """
-    stdout = external_sender_query(host, port, 'partition-query')
+    stdout = external_sender_query(addr, 'partition-query')
     try:
         return json.loads(stdout)
     except Exception as err:
@@ -85,25 +96,29 @@ def multi_states_query(addresses):
     """
     responses = {}
     # collect responses
-    for name, (host, port) in addresses:
+    for name, addr in addresses:
         try:
-            resp = external_sender_query(host, port, 'state-entity-query')
+            resp = external_sender_query(addr, 'state-entity-query')
+        except Exception as err:
+            logging.error(err)
+            raise err
+        try:
             # try to parse responses
             responses[name] = json.loads(resp)
         except Exception as err:
             e = ObservabilityResponseError(
-                "Failed to deserialize observability response from {}:\n{!r}"
-                .format(d['stdout']))
+                "Failed to deserialize observability response from {} ({}):\n{!r}"
+                .format(name, addr, resp))
             logging.error(e)
             raise
     return responses
 
 
-def cluster_status_query(host, port):
+def cluster_status_query(addr):
     """
     Query the worker at the given address for its cluster status information.
     """
-    stdout = external_sender_query(host, port, 'cluster-status')
+    stdout = external_sender_query(addr, 'cluster-status')
     try:
         return json.loads(stdout)
     except Exception as err:
@@ -113,12 +128,12 @@ def cluster_status_query(host, port):
         raise
 
 
-def partition_counts_query(host, port):
+def partition_counts_query(addr):
     """
     Query the worker at the given address for its partition counts
     information.
     """
-    stdout = external_sender_query(host, port, 'partition-counts')
+    stdout = external_sender_query(addr, 'partition-counts')
     try:
         return json.loads(stdout)
     except Exception as err:
@@ -128,11 +143,11 @@ def partition_counts_query(host, port):
         raise
 
 
-def state_entity_query(host, port):
+def state_entity_query(addr):
     """
     Query the worker at the given address for its state entities
     """
-    stdout = external_sender_query(host, port, 'state-entity-query')
+    stdout = external_sender_query(addr, 'state-entity-query')
     try:
         return json.loads(stdout)
     except Exception as err:
@@ -186,14 +201,45 @@ class ObservabilityNotifier(StoppableThread):
         self.timeout = timeout
         self.error = None
         if isinstance(tests, (list, tuple)):
-            self.tests = tests
+            # make sure it's not a (test, args kwargs) tuple
+            if len(tests) in (2,3):
+                if isinstance(tests[1], (list, tuple, dict)):
+                    self.tests = [tests]
+            else:
+                self.tests = tests
         else:
             self.tests = [tests]
-        self.tests = [(t, get_func_name(t)) for t in self.tests]
+        self.tests = [self._normalize_test_tuple(t) for t in self.tests]
         self.query_func = query_func
-        self.query_args = query_args
+        if isinstance(query_args, (bytes, basestring)):
+            self.query_args = [query_args]
+        else:
+            self.query_args = query_args
         self.query_func_name = get_func_name(query_func)
         self.period = period
+
+    def _normalize_test_tuple(self, t):
+        if isinstance(t, (tuple,list)):
+            name = get_func_name(t[0])
+            test = t[0]
+            args = tuple()
+            kwargs = tuple()
+            if len(t) == 1:
+                pass
+            elif len(t) == 2:
+                if isinstance(t[1], dict):
+                    kwargs = tuple(t[1].items())
+                else:
+                    args = tuple(t[1])
+            elif len(t) == 3:
+                args = tuple(t[1])
+                kwargs = tuple(t[2].items())
+            else:
+                raise ValueError("Test tuple must be "
+                                 "(test[, args[, kwargs]])")
+            return (name, test, args, kwargs)
+        else:
+            return (get_func_name(t), t, tuple(), frozenset())
 
     def run(self):
         started = time.time()
@@ -217,7 +263,7 @@ class ObservabilityNotifier(StoppableThread):
             errors = {}
             for t in self.tests:
                 try:
-                    t_res = t[0](deepcopy(query_result))
+                    t_res = t[1](deepcopy(query_result), *t[2], **dict(t[3]))
                 except Exception as err:
                     tb = traceback.format_exc()
                     errors[t] = (err, tb)
@@ -235,7 +281,7 @@ class ObservabilityNotifier(StoppableThread):
                     " following tests"
                     " still failing:\n{}".format(self.timeout, "\n".join((
                         " - {}: {}({})\n{}".format(
-                            t[1], type(err).__name__,
+                            t[0], type(err).__name__,
                             str(err),
                             '\n'.join((
                                 "  -> {}".format(s) for s in tb.splitlines())))
@@ -245,3 +291,116 @@ class ObservabilityNotifier(StoppableThread):
                 self.stop()
                 break
             time.sleep(self.period)
+
+
+class RunnerReadyChecker(StoppableThread):
+    __base_name__ = 'RunnerReadyChecker'
+    pattern = re.compile('Application has successfully initialized')
+
+    def __init__(self, runners, timeout=30):
+        super(RunnerReadyChecker, self).__init__()
+        self.runners = runners
+        self.name = self.__base_name__
+        self._path = self.runners[0].file.name
+        self.timeout = timeout
+        self.error = None
+
+    def run(self):
+        with open(self._path, 'rb') as r:
+            started = time.time()
+            while not self.stopped():
+                r.seek(0)
+                stdout = r.read()
+                if not stdout:
+                    time.sleep(0.1)
+                    continue
+                else:
+                    if self.pattern.search(stdout):
+                        logging.debug('Application reports it is ready.')
+                        self.stop()
+                        break
+                if time.time() - started > self.timeout:
+                    outputs = runners_output_format(self.runners)
+                    self.error = TimeoutError(
+                        'Application did not report as ready after {} '
+                        'seconds. It had the following outputs:\n===\n{}'
+                        .format(self.timeout, outputs))
+                    self.stop()
+                    break
+
+
+class RunnerChecker(StoppableThread):
+    __base_name__ = 'RunnerChecker'
+
+    def __init__(self, runner, patterns, timeout=30, start_from=0):
+        super(RunnerChecker, self).__init__()
+        self.name = self.__base_name__
+        self.runner = runner
+        self.runner_name = runner.name
+        self.start_from = start_from
+        self._path = runner.file.name
+        self.timeout = timeout
+        self.error = None
+        if isinstance(patterns, (list, tuple)):
+            self.patterns = patterns
+        else:
+            self.patterns = [pattern]
+        self.compiled = [re.compile(p) for p in patterns]
+
+    def run(self):
+        with open(self._path, 'rb') as r:
+            last_match = self.start_from
+            started = time.time()
+            while not self.stopped():
+                r.seek(last_match)
+                stdout = r.read()
+                if not stdout:
+                    time.sleep(0.1)
+                    continue
+                else:
+                    match = self.compiled[0].search(stdout)
+                    if match:
+                        logging.debug('Pattern %r found in runner STDOUT.'
+                                      % match.re.pattern)
+                        self.compiled.pop(0)
+                        last_match = self.start_from
+                        if self.compiled:
+                            continue
+                        self.stop()
+                        break
+                if time.time() - started > self.timeout:
+                    r.seek(self.start_from)
+                    stdout = r.read()
+                    self.error = TimeoutError(
+                        'Runner {!r} did not have patterns {!r}'
+                        ' after {} seconds.'
+                        .format(self.runner_name,
+                                [rx.pattern for rx in self.compiled],
+                                self.timeout))
+                    self.stop()
+                    break
+
+
+####################################
+# Query response parsing functions #
+####################################
+def joined_partition_query_data(responses):
+    """
+    Join partition query responses from multiple workers into a single
+    partition map.
+    Raise error on duplicate partitions.
+    """
+    steps = {}
+    for worker in responses.keys():
+        for step in responses[worker].keys():
+            if step not in steps:
+                steps[step] = {}
+            for part in responses[worker][step]:
+                if part in steps[step]:
+                    dup0 = worker
+                    dup1 = steps[step][part]
+                    raise DuplicateKeyError("Found duplicate keys! Step: {}, "
+                                            "Key: {}, Loc1: {}, Loc2: {}"
+                                            .format(step, part, dup0, dup1))
+                steps[step][part] = worker
+    return steps

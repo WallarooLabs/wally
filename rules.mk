@@ -53,7 +53,7 @@ SPACE := $(EMPTY) $(EMPTY)
 export PYTHONPATH = .:$(integration_path):$(wallaroo_python_path):$(SEQUENCE_WINDOW_PYTHON_PATH):$(TESTING_ALPHABET_PYTHON_PATH)
 ORIGNAL_PATH := $(PATH)
 export PATH = $(ORIGNAL_PATH):$(subst :$(SPACE),:,$(subst $(SPACE):,:,$(strip $(CUSTOM_PATH))))
-CUSTOM_PATH = $(integration_bin_path):$(machida_bin_path)
+CUSTOM_PATH = $(integration_bin_path):$(machida_bin_path):$(EXTERNAL_SENDER_PATH)
 
 # initialize default for some normal targets and variables
 build-wallarooroot-all :=
@@ -340,6 +340,11 @@ push-docker-pony-all: push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(ab
 build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): $(abspath $(1:%/=%))/$(notdir $(abspath $(1:%/=%)))
 .PHONY: build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
+endef
+
+# rule to add `build-testing-tools-external_sender` to all integrtion-test commands
+define integration-tests-external_sender-goal
+integration-tests-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))): build-testing-tools-external_sender build-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))
 endef
 
 # rule to generate targets for test-* for devs to use
@@ -754,6 +759,9 @@ ifneq ($($(ABS_PREV_MAKEFILE)_PONY_TARGET),false)
     $(eval $(call pony-clean-goal,$(PREV_PATH)))
   endif
 endif
+
+# Add external_sender dependency to integration-tests-*
+$(eval $(call integration-tests-external_sender-goal,$(PREV_PATH)))
 
 # if there's a exs source file, create the appropriate rules for it unless disabled
 ifneq ($($(ABS_PREV_MAKEFILE)_EXS_TARGET),false)

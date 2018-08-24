@@ -133,7 +133,7 @@ install_python_dependencies() {
   echo "** Installing python dependencies"
 
   echo "Installing pytest"
-  sudo python2 -m pip install pytest==3.2.2
+  sudo python2 -m pip install pytest==3.7.4
   echo "Install enum"
   sudo python2 -m pip install --upgrade pip enum34
 

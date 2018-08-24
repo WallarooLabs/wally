@@ -52,7 +52,7 @@ restart_without_resilience_tests:
 else
 restart_without_resilience_tests:
 	cd $(RESTART_WITHOUT_RESILIENCE_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose restart_without_resilience.py $(pytest_exp)
+	python2 -m pytest --color=yes --tb=native --verbose --exitfirst restart_without_resilience.py $(pytest_exp)
 endif
 
 endif
