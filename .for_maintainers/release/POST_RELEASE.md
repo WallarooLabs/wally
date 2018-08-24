@@ -2,7 +2,7 @@
 
 This document is aimed at members of the Wallaroo team who might be completing the Wallaroo release process. It serves as a checklist that can take your through the post release process step-by-step.
 
-To learn more about our release process, see [RELEASE.md].
+To learn more about our release process, see [RELEASE.md](RELEASE.md).
 
 ## Drafting a new Github Release
 

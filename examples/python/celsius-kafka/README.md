@@ -95,7 +95,7 @@ docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
 
 **Note:** The `./cluster up 1` command outputs `Host IP used for Kafka Brokers is <YOUR_HOST_IP>`. You will need to use this IP address for the `kafka_source_brokers` and `kafka_sink_brokers` arguments when starting `machida` within Docker in order to communicate with the cluster running on your host machine.
 
-#### Set up a listener to monitor the Kafka topic to which you would the application to publish results. We usually use `kafkacat`.
+#### Set up a listener to monitor the Kafka topic the application will publish results to. We usually use `kafkacat`.
 
 `kafkacat` can be installed via:
 

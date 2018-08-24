@@ -8,13 +8,9 @@ The following files have a reference to a specific version of Ponyc and will nee
 
 - `.release/bootstrap.sh`: version referenced in the following variable declaration `export PONYC_VERSION=`
 
-- `Dockerfile`: version referenced following the `ENV` declaration of `PONYC_VERSION`
-
 - `.travis.yml`: version referenced following the `PONYC_VERSION` declaration under `env: global:`
 
 - `.ci-dockerfiles/ci-standard/Dockerfile`: version referenced following the `ENV` declaration of `PONYC_VERSION`
-
-- `book/getting-started/linux-setup.md`: version referenced in the `sudo apt-get -V install ponyc=` command.
 
 ## Updating the Circle CI Docker Image
 
@@ -25,7 +21,5 @@ Once the CI Docker image has been successfully pushed, you will need to update t
 ## Files to be Updated at a Later Time
 
 The following files reference a specific Ponyc version but are tied to a specific commit in Wallaroo. Due to this, the Ponyc version should only be updated once the commit in Wallaroo that is referenced is on an updated version of Ponyc.
-
-- `vagrant/bootstrap.sh`: version referenced in the following variable declaration `export PONYC_VERSION=`
 
 - `demos/bootstrap.sh`: version referenced in the `apt-get install -y ...` command after `ponyc=`

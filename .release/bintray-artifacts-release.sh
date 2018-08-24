@@ -28,7 +28,7 @@ verify_branch() {
 verify_wallaroo_dir() {
   ## Verifies that the script is being run from the wallaroo root directory
   echo "Verifying script is being run from the wallaroo root directory..."
-  if [[ `basename $PWD` != "wallaroo" ]]
+  if [[ "$(basename "$PWD")" != "wallaroo" ]]
   then
     echo "The $0 script must be run from the root wallaroo directory."
     exit 1
@@ -45,7 +45,7 @@ verify_version() {
 
 verify_commit_on_branch() {
   echo "Verfying commit $commit is on branch: $BRANCH..."
-  if ! git branch --contains $commit 2> /dev/null | grep $BRANCH
+  if ! git branch --contains "$commit" 2> /dev/null | grep "$BRANCH"
   then
     echo "Commit $commit is not on branch: $BRANCH"
     exit 1
@@ -67,7 +67,7 @@ verify_args() {
 }
 
 verify_no_local_changes() {
-  if ! git diff --exit-code --quiet $BRANCH origin/$BRANCH
+  if ! git diff --exit-code --quiet "$BRANCH" "origin/$BRANCH"
   then
     echo "ERROR! There are local-only changes on branch '$BRANCH'!"
     exit 1
@@ -82,7 +82,7 @@ verify_no_local_changes() {
 
 checkout_to_commit() {
   echo "Checking out to commit: $commit ..."
-  git checkout $commit
+  git checkout "$commit"
 }
 
 set_artifact_names() {
@@ -102,80 +102,23 @@ build_metrics_ui_appimage() {
   bintray_metrics_ui_appimage=$(curl -s "https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version}/" grep -Po "(?<=>)$metrics_ui_appimage(?=<)" || echo "0")
   if [[ "$bintray_metrics_ui_appimage" == "$metrics_ui_appimage" ]]
   then
-    echo "Appimage for metrics ui already exists in bintray: $metrics_ui_appimage"
-  else
-    ## Check to see if image exists prior to building
-    if [[ ! -e "$metrics_ui_appimage" ]]; then
-      ## Build Metrics UI if not already built
-      mkdir -p metrics_ui.AppDir/usr/
-
-      cat > ./metrics_ui.desktop <<\EOF
-[Desktop Entry]
-Name=Wallaroo Metrics UI
-Icon=metrics_ui
-Type=Application
-NoDisplay=true
-Exec=metrics_reporter_ui
-Terminal=true
-Categories=Development;
-EOF
-
-    cat > ./AppRun <<\EOF
-#!/bin/sh
-HERE=$(dirname "$(readlink -f "${0}")")
-"${HERE}"/usr/bin/metrics_reporter_ui $@
-if [ "$1" = "start" ]; then
-  sleep 4
-fi
-if [ "$1" = "stop" ]; then
-  PID_TO_KILL=$(ps aux | grep '/usr/erts-9.1/bin/epmd' | grep -v grep | awk '{print $2}')
-  if [ "$PID_TO_KILL" != "" ]; then
-    kill $PID_TO_KILL
-  fi
-fi
-EOF
-
-      chmod a+x ./AppRun
-
-      curl https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -o linuxdeploy-x86_64.AppImage -J -L
-      chmod +x linuxdeploy-x86_64.AppImage
-
-      # set up icon/logo for appimage
-      cp .release/metrics_ui_appimage_icon.png metrics_ui.png
-
-      # remove any existing build artifacts
-      sudo make clean
-
-      # can't run appimages in docker; need to extract and then run
-      sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "./linuxdeploy-x86_64.AppImage --appimage-extract"
-
-      # need to run in CentOS 7 docker image
-      sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "make release-monitoring_hub-apps-metrics_reporter_ui"
-
-      # put files into AppDir
-      sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "cd metrics_ui.AppDir/usr && tar -xvzf ../../monitoring_hub/apps/metrics_reporter_ui/_build/prod/rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz"
-
-      # build appimage
-      sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "ARCH=x86_64 ./squashfs-root/AppRun --appdir metrics_ui.AppDir --custom-apprun=AppRun --desktop-file=metrics_ui.desktop --icon-file=metrics_ui.png"
-      ## temporary hack; remove once linuxdeploy works correctly
-      sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "mv metrics_ui.AppDir/usr/lib/libcrypto.so.10 metrics_ui.AppDir/usr/lib/crypto-4.1/priv/lib/"
-
-      sudo docker run -v "$(pwd):/home/wally" -w /home/wally --rm wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 sh -c "ARCH=x86_64 ./squashfs-root/AppRun --appdir metrics_ui.AppDir --custom-apprun=AppRun --desktop-file=metrics_ui.desktop --icon-file=metrics_ui.png --output appimage"
-
-      rm linuxdeploy-x86_64.AppImage
-      sudo rm -rf squashfs-root
-      sudo rm -rf metrics_ui.AppDir
-      rm AppRun
-      rm metrics_ui.desktop
-      rm metrics_ui.png
-
-      sudo make clean
-
-      mv Wallaroo_Metrics_UI-x86_64.AppImage $metrics_ui_appimage
-    else
-      echo "Metrics UI appimage: $metrics_ui_appimage already exists locally, skipping build step..."
+    if [[ $BRANCH == "release" ]]
+    then
+      echo "Appimage for metrics ui: $metrics_ui_appimage already exists in bintray for this release. Cannot overwrite!"
+      exit 1
     fi
   fi
+
+  ## delete the existing file if it exists
+  rm -f "$metrics_ui_appimage"
+
+  sudo make clean-monitoring_hub
+
+  make build-metrics-ui-appimage
+
+  sudo make clean-monitoring_hub
+
+  mv Wallaroo_Metrics_UI-x86_64.AppImage "$metrics_ui_appimage"
 }
 
 build_wallaroo_source_archive() {
@@ -184,15 +127,25 @@ build_wallaroo_source_archive() {
   bintray_wallaroo_source_archive=$(curl -s "https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version}/" grep -Po "(?<=>)$wallaroo_source_archive(?=<)" || echo "0")
   if [[ "$bintray_wallaroo_source_archive" == "$wallaroo_source_archive" ]]
   then
-    echo "Wallaroo source archive: $wallaroo_source_archive already exists in bintray."
-  else
-    ## Check to see if source archive exists prior to building
-    if [[ ! -e "$wallaroo_source_archive" ]]; then
-      tar --transform "flags=r;s|^|wallaroo/|" -czf "$wallaroo_source_archive" --exclude=testing *
-    else
-      echo "Wallaroo source archive: $wallaroo_source_archive already exists locally, skipping build step..."
+    if [[ $BRANCH == "release" ]]
+    then
+      echo "Wallaroo source archive: $wallaroo_source_archive already exists in bintray for this release. Cannot overwrite!"
+      exit 1
     fi
   fi
+
+  ## delete the existing file if it exists
+  rm -f "$wallaroo_source_archive"
+
+  # only include the specific testing data files in use by examples
+  rm -r testing
+  git checkout -- testing/data/market_spread/nbbo/350-symbols_initial-nbbo-fixish.msg
+  git checkout -- testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg
+  git checkout -- testing/data/market_spread/orders/350-symbols_orders-fixish.msg
+
+  make build-wallaroo-source-archive
+
+  mv wallaroo.tgz "$wallaroo_source_archive"
 }
 
 push_wallaroo_bintray_artifacts() {
@@ -201,29 +154,21 @@ push_wallaroo_bintray_artifacts() {
     curl -fL https://getcli.jfrog.io | sh
   fi
 
-  ## Only upload to bintray if necessary
-  if [[ "$bintray_wallaroo_source_archive" != "$wallaroo_source_archive" ]]
+  # push the wallaroo source archive
+  if ./jfrog bt u --override --publish "$wallaroo_source_archive" "${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version}" "${wallaroo_bintray_package}/${bintray_artifacts_version}/"
   then
-    # push the image
-    if ./jfrog bt u --publish $wallaroo_source_archive ${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version} ${wallaroo_bintray_package}/${bintray_artifacts_version}/
-    then
-      echo "Uploaded wallaroo source archive $wallaroo_source_archive to bintray successfully."
-    else
-      echo "Failed to uploaded wallaroo source archive $wallaroo_source_archive to bintray"
-    fi
+    echo "Uploaded wallaroo source archive $wallaroo_source_archive to bintray successfully."
+  else
+    echo "Failed to uploaded wallaroo source archive $wallaroo_source_archive to bintray"
   fi
 
-  ## Only upload to bintray if necessary
-  if [[ "$bintray_metrics_ui_appimage" != "$metrics_ui_appimage" ]]
+  # push the metrcis appimage
+  if ./jfrog bt u --override --publish "$metrics_ui_appimage" "${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version}" "${wallaroo_bintray_package}/${bintray_artifacts_version}/"
   then
-    # push the image
-    if ./jfrog bt u --publish $metrics_ui_appimage ${wallaroo_bintray_subject}/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${bintray_artifacts_version} ${wallaroo_bintray_package}/${bintray_artifacts_version}/
-    then
-      echo "Uploaded $metrics_ui_appimage to bintray successfully."
-    else
-      echo "Failed to upload $metrics_ui_appimage to bintray."
-      exit 1
-    fi
+    echo "Uploaded $metrics_ui_appimage to bintray successfully."
+  else
+    echo "Failed to upload $metrics_ui_appimage to bintray."
+    exit 1
   fi
 
   # delete jfrog cli
@@ -233,7 +178,7 @@ push_wallaroo_bintray_artifacts() {
 git_reset() {
   git clean -df
   git reset --hard HEAD
-  git checkout $BRANCH
+  git checkout "$BRANCH"
 }
 
 if [ $# -lt 2 ]; then

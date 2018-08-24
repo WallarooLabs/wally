@@ -37,7 +37,7 @@ cd ~/wallaroo-tutorial
 This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-wget -q -O wallaroo-{{ book.wallaroo_version }}.tar.gz {{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/{{ book.wallaroo_version }}.tar.gz
+curl -L -o wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/wallaroo-{{ book.wallaroo_version }}.tar.gz'
 mkdir wallaroo-{{ book.wallaroo_version }}
 tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
 rm wallaroo-{{ book.wallaroo_version }}.tar.gz
@@ -90,7 +90,7 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
 In order to install `ponyc` and `pony-stable` via `apt-get` the following keyserver must be added to the APT key management utility.
 
 ```bash
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "E04F0923 B3B48BDA"
+sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E04F0923 B3B48BDA
 ```
 
 The following packages need to be installed to allow `apt` to use a repository over HTTPS:
@@ -111,7 +111,7 @@ Now you need to install Pony compiler `ponyc`. Run:
 ```bash
 sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
 sudo apt-get update
-sudo apt-get -V install ponyc=0.24.4
+sudo apt-get -V install ponyc={{ book.ponyc_version }}
 ```
 
 ## Installing pony-stable
@@ -146,7 +146,7 @@ Trusty Ubuntu has an outdated `liblz4` package. You will need to install from so
 
 ```bash
 cd ~/
-wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
+curl -L -o liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
 tar zxvf liblz4-1.7.5.tar.gz
 cd lz4-1.7.5
 make
@@ -164,7 +164,7 @@ sudo apt-get install -y python-dev
 ```bash
 cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
 mkdir bin
-wget -q -O Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage {{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
+curl -L -o Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage'
 chmod +x Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
 ./Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage --appimage-extract
 mv squashfs-root bin/metrics_ui

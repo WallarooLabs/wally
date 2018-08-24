@@ -418,6 +418,9 @@ clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all += clean-$(s
 clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))):
 	$(QUIET)rm -rf $(abspath $1)/node_modules
 	$(QUIET)rm -rf $(abspath $1)/_build
+	$(QUIET)rm -rf $(abspath $1)/priv/static
+	$(QUIET)rm -rf $(abspath $1)/../../deps
+	$(QUIET)rm -rf $(abspath $1)/../../_build
 .PHONY: clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_wallaroo_dir)/,,$(abspath $1)))-all
 endef
 
@@ -508,6 +511,172 @@ print-%:
 	$(QUIET)echo '  flavor = $(flavor $*)'
 	$(QUIET)echo '   value = $(value  $*)'
 
+
+# rule to build wallaroo source archive
+.PHONY: build-wallaroo-source-archive
+build-wallaroo-source-archive:
+	$(QUIET)cd $(wallaroo_path) && \
+          tar --transform "flags=r;s|^|wallaroo/|" -czf "wallaroo.tgz" ./*
+
+
+define METRICS_UI_DESKTOP_HEREDOC
+[Desktop Entry]
+Name=Wallaroo Metrics UI
+Icon=metrics_ui
+Type=Application
+NoDisplay=true
+Exec=metrics_reporter_ui
+Terminal=true
+Categories=Development;
+endef
+
+
+define APPRUN_HEREDOC
+#!/bin/sh
+HERE=$$(dirname "$$(readlink -f "$${0}")")
+"$${HERE}"/usr/bin/metrics_reporter_ui $$@
+if [ "$$1" = "start" ]; then
+  sleep 4
+fi
+if [ "$$1" = "stop" ]; then
+  PID_TO_KILL=$$(ps aux | grep '/usr/erts-9.1/bin/epmd' | grep -v grep | awk '{print $$2}')
+  if [ "$$PID_TO_KILL" != "" ]; then
+    kill $$PID_TO_KILL
+  fi
+fi
+endef
+
+
+export APPRUN_HEREDOC
+export METRICS_UI_DESKTOP_HEREDOC
+
+# rule to build metrics_ui appimage
+.PHONY: build-metrics-ui-appimage
+build-metrics-ui-appimage:
+## Build Metrics UI if not already built
+	$(QUIET)cd $(wallaroo_path) && \
+          mkdir -p metrics_ui.AppDir/usr/
+
+	$(QUIET)cd $(wallaroo_path) && \
+	  echo "$$METRICS_UI_DESKTOP_HEREDOC" >> ./metrics_ui.desktop
+
+	$(QUIET)cd $(wallaroo_path) && \
+	  echo "$$APPRUN_HEREDOC" >> ./AppRun
+
+	$(QUIET)cd $(wallaroo_path) && \
+          chmod a+x ./AppRun
+
+	$(QUIET)cd $(wallaroo_path) && \
+          curl https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -o linuxdeploy-x86_64.AppImage -J -L
+	$(QUIET)cd $(wallaroo_path) && \
+          chmod +x linuxdeploy-x86_64.AppImage
+
+# set up icon/logo for appimage
+	$(QUIET)cd $(wallaroo_path) && \
+          cp .release/metrics_ui_appimage_icon.png metrics_ui.png
+
+# can't run appimages in docker; need to extract and then run
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "./linuxdeploy-x86_64.AppImage --appimage-extract"
+
+# need to run in CentOS 7 docker image
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "make release-monitoring_hub-apps-metrics_reporter_ui"
+
+# put files into AppDir
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "cd metrics_ui.AppDir/usr && tar -xvzf ../../monitoring_hub/apps/metrics_reporter_ui/_build/prod/rel/metrics_reporter_ui/releases/0.0.1/metrics_reporter_ui.tar.gz"
+
+# build appimage
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "ARCH=x86_64 ./squashfs-root/AppRun --appdir metrics_ui.AppDir --custom-apprun=AppRun --desktop-file=metrics_ui.desktop --icon-file=metrics_ui.png -l /usr/lib64/libtinfo.so.5"
+
+## temporary hack; remove once linuxdeploy works correctly
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "yum install patchelf -y && patchelf --set-rpath '\$$ORIGIN/../../lib' metrics_ui.AppDir/usr/erts-9.1/bin/beam.smp"
+
+## temporary hack; remove once linuxdeploy works correctly
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "mv metrics_ui.AppDir/usr/lib/libcrypto.so.10 metrics_ui.AppDir/usr/lib/crypto-4.1/priv/lib/"
+
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "ARCH=x86_64 ./squashfs-root/AppRun --appdir metrics_ui.AppDir --custom-apprun=AppRun --desktop-file=metrics_ui.desktop --icon-file=metrics_ui.png --output appimage"
+
+	$(QUIET)cd $(wallaroo_path) && \
+          rm linuxdeploy-x86_64.AppImage
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "rm -rf squashfs-root"
+	$(QUIET)docker run --rm -i -v \
+          $(abs_wallaroo_dir):$(abs_wallaroo_dir) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.gitconfig),-v $(HOME)/.gitconfig:/root/.gitconfig,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/.git-credential-cache,) \
+          $(if $(wildcard -v $(HOME)/.git-credential-cache),-v $(HOME)/.git-credential-cache:/root/.git-credential-cache,) \
+          -w $(abs_wallaroo_dir) \
+          wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
+          sh -c "rm -rf metrics_ui.AppDir"
+	$(QUIET)cd $(wallaroo_path) && \
+          rm AppRun
+	$(QUIET)cd $(wallaroo_path) && \
+          rm metrics_ui.desktop
+	$(QUIET)cd $(wallaroo_path) && \
+          rm metrics_ui.png
 
 # rule to confirm we are building for a real docker architecture we support
 docker-arch-check:

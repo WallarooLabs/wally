@@ -2,7 +2,7 @@
 
 This document is aimed at members of the Wallaroo team who might be promoting a Wallaroo release candidate to a release. It serves as a checklist that can take your through the promotion process step-by-step.
 
-To learn more about our release process, see [RELEASE.md].
+To learn more about our release process, see [RELEASE.md](RELEASE.md).
 
 ## Prerequisites for promoting any release candidate to a release
 

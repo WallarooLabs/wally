@@ -4,7 +4,7 @@ wallaroo_version="0894eac4"
 ## setup our various additional source
 
 ## pony bintray repo setup
-apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys "D401AB61 DBE1D0A2"
+apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "D401AB61 DBE1D0A2"
 echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
 echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list
 

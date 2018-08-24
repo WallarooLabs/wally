@@ -73,7 +73,7 @@ metrics_reporter_ui start
 Run `data_receiver` to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
-data_receiver/data_receiver --listen 127.0.0.1:7002
+data_receiver --listen 127.0.0.1:7002
 ```
 
 ### Shell 3: Reverse

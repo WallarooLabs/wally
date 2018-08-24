@@ -100,7 +100,7 @@ sender --host 127.0.0.1:7010 \
 You can shut down the cluster with this command at any time:
 
 ```bash
-cluster_shutdown/cluster_shutdown 127.0.0.1:6002
+cluster_shutdown 127.0.0.1:6002
 ```
 
 You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their respective shells.
