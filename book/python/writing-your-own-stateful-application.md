@@ -20,7 +20,7 @@ The state computation here is fairly straightforward: given a data object and a 
 
 ```python
 @wallaroo.state_computation(name='add votes')
-def add_votes(self, data, state):
+def add_votes(data, state):
     state.update(data)
     return (state.get_votes(data.letter), True)
 ```
@@ -75,7 +75,7 @@ The encoder is going to receive a `Votes` instance and encode into a string with
 
 ```python
 @wallaroo.encoder
-def encode(self, data):
+def encode(data):
     # data is a Votes
     return struct.pack(">IsQ", 9, data.letter, data.votes)
 ```
@@ -86,7 +86,7 @@ The decoder, like the one in Reverse Word, is going to use a `header_length` of 
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decode(self, bs):
+def decode(bs):
     (letter, vote_count) = struct.unpack(">sI", bs)
     return Votes(letter, vote_count)
 ```
@@ -127,7 +127,6 @@ That is, while the stateless computation constructor `to` took only a computatio
 This module needs its imports:
 ```python
 import struct
-import pickle
 
 import wallaroo
 ```

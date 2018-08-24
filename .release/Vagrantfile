@@ -19,6 +19,18 @@ unless provisioned? && (ARGV[0] != "up")
   end
 end
 
+$script = <<-SCRIPT
+mkdir /home/vagrant/.jfrog
+printf '{\n' >> /home/vagrant/.jfrog/jfrog-cli.conf
+printf '  "artifactory": null,\n' >> /home/vagrant/.jfrog/jfrog-cli.conf
+printf '  "bintray": {\n' >> /home/vagrant/.jfrog/jfrog-cli.conf
+printf '    "user": "#{ENV["DOCKER_USERNAME"]}",\n' >> /home/vagrant/.jfrog/jfrog-cli.conf
+printf '    "key": "#{ENV["DOCKER_PASSWORD"]}"\n' >> /home/vagrant/.jfrog/jfrog-cli.conf
+printf '  },\n' >> /home/vagrant/.jfrog/jfrog-cli.conf
+printf '  "Version": "1"\n' >> /home/vagrant/.jfrog/jfrog-cli.conf
+printf '}\n' >> /home/vagrant/.jfrog/jfrog-cli.conf
+SCRIPT
+
 # All Vagrant configuration is done below. The "2" in Vagrant.configure
 # configures the configuration version (we support older styles for
 # backwards compatibility). Please don't change it unless you know what
@@ -34,6 +46,7 @@ Vagrant.configure("2") do |config|
   config.vm.box_version = "20180504.0.0"
   config.vm.provision :shell, privileged: false, path: "bootstrap.sh"
   config.vm.provision "file", source: "~/.gitconfig", destination: "/home/vagrant/.gitconfig"
+  config.vm.provision "bintray_creds", type: "shell", inline: $script
   config.ssh.forward_agent = true
 
   config.vm.provision :docker_login

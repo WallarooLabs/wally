@@ -34,9 +34,26 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
+MARKET_SPREAD_PONY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 
 # standard rules generation makefile
 include $(rules_mk_path)
+
+integration-tests-testing-performance-apps-market-spread: market-spread_pony_test
+
+market-spread_pony_test:
+	cd $(MARKET_SPREAD_PONY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _market.txt 1 \
+	  --framed-file-sender _orders.txt 0 \
+	  --log-level error \
+	  --command './market-spread' \
+	  --validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PONY_PATH)/_expected.txt --output' \
+	  --output 'received.txt' \
+	  --sources 2 \
+	  --sink-expect 1000
+
 
 # end of prevent rules from being evaluated/included multiple times
 endif

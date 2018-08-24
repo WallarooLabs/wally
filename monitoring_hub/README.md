@@ -21,11 +21,3 @@ Installing Node dependencies: run `npm install -g node-sass browserify`
 * run `mix deps.get`
 
 To build specific apps see README's under each application.
-
-
-
-
-
-
-
-

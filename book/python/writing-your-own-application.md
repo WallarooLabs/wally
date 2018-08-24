@@ -16,7 +16,7 @@ Let's start with the computation, because that's the purpose of the application:
 
 ```python
 @wallaroo.computation(name='reverse'):
-def reverse(self, data):
+def reverse(data):
     print "compute", data
     return data[::-1]
 ```
@@ -31,7 +31,7 @@ Next, we are going to define how the output gets constructed for the sink. It is
 
 ```python
 @wallaroo.encoder
-def encode(self, data):
+def encode(data):
     # data is a string
     print "encode", data
     return data + "\n"
@@ -43,7 +43,7 @@ Now, we also need to decode the incoming bytes of the source.
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decode(self, bs):
+def decode(bs):
     print "decode", bs
     return bs.decode("utf-8")
 ```
@@ -67,7 +67,7 @@ In our case:
 
 ### Application Setup
 
-So now that we have input decoding, computation, and output decoding defined, how do we build it all into an application?
+So now that we have input decoding, computation, and output encoding defined, how do we build it all into an application?
 For this, two things are needed:
 1. An entry point for Wallaroo to create the application. This is the function `application_setup` that you need to define.
 2. The actual topology `application_setup` is going to return for Wallaroo to create the application.
@@ -93,7 +93,7 @@ ab.to(reverse)
 And finally, we add the sink, using a `TCPSinkConfig`:
 
 ```python
-ab.to_sink(wallaroo.TCPSinkConfig("localhost", "7010", encoder))
+ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
 ```
 
 ### The `application_setup` Entry Point
@@ -126,7 +126,6 @@ Wallaroo provides the convenience functions `tcp_parse_input_addrs` and `tcp_par
 Of course, no Python module is complete without its imports. In this case, only two imports are required:
 
 ```python
-import struct
 import wallaroo
 ```
 

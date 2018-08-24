@@ -5,22 +5,26 @@ In this section, we're going to run an example Wallaroo application. By the time
 There are a few Wallaroo support applications that you'll be interacting with for the first time:
 
 - Our Metrics UI allows you to monitor the performance and health of your applications.
-- Giles receiver is designed to capture TCP output from Wallaroo applications.
+- Data receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
 - Machida, our program for running Wallaroo Python applications.
 
-You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Giles receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
+You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
 
-The Metrics UI process will be run in the background. The other three processes (receiver, sender, and Wallaroo) will run in the foreground.  We recommend that you run each process in a separate terminal.
+The Metrics UI process will be run in the background. The other three processes (data_receiver, sender, and Wallaroo) will run in the foreground. We recommend that you run each process in a separate terminal.
 
-For each Terminal you're expected to setup, you'd have to run the following to access the Vagrant Box:
+For each Shell you're expected to setup, you'd have to run the following to access the Vagrant Box:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/vagrant
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
 vagrant ssh
 ```
 
-## Terminal 1, Start the Metrics UI
+Let's get started!
+
+Since Wallaroo is a distributed application, its components need to run separately, and concurrently, so that they may connect to one another to form the application cluster. For this example, you will need 5 separate terminal shells to run the metrics UI, run a source, run a sink, run the Celsius application, and eventually, to send a cluster shutdown command.
+
+## Shell 1: Start the Metrics UI
 
 To start the Metrics UI run:
 
@@ -48,30 +52,28 @@ If you need to start the UI after stopping it, run:
 metrics_reporter_ui start
 ```
 
-## Terminal 2, Run Giles Receiver
+## Shell 2: Run Data Receiver
 
-We'll use Giles Receiver to listen for data from our Wallaroo application.
+We'll use Data Receiver to listen for data from our Wallaroo application.
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/giles/receiver
-./receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
+data_receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
 ```
 
-You should see the `Listening for data` that indicates that Giles receiver is running.
+Data Receiver will start up and receive data without creating any output. By default, it prints received data to standard out, but we are giving it the `--no-write` flag which results in no output.
 
-## Terminal 3, Run the "Celsius to Fahrenheit" Application
+## Shell 3: Run the "Celsius to Fahrenheit" Application
 
-First, we will need to set up the `PYTHONPATH` environment variable. Machida needs to be able to find the `wallaroo` Python module, which is in a file called `wallaroo.py` in the `machida` directory. It also needs to be able to find the module that defines the application. In order to do that, set and export the `PYTHONPATH` environment variable like this:
+First, we will need to set up the `PYTHONPATH` environment variable. Machida needs to be able to find the the module that defines the application. In order to do that, set and export the `PYTHONPATH` environment variable like this:
 
 ```bash
-export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo/machida:$HOME/wallaroo-tutorial/wallaroo/examples/python/celsius"
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius:$PYTHONPATH"
 ```
 
 Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/machida
-./build/machida --application-module celsius --in 127.0.0.1:7000 \
+machida --application-module celsius --in 127.0.0.1:7000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
   --cluster-initializer --ponythreads=1 --ponynoblock
@@ -79,19 +81,16 @@ cd ~/wallaroo-tutorial/wallaroo/machida
 
 This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
 
-## Terminal 4
-
-### Sending Data with Giles Sender
+## Shell 4: Sending Data with Giles Sender
 
 We will be sending in 25,000,000 messages using a pre-generated data file. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
 
 You will now be able to start the `sender` with the following command:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/giles/sender
-./sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
+sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
   --repeat --no-write --msg-size 8 --ponythreads=1 --ponynoblock \
-  --file ~/wallaroo-tutorial/wallaroo/examples/python/celsius/celsius.msg
+  --file ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
@@ -120,20 +119,19 @@ You can then click into one of the elements within a category to get to a detail
 
 ![Computation Detailed Metrics page](/book/metrics/images/computation-detailed-metrics-page.png)
 
-Feel free to click around and get a feel for how the Metrics UI is setup and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
+Feel free to click around and get a feel for how the Metrics UI is set up and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
 
 ## Shutdown
 
-### Terminal 5, Cluster Shutdown
+### Shell 5: Cluster Shutdown
 
 You can shut down the cluster with this command at any time:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
-./cluster_shutdown 127.0.0.1:5050
+cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down Giles Sender and Giles Receiver by pressing Ctrl-c from their respective shells.
+You can shut down Giles Sender and Data Receiver by pressing Ctrl-c from their respective shells.
 
 You can shut down the Metrics UI with the following command:
 

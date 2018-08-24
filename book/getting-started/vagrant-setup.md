@@ -4,34 +4,6 @@ To get you up and running quickly with Wallaroo, we have provided a Vagrantfile 
 
 **Note:** For Windows users, this section of the guide assumes you are using Powershell.
 
-## Installing Git
-
-### Linux Ubuntu
-
-If you do not already have Git installed, install it:
-
-```bash
-sudo apt-get install git
-```
-
-### MacOS
-
-#### Installing a Package Manager, Homebrew
-
-Homebrew is used for easy installation of certain packages needed by Wallaroo.
-
-Instructions for installing Homebrew can be found [on their website](http://brew.sh/).  This book assumes that you use the default installation directory, `/usr/local`.  If you choose an alternate installation directory, please configure your shell's `PATH` environment variable as needed.
-
-If you do not already have Git installed, install it via Homebrew:
-
-```bash
-brew install git
-```
-
-### Windows
-
-Download git from [Git for Windows](https://gitforwindows.org/) and install it.
-
 ## Set up Environment for the Wallaroo Tutorial
 
 ### Linux Ubuntu, MacOS, and Windows via Powershell
@@ -44,12 +16,14 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
+This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-git clone https://github.com/WallarooLabs/wallaroo
-cd wallaroo
-git checkout {{ book.wallaroo_version }}
+curl -L -o wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/wallaroo-{{ book.wallaroo_version }}.tar.gz'
+mkdir wallaroo-{{ book.wallaroo_version }}
+tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
+rm wallaroo-{{ book.wallaroo_version }}.tar.gz
+cd wallaroo-{{ book.wallaroo_version }}
 ```
 
 ## Installing VirtualBox
@@ -75,7 +49,7 @@ Provisioning should take about 10 to 15 minutes. When it finishes, you will have
 To provision, run the following commands:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/vagrant
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
 vagrant up
 ```
 
@@ -98,7 +72,7 @@ vagrant up
 You can shut down the Vagrant Box by running the following on your host machine:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/vagrant
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
 vagrant halt
 ```
 

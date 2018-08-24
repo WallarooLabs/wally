@@ -17,7 +17,7 @@ Wallaroo is a fast, elastic data processing engine that rapidly takes you from p
 ## What is Wallaroo?
 
 
-Wallaroo is a fast and elastic data processing engine that rapidly takes you from prototype to production. 
+Wallaroo is a fast and elastic data processing engine that rapidly takes you from prototype to production.
 
 When we set out to build Wallaroo, we had several high-level goals in mind:
 
@@ -46,7 +46,7 @@ We've done a [15-minute video of our engineering presentation][scale independenc
 
 ### Language Bindings
 
-Existing language bindings: 
+Existing language bindings:
 
 - Python 2.7
 - C++
@@ -58,7 +58,7 @@ Planned Language bindings:
 - Python 3
 - JavaScript
 
-Please see [status][status section] for language binding support details. Wallaroo is open source software with an expanding software community. Please see the [How to Contribute][contribute section] section if you wish to help support your favorite data analysis language.
+Please see [status][status section] for language binding support details. Wallaroo is open source software with an expanding software community. Please see the [How to Contribute][contribute section] section or [contact us][contact us email] if you wish to see your favorite data analysis language supported.
 
 ### Supported platforms
 
@@ -71,7 +71,7 @@ Wallaroo is open source software with an expanding software community. Please se
 
 Wallaroo applications are user hosted. It's equally at home "in the cloud" or "on-premise."
 
-We have no "as a service" offering at this time. 
+We have no "as a service" offering at this time.
 
 ### Roadmap
 
@@ -91,21 +91,17 @@ Along with Go, Python 2.7 is our primary focus. As we add features to the Wallar
 
 - Python 3
 
-We are currently working with a client who needs Python 3 bindings. We plan to introduce Python 3 bindings in early 2018.
+While this is not supported yet, we plan to add support for Python 3. If Python 3 support is holding you back from using Wallaroo. Please [contact us][contact us email] and let us know.
 
 - C++
 
-C++ is currently unsupported and apps created with the C++ API will not build unless you checkout the `last-working-C++-commit` tag. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
+C++ is currently unsupported and apps created with the C++ API will not build unless you checkout the [last-working-C++-commit](https://github.com/WallarooLabs/wallaroo/tree/last-working-C%2B%2B-commit) tag. If you are interested in using Wallaroo with C++, you should [contact us][contact us email]. We're happy to work with you.
 
-C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API. 
+C++ was our first non-Pony API. Since that time we have learned a lot about writing Wallaroo language bindings. We plan on revisiting the C++ API in the future to improve its ergonomics. New functionality added to Wallaroo is not currently being implemented in the C++ API.
 
 - Go
 
 Along with Python 2.7, Go is our primary focus. As we add features to the Wallaroo, we will be adding corresponding Go APIs and documentation. The currently available version of the Go API is our first pass. We're quite interested in getting your feedback and improving it.
-
-- JavaScript 
-
-JavaScript support is currently in the planning stages with a release in 2018.
 
 ### Limitations
 
@@ -121,7 +117,7 @@ Our primary documentation is hosted by GitBook at [http://docs.wallaroolabs.com]
 
 ## Getting Help
 
-- [Join us on Freenode in #wallaroo][IRC]. 
+- [Join us on Freenode in #wallaroo][IRC].
 - [Join our developer mailing list][developer mailing list].
 - [Commercial support][contact us email]
 
@@ -133,7 +129,7 @@ Be sure to check out our [contributors guide][contributors guide] before you get
 
 ## License
 
-Wallaroo is an open source project. All of the source code is available to you. Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. However, not all of the Wallaroo source code is [Apache 2][apache 2 license] licensed. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. Source files in this repository have a header indicating which license they are under. Currently, all files that are licensed under the [Wallaroo Community License Agreement][wallaroo community license] are in the `lib/wallaroo/ent` directory. 
+Wallaroo is an open source project. All of the source code is available to you. Most of the Wallaroo code base is available under the [Apache License, version 2][apache 2 license]. However, not all of the Wallaroo source code is [Apache 2][apache 2 license] licensed. Parts of Wallaroo are licensed under the [Wallaroo Community License Agreement][wallaroo community license]. Source files in this repository have a header indicating which license they are under. Currently, all files that are licensed under the [Wallaroo Community License Agreement][wallaroo community license] are in the `lib/wallaroo/ent` directory.
 
 The core stream processing engine and state management facilities are all licensed under the the [Apache version 2][apache 2 license]. Autoscaling, exactly-once message processing and resiliency features are licensed under the [Wallaroo Community License Agreement][wallaroo community license].
 
@@ -143,7 +139,7 @@ The [Wallaroo Community License][wallaroo community license] is based on [Apache
 - You can **run** all Wallaroo code in a production environment for free on up to 3 server or 24 cpus.
 - If you want to **run** Wallaroo Enterprise version features in production above 3 servers or 24 cpus, you have to obtain a license.
 - You can **modify** and **redistribute** any Wallaroo code
-- Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license to run on more than 3 servers or 24 cpus in a production environment. 
+- Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license to run on more than 3 servers or 24 cpus in a production environment.
 
 Please [contact us][contact us email] if you have any questions about licensing or Wallaroo Enterprise.
 
@@ -192,17 +188,13 @@ Wallaroo currently exists as a mono-repo. All the source that makes Wallaroo go 
 
 Markdown source used to build [http://docs.wallaroolabs.com][documentation website]. [http://docs.wallaroolabs.com][documentation website] gets built from the latest commit to the `release` branch.
 
-- cpp_api
-
-Code for writing Wallaroo applications using C++. This is currently unsupported.
-
 - examples
 
 Wallaroo example applications in a variety of languages. Currently, only the Python API examples are supported. See [status section][status section] for details.
 
 - giles
 
-TCP utility applications that can stream data over TCP to Wallaroo applications and receive TCP streams from said applications. 
+TCP utility applications that can stream data over TCP to Wallaroo applications and receive TCP streams from said applications.
 
 - go_api
 
@@ -232,7 +224,7 @@ Tools we have written that are used to test Wallaroo.
 
 End user utilities designed to make it easier to do various Wallaroo tasks like cleanly shut down a cluster.
 
-[about this repository section]: #about-this-repository 
+[about this repository section]: #about-this-repository
 [additional links]: #additional-links
 [apache 2 license]: https://www.apache.org/licenses/LICENSE-2.0
 [autoscaling website]: http://www.wallaroolabs.com/technology/autoscaling

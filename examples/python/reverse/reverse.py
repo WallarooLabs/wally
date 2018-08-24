@@ -17,8 +17,6 @@ This is an example application that receives strings as input and outputs the
 reversed strings.
 """
 
-import struct
-
 import wallaroo
 
 

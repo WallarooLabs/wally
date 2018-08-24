@@ -28,14 +28,14 @@ The `decoder` function turns the input message into a string. That string is the
 
 In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
 
-You will need three separate shells to run this application. Open each shell and go to the `examples/python/word_count_with_dynamic_keys` directory.
+You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details depending on your installation choice). Open each shell and go to the `examples/python/word_count_with_dynamic_keys` directory.
 
 ### Shell 1: Metrics
 
 Start up the Metrics UI if you don't already have it running:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -43,30 +43,22 @@ You can verify it started up correctly by visiting [http://localhost:4000](http:
 If you need to restart the UI, run:
 
 ```bash
-docker restart mui
+metrics_reporter_ui restart
 ```
 
 When it's time to stop the UI, run:
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```
 
 If you need to start the UI after stopping it, run:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 ### Shell 2: Data Receiver
-
-Set `PATH` to refer to the directory that contains the `data_receiver` executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
-```
 
 Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 
@@ -76,15 +68,6 @@ data_receiver --ponythreads=1 --ponynoblock \
 ```
 
 ### Shell 3: Word Count With Dynamic Keys
-
-Set `PATH` to refer to the directory that contains the `machida` executable. Set `PYTHONPATH` to refer to the current directory (where `word_count_with_dynamic_keys.py` is) and the `machida` directory (where `wallaroo.py` is). Assuming you installed Wallaroo according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` and `PYTHONPATH` variables are pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
-export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
-```
 
 Run `machida` with `--application-module word_count_with_dynamic_keys`:
 
@@ -98,13 +81,6 @@ machida --application-module word_count_with_dynamic_keys \
 
 ### Shell 4: Sender
 
-Set `PATH` to refer to the directory that contains the `sender`  executable. Assuming you installed Wallaroo according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
-```
 Send messages:
 
 ```bash
@@ -119,14 +95,6 @@ There will be a stream of output messages in the Shell 2.
 
 ## Shell 5: Shutdown
 
-Set `PATH` to refer to the directory that contains the `cluster_shutdown` executable. Assuming you installed Wallaroo  according to the tutorial instructions you would do:
-
-**Note:** If running in Docker, the `PATH` variable is pre-set for you to include the necessary directories to run this example.
-
-```bash
-export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build:$HOME/wallaroo-tutorial/wallaroo/giles/sender:$HOME/wallaroo-tutorial/wallaroo/utils/data_receiver:$HOME/wallaroo-tutorial/wallaroo/utils/cluster_shutdown"
-```
-
 You can shut down the Wallaroo cluster with this command once processing has finished:
 
 ```bash
@@ -138,5 +106,5 @@ You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their
 You can shut down the Metrics UI with the following command:
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```

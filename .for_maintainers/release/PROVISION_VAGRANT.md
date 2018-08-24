@@ -10,7 +10,7 @@ in order to properly provision the Vagrant box used for the Wallaroo release pro
 
 - **`~/.gitconfig` file:** the `.release/Vagrantfile` expects a `.gitconfig` file to exist under `~/.gitconfig` on the host, which will be shared with the Vagrant box for committing purposes.
 
-- **Github SSH access on host:** Pushing and pulling via Git/Github will occur via ssh forwarding between the host and Vagrant box. Due to this, it is assumed that your host can access Github via ssh.
+- **Github SSH access on host:** Pushing and pulling via Git/Github will occur via ssh forwarding between the host and Vagrant box. Due to this, it is assumed that your host can access Github via ssh. (see: https://help.github.com/articles/connecting-to-github-with-ssh/)
 
 ## Provision the Wallaroo Release Vagrant Box
 

@@ -1,12 +1,12 @@
 # Setting Up Your Ubuntu Environment for Wallaroo
 
-These instructions have been tested for Ubuntu Artful, Trusty, and Xenial releases.
+These instructions have been tested for Ubuntu Artful, Bionic, Trusty, and Xenial releases.
 
 There are a few applications/tools which are required to be installed before you can proceed with the setup of the Wallaroo environment.
 
 ## Memory requirements
 
-In order to compile the Wallaroo example applications, your system will need to have approximately 6 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
+In order to compile the Wallaroo example applications, your system will need to have approximately 3 GB working memory (this can be RAM or swap). If you don't have enough memory, you are likely to see that the compile process is `Killed` by the OS.
 
 ## Update apt-get
 
@@ -34,12 +34,14 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo`):
+This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
 
 ```bash
-git clone https://github.com/WallarooLabs/wallaroo
-cd wallaroo
-git checkout {{ book.wallaroo_version }}
+curl -L -o wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/wallaroo-{{ book.wallaroo_version }}.tar.gz'
+mkdir wallaroo-{{ book.wallaroo_version }}
+tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
+rm wallaroo-{{ book.wallaroo_version }}.tar.gz
+cd wallaroo-{{ book.wallaroo_version }}
 ```
 
 ## Install make
@@ -88,7 +90,18 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
 In order to install `ponyc` and `pony-stable` via `apt-get` the following keyserver must be added to the APT key management utility.
 
 ```bash
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys D401AB61 DBE1D0A2
+sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E04F0923 B3B48BDA
+```
+
+The following packages need to be installed to allow `apt` to use a repository over HTTPS:
+
+```bash
+sudo apt-get install \
+     apt-transport-https \
+     ca-certificates \
+     curl \
+     gnupg2 \
+     software-properties-common
 ```
 
 ### Installing ponyc
@@ -96,9 +109,9 @@ sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys D401AB61 
 Now you need to install Pony compiler `ponyc`. Run:
 
 ```bash
-echo "deb https://dl.bintray.com/pony-language/ponyc-debian pony-language main" | sudo tee -a /etc/apt/sources.list
+sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
 sudo apt-get update
-sudo apt-get -V install ponyc=0.24.4
+sudo apt-get -V install ponyc={{ book.ponyc_version }}
 ```
 
 ## Installing pony-stable
@@ -106,7 +119,7 @@ sudo apt-get -V install ponyc=0.24.4
 Next, you need to install `pony-stable`, a Pony dependency management library. Navigate to a directory where you will put the `pony-stable` repo and execute the following commands:
 
 ```bash
-echo "deb https://dl.bintray.com/pony-language/pony-stable-debian /" | sudo tee -a /etc/apt/sources.list
+sudo add-apt-repository "deb https://dl.bintray.com/pony-language/ponylang-debian  $(lsb_release -cs) main"
 sudo apt-get update
 sudo apt-get -V install pony-stable
 ```
@@ -115,7 +128,7 @@ sudo apt-get -V install pony-stable
 
 Wallaroo's Kakfa support requires `libsnappy` and `liblz` to be installed.
 
-### Artful and Xenial Ubuntu:
+### Xenial Ubuntu and later:
 
 ```bash
 sudo apt-get install -y libsnappy-dev liblz4-dev
@@ -133,7 +146,7 @@ Trusty Ubuntu has an outdated `liblz4` package. You will need to install from so
 
 ```bash
 cd ~/
-wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
+curl -L -o liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz
 tar zxvf liblz4-1.7.5.tar.gz
 cd lz4-1.7.5
 make
@@ -146,40 +159,29 @@ sudo make install
 sudo apt-get install -y python-dev
 ```
 
-## Install Docker
-
-You'll need Docker (CE or EE) to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/engine/installation/linux/ubuntu/) for getting Docker up and running on Ubuntu on the [Docker website](https://docs.docker.com/engine/installation/linux/ubuntu/).
-
-Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/engine/installation/linux/linux-postinstall/#configure-docker-to-start-on-boot).
-
-All of the Docker commands throughout the rest of this manual assume that you have permission to run Docker commands as a non-root user. Follow the [Manage Docker as a non-root user](https://docs.docker.com/engine/installation/linux/linux-postinstall/#manage-docker-as-a-non-root-user) instructions to set that up. If you don't want to allow a non-root user to run Docker commands, you'll need to run `sudo docker` anywhere you see `docker` for a command.
-
-## Download the Metrics UI
+## Download and configure the Metrics UI
 
 ```bash
-sudo docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_metrics_ui_url }}
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
+mkdir bin
+curl -L -o Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage'
+chmod +x Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
+./Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage --appimage-extract
+mv squashfs-root bin/metrics_ui
+sed -i 's/sleep 4/sleep 0/' bin/metrics_ui/AppRun
+rm Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
+ln -s metrics_ui/AppRun bin/metrics_reporter_ui
 ```
 
 ## Compiling Machida
 
-Machida is the program that runs Wallaroo Python applications. Change to the `machida` directory:
+Machida is the program that runs Wallaroo Python applications. Change to the Wallaroo directory:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/machida
-```
-
-### Compiling on Artful
-
-Due to ponyc's dependence on PIC on Artful Ubuntu, all applications must be compiled with the `PONYCFLAGS="--pic"` flag, like so:
-
-```bash
-make PONYCFLAGS="--pic"
-```
-
-### Compiling on Trusty and Xenial
-
-```bash
-make
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
+make build-machida-all
+cp machida/build/machida bin
+cp machida/wallaroo.py bin
 ```
 
 ## Compiling Giles Sender, Data Receiver, Cluster Shutdown, and Cluster Shrinker tools
@@ -190,22 +192,25 @@ The Cluster Shutdown tool is used to instruct the cluster to shutdown cleanly, c
 
 The Cluster Shrinker tool is used to tell a running cluster to reduce the number of workers in the cluster and to query the cluster for information about how many workers are eligible for removal.
 
-To compile all three, change to the root Wallaroo directory:
+To compile all of the tools, change to the root Wallaroo directory:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/
-```
-
-### Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool on Artful
-
-```bash
-make build-giles-sender-all build-utils-all PONYCFLAGS="--pic"
-```
-
-### Compiling Giles Sender, Data Receiver, and the Cluster Shutdown tool on Trusty and Xenial
-
-```bash
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
 make build-giles-sender-all build-utils-all
+cp utils/data_receiver/data_receiver bin
+cp utils/cluster_shrinker/cluster_shrinker bin
+cp utils/cluster_shutdown/cluster_shutdown bin
+cp giles/sender/sender bin
+```
+
+## Set up activate file for setting environment variables
+
+The `activate` file sets up the environment for running Wallaroo examples when it is sourced
+
+The following command copies it into the correct location:
+
+```
+cp misc/activate bin/
 ```
 
 ## Register

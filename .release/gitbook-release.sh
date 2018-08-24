@@ -28,6 +28,7 @@ verify_branch() {
     docker_version=$(< VERSION)
     docker_url="release\/wallaroo:$docker_version"
     docker_metrics_ui_url="release\/metrics_ui:$ui_version"
+    bintray_repo_url="https://wallaroo-labs.bintray.com/wallaroolabs-ftp"
   elif [[ "$BRANCH" == "release" ]]
   then
     remote_branch=release
@@ -35,13 +36,15 @@ verify_branch() {
     docker_version=$(< VERSION)
     docker_url="release\/wallaroo:$docker_version"
     docker_metrics_ui_url="release\/metrics_ui:$ui_version"
+    bintray_repo_url="https://wallaroo-labs.bintray.com/wallaroolabs-ftp"
   elif [[ "$BRANCH" == *"release-"* ]]
   then
     remote_branch=rc
-    ui_version=$(git describe --tags --always)
-    docker_version=$(git describe --tags --always)
+    ui_version=$(< VERSION)-$(git log -n 1 --oneline | cut -d' ' -f1)
+    docker_version=$(< VERSION)-$(git log -n 1 --oneline | cut -d' ' -f1)
     docker_url="dev\/wallaroo:$docker_version"
     docker_metrics_ui_url="dev\/metrics_ui:$ui_version"
+    bintray_repo_url="https://wallaroo-labs.bintray.com/wallaroolabs-rc"
   else
     echo "No remote repo to push book to. Exiting"
     exit 0
@@ -50,7 +53,7 @@ verify_branch() {
 
 verify_commit_on_branch() {
   echo "Verfying commit $commit is on branch: $BRANCH..."
-  if ! git branch --contains $commit | grep $BRANCH
+  if ! git branch --contains "$commit" | grep "$BRANCH"
   then
     echo "Commit $commit is not on branch: $BRANCH"
     exit 1
@@ -59,19 +62,27 @@ verify_commit_on_branch() {
 
 checkout_to_commit() {
 
-  git checkout $commit
+  git checkout "$commit"
 }
 
 update_versions_in_gitbook() {
   echo "Sliding version number into book content with sed magic..."
   version=$(< VERSION)
   echo "Replacing {{ book.wallaroo_version }}"
-  find book -name '*.md' -exec sed -i -- "s/{{ book.wallaroo_version }}/$version/g" {} \;
-  find -name 'intro.md' -exec sed -i -- "s/{{ book.wallaroo_version }}/$version/g" {} \;
+  find book -name '*.md' -exec sed -i -- "s@{{ book.wallaroo_version }}@$version@g" {} \;
+  find -name 'intro.md' -exec sed -i -- "s@{{ book.wallaroo_version }}@$version@g" {} \;
   echo "Replacing {{ docker_metrics_ui_url }}"
-  find book -name '*.md' -exec sed -i -- "s/{{ docker_metrics_ui_url }}/$docker_metrics_ui_url/g" {} \;
+  find book -name '*.md' -exec sed -i -- "s@{{ docker_metrics_ui_url }}@$docker_metrics_ui_url@g" {} \;
   echo "Replacing {{ docker_version_url }}"
-  find book -name '*.md' -exec sed -i -- "s/{{ docker_version_url }}/$docker_url/g" {} \;
+  find book -name '*.md' -exec sed -i -- "s@{{ docker_version_url }}@$docker_url@g" {} \;
+  echo "Replacing {{ book.bintray_repo_url }}"
+  find book -name '*.md' -exec sed -i -- "s@{{ book.bintray_repo_url }}@$bintray_repo_url@g" {} \;
+  GO_VERSION=$(grep -Po '(?<=GO_VERSION=").*(?=")' .release/bootstrap.sh)
+  echo "Replacing {{ book.golang_version }}"
+  find book -name '*.md' -exec sed -i -- "s@{{ book.golang_version }}@$GO_VERSION@g" {} \;
+  PONYC_VERSION=$(grep -Po '(?<=PONYC_VERSION=").*(?=")' .release/bootstrap.sh)
+  echo "Replacing {{ book.ponyc_version }}"
+  find book -name '*.md' -exec sed -i -- "s@{{ book.ponyc_version }}@$PONYC_VERSION@g" {} \;
 }
 
 install_gitbook_deps() {
@@ -109,8 +120,8 @@ git_clean() {
   git clean -fd
   git remote rm doc-site
   echo "Checking out to $BRANCH"
-  git reset --hard origin/$BRANCH
-  git checkout $BRANCH
+  git reset --hard "origin/$BRANCH"
+  git checkout "$BRANCH"
 }
 
 if [ $# -lt 2 ]; then

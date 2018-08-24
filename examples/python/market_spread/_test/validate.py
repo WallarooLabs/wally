@@ -33,24 +33,13 @@ header_size = calcsize(header_fmt)
 # received record is in it, and no expected records are left unmatched
 received = set()
 while True:
-    payload = args.output.readline()
+    header = args.output.read(header_size)
+    if not header:
+        break
+    payload = args.output.read(unpack(header_fmt, header)[0])
     if not payload:
         break
-
-    data = dict(item.strip().split("=") for item in payload.split(","))
-
-    p = struct.pack(">HI6s4sddddQ",
-                    int(data["side"]),
-                    int(data["account"]),
-                    data["order_id"],
-                    data["symbol"],
-                    int(data["quantity"]),
-                    float(data["price"]),
-                    float(data["bid"]),
-                    float(data["offer"]),
-                    int(data["timestamp"]))
-
-    received.add(p[:-8])
+    received.add(payload[:-8])
 
 expected = set()
 while True:

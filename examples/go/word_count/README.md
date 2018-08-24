@@ -24,20 +24,24 @@ The `Decoder`'s `Decode(...)` method turns the input message into a string. That
 
 ## Building Word Count
 
+In order to build the application you will need a Wallaroo environment. Please visit our [setup](https://docs.wallaroolabs.com/book/go/getting-started/choosing-an-installation-option.html) instructions if you have not already done so.
+
+You will need a new shell to build this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details). Open a shell and go to the `examples/go/word_count` directory.
+
 In the word_count directory, run `make`.
 
 ## Running Word Count
 
-In order to run the application you will need Giles Sender, Data Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/go/getting-started/linux-setup.md) or [MacOS](/book/go/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself. Please visit our [setup](https://docs.wallaroolabs.com/book/go/getting-started/choosing-an-installation-option.html) instructions if you have not already done so.
 
-You will need five separate shells to run this application. Open each shell and go to the `examples/go/word_count` directory.
+You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details). Open each shell and go to the `examples/go/word_count` directory.
 
 ### Shell 1: Metrics
 
 Start up the Metrics UI if you don't already have it running:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -45,19 +49,19 @@ You can verify it started up correctly by visiting [http://localhost:4000](http:
 If you need to restart the UI, run:
 
 ```bash
-docker restart mui
+metrics_reporter_ui restart
 ```
 
 When it's time to stop the UI, run:
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```
 
 If you need to start the UI after stopping it, run:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 ### Shell 2: Data Receiver
@@ -65,7 +69,7 @@ docker start mui
 Run `data_receiver` to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
-../../../utils/data_receiver/data_receiver --listen 127.0.0.1:7002
+data_receiver --listen 127.0.0.1:7002
 ```
 
 ### Shell 3: Word Count
@@ -84,7 +88,7 @@ Run `word_count`.
 In a third shell, send some messages:
 
 ```bash
-../../../giles/sender/sender --host 127.0.0.1:7010 --file count_this.txt \
+sender --host 127.0.0.1:7010 --file count_this.txt \
   --batch-size 5 --interval 100_000_000 --messages 10000000 \
   --ponythreads=1 --ponynoblock --repeat --no-write
 ```
@@ -98,7 +102,7 @@ There will be a stream of output messages in the first shell (where you ran `dat
 You can shut down the cluster with this command at any time:
 
 ```bash
-../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their respective shells.
@@ -106,5 +110,5 @@ You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their
 You can shut down the Metrics UI with the following command:
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```

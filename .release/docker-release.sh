@@ -17,8 +17,9 @@ verify_branch() {
   elif [[ $BRANCH == *"release-"* ]]
   then
     ## Sets repo to dev for Wallaroo Docker image
+    version=$(< VERSION)-$(git log -n 1 --oneline | cut -d' ' -f1)
     wallaroo_docker_image_repo=dev
-    docker_image_tag=$(git describe --tags --always)
+    docker_image_tag=$version
   else
     echo "The docker release can only be run for the release/release-* branches. You are running this script on the following branch: $BRANCH"
     exit 1
@@ -28,7 +29,7 @@ verify_branch() {
 verify_wallaroo_dir() {
   ## Verifies that the script is being run from the wallaroo root directory
   echo "Verifying script is being run from the wallaroo root directory..."
-  if [[ `basename $PWD` != "wallaroo" ]]
+  if [[ $(basename "$PWD") != "wallaroo" ]]
   then
     echo "The .docker_release.sh script must be run from the root wallaroo directory."
     exit 1
@@ -45,7 +46,7 @@ verify_version() {
 
 verify_commit_on_branch() {
   echo "Verfying commit $commit is on branch: $BRANCH..."
-  if ! git branch --contains $commit | grep $BRANCH
+  if ! git branch --contains "$commit" | grep "$BRANCH"
   then
     echo "Commit $commit is not on branch: $BRANCH"
     exit 1
@@ -67,7 +68,7 @@ verify_args() {
 }
 
 verify_no_local_changes() {
-  if ! git diff --exit-code $BRANCH origin/$BRANCH
+  if ! git diff --exit-code "$BRANCH" "origin/$BRANCH"
   then
     echo "ERROR! There are local-only changes on branch '$BRANCH'!"
     exit 1
@@ -76,7 +77,7 @@ verify_no_local_changes() {
 
 checkout_to_commit() {
   echo "Checking out to commit: $commit ..."
-  git checkout $commit
+  git checkout "$commit"
 }
 
 set_docker_image_names() {
@@ -92,14 +93,14 @@ set_docker_image_names() {
 
 build_metrics_ui_image() {
   ## Check to see if image exists prior to building
-  if [[ "$(docker images -q $metrics_ui_docker_image_path 2> /dev/null)" == "" ]]; then
+  if [[ "$(docker images -q "$metrics_ui_docker_image_path" 2> /dev/null)" == "" ]]; then
     ## Build Metrics UI if not already built
     make release-monitoring_hub-apps-metrics_reporter_ui
     ## Build Metrics UI Docker image
     make arch=amd64 build-docker-monitoring_hub-apps-metrics_reporter_ui
     ## Tag Metrics UI docker image for release
     git_tag=$(git describe --tags --always)
-    docker tag wallaroolabs/monitoring_hub-apps-metrics_reporter_ui.amd64:$git_tag $metrics_ui_docker_image_path
+    docker tag "wallaroolabs/monitoring_hub-apps-metrics_reporter_ui.amd64:$git_tag" "$metrics_ui_docker_image_path"
   else
     echo "Docker image: $metrics_ui_docker_image_path already exists locally, skipping build step..."
   fi
@@ -107,11 +108,11 @@ build_metrics_ui_image() {
 
 build_wallaroo_image() {
   ## Check to see if image exists prior to building
-  if [[ "$(docker images -q $wallaroo_docker_image_path 2> /dev/null)" == "" ]]; then
+  if [[ "$(docker images -q "$wallaroo_docker_image_path" 2> /dev/null)" == "" ]]; then
     ## Build Metrics UI if not already built
     make release-monitoring_hub-apps-metrics_reporter_ui
     ## Build Wallaroo Docker image
-    docker build -t $wallaroo_docker_image_path .
+    docker build -t "$wallaroo_docker_image_path" .
   else
     echo "Docker image: $wallaroo_docker_image_path already exists locally, skipping build step..."
   fi
@@ -126,11 +127,12 @@ push_docker_images() {
     echo "Docker image: $wallaroo_docker_image_path already exists."
   else
     # push the image
-    if docker push $wallaroo_docker_image_path
+    if docker push "$wallaroo_docker_image_path"
     then
       echo "Pushed image $wallaroo_docker_image_path successfully."
     else
       echo "Failed to push image: $wallaroo_docker_image_path"
+      exit 1
     fi
   fi
 
@@ -142,7 +144,7 @@ push_docker_images() {
     echo "Docker image: $metrics_ui_docker_image_path already exists."
   else
     # push the image
-    if docker push $metrics_ui_docker_image_path
+    if docker push "$metrics_ui_docker_image_path"
     then
       echo "Pushed image $metrics_ui_docker_image_path successfully."
     else
@@ -155,7 +157,7 @@ push_docker_images() {
 git_reset() {
   git clean -df
   git reset --hard HEAD
-  git checkout $BRANCH
+  git checkout "$BRANCH"
 }
 
 if [ $# -lt 2 ]; then

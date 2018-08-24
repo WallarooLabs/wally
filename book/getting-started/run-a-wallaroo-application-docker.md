@@ -4,14 +4,14 @@ In this section, we're going to run an example Wallaroo application in Docker. B
 
 There are a few Wallaroo support applications that you'll be interacting with for the first time:
 
-* Our Metrics UI allows you to monitor the performance and health of your applications.
-* Data receiver is designed to capture TCP output from Wallaroo applications.
-* Giles sender is used to send test data into Wallaroo applications over TCP.
-* Machida, our program for running Wallaroo Python applications.
+- Our Metrics UI allows you to monitor the performance and health of your applications.
+- Data receiver is designed to capture TCP output from Wallaroo applications.
+- Giles sender is used to send test data into Wallaroo applications over TCP.
+- Machida, our program for running Wallaroo Python applications.
 
 You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
 
-The Metrics UI process will be run in the background. The other three processes \(data_receiver, sender, and Wallaroo\) will run in the foreground. We recommend that you run each process in a separate terminal.
+The Metrics UI process will be run in the background. The other three processes (data_receiver, sender, and Wallaroo) will run in the foreground. We recommend that you run each process in a separate terminal.
 
 NOTE: If you haven't set up Docker to run without root, you will need to use `sudo` with your Docker commands.
 
@@ -59,7 +59,9 @@ wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 
 * `--name wally`: The name for the container. This setting is optional but makes it easier to reference the container in later commands.
 
-## Shell 2: Metrics UI
+## Starting new shells
+
+For each Shell you're expected to setup, you'd have to run the following to enter the Wallaroo Docker container:
 
 Enter the Wallaroo Docker container:
 
@@ -68,6 +70,8 @@ docker exec -it wally env-setup
 ```
 
 This command will start a new Bash shell within the container, which will run the `env-setup` script to ensure our persistent Python `virtualenv` is set up.
+
+## Shell 2: Start the Metrics UI
 
 To start the Metrics UI run:
 
@@ -95,13 +99,7 @@ If you need to start the UI after stopping it, run:
 metrics_reporter_ui start
 ```
 
-## Shell 3: Data Receiver
-
-Enter the Wallaroo Docker container:
-
-```bash
-docker exec -it wally env-setup
-```
+## Shell 3: Run Data Receiver
 
 We'll use Data Receiver to listen for data from our Wallaroo application.
 
@@ -112,12 +110,6 @@ data_receiver --listen 127.0.0.1:5555 --no-write --ponythreads=1 --ponynoblock
 Data Receiver will start up and receive data without creating any output. By default, it prints received data to standard out, but we are giving it the `--no-write` flag which results in no output.
 
 ## Shell 4: Run the "Celsius to Fahrenheit" Application
-
-Enter the Wallaroo Docker container:
-
-```bash
-docker exec -it wally env-setup
-```
 
 First, we'll need to get to the python Celsius example directory with the following command:
 
@@ -136,13 +128,7 @@ machida --application-module celsius --in 127.0.0.1:7000 \
 
 This tells the "Celsius to Fahrenheit" application that it should listen on port `7000` for incoming data, write outgoing data to port `5555`, and send metrics data to port `5001`.
 
-## Shell 5: Sending Data
-
-Enter the Wallaroo Docker container:
-
-```bash
-docker exec -it wally env-setup
-```
+## Shell 5: Sending Data with Giles Sender
 
 We will be sending in 25,000,000 messages using a pre-generated data file. The data file will be repeatedly sent via Giles Sender until we reach 25,000,000 messages.
 
@@ -169,9 +155,9 @@ If your landing page resembles the one above, the "Celsius to Fahrenheit" applic
 
 Now, let's have a look at some metrics. By clicking on the "Celsius to Fahrenheit" link, you'll be taken to the "Application Dashboard" page. On this page you should see metric stats for the following:
 
-* a single pipeline: `Celsius Conversion`
-* a single worker: `Initializer`
-* three computations: `Add32`, `Decode Time in TCP Source`, `Multiply by 1.8`
+- a single pipeline: `Celsius Conversion`
+- a single worker: `Initializer`
+- three computations: `Add32`, `Decode Time in TCP Source`, `Multiply by 1.8`
 
 ![Application Dashboard Page](/book/metrics/images/application-dashboard-page.png)
 
@@ -186,12 +172,6 @@ Feel free to click around and get a feel for how the Metrics UI is set up and ho
 ## Shutdown
 
 ### Shell 6: Cluster Shutdown
-
-Enter the Wallaroo Docker container:
-
-```bash
-docker exec -it wally env-setup
-```
 
 You can shut down the cluster with this command at any time:
 
@@ -218,4 +198,3 @@ docker stop wally
 This command will also terminate any active sessions you may have left open to the docker container.
 
 For tips on editing existing Wallaroo example code or installing Python modules within Docker, have a look at our [Tips for using Wallaroo in Docker](/book/appendix/wallaroo-in-docker-tips.md) section.
-

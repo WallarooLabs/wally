@@ -22,24 +22,28 @@ The outputs of the application are strings. Here's an example output message, wr
 
 The `Decoder`'s `Decode(...)` method creates a string from the value represented by the payload. The string is then sent to the `Reverse` computation where it is reversed. The reversed string is then sent to `Encoder`'s `Encode(...)` method, where a newline is appended to the string.
 
-## Building Reverse
+## Building Kafka Reverse
 
-In the reverse directory, run `make`.
+In order to build the application you will need a Wallaroo environment. Please visit our [setup](https://docs.wallaroolabs.com/book/go/getting-started/choosing-an-installation-option.html) instructions if you have not already done so.
 
-## Running Reverse
+You will need a new shell to build this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details). Open a shell and go to the `examples/go/kafka_reverse` directory.
 
-In order to run the application you will need Giles Sender and the Cluster Shutdown tool. To build them, please see the [Linux](/book/go/getting-started/linux-setup.md) setup instructions.
+In the kafka_reverse directory, run `make`.
+
+## Running Kafka Reverse
+
+In order to run the application you will need the Cluster Shutdown tool. We provide instructions for building these tools yourself. Please visit our [setup](https://docs.wallaroolabs.com/book/go/getting-started/choosing-an-installation-option.html) instructions if you have not already done so.
 
 You will also need access to a Kafka cluster. This example assumes that there is a Kafka broker listening on port `9092` on `127.0.0.1`.
 
-You will need five separate shells to run this application. Open each shell and go to the `examples/go/kafka_reverse` directory.
+You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details). Open each shell and go to the `examples/go/kafka_reverse` directory.
 
 ### Shell 1: Metrics
 
 Start up the Metrics UI if you don't already have it running:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -47,19 +51,19 @@ You can verify it started up correctly by visiting [http://localhost:4000](http:
 If you need to restart the UI, run:
 
 ```bash
-docker restart mui
+metrics_reporter_ui restart
 ```
 
 When it's time to stop the UI, run:
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```
 
 If you need to start the UI after stopping it, run:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 ### Shell 2: Kafka setup and listener
@@ -96,7 +100,7 @@ docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
 
 **Note:** The `./cluster up 1` command outputs `Host IP used for Kafka Brokers is <YOUR_HOST_IP>`.
 
-#### Set up a listener to monitor the Kafka topic to which you would the application to publish results. We usually use `kafkacat`.
+#### Set up a listener to monitor the Kafka topic the application will publish results to. We usually use `kafkacat`.
 
 `kafkacat` can be installed via:
 
@@ -153,7 +157,7 @@ The output will be printed to the console in the first shell. Each line should b
 You can shut down the cluster with this command at any time:
 
 ```bash
-../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+cluster_shutdown 127.0.0.1:5050
 ```
 
 You can shut down the kafkacat producer by pressing Ctrl-d from its shell.
@@ -174,5 +178,5 @@ cd /tmp/local-kafka-cluster
 You can shut down the Metrics UI with the following command:
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```
