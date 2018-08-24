@@ -2,6 +2,17 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
+## [unreleased] - unreleased
+
+### Fixed
+
+
+### Added
+
+
+### Changed
+
+
 ## [0.5.2] - 2018-08-24
 
 ### Added
