@@ -10,7 +10,7 @@ class CountStream(object):
         self.port = int(port)
 
     def sink(self):
-        return wallaroo.experimental.ExternalSink(
+        return wallaroo.experimental.SinkExtensionConfig(
             host = self.host,
             port = self.port,
             encoder = count_encoder)

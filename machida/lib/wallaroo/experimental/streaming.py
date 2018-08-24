@@ -20,7 +20,7 @@ from wallaroo.builder import _validate_arity_compatability
 # A decorator class used because we use decode rather than call in machida and
 # also require header_length and payload_length even though those are fixed in
 # this specific implementation now.
-class stream_message_decoder(object):
+class streaming_message_decoder(object):
 
     def __init__(self, decoder):
         _validate_arity_compatability(decoder, 1)
@@ -44,7 +44,7 @@ class stream_message_decoder(object):
 
 
 # A decorator class used because we use encode rather than call in machida.
-class stream_message_encoder(object):
+class streaming_message_encoder(object):
 
     def __init__(self, encoder):
         _validate_arity_compatability(encoder, 1)
@@ -77,7 +77,7 @@ class StreamDecoderError(Exception):
     pass
 
 
-@stream_message_decoder
+@streaming_message_decoder
 def identity_decoder(message):
     return message
 

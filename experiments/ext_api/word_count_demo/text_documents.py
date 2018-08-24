@@ -11,7 +11,7 @@ class TextStream(object):
         self.port = int(port)
 
     def source(self):
-        return wallaroo.experimental.ExternalSource(
+        return wallaroo.experimental.SourceExtensionConfig(
             host=self.host,
             port=self.port,
             decoder=text_decoder)
