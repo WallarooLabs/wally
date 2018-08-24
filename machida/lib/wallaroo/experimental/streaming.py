@@ -82,7 +82,7 @@ def identity_decoder(message):
     return message
 
 
-@stream_message_encoder
+@streaming_message_encoder
 def identity_encoder(message):
     if not isinstance(message, str):
         raise StreamDecoderError(
