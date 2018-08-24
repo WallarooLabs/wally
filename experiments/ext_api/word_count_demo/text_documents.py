@@ -11,7 +11,7 @@ class TextStream(object):
         self.port = int(port)
 
     def source(self):
-        return wallaroo.experimental.ExternalSource(
+        return wallaroo.experimental.SourceExtensionConfig(
             host=self.host,
             port=self.port,
             decoder=text_decoder)
@@ -29,11 +29,11 @@ def parse_text_stream_addr(args):
     return tuple(input_addr.split(':'))
 
 
-@wallaroo.experimental.stream_message_decoder
+@wallaroo.experimental.streaming_message_decoder
 def text_decoder(message):
     return message.decode("utf-8")
 
 
-@wallaroo.experimental.stream_message_encoder
+@wallaroo.experimental.streaming_message_encoder
 def text_encoder(message):
     return message.encode("utf-8")
