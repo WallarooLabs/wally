@@ -2,10 +2,7 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [unreleased] - unreleased
-
-### Fixed
-
+## [0.5.2] - 2018-08-24
 
 ### Added
 
@@ -13,9 +10,6 @@ All notable changes to Wallaroo will be documented in this file.
 - Added support for Fedora 28, CentOS 7, and Debian Stretch Linux distributions via Wallaroo Up
 - Added Vagrant as an option for trying out the Wallaroo Go
 - Added Docker as an option for trying out the Wallaroo Go
-
-### Changed
-
 
 ## [0.5.1] - 2018-08-01
 
@@ -26,7 +20,6 @@ All notable changes to Wallaroo will be documented in this file.
 ### Changed
 
 - Filter none/nil in Decoder for Python/Go API's ([PR #2259](https://github.com/wallaroolabs/wallaroo/pull/2259))
-
 
 ## [0.5.0] - 2018-07-25
 
