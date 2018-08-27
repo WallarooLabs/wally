@@ -57,6 +57,12 @@ trait _RecoveryPhase
     _invalid_call()
     Fail()
 
+  fun ref ack_recovery_initiated(w: WorkerName,
+    token: SnapshotRollbackBarrierToken)
+  =>
+    _invalid_call()
+    Fail()
+
   fun ref rollback_complete(worker: WorkerName,
     token: SnapshotRollbackBarrierToken)
   =>
@@ -64,9 +70,10 @@ trait _RecoveryPhase
     Fail()
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken, recovery: Recovery ref)
+    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
     recovery._abort_early(worker)
+    true
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on recovery phase %s\n".cstring(),
@@ -101,16 +108,17 @@ class _BoundariesReconnect is _RecoveryPhase
 
   fun ref recovery_reconnect_finished() =>
     if not _override_received then
-      _recovery._initiate_rollback()
+      _recovery._prepare_rollback()
     else
       _recovery._abort_early(_override_worker)
     end
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken, recovery: Recovery ref)
+    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
     _override_received = true
     _override_worker = worker
+    true
 
 class _PrepareRollback is _RecoveryPhase
   let _recovery: Recovery ref
@@ -185,6 +193,32 @@ class _AwaitDataReceiversAck is _RecoveryPhase
   fun ref data_receivers_ack() =>
     _recovery._data_receivers_ack_complete(_token)
 
+class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
+  let _workers: Array[WorkerName] val
+  let _token: SnapshotRollbackBarrierToken
+  let _recovery: Recovery ref
+  let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
+
+  new create(token: SnapshotRollbackBarrierToken,
+    workers: Array[WorkerName] val, recovery: Recovery ref)
+  =>
+    _token = token
+    _workers = workers
+    _recovery = recovery
+
+  fun name(): String => "_AwaitRecoveryInitiatedAcks"
+
+  fun ref ack_recovery_initiated(w: WorkerName,
+    token: SnapshotRollbackBarrierToken)
+  =>
+    if token != _token then
+      Fail()
+    end
+    _acked_workers.set(w)
+    if _acked_workers.size() == _workers.size() then
+      _recovery._recovery_initiated_acks_complete(_token)
+    end
+
 class _Rollback is _RecoveryPhase
   let _recovery: Recovery ref
   let _token: SnapshotRollbackBarrierToken
@@ -213,11 +247,53 @@ class _Rollback is _RecoveryPhase
     end
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken, recovery: Recovery ref)
+    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
     if token > _token then
       _recovery._abort_early(worker)
+      true
+    else
+      false
     end
 
 class _FinishedRecovering is _RecoveryPhase
   fun name(): String => "_FinishedRecovering"
+
+  fun ref try_override_recovery(worker: WorkerName,
+    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
+  =>
+    true
+
+class _RecoveryOverrideAccepted is _RecoveryPhase
+  fun name(): String => "_RecoveryOverrideAccepted"
+
+  fun ref recovery_reconnect_finished() =>
+    None
+
+  fun ref rollback_prep_complete() =>
+    None
+
+  fun ref worker_ack_topology_rollback(w: WorkerName, snapshot_id: SnapshotId)
+  =>
+    None
+
+  fun ref rollback_barrier_complete(token: SnapshotRollbackBarrierToken) =>
+    None
+
+  fun ref data_receivers_ack() =>
+    None
+
+  fun ref rollback_complete(worker: WorkerName,
+    token: SnapshotRollbackBarrierToken)
+  =>
+    None
+
+  fun ref try_override_recovery(worker: WorkerName,
+    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
+  =>
+    true
+
+  fun ref ack_recovery_initiated(w: WorkerName,
+    token: SnapshotRollbackBarrierToken)
+  =>
+    None
