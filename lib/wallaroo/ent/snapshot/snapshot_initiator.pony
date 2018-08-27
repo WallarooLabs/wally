@@ -230,7 +230,6 @@ actor SnapshotInitiator is Initializable
 
   be initiate_rollback(recovery_action: Promise[SnapshotRollbackBarrierToken])
   =>
-    @printf[I32]("!@ !!!!SnapshotInitiator: initiate_rollback!!!!\n".cstring())
     if (_primary_worker == _worker_name) then
       if _current_snapshot_id == 0 then
         @printf[I32]("No snapshots were taken!\n".cstring())
@@ -244,10 +243,8 @@ actor SnapshotInitiator is Initializable
       let rollback_id = _last_rollback_id + 1
       _last_rollback_id = rollback_id
 
-      // TODO: To increase odds that snapshots were successfully flushed to
-      // disk, we're using the second to last snapshot if one exists. We
-      // should probably change this and address the question of whether a
-      // snapshot was successfully written out directly.
+      @printf[I32]("!@ !!!!SnapshotInitiator: initiate_rollback %s!!!!\n".cstring(), rollback_id.string().cstring())
+
       let token = SnapshotRollbackBarrierToken(rollback_id,
         _last_complete_snapshot_id)
       if _current_snapshot_id < _last_complete_snapshot_id then
@@ -263,7 +260,7 @@ actor SnapshotInitiator is Initializable
           Fail()
         end
       })
-      let resume_token = SnapshotRollbackResumeBarrierToken(_last_rollback_id,
+      let resume_token = SnapshotRollbackResumeBarrierToken(rollback_id,
         _last_complete_snapshot_id)
       _barrier_initiator.inject_blocking_barrier(token, barrier_action,
         resume_token)

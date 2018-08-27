@@ -116,7 +116,7 @@ actor EventLog
       if _config.is_recovering then
         _RecoveringEventLogPhase(this)
       else
-        _NormalEventLogPhase(this)
+        _NormalEventLogPhase(1, this)
       end
 
   be set_barrier_initiator(barrier_initiator: BarrierInitiator) =>
@@ -191,10 +191,10 @@ actor EventLog
     _backend.encode_snapshot_id(snapshot_id)
     _phase.snapshot_id_written(snapshot_id)
 
-  fun ref snapshot_complete() =>
+  fun ref snapshot_complete(snapshot_id: SnapshotId) =>
     @printf[I32]("!@ EventLog: snapshot_complete()\n".cstring())
     write_log()
-    _phase = _NormalEventLogPhase(this)
+    _phase = _NormalEventLogPhase(snapshot_id + 1, this)
 
   /////////////////
   // ROLLBACK
@@ -246,8 +246,8 @@ actor EventLog
   be ack_rollback(resilient_id: RoutingId) =>
     _phase.ack_rollback(resilient_id)
 
-  fun ref rollback_complete() =>
-    _phase = _NormalEventLogPhase(this)
+  fun ref rollback_complete(snapshot_id: SnapshotId) =>
+    _phase = _NormalEventLogPhase(snapshot_id + 1, this)
 
 
 
