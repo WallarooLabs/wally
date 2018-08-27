@@ -357,6 +357,12 @@ actor DataReceiver is (Producer & Rerouter)
     | let srt: SnapshotRollbackBarrierToken =>
       _pending_message_store.clear()
       _pending_barriers.clear()
+    //!@ This isn't good enough. We need to ensure that we've been overriden
+    // to make this change back from recovery phase. As it stands, this
+    // introduces a race condition if we receive an old resume token in flight
+    // before we recovered.
+    | let srt: SnapshotRollbackResumeBarrierToken =>
+      _phase = _NormalDataReceiverPhase(this)
     end
 
     _forward_barrier(target_step_id, origin_step_id, barrier_token)
