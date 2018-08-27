@@ -19,7 +19,8 @@ A typical command used to create a cluster on AWS for performance testing Wallar
 ```bash
 make cluster cluster_name=<YOUR-CLUSTER-NAME> num_followers=2 \
   force_instance=c4.8xlarge ansible_system_cpus=0,18 no_spot=true \
-  cluster_project_name=wallaroo_perf_testing ansible_install_devtools=true
+  cluster_project_name=wallaroo_perf_testing ansible_install_devtools=true \
+  terraform_args="-var placement_tenancy=dedicated"
 ```
 
 - `cluster_name`: the name you'd want to use for your cluster, this should be a unique identifier that you can remember.
@@ -36,6 +37,8 @@ make cluster cluster_name=<YOUR-CLUSTER-NAME> num_followers=2 \
 
 - `ansible_install_devtools`: When set to `true`, preinstalls several tools needed for developing Wallaroo. See the [Dev Tools List](#dev-tools-list) section for a list of tools installed.
 
+- `terraform_args="-var placement_tenancy=dedicated"`: forces the placement tenancy to dedicated for the AWS instances. Needed since there has been an increase in network latency in multi-worker runs.
+
 ### Wallaroo Metrics UI Commands
 
 The following command will start the Wallaroo Metrics UI, we're assuming this is being started on `wallaroo-follower-2`:
@@ -46,7 +49,7 @@ docker run -d -u root --cpuset-cpus 0,18 --privileged  -v /usr/bin:/usr/bin:ro \
   -v /lib64:/lib64:ro -v /usr:/usr:ro -v /tmp:/apps/metrics_reporter_ui/log \
   -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
   -e "BINS_TYPE=demo" -e "RELX_REPLACE_OS_VARS=true" --name mui -h mui \
-  --net=host wallaroolabs/wallaroo-metrics-ui:0.4.0
+  --net=host wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.5.2
 ```
 To access the Metrics UI, visit the host IP of `wallaroo-follower-2` provided by the output of
 
@@ -64,7 +67,7 @@ sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
   -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 \
   -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 \
   -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050 \
-  --ponynoblock --ponythreads=16 --ponypinasio
+  --ponynoblock --ponythreads=16 --ponypinasio --ponyminthreads=999
 ```
 
 - `cset proc -s user -e`: this command tells cset to execute the following commands in the `user` cpuset.
@@ -81,6 +84,8 @@ sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
 
 - `--ponythreads=16`: For the current processing rate we currently test Walalroo with, we've determined that 16 threads works best. This should be adjusted to fit the instance type you choose if 16 threads are not avialable.
 
+- `--ponyminthreads=999`: Forces the minimum amount of threads to be used by the application to be the maximum number of CPUs available to the application. This is to remove the possibility of the application using less threads than available.
+
 #### 2 Worker
 
 These commands will only be broken down to reference new additions or changes.
@@ -88,7 +93,12 @@ These commands will only be broken down to reference new additions or changes.
 Start `worker 1`, this command would be run on `wallaroo-leader-1`:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 ~/wallaroo/testing/performance/apps/market-spread/market-spread  -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -t -e wallaroo-leader-1:5050  -w 2 --ponynoblock --ponythreads=16 --ponypinasio
+sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
+  ~/wallaroo/testing/performance/apps/market-spread/market-spread  \
+  -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 \
+  -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 \
+  -t -e wallaroo-leader-1:5050  -w 2 --ponynoblock --ponythreads=16 --ponypinasio \
+  --ponyminthreads=999
 ```
 
 ` -w 2`: This command tells the Wallaroo `Initializer` that it is expecting to start a 2 worker cluster. This should be adjusted to account for the amount of workers you plan to test.
@@ -100,7 +110,7 @@ sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
   ~/wallaroo/testing/performance/apps/market-spread/market-spread \
   -i wallaroo-leader-1:7000,wallaroo-leader-1:7001 -o wallaroo-follower-2:5555 \
   -m wallaroo-follower-2:5001 -c wallaroo-leader-1:12500 -n worker2 \
-  --ponythreads=16 --ponypinasio --ponynoblock
+  --ponythreads=16 --ponypinasio --ponynoblock --ponyminthreads=999
 ```
 
 - `-c wallaroo-leader-1:12500`: Control channel used to communicate to the `Initializer`. If the `Initializer` was started on any host other than `wallaroo-leader-1`, this should be adjusted to match that host.

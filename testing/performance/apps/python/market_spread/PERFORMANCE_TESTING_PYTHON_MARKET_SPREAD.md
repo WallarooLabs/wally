@@ -17,7 +17,7 @@ You will have to replace `<YOUR-CLUSTER-NAME>` with the name you want to give yo
 The following command will spin up the cluster:
 
 ```bash
-make cluster cluster_name=<YOUR-CLUSTER-NAME> num_followers=2 force_instance=c4.8xlarge ansible_system_cpus=0,18 no_spot=true cluster_project_name=wallaroo_perf_testing ansible_install_devtools=true
+make cluster cluster_name=<YOUR-CLUSTER-NAME> num_followers=2 force_instance=c4.8xlarge ansible_system_cpus=0,18 no_spot=true cluster_project_name=wallaroo_perf_testing ansible_install_devtools=true terraform_args="-var placement_tenancy=dedicated"
 ```
 
 If successful, you should see output that looks like this:
@@ -100,9 +100,7 @@ Build the required Wallaroo tools:
 
 ```bash
 cd ~/wallaroo
-make build-machida
-make build-giles-all
-make build-utils-cluster_shutdown
+make build-machida build-giles-all build-utils-cluster_shutdown
 ```
 
 `scp` Wallaroo to other workers on the cluster:
@@ -141,7 +139,7 @@ SSH into `wallaroo-follower-2`
 Start the Metrics UI:
 
 ```bash
-docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroolabs/wallaroo-metrics-ui:0.4.0
+docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.5.2
 ```
 
 You can verify the Metrics UI is up by visiting the IP address of `wallaroo-follower-2` with `:4000` appended. So if the IP was `54.172.117.178` you'd visit https://54.172.117.178:4000
@@ -195,13 +193,13 @@ sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/
 #### NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 90 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
 ```
 
 #### Orders Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 175 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
 ```
 
 ### Market Spread Cluster Shutdown
@@ -224,20 +222,11 @@ You should allow this test to run for roughly 1/2 an hour and record the require
 
 ### Building Wallaroo and Tooling
 
-ssh into `wallaroo-leader-1` and get a copy of the `wallaroo` repo:
-
-```bash
-cd ~/
-git clone https://github.com/WallarooLabs/wallaroo.git
-```
-
-Build the required Wallaroo tools:
+ssh into `wallaroo-leader-1` and build the required Wallaroo tools:
 
 ```bash
 cd ~/wallaroo
-make build-machida
-make build-giles-all
-make build-utils-cluster_shutdown
+make build-machida build-giles-all build-utils-cluster_shutdown
 ```
 
 `scp` Wallaroo to other workers on the cluster:
@@ -277,7 +266,7 @@ SSH into `wallaroo-follower-2`
 Start the Metrics UI:
 
 ```bash
-docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroolabs/wallaroo-metrics-ui:0.4.0
+docker run -d -u root --cpuset-cpus 10-18 --privileged  -v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock -v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/apps/metrics_reporter_ui/log  -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 --name mui -h mui --net=host wallaroo-labs-docker-wallaroolabs.bintray.io/release/metrics_ui:0.5.2
 ```
 
 You can verify the Metrics UI is up by visiting the IP address of `wallaroo-follower-2` with `:4000` appended. So if the IP was `54.172.117.178` you'd visit https://54.172.117.178:4000
@@ -324,7 +313,7 @@ sudo PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo/machida" cset proc -s user -e numa
 
 #### Start Giles Senders
 
-These senders send out roughly 22k messages per second per stream, this is the current baseline for maximum performance of Python Market Spread, depending what you are testing this may need to be adjusted. Please visit the "Wallaroo Data Senders Commands" section of the [WALLAROO PERFORMANCE TESTING GUIDE](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#wallaroo-data-senders-commands) for more information regarding adjusting these values.
+These senders send out roughly 24k messages per second per stream, this is the current baseline for maximum performance of Python Market Spread, depending what you are testing this may need to be adjusted. Please visit the "Wallaroo Data Senders Commands" section of the [WALLAROO PERFORMANCE TESTING GUIDE](../../WALLAROO_PERFORMANCE_TESTING_GUIDE.md#wallaroo-data-senders-commands) for more information regarding adjusting these values.
 
 SSH into `wallaroo-follower-1`
 
@@ -345,7 +334,7 @@ sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/
 ##### Orders Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 100 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
 ```
 
 #### Market Spread Cluster Shutdown
