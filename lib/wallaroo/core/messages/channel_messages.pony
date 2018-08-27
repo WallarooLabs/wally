@@ -479,7 +479,19 @@ primitive ChannelMsgEncoder
   fun recovery_initiated(token: SnapshotRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
+    """
+    Sent to all workers in cluster when a recovering worker has connected so
+    that currently recovering workers can cede control.
+    """
     _encode(RecoveryInitiatedMsg(token, sender), auth)?
+
+  fun ack_recovery_initiated(token: SnapshotRollbackBarrierToken,
+    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    Worker acking that they received a RecoveryInitiatedMsg.
+    """
+    _encode(AckRecoveryInitiatedMsg(token, sender), auth)?
 
   fun initiate_rollback_barrier(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -1337,6 +1349,14 @@ class val CommitSnapshotIdMsg is ChannelMsg
     sender = sender'
 
 class val RecoveryInitiatedMsg is ChannelMsg
+  let token: SnapshotRollbackBarrierToken
+  let sender: WorkerName
+
+  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+    token = token'
+    sender = sender'
+
+class val AckRecoveryInitiatedMsg is ChannelMsg
   let token: SnapshotRollbackBarrierToken
   let sender: WorkerName
 

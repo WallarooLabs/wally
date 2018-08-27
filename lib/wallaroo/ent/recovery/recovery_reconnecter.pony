@@ -74,6 +74,9 @@ actor RecoveryReconnecter
   be register_step(step: Step) =>
     _steps.set(step)
 
+  be abort_early() =>
+    _reconnect_phase = _ReadyForNormalProcessing(this)
+
   be add_expected_boundary_count(worker: String, count: USize) =>
     _reconnect_phase.add_expected_boundary_count(worker, count)
 

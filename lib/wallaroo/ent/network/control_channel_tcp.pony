@@ -484,6 +484,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           m.sender)
       | let m: RecoveryInitiatedMsg =>
         _recovery.recovery_initiated_at_worker(m.sender, m.token)
+      | let m: AckRecoveryInitiatedMsg =>
+        _recovery.ack_recovery_initiated(m.sender, m.token)
       | let m: InitiateRollbackBarrierMsg =>
         let promise = Promise[SnapshotRollbackBarrierToken]
         promise.next[None]({(t: SnapshotRollbackBarrierToken) =>
