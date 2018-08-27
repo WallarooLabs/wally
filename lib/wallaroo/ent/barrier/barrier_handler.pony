@@ -248,11 +248,16 @@ class InProgressSecondaryBarrierHandler is BarrierHandler
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
+    @printf[I32]("!@ InProgressSecondaryBarrierHandler: Ack received.")
+
     check_for_completion()
 
   fun ref check_for_completion() =>
     if _acked_sinks.size() == _sinks.size() then
       _initiator.all_secondary_sinks_acked(_barrier_token, _primary_worker)
+    //!@
+    else
+      @printf[I32]("!@ InProgressSecondaryBarrierHandler: waiting for %s sinks to ack\n".cstring(), (_sinks.size() - _acked_sinks.size()).string().cstring())
     end
 
 class WorkerAcksBarrierHandler is BarrierHandler

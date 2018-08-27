@@ -38,6 +38,7 @@ class ActiveBarriers
   fun ref remove_barrier(barrier_token: BarrierToken) ? =>
     if _barriers.contains(barrier_token) then
       try
+        @printf[I32]("!@ ACTIVE_BARRIERS: Removing barrier %s\n".cstring(), barrier_token.string().cstring())
         _barriers.remove(barrier_token)?
       else
         Fail()
@@ -64,6 +65,11 @@ class ActiveBarriers
       _barriers(barrier_token)?.ack_barrier(s)
     else
       @printf[I32]("!@ ACTIVE_BARRIERS: ack_barrier on unknown %s\n".cstring(), barrier_token.string().cstring())
+      @printf[I32]("!@ ACTIVE_BARRIERS: Known barriers:\n".cstring())
+      //!@
+      for t in _barriers.keys() do
+        @printf[I32]("!@ -- %s\n".cstring(), t.string().cstring())
+      end
       Fail()
     end
 

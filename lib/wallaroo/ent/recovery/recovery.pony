@@ -33,8 +33,12 @@ actor Recovery
     5) _RollbackBarrier: Use barrier to ensure that all old data is cleared
        and all producers and consumers are ready to rollback state.
     6) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
-    7) _Rollback: Rollback all state to last safe checkpoint.
-    8) _FinishedRecovering: Finished recovery
+    7) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
+       recovery is about to start. This gives currently recovering workers a
+       chance to cede control to us if we're the latest recovering.
+    8) _Rollback: Rollback all state to last safe checkpoint.
+    9) _FinishedRecovering: Finished recovery
+    10) _RecoveryOverrideAccepted: If recovery was handed off to another worker
   """
   let _self: Recovery tag = this
   let _auth: AmbientAuth
@@ -101,7 +105,26 @@ actor Recovery
   be recovery_initiated_at_worker(worker: WorkerName,
     token: SnapshotRollbackBarrierToken)
   =>
-    _recovery_phase.try_override_recovery(worker, token, this)
+    let overriden = _recovery_phase.try_override_recovery(worker, token,
+      this)
+
+    if overriden then
+      _recovery_reconnecter.abort_early()
+      // !@ We should probably ensure DataReceivers has acked an override if
+      // that happens before acking.
+      try
+        let msg = ChannelMsgEncoder.ack_recovery_initiated(token, _worker_name,
+          _auth)?
+        _connections.send_control(worker, msg)
+      else
+        Fail()
+      end
+    end
+
+  be ack_recovery_initiated(worker: WorkerName,
+    token: SnapshotRollbackBarrierToken)
+  =>
+    _recovery_phase.ack_recovery_initiated(worker, token)
 
   fun ref _start_reconnect(workers: Array[WorkerName] val) =>
     ifdef "resilience" then
@@ -111,7 +134,7 @@ actor Recovery
       this)
     _recovery_phase.start_reconnect()
 
-  fun ref _initiate_rollback() =>
+  fun ref _prepare_rollback() =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Prepare Rollback - ~~|\n".cstring())
       _event_log.prepare_for_rollback(this)
@@ -184,7 +207,10 @@ actor Recovery
 
   fun ref _data_receivers_ack_complete(token: SnapshotRollbackBarrierToken) =>
     ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Rollback - ~~|\n".cstring())
+      @printf[I32](("|~~ - Recovery Phase: Await Recovery Initiated Acks " +
+        "- ~~| \n").cstring())
+      _recovery_phase = _AwaitRecoveryInitiatedAcks(token, _workers, this)
+
       // Inform cluster we've initiated recovery
       try
         let msg = ChannelMsgEncoder.recovery_initiated(token, _worker_name,
@@ -193,6 +219,14 @@ actor Recovery
       else
         Fail()
       end
+      _recovery_phase.ack_recovery_initiated(_worker_name, token)
+    end
+
+  fun ref _recovery_initiated_acks_complete(
+    token: SnapshotRollbackBarrierToken)
+  =>
+    ifdef "resilience" then
+      @printf[I32]("|~~ - Recovery Phase: Rollback - ~~|\n".cstring())
 
       _recovery_phase = _Rollback(this, token, _workers)
       let action = Promise[SnapshotRollbackBarrierToken]
@@ -236,4 +270,4 @@ actor Recovery
     """
     @printf[I32]("|~~ - Recovery initiated at %s. Ceding control. - ~~|\n"
       .cstring(), worker.cstring())
-    _recovery_phase = _FinishedRecovering
+    _recovery_phase = _RecoveryOverrideAccepted
