@@ -182,26 +182,31 @@ actor Startup
         _joining_listener = joining_listener
         _disposables.set(joining_listener)
       elseif _is_recovering then
-        let connect_addr =
-          match _startup_options.j_arg
-          | let j: Array[String] => j
-          else
-            _startup_options.c_addr
-          end
-        let control_notifier: TCPConnectionNotify iso =
-          RecoveryControlSenderConnectNotifier(auth,
-            _startup_options.worker_name, this)
-        let control_conn: TCPConnection =
-          TCPConnection(auth, consume control_notifier, connect_addr(0)?,
-            connect_addr(1)?)
-        _disposables.set(control_conn)
-        @printf[I32]("Requesting recovery info from cluster...\n".cstring())
-        // This only exists to keep recovering worker alive while it waits for
-        // cluster information.
-        // TODO: Eliminate the need for this.
-        let recovery_listener = TCPListener(auth, RecoveryListenNotifier)
-        _recovery_listener = recovery_listener
-        _disposables.set(recovery_listener)
+        // if _startup_options.is_initializer then
+        (let snapshot_id, let rollback_id) =
+          LatestSnapshotId.read(auth, _snapshot_ids_file)
+        _initialize(snapshot_id)
+        //!@
+        // let connect_addr =
+        //   match _startup_options.j_arg
+        //   | let j: Array[String] => j
+        //   else
+        //     _startup_options.c_addr
+        //   end
+        // let control_notifier: TCPConnectionNotify iso =
+        //   RecoveryControlSenderConnectNotifier(auth,
+        //     _startup_options.worker_name, this)
+        // let control_conn: TCPConnection =
+        //   TCPConnection(auth, consume control_notifier, connect_addr(0)?,
+        //     connect_addr(1)?)
+        // _disposables.set(control_conn)
+        // @printf[I32]("Requesting recovery info from cluster...\n".cstring())
+        // // This only exists to keep recovering worker alive while it waits for
+        // // cluster information.
+        // // TODO: Eliminate the need for this.
+        // let recovery_listener = TCPListener(auth, RecoveryListenNotifier)
+        // _recovery_listener = recovery_listener
+        // _disposables.set(recovery_listener)
       else
         _initialize()
       end
@@ -217,8 +222,6 @@ actor Startup
     match _recovery_listener
     | let l: TCPListener =>
       l.dispose()
-    else
-      Fail()
     end
     _initialize(snapshot_id)
 
