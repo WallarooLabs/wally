@@ -190,7 +190,7 @@ actor Recovery
       action.next[None]({(token: SnapshotRollbackBarrierToken) =>
         _self.rollback_barrier_complete(token)
       })
-      _snapshot_initiator.initiate_rollback(action)
+      _snapshot_initiator.initiate_rollback(action, _worker_name)
 
       _recovery_phase = _RollbackBarrier(this)
     else

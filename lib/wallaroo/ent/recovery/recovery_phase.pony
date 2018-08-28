@@ -259,6 +259,9 @@ class _Rollback is _RecoveryPhase
 class _FinishedRecovering is _RecoveryPhase
   fun name(): String => "_FinishedRecovering"
 
+  fun ref recovery_reconnect_finished() =>
+    None
+
   fun ref try_override_recovery(worker: WorkerName,
     token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
   =>

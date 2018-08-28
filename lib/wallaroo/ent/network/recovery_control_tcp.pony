@@ -20,6 +20,7 @@ use "wallaroo/ent/recovery"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/mort"
 
+//!@
 class RecoveryControlSenderConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _worker_name: String

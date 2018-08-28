@@ -228,7 +228,8 @@ actor SnapshotInitiator is Initializable
     end
     _phase = _WaitingSnapshotInitiatorPhase
 
-  be initiate_rollback(recovery_action: Promise[SnapshotRollbackBarrierToken])
+  be initiate_rollback(recovery_action: Promise[SnapshotRollbackBarrierToken],
+    worker: WorkerName)
   =>
     if (_primary_worker == _worker_name) then
       if _current_snapshot_id == 0 then
@@ -243,7 +244,7 @@ actor SnapshotInitiator is Initializable
       let rollback_id = _last_rollback_id + 1
       _last_rollback_id = rollback_id
 
-      @printf[I32]("!@ !!!!SnapshotInitiator: initiate_rollback %s!!!!\n".cstring(), rollback_id.string().cstring())
+      @printf[I32]("!@ !!!!SnapshotInitiator: initiate_rollback %s on behalf of %s!!!!\n".cstring(), rollback_id.string().cstring(), worker.cstring())
 
       let token = SnapshotRollbackBarrierToken(rollback_id,
         _last_complete_snapshot_id)
@@ -311,8 +312,22 @@ actor SnapshotInitiator is Initializable
 
   fun ref _load_latest_snapshot_id() =>
     @printf[I32]("!@ Loading _load_latest_snapshot_id\n".cstring())
+    (let snapshot_id, let rollback_id) =
+      LatestSnapshotId.read(_auth, _snapshot_id_file)
+    _current_snapshot_id = snapshot_id
+    _last_complete_snapshot_id = snapshot_id
+    _last_rollback_id = rollback_id
+
+  be dispose() =>
+    @printf[I32]("Shutting down SnapshotInitiator\n".cstring())
+    _timers.dispose()
+
+primitive LatestSnapshotId
+  fun read(auth: AmbientAuth, snapshot_id_file: String):
+    (SnapshotId, RollbackId)
+  =>
     try
-      let filepath = FilePath(_auth, _snapshot_id_file)?
+      let filepath = FilePath(auth, snapshot_id_file)?
       if filepath.exists() then
         let file = File(filepath)
         file.seek_end(0)
@@ -322,25 +337,21 @@ actor SnapshotInitiator is Initializable
         //!@
         let snapshot_id = r.u64_be()?
         @printf[I32]("!@ Loaded SnapshotId: %s\n".cstring(), snapshot_id.string().cstring())
-        _current_snapshot_id = snapshot_id
-        _last_complete_snapshot_id = snapshot_id
         let rollback_id = r.u64_be()?
         @printf[I32]("!@ Loaded RollbackId: %s\n".cstring(), rollback_id.string().cstring())
-        _last_rollback_id = rollback_id
+        (snapshot_id, rollback_id)
       else
         @printf[I32]("No latest snapshot id in recovery file.\n".cstring())
         //!@ What do we do here?
         Fail()
+        (0, 0)
       end
     else
       @printf[I32]("Error reading snapshot id recovery file!".cstring())
       //!@ What do we do here?
       Fail()
+      (0, 0)
     end
-
-  be dispose() =>
-    @printf[I32]("Shutting down SnapshotInitiator\n".cstring())
-    _timers.dispose()
 
 class _InitiateSnapshot is TimerNotify
   let _si: SnapshotInitiator
