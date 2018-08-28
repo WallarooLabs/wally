@@ -293,7 +293,8 @@ class DataChannelConnectNotifier is DataChannelNotify
               data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
               my_latest_ts)
           | let fbm: ForwardBarrierMsg =>
-            _receiver.forward_barrier(fbm.target_id, fbm.origin_id, fbm.token)
+            _receiver.forward_barrier(fbm.target_id, fbm.origin_id, fbm.token,
+              fbm.seq_id)
           end
         else
           Fail()
@@ -315,7 +316,7 @@ class DataChannelConnectNotifier is DataChannelNotify
       | let m: UnregisterProducerMsg =>
         _receiver.unregister_producer(m.source_id, m.target_id)
       | let m: ForwardBarrierMsg =>
-        _receiver.forward_barrier(m.target_id, m.origin_id, m.token)
+        _receiver.forward_barrier(m.target_id, m.origin_id, m.token, m.seq_id)
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
           .cstring())
@@ -366,7 +367,7 @@ trait _DataReceiverWrapper
     Fail()
 
   fun forward_barrier(target_id: RoutingId, origin_id: RoutingId,
-    token: BarrierToken)
+    token: BarrierToken, seq_id: SeqId)
   =>
     Fail()
 
@@ -415,6 +416,6 @@ class _DataReceiver is _DataReceiverWrapper
     data_receiver.unregister_producer(input_id, output_id)
 
   fun forward_barrier(target_id: RoutingId, origin_id: RoutingId,
-    token: BarrierToken)
+    token: BarrierToken, seq_id: SeqId)
   =>
-    data_receiver.forward_barrier(target_id, origin_id, token)
+    data_receiver.forward_barrier(target_id, origin_id, token, seq_id)

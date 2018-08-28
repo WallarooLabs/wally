@@ -25,7 +25,7 @@ trait _DataReceiverPhase
     Fail()
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
-    token: BarrierToken)
+    token: BarrierToken, seq_id: SeqId)
   =>
     _invalid_call()
     Fail()
@@ -83,14 +83,14 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
     None
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
-    token: BarrierToken)
+    token: BarrierToken, seq_id: SeqId)
   =>
     // Drop anything that's not related to rollback
     match token
     | let srt: SnapshotRollbackBarrierToken =>
-      _data_receiver.send_barrier(input_id, output_id, token)
+      _data_receiver.send_barrier(input_id, output_id, token, seq_id)
     | let srt: SnapshotRollbackResumeBarrierToken =>
-      _data_receiver.send_barrier(input_id, output_id, token)
+      _data_receiver.send_barrier(input_id, output_id, token, seq_id)
     else
       ifdef debug then
         @printf[I32]("Recovering DataReceiver dropping non-rollback barrier\n"
@@ -129,9 +129,9 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
       metrics_id, worker_ingress_ts)
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
-    token: BarrierToken)
+    token: BarrierToken, seq_id: SeqId)
   =>
-    _data_receiver.send_barrier(input_id, output_id, token)
+    _data_receiver.send_barrier(input_id, output_id, token, seq_id)
 
   fun data_connect() =>
     _data_receiver._inform_boundary_to_send_normal_messages()
@@ -167,9 +167,9 @@ class _QueuingDataReceiverPhase is _DataReceiverPhase
     _queued.push(qrdm)
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
-    token: BarrierToken)
+    token: BarrierToken, seq_id: SeqId)
   =>
-    _queued.push((input_id, output_id, token))
+    _queued.push((input_id, output_id, token, seq_id))
 
   fun data_connect() =>
     _data_receiver._inform_boundary_to_send_normal_messages()
@@ -181,7 +181,7 @@ class _QueuingDataReceiverPhase is _DataReceiverPhase
 type _Queued is (_QueuedBarrier | _QueuedDeliveryMessage |
   _QueuedReplayableDeliveryMessage)
 
-type _QueuedBarrier is (RoutingId, RoutingId, BarrierToken)
+type _QueuedBarrier is (RoutingId, RoutingId, BarrierToken, SeqId)
 
 // !@ We need to unify this with RoutingArguments
 class _QueuedDeliveryMessage
