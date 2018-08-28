@@ -222,7 +222,8 @@ class DataChannelConnectNotifier is DataChannelNotify
         @printf[I32]("Rcvd msg header on data channel\n".cstring())
       end
       try
-        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
+        let expect =
+          Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
         conn.expect(expect)
         _header = false

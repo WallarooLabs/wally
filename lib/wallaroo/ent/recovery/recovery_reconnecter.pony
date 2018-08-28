@@ -252,6 +252,7 @@ class _WaitingForBoundaryCounts is _ReconnectPhase
   fun name(): String => "Waiting for Boundary Counts Phase"
 
   fun ref add_expected_boundary_count(worker: String, count: USize) =>
+    @printf[I32]("!@ add_expected_boundary_count: w: %s, c: %s\n".cstring(), worker.cstring(), count.string().cstring())
     ifdef debug then
       // This should only be called once per worker
       Invariant(not _expected_boundaries.contains(worker))
