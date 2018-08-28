@@ -86,6 +86,8 @@ use @py_decref[None](o: Pointer[U8] box)
 use @py_list_check[I32](b: Pointer[U8] box)
 
 use @Py_Initialize[None]()
+use @Py_SetProgramName[None](str: Pointer[U8] tag)
+use @PySys_SetArgv[None](argc: U32, argv: Pointer[U8] tag)
 use @PyErr_Clear[None]()
 use @PyErr_Occurred[Pointer[U8]]()
 use @PyErr_print[None]()
@@ -521,6 +523,8 @@ primitive Machida
 
   fun start_python() =>
     @Py_Initialize()
+    @PySys_SetArgv(0, "".cstring())
+    @Py_SetProgramName("wallaroo".cstring())
 
   fun load_module(module_name: String): ModuleP ? =>
     let r = @load_module(module_name.cstring())
