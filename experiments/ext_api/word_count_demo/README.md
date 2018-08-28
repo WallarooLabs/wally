@@ -1,3 +1,9 @@
+---
+
+*NOTE* This document describes a feature under dvelopment and is meant for internal Wallaroo use only.
+
+---
+
 # Experimental Wallaroo Extension API
 
 Wallaroo includes some relatively low level extension points. These may work

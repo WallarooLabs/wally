@@ -26,7 +26,7 @@ class SourceConfig(object):
         self._decoder = decoder
 
     def to_tuple(self):
-        return ("byoi", self._host, self._port, self._decoder)
+        return ("byoi", self._host, str(self._port), self._decoder)
 
 
 class SinkConfig(object):
@@ -36,7 +36,7 @@ class SinkConfig(object):
         self._encoder = encoder
 
     def to_tuple(self):
-        return ("byoi", self._host, self._port, self._encoder)
+        return ("byoi", self._host, str(self._port), self._encoder)
 
 
 def parse_input_addrs(args):

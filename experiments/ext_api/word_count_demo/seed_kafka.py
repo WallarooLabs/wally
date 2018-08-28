@@ -13,7 +13,7 @@ producer = KafkaProducer(bootstrap_servers='127.0.0.1:9092')
 
 print("Publishing to kafka topic 'text'")
 while True:
-    producer.send('text', key=b'bill_of_rights', value=b'some_message_bytes')
+    producer.send('text', key=b'bill_of_rights', value=bill)
     print('.', end = '')
     sys.stdout.flush()
     time.sleep(0.5)
