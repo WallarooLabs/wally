@@ -75,19 +75,19 @@ class iso _TestTargetIdRouterEquality is UnitTest
     target_data_routes(2) = step2
 
     let base_step_map = recover trn Map[U128, ProxyAddress] end
-    base_step_map(1) = ProxyAddress("w1", 1)
+    // base_step_map(1) = ProxyAddress("w1", 1)
     base_step_map(2) = ProxyAddress("w2", 2)
 
     let target_step_map = recover trn Map[U128, ProxyAddress] end
     target_step_map(1) = ProxyAddress("w2", 1)
-    target_step_map(2) = ProxyAddress("w1", 2)
+    // target_step_map(2) = ProxyAddress("w1", 2)
 
     let base_boundaries = recover trn Map[String, OutgoingBoundary] end
     base_boundaries("w2") = boundary2
 
     let target_boundaries = recover trn Map[String, OutgoingBoundary] end
     target_boundaries("w2") = boundary2
-    target_boundaries("w3") = boundary3
+    // target_boundaries("w3") = boundary3
 
     let base_stateless_partitions =
       recover trn Map[U128, StatelessPartitionRouter] end

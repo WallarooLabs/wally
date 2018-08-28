@@ -749,33 +749,6 @@ class val StateStepRouter is TargetIdRouter
     end
     consume a
 
-//!@
-  // fun val add_boundary(w: String, boundary: OutgoingBoundary): TargetIdRouter
-  // =>
-  //   // TODO: Using persistent maps for our fields would make this more
-  //   // efficient
-  //   let new_outgoing_boundaries = recover trn Map[String, OutgoingBoundary] end
-  //   for (k, v) in _outgoing_boundaries.pairs() do
-  //     new_outgoing_boundaries(k) = v
-  //   end
-  //   new_outgoing_boundaries(w) = boundary
-  //   RoutingIdRouter(_worker_name, _data_routes, _step_map,
-  //     consume new_outgoing_boundaries, _stateless_partitions, _sources,
-  //     _data_receivers)
-
-  // fun val remove_boundary(w: String): TargetIdRouter =>
-  //   // TODO: Using persistent maps for our fields would make this more
-  //   // efficient
-  //   let new_outgoing_boundaries = recover trn Map[String, OutgoingBoundary] end
-  //   for (k, v) in _outgoing_boundaries.pairs() do
-  //     if k != w then
-  //       new_outgoing_boundaries(k) = v
-  //     end
-  //   end
-  //   RoutingIdRouter(_worker_name, _data_routes, _step_map,
-  //     consume new_outgoing_boundaries, _stateless_partitions, _sources,
-  //     _data_receivers)
-
   fun routes(): Map[RoutingId, Consumer] val =>
     let m = recover iso Map[RoutingId, Consumer] end
     for (id, c) in _consumers.pairs() do
@@ -818,6 +791,20 @@ class val StateStepRouter is TargetIdRouter
       sp_blueprints(p_id) = sp.blueprint()
     end
     StateStepRouterBlueprint(consume step_map, consume sp_blueprints)
+
+  fun eq(that: box->TargetIdRouter): Bool =>
+    match that
+    | let ssr: StateStepRouter =>
+      (_worker_name == ssr._worker_name) and
+      MapTagEquality[RoutingId, Consumer](_consumers, ssr._consumers) and
+      MapEquality[RoutingId, ProxyAddress](_proxies, ssr._proxies) and
+      MapTagEquality[WorkerName, OutgoingBoundary](_outgoing_boundaries,
+        ssr._outgoing_boundaries) and
+      MapEquality[RoutingId, StatelessPartitionRouter](_stateless_partitions,
+        ssr._stateless_partitions)
+    else
+      false
+    end
 
 trait val TargetIdRouterBlueprint
   fun build_router(worker_name: String,
