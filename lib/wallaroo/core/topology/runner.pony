@@ -674,6 +674,10 @@ class StateRunner[S: State ref] is (Runner & RollbackableRunner &
       Fail()
     end
 
+//!@
+interface Stringablike
+  fun string(): String
+
 class iso RouterRunner
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer_id: RoutingId, producer: Producer ref, router: Router,

@@ -149,7 +149,7 @@ actor OutgoingBoundary is Consumer
   var _lowest_queue_id: SeqId = 0
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
-  var _seq_id: SeqId = 1
+  var _seq_id: SeqId = 0
 
   var _reconnect_pause: U64 = 10_000_000_000
   let _timers: Timers = Timers
@@ -210,7 +210,7 @@ actor OutgoingBoundary is Consumer
       end
 
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
-        _auth)?
+        _seq_id, _auth)?
       _writev(connect_msg)
     else
       Fail()
@@ -241,7 +241,7 @@ actor OutgoingBoundary is Consumer
         end
 
         let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-          _step_id, _auth)?
+          _step_id, _seq_id, _auth)?
         _writev(connect_msg)
       else
         Fail()
@@ -335,11 +335,11 @@ actor OutgoingBoundary is Consumer
       end
 
     try
-      let seq_id = (_seq_id = _seq_id + 1)
+      _seq_id = _seq_id + 1
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
-        seq_id, _wb, _auth, WallClock.nanoseconds(),
+        _seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)?
       _add_to_upstream_backup(outgoing_msg)
 
@@ -546,10 +546,10 @@ actor OutgoingBoundary is Consumer
     try
       // If our downstream DataReceiver requests we replay messages, we need
       // to ensure we replay the barrier as well and in the correct place.
-      let seq_id = (_seq_id = _seq_id + 1)
+      _seq_id = _seq_id + 1
 
       let msg = ChannelMsgEncoder.forward_barrier(target_step_id,
-        origin_step_id, barrier_token, seq_id, _auth)?
+        origin_step_id, barrier_token, _seq_id, _auth)?
       _writev(msg)
       _add_to_upstream_backup(msg)
     else
@@ -660,7 +660,7 @@ actor OutgoingBoundary is Consumer
 
             try
               let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-                _step_id, _auth)?
+                _step_id, _seq_id, _auth)?
               _writev(connect_msg)
             else
               @printf[I32]("error creating data connect message on reconnect\n"
