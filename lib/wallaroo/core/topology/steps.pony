@@ -535,14 +535,16 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
       end
     end
 
-  be send_state(boundary: OutgoingBoundary, state_name: String, key: Key) =>
+  be send_state(boundary: OutgoingBoundary, state_name: String, key: Key,
+    snapshot_id: SnapshotId)
+  =>
     ifdef "autoscale" then
       //@!
       // _unregister_all_outputs()
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
         StepStateMigrator.send_state(_runner, _id, boundary, state_name,
-          key, _auth)
+          key, snapshot_id, _auth)
       else
         Fail()
       end

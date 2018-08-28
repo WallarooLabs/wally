@@ -53,11 +53,11 @@ primitive ChannelMsgEncoder
       metrics_id, metric_name), auth, wb)?
 
   fun migrate_step(step_id: RoutingId, state_name: String, key: Key,
-    state: ByteSeq val, worker: String, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+    snapshot_id: SnapshotId, state: ByteSeq val, worker: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(KeyedStepMigrationMsg(step_id, state_name, key, state, worker),
-      auth)?
+    _encode(KeyedStepMigrationMsg(step_id, state_name, key, snapshot_id, state,
+      worker), auth)?
 
   fun migration_batch_complete(sender: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -292,14 +292,16 @@ primitive ChannelMsgEncoder
     _encode(InformRecoverNotJoinMsg, auth)?
 
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
-    d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
+    d_addr: (String, String), state_routing_ids: Map[StateName, RoutingId] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     This message is sent after a joining worker uses partition blueprints and
     other topology information to initialize its topology. It indicates that
     it is ready to receive migrated steps.
     """
-    _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)?
+    _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr,
+      state_routing_ids), auth)?
 
   fun initiate_stop_the_world_for_join_migration(
     new_workers: Array[String] val, auth: AmbientAuth): Array[ByteSeq] val ?
@@ -345,18 +347,21 @@ primitive ChannelMsgEncoder
     _encode(ReplayBoundaryCountMsg(sender, count), auth)?
 
   fun announce_connections(control_addrs: Map[String, (String, String)] val,
-    data_addrs: Map[String, (String, String)] val, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+    data_addrs: Map[String, (String, String)] val,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(AnnounceConnectionsMsg(control_addrs, data_addrs), auth)?
+    _encode(AnnounceConnectionsMsg(control_addrs, data_addrs,
+      new_state_routing_ids), auth)?
 
   fun announce_joining_workers(sender: String,
     control_addrs: Map[String, (String, String)] val,
-    data_addrs: Map[String, (String, String)] val, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+    data_addrs: Map[String, (String, String)] val,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(AnnounceJoiningWorkersMsg(sender, control_addrs, data_addrs),
-      auth)?
+    _encode(AnnounceJoiningWorkersMsg(sender, control_addrs, data_addrs,
+      new_state_routing_ids), auth)?
 
   fun announce_hash_partitions_grow(sender: String,
     joining_workers: Array[String] val,
@@ -380,17 +385,6 @@ primitive ChannelMsgEncoder
     all joining workers, it informs the coordinator.
     """
     _encode(ConnectedToJoiningWorkersMsg(sender), auth)?
-
-  fun announce_new_stateful_step(id: RoutingId, worker_name: String, key: Key,
-    state_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    """
-    This message is sent to notify another worker that a new stateful step
-    has been created on this worker and that partition routers should be
-    updated.
-    """
-    _encode(AnnounceNewStatefulStepMsg(id, worker_name, key,
-      state_name), auth)?
 
   fun announce_new_source(worker_name: String, id: RoutingId,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -704,37 +698,42 @@ class val ReplayCompleteMsg is ChannelMsg
 
 trait val StepMigrationMsg is ChannelMsg
   fun state_name(): String
-  fun step_id(): U128
+  fun step_id(): RoutingId
+  fun snapshot_id(): SnapshotId
   fun state(): ByteSeq val
   fun worker(): String
   fun update_router_registry(router_registry: RouterRegistry ref,
-    target: Consumer)
+    step: Step)
 
 class val KeyedStepMigrationMsg is StepMigrationMsg
   let _state_name: String
   let _key: Key
   let _step_id: RoutingId
+  // The next snapshot that this migrated step will be a part of
+  let _snapshot_id: SnapshotId
   let _state: ByteSeq val
   let _worker: String
 
   new val create(step_id': U128, state_name': String, key': Key,
-    state': ByteSeq val, worker': String)
+    snapshot_id': SnapshotId, state': ByteSeq val, worker': String)
   =>
     _state_name = state_name'
     _key = key'
     _step_id = step_id'
+    _snapshot_id = snapshot_id'
     _state = state'
     _worker = worker'
 
   fun state_name(): String => _state_name
-  fun step_id(): U128 => _step_id
+  fun step_id(): RoutingId => _step_id
+  fun snapshot_id(): SnapshotId => _snapshot_id
   fun state(): ByteSeq val => _state
   fun worker(): String => _worker
   fun update_router_registry(router_registry: RouterRegistry ref,
-    target: Consumer)
+    step: Step)
   =>
-    router_registry.move_proxy_to_stateful_step(_step_id, target, _key,
-      _state_name, _worker)
+    router_registry.move_proxy_to_stateful_step(_step_id, step, _key,
+      _state_name, _worker, _snapshot_id)
 
 class val MigrationBatchCompleteMsg is ChannelMsg
   let sender_name: String
@@ -1084,30 +1083,30 @@ class val InformJoiningWorkerMsg is ChannelMsg
   """
   This message is sent as a response to a JoinCluster message.
   """
-  let sender_name: String
+  let sender_name: WorkerName
   let local_topology: LocalTopology
   let metrics_app_name: String
   let metrics_host: String
   let metrics_service: String
-  let control_addrs: Map[String, (String, String)] val
-  let data_addrs: Map[String, (String, String)] val
-  let worker_names: Array[String] val
+  let control_addrs: Map[WorkerName, (String, String)] val
+  let data_addrs: Map[WorkerName, (String, String)] val
+  let worker_names: Array[WorkerName] val
   // The worker currently in control of snapshots
-  let primary_snapshot_worker: String
-  let partition_router_blueprints: Map[String, PartitionRouterBlueprint] val
+  let primary_snapshot_worker: WorkerName
+  let partition_router_blueprints: Map[StateName, PartitionRouterBlueprint] val
   let stateless_partition_router_blueprints:
     Map[U128, StatelessPartitionRouterBlueprint] val
-  let target_id_router_blueprints: Map[String, TargetIdRouterBlueprint] val
+  let target_id_router_blueprints: Map[StateName, TargetIdRouterBlueprint] val
 
-  new val create(sender: String, app: String, l_topology: LocalTopology,
+  new val create(sender: WorkerName, app: String, l_topology: LocalTopology,
     m_host: String, m_service: String,
-    c_addrs: Map[String, (String, String)] val,
-    d_addrs: Map[String, (String, String)] val,
+    c_addrs: Map[WorkerName, (String, String)] val,
+    d_addrs: Map[WorkerName, (String, String)] val,
     w_names: Array[String] val,
-    p_snapshot_worker: String,
-    p_blueprints: Map[String, PartitionRouterBlueprint] val,
+    p_snapshot_worker: WorkerName,
+    p_blueprints: Map[StateName, PartitionRouterBlueprint] val,
     stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    tidr_blueprints: Map[String, TargetIdRouterBlueprint] val)
+    tidr_blueprints: Map[StateName, TargetIdRouterBlueprint] val)
   =>
     sender_name = sender
     local_topology = l_topology
@@ -1135,13 +1134,15 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
   let worker_name: String
   let control_addr: (String, String)
   let data_addr: (String, String)
+  let state_routing_ids: Map[StateName, RoutingId] val
 
   new val create(name: String, c_addr: (String, String),
-    d_addr: (String, String))
+    d_addr: (String, String), s_routing_ids: Map[StateName, RoutingId] val)
   =>
     worker_name = name
     control_addr = c_addr
     data_addr = d_addr
+    state_routing_ids = s_routing_ids
 
 class val InitiateStopTheWorldForJoinMigrationMsg is ChannelMsg
   let new_workers: Array[String] val
@@ -1169,25 +1170,31 @@ class val LeavingWorkerDoneMigratingMsg is ChannelMsg
 class val AnnounceConnectionsMsg is ChannelMsg
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
+  let new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val
 
   new val create(c_addrs: Map[String, (String, String)] val,
-    d_addrs: Map[String, (String, String)] val)
+    d_addrs: Map[String, (String, String)] val,
+    sri: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
     control_addrs = c_addrs
     data_addrs = d_addrs
+    new_state_routing_ids = sri
 
 class val AnnounceJoiningWorkersMsg is ChannelMsg
   let sender: String
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
+  let new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val
 
   new val create(sender': String,
     c_addrs: Map[String, (String, String)] val,
-    d_addrs: Map[String, (String, String)] val)
+    d_addrs: Map[String, (String, String)] val,
+    sri: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
     sender = sender'
     control_addrs = c_addrs
     data_addrs = d_addrs
+    new_state_routing_ids = sri
 
 class val AnnounceHashPartitionsGrowMsg is ChannelMsg
   let sender: String
@@ -1206,26 +1213,6 @@ class val ConnectedToJoiningWorkersMsg is ChannelMsg
 
   new val create(sender': String) =>
     sender = sender'
-
-class val AnnounceNewStatefulStepMsg is ChannelMsg
-  """
-  This message is sent to notify another worker that a new stateful step has
-  been created on this worker and that partition routers should be updated.
-  """
-  let _step_id: RoutingId
-  let _worker_name: String
-  let _key: Key
-  let _state_name: String
-
-  new val create(id: RoutingId, worker: String, k: Key, s_name: String) =>
-    _step_id = id
-    _worker_name = worker
-    _key = k
-    _state_name = s_name
-
-  fun update_registry(r: RouterRegistry) =>
-    r.add_state_proxy(_step_id, ProxyAddress(_worker_name, _step_id), _key,
-      _state_name)
 
 class val AnnounceNewSourceMsg is ChannelMsg
   """

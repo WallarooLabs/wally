@@ -374,6 +374,9 @@ actor TCPSource is Source
     end
 
   be dispose() =>
+    _dispose()
+
+  fun ref _dispose() =>
     """
     - Close the connection gracefully.
     """
@@ -435,7 +438,7 @@ actor TCPSource is Source
     _initiate_barrier(token)
 
   fun ref _initiate_barrier(token: BarrierToken) =>
-    if not _shutdown then
+    if not _disposed and not _shutdown then
       match token
       | let srt: SnapshotRollbackBarrierToken =>
         @printf[I32]("!@ TCPSource clearing pending message store\n".cstring())

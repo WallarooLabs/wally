@@ -85,13 +85,13 @@ class Autoscale
       shut down.
   """
   let _auth: AmbientAuth
-  let _worker_name: String
+  let _worker_name: WorkerName
   let _router_registry: RouterRegistry ref
   let _connections: Connections
   var _phase: _AutoscalePhase = _EmptyAutoscalePhase
 
-  new create(auth: AmbientAuth, worker_name: String, rr: RouterRegistry ref,
-    connections: Connections, is_joining: Bool)
+  new create(auth: AmbientAuth, worker_name: WorkerName,
+    rr: RouterRegistry ref, connections: Connections, is_joining: Bool)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -103,14 +103,14 @@ class Autoscale
       _phase = _WaitingForAutoscale(this)
     end
 
-  fun ref worker_join(conn: TCPConnection, worker: String,
+  fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
   =>
     _phase.worker_join(conn, worker, worker_count, local_topology,
       current_worker_count)
 
-  fun ref wait_for_joiners(conn: TCPConnection, worker: String,
+  fun ref wait_for_joiners(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
   =>
@@ -120,12 +120,14 @@ class Autoscale
       current_worker_count)
 
   fun ref wait_for_joiner_initialization(joining_worker_count: USize,
-    initialized_workers: _StringSet, current_worker_count: USize)
+    initialized_workers: _StringSet,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    current_worker_count: USize)
   =>
     _phase = _WaitingForJoinerInitialization(this, joining_worker_count,
-      initialized_workers, current_worker_count)
+      initialized_workers, new_state_routing_ids, current_worker_count)
 
-  fun ref wait_for_connections(new_workers: Array[String] val,
+  fun ref wait_for_connections(new_workers: Array[WorkerName] val,
     current_worker_count: USize)
   =>
     _phase = _WaitingForConnections(this, new_workers, current_worker_count)
@@ -133,45 +135,51 @@ class Autoscale
     // to the joining workers.
     _phase.worker_connected_to_joining_workers(_worker_name)
 
-  fun ref joining_worker_initialized(worker: String) =>
-    _phase.joining_worker_initialized(worker)
+  fun ref joining_worker_initialized(worker: WorkerName,
+    state_routing_ids: Map[StateName, RoutingId] val)
+  =>
+    _phase.joining_worker_initialized(worker, state_routing_ids)
 
-  fun ref worker_connected_to_joining_workers(worker: String) =>
+  fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
     _phase.worker_connected_to_joining_workers(worker)
 
   fun notify_current_workers_of_joining_addresses(
-    new_workers: Array[String] val)
+    new_workers: Array[WorkerName] val,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
-    _connections.notify_current_workers_of_joining_addresses(new_workers)
+    _connections.notify_current_workers_of_joining_addresses(new_workers,
+      new_state_routing_ids)
 
   fun notify_joining_workers_of_joining_addresses(
-    new_workers: Array[String] val)
+    new_workers: Array[WorkerName] val,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
-    _connections.notify_joining_workers_of_joining_addresses(new_workers)
+    _connections.notify_joining_workers_of_joining_addresses(new_workers,
+      new_state_routing_ids)
 
-  fun ref connect_to_joining_workers(ws: Array[String] val,
+  fun ref connect_to_joining_workers(ws: Array[WorkerName] val,
     coordinator: String)
   =>
     _phase = _WaitingToConnectToJoiners(_auth, this, _worker_name, ws,
       coordinator)
 
-  fun ref waiting_for_stop_the_world(joining_workers: Array[String] val) =>
+  fun ref waiting_for_stop_the_world(joining_workers: Array[WorkerName] val) =>
     _phase = _WaitingForStopTheWorld(this, joining_workers)
 
-  fun ref waiting_for_migration(joining_workers: Array[String] val) =>
+  fun ref waiting_for_migration(joining_workers: Array[WorkerName] val) =>
     _phase = _WaitingForMigration(this, joining_workers)
 
   fun ref stop_the_world_for_join_migration_initiated(
-    joining_workers: Array[String] val)
+    joining_workers: Array[WorkerName] val)
   =>
     _phase.stop_the_world_for_join_migration_initiated()
 
-  fun ref join_migration_initiated(joining_workers: Array[String] val,
+  fun ref join_migration_initiated(joining_workers: Array[WorkerName] val,
     snapshot_id: SnapshotId)
   =>
     _phase.join_migration_initiated(snapshot_id)
 
-  fun ref begin_join_migration(joining_workers: Array[String] val,
+  fun ref begin_join_migration(joining_workers: Array[WorkerName] val,
     snapshot_id: SnapshotId)
   =>
     _phase = _WaitingForJoinMigration(this, _auth, joining_workers
@@ -180,7 +188,7 @@ class Autoscale
       snapshot_id)
 
   fun ref initiate_stop_the_world_for_join_migration(
-    joining_workers: Array[String] val)
+    joining_workers: Array[WorkerName] val)
   =>
     _phase = _WaitingForJoinMigration(this, _auth, joining_workers
       where is_coordinator = true)
@@ -190,7 +198,8 @@ class Autoscale
     _router_registry.initiate_stop_the_world_for_grow_migration(
       joining_workers)
 
-  fun ref stop_the_world_for_join_migration(joining_workers: Array[String] val)
+  fun ref stop_the_world_for_join_migration(
+    joining_workers: Array[WorkerName] val)
   =>
     _phase = _WaitingForMigration(this, joining_workers)
     // TODO: For now, we're handing control of the join protocol over to
@@ -201,7 +210,7 @@ class Autoscale
   fun ref all_step_migration_complete() =>
     _phase.all_step_migration_complete()
 
-  fun ref send_migration_batch_complete(joining_workers: Array[String] val,
+  fun ref send_migration_batch_complete(joining_workers: Array[WorkerName] val,
     is_coordinator: Bool)
   =>
     _phase = _WaitingForJoinMigrationAcks(this, _auth, joining_workers,
@@ -210,33 +219,34 @@ class Autoscale
       _router_registry.send_migration_batch_complete_msg(target)
     end
 
-  fun ref receive_join_migration_ack(worker: String) =>
+  fun ref receive_join_migration_ack(worker: WorkerName) =>
     _phase.receive_join_migration_ack(worker)
 
-  fun ref all_join_migration_acks_received(joining_workers: Array[String] val,
-    is_coordinator: Bool)
+  fun ref all_join_migration_acks_received(
+    joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
     _phase = _WaitingForResumeTheWorld(this, _auth, is_coordinator)
     _router_registry.all_join_migration_acks_received(joining_workers,
       is_coordinator)
 
-  fun ref initiate_shrink(remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val)
+  fun ref initiate_shrink(remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
   =>
     _phase = _InitiatingShrink(this, remaining_workers, leaving_workers)
 
-  fun ref prepare_shrink(remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val)
+  fun ref prepare_shrink(remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
   =>
     _phase = _ShrinkInProgress(this, remaining_workers, leaving_workers)
 
-  fun ref begin_leaving_migration(remaining_workers: Array[String] val) =>
+  fun ref begin_leaving_migration(remaining_workers: Array[WorkerName] val) =>
     _phase = _WaitingForLeavingMigration(this, remaining_workers)
 
-  fun ref leaving_worker_finished_migration(worker: String) =>
+  fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     _phase.leaving_worker_finished_migration(worker)
 
-  fun ref all_leaving_workers_finished(leaving_workers: Array[String] val) =>
+  fun ref all_leaving_workers_finished(leaving_workers: Array[WorkerName] val)
+  =>
     _phase = _WaitingForResumeTheWorld(this, _auth
       where is_coordinator = false)
     _router_registry.all_leaving_workers_finished(leaving_workers)
@@ -244,12 +254,13 @@ class Autoscale
   fun ref autoscale_complete() =>
     _phase.autoscale_complete()
 
-  fun ref wait_for_leaving_migration_acks(remaining_workers: Array[String] val)
+  fun ref wait_for_leaving_migration_acks(
+    remaining_workers: Array[WorkerName] val)
   =>
     _phase = _WaitingForLeavingMigrationAcks(this, remaining_workers)
     _router_registry.send_leaving_migration_ack_request(remaining_workers)
 
-  fun ref receive_leaving_migration_ack(worker: String) =>
+  fun ref receive_leaving_migration_ack(worker: WorkerName) =>
     _phase.receive_leaving_migration_ack(worker)
 
   fun ref mark_autoscale_complete() =>
@@ -277,18 +288,20 @@ class Autoscale
 trait _AutoscalePhase
   fun name(): String
 
-  fun ref worker_join(conn: TCPConnection, worker: String,
+  fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
   =>
     _invalid_call()
     Fail()
 
-  fun ref joining_worker_initialized(worker: String) =>
+  fun ref joining_worker_initialized(worker: WorkerName,
+    state_routing_ids: Map[StateName, RoutingId] val)
+  =>
     _invalid_call()
     Fail()
 
-  fun ref worker_connected_to_joining_workers(worker: String) =>
+  fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
     _invalid_call()
     Fail()
 
@@ -304,15 +317,15 @@ trait _AutoscalePhase
     _invalid_call()
     Fail()
 
-  fun ref receive_join_migration_ack(worker: String) =>
+  fun ref receive_join_migration_ack(worker: WorkerName) =>
     _invalid_call()
     Fail()
 
-  fun ref leaving_worker_finished_migration(worker: String) =>
+  fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     _invalid_call()
     Fail()
 
-  fun ref receive_leaving_migration_ack(worker: String) =>
+  fun ref receive_leaving_migration_ack(worker: WorkerName) =>
     _invalid_call()
     Fail()
 
@@ -336,7 +349,7 @@ class _WaitingForAutoscale is _AutoscalePhase
 
   fun name(): String => "WaitingForAutoscale"
 
-  fun ref worker_join(conn: TCPConnection, worker: String,
+  fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
   =>
@@ -353,6 +366,9 @@ class _WaitingForJoiners is _AutoscalePhase
   let _joining_worker_count: USize
   let _connected_joiners: _StringSet = _connected_joiners.create()
   let _initialized_workers: _StringSet = _initialized_workers.create()
+  var _new_state_routing_ids:
+    Map[WorkerName, Map[StateName, RoutingId] val] iso =
+    recover Map[WorkerName, Map[StateName, RoutingId] val] end
   let _current_worker_count: USize
 
   new create(auth: AmbientAuth, autoscale: Autoscale ref,
@@ -371,7 +387,7 @@ class _WaitingForJoiners is _AutoscalePhase
 
   fun name(): String => "WaitingForJoiners"
 
-  fun ref worker_join(conn: TCPConnection, worker: String,
+  fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
   =>
@@ -402,16 +418,23 @@ class _WaitingForJoiners is _AutoscalePhase
       _router_registry.inform_joining_worker(conn, worker, local_topology)
       _connected_joiners.set(worker)
       if _connected_joiners.size() == _joining_worker_count then
+        let new_state_routing_ids:
+          Map[WorkerName, Map[StateName, RoutingId] val] val =
+            (_new_state_routing_ids = recover Map[WorkerName, Map[StateName,
+              RoutingId] val] end)
         _autoscale.wait_for_joiner_initialization(_joining_worker_count,
-          _initialized_workers, _current_worker_count)
+          _initialized_workers, new_state_routing_ids, _current_worker_count)
       end
     end
 
-  fun ref joining_worker_initialized(worker: String) =>
+  fun ref joining_worker_initialized(worker: WorkerName,
+    state_routing_ids: Map[StateName, RoutingId] val)
+  =>
     // It's possible some workers will be initialized when we're still in
     // this phase. We need to keep track of this to hand off that info to
     // the next phase.
     _initialized_workers.set(worker)
+    _new_state_routing_ids(worker) = state_routing_ids
     if _initialized_workers.size() >= _joining_worker_count then
       // We should have already transitioned to the next phase before this.
       Fail()
@@ -422,9 +445,14 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
   let _joining_worker_count: USize
   var _initialized_joining_workers: _StringSet
   let _current_worker_count: USize
+  var _new_state_routing_ids:
+    Map[WorkerName, Map[StateName, RoutingId] val] iso =
+    recover Map[WorkerName, Map[StateName, RoutingId] val] end
 
   new create(autoscale: Autoscale ref, joining_worker_count: USize,
-    initialized_workers: _StringSet, current_worker_count: USize)
+    initialized_workers: _StringSet,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    current_worker_count: USize)
   =>
     ifdef debug then
       // When this phase begins, at least one joining worker should still
@@ -435,6 +463,9 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
     _joining_worker_count = joining_worker_count
     _initialized_joining_workers = initialized_workers
     _current_worker_count = current_worker_count
+    for (w, sri) in new_state_routing_ids.pairs() do
+      _new_state_routing_ids(w) = sri
+    end
     @printf[I32](("AUTOSCALE: Waiting for %s joining workers to initialize. " +
       "Already initialized: %s. Current cluster size is %s\n").cstring(),
       _joining_worker_count.string().cstring(),
@@ -443,16 +474,25 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
 
   fun name(): String => "WaitingForJoinerInitialization"
 
-  fun ref joining_worker_initialized(worker: String) =>
+  fun ref joining_worker_initialized(worker: WorkerName,
+    state_routing_ids: Map[StateName, RoutingId] val)
+  =>
     _initialized_joining_workers.set(worker)
+    _new_state_routing_ids(worker) = state_routing_ids
     if _initialized_joining_workers.size() == _joining_worker_count then
       let nws = recover trn Array[String] end
       for w in _initialized_joining_workers.values() do
         nws.push(w)
       end
       let new_workers = consume val nws
-      _autoscale.notify_joining_workers_of_joining_addresses(new_workers)
-      _autoscale.notify_current_workers_of_joining_addresses(new_workers)
+      let new_state_routing_ids:
+        Map[WorkerName, Map[StateName, RoutingId] val] val =
+          (_new_state_routing_ids = recover Map[WorkerName, Map[StateName,
+            RoutingId] val] end)
+      _autoscale.notify_joining_workers_of_joining_addresses(new_workers,
+        new_state_routing_ids)
+      _autoscale.notify_current_workers_of_joining_addresses(new_workers,
+        new_state_routing_ids)
       _autoscale.wait_for_connections(new_workers, _current_worker_count)
     end
 
@@ -478,13 +518,15 @@ class _WaitingForConnections is _AutoscalePhase
     @printf[I32](("AUTOSCALE: Waiting for %s current workers to connect " +
       "to joining workers.\n").cstring(),
       _connecting_worker_count.string().cstring())
+    @printf[I32]("!@ -- current_worker_count: %s\n".cstring(), current_worker_count.string().cstring())
 
   fun name(): String => "WaitingForConnections"
 
-  fun ref worker_connected_to_joining_workers(worker: String) =>
+  fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
     """
     Indicates that another worker has connected to joining workers.
     """
+    @printf[I32]("!@ worker_connected_to_joining_workers from %s\n".cstring(), worker.cstring())
     _connected_workers.set(worker)
     if _connected_workers.size() == _connecting_worker_count then
       _autoscale.initiate_stop_the_world_for_join_migration(_new_workers)
@@ -493,13 +535,14 @@ class _WaitingForConnections is _AutoscalePhase
 class _WaitingToConnectToJoiners is _AutoscalePhase
   let _auth: AmbientAuth
   let _autoscale: Autoscale ref
-  let _worker_name: String
-  let _joining_workers: Array[String] val
-  let _coordinator: String
+  let _worker_name: WorkerName
+  let _joining_workers: Array[WorkerName] val
+  let _coordinator: WorkerName
   let _new_boundaries: _StringSet = _new_boundaries.create()
 
-  new create(auth: AmbientAuth, autoscale: Autoscale ref, worker_name: String,
-    joining_workers: Array[String] val, coordinator: String)
+  new create(auth: AmbientAuth, autoscale: Autoscale ref,
+    worker_name: WorkerName, joining_workers: Array[WorkerName] val,
+    coordinator: String)
   =>
     _auth = auth
     _autoscale = autoscale
@@ -514,7 +557,10 @@ class _WaitingToConnectToJoiners is _AutoscalePhase
 
   fun name(): String => "WaitingToConnectToJoiners"
 
-  fun ref joining_worker_initialized(worker: String) =>
+  //!@ What do we do here with state_routing_ids?
+  fun ref joining_worker_initialized(worker: WorkerName,
+    state_routing_ids: Map[StateName, RoutingId] val)
+  =>
     _new_boundaries.set(worker)
     ifdef debug then
       Invariant(
@@ -534,9 +580,10 @@ class _WaitingToConnectToJoiners is _AutoscalePhase
 
 class _WaitingForStopTheWorld is _AutoscalePhase
   let _autoscale: Autoscale ref
-  let _joining_workers: Array[String] val
+  let _joining_workers: Array[WorkerName] val
 
-  new create(autoscale: Autoscale ref, joining_workers: Array[String] val) =>
+  new create(autoscale: Autoscale ref, joining_workers: Array[WorkerName] val)
+  =>
     _autoscale = autoscale
     _joining_workers = joining_workers
     @printf[I32](("AUTOSCALE: Waiting for signal to begin local stop the " +
@@ -549,9 +596,10 @@ class _WaitingForStopTheWorld is _AutoscalePhase
 
 class _WaitingForMigration is _AutoscalePhase
   let _autoscale: Autoscale ref
-  let _joining_workers: Array[String] val
+  let _joining_workers: Array[WorkerName] val
 
-  new create(autoscale: Autoscale ref, joining_workers: Array[String] val) =>
+  new create(autoscale: Autoscale ref, joining_workers: Array[WorkerName] val)
+  =>
     _autoscale = autoscale
     _joining_workers = joining_workers
     @printf[I32]("AUTOSCALE: Waiting for signal to begin migration\n"
@@ -569,11 +617,11 @@ class _WaitingForJoinMigration is _AutoscalePhase
   """
   let _autoscale: Autoscale ref
   let _auth: AmbientAuth
-  let _joining_workers: Array[String] val
+  let _joining_workers: Array[WorkerName] val
   let _is_coordinator: Bool
 
   new create(autoscale: Autoscale ref, auth: AmbientAuth,
-    joining_workers: Array[String] val, is_coordinator: Bool)
+    joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
     @printf[I32]("AUTOSCALE: Waiting for join migration to complete.\n"
       .cstring())
@@ -598,7 +646,7 @@ class _WaitingForJoinMigrationAcks is _AutoscalePhase
     _migration_target_ack_list.create()
 
   new create(autoscale: Autoscale ref, auth: AmbientAuth,
-    joining_workers: Array[String] val, is_coordinator: Bool)
+    joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
     @printf[I32]("AUTOSCALE: Waiting for join migration acks.\n"
       .cstring())
@@ -612,7 +660,7 @@ class _WaitingForJoinMigrationAcks is _AutoscalePhase
 
   fun name(): String => "WaitingForJoinMigrationAcks"
 
-  fun ref receive_join_migration_ack(worker: String) =>
+  fun ref receive_join_migration_ack(worker: WorkerName) =>
     _migration_target_ack_list.unset(worker)
     if _migration_target_ack_list.size() == 0 then
       @printf[I32]("--All new workers have acked migration batch complete\n"
@@ -630,16 +678,18 @@ class _JoiningWorker is _AutoscalePhase
 
   fun name(): String => "JoiningWorker"
 
-  fun ref worker_join(conn: TCPConnection, worker: String,
+  fun ref worker_join(conn: TCPConnection, worker: WorkerName,
     worker_count: USize, local_topology: LocalTopology,
     current_worker_count: USize)
   =>
     None
 
-  fun ref joining_worker_initialized(worker: String) =>
+  fun ref joining_worker_initialized(worker: WorkerName,
+    state_routing_ids: Map[StateName, RoutingId] val)
+  =>
     None
 
-  fun ref worker_connected_to_joining_workers(worker: String) =>
+  fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
     None
 
   fun ref stop_the_world_for_join_migration_initiated() =>
@@ -660,13 +710,14 @@ class _JoiningWorker is _AutoscalePhase
 /////////////////////////////////////////////////
 class _InitiatingShrink is _AutoscalePhase
   let _autoscale: Autoscale ref
-  let _remaining_workers: Array[String] val
-  let _leaving_workers: Array[String] val
+  let _remaining_workers: Array[WorkerName] val
+  let _leaving_workers: Array[WorkerName] val
   let _leaving_workers_waiting_list: _StringSet =
     _leaving_workers_waiting_list.create()
 
-  new create(autoscale: Autoscale ref, remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val)
+  new create(autoscale: Autoscale ref,
+    remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
   =>
     @printf[I32]("AUTOSCALE: Initiating shrink.\n".cstring())
     _autoscale = autoscale
@@ -678,7 +729,7 @@ class _InitiatingShrink is _AutoscalePhase
 
   fun name(): String => "InitiatingShrink"
 
-  fun ref leaving_worker_finished_migration(worker: String) =>
+  fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     @printf[I32]("Leaving worker %s reported migration complete\n".cstring(),
       worker.cstring())
     ifdef debug then
@@ -691,13 +742,14 @@ class _InitiatingShrink is _AutoscalePhase
 
 class _ShrinkInProgress is _AutoscalePhase
   let _autoscale: Autoscale ref
-  let _remaining_workers: Array[String] val
-  let _leaving_workers: Array[String] val
+  let _remaining_workers: Array[WorkerName] val
+  let _leaving_workers: Array[WorkerName] val
   let _leaving_workers_waiting_list: _StringSet =
     _leaving_workers_waiting_list.create()
 
-  new create(autoscale: Autoscale ref, remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val)
+  new create(autoscale: Autoscale ref,
+    remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
   =>
     @printf[I32]("AUTOSCALE: Shrink in progress.\n".cstring())
     _autoscale = autoscale
@@ -709,7 +761,7 @@ class _ShrinkInProgress is _AutoscalePhase
 
   fun name(): String => "ShrinkInProgress"
 
-  fun ref leaving_worker_finished_migration(worker: String) =>
+  fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     ifdef debug then
       Invariant(_leaving_workers_waiting_list.size() > 0)
     end
@@ -726,14 +778,16 @@ class _WaitingForLeavingMigration is _AutoscalePhase
   let _autoscale: Autoscale ref
   let _remaining_workers: Array[String] val
 
-  new create(autoscale: Autoscale ref, remaining_workers: Array[String] val) =>
+  new create(autoscale: Autoscale ref,
+    remaining_workers: Array[WorkerName] val)
+  =>
     @printf[I32]("AUTOSCALE: Waiting for leaving migration.\n".cstring())
     _autoscale = autoscale
     _remaining_workers = remaining_workers
 
   fun name(): String => "WaitingForLeavingMigration"
 
-  fun ref leaving_worker_finished_migration(worker: String) =>
+  fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     None
 
   fun ref all_step_migration_complete() =>
@@ -744,10 +798,12 @@ class _WaitingForLeavingMigrationAcks is _AutoscalePhase
   Wait for remaining workers to ack that we've migrated all steps.
   """
   let _autoscale: Autoscale ref
-  let _remaining_workers: Array[String] val
+  let _remaining_workers: Array[WorkerName] val
   let _worker_waiting_list: _StringSet = _worker_waiting_list.create()
 
-  new create(autoscale: Autoscale ref, remaining_workers: Array[String] val) =>
+  new create(autoscale: Autoscale ref,
+    remaining_workers: Array[WorkerName] val)
+  =>
     @printf[I32]("AUTOSCALE: Waiting for leaving migration complete acks.\n"
       .cstring())
     _autoscale = autoscale
@@ -758,13 +814,14 @@ class _WaitingForLeavingMigrationAcks is _AutoscalePhase
 
   fun name(): String => "WaitingForLeavingMigrationAcks"
 
-  fun ref leaving_worker_finished_migration(worker: String) =>
+  fun ref leaving_worker_finished_migration(worker: WorkerName) =>
     None
 
-  fun ref receive_leaving_migration_ack(worker: String) =>
+  fun ref receive_leaving_migration_ack(worker: WorkerName) =>
     ifdef debug then
       Invariant(
-        ArrayHelpers[String].contains[String](_remaining_workers, worker))
+        ArrayHelpers[WorkerName].contains[WorkerName](_remaining_workers,
+          worker))
     end
     _worker_waiting_list.unset(worker)
     if _worker_waiting_list.size() == 0 then

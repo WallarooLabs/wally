@@ -1196,6 +1196,12 @@ class val DataRouter is Equatable[DataRouter]
         Unreachable()
       end
     else
+      @printf[I32]("!@ DataRouter: Known state_routing_ids:\n".cstring())
+      //!@
+      for (r_id, state) in _state_routing_ids.pairs() do
+        @printf[I32]("!@ -- %s:%s\n".cstring(), r_id.string().cstring(), state.cstring())
+      end
+
       @printf[I32]("!@ Failed to route to routing_id %s\n".cstring(), target_step_id.string().cstring())
       Fail()
     end
@@ -1232,7 +1238,7 @@ trait val PartitionRouter is Router
     target_workers: Array[(String, OutgoingBoundary)] val,
     leaving_workers: Array[String] val,
     router_registry: RouterRegistry ref,
-    snapshot_id: (SnapshotId | None) = None): Bool
+    snapshot_id: SnapshotId): Bool
   fun recalculate_hash_partitions_for_join(auth: AmbientAuth,
     joining_workers: Array[String] val,
     outgoing_boundaries: Map[String, OutgoingBoundary]): PartitionRouter
@@ -1244,6 +1250,8 @@ trait val PartitionRouter is Router
   fun local_size(): USize
   fun update_boundaries(auth: AmbientAuth,
     ob: box->Map[String, OutgoingBoundary]): PartitionRouter
+  fun add_state_routing_id(worker: WorkerName, routing_id: RoutingId):
+    PartitionRouter
   fun blueprint(): PartitionRouterBlueprint
   fun distribution_digest(): Map[String, Array[String] val] val
   fun state_entity_digest(): Array[String] val
@@ -1389,6 +1397,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     end
     for (w, hpr) in _hashed_node_routes.pairs() do
       try
+        @printf[I32]("!@ Looking up state routing ids for %s\n".cstring(), w.cstring())
         m(_state_routing_ids(w)?) = hpr.target_boundary()
       else
         Fail()
@@ -1597,7 +1606,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     target_workers: Array[(String, OutgoingBoundary)] val,
     leaving_workers: Array[String] val,
     router_registry: RouterRegistry ref,
-    snapshot_id: (SnapshotId | None) = None): Bool
+    snapshot_id: SnapshotId): Bool
   =>
     let remaining_workers_trn = recover trn Array[String] end
     let remaining_boundaries = Map[String, OutgoingBoundary]
@@ -1649,7 +1658,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
 
   fun migrate_steps(router_registry: RouterRegistry ref,
     steps_to_migrate': Array[(String, OutgoingBoundary, Key, RoutingId, Step)],
-    target_worker_count: USize, snapshot_id: (SnapshotId | None)): Bool
+    target_worker_count: USize, snapshot_id: SnapshotId): Bool
   =>
     """
     Actually initiate the migration of steps. Return false if none were
@@ -1662,7 +1671,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
         in steps_to_migrate'.values()
       do
         router_registry.add_to_step_waiting_list(step_id)
-        step.send_state(boundary, _state_name, key)
+        step.send_state(boundary, _state_name, key, snapshot_id)
         router_registry.move_stateful_step_to_proxy(step_id, step,
           key, _state_name, snapshot_id)
         @printf[I32](
@@ -1674,6 +1683,18 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     else
       false
     end
+
+  fun add_state_routing_id(worker: WorkerName, routing_id: RoutingId):
+    PartitionRouter
+  =>
+    let new_state_routing_ids = recover iso Map[WorkerName, RoutingId] end
+    for (w, r_id) in _state_routing_ids.pairs() do
+      new_state_routing_ids(w) = r_id
+    end
+    new_state_routing_ids(worker) = routing_id
+    LocalPartitionRouter[In, S](_state_name, _worker_name, _local_routes,
+      _step_ids, _hashed_node_routes, _hash_partitions, _partition_function,
+      consume new_state_routing_ids)
 
   fun blueprint(): PartitionRouterBlueprint =>
     LocalPartitionRouterBlueprint[In, S](_state_name, _step_ids,

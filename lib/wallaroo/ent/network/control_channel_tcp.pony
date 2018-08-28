@@ -318,9 +318,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             let host = m.control_addrs(w)?._1
             let control_addr = m.control_addrs(w)?
             let data_addr = m.data_addrs(w)?
+            let new_state_routing_ids = m.new_state_routing_ids(w)?
             match _layout_initializer
             | let lti: LocalTopologyInitializer =>
-              lti.add_joining_worker(w, host, control_addr, data_addr)
+              lti.add_joining_worker(w, host, control_addr, data_addr,
+                new_state_routing_ids)
             else
               Fail()
             end
@@ -332,7 +334,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
           lti.connect_to_joining_workers(m.sender, m.control_addrs,
-            m.data_addrs)
+            m.data_addrs, m.new_state_routing_ids)
         else
           Fail()
         end
@@ -341,8 +343,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           m.hash_partitions)
       | let m: ConnectedToJoiningWorkersMsg =>
         _router_registry.report_connected_to_joining_worker(m.sender)
-      | let m: AnnounceNewStatefulStepMsg =>
-        m.update_registry(_router_registry)
       | let m: AnnounceNewSourceMsg =>
         _router_registry.register_remote_source(m.sender, m.source_id)
       | let m: StepMigrationCompleteMsg =>
@@ -357,7 +357,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
             lti.add_joining_worker(m.worker_name, joining_host, m.control_addr,
-              m.data_addr)
+              m.data_addr, m.state_routing_ids)
           else
             Fail()
           end
@@ -397,7 +397,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32](("Received BeginLeavingMigrationMsg on Control " +
             "Channel\n").cstring())
         end
-        _router_registry.begin_leaving_migration(m.remaining_workers,
+        _router_registry.prepare_leaving_migration(m.remaining_workers,
           m.leaving_workers)
       | let m: InitiateShrinkMsg =>
         match _layout_initializer
