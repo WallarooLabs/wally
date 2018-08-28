@@ -51,6 +51,8 @@ class SinkExtension(object):
         self._decoder = decoder
         self._acceptor = None
         self._connections = []
+        self._buffers = {}
+        self._pending = []
 
     def listen(self, host, port, backlog = 0):
         acceptor = socket.socket()
@@ -61,29 +63,54 @@ class SinkExtension(object):
 
     def read(self, timeout=None):
         while True:
-            readable, _, exceptional = select(self._connections, [], self._connections, timeout)
-            for socket in exceptional:
-                if socket is self._acceptor:
-                    socket.close()
-                    raise UnexpectedSocketError()
-                else:
-                    self._connections.remove(socket)
-                    socket.close()
-            for socket in readable:
-                if socket is self._acceptor:
-                    conn, _addr = socket.accept()
-                    conn.setblocking(0)
-                    self._connections.append(conn)
-                else:
-                    header = socket.recv(self._decoder.header_length())
-                    if not header:
-                        socket.close()
-                        self._connections.remove(socket)
-                        return None
-                    expected = self._decoder.payload_length(header)
-                    # TODO: implement partial recv buffers.
-                    data = socket.recv(expected)
-                    return self._decoder._message_decoder(data)
+            for socket in self._pending:
+                ok, message = self._read_one(socket)
+                if ok: return message
+            self._select_any(timeout)
+
+    def _select_any(self, timeout=None):
+        readable, _, exceptional = select(self._connections, [], self._connections, timeout)
+        for socket in exceptional:
+            if socket is self._acceptor:
+                socket.close()
+                raise UnexpectedSocketError()
+            else:
+                self._teardown_connection(socket)
+        for socket in readable:
+            if socket is self._acceptor:
+                conn, _addr = socket.accept()
+                self._setup_connection(conn)
+            else:
+                buffered = self._buffers[socket] + socket.recv(4096)
+                self._buffers[socket] = buffered
+                self._pending.append(socket)
+
+    def _read_one(self, socket):
+        buffered = self._buffers[socket]
+        header_len = self._decoder.header_length()
+        if len(buffered) < header_len:
+            self._buffers[socket] = buffered
+            return (False, None)
+        expected = self._decoder.payload_length(buffered[:header_len])
+        if len(buffered) < header_len + expected:
+            self._buffers[socket] = buffered
+            return (False, None)
+        data = buffered[header_len:expected]
+        buffered = buffered[header_len + expected:]
+        self._buffers[socket] = buffered
+        if len(buffered) < header_len:
+            self._pending.remove(socket)
+        return (True, self._decoder._message_decoder(data))
+
+    def _setup_connection(self, conn):
+        conn.setblocking(0)
+        self._connections.append(conn)
+        self._buffers[conn] = b""
+
+    def _teardown_connection(self, conn):
+        self._connections.remove(conn)
+        del self._buffers[conn]
+        conn.close()
 
 
 class UnexpectedSocketError(Exception):
