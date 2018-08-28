@@ -8,9 +8,9 @@ To learn more about our release process, see [RELEASE.md](RELEASE.md).
 
 In order to promote a release candidate to a release, you absolutely must have:
 
-* Commit access to the `wallaroo` repo
+* Provisioned the Wallaroo Release Vagrant box as described in [PROVISION_VAGRANT.md](PROVISION_VAGRANT.md) and ssh'ed into it.
 * Commit access to the `wallaroo` `release` branch
-* Installed the [changelog tool](https://github.com/ponylang/changelog-tool)
+
 
 ## Prerequisites for specific release candidate to release promotion
 
@@ -21,9 +21,9 @@ Before getting started, you will need the number for the version that you will b
 
 ## Promoting a release candidate to a release
 
-Please note that the release script was written with the assumption that you are using a clone of the `wallaroolabs/wallaroo` repo. This process will not work without modification if you try to use a fork rather than a clone of the repo.
+Please note that the release script was written with the assumption that you are using a clone of the `wallaroolabs/wallaroo` repo. This process will not work without modification if you try to use a fork rather than a clone of the repo. It is assumed that you are running this script within the Wallaroo Release Vagrant Box.
 
-Promoting a release candidate to a release is a simple process. Run a script with the correct arguments and you are done. The release promotion script is run as:
+Promoting a release candidate to a release is a simple process. Run the script with the correct arguments and you are done. The release promotion script is run with the following format:
 
 ```bash
 bash .release/release.sh RELEASE_CANDIDATE_BRANCH RELEASE_VERSION
@@ -35,4 +35,4 @@ So, for example, if you are releasing from branch `release-0.4.0`, with version 
 bash .release/release.sh release-0.4.1 0.4.1
 ```
 
-The script will make changes on in your local Wallaroo repo and will prompt you before pushing them back to GitHub.
+The script will make changes on the Wallaroo repo it is run in and will prompt you before pushing them back to GitHub.
