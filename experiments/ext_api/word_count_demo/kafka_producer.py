@@ -14,4 +14,4 @@ producer = KafkaProducer(bootstrap_servers=params.bootstrap_broker)
 
 while True:
     word, count = extension.read()
-    producer.send(params.topics[0], key=word, value=count)
+    producer.send(params.topics[0], key=word, value=str(count))

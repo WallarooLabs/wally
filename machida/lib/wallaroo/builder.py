@@ -61,7 +61,6 @@ class ApplicationBuilder(object):
 
     def build(self):
         self._validate_actions()
-        print("built", repr(self._actions))
         return self._actions
 
     def _validate_actions(self):
