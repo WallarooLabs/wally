@@ -16,7 +16,7 @@ import argparse
 import struct
 from functools import wraps
 
-from builder import _validate_arity_compatability
+from wallaroo.builder import _validate_arity_compatability
 
 
 class SourceConfig(object):

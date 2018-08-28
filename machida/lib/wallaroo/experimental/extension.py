@@ -75,13 +75,14 @@ class SinkExtension(object):
                     conn.setblocking(0)
                     self._connections.append(conn)
                 else:
-                    header = socket.recv(self._decoder.header_length(), socket.MSG_WAITALL)
+                    header = socket.recv(self._decoder.header_length())
                     if not header:
                         socket.close()
                         self._connections.remove(socket)
                         return None
                     expected = self._decoder.payload_length(header)
-                    data = socket.recv(expected, socket.MSG_WAITALL)
+                    # TODO: implement partial recv buffers.
+                    data = socket.recv(expected)
                     return self._decoder._message_decoder(data)
 
 
