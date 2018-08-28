@@ -12,9 +12,21 @@ There will be a text field with `Tag version` as a place holder. You will need t
 
 The `Release Title` will be the same as the tag and version you just pushed. If it was `0.4.0` you'd enter `0.4.0`.
 
-For the content of the release, you'd enter `Release Notes` as a h1 header and include the changes within the `CHANGELOG` for this release. Dependent on what it is included, you might want to preface with a few words. Have a look at previous releases for ideas.
+For the content of the release, please see the [RELEASE_NOTES.md](RELEASE_NOTES.md) document.
 
 Once you have completed the above, click on the `Publish release` button in order to publish the release.
+
+## Announcing the Release
+
+Once the release is published, the release should be announced via the following channels:
+
+- Wallaroo #b-news Slack channel
+- Wallaroo #general Slack channel
+- Wallaroo Mailing List
+- Wallaroo IRC channel
+- Release Notes posted to HN
+- Release notes posted to Lobsters
+- Release Notes tweeted via the WallarooLabs Twitter account
 
 ## Merging `release` into `master`
 
