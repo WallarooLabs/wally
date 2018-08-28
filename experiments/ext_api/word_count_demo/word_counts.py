@@ -11,13 +11,13 @@ class CountStream(object):
 
     def sink(self):
         return wallaroo.experimental.SinkExtensionConfig(
-            host = self.host,
-            port = self.port,
-            encoder = count_encoder)
+            host=self.host,
+            port=self.port,
+            encoder=count_encoder)
 
     def extension(self):
         extension = wallaroo.experimental.SinkExtension(count_decoder)
-        extension.listen('127.0.0.1', 7200, backlog=16)
+        extension.listen(self.host, self.port, backlog=16)
         return extension
 
 
