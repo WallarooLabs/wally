@@ -139,8 +139,8 @@ actor OutgoingBoundary is Consumer
   var _connection_initialized: Bool = false
   var _replaying: Bool = false
   let _auth: AmbientAuth
-  let _worker_name: String
-  let _target_worker: String
+  let _worker_name: WorkerName
+  let _target_worker: WorkerName
   var _step_id: RoutingId = 0
   let _host: String
   let _service: String
@@ -185,6 +185,7 @@ actor OutgoingBoundary is Consumer
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = 65_536
+    @printf[I32]("!@ CREATED OutgoingBoundary to %s\n".cstring(), _target_worker.cstring())
 
   //
   // Application startup lifecycle event
@@ -258,13 +259,14 @@ actor OutgoingBoundary is Consumer
 
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
       + "\n").cstring())
+    @printf[I32]("!@ reconnect() RE-Connecting OutgoingBoundary %s to %s:%s on %s\n".cstring(), _step_id.string().cstring(), _host.cstring(), _service.cstring(), _target_worker.cstring())
 
   be migrate_step(step_id: RoutingId, state_name: String, key: Key,
-    state: ByteSeq val)
+    snapshot_id: SnapshotId, state: ByteSeq val)
   =>
     try
       let outgoing_msg = ChannelMsgEncoder.migrate_step(step_id,
-        state_name, key, state, _worker_name, _auth)?
+        state_name, key, snapshot_id, state, _worker_name, _auth)?
       _writev(outgoing_msg)
     else
       Fail()
@@ -281,6 +283,7 @@ actor OutgoingBoundary is Consumer
 
   be register_step_id(step_id: RoutingId) =>
     _step_id = step_id
+    @printf[I32]("!@ REGISTERED OutgoingBoundary id %s\n".cstring(), step_id.string().cstring())
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
@@ -400,6 +403,10 @@ actor OutgoingBoundary is Consumer
     _maybe_mute_or_unmute_upstreams()
 
   fun ref _replay_from(idx: SeqId) =>
+    // In case the downstream has failed and recovered, resend producer
+    // registrations.
+    resend_producer_registrations()
+
     try
       var cur_id = _lowest_queue_id
       for msg in _queue.values() do
@@ -519,6 +526,7 @@ actor OutgoingBoundary is Consumer
     _upstreams.unset(producer)
 
   fun ref resend_producer_registrations() =>
+    @printf[I32]("!@ resend_producer_registrations\n".cstring())
     for (producer_id, producer, target_id) in
       _registered_producers.registrations().values()
     do
@@ -659,6 +667,7 @@ actor OutgoingBoundary is Consumer
             _pending_reads()
 
             try
+              @printf[I32]("!@ Sending data_connect as part of _event_notify from Boundary %s\n".cstring(), _step_id.string().cstring())
               let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
                 _step_id, _seq_id, _auth)?
               _writev(connect_msg)
@@ -735,6 +744,7 @@ actor OutgoingBoundary is Consumer
     if (_host != "") and (_service != "") and not _no_more_reconnect then
       @printf[I32]("RE-Connecting OutgoingBoundary to %s:%s\n".cstring(),
         _host.cstring(), _service.cstring())
+        @printf[I32]("!@ _schedule_reconnect() RE-Connecting OutgoingBoundary %s to %s:%s on %s\n".cstring(), _step_id.string().cstring(), _host.cstring(), _service.cstring(), _target_worker.cstring())
       let timer = Timer(_PauseBeforeReconnect(this), _reconnect_pause)
       _timers(consume timer)
     end

@@ -251,6 +251,7 @@ actor Recovery
       @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())
     end
     _router_registry.resume_the_world(_worker_name)
+    _data_receivers.recovery_complete(this)
     _recovery_phase = _FinishedRecovering
     //!@ Do we still want to do this?
     match _initializer

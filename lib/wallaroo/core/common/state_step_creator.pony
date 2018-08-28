@@ -188,6 +188,7 @@ actor StateStepCreator is Initializable
     rollback_keys: Map[StateName, Map[Key, RoutingId] val] val,
     promise: Promise[None])
   =>
+    @printf[I32]("!@ StateStepCreator: rollback_state_steps\n".cstring())
     _pending_steps.clear()
     (let keys_to_add, let keys_to_remove) =
       _keys_to_steps.key_diff(rollback_keys)
@@ -216,6 +217,7 @@ actor StateStepCreator is Initializable
   fun ref _create_state_step(state_name: StateName, key: Key, id: RoutingId,
     snapshot_id: (SnapshotId | None) = None)
   =>
+    @printf[I32]("!@ _create_state_step!!! w/ snapshot id %s\n".cstring(), snapshot_id.string().cstring())
     _state_key_known(state_name, key)
 
     try

@@ -30,7 +30,7 @@ trait _DataReceiverPhase
     _invalid_call()
     Fail()
 
-  fun data_connect() =>
+  fun ref data_connect(highest_seq_id: SeqId) =>
     _invalid_call()
     Fail()
 
@@ -41,7 +41,7 @@ trait _DataReceiverPhase
 class _DataReceiverNotProcessingPhase is _DataReceiverPhase
   fun name(): String => "_DataReceiverNotProcessingPhase"
 
-  fun data_connect() =>
+  fun ref data_connect(highest_seq_id: SeqId) =>
     // If we're not processing, then we need to wait for DataReceivers to be
     // initialized.
     @printf[I32](("DataReceiver: data_connect received, but still waiting " +
@@ -98,7 +98,10 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
       end
     end
 
-  fun data_connect() =>
+  fun ref data_connect(highest_seq_id: SeqId) =>
+    // If we're recovering, then we ignore existing queues on upstream
+    // boundaries, which will be cleared as part of rollback.
+    _data_receiver._update_last_id_seen(highest_seq_id)
     _data_receiver._inform_boundary_to_send_normal_messages()
 
   fun ref flush(): Array[_Queued] =>
@@ -133,7 +136,7 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
   =>
     _data_receiver.send_barrier(input_id, output_id, token, seq_id)
 
-  fun data_connect() =>
+  fun ref data_connect(highest_seq_id: SeqId) =>
     _data_receiver._inform_boundary_to_send_normal_messages()
 
   fun ref flush(): Array[_Queued] =>
@@ -171,7 +174,7 @@ class _QueuingDataReceiverPhase is _DataReceiverPhase
   =>
     _queued.push((input_id, output_id, token, seq_id))
 
-  fun data_connect() =>
+  fun ref data_connect(highest_seq_id: SeqId) =>
     _data_receiver._inform_boundary_to_send_normal_messages()
 
   fun ref flush(): Array[_Queued] =>

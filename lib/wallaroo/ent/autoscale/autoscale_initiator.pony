@@ -11,17 +11,18 @@ the License. You may obtain a copy of the License at
 */
 
 use "promises"
+use "wallaroo/core/common"
 use "wallaroo/ent/barrier"
 use "wallaroo_labs/mort"
 
 
 actor AutoscaleInitiator
-  let _worker_name: String
+  let _worker_name: WorkerName
   let _barrier_initiator: BarrierInitiator
   var _current_autoscale_tokens: AutoscaleTokens
   var _autoscale_token_in_progress: Bool = false
 
-  new create(w_name: String, barrier_initiator: BarrierInitiator) =>
+  new create(w_name: WorkerName, barrier_initiator: BarrierInitiator) =>
     _worker_name = w_name
     _current_autoscale_tokens = AutoscaleTokens(_worker_name, 0)
     _barrier_initiator = barrier_initiator
