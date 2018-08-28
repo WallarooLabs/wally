@@ -546,10 +546,10 @@ actor OutgoingBoundary is Consumer
     try
       // If our downstream DataReceiver requests we replay messages, we need
       // to ensure we replay the barrier as well and in the correct place.
-      _seq_id = _seq_id + 1
+      let seq_id = (_seq_id = _seq_id + 1)
 
       let msg = ChannelMsgEncoder.forward_barrier(target_step_id,
-        origin_step_id, barrier_token, _auth)?
+        origin_step_id, barrier_token, seq_id, _auth)?
       _writev(msg)
       _add_to_upstream_backup(msg)
     else
