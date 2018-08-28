@@ -38,7 +38,7 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
     if base_cls is _Encoder:
         class C(base_cls):
             def encode(self, data, partition=None, sequence=None):
-                encoded = self._message_encoder(data)
+                encoded = func(data)
                 if partition:
                     part = str(partition)
                 else:
@@ -61,7 +61,9 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                 # We dropping the metadata on the floor for now, slice out the
                 # remaining data for message decoding.
                 message_data = bs[struct.calcsize('<H') + meta_len :]
-                return self._message_decoder(message_data)
+                return func(message_data)
+            def decoder(self):
+                return func
 
     # Attach the new class to the module's global namespace and return it
     return _attach_to_module(C, base_cls.__name__, func)

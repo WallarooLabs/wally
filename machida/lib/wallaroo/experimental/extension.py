@@ -100,7 +100,7 @@ class SinkExtension(object):
         self._buffers[socket] = buffered
         if len(buffered) < header_len:
             self._pending.remove(socket)
-        return (True, self._decoder._message_decoder(data))
+        return (True, self._decoder.decoder()(data))
 
     def _setup_connection(self, conn):
         conn.setblocking(0)
