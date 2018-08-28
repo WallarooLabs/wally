@@ -6,7 +6,7 @@ from kafka import KafkaConsumer
 from text_documents import TextStream, parse_text_stream_addr
 
 params = parse_kafka_params(sys.argv)
-consumer = KafkaConsumer(params.topics, bootstrap_servers=params.bootstrap_broker, group_id=params.consumer_group)
+consumer = KafkaConsumer(','.join(params.topics), bootstrap_servers=params.bootstrap_broker, group_id=params.consumer_group)
 text_stream_addr = parse_text_stream_addr(sys.argv)
 extension = TextStream(*text_stream_addr).extension()
 
