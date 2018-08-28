@@ -123,8 +123,14 @@ actor DataReceivers
     end
 
   be rollback_barrier_complete(recovery: Recovery) =>
+    _recovery_complete()
+    recovery.data_receivers_ack()
+
+  be recovery_complete(recovery: Recovery) =>
+    _recovery_complete()
+
+  fun ref _recovery_complete() =>
     _is_recovering = false
     for dr in _data_receivers.values() do
-      dr.rollback_barrier_complete()
+      dr.recovery_complete()
     end
-    recovery.data_receivers_ack()

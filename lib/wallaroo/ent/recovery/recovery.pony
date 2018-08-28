@@ -268,6 +268,7 @@ actor Recovery
     then we finish our boundary connections and then abort, ceding the recovery
     protocol to the other worker.
     """
+    _data_receivers.recovery_complete(this)
     @printf[I32]("|~~ - Recovery initiated at %s. Ceding control. - ~~|\n"
       .cstring(), worker.cstring())
     _recovery_phase = _RecoveryOverrideAccepted

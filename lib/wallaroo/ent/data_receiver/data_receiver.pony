@@ -404,7 +404,7 @@ actor DataReceiver is (Producer & Rerouter)
     // should never be called.
     Fail()
 
-  be rollback_barrier_complete() =>
+  be recovery_complete() =>
     _phase = _NormalDataReceiverPhase(this)
 
   /////////////////////////////////////////////////////////////////////////////
