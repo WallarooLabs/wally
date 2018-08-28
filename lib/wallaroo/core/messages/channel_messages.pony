@@ -198,9 +198,9 @@ primitive ChannelMsgEncoder
     _encode(CreateDataChannelListener(workers), auth)?
 
   fun data_connect(sender_name: String, sender_step_id: RoutingId,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+    highest_seq_id: SeqId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(DataConnectMsg(sender_name, sender_step_id), auth)?
+    _encode(DataConnectMsg(sender_name, sender_step_id, highest_seq_id), auth)?
 
   fun ack_data_connect(last_id_seen: SeqId, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -656,10 +656,14 @@ class val CreateDataChannelListener is ChannelMsg
 class val DataConnectMsg is ChannelMsg
   let sender_name: String
   let sender_boundary_id: U128
+  let highest_seq_id: SeqId
 
-  new val create(sender_name': String, sender_boundary_id': U128) =>
+  new val create(sender_name': String, sender_boundary_id': U128,
+    highest_seq_id': SeqId)
+  =>
     sender_name = sender_name'
     sender_boundary_id = sender_boundary_id'
+    highest_seq_id = highest_seq_id'
 
 primitive DataDisconnectMsg is ChannelMsg
 

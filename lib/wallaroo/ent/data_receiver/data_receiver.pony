@@ -271,19 +271,26 @@ actor DataReceiver is (Producer & Rerouter)
     _phase = _NormalDataReceiverPhase(this)
     _inform_boundary_to_send_normal_messages()
 
-  be data_connect(sender_step_id: RoutingId, conn: DataChannel) =>
+  be data_connect(sender_step_id: RoutingId, highest_seq_id: SeqId,
+    conn: DataChannel)
+  =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
-    _phase.data_connect()
 
-    //!@
-  // fun _ack_data_connect() =>
-  //   try
-  //     let ack_msg = ChannelMsgEncoder.ack_data_connect(_last_id_seen, _auth)?
-  //     _write_on_conn(ack_msg)
-  //   else
-  //     Fail()
-  //   end
+    // TODO: In a recovery scenario, an upstream boundary clears its queue and
+    // starts from an earlier snapshot. If the upstream is on a recovering
+    // worker, then it will start its seq ids again from 0. These seq ids only
+    // serve the purpose of coordinating point to point communication over
+    // the boundary connection, so this works, though it could stand to be
+    // improved.
+    if highest_seq_id < _last_id_seen then
+      _last_id_seen = highest_seq_id
+    end
+    if highest_seq_id < _last_id_acked then
+      _last_id_acked = highest_seq_id
+    end
+
+    _phase.data_connect()
 
   fun _inform_boundary_to_send_normal_messages() =>
     try
@@ -369,6 +376,9 @@ actor DataReceiver is (Producer & Rerouter)
       end
 
       _forward_barrier(target_step_id, origin_step_id, barrier_token, seq_id)
+    //!@
+    else
+      @printf[I32]("!@ Dropping barrier because seq_id is %s and last_seen is %s\n".cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
     end
 
   fun ref _forward_barrier(target_step_id: RoutingId,

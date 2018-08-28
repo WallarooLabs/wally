@@ -228,21 +228,3 @@ class _QueuedReplayableDeliveryMessage
   fun replay_process_message(dr: DataReceiver ref) =>
     dr.replay_process_message(msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
-
-// class _DataReceiverAcceptingReplaysPhase is _DataReceiverPhase
-//   let _data_receiver: DataReceiver ref
-
-//   new create(dr: DataReceiver ref) =>
-//     _data_receiver = dr
-
-//   fun data_connect() =>
-//     _data_receiver._ack_data_connect()
-
-// class _DataReceiverAcceptingMessagesPhase is _DataReceiverPhase
-//   let _data_receiver: DataReceiver ref
-
-//   new create(dr: DataReceiver ref) =>
-//     _data_receiver = dr
-
-//   fun data_connect() =>
-//     _data_receiver._inform_boundary_to_send_normal_messages()

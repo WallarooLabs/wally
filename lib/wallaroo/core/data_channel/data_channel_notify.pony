@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use "collections"
 use "wallaroo/core/boundary"
+use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
 
 interface DataChannelNotify
@@ -39,7 +40,7 @@ interface DataChannelNotify
   `DataChannel` and `DataChannelListener` actors.
   """
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
     """
     Each abstract data channel (a connection from an OutgoingBoundary)
     corresponds to a single DataReceiver. On reconnect, we want a new

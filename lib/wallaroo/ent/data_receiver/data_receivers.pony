@@ -69,7 +69,7 @@ actor DataReceivers
     end
 
   be request_data_receiver(sender_name: String, sender_boundary_id: RoutingId,
-    conn: DataChannel)
+    highest_seq_id: SeqId, conn: DataChannel)
   =>
     """
     Called when a DataChannel is first created and needs to know the
@@ -99,7 +99,7 @@ actor DataReceivers
         _connections.register_disposable(new_dr)
         new_dr
       end
-    conn.identify_data_receiver(dr, sender_boundary_id)
+    conn.identify_data_receiver(dr, sender_boundary_id, highest_seq_id)
     _inform_subscribers(boundary_id, dr)
 
     //!@
