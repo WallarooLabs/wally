@@ -1,7 +1,3 @@
-<!--
-Before submitting an issue, please make sure the issue hasn't already been reported.
--->
-
 ### Is this a bug, feature request, or feedback?
 
 ### What is the current behavior?
