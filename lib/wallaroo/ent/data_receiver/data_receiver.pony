@@ -141,7 +141,7 @@ actor DataReceiver is (Producer & Rerouter)
         | let qrdm: _QueuedReplayableDeliveryMessage =>
           qrdm.replay_process_message(this)
         | let pb: _QueuedBarrier =>
-          _forward_barrier(pb._1, pb._2, pb._3)
+          _forward_barrier(pb._1, pb._2, pb._3, pb._4)
         end
       end
     end
@@ -202,8 +202,10 @@ actor DataReceiver is (Producer & Rerouter)
   be replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    replay_process_message(r, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+    if seq_id > _last_id_seen then
+      replay_process_message(r, pipeline_time_spent, seq_id, latest_ts,
+        metrics_id, worker_ingress_ts)
+    end
 
   fun ref replay_process_message(r: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
@@ -350,44 +352,50 @@ actor DataReceiver is (Producer & Rerouter)
   // BARRIER
   /////////////////////////////////////////////////////////////////////////////
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken, seq_id: SeqId)
   =>
-    @printf[I32]("!@ DataReceiver: received token %s from %s\n".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring())
-    match barrier_token
-    | let srt: SnapshotRollbackBarrierToken =>
-      _pending_message_store.clear()
-      _pending_barriers.clear()
-    //!@ This isn't good enough. We need to ensure that we've been overriden
-    // to make this change back from recovery phase. As it stands, this
-    // introduces a race condition if we receive an old resume token in flight
-    // before we recovered.
-    | let srt: SnapshotRollbackResumeBarrierToken =>
-      _phase = _NormalDataReceiverPhase(this)
+    if seq_id > _last_id_seen then
+      @printf[I32]("!@ DataReceiver: received token %s from %s\n".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring())
+      match barrier_token
+      | let srt: SnapshotRollbackBarrierToken =>
+        _pending_message_store.clear()
+        _pending_barriers.clear()
+      //!@ This isn't good enough. We need to ensure that we've been overriden
+      // to make this change back from recovery phase. As it stands, this
+      // introduces a race condition if we receive an old resume token in
+      // flight before we recovered.
+      | let srt: SnapshotRollbackResumeBarrierToken =>
+        _phase = _NormalDataReceiverPhase(this)
+      end
+
+      _forward_barrier(target_step_id, origin_step_id, barrier_token, seq_id)
     end
 
-    _forward_barrier(target_step_id, origin_step_id, barrier_token)
-
   fun ref _forward_barrier(target_step_id: RoutingId,
-    origin_step_id: RoutingId, barrier_token: BarrierToken)
+    origin_step_id: RoutingId, barrier_token: BarrierToken, seq_id: SeqId)
   =>
-    _phase.forward_barrier(target_step_id, origin_step_id, barrier_token)
+    _phase.forward_barrier(target_step_id, origin_step_id, barrier_token, seq_id)
 
   fun ref send_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
-    barrier_token: BarrierToken)
+    barrier_token: BarrierToken, seq_id: SeqId)
   =>
-    if not _pending_message_store.has_pending() then
-      match barrier_token
-      | let sbt: SnapshotBarrierToken =>
-        snapshot_state(sbt.id)
-      end
-      _router.forward_barrier(target_step_id, origin_step_id, this,
-        barrier_token)
-    else
-      _pending_barriers.push((target_step_id, origin_step_id, barrier_token))
-      match _phase
-      | let qdr: _QueuingDataReceiverPhase => None
+    if seq_id > _last_id_seen then
+      _ack_counter = _ack_counter + 1
+      _last_id_seen = seq_id
+      if not _pending_message_store.has_pending() then
+        match barrier_token
+        | let sbt: SnapshotBarrierToken =>
+          snapshot_state(sbt.id)
+        end
+        _router.forward_barrier(target_step_id, origin_step_id, this,
+          barrier_token)
       else
-        _phase = _QueuingDataReceiverPhase(this)
+        _pending_barriers.push((target_step_id, origin_step_id, barrier_token))
+        match _phase
+        | let qdr: _QueuingDataReceiverPhase => None
+        else
+          _phase = _QueuingDataReceiverPhase(this)
+        end
       end
     end
 

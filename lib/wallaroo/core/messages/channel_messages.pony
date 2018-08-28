@@ -447,9 +447,11 @@ primitive ChannelMsgEncoder
     _encode(WorkerAckBarrierMsg(sender, token), auth)?
 
   fun forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
-    token: BarrierToken, auth: AmbientAuth): Array[ByteSeq] val ?
+    token: BarrierToken, seq_id: SeqId, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
-    _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token), auth)?
+    _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token, seq_id),
+      auth)?
 
   fun barrier_complete(token: BarrierToken, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -1298,12 +1300,16 @@ class val ForwardBarrierMsg is ChannelMsg
   let target_id: RoutingId
   let origin_id: RoutingId
   let token: BarrierToken
+  // Seq id assigned by boundary
+  let seq_id: SeqId
 
-  new val create(target_id': RoutingId, origin_id': RoutingId, token': BarrierToken)
+  new val create(target_id': RoutingId, origin_id': RoutingId,
+    token': BarrierToken, seq_id': SeqId)
   =>
     target_id = target_id'
     origin_id = origin_id'
     token = token'
+    seq_id = seq_id'
 
 class val BarrierCompleteMsg is ChannelMsg
   let token: BarrierToken
