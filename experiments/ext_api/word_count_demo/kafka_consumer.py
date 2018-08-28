@@ -12,4 +12,4 @@ extension = TextStream(*text_stream_addr).extension()
 
 print("Consuming topic 'text'")
 for message in consumer:
-    extension.write(message.value, partition=message.partition, sequence=message.sequence)
+    extension.write(message.value, partition=message.partition, sequence=message.offset)

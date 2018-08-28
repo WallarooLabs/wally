@@ -41,7 +41,7 @@ class SourceExtension(object):
     def write(self, message, partition=None, sequence=None):
         if self._conn == None:
             raise RuntimeError("Please call connect before writing")
-        payload = self._encoder(message)
+        payload = self._encoder.encode(message)
         self._conn.sendall(payload)
 
 
@@ -95,12 +95,12 @@ class SinkExtension(object):
         if len(buffered) < header_len + expected:
             self._buffers[socket] = buffered
             return (False, None)
-        data = buffered[header_len:expected]
+        data = buffered[header_len:header_len+expected]
         buffered = buffered[header_len + expected:]
         self._buffers[socket] = buffered
         if len(buffered) < header_len:
             self._pending.remove(socket)
-        return (True, self._decoder.decoder()(data))
+        return (True, self._decoder.decode(data))
 
     def _setup_connection(self, conn):
         conn.setblocking(0)

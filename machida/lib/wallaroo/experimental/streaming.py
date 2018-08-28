@@ -53,11 +53,11 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
     elif base_cls is _Decoder:
         class C(base_cls):
             def header_length(self):
-                return 4
+                return struct.calcsize('<I')
             def payload_length(self, bs):
                 return struct.unpack("<I", bs)[0]
             def decode(self, bs):
-                meta_len = struct.unpack_from('<H', bs)
+                meta_len = struct.unpack_from('<H', bs)[0]
                 # We dropping the metadata on the floor for now, slice out the
                 # remaining data for message decoding.
                 message_data = bs[struct.calcsize('<H') + meta_len :]
