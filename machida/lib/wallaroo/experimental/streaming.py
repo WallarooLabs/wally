@@ -13,71 +13,83 @@
 #  permissions and limitations under the License.
 
 import struct
+import sys
 
 from wallaroo.builder import _validate_arity_compatability
 
-# A decorator class used because we use decode rather than call in machida and
-# also require header_length and payload_length even though those are fixed in
-# this specific implementation now.
-class StreamingMessageDecoder(object):
 
-    def __init__(self, decoder):
-        _validate_arity_compatability(decoder, 1)
-        self._message_decoder = decoder
+def _attach_to_module(cls, cls_name, func):
+    # Do some scope mangling to create a uniquely named class based on
+    # the decorated function's name and place it in the wallaroo module's
+    # namespace so that pickle can find it.
+    name = cls_name + '__' + func.__name__
+    # Python2: use __name__
+    if sys.version_info.major == 2:
+        cls.__name__ = name
+    # Python3: use __qualname__
+    else:
+        cls.__qualname__ = name
 
-    def header_length(self):
-        return 4
+    globals()[name] = cls
+    return globals()[name]
 
-    def payload_length(self, bytes):
-        return struct.unpack("<I", bytes)[0]
 
-    def decode(self, data):
-        meta_len = struct.unpack_from('<H', data)
-        # We dropping the metadata on the floor for now, slice out the
-        # remaining data for message decoding.
-        message_data = data[struct.calcsize('<H') + meta_len :]
-        return self._message_decoder(message_data)
+def _wallaroo_wrap(name, func, base_cls, **kwargs):
+    if base_cls is _Encoder:
+        class C(base_cls):
+            def encode(self, data, partition=None, sequence=None):
+                encoded = self._message_encoder(data)
+                if partition:
+                    part = str(partition)
+                else:
+                    part = ''
+                if sequence:
+                    seq = int(sequence)
+                else:
+                    seq = -1
+                meta = struct.pack('<H', len(part) + struct.calcsize('<q')) + part + struct.pack('<q', seq)
+                return struct.pack('<I', len(meta) + len(encoded)) + meta + encoded
 
+    elif base_cls is _Decoder:
+        class C(base_cls):
+            def header_length(self):
+                return 4
+            def payload_length(self, bs):
+                return struct.unpack("<I", bs)[0]
+            def decode(self, bs):
+                meta_len = struct.unpack_from('<H', bs)
+                # We dropping the metadata on the floor for now, slice out the
+                # remaining data for message decoding.
+                message_data = bs[struct.calcsize('<H') + meta_len :]
+                return self._message_decoder(message_data)
+
+    # Attach the new class to the module's global namespace and return it
+    return _attach_to_module(C, base_cls.__name__, func)
+
+
+class _BaseWrapped(object):
     def __call__(self, *args):
-        return self._message_decoder(*args)
+        return self
+
+
+class _Encoder(_BaseWrapped):
+    pass
+
+
+class _Decoder(_BaseWrapped):
+    pass
 
 
 def streaming_message_decoder(func):
-    return StreamingMessageDecoder(func)
-
-
-# A decorator class used because we use encode rather than call in machida.
-class StreamingMessageEncoder(object):
-
-    def __init__(self, encoder):
-        _validate_arity_compatability(encoder, 1)
-        self._message_encoder = encoder
-
-    def encode(self, data, partition=None, sequence=None):
-        encoded = self._message_encoder(data)
-        if partition:
-            part = str(partition)
-        else:
-            part = ''
-        if sequence:
-            seq = int(sequence)
-        else:
-            seq = -1
-        meta = struct.pack('<H', len(part) + struct.calcsize('<q')) + part + struct.pack('<q', seq)
-        return struct.pack('<I', len(meta) + len(encoded)) + meta + encoded
-
-    def __call__(self, *args):
-        # NOTE: I'm not sure when we use these __call__ forms. We may have
-        # them in place so applications may call their functions. We should
-        # be careful to avoid using this ourselves since it lacks the metadata
-        # section of the payload and proper framing.
-        # Longer term, the framing and metadata serializatoin will all be in
-        # Pony so this decorator can be removed entirely.
-        return self._message_encoder(*args)
+    _validate_arity_compatability(func, 1)
+    C = _wallaroo_wrap(func.__name__, func, _Decoder)
+    return C()
 
 
 def streaming_message_encoder(func):
-    return StreamingMessageEncoder(func)
+    _validate_arity_compatability(func, 1)
+    C = _wallaroo_wrap(func.__name__, func, _Encoder)
+    return C()
 
 
 class StreamDecoderError(Exception):
