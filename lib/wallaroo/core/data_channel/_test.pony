@@ -240,7 +240,7 @@ class _TestDataChannelExpectNotify is DataChannelNotify
     true
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     None
 
@@ -288,7 +288,7 @@ class _TestDataChannelWritevNotifyClient is DataChannelNotify
     _h.fail_action("client connect")
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     None
 
@@ -313,7 +313,7 @@ class _TestDataChannelWritevNotifyServer is DataChannelNotify
     true
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     None
 
@@ -369,7 +369,7 @@ class _TestDataChannelMuteReceiveNotify is DataChannelNotify
     true
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     None
 
@@ -400,7 +400,7 @@ class _TestDataChannelMuteSendNotify is DataChannelNotify
      true
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     None
 
@@ -455,7 +455,7 @@ class _TestDataChannelUnmuteReceiveNotify is DataChannelNotify
     true
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     None
 
@@ -505,7 +505,7 @@ class _TestDataChannelThrottleReceiveNotify is DataChannelNotify
     _h.dispose_when_done(conn)
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     None
 
@@ -548,7 +548,7 @@ class _TestDataChannelThrottleSendNotify is DataChannelNotify
     data
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     None
 

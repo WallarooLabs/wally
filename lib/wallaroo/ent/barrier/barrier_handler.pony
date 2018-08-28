@@ -253,6 +253,7 @@ class InProgressSecondaryBarrierHandler is BarrierHandler
     check_for_completion()
 
   fun ref check_for_completion() =>
+    @printf[I32]("!@ BarrierHandler: check_for_completion: acked_sinks: %s, sinks: %s\n".cstring(), _acked_sinks.size().string().cstring(), _sinks.size().string().cstring())
     if _acked_sinks.size() == _sinks.size() then
       _initiator.all_secondary_sinks_acked(_barrier_token, _primary_worker)
     //!@
