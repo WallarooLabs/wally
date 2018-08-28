@@ -19,7 +19,6 @@ When we set out to build Wallaroo, we had several high-level goals in mind:
 - Create a dependable and resilient distributed computing framework
 - Take care of the complexities of distributed computing "plumbing," allowing developers to focus on their business logic
 - Provide high-performance & low-latency data processing
-- Language agnostic
 - Be portable and deploy easily (i.e., run on-prem or any cloud)
 - Manage in-memory state for the application
 - Allow applications to scale as needed, even when they are live and up-and-running
@@ -37,7 +36,7 @@ Wallaroo can either be installed via [Docker, Vagrant][docker-link] or (on Linux
 As easy as:
 
 ```sh
-docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.5.1
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.5.2
 ```
 
 ## Usage
