@@ -497,7 +497,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             Fail()
           end
         })
-        _snapshot_initiator.initiate_rollback(promise)
+        _snapshot_initiator.initiate_rollback(promise, m.sender)
       | let m: PrepareForRollbackMsg =>
         // !@ TODO: This promise can be used for acking. Right now it's a
         // placeholder.

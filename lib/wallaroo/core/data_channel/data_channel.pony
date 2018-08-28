@@ -154,7 +154,9 @@ actor DataChannel
     _queue_read()
     _pending_reads()
 
-  be identify_data_receiver(dr: DataReceiver, sender_step_id: RoutingId) =>
+  be identify_data_receiver(dr: DataReceiver, sender_step_id: RoutingId,
+    highest_seq_id: SeqId)
+  =>
     """
     Each abstract data channel (a connection from an OutgoingBoundary)
     corresponds to a single DataReceiver. On reconnect, we want a new
@@ -162,7 +164,7 @@ actor DataChannel
     called once we have found (or initially created) the DataReceiver for
     this DataChannel.
     """
-    _notify.identify_data_receiver(dr, sender_step_id, this)
+    _notify.identify_data_receiver(dr, sender_step_id, highest_seq_id, this)
 
   be write(data: ByteSeq) =>
     """

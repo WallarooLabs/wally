@@ -174,7 +174,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     _receiver = _WaitingDataReceiver(this)
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     """
     Each abstract data channel (a connection from an OutgoingBoundary)
@@ -185,7 +185,7 @@ class DataChannelConnectNotifier is DataChannelNotify
     """
     // State change to our real DataReceiver.
     _receiver = _DataReceiver(dr)
-    _receiver.data_connect(sender_boundary_id, conn)
+    _receiver.data_connect(sender_boundary_id, highest_seq_id, conn)
 
     // If we have pending register_producer calls, then try to process them now
     var retries = Array[(RoutingId, RoutingId)]
@@ -257,7 +257,7 @@ class DataChannelConnectNotifier is DataChannelNotify
         // messages to.
         conn._mute(this)
         _data_receivers.request_data_receiver(dc.sender_name,
-          dc.sender_boundary_id, conn)
+          dc.sender_boundary_id, dc.highest_seq_id, conn)
       | let sm: StepMigrationMsg =>
         ifdef "trace" then
           @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
@@ -348,7 +348,9 @@ class DataChannelConnectNotifier is DataChannelNotify
     //      create a new connection in OutgoingBoundary
 
 trait _DataReceiverWrapper
-  fun data_connect(sender_step_id: RoutingId, conn: DataChannel) =>
+  fun data_connect(sender_step_id: RoutingId, highest_seq_id: SeqId,
+    conn: DataChannel)
+  =>
     Fail()
   fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -391,8 +393,10 @@ class _DataReceiver is _DataReceiverWrapper
   new create(dr: DataReceiver) =>
     data_receiver = dr
 
-  fun data_connect(sender_step_id: RoutingId, conn: DataChannel) =>
-    data_receiver.data_connect(sender_step_id, conn)
+  fun data_connect(sender_step_id: RoutingId, highest_seq_id: SeqId,
+    conn: DataChannel)
+  =>
+    data_receiver.data_connect(sender_step_id, highest_seq_id, conn)
 
   fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
