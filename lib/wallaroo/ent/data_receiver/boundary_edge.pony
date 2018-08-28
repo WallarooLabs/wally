@@ -15,3 +15,4 @@ class val BoundaryEdge is Equatable[BoundaryEdge]
 
   fun hash(): USize =>
     input_id.hash() xor output_id.hash()
+

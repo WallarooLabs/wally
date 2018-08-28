@@ -240,7 +240,7 @@ actor Connections is Cluster
       _send_data(worker, data)
     end
 
-  be disconnect_from(worker: String) =>
+  be disconnect_from(worker: WorkerName) =>
     try
       (_, let d) = _data_conns.remove(worker)?
       d.dispose()
@@ -254,12 +254,13 @@ actor Connections is Cluster
         worker.cstring())
     end
 
-  be notify_joining_workers_of_joining_addresses(joining_workers:
-    Array[String] val)
+  be notify_joining_workers_of_joining_addresses(
+    joining_workers: Array[WorkerName] val,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
     for w1 in joining_workers.values() do
-      let others_control = recover iso Map[String, (String, String)] end
-      let others_data = recover iso Map[String, (String, String)] end
+      let others_control = recover iso Map[WorkerName, (String, String)] end
+      let others_data = recover iso Map[WorkerName, (String, String)] end
       for w2 in joining_workers.values() do
         try
           if w1 != w2 then others_control(w2) = _control_addrs(w2)? end
@@ -270,18 +271,20 @@ actor Connections is Cluster
       end
       try
         let msg = ChannelMsgEncoder.announce_connections(
-          consume others_control, consume others_data, _auth)?
+          consume others_control, consume others_data,
+          new_state_routing_ids, _auth)?
         _send_control(w1, msg)
       else
         Fail()
       end
     end
 
-  be notify_current_workers_of_joining_addresses(joining_workers:
-    Array[String] val)
+  be notify_current_workers_of_joining_addresses(
+    joining_workers: Array[WorkerName] val,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
-    let joining_control = recover iso Map[String, (String, String)] end
-    let joining_data = recover iso Map[String, (String, String)] end
+    let joining_control = recover iso Map[WorkerName, (String, String)] end
+    let joining_data = recover iso Map[WorkerName, (String, String)] end
     for jw in joining_workers.values() do
       try
         joining_control(jw) = _control_addrs(jw)?
@@ -292,7 +295,8 @@ actor Connections is Cluster
     end
     try
       let msg = ChannelMsgEncoder.announce_joining_workers(_worker_name,
-        consume joining_control, consume joining_data, _auth)?
+        consume joining_control, consume joining_data,
+        new_state_routing_ids, _auth)?
       _send_control_to_cluster(msg where exclusions = joining_workers)
     else
       Fail()
@@ -303,14 +307,6 @@ actor Connections is Cluster
     recover Array[String] end)
   =>
     try
-      let new_step_msg = ChannelMsgEncoder.announce_new_stateful_step(id,
-        _worker_name, key, state_name, _auth)?
-      for (target, ch) in _control_conns.pairs() do
-        // Only send to workers that don't already know about this step
-        if not exclusions.contains(target) then
-          ch.writev(new_step_msg)
-        end
-      end
       let migration_complete_msg =
         ChannelMsgEncoder.step_migration_complete(id, _auth)?
       for producer in exclusions.values() do
@@ -360,24 +356,26 @@ actor Connections is Cluster
       Fail()
     end
 
-  be create_boundary_to_joining_worker(target: String, boundary_id: U128,
-    local_topology_initializer: LocalTopologyInitializer)
-  =>
-    try
-      (let host, let service) = _data_addrs(target)?
-      let reporter = MetricsReporter(_app_name,
-        _worker_name, _metrics_conn)
-      let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-        consume reporter, host, service, _spike_config)
-      let boundary = builder.build_and_initialize(boundary_id, target,
-        local_topology_initializer)
-      _register_disposable(boundary)
-      local_topology_initializer.add_boundary_to_joining_worker(target,
-        boundary, builder)
-    else
-      @printf[I32]("Can't find data address for worker\n".cstring())
-      Fail()
-    end
+//!@
+  // be create_boundary_to_joining_worker(target: String, boundary_id: U128,
+  //   state_routing_ids: Map[StateName, RoutingId] val,
+  //   local_topology_initializer: LocalTopologyInitializer)
+  // =>
+  //   try
+  //     (let host, let service) = _data_addrs(target)?
+  //     let reporter = MetricsReporter(_app_name,
+  //       _worker_name, _metrics_conn)
+  //     let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
+  //       consume reporter, host, service, _spike_config)
+  //     let boundary = builder.build_and_initialize(boundary_id, target,
+  //       local_topology_initializer)
+  //     _register_disposable(boundary)
+  //     local_topology_initializer.add_boundary_to_joining_worker(target,
+  //       boundary, builder, state_routing_ids)
+  //   else
+  //     @printf[I32]("Can't find data address for worker\n".cstring())
+  //     Fail()
+  //   end
 
   // TODO: Passing in snapshot target here is a hack because we currently
   // do recovery initialization at the point boundary updates are complete.
@@ -640,18 +638,22 @@ actor Connections is Cluster
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
 
-  be create_data_connection_to_joining_worker(target_name: String,
-    host: String, service: String, li: LayoutInitializer)
+  be create_data_connection_to_joining_worker(target_name: WorkerName,
+    host: String, service: String, new_boundary_id: RoutingId,
+    state_routing_ids: Map[StateName, RoutingId] val,
+    lti: LocalTopologyInitializer)
   =>
     _data_addrs(target_name) = (host, service)
+    let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
-      _spike_config)
+      consume reporter, host, service, _spike_config)
     let outgoing_boundary =
-      boundary_builder.build_and_initialize(_routing_id_gen(), target_name, li)
+      boundary_builder.build_and_initialize(new_boundary_id, target_name, lti)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
+    lti.add_boundary_to_joining_worker(target_name, outgoing_boundary,
+      boundary_builder, state_routing_ids)
 
   be update_boundary_ids(boundary_ids: Map[String, RoutingId] val) =>
     for (worker, boundary) in _data_conns.pairs() do
@@ -709,7 +711,9 @@ actor Connections is Cluster
       end
     end
 
-  be inform_contacted_worker_of_initialization(contacted_worker: String) =>
+  be inform_contacted_worker_of_initialization(contacted_worker: String,
+    state_routing_ids: Map[StateName, RoutingId] val)
+  =>
     try
       if not _has_registered_my_addrs() then
         @printf[I32](("Cannot inform contacted worker of join: my addresses " +
@@ -721,7 +725,7 @@ actor Connections is Cluster
         "I have completed initialization\n").cstring(),
         contacted_worker.cstring())
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
-        _my_control_addr, _my_data_addr, _auth)?
+        _my_control_addr, _my_data_addr, state_routing_ids, _auth)?
       _send_control(contacted_worker, msg)
     else
       Fail()

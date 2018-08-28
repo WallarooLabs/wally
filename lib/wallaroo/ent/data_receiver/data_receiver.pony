@@ -92,6 +92,8 @@ actor DataReceiver is (Producer & Rerouter)
       _phase = _NormalDataReceiverPhase(this)
     end
 
+    @printf[I32]("!@ CREATED DataReceiver %s\n".cstring(), _id.string().cstring())
+
   fun router(): DataRouter =>
     _router
 
@@ -274,6 +276,7 @@ actor DataReceiver is (Producer & Rerouter)
   be data_connect(sender_step_id: RoutingId, highest_seq_id: SeqId,
     conn: DataChannel)
   =>
+    @printf[I32]("!@ DataReceiver: data_connect: highest_seq_id: %s\n".cstring(), highest_seq_id.string().cstring())
     _sender_step_id = sender_step_id
     _latest_conn = conn
 
@@ -290,7 +293,10 @@ actor DataReceiver is (Producer & Rerouter)
       _last_id_acked = highest_seq_id
     end
 
-    _phase.data_connect()
+    _phase.data_connect(highest_seq_id)
+
+  fun ref _update_last_id_seen(seq_id: SeqId) =>
+    _last_id_seen = seq_id
 
   fun _inform_boundary_to_send_normal_messages() =>
     try
@@ -361,8 +367,9 @@ actor DataReceiver is (Producer & Rerouter)
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
+    @printf[I32]("!@ DataReceiver: forward_barrier -> seq id %s, last_seen: %s\n".cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
     if seq_id > _last_id_seen then
-      @printf[I32]("!@ DataReceiver: received token %s from %s\n".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring())
+      @printf[I32]("!@ DataReceiver: received token %s from %s at DataReceiver %s\n".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring(), _id.string().cstring())
       match barrier_token
       | let srt: SnapshotRollbackBarrierToken =>
         _pending_message_store.clear()
@@ -389,6 +396,7 @@ actor DataReceiver is (Producer & Rerouter)
   fun ref send_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
+    @printf[I32]("!@ DataReceiver: send_barrier %s -> seq id %s, last_seen: %s\n".cstring(), barrier_token.string().cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
     if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
@@ -400,6 +408,7 @@ actor DataReceiver is (Producer & Rerouter)
         _router.forward_barrier(target_step_id, origin_step_id, this,
           barrier_token)
       else
+        @printf[I32]("!@ Queueing barrier %s\n".cstring(), barrier_token.string().cstring())
         _pending_barriers.push((target_step_id, origin_step_id, barrier_token))
         match _phase
         | let qdr: _QueuingDataReceiverPhase => None
