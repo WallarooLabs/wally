@@ -32,7 +32,7 @@ Overview of release and what is included.
 In all cases below, if you run into issues, please reach out to us! We’re available on [twitter](https://twitter.com/wallaroolabs), [IRC](https://webchat.freenode.net/?channels=#wallaroo), [Github](https://github.com/WallarooLabs/wallaroo), [by email](mailto:hello@wallaroolabs.com), or [our mailing list](https://groups.io/g/wallaroo).
 We love questions!
 
-**If you have made no changes to Wallaroo or Pony since installation, your best bet will be to delete your Wallaroo installation and start from scratch, following the [instructions] (https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) of your choice.**
+**If you have made no changes to Wallaroo or Pony since installation, your best bet will be to start from scratch, following the [instructions](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) of your choice.**
 
 Below are instructions for [Upgrading Wallaroo when compiled from source](#upgrading-wallaroo-when-compiled-from-source), [Upgrading Wallaroo in Docker](#upgrading-wallaroo-in-docker), [Upgrading Wallaroo in Vagrant](#upgrading-wallaroo-in-vagrant), and [Upgrading Wallaroo via Wallaroo Up](#upgrading-wallaroo-up).
 
@@ -65,7 +65,7 @@ x.x.x [release]
 
 Once you're on the latest ponyc and pony stable, you're ready to switch over to Wallaroo x.x.x.
 
-We recommend moving your current Wallaroo directory and starting with a fresh clone of the latest release. If you have made prior changes to the Wallaroo code, you’ll need to re-implement those changes. To get a fresh clone, assuming that you cloned the repository to the directory we recommended in setup, you’ll need to run the following:
+If you have made prior changes to the Wallaroo code, you’ll need to re-implement those changes. To get the latest release, assuming that you previously installed to the directory we recommended in setup, you’ll need to run the following:
 
 ```bash
 cd ~/wallaroo-tutorial/
@@ -85,7 +85,7 @@ cd wallaroo-x.x.x
 You can then run the following commands to build the necessary tools to continue developing using Wallaroo x.x.x:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo
+cd ~/wallaroo-tutorial/wallaroo-x.x.x
 make build-machida build-giles-all build-utils-cluster_shutdown
 ```
 
@@ -125,27 +125,19 @@ mkdir c:\wallaroo-docker\wallaroo-src
 <a name="upgrading-wallaroo-in-vagrant"></a>
 ### Upgrading Wallaroo in Vagrant
 
-To upgrade your Wallaroo installation in Vagrant, you’ll want to start by moving your current Vagrant directory to a new location. Assuming that you’ve installed it according to our setup documentation, you’ll run:
-
-```bash
-cd ~/
-mv wallaroo-tutorial/wallaroo/vagrant wallaroo-tutorial/wallaroo/vagrant-x.x.x
-cd ~/wallaroo-tutorial/wallaroo/
-git fetch origin
-git checkout -f x.x.x
-```
+To upgrade your Wallaroo installation in Vagrant, you’ll want to follow the latest installation instructions for [Wallaroo in Vagrant](https://docs.wallaroolabs.com/book/getting-started/vagrant-setup.html).
 
 Finally, to provision your new Vagrant box, run the following commands:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/vagrant
+cd ~/wallaroo-tutorial/wallaroo-x.x.x/vagrant
 vagrant up
 ```
 
 If you have modified your old Vagrant VM in any way that you intend to persist, you’ll need to do that now.  For example, copy any edited or new files from the old Vagrant VM to the new one. When you’ve completed that, it’s a good idea to clean up your old Vagrant box, by running:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/vagrant-x.x.x
+cd ~/wallaroo-tutorial/wallaroo-x.x.x/vagrant
 vagrant destroy
 ```
 
