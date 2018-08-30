@@ -336,7 +336,7 @@ actor TCPSink is Sink
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ Receive barrier %s at TCPSink\n".cstring(), barrier_token.string().cstring())
+    @printf[I32]("!@ Receive barrier %s at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     process_barrier(input_id, producer, barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
@@ -378,7 +378,7 @@ actor TCPSink is Sink
     end
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
-    // @printf[I32]("!@ Barrier complete at TCPSink\n".cstring())
+    @printf[I32]("!@ Barrier %s complete at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     ifdef debug then
       Invariant(_message_processor.barrier_in_progress())
     end
@@ -401,6 +401,7 @@ actor TCPSink is Sink
       recover val Array[ByteSeq] end)
 
   be prepare_for_rollback() =>
+    _inputs.clear()
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>

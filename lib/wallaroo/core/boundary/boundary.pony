@@ -526,6 +526,7 @@ actor OutgoingBoundary is Consumer
     _upstreams.unset(producer)
 
   fun ref resend_producer_registrations() =>
+    //!@
     @printf[I32]("!@ resend_producer_registrations\n".cstring())
     for (producer_id, producer, target_id) in
       _registered_producers.registrations().values()
@@ -589,7 +590,8 @@ actor OutgoingBoundary is Consumer
     """
     There is nothing for a Boundary to rollback to.
     """
-    None
+    // Clear inputs
+    _registered_producers.clear()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     snapshot_id: SnapshotId)

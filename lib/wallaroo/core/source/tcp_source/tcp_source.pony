@@ -276,6 +276,19 @@ actor TCPSource is Source
       end
     end
 
+  be register_downstream() =>
+    _reregister_as_producer()
+
+  fun ref _reregister_as_producer() =>
+    for (id, c) in _outputs.pairs() do
+      match c
+      | let ob: OutgoingBoundary =>
+        ob.forward_register_producer(_source_id, id, this)
+      else
+        c.register_producer(_source_id, this)
+      end
+    end
+
   be register_downstreams(action: Promise[Source]) =>
     action(this)
 

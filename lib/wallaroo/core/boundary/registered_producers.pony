@@ -93,3 +93,7 @@ class RegisteredProducers
       end
     end
     regs
+
+  fun ref clear() =>
+    _targets.clear()
+    _producers.clear()

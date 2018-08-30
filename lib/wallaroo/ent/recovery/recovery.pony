@@ -30,15 +30,17 @@ actor Recovery
     3) _PrepareRollback: Have EventLog tell all resilients to prepare for
        rollback.
     4) _RollbackTopology: Roll back topology. Wait for acks from all workers.
-    5) _RollbackBarrier: Use barrier to ensure that all old data is cleared
+    5) _RegisterProducers: Every producer in the rolled back topology needs to
+       register downstream.
+    6) _RollbackBarrier: Use barrier to ensure that all old data is cleared
        and all producers and consumers are ready to rollback state.
-    6) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
-    7) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
+    7) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
+    8) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
        recovery is about to start. This gives currently recovering workers a
        chance to cede control to us if we're the latest recovering.
-    8) _Rollback: Rollback all state to last safe checkpoint.
-    9) _FinishedRecovering: Finished recovery
-    10) _RecoveryOverrideAccepted: If recovery was handed off to another worker
+    9) _Rollback: Rollback all state to last safe checkpoint.
+    10) _FinishedRecovering: Finished recovery
+    11) _RecoveryOverrideAccepted: If recovery was handed off to another worker
   """
   let _self: Recovery tag = this
   let _auth: AmbientAuth
@@ -90,6 +92,9 @@ actor Recovery
 
   be worker_ack_topology_rollback(w: WorkerName, s_id: SnapshotId) =>
     _recovery_phase.worker_ack_topology_rollback(w, s_id)
+
+  be worker_ack_register_producers(w: WorkerName) =>
+    _recovery_phase.worker_ack_register_producers(w)
 
   be rollback_barrier_complete(token: SnapshotRollbackBarrierToken) =>
     _recovery_phase.rollback_barrier_complete(token)
@@ -184,6 +189,28 @@ actor Recovery
     end
 
   fun ref _topology_rollback_complete() =>
+    ifdef "resilience" then
+      @printf[I32]("|~~ - Recovery Phase: Register Producers - ~~|\n"
+        .cstring())
+      let action = Promise[None]
+      action.next[None]({(n: None) =>
+        _self.worker_ack_register_producers(_worker_name)})
+      _router_registry.producers_register_downstream(action)
+
+      // Inform cluster to register_producers
+      try
+        let msg = ChannelMsgEncoder.register_producers(_worker_name, _auth)?
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
+
+      _recovery_phase = _RegisterProducers(this, _workers)
+    else
+      _recovery_complete()
+    end
+
+  fun ref _register_producers_complete() =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
       let action = Promise[SnapshotRollbackBarrierToken]
