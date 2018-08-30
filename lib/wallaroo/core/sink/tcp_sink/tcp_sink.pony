@@ -179,6 +179,7 @@ actor TCPSink is Sink
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("!@ application_begin_reporting TCPSink %s\n".cstring(), _sink_id.string().cstring())
     _initializer = initializer
     initializer.report_created(this)
 

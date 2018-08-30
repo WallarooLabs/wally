@@ -85,6 +85,7 @@ actor StateStepCreator is Initializable
     _event_log = event_log
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("!@ application_begin_reporting StateStepCreator\n".cstring())
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>

@@ -520,7 +520,10 @@ actor RouterRegistry
     try
       _producers.remove(id)?
     else
-      Fail()
+      ifdef debug then
+        @printf[I32]("RouterRegistry: Trying to remove unknown producer.\n"
+          .cstring())
+      end
     end
 
   fun _distribute_data_router() =>
