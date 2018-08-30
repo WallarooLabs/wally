@@ -111,6 +111,7 @@ actor RouterRegistry
   //
   ////////////////
 
+  let _producers: Map[RoutingId, Producer] = _producers.create()
   let _sources: Map[RoutingId, Source] = _sources.create()
   let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
   // Map from Source digestof value to source id
@@ -254,6 +255,7 @@ actor RouterRegistry
     _connections.register_disposable(d)
 
   be register_source(source: Source, source_id: RoutingId) =>
+    _producers(source_id) = source
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
     _barrier_initiator.register_source(source, source_id)
@@ -266,6 +268,7 @@ actor RouterRegistry
 
   be unregister_source(source: Source, source_id: RoutingId) =>
     try
+      _unregister_producer(source_id)
       _sources.remove(source_id)?
       _source_ids.remove(digestof source)?
       _barrier_initiator.unregister_source(source, source_id)
@@ -486,6 +489,8 @@ actor RouterRegistry
       Fail()
     end
     _add_routes_to_state_step(step_id, step, key, state_name)
+    _producers(step_id) = step
+    _state_step_creator.register_state_step(state_name, key, step_id, step)
 
   be unregister_state_step(state_name: StateName, key: Key, step_id: RoutingId,
     step: Step, snapshot_id: (SnapshotId | None) = None)
@@ -503,6 +508,20 @@ actor RouterRegistry
       Fail()
     end
     move_stateful_step_to_proxy(id, step, key, state_name, snapshot_id)
+    _unregister_producer(id)
+
+  be register_producer(id: RoutingId, p: Producer) =>
+    _producers(id) = p
+
+  be unregister_producer(id: RoutingId) =>
+    _unregister_producer(id)
+
+  fun ref _unregister_producer(id: RoutingId) =>
+    try
+      _producers.remove(id)?
+    else
+      Fail()
+    end
 
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
@@ -690,6 +709,12 @@ actor RouterRegistry
       lti.update_target_id_router(state_name, new_target_id_router)
     end
     lti.initialize_join_initializables()
+
+  be producers_register_downstream(promise: Promise[None]) =>
+    for p in _producers.values() do
+      p.register_downstream()
+    end
+    promise(None)
 
   be report_status(code: ReportStatusCode) =>
     match code

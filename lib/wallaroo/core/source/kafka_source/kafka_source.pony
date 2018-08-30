@@ -252,6 +252,19 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       end
     end
 
+  be register_downstream() =>
+    _reregister_as_producer()
+
+  fun ref _reregister_as_producer() =>
+    for (id, c) in _outputs.pairs() do
+      match c
+      | let ob: OutgoingBoundary =>
+        ob.forward_register_producer(_source_id, id, this)
+      else
+        c.register_producer(_source_id, this)
+      end
+    end
+
   fun router(): Router =>
     _router
 

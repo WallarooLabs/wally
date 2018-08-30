@@ -24,15 +24,16 @@ use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/equality"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/ent/barrier"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/network"
-use "wallaroo/ent/recovery"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
+use "wallaroo_labs/mort"
 
 class val Partitions[In: Any val]
   let _function: PartitionFunction[In] val
@@ -170,7 +171,8 @@ trait val StateSubpartitions is Equatable[StateSubpartitions]
     keyed_step_ids: LocalStatePartitionIds,
     state_steps: Map[StateName, Array[Step]],
     state_step_creator: StateStepCreator,
-    state_routing_ids: Map[WorkerName, RoutingId] val): PartitionRouter
+    state_routing_ids: Map[WorkerName, RoutingId] val,
+    router_registery: RouterRegistry): PartitionRouter
   fun update_key(key: Key, pa: ProxyAddress): StateSubpartitions ?
   fun add_worker_name(worker: String): StateSubpartitions
   fun initial_local_keys(w: WorkerName): Map[Key, RoutingId] val
@@ -213,7 +215,8 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
     keyed_step_ids: LocalStatePartitionIds,
     state_steps: Map[StateName, Array[Step]],
     state_step_creator: StateStepCreator,
-    state_routing_ids: Map[WorkerName, RoutingId] val):
+    state_routing_ids: Map[WorkerName, RoutingId] val,
+    router_registery: RouterRegistry):
     LocalPartitionRouter[PIn, S] val
   =>
     let hashed_node_routes = recover trn Map[WorkerName, HashedProxyRouter] end
@@ -241,6 +244,7 @@ class val KeyedStateSubpartitions[PIn: Any val, S: State ref] is
         keyed_data_routes.add(_state_name, key, next_state_step)
         keyed_step_ids.add(_state_name, key, id)
         m(key) = next_state_step
+        router_registery.register_producer(id, next_state_step)
         partition_count = partition_count + 1
       end
     else
@@ -406,7 +410,12 @@ class LocalStatePartitions
       for (state, keys) in new_keys.pairs() do
         keys_to_add(state) = Map[Key, RoutingId]
         keys_to_remove(state) = SetIs[Key]
-        let next = _info.insert_if_absent(state, Map[Key, Step])?
+        if not _info.contains(state) then
+          @printf[I32]("!@ LocalStatePartitions: _info didn't contain Map[Key, Step]!!!\n".cstring())
+          _info(state) = Map[Key, Step]
+        end
+        let next = _info(state)?
+        @printf[I32]("!@ LocalStatePartitions: _info(state) is of size %s\n".cstring(), next.size().string().cstring())
         for (k, r_id) in keys.pairs() do
           if not next.contains(k) then
             keys_to_add(state)?(k) = r_id
