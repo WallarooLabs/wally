@@ -250,29 +250,31 @@ actor TCPSource is Source
     end
 
   fun ref _register_output(id: RoutingId, c: Consumer) =>
-    if _outputs.contains(id) then
-      try
-        let old_c = _outputs(id)?
-        if old_c is c then
-          // We already know about this output.
-          return
+    if not _disposed then
+      if _outputs.contains(id) then
+        try
+          let old_c = _outputs(id)?
+          if old_c is c then
+            // We already know about this output.
+            return
+          end
+          _unregister_output(id, old_c)
+        else
+          Unreachable()
         end
-        _unregister_output(id, old_c)
-      else
-        Unreachable()
       end
-    end
 
-    _outputs(id) = c
-    if not _routes.contains(c) then
-      let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
-      _routes(c) = new_route
-      new_route.register_producer(id)
-    else
-      try
-        _routes(c)?.register_producer(id)
+      _outputs(id) = c
+      if not _routes.contains(c) then
+        let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
+        _routes(c) = new_route
+        new_route.register_producer(id)
       else
-        Unreachable()
+        try
+          _routes(c)?.register_producer(id)
+        else
+          Unreachable()
+        end
       end
     end
 
@@ -280,15 +282,18 @@ actor TCPSource is Source
     _reregister_as_producer()
 
   fun ref _reregister_as_producer() =>
-    for (id, c) in _outputs.pairs() do
-      match c
-      | let ob: OutgoingBoundary =>
-        ob.forward_register_producer(_source_id, id, this)
-      else
-        c.register_producer(_source_id, this)
+    if not _disposed then
+      for (id, c) in _outputs.pairs() do
+        match c
+        | let ob: OutgoingBoundary =>
+          ob.forward_register_producer(_source_id, id, this)
+        else
+          c.register_producer(_source_id, this)
+        end
       end
     end
 
+  //!@ rename
   be register_downstreams(action: Promise[Source]) =>
     action(this)
 

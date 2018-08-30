@@ -130,6 +130,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   // Application startup lifecycle event
   //
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("!@ application_begin_reporting Step %s\n".cstring(), _id.string().cstring())
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>

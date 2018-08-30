@@ -81,6 +81,7 @@ actor SnapshotInitiator is Initializable
     end
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("!@ application_begin_reporting SnapshotInitiator\n".cstring())
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>

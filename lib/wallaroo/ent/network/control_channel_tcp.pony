@@ -373,6 +373,12 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: AutoscaleCompleteMsg =>
         _router_registry.autoscale_complete()
       | let m: LeavingMigrationAckRequestMsg =>
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          lti.remove_worker_connection_info(m.sender)
+        else
+          Fail()
+        end
         try
           // We're acking immediately here, but in the future we may need
           // to take other steps first, plugging this directly into the
