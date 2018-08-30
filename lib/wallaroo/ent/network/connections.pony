@@ -42,13 +42,14 @@ actor Connections is Cluster
   let _is_initializer: Bool
   var _my_control_addr: (String, String) = ("", "")
   var _my_data_addr: (String, String) = ("", "")
-  let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
-  let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
-  let _control_conns: Map[String, ControlConnection] =
+  let _control_addrs: Map[WorkerName, (String, String)] =
+    _control_addrs.create()
+  let _data_addrs: Map[WorkerName, (String, String)] = _data_addrs.create()
+  let _control_conns: Map[WorkerName, ControlConnection] =
     _control_conns.create()
-  let _data_conn_builders: Map[String, OutgoingBoundaryBuilder] =
+  let _data_conn_builders: Map[WorkerName, OutgoingBoundaryBuilder] =
     _data_conn_builders.create()
-  let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
+  let _data_conns: Map[WorkerName, OutgoingBoundary] = _data_conns.create()
   let _metrics_conn: MetricsSink
   let _metrics_host: String
   let _metrics_service: String
@@ -469,33 +470,53 @@ actor Connections is Cluster
         .cstring())
     end
 
+  be remove_worker_connection_info(worker: WorkerName) =>
+    try
+      _control_addrs.remove(worker)?
+      _data_addrs.remove(worker)?
+      _control_conns.remove(worker)?
+      _data_conn_builders.remove(worker)?
+      _data_conns.remove(worker)?
+    else
+      ifdef debug then
+        @printf[I32]("Couldn't find all worker connections to remove\n"
+          .cstring())
+      end
+    end
+
   be save_connections() =>
     _save_connections(_control_addrs, _data_addrs)
 
-  fun _save_connections(control_addrs: Map[String, (String, String)] box,
-    data_addrs: Map[String, (String, String)] box)
+  fun _save_connections(control_addrs: Map[WorkerName, (String, String)] box,
+    data_addrs: Map[WorkerName, (String, String)] box)
   =>
     @printf[I32]("Saving connection addresses!\n".cstring())
 
-    let map = recover trn Map[String, Map[String, (String, String)]] end
-    let control_map = recover trn Map[String, (String, String)] end
+    let map = recover trn Map[String, Map[WorkerName, (String, String)]] end
+    let control_map = recover trn Map[WorkerName, (String, String)] end
     for (key, value) in control_addrs.pairs() do
       control_map(key) = value
     end
-    let data_map = recover trn Map[String, (String, String)] end
+    let data_map = recover trn Map[WorkerName, (String, String)] end
     for (key, value) in data_addrs.pairs() do
       data_map(key) = value
     end
 
+    //!@
+    for (w, a) in control_map.pairs() do
+      @printf[I32]("!@ CONN TO WORKER WWW %s\n".cstring(), w.cstring())
+    end
+
     map("control") = consume control_map
     map("data") = consume data_map
-    let addresses: Map[String, Map[String, (String, String)]] val =
+    let addresses: Map[String, Map[WorkerName, (String, String)]] val =
       consume map
 
     try
       let connection_addresses_file = FilePath(_auth,
         _connection_addresses_file)?
       let file = File(connection_addresses_file)
+      file.set_length(0)
       let wb = Writer
       let serialised_connection_addresses: Array[U8] val =
         Serialised(SerialiseAuth(_auth), addresses)?.output(
@@ -512,10 +533,10 @@ actor Connections is Cluster
       boundary.quick_initialize(li)
     end
 
-  be create_routers_from_blueprints(workers: Array[String] val,
-    pr_blueprints: Map[String, PartitionRouterBlueprint] val,
+  be create_routers_from_blueprints(workers: Array[WorkerName] val,
+    pr_blueprints: Map[StateName, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    tidr_blueprints: Map[String, TargetIdRouterBlueprint] val,
+    tidr_blueprints: Map[StateName, TargetIdRouterBlueprint] val,
     local_sinks: Map[RoutingId, Consumer] val,
     router_registry: RouterRegistry, lti: LocalTopologyInitializer)
   =>
