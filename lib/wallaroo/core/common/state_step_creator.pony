@@ -164,10 +164,6 @@ actor StateStepCreator is Initializable
 
       (_, let pending_step) = _pending_steps.remove(step)?
 
-      _keys_to_steps.add(pending_step.state_name, pending_step.key, step)
-      _keys_to_step_ids.add(pending_step.state_name, pending_step.key,
-        pending_step.routing_id)
-
       try
         (_router_registry as RouterRegistry).register_state_step(step,
           pending_step.state_name, pending_step.key,
@@ -234,6 +230,9 @@ actor StateStepCreator is Initializable
           _outgoing_boundaries, this
           where target_id_router = target_id_router)
 
+      _keys_to_steps.add(state_name, key, state_step)
+      _keys_to_step_ids.add(state_name, key, id)
+
       _pending_steps(state_step) =
         _PendingStep(state_name, key, id, snapshot_id)
       state_step.quick_initialize(this)
@@ -242,7 +241,16 @@ actor StateStepCreator is Initializable
       Fail()
     end
 
-  // TargetIdRouter updates
+  be register_state_step(state_name: StateName, key: Key, id: RoutingId,
+    step: Step)
+  =>
+    _register_state_step(state_name, key, id, step)
+
+  fun ref _register_state_step(state_name: StateName, key: Key, id: RoutingId,
+    step: Step)
+  =>
+    _keys_to_steps.add(state_name, key, step)
+    _keys_to_step_ids.add(state_name, key, id)
 
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
     _update_boundaries(boundaries)

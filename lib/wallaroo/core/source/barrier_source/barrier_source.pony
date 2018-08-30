@@ -78,6 +78,7 @@ actor BarrierSource is Source
     _source_id = source_id
     _router_registry = router_registry
     _event_log = event_log
+    _router_registry.register_producer(_source_id, this)
 
   fun router(): Router =>
     let rs = recover iso Array[Router] end
@@ -221,6 +222,19 @@ actor BarrierSource is Source
       Fail()
     end
 
+  be register_downstream() =>
+    _reregister_as_producer()
+
+  fun ref _reregister_as_producer() =>
+    for (id, c) in _outputs.pairs() do
+      match c
+      | let ob: OutgoingBoundary =>
+        ob.forward_register_producer(_source_id, id, this)
+      else
+        c.register_producer(_source_id, this)
+      end
+    end
+
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   =>
@@ -271,7 +285,7 @@ actor BarrierSource is Source
   be dispose() =>
     if not _disposed then
       _unregister_all_outputs()
-      _router_registry.unregister_source(this, _source_id)
+      _router_registry.unregister_producer(_source_id)
       @printf[I32]("Shutting down BarrierSource\n".cstring())
       _disposed = true
     end

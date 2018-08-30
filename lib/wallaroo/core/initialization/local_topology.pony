@@ -103,7 +103,8 @@ class val LocalTopology
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
     state_steps: Map[StateName, Array[Step]],
-    state_step_creator: StateStepCreator) ?
+    state_step_creator: StateStepCreator,
+    router_registry: RouterRegistry) ?
   =>
     let subpartition =
       try
@@ -123,7 +124,7 @@ class val LocalTopology
           worker_names, metrics_conn, auth, event_log, all_local_keys,
           recovery_replayer, outgoing_boundaries, initializables, data_routes,
           keyed_data_routes, keyed_step_ids, state_steps, state_step_creator,
-          local_state_routing_ids)
+          local_state_routing_ids, router_registry)
       else
         Fail()
       end
@@ -1058,7 +1059,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                       _outgoing_boundaries, _initializables,
                       data_routes_ref, keyed_data_routes_ref,
                       keyed_step_ids_ref, built_state_steps,
-                      _state_step_creator)?
+                      _state_step_creator, _router_registry)?
                   else
                     @printf[I32]("Failed to update state_map\n".cstring())
                     error
@@ -1108,6 +1109,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   state_comp_target_router)
                 _router_registry.register_partition_router_subscriber(
                   builder.state_name(), next_step)
+                _router_registry.register_producer(next_id, next_step)
 
                 data_routes(next_id) = next_step
                 _initializables.set(next_step)
@@ -1247,6 +1249,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                       _event_log, _recovery_replayer, _auth,
                       _outgoing_boundaries, _state_step_creator,
                       state_comp_target)
+                    _router_registry.register_producer(b.id(), pre_state_step)
                     data_routes(b.id()) = pre_state_step
                     _initializables.set(pre_state_step)
 
@@ -1438,7 +1441,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                     _outgoing_boundaries, _initializables,
                     data_routes_ref, keyed_data_routes_ref,
                     keyed_step_ids_ref, built_state_steps,
-                    _state_step_creator)?
+                    _state_step_creator, _router_registry)?
                 else
                   @printf[I32]("Failed to update state map\n".cstring())
                   error
@@ -1591,7 +1594,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   _outgoing_boundaries, _initializables,
                   data_routes_ref, keyed_data_routes_ref,
                   keyed_step_ids_ref, built_state_steps,
-                  _state_step_creator)?
+                  _state_step_creator, _router_registry)?
               else
                 @printf[I32]("Failed to update state map\n".cstring())
                 error

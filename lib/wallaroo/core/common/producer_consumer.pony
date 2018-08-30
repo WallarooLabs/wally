@@ -37,6 +37,7 @@ trait tag Producer is (Muteable & Rerouter & Resilient)
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
+  be register_downstream()
 
 interface tag RouterUpdatable
   be update_router(r: Router)

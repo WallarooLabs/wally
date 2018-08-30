@@ -522,6 +522,22 @@ primitive ChannelMsgEncoder
     """
     _encode(AckRollbackTopologyGraphMsg(sender, snapshot_id), auth)?
 
+  fun register_producers(sender: WorkerName, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    Sent to all workers in cluster by recovering worker.
+    """
+    _encode(RegisterProducersMsg(sender), auth)?
+
+  fun ack_register_producers(sender: WorkerName, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    Sent to ack register producers.
+    """
+    _encode(AckRegisterProducersMsg(sender), auth)?
+
   fun rollback_barrier_complete(token: SnapshotRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1404,6 +1420,18 @@ class val AckRollbackTopologyGraphMsg is ChannelMsg
   new val create(sender': WorkerName, s_id: SnapshotId) =>
     sender = sender'
     snapshot_id = s_id
+
+class val RegisterProducersMsg is ChannelMsg
+  let sender: WorkerName
+
+  new val create(sender': WorkerName) =>
+    sender = sender'
+
+class val AckRegisterProducersMsg is ChannelMsg
+  let sender: WorkerName
+
+  new val create(sender': WorkerName) =>
+    sender = sender'
 
 class val RollbackBarrierCompleteMsg is ChannelMsg
   let token: SnapshotRollbackBarrierToken
