@@ -98,7 +98,7 @@ class val LocalTopology
     recovery_replayer: RecoveryReconnecter,
     auth: AmbientAuth,
     outgoing_boundaries: Map[WorkerName, OutgoingBoundary] val,
-    initializables: SetIs[Initializable],
+    initializables: Initializables,
     data_routes: Map[RoutingId, Consumer tag],
     keyed_data_routes: LocalStatePartitions,
     keyed_step_ids: LocalStatePartitionIds,
@@ -294,7 +294,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _created: SetIs[Initializable] = _created.create()
   var _initialized: SetIs[Initializable] = _initialized.create()
   var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
-  let _initializables: SetIs[Initializable] = _initializables.create()
+  let _initializables: Initializables = Initializables
   let _state_step_creator: StateStepCreator
   var _initialization_lifecycle_complete: Bool = false
 
@@ -467,19 +467,23 @@ actor LocalTopologyInitializer is LayoutInitializer
       conn.writev(error_reply)
     end
 
-  be take_over_initiate_shrink(remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val)
+  be take_over_initiate_shrink(remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
   =>
     _remove_worker_names(leaving_workers)
     _router_registry.initiate_shrink(remaining_workers, leaving_workers)
 
-  be prepare_shrink(remaining_workers: Array[String] val,
-    leaving_workers: Array[String] val)
+  be prepare_shrink(remaining_workers: Array[WorkerName] val,
+    leaving_workers: Array[WorkerName] val)
   =>
     _remove_worker_names(leaving_workers)
     _router_registry.prepare_shrink(remaining_workers, leaving_workers)
 
-  fun _are_valid_shrink_candidates(candidates: Array[String] val): Bool =>
+  be remove_worker_connection_info(worker: WorkerName) =>
+    _connections.remove_worker_connection_info(worker)
+    _connections.save_connections()
+
+  fun _are_valid_shrink_candidates(candidates: Array[WorkerName] val): Bool =>
     match _topology
     | let t: LocalTopology =>
       for c in candidates.values() do
@@ -1741,9 +1745,10 @@ actor LocalTopologyInitializer is LayoutInitializer
           _router_registry.set_stateless_partition_router(id, pr)
         end
 
-        for i in _initializables.values() do
-          i.application_begin_reporting(this)
-        end
+        _initializables.application_begin_reporting(this)
+        // for i in _initializables.values() do
+        //   i.application_begin_reporting(this)
+        // end
 
         @printf[I32]("Local topology initialized\n".cstring())
         _topology_initialized = true
@@ -2002,32 +2007,35 @@ actor LocalTopologyInitializer is LayoutInitializer
     // over boundaries. This means the boundaries can not
     // report as initialized until the join is complete, but
     // the join can't complete until we say we're initialized.
-    let boundaries = Array[Initializable]
-    for i in _initializables.values() do
-      match i
-      | let ob: OutgoingBoundary =>
-        boundaries.push(ob)
-      else
-        i.application_begin_reporting(this)
-      end
-    end
-    for b in boundaries.values() do
-      _initializables.unset(b)
-    end
+    _initializables.remove_boundaries()
+    _initializables.application_begin_reporting(this)
+    // for i in _initializables.values() do
+    //   match i
+    //   | let ob: OutgoingBoundary =>
+    //     boundaries.push(ob)
+    //   else
+    //     i.application_begin_reporting(this)
+    //   end
+    // end
+    // for b in boundaries.values() do
+    //   _initializables.unset(b)
+    // end
     if _initializables.size() == 0 then
       _complete_initialization_lifecycle()
     end
 
   be report_created(initializable: Initializable) =>
     if not _created.contains(initializable) then
+      @printf[I32]("!@ LocalTopologyInitializer: report_created when there are %s initializables to go\n".cstring(), (_initializables.size() - _created.size()).string().cstring())
       _created.set(initializable)
       if _created.size() == _initializables.size() then
         @printf[I32]("|~~ INIT PHASE I: Application is created! ~~|\n"
           .cstring())
         _spin_up_source_listeners()
-        for i in _initializables.values() do
-          i.application_created(this)
-        end
+        _initializables.application_created(this)
+        // for i in _initializables.values() do
+        //   i.application_created(this)
+        // end
       end
     else
       @printf[I32]("The same Initializable reported being created twice\n"
@@ -2041,9 +2049,10 @@ actor LocalTopologyInitializer is LayoutInitializer
       if _initialized.size() == _initializables.size() then
         @printf[I32]("|~~ INIT PHASE II: Application is initialized! ~~|\n"
           .cstring())
-        for i in _initializables.values() do
-          i.application_initialized(this)
-        end
+        _initializables.application_initialized(this)
+        // for i in _initializables.values() do
+        //   i.application_initialized(this)
+        // end
       end
     else
       @printf[I32]("The same Initializable reported being initialized twice\n"
@@ -2104,9 +2113,10 @@ actor LocalTopologyInitializer is LayoutInitializer
   fun ref _application_ready_to_work() =>
     @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
       .cstring())
-    for i in _initializables.values() do
-      i.application_ready_to_work(this)
-    end
+    _initializables.application_ready_to_work(this)
+    // for i in _initializables.values() do
+    //   i.application_ready_to_work(this)
+    // end
 
     if _is_initializer then
       match _cluster_initializer

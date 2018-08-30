@@ -79,6 +79,7 @@ actor BarrierInitiator is Initializable
     end
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("!@ application_begin_reporting BarrierInitiator\n".cstring())
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>

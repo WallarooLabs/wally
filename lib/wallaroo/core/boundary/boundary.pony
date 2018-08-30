@@ -192,6 +192,7 @@ actor OutgoingBoundary is Consumer
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    @printf[I32]("!@ application_begin_reporting OutgoingBoundary\n".cstring())
     _initializer = initializer
     initializer.report_created(this)
 
