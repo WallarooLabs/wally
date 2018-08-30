@@ -261,6 +261,19 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
       _unregister_output(id, consumer)
     end
 
+  be register_downstream() =>
+    _reregister_as_producer()
+
+  fun ref _reregister_as_producer() =>
+    for (id, c) in _outputs.pairs() do
+      match c
+      | let ob: OutgoingBoundary =>
+        ob.forward_register_producer(_id, id, this)
+      else
+        c.register_producer(_id, this)
+      end
+    end
+
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
       ifdef debug then
@@ -629,6 +642,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     end
 
   be prepare_for_rollback() =>
+    _inputs.clear()
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>

@@ -17,7 +17,7 @@ use "wallaroo_labs/mort"
 
 
 class BarrierSinkAcker
-  let _step_id: RoutingId
+  let _sink_id: RoutingId
   let _sink: Sink ref
   var _barrier_token: BarrierToken = InitialBarrierToken
   let _barrier_initiator: BarrierInitiator
@@ -25,10 +25,10 @@ class BarrierSinkAcker
 
   // !@ Perhaps to add invariant wherever inputs can be updated in
   // the encapsulating actor to check if barrier is in progress.
-  new create(step_id: RoutingId, sink: Sink ref,
+  new create(sink_id: RoutingId, sink: Sink ref,
     barrier_initiator: BarrierInitiator)
   =>
-    _step_id = step_id
+    _sink_id = sink_id
     _sink = sink
     _barrier_initiator = barrier_initiator
 
@@ -58,6 +58,7 @@ class BarrierSinkAcker
       _inputs_blocking(step_id) = producer
       _check_completion(inputs)
     else
+      @printf[I32]("!@ Failed to find step_id %s in inputs at Sink %s\n".cstring(), step_id.string().cstring(), _sink_id.string().cstring())
       Fail()
     end
 

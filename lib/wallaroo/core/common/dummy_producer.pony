@@ -80,3 +80,6 @@ actor DummyProducer is Producer
   =>
     None
 
+  be register_downstream() =>
+    None
+

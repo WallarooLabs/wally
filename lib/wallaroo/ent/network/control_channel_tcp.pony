@@ -518,6 +518,20 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           promise)
       | let m: AckRollbackTopologyGraphMsg =>
         _recovery.worker_ack_topology_rollback(m.sender, m.snapshot_id)
+      | let m: RegisterProducersMsg =>
+        let promise = Promise[None]
+        promise.next[None]({(n: None) =>
+          try
+            let msg = ChannelMsgEncoder.ack_register_producers( _worker_name,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _router_registry.producers_register_downstream(promise)
+      | let m: AckRegisterProducersMsg =>
+        _recovery.worker_ack_register_producers(m.sender)
       | let m: RollbackBarrierCompleteMsg =>
         _recovery.rollback_barrier_complete(m.token)
       | let m: EventLogInitiateRollbackMsg =>

@@ -152,6 +152,10 @@ actor DataReceiver is (Producer & Rerouter)
     // DataReceiver doesn't have its own routes
     None
 
+  be register_downstream() =>
+    // DataReceiver doesn't register directly with its downstreams
+    None
+
   be report_status(code: ReportStatusCode) =>
     _router.report_status(code)
 
@@ -439,6 +443,10 @@ actor DataReceiver is (Producer & Rerouter)
     """
     There is nothing for a DataReceiver to rollback to.
     """
+    _pending_barriers.clear()
+    _state_partition_producers.clear()
+    _queued_register_producers.clear()
+    _queued_unregister_producers.clear()
     None
 
   be rollback(payload: ByteSeq val, event_log: EventLog,

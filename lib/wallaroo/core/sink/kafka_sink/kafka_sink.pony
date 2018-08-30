@@ -460,6 +460,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       recover val Array[ByteSeq] end)
 
   be prepare_for_rollback() =>
+    _inputs.clear()
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
