@@ -21,7 +21,7 @@ class ActiveBarriers
 
   fun ref add_barrier(barrier_token: BarrierToken, handler: BarrierHandler) ?
   =>
-    @printf[I32]("!@ ActiveBarriers: Adding barrier %s\n".cstring(), barrier_token.string().cstring())
+    @printf[I32]("!@ ACTIVE_BARRIERS: Adding barrier %s\n".cstring(), barrier_token.string().cstring())
     if _barriers.contains(barrier_token) then
       try
         let old_handler = _barriers(barrier_token)?
@@ -64,35 +64,42 @@ class ActiveBarriers
     try
       _barriers(barrier_token)?.ack_barrier(s)
     else
-      @printf[I32]("!@ ACTIVE_BARRIERS: ack_barrier on unknown %s\n".cstring(), barrier_token.string().cstring())
-      @printf[I32]("!@ ACTIVE_BARRIERS: Known barriers:\n".cstring())
-      //!@
-      for t in _barriers.keys() do
-        @printf[I32]("!@ -- %s\n".cstring(), t.string().cstring())
+      ifdef debug then
+        @printf[I32](("ActiveBarriers: ack_barrier on unknown " +
+          "barrier %s.\n").cstring(), barrier_token.string().cstring())
       end
-      Fail()
     end
 
   fun ref worker_ack_barrier_start(w: String, barrier_token: BarrierToken) =>
     try
       _barriers(barrier_token)?.worker_ack_barrier_start(w)
     else
-      Fail()
+      ifdef debug then
+        @printf[I32](("ActiveBarriers: worker_ack_barrier_start on unknown " +
+          "barrier %s.\n").cstring(), barrier_token.string().cstring())
+      end
     end
 
   fun ref worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
     try
       _barriers(barrier_token)?.worker_ack_barrier(w)
     else
-      Fail()
+      ifdef debug then
+        @printf[I32](("ActiveBarriers: worker_ack_barrier on unknown " +
+          "barrier %s.\n").cstring(), barrier_token.string().cstring())
+      end
     end
 
   fun ref check_for_completion(barrier_token: BarrierToken) =>
     try
       _barriers(barrier_token)?.check_for_completion()
     else
-      Fail()
+      ifdef debug then
+        @printf[I32](("ActiveBarriers: check_for_completion on unknown " +
+          "barrier %s.\n").cstring(), barrier_token.string().cstring())
+      end
     end
 
   fun ref clear() =>
+    @printf[I32]("!@ ACTIVE_BARRIERS: Clearing!!\n".cstring())
     _barriers.clear()

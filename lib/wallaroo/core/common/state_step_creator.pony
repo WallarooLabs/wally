@@ -85,7 +85,6 @@ actor StateStepCreator is Initializable
     _event_log = event_log
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("!@ application_begin_reporting StateStepCreator\n".cstring())
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
@@ -185,7 +184,6 @@ actor StateStepCreator is Initializable
     rollback_keys: Map[StateName, Map[Key, RoutingId] val] val,
     promise: Promise[None])
   =>
-    @printf[I32]("!@ StateStepCreator: rollback_state_steps\n".cstring())
     _pending_steps.clear()
     (let keys_to_add, let keys_to_remove) =
       _keys_to_steps.key_diff(rollback_keys)
@@ -208,13 +206,11 @@ actor StateStepCreator is Initializable
       end
     end
     //!@ We should prove the updates are done before fulfilling
-    @printf[I32]("!@ StateStepCreator: fulfilling rollback topology promise\n".cstring())
     promise(None)
 
   fun ref _create_state_step(state_name: StateName, key: Key, id: RoutingId,
     snapshot_id: (SnapshotId | None) = None)
   =>
-    @printf[I32]("!@ _create_state_step!!! w/ snapshot id %s\n".cstring(), snapshot_id.string().cstring())
     _state_key_known(state_name, key)
 
     try
