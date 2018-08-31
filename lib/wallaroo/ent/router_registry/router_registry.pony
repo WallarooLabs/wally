@@ -1470,8 +1470,13 @@ actor RouterRegistry
     _connections.disconnect_from(worker)
     try
       _remove_worker(worker)
+      _outgoing_boundaries(worker)?.dispose()
+      for s in _sources.values() do
+        s.disconnect_boundary(worker)
+      end
       _outgoing_boundaries.remove(worker)?
       _outgoing_boundaries_builders.remove(worker)?
+      _unmute_request(worker)
     else
       Fail()
     end
