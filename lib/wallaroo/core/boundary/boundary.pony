@@ -464,6 +464,7 @@ actor OutgoingBoundary is Consumer
     silently discarded and not acknowleged.
     """
     @printf[I32]("Shutting down OutgoingBoundary\n".cstring())
+    _unmute_upstreams()
     _no_more_reconnect = true
     _timers.dispose()
     close()
