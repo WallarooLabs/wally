@@ -210,6 +210,21 @@ actor BarrierInitiator is Initializable
     """
     @printf[I32]("!@ Injecting blocking barrier %s\n".cstring(), barrier_token.string().cstring())
     if _primary_worker == _worker_name then
+      // We handle rollback barrier token as a special case. That's because
+      // in the presence of a rollback token, we need to cancel all other
+      // tokens in flight since we are rolling back to an earlier state of
+      // the system. On a successful match here, we transition to the
+      // rollback phase.
+      match barrier_token
+      | let srt: SnapshotRollbackBarrierToken =>
+        // Check if this rollback token is higher priority than a current
+        // rollback token, in case one is being processed. If it's not, drop
+        // it.
+        if _phase.higher_priority(srt) then
+          _clear_barriers()
+        end
+      end
+
       //!@ We need to make sure this gets queued if we're in rollback mode
       _phase = _BlockingBarrierInitiatorPhase(this, barrier_token,
         wait_for_token)

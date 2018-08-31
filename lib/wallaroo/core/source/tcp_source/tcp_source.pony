@@ -463,19 +463,17 @@ actor TCPSource is Source
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    @printf[I32]("!@ TCPSource received initiate_barrier\n".cstring())
+    @printf[I32]("!@ TCPSource received initiate_barrier %s\n".cstring(), token.string().cstring())
     _initiate_barrier(token)
 
   fun ref _initiate_barrier(token: BarrierToken) =>
     if not _disposed and not _shutdown then
       match token
       | let srt: SnapshotRollbackBarrierToken =>
-        @printf[I32]("!@ TCPSource clearing pending message store\n".cstring())
         _prepare_for_rollback()
       end
 
       if not _pending_message_store.has_pending() then
-        @printf[I32]("!@ TCPSource initiate_barrier %s\n".cstring(), token.string().cstring())
         match token
         | let sbt: SnapshotBarrierToken =>
           snapshot_state(sbt.id)
@@ -507,7 +505,6 @@ actor TCPSource is Source
     """
     TCPSources don't currently write out any data as part of the snapshot.
     """
-    @printf[I32]("!@ TCPSource %s calling EventLog.snapshot_state()\n".cstring(), _source_id.string().cstring())
     _next_snapshot_id = snapshot_id + 1
     _event_log.snapshot_state(_source_id, snapshot_id,
       recover val Array[ByteSeq] end)

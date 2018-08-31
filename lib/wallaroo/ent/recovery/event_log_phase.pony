@@ -67,7 +67,7 @@ class _NormalEventLogPhase is _EventLogPhase
   fun ref snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
   =>
-    @printf[I32]("!@ _NormalEventLogPhase: snapshot_state() for snapshot_id %s\n".cstring(), snapshot_id.string().cstring())
+    // @printf[I32]("!@ _NormalEventLogPhase: snapshot_state() for snapshot_id %s\n".cstring(), snapshot_id.string().cstring())
 
     ifdef debug then
       Invariant(snapshot_id == _next_snapshot_id)
@@ -124,7 +124,7 @@ class _SnapshotEventLogPhase is _EventLogPhase
   fun ref snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
   =>
-    @printf[I32]("!@ _SnapshotEventLogPhase: snapshot_state()\n".cstring())
+    // @printf[I32]("!@ _SnapshotEventLogPhase: snapshot_state()\n".cstring())
 
     ifdef debug then
       Invariant(snapshot_id == _snapshot_id)
@@ -146,7 +146,7 @@ class _SnapshotEventLogPhase is _EventLogPhase
     _event_log._write_snapshot_id(snapshot_id)
 
   fun ref snapshot_id_written(snapshot_id: SnapshotId) =>
-    @printf[I32]("!@ _SnapshotEventLogPhase: snapshot_id_written()\n".cstring())
+    // @printf[I32]("!@ _SnapshotEventLogPhase: snapshot_id_written()\n".cstring())
     ifdef debug then
       Invariant(snapshot_id == _snapshot_id)
     end
@@ -175,11 +175,11 @@ class _RollbackEventLogPhase is _EventLogPhase
     _rollback_count = count
 
   fun ref ack_rollback(resilient_id: RoutingId) =>
-    @printf[I32]("!@ EventLogPhase: ack_rollback for %s\n".cstring(), resilient_id.string().cstring())
+    // @printf[I32]("!@ EventLogPhase: ack_rollback for %s\n".cstring(), resilient_id.string().cstring())
     ifdef debug then
       Invariant(not _resilients_acked.contains(resilient_id))
     end
-    @printf[I32]("!@ resilients acked when ack received: %s\n".cstring(), _resilients_acked.size().string().cstring())
+    // @printf[I32]("!@ resilients acked when ack received: %s\n".cstring(), _resilients_acked.size().string().cstring())
     _resilients_acked.set(resilient_id)
     if _resilients_acked.size() == _rollback_count then
       _complete()
