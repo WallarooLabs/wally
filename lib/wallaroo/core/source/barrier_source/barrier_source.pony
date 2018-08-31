@@ -253,6 +253,9 @@ actor BarrierSource is Source
   be reconnect_boundary(target_worker_name: String) =>
     None
 
+  be disconnect_boundary(worker: WorkerName) =>
+    None
+
   be mute(c: Consumer) =>
     None
 

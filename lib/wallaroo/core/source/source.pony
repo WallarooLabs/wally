@@ -102,7 +102,8 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
-  be reconnect_boundary(target_worker_name: String)
+  be reconnect_boundary(target_worker_name: WorkerName)
+  be disconnect_boundary(worker: WorkerName)
   be mute(c: Consumer)
   be unmute(c: Consumer)
   be initiate_barrier(token: BarrierToken)
