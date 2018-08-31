@@ -283,14 +283,6 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoinErrorMsg(msg), auth)?
 
-  fun inform_recover_not_join(auth: AmbientAuth): Array[ByteSeq] val ? =>
-    """
-    This message is sent as a response to a JoinCluster message when we
-    already know the worker name (which indicates that it is recovering, not
-    joining)
-    """
-    _encode(InformRecoverNotJoinMsg, auth)?
-
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
     d_addr: (String, String), state_routing_ids: Map[StateName, RoutingId] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -1142,8 +1134,6 @@ class val InformJoinErrorMsg is ChannelMsg
 
   new val create(m: String) =>
     message = m
-
-primitive InformRecoverNotJoinMsg is ChannelMsg
 
 // TODO: Don't send host over since we need to determine that on receipt
 class val JoiningWorkerInitializedMsg is ChannelMsg
