@@ -2145,22 +2145,8 @@ actor LocalTopologyInitializer is LayoutInitializer
   =>
     match _topology
     | let t: LocalTopology =>
-      if ArrayHelpers[String].contains[String](t.worker_names, worker_name)
-      then
-        // We know this worker name, which indicates that it is recovering
-        // instead of joining.
-        try
-          @printf[I32]("Previously joined worker %s is recovering\n".cstring(),
-            worker_name.cstring())
-          let msg = ChannelMsgEncoder.inform_recover_not_join(_auth)?
-          conn.writev(msg)
-        else
-          Fail()
-        end
-      else
-        _router_registry.worker_join(conn, worker_name, worker_count,
-          t, t.worker_names.size())
-      end
+      _router_registry.worker_join(conn, worker_name, worker_count,
+        t, t.worker_names.size())
     else
       Fail()
     end
