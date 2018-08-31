@@ -1,6 +1,7 @@
 #!/bin/bash
 
-MD5="48b8873d2bb2aee7a37b4829ca6ef28c  -"
+# md5 for validatiing script checksum
+MD5="9e01ca7e71174d8b9faa457817352286  -"
 
 set -eEuo pipefail
 
@@ -18,15 +19,25 @@ PYTHON_INSTALL=
 WALLAROO_UP_NAME=wallaroo-up
 LOG_FILE="$(pwd -P)/$WALLAROO_UP_NAME.log"
 
-trap "echo \"ERROR!!!! Please check log file ($LOG_FILE) for details.\"" ERR
+set_trap() {
+  trap 'echo "ERROR!!!! Please check log file ($LOG_FILE) for details."' ERR
+}
+
+clear_trap() {
+  trap - ERR
+}
+
+# set trap
+set_trap
 
 #reset log file
 echo > "$LOG_FILE"
+
+# set up redirects
 REDIRECT=" >> $LOG_FILE 2>&1"
 VERBOSE_REDIRECT=" 2>&1 | tee -a $LOG_FILE"
 VERBOSE=
 
-MIN_GOLANG_MAJOR_VERSION=9
 GOLANG_VERSION=1.9.4
 GOLANG_DL_URL=https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz
 
@@ -64,6 +75,7 @@ PREVIEW_COMMANDS=
 
 OS=$(uname -s)
 
+# check OS
 case "$OS" in
     Linux)
     ;;
@@ -79,37 +91,85 @@ case "$OS" in
     ;;
 esac
 
-CALCULATED_MD5="$(tail -n +5 $0 | md5sum)"
+# check checksum of script to ensure it wasn't accidentally mangled
+CALCULATED_MD5="$(tail -n +5 "$0" | md5sum)"
 if [[ "$CALCULATED_MD5" != "$MD5" ]]; then
   echo "Checksum error in '$0'! Script is corrupted! Please re-download." >&2
   exit 1
 fi
 
+# function to log/run command (or if preview, only log it)
 run_cmd() {
-  if [ "${2:-}" == "root" ]; then
-    if [ "$PREVIEW_COMMANDS" == "true" ]; then
-      tmp_cmd="echo \"$root_cmd_pre '$1'\" $VERBOSE_REDIRECT"
-    else
-      tmp_cmd="echo \"Running: $root_cmd_pre '$1'\" $REDIRECT"
-    fi
-  else
-    if [ "$PREVIEW_COMMANDS" == "true" ]; then
-      tmp_cmd="echo \"$cmd_pre '$1'\" $VERBOSE_REDIRECT"
-    else
-      tmp_cmd="echo \"Running: $cmd_pre '$1'\" $REDIRECT"
-    fi
-  fi
-  eval "$tmp_cmd"
+  num_retries=0
+  max_retries=0
 
-  if [ "$PREVIEW_COMMANDS" != "true" ]; then
-    if [ "${2:-}" == "root" ]; then
-      $root_cmd_pre "$1"
-    else
-      $cmd_pre "$1"
-    fi
+  # only retry if requested
+  if [ "${3:-}" == "retry" ]; then
+    max_retries=3
   fi
+
+  # retry loop
+  while true; do
+
+    # log commnd being run
+    if [ "${2:-}" == "root" ]; then
+      if [ "$PREVIEW_COMMANDS" == "true" ]; then
+        tmp_cmd="echo \"$root_cmd_pre '$1'\" $VERBOSE_REDIRECT"
+      else
+        tmp_cmd="echo \"Running: $root_cmd_pre '$1'\" $REDIRECT"
+      fi
+    else
+      if [ "$PREVIEW_COMMANDS" == "true" ]; then
+        tmp_cmd="echo \"$cmd_pre '$1'\" $VERBOSE_REDIRECT"
+      else
+        tmp_cmd="echo \"Running: $cmd_pre '$1'\" $REDIRECT"
+      fi
+    fi
+    eval "$tmp_cmd"
+
+    # if not previewing, run the command
+    if [ "$PREVIEW_COMMANDS" != "true" ]; then
+      # disable exit on error and trap
+      set +e
+      clear_trap
+
+      # run command (as root or normal)
+      if [ "${2:-}" == "root" ]; then
+        $root_cmd_pre "$1"
+      else
+        $cmd_pre "$1"
+      fi
+
+      # check exit code from command
+      # shellcheck disable=SC2181
+      if [ $? -eq 0 ]; then
+        break
+      fi
+
+      # check if we've exhausted all of our retries
+      (( num_retries=num_retries+1 ))
+      if [ $num_retries -gt $max_retries ]; then
+        if [ "${2:-}" == "root" ]; then
+          echo "ERROR! Error running '$root_cmd_pre \"$1\"'!"
+        else
+          echo "ERROR! Error running '$cmd_pre \"$1\"'!"
+        fi
+        echo "ERROR!!!! Please check log file ($LOG_FILE) for details."
+        exit 1
+      fi
+
+      # sleep for 1 second before retrying again
+      sleep 1
+      # re-enable exit on error and trap
+      set_trap
+      set -e
+    else
+      break
+    fi
+  done
 }
 
+# function to log messages
 log() {
   tmp_cmd="echo \"$WALLAROO_UP_NAME: $1\" $REDIRECT"
   eval "$tmp_cmd"
@@ -123,13 +183,14 @@ error() {
     exit 1
 }
 
+# function to check if a command exists or exit with failure otherwise
 check_cmd() {
-  have_cmd "$1"
-  if [[ $? != 0 ]]; then
+  if have_cmd "$1"; then
     error "Needed command '$1' not available"
   fi
 }
 
+# check if a command exists
 have_cmd() {
   command -v "$1" > /dev/null 2>&1
 }
@@ -152,6 +213,7 @@ OPTIONS:
 EOF
 }
 
+# parse command line options
 while getopts 'vht:p:w:' OPTION; do
   case "$OPTION" in
     t)
@@ -185,6 +247,7 @@ while getopts 'vht:p:w:' OPTION; do
 done
 shift "$((OPTIND -1))"
 
+# validate arguments and set variables
 if ! echo "$VALID_INSTALL_TYPES" | grep "^$WALLAROO_UP_INSTALL_TYPE\$" >/dev/null; then
   usage
   echo
@@ -206,6 +269,7 @@ else
   esac
 fi
 
+# validate wallaroo version requested
 if ! echo "$WALLAROO_PONYC_MAP" | grep "^W$WALLAROO_VERSION=" >/dev/null; then
   usage
   echo
@@ -217,42 +281,59 @@ fi
 
 WALLAROO_UP_DEST=$(readlink -m "${WALLAROO_UP_DEST_ARG}")
 
+# get which distribution we're running on
 get_distribution() {
+  # check upstream lsb-release info if it exists
   if [ -r /etc/upstream-release/lsb-release ]; then
+    # shellcheck disable=SC1091
     dist="$(. /etc/upstream-release/lsb-release && echo "$DISTRIB_ID")"
+  # otherwise use standard os-release info
   elif [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
     dist="$(. /etc/os-release && echo "$ID")"
   fi
 
+  # make it all lowercase just in case
+  # shellcheck disable=SC1091
   dist="$(echo "$dist" | tr '[:upper:]' '[:lower:]')"
 }
 
+# get version of distribution
 get_distribution_version() {
+  # check upstream lsb-release info if it exists
   if [ -r /etc/upstream-release/lsb-release ]; then
+    # shellcheck disable=SC1091
     dist_version="$(. /etc/upstream-release/lsb-release && echo "$DISTRIB_CODENAME")"
   else
+    # otherwise use standard stuff based on distribution
     case "$dist" in
       ubuntu)
         if [ -r /etc/lsb-release ]; then
+          # shellcheck disable=SC1091
           dist_version="$(. /etc/lsb-release && echo "$DISTRIB_CODENAME")"
         fi
       ;;
 
       centos)
         if [ -r /etc/os-release ]; then
+          # shellcheck disable=SC1091
           dist_version="$(. /etc/os-release && echo "$VERSION_ID")"
         fi
       ;;
 
       rhel|ol)
         if [ -r /etc/os-release ]; then
+          # for RHEL/OL we need to get the major version out of a version number that looks like 7.5
+          # shellcheck disable=SC1091
           dist_version="$(. /etc/os-release && echo "$VERSION_ID" | grep -o '^[0-9]')"
         fi
       ;;
 
       debian)
         if [ -r /etc/os-release ]; then
-          dist_version="$(. /etc/os-release && echo "${VERSION_ID:-$(cat /etc/debian_version | cut -d'/' -f1)}")"
+          # for debian, os-release is a number and not the codename and for testing there is no VERSION_ID set so we fall back to reading parsing it from debian_version
+          # shellcheck disable=SC1091
+          dist_version="$(. /etc/os-release && echo "${VERSION_ID:-$(cut -d'/' -f1 < /etc/debian_version)}")"
           case "$dist_version" in
             10)
               dist_version="buster"
@@ -269,6 +350,7 @@ get_distribution_version() {
 
       *)
         if [ -r /etc/os-release ]; then
+          # shellcheck disable=SC1091
           dist_version="$(. /etc/os-release && echo "$VERSION_ID")"
         fi
       ;;
@@ -279,6 +361,7 @@ get_distribution_version() {
   dist_version="$(echo "$dist_version" | tr '[:upper:]' '[:lower:]')"
 }
 
+# Figure out if we have sudo or not or if we're already root for when running commands
 set_cmd_prefix() {
   root_cmd_pre="sh -c"
   cmd_pre="sh -c"
@@ -293,39 +376,22 @@ set_cmd_prefix() {
   fi
 }
 
+# check architecture
 check_arch() {
   arch=$(uname -m)
   if [ "$arch" != 'x86_64' ]; then
-    error "Architecture '${arch}' not supported!"
+    error "Wallaroo is currently only available for x86_64 architectures. Architecture '${arch}' not supported!"
   fi
 }
 
+# confirm we're running for a distro/version combination we support
 check_valid_distro() {
   if ! echo "$VALID_DISTRO_VERSIONS" | grep "^$dist-$dist_version\$" >/dev/null; then
     error "Distro/version combination not supported: $dist-$dist_version"
   fi
 }
 
-check_golang() {
-  GOLANG_UPGRADE=false
-  if have_cmd /usr/local/go/bin/go; then
-    GOLANG_INSTALLED_MAjOR_VERSION=$( /usr/local/go/bin/go version | grep -o '1\.[0-9]*' | cut -d'.' -f 2 )
-    if (( GOLANG_INSTALLED_MAjOR_VERSION < MIN_GOLANG_MAJOR_VERSION )); then
-      GOLANG_UPGRADE=true
-    else
-      GOLANG_INSTALL=false
-    fi
-  fi
-  if have_cmd go; then
-    GOLANG_INSTALLED_MAjOR_VERSION=$( go version | grep -o '1\.[0-9]*' | cut -d'.' -f 2 )
-    if (( GOLANG_INSTALLED_MAjOR_VERSION < MIN_GOLANG_MAJOR_VERSION )); then
-      GOLANG_UPGRADE=true
-    else
-      GOLANG_INSTALL=false
-    fi
-  fi
-}
-
+# install dependencies for wallaroo
 install_required_dependencies() {
   if [ "$PREVIEW_COMMANDS" != "true" ]; then
     log "Installing dependencies..."
@@ -333,12 +399,7 @@ install_required_dependencies() {
 
   case "$dist" in
     debian|ubuntu)
-      if [ "$PYTHON_INSTALL" == "true" ]; then
-        PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-dev"
-      fi
-      if [ "$PONYC_VERSION" != "" ]; then
-        PKGS_TO_INSTALL="$PKGS_TO_INSTALL ponyc=${PONYC_VERSION}"
-      fi
+      # figure out which pre-reqs need installing and install them
       PREREQS_TO_INSTALL=
       if ! dpkg -l | grep -q '\Wsoftware-properties-common\W'; then
         PREREQS_TO_INSTALL="$PREREQS_TO_INSTALL software-properties-common"
@@ -359,29 +420,42 @@ install_required_dependencies() {
         PREREQS_TO_INSTALL="$PREREQS_TO_INSTALL dirmngr"
       fi
       if [ "$PREREQS_TO_INSTALL" != "" ]; then
-        run_cmd "apt-get update $REDIRECT" root
+        run_cmd "apt-get update $REDIRECT" root retry
         run_cmd "apt-get install -y $PREREQS_TO_INSTALL $REDIRECT" root
       fi
+
+      # figure out which packages need installing
+      if [ "$PYTHON_INSTALL" == "true" ]; then
+        PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-dev"
+      fi
+      if [ "$PONYC_VERSION" != "" ]; then
+        PKGS_TO_INSTALL="$PKGS_TO_INSTALL ponyc=${PONYC_VERSION}"
+      fi
+      PKGS_TO_INSTALL="$PKGS_TO_INSTALL libssl-dev make pony-stable libsnappy-dev liblz4-dev"
+
+      # if jessie/trusty add in wallaroolabs-debian repo for backport of liblz4 needed by Wallaroo
       case "$dist_version" in
         jessie|trusty)
           if ! apt-cache policy 2>&1 | grep wallaroolabs-debian > /dev/null 2>&1; then
-            # TODO: apt-key sometimes fails for transient reasons... make it re-try a few times before erroring out
-            run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 379CE192D401AB61 $REDIRECT" root
+            run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 379CE192D401AB61 $REDIRECT" root retry
             run_cmd "add-apt-repository 'deb https://wallaroo-labs.bintray.com/wallaroolabs-debian ${dist_version} main' $REDIRECT" root
           fi
         ;;
       esac
+
+      # add in ponylang-debian repo for ponylang install
       if ! apt-cache policy 2>&1 | grep pony-language/ponylang-debian > /dev/null 2>&1; then
-        # TODO: apt-key sometimes fails for transient reasons... make it re-try a few times before erroring out
-        run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E04F0923 B3B48BDA $REDIRECT" root
+        run_cmd "apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E04F0923 B3B48BDA $REDIRECT" root retry
         run_cmd "add-apt-repository 'deb https://dl.bintray.com/pony-language/ponylang-debian ${dist_version} main' $REDIRECT" root
       fi
-      PKGS_TO_INSTALL="$PKGS_TO_INSTALL libssl-dev make pony-stable libsnappy-dev liblz4-dev"
-      run_cmd "apt-get update $REDIRECT" root
+
+      # install dependencies for wallaroo
+      run_cmd "apt-get update $REDIRECT" root retry
       run_cmd "apt-get install -y $PKGS_TO_INSTALL $REDIRECT" root
     ;;
 
     centos|rhel|ol|amzn)
+      # figure out which packages need installing
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL which"
       if [ "$PYTHON_INSTALL" == "true" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-devel"
@@ -392,18 +466,23 @@ install_required_dependencies() {
       if [ "$dist" == "amzn" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL tar"
       fi
+      PKGS_TO_INSTALL="$PKGS_TO_INSTALL pony-stable make gcc-c++ snappy-devel openssl-devel lz4-devel"
+
+      # if oracle linux, enable the optional repo
       if [ "$dist" == "ol" ]; then
         run_cmd "yum-config-manager --enable ol7_optional_latest $REDIRECT" root
       fi
+
+      # enable ponylang copr repo
       if ! yum list installed -q yum-plugin-copr > /dev/null 2>&1; then
-        run_cmd "yum makecache -y $REDIRECT" root
+        run_cmd "yum makecache -y $REDIRECT" root retry
         run_cmd "yum install -y yum-plugin-copr $REDIRECT" root
       fi
       if ! yum repolist 2>&1 | grep ponylang-ponylang > /dev/null 2>&1; then
         run_cmd "yum copr enable ponylang/ponylang epel-7 -y $REDIRECT" root
       fi
-      PKGS_TO_INSTALL="$PKGS_TO_INSTALL pony-stable make gcc-c++ snappy-devel openssl-devel lz4-devel"
-      run_cmd "yum makecache -y $REDIRECT" root
+      run_cmd "yum makecache -y $REDIRECT" root retry
+
       ## install one at a time or else yum doesn't throw an error for missing packages
       for pkg in $PKGS_TO_INSTALL; do
         run_cmd "yum install -y $pkg $REDIRECT" root
@@ -411,6 +490,7 @@ install_required_dependencies() {
     ;;
 
     fedora)
+      # figure out which packages need installing
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL which"
       if [ "$PYTHON_INSTALL" == "true" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-devel"
@@ -418,15 +498,19 @@ install_required_dependencies() {
       if [ "$PONYC_VERSION" != "" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL ponyc-${PONYC_VERSION}"
       fi
+      PKGS_TO_INSTALL="$PKGS_TO_INSTALL pony-stable make gcc-c++ snappy-devel openssl-devel lz4-devel"
+
+      # enable ponylang copr repo
       if ! dnf list installed -q 'dnf-plugins-core' > /dev/null 2>&1; then
-        run_cmd "dnf makecache -y >/dev/null $REDIRECT" root
+        run_cmd "dnf makecache -y >/dev/null $REDIRECT" root retry
         run_cmd "dnf install 'dnf-command(copr)' -y $REDIRECT" root
       fi
       if ! dnf repolist 2>&1 | grep ponylang-ponylang > /dev/null 2>&1; then
         run_cmd "dnf copr enable ponylang/ponylang -y $REDIRECT" root
       fi
-      PKGS_TO_INSTALL="$PKGS_TO_INSTALL pony-stable make gcc-c++ snappy-devel openssl-devel lz4-devel"
-      run_cmd "dnf makecache -y $REDIRECT" root
+      run_cmd "dnf makecache -y $REDIRECT" root retry
+
+      # install dependencies for wallaroo
       run_cmd "dnf install -y $PKGS_TO_INSTALL $REDIRECT" root
     ;;
 
@@ -438,6 +522,7 @@ install_required_dependencies() {
   esac
 }
 
+# check to see if the wallaroo destination already exists
 check_wallaroo_dest() {
   BACKUP_WALLAROO_UP_DEST=
 
@@ -446,7 +531,9 @@ check_wallaroo_dest() {
   fi
 }
 
+# configure wallaroo version being installed
 configure_wallaroo() {
+  # back up wallaroo directory if needed
   if [ "$BACKUP_WALLAROO_UP_DEST" == "true" ]; then
     INSTALL_TYPE=subsequent
     DATETIME=$(date +%Y%m%d%H%M%S)
@@ -460,6 +547,7 @@ configure_wallaroo() {
     log "Configuring Wallaroo into '${WALLAROO_UP_DEST}/${WALLAROO_VERSION_DIRECTORY}'..."
   fi
 
+  # make wallaroo destination directory and change to it
   run_cmd "mkdir -p \"$WALLAROO_UP_DEST\" $REDIRECT"
 
   if [ "$PREVIEW_COMMANDS" != "true" ]; then
@@ -480,6 +568,7 @@ configure_wallaroo() {
   ## Sets Metrics UI appimage name
   metrics_ui_appimage="Wallaroo_Metrics_UI-${WALLAROO_VERSION}-x86_64.AppImage"
 
+  # set the correct wallaroo bintray repo name
   if [[ "$WALLAROO_VERSION" == "release"* ]]; then
     wallaroo_bintray_artifacts_repo=wallaroolabs-rc
   else
@@ -495,28 +584,40 @@ configure_wallaroo() {
   WGET_URL_SUFFIX="?source=${WALLAROO_UP_SOURCE:-wallaroo-up}&install=${INSTALL_TYPE:-initial}&install_type=${WALLAROO_UP_INSTALL_TYPE}"
   WGET_URL_SUFFIX=
   WALLAROO_SOURCE_TGZ_URL="https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${wallaroo_source_archive}${WGET_URL_SUFFIX}"
+
+  # download wallaroo source code (use custom tgz if requested for testing)
   if [[ "${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}" == "" ]]; then
-    run_cmd "wget $QUIET -O $wallaroo_source_archive '${WALLAROO_SOURCE_TGZ_URL}' $REDIRECT"
+    run_cmd "wget $QUIET -O $wallaroo_source_archive '${WALLAROO_SOURCE_TGZ_URL}' $REDIRECT" "" retry
   else
+    log "Using custom wallaroo source tgz '${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}'..."
     if [[ "${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}" == "http://"* ]] ; then
-      run_cmd "wget $QUIET -O $wallaroo_source_archive '${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}' $REDIRECT"
+      run_cmd "wget $QUIET -O $wallaroo_source_archive '${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}' $REDIRECT" "" retry
     else
       run_cmd "cp ${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-} $wallaroo_source_archive $REDIRECT"
     fi
   fi
+
+  # make wallaroo version directory and extract wallaroo source code into it
   run_cmd "mkdir ${WALLAROO_VERSION_DIRECTORY} $REDIRECT"
   run_cmd "tar -C ${WALLAROO_VERSION_DIRECTORY} --strip-components=1 -xzf $wallaroo_source_archive $REDIRECT"
   run_cmd "rm $wallaroo_source_archive $REDIRECT"
 
+  # change to wallaroo version directory
   if [ "$PREVIEW_COMMANDS" != "true" ]; then
     tmp_cmd="echo Running: cd ${WALLAROO_VERSION_DIRECTORY} $REDIRECT"
     eval "$tmp_cmd"
     cd "${WALLAROO_VERSION_DIRECTORY}"
+
+    # do a make clean if using a custom wallaroo source tgz
+    if [[ "${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-}" != "" ]]; then
+      run_cmd "make clean $REDIRECT"
+    fi
   else
     tmp_cmd="echo cd ${WALLAROO_VERSION_DIRECTORY} $VERBOSE_REDIRECT"
     eval "$tmp_cmd"
   fi
 
+  # make bin directory
   run_cmd "mkdir bin $REDIRECT"
 
   ## download/install our private golang
@@ -529,7 +630,7 @@ configure_wallaroo() {
     if [ "$VERBOSE" == "true" ]; then
       QUIET=
     fi
-    run_cmd "wget $QUIET $GOLANG_DL_URL -O /tmp/go.tar.gz $REDIRECT"
+    run_cmd "wget $QUIET $GOLANG_DL_URL -O /tmp/go.tar.gz $REDIRECT" "" retry
     run_cmd "tar -C bin -xzf /tmp/go.tar.gz $REDIRECT"
     run_cmd "mv bin/go bin/go${GOLANG_VERSION} $REDIRECT"
     run_cmd "rm /tmp/go.tar.gz $REDIRECT"
@@ -539,13 +640,14 @@ configure_wallaroo() {
     log "Configuring Wallaroo Metrics UI..."
   fi
 
-  ## download/install monhub appImage
+  ## download/install metrics UI appImage
   WALLAROO_METRICS_UI_APPIMAGE_URL="https://${wallaroo_bintray_subject}.bintray.com/${wallaroo_bintray_artifacts_repo}/${wallaroo_bintray_package}/${WALLAROO_VERSION}/${metrics_ui_appimage}${WGET_URL_SUFFIX}"
   if [[ "${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}" == "" ]]; then
-    run_cmd "wget $QUIET -O $metrics_ui_appimage '${WALLAROO_METRICS_UI_APPIMAGE_URL}' $REDIRECT"
+    run_cmd "wget $QUIET -O $metrics_ui_appimage '${WALLAROO_METRICS_UI_APPIMAGE_URL}' $REDIRECT" "" retry
   else
+    log "Using custom wallaroo metrics ui appimage '${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}'..."
     if [[ "${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}" == "http://"* ]] ; then
-      run_cmd "wget $QUIET -O $metrics_ui_appimage '${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}' $REDIRECT"
+      run_cmd "wget $QUIET -O $metrics_ui_appimage '${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-}' $REDIRECT" "" retry
     else
       run_cmd "cp ${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-} $metrics_ui_appimage $REDIRECT"
     fi
@@ -555,6 +657,8 @@ configure_wallaroo() {
   # extract the appimage because metrics_ui likes to be able to write to it's directories and also because appimages don't work in docker
   run_cmd "./$metrics_ui_appimage --appimage-extract $REDIRECT"
   run_cmd "mv squashfs-root bin/metrics_ui $REDIRECT"
+
+  # delete libtinfo.so.5 so the one provided by the distribution can be used
   if [[ "$dist" != "fedora" ]]; then
     if [[ "$dist_version" != "buster" ]]; then
       run_cmd "rm bin/metrics_ui/usr/lib/libtinfo.so.5"
@@ -567,8 +671,10 @@ configure_wallaroo() {
     log "Compiling Wallaroo tools..."
   fi
 
+  # compile wallaroo tools
   run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} $WALLAROO_TOOLS_TO_BUILD $REDIRECT"
 
+  # compile machida if needed
   if [ "$PYTHON_INSTALL" == "true" ]; then
     if [ "$PREVIEW_COMMANDS" != "true" ]; then
       log "Compiling Machida for running Python Wallaroo Applications..."
@@ -577,6 +683,7 @@ configure_wallaroo() {
     run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all $REDIRECT"
   fi
 
+  # copy binaries to the bin directory
   run_cmd "cp utils/data_receiver/data_receiver bin $REDIRECT"
   run_cmd "cp utils/cluster_shutdown/cluster_shutdown bin $REDIRECT"
   run_cmd "cp utils/cluster_shrinker/cluster_shrinker bin $REDIRECT"
@@ -588,14 +695,17 @@ configure_wallaroo() {
     run_cmd "cp machida/wallaroo.py bin $REDIRECT"
   fi
 
+  # clean up built artifacts
   run_cmd "make clean $REDIRECT $REDIRECT"
 }
 
+# do the actual install
 do_install() {
   install_required_dependencies
   configure_wallaroo
 }
 
+# get user permission prior to proceeding
 user_permission() {
   log "This script will install/configure Wallaroo version '$WALLAROO_VERSION' for $dist-$dist_version."
   log "It will use root privileges via '$HAVE_ROOT' to perform administrative tasks."
@@ -624,6 +734,7 @@ user_permission() {
     error 'Unable to find "sudo" available to make this happen. Cannot proceed!'
   fi
 
+  # allow user to proceed/abort/preview
   while true; do
     read -rp "$WALLAROO_UP_NAME: Ok to proceed with installation (y = Yes, n = No, p = preview)? " yn
     case $yn in
@@ -656,6 +767,7 @@ user_permission() {
 
 }
 
+# put the activate script in the right location
 create_env_file() {
   cd "${WALLAROO_UP_DEST}/${WALLAROO_VERSION_DIRECTORY}"
   cp misc/activate bin/

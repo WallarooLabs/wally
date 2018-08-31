@@ -9,9 +9,7 @@ In order to compile the Wallaroo example applications, your system will need to 
 ## Download Wallaroo Up script
 
 ```bash
-cd /tmp
-curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/{{ book.wallaroo_version }}/misc/wallaroo-up.sh -o wallaroo-up.sh -J -L
-chmod +x wallaroo-up.sh
+curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/{{ book.wallaroo_version }}/misc/wallaroo-up.sh -o /tmp/wallaroo-up.sh -J -L
 ```
 
 ## Run the Wallaroo Up script
@@ -21,7 +19,7 @@ The `-t python` argument is required for a Python environment installation. The 
 The script will require superuser privileges via `sudo` and will throw an error if `sudo` is not available. The script will prompt you prior to making any changes. It can optionally print out the commands it will run.
 
 ```bash
-./wallaroo-up.sh -t python 
+bash /tmp/wallaroo-up.sh -t python
 ```
 
 Follow the prompts to have Wallaroo Up install and configure Wallaroo and its dependencies.
