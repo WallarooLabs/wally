@@ -216,7 +216,12 @@ class FileBackend is Backend
         _event_log.rollback_from_log_entry(entry._1, entry._2, snapshot_id)
       end
 
-      _file.seek_end(0)
+      //!@
+      // _file.seek_end(0)
+
+      // Truncate rest of file since we are rolling back to an earlier
+      // snapshot.
+      _file.set_length(_file.position())
 
       @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
         "file.\n").cstring(), num_replayed)
