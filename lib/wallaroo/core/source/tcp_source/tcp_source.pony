@@ -363,6 +363,17 @@ actor TCPSource is Source
       Fail()
     end
 
+  be disconnect_boundary(worker: WorkerName) =>
+    try
+      _outgoing_boundaries(worker)?.dispose()
+      _outgoing_boundaries.remove(worker)?
+    else
+      ifdef debug then
+        @printf[I32]("TCPSource couldn't find boundary to %s to disconnect\n"
+          .cstring(), worker.cstring())
+      end
+    end
+
   be remove_route_for(step: Consumer) =>
     try
       _routes.remove(step)?
