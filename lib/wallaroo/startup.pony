@@ -195,10 +195,6 @@ actor Startup
       StartupHelp()
     end
 
-  //!@
-  // be initialize() =>
-  //   _initialize()
-
   be recover_and_initialize(snapshot_id: SnapshotId) =>
     match _recovery_listener
     | let l: TCPListener =>
@@ -439,8 +435,6 @@ actor Startup
   be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg) =>
     try
       let auth = _env.root as AmbientAuth
-      //!@
-      // _set_recovery_file_names(auth)
 
       let local_keys_filepath: FilePath = FilePath(auth,
         _local_keys_file)?
@@ -475,12 +469,6 @@ actor Startup
         new_state_routing_ids_iso(state_name) = routing_id_gen()
       end
       let new_state_routing_ids = consume val new_state_routing_ids_iso
-
-      //!@
-      @printf[I32]("!@ My state routing ids are:\n".cstring())
-      for (s, r) in new_state_routing_ids.pairs() do
-        @printf[I32]("!@ -- %s:%s\n".cstring(), s.cstring(), r.string().cstring())
-      end
 
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _event_log = ifdef "resilience" then
@@ -647,17 +635,14 @@ actor Startup
 
   fun ref _set_recovery_file_names(auth: AmbientAuth) =>
     try
-      @printf[I32]("!@ resilience_dir: %s\n".cstring(), _startup_options.resilience_dir.cstring())
       _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)?
     else
       Fail()
     end
     _event_log_file_basename = _app_name + "-" + _startup_options.worker_name
-    @printf[I32]("!@ Startup: _event_log_file_basename: %s\n".cstring(), _event_log_file_basename.string().cstring())
     _event_log_file_suffix = ".evlog"
     _event_log_file = _startup_options.resilience_dir + "/" + _app_name + "-" +
       _startup_options.worker_name + ".evlog"
-    @printf[I32]("!@ Startup: _event_log_file: %s\n".cstring(), _event_log_file.string().cstring())
     _local_topology_file = _startup_options.resilience_dir + "/" + _app_name +
       "-" + _startup_options.worker_name + ".local-topology"
     _local_keys_file = _startup_options.resilience_dir + "/" + _app_name +
@@ -679,9 +664,7 @@ actor Startup
     let existing_files: Set[String] = Set[String]
 
     try
-      @printf[I32]("!@1\n".cstring())
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
-      @printf[I32]("!@2\n".cstring())
 
       let event_log_filepath = try
         let elf: FilePath = LastLogFilePath(_event_log_file_basename,

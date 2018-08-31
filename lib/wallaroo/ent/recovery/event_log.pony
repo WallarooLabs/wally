@@ -127,11 +127,11 @@ actor EventLog
     initializer.report_event_log_ready_to_work()
 
   be register_resilient(id: RoutingId, resilient: Resilient) =>
-    @printf[I32]("!@ EventLog register_resilient %s\n".cstring(), id.string().cstring())
+    // @printf[I32]("!@ EventLog register_resilient %s\n".cstring(), id.string().cstring())
     _resilients(id) = resilient
 
   be unregister_resilient(id: RoutingId, resilient: Resilient) =>
-    @printf[I32]("!@ EventLog unregister_resilient %s\n".cstring(), id.string().cstring())
+    // @printf[I32]("!@ EventLog unregister_resilient %s\n".cstring(), id.string().cstring())
     try
       _resilients.remove(id)?
     else
@@ -187,12 +187,12 @@ actor EventLog
     _phase.write_snapshot_id(snapshot_id)
 
   fun ref _write_snapshot_id(snapshot_id: SnapshotId) =>
-    @printf[I32]("!@ EventLog: write_snapshot_id\n".cstring())
+    // @printf[I32]("!@ EventLog: write_snapshot_id\n".cstring())
     _backend.encode_snapshot_id(snapshot_id)
     _phase.snapshot_id_written(snapshot_id)
 
   fun ref snapshot_complete(snapshot_id: SnapshotId) =>
-    @printf[I32]("!@ EventLog: snapshot_complete()\n".cstring())
+    // @printf[I32]("!@ EventLog: snapshot_complete()\n".cstring())
     write_log()
     _phase = _NormalEventLogPhase(snapshot_id + 1, this)
 

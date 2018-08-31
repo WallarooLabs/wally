@@ -179,7 +179,6 @@ actor TCPSink is Sink
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("!@ application_begin_reporting TCPSink %s\n".cstring(), _sink_id.string().cstring())
     _initializer = initializer
     initializer.report_created(this)
 
@@ -292,7 +291,6 @@ actor TCPSink is Sink
     // If we have at least one input, then we are involved in snapshotting.
     if _inputs.size() == 0 then
       _barrier_initiator.register_sink(this)
-                @printf[I32]("!@!! register_resilient: TCPSink %s\n".cstring(), _sink_id.string().cstring())
       _event_log.register_resilient(_sink_id, this)
     end
 
@@ -337,7 +335,7 @@ actor TCPSink is Sink
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ Receive barrier %s at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    // @printf[I32]("!@ Receive barrier %s at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     process_barrier(input_id, producer, barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
@@ -345,14 +343,10 @@ actor TCPSink is Sink
   =>
     match barrier_token
     | let srt: SnapshotRollbackBarrierToken =>
-      @printf[I32]("!@ Sink checking to clear\n".cstring())
       try
         let b_acker = _barrier_acker as BarrierSinkAcker
         if b_acker.higher_priority(srt) then
-          @printf[I32]("!@ Sink clearing based on %s\n".cstring(), barrier_token.string().cstring())
           _prepare_for_rollback()
-        else
-          @printf[I32]("!@ Sink NOT clearing based on %s\n".cstring(), barrier_token.string().cstring())
         end
       else
         Fail()
@@ -397,7 +391,6 @@ actor TCPSink is Sink
     """
     TCPSinks don't currently write out any data as part of the snapshot.
     """
-    @printf[I32]("!@ TCPSink %s calling EventLog.snapshot_state()\n".cstring(), _sink_id.string().cstring())
     _event_log.snapshot_state(_sink_id, snapshot_id,
       recover val Array[ByteSeq] end)
 

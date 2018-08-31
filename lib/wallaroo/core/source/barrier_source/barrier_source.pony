@@ -197,7 +197,6 @@ actor BarrierSource is Source
     """
     for (pipeline, outputs) in _pipeline_outputs.pairs() do
       for (id, consumer) in outputs.pairs() do
-        // @printf[I32]("!@ -- _unregister_all_outputs\n".cstring())
         _unregister_output(pipeline, id, consumer)
       end
     end
@@ -271,7 +270,7 @@ actor BarrierSource is Source
     for (o_id, o) in _outputs.pairs() do
       match o
       | let ob: OutgoingBoundary =>
-        @printf[I32]("!@ BarrierSource: barrier over boundary to %s!\n".cstring(), o_id.string().cstring())
+        // @printf[I32]("!@ BarrierSource: barrier over boundary to %s!\n".cstring(), o_id.string().cstring())
         ob.forward_barrier(o_id, _source_id, token)
       else
         o.receive_barrier(_source_id, this, token)

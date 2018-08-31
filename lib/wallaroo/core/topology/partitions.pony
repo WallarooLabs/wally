@@ -367,12 +367,7 @@ class LocalStatePartitions
   fun apply(state_name: StateName, key: box->Key!): this->Step ? =>
     _info(state_name)?(key)?
 
-  //!@
   fun size(): USize =>
-    @printf[I32]("!@ LocalStatePartitions: _info\n".cstring())
-    for k in _info.keys() do
-      @printf[I32]("!@ -- %s\n".cstring(), k.cstring())
-    end
     _info.size()
 
   fun ref add_state(state_name: StateName) =>
@@ -411,11 +406,9 @@ class LocalStatePartitions
         keys_to_add(state) = Map[Key, RoutingId]
         keys_to_remove(state) = SetIs[Key]
         if not _info.contains(state) then
-          @printf[I32]("!@ LocalStatePartitions: _info didn't contain Map[Key, Step]!!!\n".cstring())
           _info(state) = Map[Key, Step]
         end
         let next = _info(state)?
-        @printf[I32]("!@ LocalStatePartitions: _info(state) is of size %s\n".cstring(), next.size().string().cstring())
         for (k, r_id) in keys.pairs() do
           if not next.contains(k) then
             keys_to_add(state)?(k) = r_id
@@ -440,9 +433,8 @@ class LocalStatePartitions
         step.register_producer(input_id, producer)
       end
     else
-      @printf[I32]("!@ LocalStatePartitions: Can't find %s\n".cstring(), state_name.cstring())
-      //!@
-      // Fail()
+      // @printf[I32]("!@ LocalStatePartitions: Can't find %s\n".cstring(), state_name.cstring())
+      None
     end
 
   fun unregister_producer(state_name: StateName, input_id: RoutingId,
@@ -462,7 +454,6 @@ class LocalStatePartitions
         step.receive_barrier(origin_step_id, producer, barrier_token)
       end
     else
-      //!@
       None
       //!@
       // Fail()

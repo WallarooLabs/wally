@@ -411,9 +411,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         _connections.create_data_connection_to_joining_worker(w,
           joining_host, data_addr._2, new_boundary_id, state_routing_ids, this)
         _connections.save_connections()
-        //!@
-        // _connections.create_boundary_to_joining_worker(w, new_boundary_id,
-          // state_routing_ids, this)
         _topology = updated_topology.add_state_routing_ids(w,
           state_routing_ids)
         @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
@@ -663,7 +660,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("Rolling back topology graph.\n".cstring())
     let local_keys = _local_keys_file.read_local_keys_and_truncate(
       snapshot_id)
-    @printf[I32]("!@ Found %s collection of local keys to rollback to.\n".cstring(), local_keys.size().string().cstring())
     _router_registry.rollback_state_steps(local_keys, action)
 
   be recover_and_initialize(ws: Array[String] val,
@@ -706,11 +702,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     // snapshot.
     match snapshot_id
     | let s_id: SnapshotId =>
-      @printf[I32]("!@ register_state_step writing to local keys!!!\n".cstring())
       _local_keys_file.add_key(state_name, key, r_id, s_id)
-    //!@
-    else
-      @printf[I32]("!@ register_state_step no snapshot id!!! No local keys write\n".cstring())
     end
 
   be unregister_state_step(state_name: StateName, key: Key,
@@ -2026,7 +2018,6 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   be report_created(initializable: Initializable) =>
     if not _created.contains(initializable) then
-      @printf[I32]("!@ LocalTopologyInitializer: report_created when there are %s initializables to go\n".cstring(), (_initializables.size() - _created.size()).string().cstring())
       _created.set(initializable)
       if _created.size() == _initializables.size() then
         @printf[I32]("|~~ INIT PHASE I: Application is created! ~~|\n"

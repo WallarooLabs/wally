@@ -529,7 +529,6 @@ class val StateStepRouter is TargetIdRouter
 
           (false, latest_ts)
         else
-          @printf[I32]("!@ Failed to route to id %s\n".cstring(), target_id.string().cstring())
           // No route for this target
           Fail()
           (true, latest_ts)
@@ -1196,13 +1195,6 @@ class val DataRouter is Equatable[DataRouter]
         Unreachable()
       end
     else
-      @printf[I32]("!@ DataRouter: Known state_routing_ids:\n".cstring())
-      //!@
-      for (r_id, state) in _state_routing_ids.pairs() do
-        @printf[I32]("!@ -- %s:%s\n".cstring(), r_id.string().cstring(), state.cstring())
-      end
-
-      @printf[I32]("!@ Failed to route to routing_id %s\n".cstring(), target_step_id.string().cstring())
       Fail()
     end
 
@@ -1397,7 +1389,6 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     end
     for (w, hpr) in _hashed_node_routes.pairs() do
       try
-        @printf[I32]("!@ Looking up state routing ids for %s\n".cstring(), w.cstring())
         m(_state_routing_ids(w)?) = hpr.target_boundary()
       else
         Fail()
