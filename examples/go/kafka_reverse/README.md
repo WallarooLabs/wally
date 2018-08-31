@@ -34,7 +34,7 @@ In the kafka_reverse directory, run `make`.
 
 In order to run the application you will need the Cluster Shutdown tool. We provide instructions for building these tools yourself. Please visit our [setup](https://docs.wallaroolabs.com/book/go/getting-started/choosing-an-installation-option.html) instructions if you have not already done so.
 
-You will also need access to a Kafka cluster. This example assumes that there is a Kafka broker listening on port `9092` on `127.0.0.1`.
+You will also need access to a Kafka cluster.
 
 You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details). Open each shell and go to the `examples/go/kafka_reverse` directory.
 
@@ -90,10 +90,11 @@ cd /tmp
 git clone https://github.com/effata/local-kafka-cluster
 cd local-kafka-cluster
 ./cluster up 1 # change 1 to however many brokers are desired to be started
-docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
+sleep 1 # allow kafka to start
+docker exec -i local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
   zookeeper:2181 --create --partitions 4 --topic test-in --replication-factor \
   1 # to create a test-in topic; change arguments as desired
-docker exec -it local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
+docker exec -i local_kafka_1_1 /kafka/bin/kafka-topics.sh --zookeeper \
   zookeeper:2181 --create --partitions 4 --topic test-out --replication-factor \
   1 # to create a test-out topic; change arguments as desired
 ```
@@ -110,20 +111,36 @@ docker pull ryane/kafkacat
 
 ##### Run `kafkacat` from Docker
 
-To run `kafkacat` to listen to the `test-out` topic via Docker:
+Set the Kafka broker IP address:
 
-**NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 2.
+**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_UP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
 
 ```bash
-docker run --rm -it ryane/kafkacat -C -b *IP OUTPUT BY ./cluster up 1 COMMAND*:9092 -t test-out -q
+export KAFKA_IP=$(docker inspect local_kafka_1_1 | grep kafka_ip | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+```
+
+To run `kafkacat` to listen to the `test-out` topic via Docker:
+
+```bash
+docker run --rm -i --name kafkacatconsumer ryane/kafkacat -C -b ${KAFKA_IP}:9092 -t test-out -q
 ```
 
 ### Shell 3: Kafka Reverse
 
+Set the Kafka broker IP address:
+
+**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_UP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
+
+```bash
+export KAFKA_IP=$(docker inspect local_kafka_1_1 | grep kafka_ip | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+```
+
+Run Kafka reverse:
+
 ```bash
 ./kafka_reverse \
-  --kafka_source_topic test-in --kafka_source_brokers 127.0.0.1:9092 \
-  --kafka_sink_topic test-out --kafka_sink_brokers 127.0.0.1:9092 \
+  --kafka_source_topic test-in --kafka_source_brokers ${KAFKA_IP}:9092 \
+  --kafka_sink_topic test-out --kafka_sink_brokers ${KAFKA_IP}:9092 \
   --kafka_sink_max_message_size 100000 --kafka_sink_max_produce_buffer_ms 10 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
@@ -138,15 +155,19 @@ docker run --rm -it ryane/kafkacat -C -b *IP OUTPUT BY ./cluster up 1 COMMAND*:9
 
 Send data into Kafka. Again, we use `kafakcat`.
 
-Run the following and then type some characters and hit enter to send in the string to be reversed:
+Set the Kafka broker IP address:
 
-**NOTE:** You will need to replace the IP address for the `-b` option with the one provided by `./cluster up 1` command in Shell 2.
+**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_UP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
 
 ```bash
-docker run --rm -it ryane/kafkacat -P -b *IP OUTPUT BY ./cluster up 1 COMMAND*:9092 -t test-in
+export KAFKA_IP=$(docker inspect local_kafka_1_1 | grep kafka_ip | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
 ```
 
-Note: You can use `ctrl-d` to exit `kafkacat`
+Run the following to send the numbers 1 - 100 to be reversed:
+
+```bash
+seq 1 100 | docker run --rm -i --name kafkacatproducer ryane/kafkacat -P -b ${KAFKA_IP}:9092 -t test-in
+```
 
 ## Reading the Output
 
@@ -159,8 +180,6 @@ You can shut down the cluster with this command at any time:
 ```bash
 cluster_shutdown 127.0.0.1:5050
 ```
-
-You can shut down the kafkacat producer by pressing Ctrl-d from its shell.
 
 You can shut down the kafkacat consumer by pressing Ctrl-c from its shell.
 

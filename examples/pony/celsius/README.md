@@ -31,22 +31,47 @@ This will create a `celsius.msg` file in your current working directory.
 
 ## Running Celsius
 
-In a separate shell, each:
+You will need five separate shells to run this application. Open each shell and go to the `examples/pony/celsius` directory.
 
-0. In a shell, start up the Metrics UI if you don't already have it running:
+### Shell 1: Metrics
 
-```bash
-docker start mui
-```
-
-1. Start a listener
+Start up the Metrics UI if you don't already have it running:
 
 ```bash
-../../../giles/receiver/receiver --listen 127.0.0.1:7002 --no-write \
-  --ponynoblock --ponythreads=1
+metrics_reporter_ui start
 ```
 
-2. Start the application
+You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
+
+If you need to restart the UI, run:
+
+```bash
+metrics_reporter_ui restart
+```
+
+When it's time to stop the UI, run:
+
+```bash
+metrics_reporter_ui stop
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+metrics_reporter_ui start
+```
+
+### Shell 2: Data Receiver
+
+Start a listener
+
+```bash
+data_receiver --listen 127.0.0.1:7002 --no-write \
+  --ponythreads=1 --ponynoblock
+```
+
+### Shell 3: Alphabet
+Start the application
 
 ```bash
 ./celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 \
@@ -54,17 +79,34 @@ docker start mui
   --cluster-initializer --ponynoblock --ponythreads=1
 ```
 
-3. Start a sender
+### Shell 4: Sender
+
+Start a sender
 
 ```bash
-../../../giles/sender/sender --host 127.0.0.1:7010 \
+cd data_gen
+./data_gen --message-count 10000
+cd ..
+sender --host 127.0.0.1:7010 \
   --file data_gen/celsius.msg \
   --batch-size 5 --interval 100_000_000 --messages 150 --binary \
   --variable-size --repeat --ponythreads=1 --ponynoblock --no-write
 ```
 
-4. Shut down cluster once finished processing
+## Shutdown
+
+### Shell 5: Shutdown
+
+You can shut down the cluster with this command at any time:
 
 ```bash
-../../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:5050
+cluster_shutdown 127.0.0.1:5050
+```
+
+You can shut down Giles Sender and Data Receiver by pressing Ctrl-c from their respective shells.
+
+You can shut down the Metrics UI with the following command:
+
+```bash
+metrics_reporter_ui stop
 ```

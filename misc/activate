@@ -1,8 +1,9 @@
+# shellcheck disable=SC2148
 ## stolen from python virtualenv
-WALLAROO_ACTIVATE="${BASH_SOURCE}"
+WALLAROO_ACTIVATE="${BASH_SOURCE[0]}"
 HERE=$(dirname "$(readlink -e "${WALLAROO_ACTIVATE}")")
 
-WALLAROO_ROOT="${HOME}/wallaroo-tutorial/wallaroo-0.5.2"
+WALLAROO_ROOT="$(readlink -e "${HERE}/..")"
 export WALLAROO_ROOT
 
 export GOROOT=$WALLAROO_ROOT/bin/go1.9.4

@@ -39,7 +39,7 @@ You will need five separate shells to run this application. Open each shell and 
 Start up the Metrics UI if you don't already have it running:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000).
@@ -47,19 +47,19 @@ You can verify it started up correctly by visiting [http://localhost:4000](http:
 If you need to restart the UI, run:
 
 ```bash
-docker restart mui
+metrics_reporter_ui restart
 ```
 
 When it's time to stop the UI, run:
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```
 
 If you need to start the UI after stopping it, run:
 
 ```bash
-docker start mui
+metrics_reporter_ui start
 ```
 
 ### Shell 2: Data Receiver
@@ -67,7 +67,7 @@ docker start mui
 Start a listener
 
 ```bash
-../../../../giles/receiver/receiver --listen 127.0.0.1:7002 --no-write \
+data_receiver --listen 127.0.0.1:7002 --no-write \
   --ponythreads=1 --ponynoblock
 ```
 
@@ -85,8 +85,11 @@ Start the application
 Start a sender
 
 ```bash
-../../../../giles/sender/sender --host 127.0.0.1:7010 \
-  --file data_gen/votes.msg \ --batch-size 5 --interval 100_000_000 \
+cd data_gen
+./data_gen --message-count 1000
+cd ..
+sender --host 127.0.0.1:7010 \
+  --file data_gen/votes.msg --batch-size 5 --interval 100_000_000 \
   --messages 150000000 --binary --variable-size --repeat --ponythreads=1 \
   --ponynoblock --no-write
 ```
@@ -98,14 +101,13 @@ Start a sender
 You can shut down the cluster with this command at any time:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/utils/cluster_shutdown
-./cluster_shutdown 127.0.0.1:5050
+cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down Giles Sender and Giles Receiver by pressing Ctrl-c from their respective shells.
+You can shut down Giles Sender and Data Receiver by pressing Ctrl-c from their respective shells.
 
 You can shut down the Metrics UI with the following command:
 
 ```bash
-docker stop mui
+metrics_reporter_ui stop
 ```
