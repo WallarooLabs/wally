@@ -651,9 +651,6 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
       | let m: InformJoinErrorMsg =>
         @printf[I32]("Join Error: %s\n".cstring(), m.message.cstring())
         FatalUserError("Join Error: " + m.message)
-      | let m: InformRecoverNotJoinMsg =>
-        @printf[I32]("Informed that we should recover.\n".cstring())
-        _startup.recover_not_join()
       | let m: CleanShutdownMsg =>
         @printf[I32]("Shutting down early: %s\n".cstring(), m.msg.cstring())
         _startup.dispose()
