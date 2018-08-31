@@ -76,7 +76,6 @@ class PendingMessageStore
     for (state_name, keys_routing_args) in _data_store.pairs() do
       for (key, route_args) in keys_routing_args.pairs() do
         if router.has_state_partition(state_name, key) then
-          @printf[I32]("!@ PendingMessageStore: Router has pending state/key %s/%s. Clearing.\n".cstring(), state_name.cstring(), key.cstring())
           try
             keys_routing_args.remove(key)?
             _pending_size = _pending_size - 1
@@ -84,9 +83,6 @@ class PendingMessageStore
               r(producer)
             end
           end
-        //!@
-        else
-          @printf[I32]("!@ PendingMessageStore: Router DOES NOT HAVE pending state/key %s/%s. NOT Clearing.\n".cstring(), state_name.cstring(), key.cstring())
         end
       end
     end

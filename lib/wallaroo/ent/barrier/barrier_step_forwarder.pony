@@ -43,7 +43,7 @@ class BarrierStepForwarder
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ StepForwarder: receive_new_barrier\n".cstring())
+    // @printf[I32]("!@ StepForwarder: receive_new_barrier\n".cstring())
     _barrier_token = barrier_token
     receive_barrier(step_id, producer, barrier_token)
 
@@ -108,15 +108,15 @@ class BarrierStepForwarder
     if (inputs.size() == (_inputs_blocking.size() + _removed_inputs.size()))
       and not _step.has_pending_messages()
     then
-      @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
+      // @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
       for (o_id, o) in _step.outputs().pairs() do
         match o
         | let ob: OutgoingBoundary =>
-          @printf[I32]("!@ FORWARDING TO BOUNDARY\n".cstring())
+          // @printf[I32]("!@ FORWARDING TO BOUNDARY\n".cstring())
           ob.forward_barrier(o_id, _step_id,
             _barrier_token)
         else
-          @printf[I32]("!@ FORWARDING TO NON BOUNDARY\n".cstring())
+          // @printf[I32]("!@ FORWARDING TO NON BOUNDARY\n".cstring())
           o.receive_barrier(_step_id, _step, _barrier_token)
         end
       end
@@ -124,12 +124,14 @@ class BarrierStepForwarder
       clear()
     //!@
     else
-      @printf[I32]("!@ Not last barrier at Forwarder. inputs: %s, inputs_blocking: %s, removed_inputs: %s\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring(), _removed_inputs.size().string().cstring())
-      @printf[I32]("!@ Inputs:\n".cstring())
       //!@
-      for i in inputs.keys() do
-        @printf[I32]("!@ -- %s\n".cstring(), i.string().cstring())
-      end
+      None
+      // @printf[I32]("!@ Not last barrier at Forwarder. inputs: %s, inputs_blocking: %s, removed_inputs: %s\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring(), _removed_inputs.size().string().cstring())
+      // @printf[I32]("!@ Inputs:\n".cstring())
+      //!@
+      // for i in inputs.keys() do
+        // @printf[I32]("!@ -- %s\n".cstring(), i.string().cstring())
+      // end
     end
 
   fun ref clear() =>

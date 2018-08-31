@@ -114,7 +114,7 @@ actor Recovery
       this)
 
     if overriden then
-      _recovery_reconnecter.abort_early()
+      _recovery_reconnecter.abort_early(worker)
       // !@ We should probably ensure DataReceivers has acked an override if
       // that happens before acking.
       try

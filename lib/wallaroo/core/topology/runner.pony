@@ -572,6 +572,7 @@ class StateRunner[S: State ref] is (Runner & RollbackableRunner &
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
+    @printf[I32]("!@ StateRunner run: STATE MIGHT CHANGE\n".cstring())
     match data
     | let sp: StateProcessor[S] =>
       let new_metrics_id = ifdef "detailed-metrics" then
@@ -654,6 +655,11 @@ class StateRunner[S: State ref] is (Runner & RollbackableRunner &
 
   fun ref serialize_state(): ByteSeq val =>
     try
+      //!@
+      match _state
+      | let s: Stringablike =>
+        @printf[I32]("!@ SERIALIZE: %s on step %s with tag %s\n".cstring(), s.string().cstring(), _id.string().cstring(), (digestof this).string().cstring())
+      end
       Serialised(SerialiseAuth(_auth), _state)?
         .output(OutputSerialisedAuth(_auth))
     else
@@ -666,6 +672,14 @@ class StateRunner[S: State ref] is (Runner & RollbackableRunner &
       _rb.append(payload as Array[U8] val)
       match _state.read_log_entry(_rb, _auth)?
       | let s: S =>
+        //!@
+        match _state
+        | let st: Stringablike =>
+          match s
+          | let st2: Stringablike =>
+            @printf[I32]("!@ DESERIALIZE: old %s replaced by new %s on step %s with tag %s\n".cstring(), st.string().cstring(), st2.string().cstring(), _id.string().cstring(), (digestof this).string().cstring())
+          end
+        end
         _state = s
       else
         Fail()

@@ -185,14 +185,12 @@ actor OutgoingBoundary is Consumer
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = 65_536
-    @printf[I32]("!@ CREATED OutgoingBoundary to %s\n".cstring(), _target_worker.cstring())
 
   //
   // Application startup lifecycle event
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("!@ application_begin_reporting OutgoingBoundary\n".cstring())
     _initializer = initializer
     initializer.report_created(this)
 
@@ -284,7 +282,6 @@ actor OutgoingBoundary is Consumer
 
   be register_step_id(step_id: RoutingId) =>
     _step_id = step_id
-    @printf[I32]("!@ REGISTERED OutgoingBoundary id %s\n".cstring(), step_id.string().cstring())
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
@@ -412,35 +409,17 @@ actor OutgoingBoundary is Consumer
       var cur_id = _lowest_queue_id
       for msg in _queue.values() do
         //!@
-        var count: USize = 1
-        let next = recover iso Array[U8] end
-        for x in msg.values() do
-          if count > 4 then
-            match x
-            | let s: String =>
-              for b in s.values() do
-                next.push(b)
-              end
-            | let a: Array[U8] val =>
-              for b in a.values() do
-                next.push(b)
-              end
-            end
-          else
-            count = count + 1
-          end
-        end
-        match ChannelMsgDecoder(consume next, _auth)
-        | let r: ReplayMsg =>
-          try
-            match r.msg(_auth)?
-            | let fbm: ForwardBarrierMsg =>
-              @printf[I32]("!@ Boundary %s: ForwardBarrierMsg %s\n".cstring(), _step_id.string().cstring(), fbm.token.string().cstring())
-            end
-          end
-        end
+        // match ChannelMsgDecoder(consume next, _auth)
+        // | let r: ReplayMsg =>
+          // try
+            // match r.msg(_auth)?
+            // | let fbm: ForwardBarrierMsg =>
+              // @printf[I32]("!@ Boundary %s: ForwardBarrierMsg %s\n".cstring(), _step_id.string().cstring(), fbm.token.string().cstring())
+            // end
+          // end
+        // end
 
-        @printf[I32]("!@ Boundary %s: replaying message!\n".cstring(), _step_id.string().cstring())
+        // @printf[I32]("!@ Boundary %s: replaying message!\n".cstring(), _step_id.string().cstring())
         if cur_id >= idx then
           _writev(ChannelMsgEncoder.replay(msg, _auth)?)
         end
@@ -528,8 +507,6 @@ actor OutgoingBoundary is Consumer
     _upstreams.unset(producer)
 
   fun ref resend_producer_registrations() =>
-    //!@
-    @printf[I32]("!@ resend_producer_registrations\n".cstring())
     for (producer_id, producer, target_id) in
       _registered_producers.registrations().values()
     do
@@ -671,7 +648,6 @@ actor OutgoingBoundary is Consumer
             _pending_reads()
 
             try
-              @printf[I32]("!@ Sending data_connect as part of _event_notify from Boundary %s\n".cstring(), _step_id.string().cstring())
               let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
                 _step_id, _seq_id, _auth)?
               _writev(connect_msg)
