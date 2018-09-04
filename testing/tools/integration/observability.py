@@ -384,9 +384,9 @@ class RunnerChecker(StoppableThread):
 ####################################
 # Query response parsing functions #
 ####################################
-def joined_partition_query_data(responses):
+def coalesce_partition_query_responses(responses):
     """
-    Join partition query responses from multiple workers into a single
+    Coalesce partition query responses from multiple workers into a single
     partition map.
     Raise error on duplicate partitions.
     """

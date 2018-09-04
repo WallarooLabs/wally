@@ -43,7 +43,7 @@ from external import (clean_resilience_path,
 from logger import INFO2
 
 from observability import (cluster_status_query,
-                           joined_partition_query_data,
+                           coalesce_partition_query_responses,
                            multi_states_query,
                            ObservabilityNotifier,
                            state_entity_query)
@@ -539,7 +539,7 @@ class Cluster(object):
         logging.debug("get_partition_data()")
         addresses = [(w.name, w.external) for w in self.workers]
         responses = multi_states_query(addresses)
-        return joined_partition_query_data(responses)
+        return coalesce_partition_query_responses(responses)
 
     def confirm_migration(self, pre_partitions, workers, timeout=120):
         logging.debug("confirm_migration(pre_partitions={}, workers={},"
@@ -547,7 +547,7 @@ class Cluster(object):
         def pre_process():
             addresses = [(r.name, r.external) for r in self.workers]
             responses = multi_states_query(addresses)
-            post_partitions = joined_partition_query_data(responses)
+            post_partitions = coalesce_partition_query_responses(responses)
             return (pre_partitions, post_partitions, workers)
         # retry the test until it passes or a timeout elapses
         logging.debug("Running pre_process func with try_until")
