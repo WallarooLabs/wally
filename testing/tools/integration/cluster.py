@@ -31,9 +31,9 @@ from end_points import (Metrics,
                         Sender,
                         Sink)
 
-from errors import (StopError,
-                    TimeoutError,
-                    CrashedWorkerError)
+from errors import (CrashedWorkerError,
+                    StopError,
+                    TimeoutError)
 
 from external import (clean_resilience_path,
                       get_port_values,
@@ -244,7 +244,7 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
 
     # for each worker, assign `name` and `cluster-initializer` values
     if workers < 1:
-        raise PipelineTestError("workers must be 1 or more")
+        raise ClusterError("workers must be 1 or more")
     x = 0
     if x in spikes:
         logging.info("Enabling spike for initializer")
@@ -305,13 +305,13 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
             assert(r.is_alive())
         except Exception as err:
             stdout = r.get_output()
-            raise PipelineTestError(
+            raise ClusterError(
                     "Runner %d of %d has exited with an error: "
                     "\n---\n%s" % (idx+1, len(runners), stdout))
         try:
             assert(r.error is None)
         except Exception as err:
-            raise PipelineTestError(
+            raise ClusterError(
                     "Runner %d of %d has exited with an error: "
                     "\n---\n%s" % (idx+1, len(runners), r.error))
 
@@ -328,10 +328,10 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
 
     # Test that the new worker *can* join
     if len(runners) < 1:
-        raise PipelineTestError("There must be at least 1 worker to join!")
+        raise ClusterError("There must be at least 1 worker to join!")
 
     if not any(r.is_alive() for r in runners):
-        raise PipelineTestError("There must be at least 1 live worker to "
+        raise ClusterError("There must be at least 1 live worker to "
                                 "join!")
 
     if worker_id in spikes:
