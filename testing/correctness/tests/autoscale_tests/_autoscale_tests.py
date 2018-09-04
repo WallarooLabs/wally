@@ -238,7 +238,7 @@ def _autoscale_run(command, ops=[], cycles=1, initial=None,
         cluster.stop_senders()
 
         # wait until sender sends out its final batch and exits
-        cluster.join_sender()
+        cluster.wait_for_sender()
 
         logging.info('Sender sent {} messages'.format(sum(expected.values())))
 

@@ -80,7 +80,7 @@ def _test_restart(command):
 
         # wait until sender completes (~1 second)
         logging.debug("Waiting for sender to complete")
-        cluster.join_sender()
+        cluster.wait_for_sender()
 
         # Wait for the last sent value expected at the worker
         logging.debug("Waiting for sink to complete")

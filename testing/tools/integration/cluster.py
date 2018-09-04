@@ -669,8 +669,8 @@ class Cluster(object):
         if start:
             sender.start()
 
-    def join_sender(self, sender=-1, timeout=30):
-        logging.debug("join_sender(sender={}, timeout={})"
+    def wait_for_sender(self, sender=-1, timeout=30):
+        logging.debug("wait_for_sender(sender={}, timeout={})"
             .format(sender, timeout))
         if isinstance(sender, Sender):
             pass
