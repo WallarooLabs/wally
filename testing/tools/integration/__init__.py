@@ -101,7 +101,7 @@ from errors import (AutoscaleError,
 
 from external import (clean_resilience_path,
                       create_resilience_dir,
-                      ex_validate,
+                      run_shell_cmd,
                       get_port_values,
                       is_address_available,
                       setup_resilience_path)

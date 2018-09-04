@@ -13,6 +13,7 @@
 #  permissions and limitations under the License.
 
 
+from collections import namedtuple
 import logging
 import os
 import shlex
@@ -21,7 +22,11 @@ import socket
 import subprocess
 
 
-def ex_validate(cmd):
+ShellCmdResult = NamedTuple('ShellCmdResult',
+                            ('success', 'output', 'return_code', 'command'))
+
+
+def run_shell_cmd(cmd):
     """
     Run a shell command, wait for it to exit.
     Return the tuple (Success (bool), output, return_code, command).
@@ -30,8 +35,8 @@ def ex_validate(cmd):
         out = subprocess.check_output(shlex.split(cmd),
                                       stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
-        return (False, err.output, err.returncode, err.cmd)
-    return (True, out, 0, shlex.split(cmd))
+        return ShellCmdResult(False, err.output, err.returncode, err.cmd)
+    return ShellCmdResult(True, out, 0, shlex.split(cmd))
 
 
 def setup_resilience_path(res_dir):
@@ -97,10 +102,10 @@ def send_shrink_command(addr, workers):
     cmd_external_trigger = ('cluster_shrinker --external {} --workers {}'
                             .format(addr, workers))
 
-    success, stdout, retcode, cmd = ex_validate(cmd_external_trigger)
+    res = run_shell_cmd(cmd_external_trigger)
     try:
-        assert(success)
+        assert(res.success)
     except AssertionError:
         raise AssertionError('External shrink trigger failed with '
-                             'the error:\n{}'.format(stdout))
-    return stdout
+                             'the error:\n{}'.format(res.output))
+    return res.output

@@ -26,7 +26,7 @@ import time
 
 from errors import (DuplicateKeyError,
                     TimeoutError)
-from external import ex_validate
+from external import run_shell_cmd
 from logger import INFO2
 from stoppable_thread import StoppableThread
 
@@ -64,12 +64,12 @@ def external_sender_query(addr, query_type):
     t = QUERY_TYPES[query_type]
     cmd = ('external_sender --external {} --type {} --json'
            .format(addr, t))
-    success, stdout, retcode, cmd = ex_validate(cmd)
+    res = run_shell_cmd(cmd)
     try:
-        assert(success)
+        assert(res.success)
     except AssertionError:
         raise AssertionError("Failed to query cluster for '{}' with the "
-                             "following error:\n{}".format(t, stdout))
+                             "following error:\n{}".format(t, res.output))
     return stdout
 
 

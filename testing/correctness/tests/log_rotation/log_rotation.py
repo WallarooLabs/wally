@@ -22,7 +22,7 @@
 
 
 # import requisite components for integration test
-from integration import (ex_validate,
+from integration import (run_shell_cmd,
                          get_port_values,
                          Metrics,
                          Reader,
@@ -132,12 +132,12 @@ def _test_log_rotation_external_trigger_no_recovery(command):
                                 'worker1'
                                 .format(host, external_port))
 
-        success, stdout, retcode, cmd = ex_validate(cmd_external_trigger)
+        res = run_shell_cmd(cmd_external_trigger)
         try:
-            assert(success)
+            assert(res.success)
         except AssertionError:
             raise AssertionError('External rotation trigger failed with '
-                                 'the error:\n{}'.format(stdout))
+                                 'the error:\n{}'.format(res.output))
 
         # wait until sender completes (~1 second)
         sender.join(30)
@@ -177,9 +177,9 @@ def _test_log_rotation_external_trigger_no_recovery(command):
         cmd_validate = ('validator -i {out_file} -e {expect} -a'
                         .format(out_file = out_file,
                                 expect = expect))
-        success, stdout, retcode, cmd = ex_validate(cmd_validate)
+        res = run_shell_cmd(cmd_validate)
         try:
-            assert(success)
+            assert(res.success)
         except AssertionError:
             print runners[0].name
             print runners[0].get_output()
@@ -188,7 +188,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
             print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
-                                 'error:\n{}'.format(stdout))
+                                 'error:\n{}'.format(res.output))
 
         # Validate all workers underwent log rotation
         for r in runners[1:]:
@@ -288,12 +288,12 @@ def _test_log_rotation_external_trigger_recovery(command):
                                 'worker1'
                                 .format(host, external_port))
 
-        success, stdout, retcode, cmd = ex_validate(cmd_external_trigger)
+        res = run_shell_cmd(cmd_external_trigger)
         try:
-            assert(success)
+            assert(res.success)
         except AssertionError:
             raise AssertionError('External rotation trigger failed with '
-                                 'the error:\n{}'.format(stdout))
+                                 'the error:\n{}'.format(res.output))
 
         # Check for log rotation
         log_rotated_checker = RunnerChecker(runners[1], log_rotated_patterns,
@@ -349,9 +349,9 @@ def _test_log_rotation_external_trigger_recovery(command):
         cmd_validate = ('validator -i {out_file} -e {expect} -a'
                         .format(out_file = out_file,
                                 expect = expect))
-        success, stdout, retcode, cmd = ex_validate(cmd_validate)
+        res = run_shell_cmd(cmd_validate)
         try:
-            assert(success)
+            assert(res.success)
         except AssertionError:
             print runners[0].name
             print runners[0].get_output()
@@ -360,7 +360,7 @@ def _test_log_rotation_external_trigger_recovery(command):
             print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
-                                 'error:\n{}'.format(stdout))
+                                 'error:\n{}'.format(res.output))
 
         # Validate all workers underwent log rotation
         r = runners[1]
@@ -504,16 +504,16 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         cmd_validate = ('validator -i {out_file} -e {expect} -a'
                         .format(out_file = out_file,
                                 expect = expect))
-        success, stdout, retcode, cmd = ex_validate(cmd_validate)
+        res = run_shell_cmd(cmd_validate)
         try:
-            assert(success)
+            assert(res.success)
         except AssertionError:
             print runners[0].get_output()
             print '---'
             print runners[1].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
-                                 'error:\n{}'.format(stdout))
+                                 'error:\n{}'.format(res.output))
 
         # Validate all workers underwent log rotation
         for r in runners:
@@ -662,9 +662,9 @@ def _test_log_rotation_file_size_trigger_recovery(command):
         cmd_validate = ('validator -i {out_file} -e {expect} -a'
                         .format(out_file = out_file,
                                 expect = expect))
-        success, stdout, retcode, cmd = ex_validate(cmd_validate)
+        res = run_shell_cmd(cmd_validate)
         try:
-            assert(success)
+            assert(res.success)
         except AssertionError:
             print runners[-1].name
             print runners[-1].get_output()
@@ -673,7 +673,7 @@ def _test_log_rotation_file_size_trigger_recovery(command):
             print runners[-2].get_output()
             print '---'
             raise AssertionError('Validation failed with the following '
-                                 'error:\n{}'.format(stdout))
+                                 'error:\n{}'.format(res.output))
 
         # Validate worker underwent log rotation, but not initializer
         i, r = 1, runners[1]

@@ -15,7 +15,7 @@
 
 # import requisite components for integration test
 from integration import (Cluster,
-                         ex_validate,
+                         run_shell_cmd,
                          Reader,
                          runner_data_format,
                          Sender,
@@ -115,12 +115,12 @@ def _run(command, runner_data=[]):
         cmd_validate = ('validator -i {out_file} -e {expect} -a'
                         .format(out_file = out_file,
                                 expect = expect))
-        success, stdout, retcode, cmd = ex_validate(cmd_validate)
+        res = run_shell_cmd(cmd_validate)
         try:
-            assert(success)
+            assert(res.success)
         except AssertionError:
             raise AssertionError('Output validation failed with the following '
-                                 'error:\n{}'.format(stdout))
+                                 'error:\n{}'.format(res.output))
 
         # Validate worker actually underwent recovery
         logging.debug("Validating recovery from worker stdout")
