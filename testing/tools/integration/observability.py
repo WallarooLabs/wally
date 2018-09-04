@@ -70,7 +70,7 @@ def external_sender_query(addr, query_type):
     except AssertionError:
         raise AssertionError("Failed to query cluster for '{}' with the "
                              "following error:\n{}".format(t, res.output))
-    return stdout
+    return res.output
 
 
 def partitions_query(addr):

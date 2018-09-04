@@ -526,7 +526,7 @@ def CLI():
 
     if validation_cmd:
         res = run_shell_cmd(validation_cmd)
-        if success:
+        if res.success:
             if res.output:
                 logging.info("Validation command '%s' completed successfully "
                              "with the output:\n--\n%s", ' '.join(res.command),

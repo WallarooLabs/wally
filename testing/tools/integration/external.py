@@ -22,7 +22,7 @@ import socket
 import subprocess
 
 
-ShellCmdResult = NamedTuple('ShellCmdResult',
+ShellCmdResult = namedtuple('ShellCmdResult',
                             ('success', 'output', 'return_code', 'command'))
 
 

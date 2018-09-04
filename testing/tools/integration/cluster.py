@@ -458,6 +458,7 @@ class Cluster(object):
             logging.exception(err)
             self.errors.append(err)
             self.__finally__()
+            raise err
 
     #############
     # Autoscale #
