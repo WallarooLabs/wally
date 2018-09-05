@@ -38,7 +38,10 @@ class SourceExtension(object):
                 else:
                     raise
 
-    def write(self, message, partition=None, sequence=None):
+    def write(self, message):
+        # Future parameters
+        partition = None
+        sequence = None
         if self._conn == None:
             raise RuntimeError("Please call connect before writing")
         payload = self._encoder.encode(message)
