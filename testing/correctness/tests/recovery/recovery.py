@@ -14,25 +14,24 @@
 
 
 # import requisite components for integration test
-from integration import (ex_validate,
-                         get_port_values,
-                         Metrics,
+from integration import (Cluster,
+                         run_shell_cmd,
                          Reader,
-                         Runner,
-                         RunnerReadyChecker,
+                         runner_data_format,
                          Sender,
-                         sequence_generator,
-                         setup_resilience_path,
-                         clean_resilience_path,
-                         Sink,
-                         SinkAwaitValue,
-                         start_runners,
-                         TimeoutError)
+                         sequence_generator)
+from integration.logger import set_logging
+
+import logging
 import os
 import re
 import struct
-import tempfile
 import time
+
+set_logging(level=logging.DEBUG)
+
+
+FROM_TAIL = 10
 
 
 def test_recovery_pony():
@@ -46,126 +45,88 @@ def test_recovery_machida():
 
 
 def _test_recovery(command):
+    runner_data = []
+    try:
+        _run(command, runner_data)
+    except:
+        logging.error("Integration pipeline_test encountered an error")
+        logging.error("Some workers exited badly. The last {} lines of "
+            "each were:\n\n{}"
+            .format(FROM_TAIL,
+                runner_data_format(runner_data,
+                                   from_tail=FROM_TAIL)))
+        raise
+
+
+def _run(command, runner_data=[]):
     host = '127.0.0.1'
     sources = 1
+    sinks = 1
+    sink_mode = 'framed'
     workers = 2
-    res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
     expect = 2000
     last_value_0 = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
     last_value_1 = '[{}]'.format(','.join((str(expect-1-v) for v in range(6,-2,-2))))
-
     await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
-                    struct.pack('>I', len(last_value_1)) + last_value_1)
+                   struct.pack('>I', len(last_value_1)) + last_value_1)
 
+    # Start cluster
+    with Cluster(command=command, host=host, sources=sources,
+                 workers=workers, sinks=sinks, sink_mode=sink_mode,
+                 runner_data=runner_data) as cluster:
+        # Create sender
+        logging.debug("Creating sender")
+        sender = Sender(cluster.source_addrs[0],
+                        Reader(sequence_generator(expect)),
+                        batch_size=100, interval=0.05, reconnect=True)
+        cluster.add_sender(sender, start=True)
 
-    setup_resilience_path(res_dir)
-
-    runners = []
-    try:
-        # Create sink, metrics, reader, sender
-        sink = Sink(host)
-        metrics = Metrics(host)
-        reader = Reader(sequence_generator(expect))
-
-        # Start sink and metrics, and get their connection info
-        sink.start()
-        sink_host, sink_port = sink.get_connection_info()
-        outputs = '{}:{}'.format(sink_host, sink_port)
-
-        metrics.start()
-        metrics_host, metrics_port = metrics.get_connection_info()
-        time.sleep(0.05)
-
-        num_ports = sources + 3 * workers
-        ports = get_port_values(num=num_ports, host=host)
-        (input_ports, worker_ports) = (
-            ports[:sources],
-            [ports[sources:][i:i+3] for i in xrange(0,
-                len(ports[sources:]), 3)])
-        inputs = ','.join(['{}:{}'.format(host, p) for p in
-                           input_ports])
-
-        start_runners(runners, command, host, inputs, outputs,
-                      metrics_port, res_dir, workers, worker_ports)
-
-        # Wait for first runner (initializer) to report application ready
-        runner_ready_checker = RunnerReadyChecker(runners, timeout=30)
-        runner_ready_checker.start()
-        runner_ready_checker.join()
-        if runner_ready_checker.error:
-            raise runner_ready_checker.error
-
-        # start sender
-        sender = Sender(host, input_ports[0], reader, batch_size=100,
-                        interval=0.05)
-        sender.start()
+        # wait for some data to go through the system
         time.sleep(0.2)
 
-        # simulate worker crash by doing a non-graceful shutdown
-        runners[-1].kill()
+        # stop worker in a non-graceful fashion so that recovery files
+        # aren't removed
+        logging.debug("Killing worker")
+        killed = cluster.kill_worker(worker=-1)
 
         ## restart worker
-        runners.append(runners[-1].respawn())
-        runners[-1].start()
-
+        logging.debug("Restarting worker")
+        cluster.restart_worker(killed)
 
         # wait until sender completes (~1 second)
-        sender.join(5)
-        if sender.error:
-            raise sender.error
-        if sender.is_alive():
-            sender.stop()
-            raise TimeoutError('Sender did not complete in the expected '
-                               'period')
+        logging.debug("Waiting for sender to complete")
+        cluster.wait_for_sender()
 
-        # Use metrics to determine when to stop runners and sink
-        stopper = SinkAwaitValue(sink, await_values, 30)
-        stopper.start()
-        stopper.join()
-        if stopper.error:
-            raise stopper.error
+        # Wait for the last sent value expected at the worker
+        logging.debug("Waiting for sink to complete")
+        cluster.sink_await(await_values)
 
-        # stop application workers
-        for r in runners:
-            r.stop()
-
-        # Stop sink
-        sink.stop()
-        print 'sink.data size: ', len(sink.data)
+        # stop the cluster
+        logging.debug("Stopping cluster")
+        cluster.stop_cluster()
 
         # Use validator to validate the data in at-least-once mode
         # save sink data to a file
-        out_file = os.path.join(res_dir, 'received.txt')
-        sink.save(out_file, mode='giles')
-
+        out_file = os.path.join(cluster.res_dir, 'received.txt')
+        cluster.sinks[0].save(out_file, mode='giles')
 
         # Validate captured output
+        logging.debug("Validating output")
         cmd_validate = ('validator -i {out_file} -e {expect} -a'
                         .format(out_file = out_file,
                                 expect = expect))
-        success, stdout, retcode, cmd = ex_validate(cmd_validate)
+        res = run_shell_cmd(cmd_validate)
         try:
-            assert(success)
+            assert(res.success)
         except AssertionError:
-            print runners[-1].get_output()
-            print '---'
-            print runners[-2].get_output()
-            print '---'
-            raise AssertionError('Validation failed with the following '
-                                 'error:\n{}'.format(stdout))
+            raise AssertionError('Output validation failed with the following '
+                                 'error:\n{}'.format(res.output))
 
         # Validate worker actually underwent recovery
+        logging.debug("Validating recovery from worker stdout")
         pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."
-        stdout = runners[-1].get_output()
         try:
-            assert(re.search(pattern, stdout) is not None)
+            assert(re.search(pattern, cluster.runners[-1].get_output()) is not None)
         except AssertionError:
-            raise AssertionError('Worker does not appear to have performed '
-                                 'recovery as expected. Worker output is '
-                                 'included below.\nSTDOUT\n---\n%s'
-                                 % stdout)
-
-    finally:
-        for r in runners:
-            r.stop()
-        clean_resilience_path(res_dir)
+            raise AssertionError("Worker does not appear to have performed "
+                                 "recovery as expected.")

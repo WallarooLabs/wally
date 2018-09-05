@@ -52,11 +52,11 @@ ENV LANGUAGE en_US:en
 
 # python2 testing dependencies
 RUN python2 -m pip install --upgrade pip enum34 \
-  && python2 -m pip install pytest==3.2.2
+  && python2 -m pip install pytest==3.7.4
 
 # python3 testing dependencies
 RUN python3 -m pip install --upgrade pip enum34 \
-  && python3 -m pip install pytest==3.7.1
+  && python3 -m pip install pytest==3.7.4
 
 # install go
 RUN wget https://dl.google.com/go/go1.9.2.linux-amd64.tar.gz \

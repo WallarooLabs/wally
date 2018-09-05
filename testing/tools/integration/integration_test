@@ -8,12 +8,14 @@ import random
 import re
 import struct
 
-from integration import (ex_validate,
-                         files_generator,
-                         iter_generator,
-                         pipeline_test,
-                         sequence_generator,
-                         set_logging)
+from cluster import runner_data_format
+from external import run_shell_cmd
+from end_points import (files_generator,
+                        iter_generator,
+                        sequence_generator)
+from integration import pipeline_test
+from logger import (INFO2,
+                    set_logging)
 
 set_logging(name='integration', level=logging.DEBUG)
 
@@ -523,29 +525,28 @@ def CLI():
         parser.exit(1)
 
     if validation_cmd:
-        (success, out, ret_code, cmd) = ex_validate(validation_cmd)
-        if success:
-            if out:
+        res = run_shell_cmd(validation_cmd)
+        if res.success:
+            if res.output:
                 logging.info("Validation command '%s' completed successfully "
-                             "with the output:\n--\n%s", ' '.join(cmd), out)
+                             "with the output:\n--\n%s", ' '.join(res.command),
+                                                                  res.output)
             else:
                 logging.info("Validation command '%s' completed successfully",
-                             ' '.join(cmd))
+                             ' '.join(res.command))
         else:
-            outputs = [(o[0], o[1]) for o in outputs]
-            outputs = '\n===\n'.join(('\n---\n'.join(t) for t in outputs))
-            logging.error("Application outputs:\n===\n{}\n===\n"
-                          .format(outputs))
+            outputs = runner_data_format(outputs)
+            logging.error("Application outputs:\n{}".format(outputs))
             logging.error("Validation command '%s' failed with the output:\n"
                           "--\n%s\nThe application output is shown above.\n",
-                          ' '.join(cmd), out)
+                          ' '.join(res.command), res.output)
 
         if logging.root.level > logging.ERROR:
             # If failed, and logging level means we didn't log error, include it
             # in exit message
-            parser.exit(ret_code, out)
+            parser.exit(res.return_code, res.output)
         else:
-            parser.exit(ret_code)
+            parser.exit(res.return_code)
 
     # Reached the end and nothing broke. Success!
     logging.info("Integration test completed successfully for command %r" %

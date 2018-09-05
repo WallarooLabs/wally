@@ -12,13 +12,6 @@ will say it failed after the operations [2,-1,2,-1,2,-1].
 """
 
 
-# set up basic logging
-import logging
-from integration import INFO2, set_logging
-set_logging(name='autoscale_tests', level=INFO2,
-            fmt='%(levelname)s - %(message)s')
-
-
 from _autoscale_tests import autoscale_sequence
 
 

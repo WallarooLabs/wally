@@ -87,7 +87,7 @@ install_python_dependencies() {
   echo "Installing pip"
   sudo apt-get install -y python-pip
   echo "Installing pytest"
-  sudo -H python -m pip install pytest==3.2.2
+  sudo -H python -m pip install pytest==3.7.4
   echo "Install enum"
   sudo -H python -m pip install --upgrade pip enum34
 
