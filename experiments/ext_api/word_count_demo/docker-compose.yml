@@ -1,5 +1,6 @@
 version: '3'
 services:
+
   zookeeper:
     image: wurstmeister/zookeeper
     ports:
@@ -14,3 +15,13 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     links:
       - zookeeper
+
+  redis:
+    image: 'redis'
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  rabbitmq:
+    image: 'rabbitmq'
+    ports:
+      - "127.0.0.1:5672:5672"
