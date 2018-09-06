@@ -16,14 +16,10 @@
 from integration import (Cluster,
                          iter_generator,
                          Reader,
-                         Runner,
-                         runners_output_format,
-                         Sender,
-                         setup_resilience_path,
-                         Sink,
-                         SinkAwaitValue,
-                         start_runners,
-                         TimeoutError)
+                         runner_data_format,
+                         Sender)
+from integration.logger import set_logging
+
 
 from collections import Counter
 from itertools import cycle
@@ -242,7 +238,7 @@ def _autoscale_run(command, ops=[], cycles=1, initial=None,
         cluster.stop_senders()
 
         # wait until sender sends out its final batch and exits
-        cluster.wait_for_sender()
+        cluster.join_sender()
 
         logging.info('Sender sent {} messages'.format(sum(expected.values())))
 

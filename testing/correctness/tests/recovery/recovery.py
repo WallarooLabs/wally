@@ -15,7 +15,7 @@
 
 # import requisite components for integration test
 from integration import (Cluster,
-                         run_shell_cmd,
+                         ex_validate,
                          Reader,
                          runner_data_format,
                          Sender,
@@ -95,7 +95,7 @@ def _run(command, runner_data=[]):
 
         # wait until sender completes (~1 second)
         logging.debug("Waiting for sender to complete")
-        cluster.wait_for_sender()
+        cluster.join_sender()
 
         # Wait for the last sent value expected at the worker
         logging.debug("Waiting for sink to complete")
@@ -115,12 +115,12 @@ def _run(command, runner_data=[]):
         cmd_validate = ('validator -i {out_file} -e {expect} -a'
                         .format(out_file = out_file,
                                 expect = expect))
-        res = run_shell_cmd(cmd_validate)
+        success, stdout, retcode, cmd = ex_validate(cmd_validate)
         try:
-            assert(res.success)
+            assert(success)
         except AssertionError:
             raise AssertionError('Output validation failed with the following '
-                                 'error:\n{}'.format(res.output))
+                                 'error:\n{}'.format(stdout))
 
         # Validate worker actually underwent recovery
         logging.debug("Validating recovery from worker stdout")

@@ -9,7 +9,7 @@ import re
 import struct
 
 from cluster import runner_data_format
-from external import run_shell_cmd
+from external import ex_validate
 from end_points import (files_generator,
                         iter_generator,
                         sequence_generator)
@@ -525,28 +525,27 @@ def CLI():
         parser.exit(1)
 
     if validation_cmd:
-        res = run_shell_cmd(validation_cmd)
-        if res.success:
-            if res.output:
+        (success, out, ret_code, cmd) = ex_validate(validation_cmd)
+        if success:
+            if out:
                 logging.info("Validation command '%s' completed successfully "
-                             "with the output:\n--\n%s", ' '.join(res.command),
-                                                                  res.output)
+                             "with the output:\n--\n%s", ' '.join(cmd), out)
             else:
                 logging.info("Validation command '%s' completed successfully",
-                             ' '.join(res.command))
+                             ' '.join(cmd))
         else:
             outputs = runner_data_format(outputs)
             logging.error("Application outputs:\n{}".format(outputs))
             logging.error("Validation command '%s' failed with the output:\n"
                           "--\n%s\nThe application output is shown above.\n",
-                          ' '.join(res.command), res.output)
+                          ' '.join(cmd), out)
 
         if logging.root.level > logging.ERROR:
             # If failed, and logging level means we didn't log error, include it
             # in exit message
-            parser.exit(res.return_code, res.output)
+            parser.exit(ret_code, out)
         else:
-            parser.exit(res.return_code)
+            parser.exit(ret_code)
 
     # Reached the end and nothing broke. Success!
     logging.info("Integration test completed successfully for command %r" %

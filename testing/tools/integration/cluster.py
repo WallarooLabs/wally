@@ -31,9 +31,9 @@ from end_points import (Metrics,
                         Sender,
                         Sink)
 
-from errors import (CrashedWorkerError,
-                    StopError,
-                    TimeoutError)
+from errors import (StopError,
+                    TimeoutError,
+                    CrashedWorkerError)
 
 from external import (clean_resilience_path,
                       get_port_values,
@@ -43,7 +43,7 @@ from external import (clean_resilience_path,
 from logger import INFO2
 
 from observability import (cluster_status_query,
-                           coalesce_partition_query_responses,
+                           joined_partition_query_data,
                            multi_states_query,
                            ObservabilityNotifier,
                            state_entity_query)
@@ -244,7 +244,7 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
 
     # for each worker, assign `name` and `cluster-initializer` values
     if workers < 1:
-        raise ClusterError("workers must be 1 or more")
+        raise PipelineTestError("workers must be 1 or more")
     x = 0
     if x in spikes:
         logging.info("Enabling spike for initializer")
@@ -305,13 +305,13 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
             assert(r.is_alive())
         except Exception as err:
             stdout = r.get_output()
-            raise ClusterError(
+            raise PipelineTestError(
                     "Runner %d of %d has exited with an error: "
                     "\n---\n%s" % (idx+1, len(runners), stdout))
         try:
             assert(r.error is None)
         except Exception as err:
-            raise ClusterError(
+            raise PipelineTestError(
                     "Runner %d of %d has exited with an error: "
                     "\n---\n%s" % (idx+1, len(runners), r.error))
 
@@ -328,10 +328,10 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
 
     # Test that the new worker *can* join
     if len(runners) < 1:
-        raise ClusterError("There must be at least 1 worker to join!")
+        raise PipelineTestError("There must be at least 1 worker to join!")
 
     if not any(r.is_alive() for r in runners):
-        raise ClusterError("There must be at least 1 live worker to "
+        raise PipelineTestError("There must be at least 1 live worker to "
                                 "join!")
 
     if worker_id in spikes:
@@ -458,7 +458,6 @@ class Cluster(object):
             logging.exception(err)
             self.errors.append(err)
             self.__finally__()
-            raise err
 
     #############
     # Autoscale #
@@ -540,7 +539,7 @@ class Cluster(object):
         logging.debug("get_partition_data()")
         addresses = [(w.name, w.external) for w in self.workers]
         responses = multi_states_query(addresses)
-        return coalesce_partition_query_responses(responses)
+        return joined_partition_query_data(responses)
 
     def confirm_migration(self, pre_partitions, workers, timeout=120):
         logging.debug("confirm_migration(pre_partitions={}, workers={},"
@@ -548,7 +547,7 @@ class Cluster(object):
         def pre_process():
             addresses = [(r.name, r.external) for r in self.workers]
             responses = multi_states_query(addresses)
-            post_partitions = coalesce_partition_query_responses(responses)
+            post_partitions = joined_partition_query_data(responses)
             return (pre_partitions, post_partitions, workers)
         # retry the test until it passes or a timeout elapses
         logging.debug("Running pre_process func with try_until")
@@ -670,8 +669,8 @@ class Cluster(object):
         if start:
             sender.start()
 
-    def wait_for_sender(self, sender=-1, timeout=30):
-        logging.debug("wait_for_sender(sender={}, timeout={})"
+    def join_sender(self, sender=-1, timeout=30):
+        logging.debug("join_sender(sender={}, timeout={})"
             .format(sender, timeout))
         if isinstance(sender, Sender):
             pass

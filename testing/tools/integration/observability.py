@@ -26,7 +26,7 @@ import time
 
 from errors import (DuplicateKeyError,
                     TimeoutError)
-from external import run_shell_cmd
+from external import ex_validate
 from logger import INFO2
 from stoppable_thread import StoppableThread
 
@@ -64,13 +64,13 @@ def external_sender_query(addr, query_type):
     t = QUERY_TYPES[query_type]
     cmd = ('external_sender --external {} --type {} --json'
            .format(addr, t))
-    res = run_shell_cmd(cmd)
+    success, stdout, retcode, cmd = ex_validate(cmd)
     try:
-        assert(res.success)
+        assert(success)
     except AssertionError:
         raise AssertionError("Failed to query cluster for '{}' with the "
-                             "following error:\n{}".format(t, res.output))
-    return res.output
+                             "following error:\n{}".format(t, stdout))
+    return stdout
 
 
 def partitions_query(addr):
@@ -384,9 +384,9 @@ class RunnerChecker(StoppableThread):
 ####################################
 # Query response parsing functions #
 ####################################
-def coalesce_partition_query_responses(responses):
+def joined_partition_query_data(responses):
     """
-    Coalesce partition query responses from multiple workers into a single
+    Join partition query responses from multiple workers into a single
     partition map.
     Raise error on duplicate partitions.
     """
