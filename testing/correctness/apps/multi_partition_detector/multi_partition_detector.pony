@@ -66,7 +66,7 @@ actor Main
       let partition = Partitions[t.Message](WindowPartitionFunction, [])
 
       let application = recover val
-        let a = Application("Multi Partition Detector")
+        let a = Application("multi_partition_detector")
         let p = a.new_pipeline[t.Message, String]("Detector",
           TCPSourceConfig[t.Message].from_options(PartitionedU64FramedHandler,
             TCPSourceConfigCLIParser(env.args)?(0)?))
@@ -83,7 +83,7 @@ actor Main
             TCPSinkConfigCLIParser(env.args)?(0)?))
         consume a
       end
-      Startup(env, application, "Multi Partition Detector")
+      Startup(env, application, "multi_partition_detector")
     else
       env.out.print("Couldn't build topology!")
     end
