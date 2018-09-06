@@ -58,26 +58,26 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
 class val OutgoingBoundaryBuilder
-  let _auth: AmbientAuth
-  let _worker_name: String
-  let _reporter: MetricsReporter val
-  let _host: String
-  let _service: String
-  let _spike_config: (SpikeConfig | None)
+  let auth: AmbientAuth
+  let worker_name: String
+  let reporter: MetricsReporter val
+  let host: String
+  let service: String
+  let spike_config_none: (SpikeConfig | None)
 
-  new val create(auth: AmbientAuth, name: String, r: MetricsReporter iso,
+  new val create(auth': AmbientAuth, name: String, r: MetricsReporter iso,
     h: String, s: String, spike_config: (SpikeConfig | None) = None)
   =>
-    _auth = auth
-    _worker_name = name
-    _reporter = consume r
-    _host = h
-    _service = s
-    _spike_config = spike_config
+    auth = auth'
+    worker_name = name
+    reporter = consume r
+    host = h
+    service = s
+    spike_config_none = spike_config
 
   fun apply(step_id: RoutingId, target_worker: String): OutgoingBoundary =>
-    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
-      _reporter.clone(), _host, _service where spike_config = _spike_config)
+    let boundary = OutgoingBoundary(auth, worker_name, target_worker,
+      reporter.clone(), host, service where spike_config = spike_config_none)
     boundary.register_step_id(step_id)
     boundary
 
@@ -87,11 +87,18 @@ class val OutgoingBoundaryBuilder
     """
     Called when creating a boundary post cluster initialization
     """
-    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
-      _reporter.clone(), _host, _service where spike_config = _spike_config)
+    let boundary = OutgoingBoundary(auth, worker_name, target_worker,
+      reporter.clone(), host, service where spike_config = spike_config_none)
     boundary.register_step_id(step_id)
     boundary.quick_initialize(layout_initializer)
     boundary
+
+  fun val clone_with_new_service(host': String, service': String)
+    : OutgoingBoundaryBuilder val
+  =>
+    let r = reporter.clone()
+    OutgoingBoundaryBuilder(auth, worker_name, consume r, host', service',
+      spike_config_none)
 
 actor OutgoingBoundary is Consumer
   // Steplike
@@ -142,8 +149,8 @@ actor OutgoingBoundary is Consumer
   let _worker_name: WorkerName
   let _target_worker: WorkerName
   var _step_id: RoutingId = 0
-  let _host: String
-  let _service: String
+  var _host: String
+  var _service: String
   let _from: String
   let _queue: Array[Array[ByteSeq] val] = _queue.create()
   var _lowest_queue_id: SeqId = 0
@@ -579,6 +586,16 @@ actor OutgoingBoundary is Consumer
     There is nothing for a Boundary to rollback to.
     """
     None
+
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
+  =>
+    @printf[I32]("SLF: OutgoingBoundary.update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    if worker != _target_worker then
+      Fail()
+    end
+    _host = host
+    _service = service
 
   ///////////
   // TCP
