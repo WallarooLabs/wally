@@ -459,6 +459,17 @@ actor TCPSource is Source
       route.report_status(code)
     end
 
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
+  =>
+    @printf[I32]("SLF: TCPSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    try
+      let b = _outgoing_boundaries(worker)?
+      b.update_worker_data_service(worker, host, service)
+    else
+      Fail()
+    end
+
   //////////////
   // BARRIER
   //////////////

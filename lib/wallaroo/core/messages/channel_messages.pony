@@ -160,10 +160,10 @@ primitive ChannelMsgEncoder
   =>
     _encode(IdentifyDataPortMsg(worker_name, service), auth)?
 
-  fun reconnect_data_port(worker_name: String,
+  fun reconnect_data_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ReconnectDataPortMsg(worker_name), auth)?
+    _encode(ReconnectDataPortMsg(worker_name, service), auth)?
 
   fun spin_up_local_topology(local_topology: LocalTopology,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -609,9 +609,11 @@ class val IdentifyDataPortMsg is ChannelMsg
 
 class val ReconnectDataPortMsg is ChannelMsg
   let worker_name: String
+  let service: String
 
-  new val create(name: String) =>
+  new val create(name: String, s: String) =>
     worker_name = name
+    service = s
 
 class val SpinUpLocalTopologyMsg is ChannelMsg
   let local_topology: LocalTopology
