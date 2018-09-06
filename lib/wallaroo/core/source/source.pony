@@ -108,6 +108,8 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   be unmute(c: Consumer)
   be initiate_barrier(token: BarrierToken)
   be barrier_complete(token: BarrierToken)
+  be update_worker_data_service(worker_name: String,
+    host: String, service: String)
 
 interface tag SourceListener is (DisposableActor & BoundaryUpdatable)
   be update_router(router: PartitionRouter)

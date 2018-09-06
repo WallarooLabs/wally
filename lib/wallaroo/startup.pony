@@ -326,8 +326,18 @@ actor Startup
         initializer_name)
       router_registry.set_event_log(event_log)
 
+      (let control_host, let control_service, let data_service) =
+        if _startup_options.is_initializer then
+          (_startup_options.c_host, _startup_options.c_service,
+            _startup_options.d_service)
+        else
+          (_startup_options.my_c_host, _startup_options.my_c_service,
+            _startup_options.my_d_service)
+        end
+
       let recovery_reconnecter = RecoveryReconnecter(auth,
-        _startup_options.worker_name, data_receivers, router_registry,
+        _startup_options.worker_name, data_service,
+        data_receivers, router_registry,
         connections, _is_recovering)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
@@ -531,7 +541,7 @@ actor Startup
       router_registry.set_event_log(event_log)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
-        _startup_options.worker_name,
+        _startup_options.worker_name, _startup_options.my_d_service,
         data_receivers, router_registry, connections)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
