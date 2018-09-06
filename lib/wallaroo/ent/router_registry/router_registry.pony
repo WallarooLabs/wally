@@ -1725,6 +1725,28 @@ actor RouterRegistry
       _stateless_partition_routers)
     conn.writev(msg)
 
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
+  =>
+    @printf[I32]("SLF: RouterRegistry: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    try
+      let b = _outgoing_boundaries(worker)?
+      b.update_worker_data_service(worker, host, service)
+    else
+      Fail()
+    end
+    try
+      let old_bb = _outgoing_boundaries_builders(worker)?
+      let new_bb = old_bb.clone_with_new_service(host, service)
+      _outgoing_boundaries_builders(worker) = new_bb
+    else
+      Fail()
+    end
+    _distribute_boundary_builders()
+    for source in _sources.values() do
+      source.update_worker_data_service(worker, host, service)
+    end
+
 /////////////////////////////////////////////////////////////////////////////
 // TODO: Replace using this with the badly named SetIs once we address a bug
 // in SetIs where unsetting doesn't reduce set size for type SetIs[String].

@@ -281,6 +281,12 @@ actor BarrierSource is Source
     @printf[I32]("!@ barrier_complete at BarrierSource %s\n".cstring(), _source_id.string().cstring())
     None
 
+  be update_worker_data_service(worker_name: String,
+    host: String, service: String)
+  =>
+    @printf[I32]("!@ update_worker_data_service at BarrierSource %s: %s -> %s %s\n".cstring(), _source_id.string().cstring(), worker_name.cstring(), host.cstring(), service.cstring())
+    None
+
   be report_status(code: ReportStatusCode) =>
     None
 

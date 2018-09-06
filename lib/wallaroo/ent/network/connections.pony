@@ -836,3 +836,21 @@ actor Connections is Cluster
       @printf[I32]("WARNING: LogRotation requested, but log_rotation is off!\n"
         .cstring())
     end
+
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
+  =>
+    @printf[I32]("SLF: Connections.update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    if not _data_addrs.contains(worker) then
+      Fail()
+    end
+    _data_addrs(worker) = (host, service)
+    try
+      let old_bb = _data_conn_builders(worker)?
+      _data_conn_builders(worker) = old_bb.clone_with_new_service(host, service)
+    else
+      Fail()
+    end
+
+    @printf[I32]("SLF: TODO Connections.update_worker_data_service: anything with _data_conns iteration & update?\n".cstring())
+    // TODO ^^^^
