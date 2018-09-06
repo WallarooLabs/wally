@@ -52,4 +52,4 @@ env START_SENDER_CMD="$START_SENDER_CMD2" START_SENDER_BG=n \
   ./30-start-sender.sh
 echo Second sender has finished; sleep 1
 
-echo To stop everything, run: env WALLAROO_BIN="./testing/correctness/apps/multi_partition_detector/multi_partition_detector" ./99-stop-everything.sh
+echo To stop everything, run: env WALLAROO_BIN=$WALLAROO_BIN ./99-stop-everything.sh
