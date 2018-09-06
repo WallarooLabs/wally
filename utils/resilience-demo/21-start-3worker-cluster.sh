@@ -15,9 +15,16 @@ echo Start MUI
 ssh -n $USER@$SERVER1_EXT "/home/ubuntu/wallaroo-tutorial/wallaroo-0.5.2/bin/metrics_ui/AppRun start" &
 sleep 1
 
-echo Start receiver
-ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
-sleep 2
+if [ ! -z "$START_RECEIVER_CMD" ]; then
+    echo Start receiver via external var
+    CMD=`eval echo $START_RECEIVER_CMD`
+    echo "CMD = $CMD"
+    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; $CMD > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
+else
+    echo Start receiver
+    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
+    sleep 2
+fi
 
 echo Start initializer
 ssh -n $USER@$SERVER1_EXT "cd wallaroo ; $WALLAROO_BIN -i ${SERVER1}:${ORDERS_PORT},${SERVER1}:${NBBO_PORT} -o ${SERVER1}:5555 -m ${SERVER1}:5001 -c ${SERVER1}:12500 -d ${SERVER1}:12501 -t -e ${SERVER1}:5050 -w 3 $W_DOS_SERVER_ARG --ponynoblock > /tmp/run-dir/${WALLAROO_NAME}1.out 2>&1" > /dev/null 2>&1 &
