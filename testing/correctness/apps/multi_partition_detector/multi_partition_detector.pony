@@ -31,6 +31,7 @@ use "window_codecs"
 use "assert"
 use "buffered"
 use "collections"
+use "options"
 use "serialise"
 
 // wallaroo/lib
@@ -44,37 +45,43 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
 
-/*
-TODO:
-- Use Options package to allow users to choose depth
-*/
-
 actor Main
   new create(env: Env) =>
 
     try
-      // Still requires passing an array here...
+      // Add "--depth" option
+      var depth: USize = 1
+      let options = Options(env.args, false)
+
+      options.add("depth", "", I64Argument)
+
+      for option in options do
+        match option
+        | ("depth", let arg: I64) =>
+          depth = arg.usize()
+        end
+      end
+
+      // Still requires passing an array here... even though it's empty
       let partition = Partitions[t.Message](WindowPartitionFunction, [])
 
-      let tid1 = TraceID("1")
-      let tid2 = TraceID("2")
-      let tw1 = TraceWindow("1")
-      let tw2 = TraceWindow("2")
       let application = recover val
-        Application("Multi Partition Detector")
-          .new_pipeline[t.Message, String]("Detector",
-            TCPSourceConfig[t.Message].from_options(PartitionedU64FramedHandler,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
-          .to[t.Message]({(): TraceID => tid1})
-          .to_state_partition[t.Message, t.Message,
-            WindowState](tw1, WindowStateBuilder, "state1",
-              partition where multi_worker = true)
-          .to[t.Message]({(): TraceID => tid2})
-          .to_state_partition[t.Message, t.Message,
-            WindowState](tw2, WindowStateBuilder, "state2",
-              partition where multi_worker = true)
-          .to_sink(TCPSinkConfig[t.Message].from_options(MessageEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))
+        let a = Application("Multi Partition Detector")
+        let p = a.new_pipeline[t.Message, String]("Detector",
+          TCPSourceConfig[t.Message].from_options(PartitionedU64FramedHandler,
+            TCPSourceConfigCLIParser(env.args)?(0)?))
+        // Add as many layers of depth as specified in the `--depth` option
+        for x in Range[USize](1, depth + 1) do
+          env.out.print("Adding level " + x.string())
+          p.to[t.Message]({(): TraceID => TraceID(x.string())})
+          p.to_state_partition[t.Message, t.Message,
+            WindowState](TraceWindow(x.string()), WindowStateBuilder,
+            "state" + x.string(),
+            partition where multi_worker = true)
+        end
+        p.to_sink(TCPSinkConfig[t.Message].from_options(MessageEncoder,
+            TCPSinkConfigCLIParser(env.args)?(0)?))
+        consume a
       end
       Startup(env, application, "Multi Partition Detector")
     else
@@ -114,7 +121,11 @@ class WindowState is State
     else
       Debug("failed values ...")
       Debug(values)
-      Fail()
+      ifdef "allow-invalid-state" then
+        None
+      else
+        Fail()
+      end
     end
 
   fun window(): t.Window val =>
