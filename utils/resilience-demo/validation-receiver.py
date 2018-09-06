@@ -24,6 +24,7 @@ of = open(output_file, 'w')
 
 def extract_fun(got):
 	of.write(got)
+	of.flush()
 	return re.sub('.*\(', '(', got)
 
 await_values = []
