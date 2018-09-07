@@ -60,7 +60,6 @@ def count_word(word, word_totals):
 
 class WordTotal(object):
     def __init__(self):
-        print("word total")
         self.word = ""
         self.total = 0
 
