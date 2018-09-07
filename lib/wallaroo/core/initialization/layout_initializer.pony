@@ -45,4 +45,5 @@ trait tag LayoutInitializer
 
   be ack_migration_batch_complete(sender: String)
 
-  be rollback_topology_graph(checkpoint_id: CheckpointId, action: Promise[None])
+  be rollback_topology_graph(checkpoint_id: CheckpointId,
+    promise: Promise[None])
