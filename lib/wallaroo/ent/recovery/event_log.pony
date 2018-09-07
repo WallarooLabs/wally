@@ -38,6 +38,10 @@ class val EventLogConfig
   let log_rotation: Bool
   let suffix: String
   let is_recovering: Bool
+  let do_local_file_io: Bool
+  let worker_name: String
+  let dos_host: String
+  let dos_service: String
 
   new val create(log_dir': (FilePath | AmbientAuth | None) = None,
     filename': (String val | None) = None,
@@ -45,7 +49,11 @@ class val EventLogConfig
     backend_file_length': (USize | None) = None,
     log_rotation': Bool = false,
     suffix': String = ".evlog",
-    is_recovering': Bool = false)
+    is_recovering': Bool = false,
+    do_local_file_io': Bool = true,
+    worker_name': String = "unknown-worker-name",
+    dos_host': String = "localhost",
+    dos_service': String = "9999")
   =>
     filename = filename'
     log_dir = log_dir'
@@ -54,8 +62,12 @@ class val EventLogConfig
     log_rotation = log_rotation'
     suffix = suffix'
     is_recovering = is_recovering'
+    do_local_file_io = do_local_file_io'
+    worker_name = worker_name'
+    dos_host = dos_host'
+    dos_service = dos_service'
 
-actor EventLog
+actor EventLog is SimpleJournalAsyncResponseReceiver
   let _auth: AmbientAuth
   let _worker_name: WorkerName
   let _resilients: Map[RoutingId, Resilient] = _resilients.create()
@@ -63,6 +75,7 @@ actor EventLog
   let _replay_complete_markers: Map[U64, Bool] =
     _replay_complete_markers.create()
   let _config: EventLogConfig
+  let _the_journal: SimpleJournal
   var _barrier_initiator: (BarrierInitiator | None) = None
   var _checkpoint_initiator: (CheckpointInitiator | None) = None
   var num_encoded: USize = 0
@@ -74,6 +87,7 @@ actor EventLog
   var _rotating: Bool = false
   //!@ What do we do with this?
   var _backend_bytes_after_checkpoint: USize
+  var _disposed: Bool = false
 
   var _phase: _EventLogPhase = _InitialEventLogPhase
 
@@ -81,12 +95,13 @@ actor EventLog
 
   var _pending_sources: SetIs[(RoutingId, Source)] = _pending_sources.create()
 
-  new create(auth: AmbientAuth, worker: WorkerName,
+  new create(auth: AmbientAuth, worker: WorkerName, the_journal: SimpleJournal,
     event_log_config: EventLogConfig = EventLogConfig())
   =>
     _auth = auth
     _worker_name = worker
     _config = event_log_config
+    _the_journal = the_journal
     _backend_bytes_after_checkpoint = _backend.bytes_written()
     _backend = match _config.filename
       | let f: String val =>
@@ -95,7 +110,10 @@ actor EventLog
             match _config.log_dir
             | let ld: FilePath =>
               RotatingFileBackend(ld, f, _config.suffix, this,
-                _config.backend_file_length)?
+                _config.backend_file_length, _the_journal, _auth,
+                _config.worker_name, _config.do_local_file_io,
+                _config.dos_host, _config.dos_service
+                where rotation_enabled = true)?
             else
               Fail()
               DummyBackend(this)
@@ -103,9 +121,17 @@ actor EventLog
           else
             match _config.log_dir
             | let ld: FilePath =>
-              FileBackend(FilePath(ld, f)?, this)
+              RotatingFileBackend(ld, f, "", this,
+                _config.backend_file_length, _the_journal, _auth,
+                _config.worker_name, _config.do_local_file_io,
+                _config.dos_host, _config.dos_service
+                where rotation_enabled = false)?
             | let ld: AmbientAuth =>
-              FileBackend(FilePath(ld, f)?, this)
+              RotatingFileBackend(FilePath(ld, f)?, f, "", this,
+                _config.backend_file_length, _the_journal, _auth,
+                _config.worker_name, _config.do_local_file_io,
+                _config.dos_host, _config.dos_service
+                where rotation_enabled = false)?
             else
               Fail()
               DummyBackend(this)
@@ -168,6 +194,12 @@ actor EventLog
       @printf[I32]("Attempted to unregister non-registered resilient\n"
         .cstring())
     end
+
+  be dispose() =>
+    @printf[I32]("EventLog: dispose\n".cstring())
+    _backend.dispose()
+    _disposed = true
+    @printf[I32]("EventLog: dispose 2\n".cstring())
 
   /////////////////
   // CHECKPOINT
@@ -386,8 +418,10 @@ actor EventLog
       // write buffer to disk
       _backend.write()?
     else
-      @printf[I32]("error writing log entries to disk!\n".cstring())
-      Fail()
+      if not _disposed then
+        @printf[I32]("error writing log entries to disk!\n".cstring())
+        Fail()
+      end
     end
 
   be start_rotation() =>
@@ -462,3 +496,14 @@ actor EventLog
     end
     _rotating = false
 
+ // TODO: If we're using RotatingFileBackend, then knowing the
+ // identity of the failed journal isn't really helpful, is it?
+
+  be async_io_ok(j: SimpleJournal, optag: USize) =>
+      // @printf[I32]("EventLog: TODO async_io_ok journal %d tag %d\n".cstring(), j, optag)
+      None
+
+  be async_io_error(j: SimpleJournal, optag: USize) =>
+      @printf[I32]("EventLog: TODO async_io_error journal %d tag %d\n".cstring(),
+      j, optag)
+    Fail()

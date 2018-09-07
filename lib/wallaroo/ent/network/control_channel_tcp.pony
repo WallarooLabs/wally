@@ -32,8 +32,8 @@ use "wallaroo_labs/mort"
 class ControlChannelListenNotifier is TCPListenNotify
   let _auth: AmbientAuth
   let _worker_name: String
-  var _host: String = ""
-  var _service: String = ""
+  let _c_host: String
+  let _c_service: String
   var _d_host: String
   var _d_service: String
   let _is_initializer: Bool
@@ -48,6 +48,8 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _recovery_file: FilePath
   let _event_log: EventLog
   let _recovery_file_cleaner: RecoveryFileCleaner
+  let _the_journal: SimpleJournal
+  let _do_local_file_io: Bool
 
   new iso create(worker_name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
@@ -56,7 +58,9 @@ class ControlChannelListenNotifier is TCPListenNotify
     recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
     barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
     recovery_file: FilePath, data_host: String, data_service: String,
-    event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner)
+    event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner,
+    the_journal: SimpleJournal, do_local_file_io: Bool,
+    control_host: String, control_service: String)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -74,14 +78,15 @@ class ControlChannelListenNotifier is TCPListenNotify
     _recovery_file = recovery_file
     _event_log = event_log
     _recovery_file_cleaner = recovery_file_cleaner
+    _the_journal = the_journal
+    _do_local_file_io = do_local_file_io
+    _c_host = control_host
+    _c_service = control_service
 
   fun ref listening(listen: TCPListener ref) =>
     try
-      (_host, _service) = listen.local_address().name()?
-      if _host == "::1" then _host = "127.0.0.1" end
-
       if not _is_initializer then
-        _connections.register_my_control_addr(_host, _service)
+        _connections.register_my_control_addr(_c_host, _c_service)
       end
       _router_registry.register_control_channel_listener(listen)
 
@@ -90,26 +95,28 @@ class ControlChannelListenNotifier is TCPListenNotify
       end
 
       let message = ChannelMsgEncoder.identify_control_port(_worker_name,
-        _service, _auth)?
+        _c_service, _auth)?
       _connections.send_control_to_cluster(message)
 
-      let f = File(_recovery_file)
-      f.print(_host)
-      f.print(_service)
+      let f = AsyncJournalledFile(_recovery_file, _the_journal, _auth,
+        _do_local_file_io)
+      f.print(_c_host)
+      f.print(_c_service)
       f.sync()
       f.dispose()
+      // TODO: AsyncJournalledFile does not provide implicit sync semantics here
 
-      @printf[I32]((_worker_name + " control: listening on " + _host + ":" +
-        _service + "\n").cstring())
+      @printf[I32]((_worker_name + " control: listening on " + _c_host +
+        ":" + _c_service + "\n").cstring())
     else
-      @printf[I32]((_worker_name + " control: couldn't get local address\n")
-        .cstring())
+      @printf[I32]((_worker_name + " control: couldn't get local address %s:%s\n")
+        .cstring(), _c_host.cstring(), _c_service.cstring())
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
     @printf[I32]((_worker_name + " control: unable to listen on (%s:%s)\n")
-      .cstring(), _host.cstring(), _service.cstring())
+      .cstring(), _c_host.cstring(), _c_service.cstring())
     Fail()
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
@@ -193,6 +200,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           | let i: ClusterInitializer =>
             i.identify_control_address(m.worker_name, host, m.service)
           end
+          @printf[I32]("_create_control_connection: call from control_channel_tcp line %d\n".cstring(), __loc.line())
           _connections.create_control_connection(m.worker_name, host,
             m.service)
         else
@@ -209,6 +217,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           | let i: ClusterInitializer =>
             i.identify_data_address(m.worker_name, host, m.service)
           end
+          @printf[I32]("create_data_connection: call from control_channel_tcp line %d\n".cstring(), __loc.line())
           _connections.create_data_connection(m.worker_name, host, m.service)
         end
       | let m: RequestBoundaryCountMsg =>

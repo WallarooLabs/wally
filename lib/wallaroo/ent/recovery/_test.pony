@@ -33,7 +33,7 @@ class _TestEventLogDummyCreation is UnitTest
     let auth = h.env.root as AmbientAuth
 
     // Create an event log without a config (gets a DummyBackend)
-    let el_no_conf = EventLog(auth, "w1")
+    let el_no_conf = EventLog(auth, "w1", SimpleJournalNoop)
 
 class _TestHexOffset is UnitTest
   fun name(): String =>

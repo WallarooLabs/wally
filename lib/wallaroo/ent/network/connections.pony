@@ -24,7 +24,8 @@ use "wallaroo/core/data_channel"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
-use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/source"
+////// delme?? use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
@@ -61,7 +62,11 @@ actor Connections is Cluster
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
   let _event_log: EventLog
+  let _the_journal: SimpleJournal
+  let _do_local_file_io: Bool
   let _log_rotation: Bool
+  let _source_listeners: SetIs[SourceListener] =
+    _source_listeners.create()
 
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
@@ -69,7 +74,8 @@ actor Connections is Cluster
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
     is_joining: Bool, spike_config: (SpikeConfig | None) = None,
-    event_log: EventLog, log_rotation: Bool = false,
+    event_log: EventLog, the_journal: SimpleJournal,
+    do_local_file_io: Bool = true, log_rotation: Bool = false,
     recovery_file_cleaner: (RecoveryFileCleaner | None) = None)
   =>
     _app_name = app_name
@@ -85,12 +91,15 @@ actor Connections is Cluster
     _is_joining = is_joining
     _spike_config = spike_config
     _event_log = event_log
+    _the_journal = the_journal
+    _do_local_file_io = do_local_file_io
     _log_rotation = log_rotation
 
     if _is_initializer then
       _my_control_addr = (c_host, c_service)
       _my_data_addr = (d_host, d_service)
     else
+     @printf[I32]("_create_control_connection: call from line %d\n".cstring(), __loc.line())
       create_control_connection("initializer", c_host, c_service)
     end
 
@@ -115,6 +124,7 @@ actor Connections is Cluster
   =>
     if recovery_addr_file.exists() then
       try
+        // TODO: We assume that all journal data is copied to local file system first
         let file = File(recovery_addr_file)
         let host' = file.line()?
         let port' = file.line()?
@@ -141,6 +151,7 @@ actor Connections is Cluster
   =>
     if recovery_addr_file.exists() then
       try
+        // TODO: We assume that all journal data is copied to local file system first
         let file = File(recovery_addr_file)
         var host': String = file.line()?
         let port': String = file.line()?
@@ -172,7 +183,7 @@ actor Connections is Cluster
         _is_initializer,
         MetricsReporter(_app_name, _worker_name, _metrics_conn),
         data_channel_file, layout_initializer, data_receivers,
-        recovery_replayer, router_registry)
+        recovery_replayer, router_registry, _the_journal, _do_local_file_io)
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     let dch_listener = DataChannelListener(_auth, consume data_notifier,
@@ -431,10 +442,12 @@ actor Connections is Cluster
     router_registry: (RouterRegistry | None) = None)
   =>
     try
+      @printf[I32]("SLF hey, Connections.create_connections top\n".cstring())
       _save_connections(control_addrs, data_addrs)
 
       for (target, address) in control_addrs.pairs() do
         if target != _worker_name then
+          @printf[I32]("_create_control_connection: call from line %d\n".cstring(), __loc.line())
           _create_control_connection(target, address._1, address._2)
         end
       end
@@ -511,7 +524,7 @@ actor Connections is Cluster
     try
       let connection_addresses_file = FilePath(_auth,
         _connection_addresses_file)?
-      let file = File(connection_addresses_file)
+      let file = AsyncJournalledFile(connection_addresses_file, _the_journal, _auth, _do_local_file_io)
       file.set_length(0)
       let wb = Writer
       let serialised_connection_addresses: Array[U8] val =
@@ -519,6 +532,7 @@ actor Connections is Cluster
           OutputSerialisedAuth(_auth))
       wb.write(serialised_connection_addresses)
       file.writev(recover val wb.done() end)
+      // TODO: AsyncJournalledFile does not provide implicit sync semantics here
     else
       @printf[I32]("Error saving connection addresses!\n".cstring())
       Fail()
@@ -582,6 +596,7 @@ actor Connections is Cluster
       let data_addrs = addresses("data")?
       for (target, address) in control_addrs.pairs() do
         if target != _worker_name then
+          @printf[I32]("_create_control_connection: call from line %d\n".cstring(), __loc.line())
           _create_control_connection(target, address._1, address._2)
         end
       end
@@ -605,11 +620,13 @@ actor Connections is Cluster
   be create_control_connection(target_name: String, host: String,
     service: String)
   =>
+    @printf[I32]("_create_control_connection: call from line %d\n".cstring(), __loc.line())
     _create_control_connection(target_name, host, service)
 
   fun ref _create_control_connection(target_name: String, host: String,
     service: String)
   =>
+    @printf[I32]("_create_control_connection: target_name %s host %s service %s\n".cstring(), target_name.cstring(), host.cstring(), service.cstring())
     _control_addrs(target_name) = (host, service)
     let tcp_conn_wrapper =
       if _control_conns.contains(target_name) then
@@ -627,18 +644,6 @@ actor Connections is Cluster
       ControlSenderConnectNotifier(_auth, target_name, tcp_conn_wrapper)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
-
-  be reconnect_data_connection(target_name: String) =>
-    if _data_conns.contains(target_name) then
-      try
-        let outgoing_boundary = _data_conns(target_name)?
-        outgoing_boundary.reconnect()
-      end
-    else
-      @printf[I32]("Target: %s not found in data connection map!\n".cstring(),
-        target_name.cstring())
-      Fail()
-    end
 
   be create_data_connection(target_name: String, host: String,
     service: String)
