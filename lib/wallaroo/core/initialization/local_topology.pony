@@ -1738,9 +1738,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         _initializables.application_begin_reporting(this)
-        // for i in _initializables.values() do
-        //   i.application_begin_reporting(this)
-        // end
 
         @printf[I32]("Local topology initialized\n".cstring())
         _topology_initialized = true
@@ -2001,17 +1998,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     // the join can't complete until we say we're initialized.
     _initializables.remove_boundaries()
     _initializables.application_begin_reporting(this)
-    // for i in _initializables.values() do
-    //   match i
-    //   | let ob: OutgoingBoundary =>
-    //     boundaries.push(ob)
-    //   else
-    //     i.application_begin_reporting(this)
-    //   end
-    // end
-    // for b in boundaries.values() do
-    //   _initializables.unset(b)
-    // end
     if _initializables.size() == 0 then
       _complete_initialization_lifecycle()
     end
@@ -2024,9 +2010,6 @@ actor LocalTopologyInitializer is LayoutInitializer
           .cstring())
         _spin_up_source_listeners()
         _initializables.application_created(this)
-        // for i in _initializables.values() do
-        //   i.application_created(this)
-        // end
       end
     else
       @printf[I32]("The same Initializable reported being created twice\n"
@@ -2041,9 +2024,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         @printf[I32]("|~~ INIT PHASE II: Application is initialized! ~~|\n"
           .cstring())
         _initializables.application_initialized(this)
-        // for i in _initializables.values() do
-        //   i.application_initialized(this)
-        // end
       end
     else
       @printf[I32]("The same Initializable reported being initialized twice\n"
@@ -2105,9 +2085,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
       .cstring())
     _initializables.application_ready_to_work(this)
-    // for i in _initializables.values() do
-    //   i.application_ready_to_work(this)
-    // end
 
     if _is_initializer then
       match _cluster_initializer

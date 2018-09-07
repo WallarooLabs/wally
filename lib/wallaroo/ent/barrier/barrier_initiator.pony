@@ -37,7 +37,7 @@ actor BarrierInitiator is Initializable
   of the protocol depend on the BarrierToken and are opaque to the
   BarrierInitiator. That means it can be used as part of different protocols
   if they require general barrier processing behavior (for example,
-  the checkpointting protocol and the protocol checking that all in flight
+  the checkpointing protocol and the protocol checking that all in flight
   messages have been processed).
   """
   let _auth: AmbientAuth
