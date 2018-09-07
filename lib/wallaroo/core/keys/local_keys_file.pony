@@ -21,6 +21,7 @@ use "collections"
 use "files"
 use "wallaroo/core/common"
 use "wallaroo/ent/checkpoint"
+use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
 
 
@@ -36,14 +37,18 @@ class LocalKeysFile
   //   x - StateName
   //   4 - Key entry length y
   //   y - Key
-  let _file: File iso
+  //   16 - RoutingId <--- only for add() (TODO still valid?)
+  let _file: AsyncJournalledFile iso
   let _filepath: FilePath
   let _writer: Writer
 
-  new create(fpath: FilePath) =>
+  new create(fpath: FilePath, the_journal: SimpleJournal, auth: AmbientAuth,
+    do_local_file_io: Bool)
+  =>
     _writer = Writer
     _filepath = fpath
-    _file = recover iso File(_filepath) end
+    _file = recover iso AsyncJournalledFile(_filepath, the_journal, auth,
+      do_local_file_io) end
 
   fun ref add_key(state_name: StateName, k: Key, checkpoint_id: CheckpointId)
   =>
@@ -85,7 +90,10 @@ class LocalKeysFile
           /////
           // Read next entry
           /////
-          r.append(_file.read(1))
+          //// QQQ r.append(_file.read(1))
+          let qqq = _file.read(1)
+          @printf[I32]("@! read result size = %d\n".cstring(), qqq.size())
+          r.append(consume qqq)
           @printf[I32]("!@cmd\n".cstring())
           let cmd: U8 = r.u8()?
           @printf[I32]("!@next_cpoint_id\n".cstring())
@@ -96,7 +104,7 @@ class LocalKeysFile
           let payload_size = r.u32_be()?
           if next_cpoint_id > checkpoint_id then
             // Skip this entry
-            // @printf[I32]("!@ Skipping local keys entry by %s bytes (with %s left in file). Checkpoint %s higher than target checkpoint %s\n".cstring(), payload_size.string().cstring(), (_file.size().isize() - _file.position().isize()).string().cstring(), next_cpoint_id.string().cstring(), checkpoint_id.string().cstring())
+             @printf[I32]("!@ next_cpoint_id %d > checkpoint_id %d, payload_size = %d\n".cstring(), next_cpoint_id, checkpoint_id, payload_size)
             _file.seek(payload_size.isize())
           else
             r.append(_file.read(4))
@@ -135,8 +143,7 @@ class LocalKeysFile
           @printf[I32]("Error reading local keys file!\n".cstring())
           Fail()
         end
-        //!@
-        // if _file.size() <= _file.position() then
+        @printf[I32]("!@bottom of loop: _file.size() %d vs _file.position() %d\n".cstring(), _file.size(), _file.position())
         if _file.size() == _file.position() then
           end_of_checkpoint = true
         //!@

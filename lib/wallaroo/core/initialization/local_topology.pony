@@ -296,6 +296,8 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _data_channel_file: String
   let _worker_names_file: String
   let _local_keys_file: LocalKeysFile
+  let _the_journal: SimpleJournal
+  let _do_local_file_io: Bool
   var _topology_initialized: Bool = false
   var _recovered_worker_names: Array[WorkerName] val =
     recover val Array[WorkerName] end
@@ -347,6 +349,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     checkpoint_initiator: CheckpointInitiator, barrier_initiator: BarrierInitiator,
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, local_keys_filepath: FilePath,
+    the_journal: SimpleJournal, do_local_file_io: Bool,
     cluster_manager: (ClusterManager | None) = None,
     is_joining: Bool = false,
     joining_state_routing_ids: (Map[StateName, RoutingId] val | None) = None)
@@ -368,7 +371,10 @@ actor LocalTopologyInitializer is LayoutInitializer
     _local_topology_file = local_topology_file
     _data_channel_file = data_channel_file
     _worker_names_file = worker_names_file
-    _local_keys_file = LocalKeysFile(local_keys_filepath)
+    _local_keys_file = LocalKeysFile(local_keys_filepath, the_journal, auth,
+      do_local_file_io)
+    _the_journal = the_journal
+    _do_local_file_io = do_local_file_io
     _cluster_manager = cluster_manager
     _is_joining = is_joining
     _joining_state_routing_ids = joining_state_routing_ids
@@ -630,7 +636,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             MetricsReporter(_application.name(), _worker_name,
               _metrics_conn),
             data_channel_filepath, this, _data_receivers, _recovery_replayer,
-            _router_registry)
+            _router_registry, _the_journal, _do_local_file_io)
 
         _connections.make_and_register_recoverable_data_channel_listener(
           _auth, consume data_notifier, _router_registry,
@@ -698,7 +704,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             MetricsReporter(_application.name(), _worker_name,
               _metrics_conn),
             data_channel_filepath, this, _data_receivers, _recovery_replayer,
-            _router_registry)
+            _router_registry, _the_journal, _do_local_file_io)
 
         _connections.make_and_register_recoverable_data_channel_listener(
           _auth, consume data_notifier, _router_registry,
@@ -746,7 +752,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         @printf[I32](("Saving worker names to file: " + _worker_names_file +
           "\n").cstring())
         let worker_names_filepath = FilePath(_auth, _worker_names_file)?
-        let file = File(worker_names_filepath)
+        let file = AsyncJournalledFile(worker_names_filepath, _the_journal, _auth, _do_local_file_io)
         // Clear file
         file.set_length(0)
         for worker_name in t.worker_names.values() do
@@ -756,6 +762,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
         file.sync()
         file.dispose()
+        // TODO: AsyncJournalledFile does not provide implicit sync semantics here
       else
         Fail()
       end
@@ -776,7 +783,8 @@ actor LocalTopologyInitializer is LayoutInitializer
           error
         end
         // TODO: Back up old file before clearing it?
-        let file = File(local_topology_file)
+        let file = AsyncJournalledFile(local_topology_file, _the_journal,
+          _auth, _do_local_file_io)
         // Clear contents of file.
         file.set_length(0)
         let wb = Writer
@@ -794,6 +802,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         file.writev(recover val wb.done() end)
         file.sync()
         file.dispose()
+        // TODO: AsyncJournalledFile does not provide implicit sync semantics here
       else
         @printf[I32]("Error saving topology!\n".cstring())
         Fail()
@@ -846,6 +855,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         if local_topology_file.exists() then
           //we are recovering an existing worker topology
           let data = recover val
+            // TODO: We assume that all journal data is copied to local file system first
             let file = File(local_topology_file)
             file.read(file.size())
           end
