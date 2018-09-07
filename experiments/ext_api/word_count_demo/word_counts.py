@@ -35,4 +35,5 @@ def count_decoder(message):
 
 @wallaroo.experimental.streaming_message_encoder
 def count_encoder(message):
+    print message.__dict__
     return cPickle.dumps((message.word.encode("utf-8"), message.count), -1)
