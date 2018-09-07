@@ -20,7 +20,7 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 
 trait StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,

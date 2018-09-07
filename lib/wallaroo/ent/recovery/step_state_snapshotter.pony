@@ -13,11 +13,11 @@ the License. You may obtain a copy of the License at
 use "buffered"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
-primitive StepStateSnapshotter
-  fun apply(runner: Runner, id: RoutingId, snapshot_id: SnapshotId,
+primitive StepStateCheckpointter
+  fun apply(runner: Runner, id: RoutingId, checkpoint_id: CheckpointId,
     event_log: EventLog, wb: Writer = Writer)
   =>
     match runner
@@ -25,11 +25,11 @@ primitive StepStateSnapshotter
       let serialized: ByteSeq val = r.serialize_state()
       wb.write(serialized)
       let payload = wb.done()
-      // @printf[I32]("!@ State Step %s calling EventLog.snapshot_state()\n".cstring(), id.string().cstring())
-      event_log.snapshot_state(id, snapshot_id, consume payload)
+      // @printf[I32]("!@ State Step %s calling EventLog.checkpoint_state()\n".cstring(), id.string().cstring())
+      event_log.checkpoint_state(id, checkpoint_id, consume payload)
     else
-      // Currently, non-state steps don't have anything to snapshot.
-      @printf[I32]("!@ Stateless Step %s calling EventLog.snapshot_state()\n".cstring(), id.string().cstring())
-      event_log.snapshot_state(id, snapshot_id,
+      // Currently, non-state steps don't have anything to checkpoint.
+      @printf[I32]("!@ Stateless Step %s calling EventLog.checkpoint_state()\n".cstring(), id.string().cstring())
+      event_log.checkpoint_state(id, checkpoint_id,
         recover val Array[ByteSeq] end)
     end

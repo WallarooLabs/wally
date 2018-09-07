@@ -23,7 +23,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 
 
 actor DummyProducer is Producer
@@ -69,14 +69,14 @@ actor DummyProducer is Producer
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     None
 
   be prepare_for_rollback() =>
     None
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     None
 

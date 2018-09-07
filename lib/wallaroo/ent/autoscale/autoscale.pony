@@ -18,7 +18,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/ent/network"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
@@ -175,17 +175,17 @@ class Autoscale
     _phase.stop_the_world_for_join_migration_initiated()
 
   fun ref join_migration_initiated(joining_workers: Array[WorkerName] val,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
-    _phase.join_migration_initiated(snapshot_id)
+    _phase.join_migration_initiated(checkpoint_id)
 
   fun ref begin_join_migration(joining_workers: Array[WorkerName] val,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     _phase = _WaitingForJoinMigration(this, _auth, joining_workers
       where is_coordinator = false)
     _router_registry.begin_join_migration(joining_workers,
-      snapshot_id)
+      checkpoint_id)
 
   fun ref initiate_stop_the_world_for_join_migration(
     joining_workers: Array[WorkerName] val)
@@ -309,7 +309,7 @@ trait _AutoscalePhase
     _invalid_call()
     Fail()
 
-  fun ref join_migration_initiated(snapshot_id: SnapshotId) =>
+  fun ref join_migration_initiated(checkpoint_id: CheckpointId) =>
     _invalid_call()
     Fail()
 
@@ -607,8 +607,8 @@ class _WaitingForMigration is _AutoscalePhase
 
   fun name(): String => "WaitingForMigration"
 
-  fun ref join_migration_initiated(snapshot_id: SnapshotId) =>
-    _autoscale.begin_join_migration(_joining_workers, snapshot_id)
+  fun ref join_migration_initiated(checkpoint_id: CheckpointId) =>
+    _autoscale.begin_join_migration(_joining_workers, checkpoint_id)
 
 class _WaitingForJoinMigration is _AutoscalePhase
   """
@@ -695,7 +695,7 @@ class _JoiningWorker is _AutoscalePhase
   fun ref stop_the_world_for_join_migration_initiated() =>
     None
 
-  fun ref join_migration_initiated(snapshot_id: SnapshotId) =>
+  fun ref join_migration_initiated(checkpoint_id: CheckpointId) =>
     None
 
 //!2

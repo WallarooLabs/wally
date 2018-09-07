@@ -39,7 +39,7 @@ use "wallaroo/ent/cluster_manager"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/ent/spike"
 
 
@@ -70,7 +70,7 @@ actor Startup
   var _control_channel_file: String = ""
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
-  var _snapshot_ids_file: String = ""
+  var _checkpoint_ids_file: String = ""
 
   var _connections: (Connections | None) = None
 
@@ -185,9 +185,9 @@ actor Startup
         _joining_listener = joining_listener
         _disposables.set(joining_listener)
       elseif _is_recovering then
-        (let snapshot_id, let rollback_id) =
-          LatestSnapshotId.read(auth, _snapshot_ids_file)
-        _initialize(snapshot_id)
+        (let checkpoint_id, let rollback_id) =
+          LatestCheckpointId.read(auth, _checkpoint_ids_file)
+        _initialize(checkpoint_id)
       else
         _initialize()
       end
@@ -195,14 +195,14 @@ actor Startup
       StartupHelp()
     end
 
-  be recover_and_initialize(snapshot_id: SnapshotId) =>
+  be recover_and_initialize(checkpoint_id: CheckpointId) =>
     match _recovery_listener
     | let l: TCPListener =>
       l.dispose()
     end
-    _initialize(snapshot_id)
+    _initialize(checkpoint_id)
 
-  fun ref _initialize(snapshot_id: (SnapshotId | None) = None) =>
+  fun ref _initialize(checkpoint_id: (CheckpointId | None) = None) =>
     try
       if _is_joining then
         Fail()
@@ -254,8 +254,8 @@ actor Startup
       let connection_addresses_filepath: FilePath = FilePath(auth,
         _connection_addresses_file)?
 
-      let snapshot_ids_filepath: FilePath = FilePath(auth,
-        _snapshot_ids_file)?
+      let checkpoint_ids_filepath: FilePath = FilePath(auth,
+        _checkpoint_ids_file)?
 
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
@@ -297,14 +297,14 @@ actor Startup
       connections.register_disposable(barrier_initiator)
       event_log.set_barrier_initiator(barrier_initiator)
 
-      // TODO: We currently set the primary snapshot initiator worker to the
+      // TODO: We currently set the primary checkpoint initiator worker to the
       // initializer.
-      let snapshot_initiator = SnapshotInitiator(auth,
+      let checkpoint_initiator = CheckpointInitiator(auth,
         _startup_options.worker_name, initializer_name, connections,
-        _startup_options.time_between_snapshots, event_log, barrier_initiator,
-        _snapshot_ids_file, _startup_options.snapshots_enabled
+        _startup_options.time_between_checkpoints, event_log, barrier_initiator,
+        _checkpoint_ids_file, _startup_options.checkpoints_enabled
         where is_recovering = _is_recovering)
-      connections.register_disposable(snapshot_initiator)
+      connections.register_disposable(checkpoint_initiator)
 
       let autoscale_initiator = AutoscaleInitiator(
         _startup_options.worker_name, barrier_initiator)
@@ -322,7 +322,7 @@ actor Startup
         _startup_options.worker_name, data_receivers,
         connections, state_step_creator, this,
         _startup_options.stop_the_world_pause, _is_joining, initializer_name,
-        barrier_initiator, snapshot_initiator, autoscale_initiator,
+        barrier_initiator, checkpoint_initiator, autoscale_initiator,
         initializer_name)
       router_registry.set_event_log(event_log)
 
@@ -341,7 +341,7 @@ actor Startup
         connections, _is_recovering)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        event_log, recovery_reconnecter, snapshot_initiator, connections,
+        event_log, recovery_reconnecter, checkpoint_initiator, connections,
         router_registry, data_receivers)
 
       let local_topology_initializer =
@@ -349,7 +349,7 @@ actor Startup
           _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers, event_log, recovery,
-          recovery_reconnecter, snapshot_initiator, barrier_initiator,
+          recovery_reconnecter, checkpoint_initiator, barrier_initiator,
           _local_topology_file, _data_channel_file, _worker_names_file,
           local_keys_filepath, state_step_creator)
 
@@ -388,7 +388,7 @@ actor Startup
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
           recovery_reconnecter, router_registry, barrier_initiator,
-          snapshot_initiator, control_channel_filepath,
+          checkpoint_initiator, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service, event_log,
           this)
 
@@ -397,8 +397,8 @@ actor Startup
       // the cluster of our control address. If the cluster connection
       // addresses were not yet recovered, we'd only notify the initializer.
       if _is_recovering then
-        match snapshot_id
-        | let s_id: SnapshotId =>
+        match checkpoint_id
+        | let s_id: CheckpointId =>
           connections.recover_connections(local_topology_initializer, s_id)
         else
           Fail()
@@ -422,11 +422,11 @@ actor Startup
           worker_names_filepath)
         if recovered_workers.size() > 1 then
           local_topology_initializer.recover_and_initialize(
-            recovered_workers, snapshot_id as SnapshotId,
+            recovered_workers, checkpoint_id as CheckpointId,
             _cluster_initializer)
         else
           local_topology_initializer.initialize(
-            where snapshot_target = snapshot_id)
+            where checkpoint_target = checkpoint_id)
         end
       end
 
@@ -516,10 +516,10 @@ actor Startup
         _startup_options.worker_name, connections, initializer_name)
       event_log.set_barrier_initiator(barrier_initiator)
 
-      let snapshot_initiator = SnapshotInitiator(auth,
-        _startup_options.worker_name, m.primary_snapshot_worker, connections,
-        _startup_options.time_between_snapshots, event_log, barrier_initiator,
-        _snapshot_ids_file, _startup_options.snapshots_enabled)
+      let checkpoint_initiator = CheckpointInitiator(auth,
+        _startup_options.worker_name, m.primary_checkpoint_worker, connections,
+        _startup_options.time_between_checkpoints, event_log, barrier_initiator,
+        _checkpoint_ids_file, _startup_options.checkpoints_enabled)
 
       let autoscale_initiator = AutoscaleInitiator(
         _startup_options.worker_name, barrier_initiator)
@@ -536,7 +536,7 @@ actor Startup
         _startup_options.worker_name, data_receivers,
         connections, state_step_creator, this,
         _startup_options.stop_the_world_pause, _is_joining, initializer_name,
-        barrier_initiator, snapshot_initiator, autoscale_initiator,
+        barrier_initiator, checkpoint_initiator, autoscale_initiator,
         m.sender_name where joining_state_routing_ids = new_state_routing_ids)
       router_registry.set_event_log(event_log)
 
@@ -545,7 +545,7 @@ actor Startup
         data_receivers, router_registry, connections)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        event_log, recovery_reconnecter, snapshot_initiator, connections,
+        event_log, recovery_reconnecter, checkpoint_initiator, connections,
         router_registry, data_receivers)
 
       let local_topology_initializer =
@@ -553,7 +553,7 @@ actor Startup
           _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
-          event_log, recovery, recovery_reconnecter, snapshot_initiator,
+          event_log, recovery, recovery_reconnecter, checkpoint_initiator,
           barrier_initiator, _local_topology_file, _data_channel_file,
           _worker_names_file, local_keys_filepath, state_step_creator
           where is_joining = true,
@@ -614,7 +614,7 @@ actor Startup
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
           recovery_reconnecter, router_registry, barrier_initiator,
-          snapshot_initiator, control_channel_filepath,
+          checkpoint_initiator, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service,
           event_log, this)
 
@@ -665,8 +665,8 @@ actor Startup
       "-" + _startup_options.worker_name + ".workers"
     _connection_addresses_file = _startup_options.resilience_dir + "/" +
       _app_name + "-" + _startup_options.worker_name + ".connection-addresses"
-    _snapshot_ids_file = _startup_options.resilience_dir + "/" + _app_name +
-      "-" + _startup_options.worker_name + ".snapshot_ids"
+    _checkpoint_ids_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".checkpoint_ids"
 
   fun is_recovering(auth: AmbientAuth): Bool =>
     // check to see if we can recover
@@ -726,10 +726,10 @@ actor Startup
         existing_files.set(connection_addresses_filepath.path)
       end
 
-      let snapshot_ids_filepath: FilePath = FilePath(auth,
-        _snapshot_ids_file)?
-      if snapshot_ids_filepath.exists() then
-        existing_files.set(snapshot_ids_filepath.path)
+      let checkpoint_ids_filepath: FilePath = FilePath(auth,
+        _checkpoint_ids_file)?
+      if checkpoint_ids_filepath.exists() then
+        existing_files.set(checkpoint_ids_filepath.path)
       end
 
       let required_files: Set[String] = Set[String]
@@ -779,7 +779,7 @@ actor Startup
     _remove_file(_control_channel_file)
     _remove_file(_worker_names_file)
     _remove_file(_connection_addresses_file)
-    _remove_file(_snapshot_ids_file)
+    _remove_file(_checkpoint_ids_file)
 
     try
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath

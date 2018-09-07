@@ -26,7 +26,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 
@@ -264,8 +264,8 @@ actor BarrierSource is Source
   be initiate_barrier(token: BarrierToken) =>
     @printf[I32]("!@ BarrierSource initiate_barrier. Forwarding to %s outputs\n".cstring(), _outputs.size().string().cstring())
     match token
-    | let sbt: SnapshotBarrierToken =>
-      snapshot_state(sbt.id)
+    | let sbt: CheckpointBarrierToken =>
+      checkpoint_state(sbt.id)
     end
     for (o_id, o) in _outputs.pairs() do
       match o
@@ -299,15 +299,15 @@ actor BarrierSource is Source
     end
 
   //////////////
-  // SNAPSHOTS
+  // CHECKPOINTS
   //////////////
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     """
-    BarrierSources don't currently write out any data as part of the snapshot.
+    BarrierSources don't currently write out any data as part of the checkpoint.
     """
     None
-    // @printf[I32]("!@ BarrierSource %s calling EventLog.snapshot_state()\n".cstring(), _source_id.string().cstring())
-    // _event_log.snapshot_state(_source_id, snapshot_id,
+    // @printf[I32]("!@ BarrierSource %s calling EventLog.checkpoint_state()\n".cstring(), _source_id.string().cstring())
+    // _event_log.checkpoint_state(_source_id, checkpoint_id,
     //   recover val Array[ByteSeq] end)
 
   be prepare_for_rollback() =>
@@ -317,7 +317,7 @@ actor BarrierSource is Source
     None
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     """
     There is nothing for a BarrierSource to rollback to.

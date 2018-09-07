@@ -25,7 +25,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 actor EmptySink is Sink
@@ -80,14 +80,14 @@ actor EmptySink is Sink
 
   be receive_state(state: ByteSeq val) => Fail()
 
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     None
 
   be prepare_for_rollback() =>
     None
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     None
 

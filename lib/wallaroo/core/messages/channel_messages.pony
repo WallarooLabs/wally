@@ -29,7 +29,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 
 
 primitive ChannelMsgEncoder
@@ -53,10 +53,10 @@ primitive ChannelMsgEncoder
       metrics_id, metric_name), auth, wb)?
 
   fun migrate_step(step_id: RoutingId, state_name: String, key: Key,
-    snapshot_id: SnapshotId, state: ByteSeq val, worker: String,
+    checkpoint_id: CheckpointId, state: ByteSeq val, worker: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(KeyedStepMigrationMsg(step_id, state_name, key, snapshot_id, state,
+    _encode(KeyedStepMigrationMsg(step_id, state_name, key, checkpoint_id, state,
       worker), auth)?
 
   fun migration_batch_complete(sender: String,
@@ -238,13 +238,13 @@ primitive ChannelMsgEncoder
     """
     _encode(RequestRecoveryInfoMsg(worker_name), auth)?
 
-  fun inform_recovering_worker(worker_name: String, snapshot_id: SnapshotId,
+  fun inform_recovering_worker(worker_name: String, checkpoint_id: CheckpointId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     This message is sent as a response to a RequestRecoveryInfo message.
     """
-    _encode(InformRecoveringWorkerMsg(worker_name, snapshot_id), auth)?
+    _encode(InformRecoveringWorkerMsg(worker_name, checkpoint_id), auth)?
 
   fun join_cluster(worker_name: String, worker_count: USize,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -260,7 +260,7 @@ primitive ChannelMsgEncoder
     l_topology: LocalTopology, metric_host: String,
     metric_service: String, control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
-    worker_names: Array[String] val, primary_snapshot_worker: String,
+    worker_names: Array[String] val, primary_checkpoint_worker: String,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
@@ -272,7 +272,7 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
       metric_host, metric_service, control_addrs, data_addrs, worker_names,
-      primary_snapshot_worker, partition_blueprints,
+      primary_checkpoint_worker, partition_blueprints,
       stateless_partition_blueprints, target_id_router_blueprints), auth)?
 
   fun inform_join_error(msg: String, auth: AmbientAuth): Array[ByteSeq] val ?
@@ -301,16 +301,16 @@ primitive ChannelMsgEncoder
     _encode(InitiateStopTheWorldForJoinMigrationMsg(new_workers), auth)?
 
   fun initiate_join_migration(new_workers: Array[String] val,
-    snapshot_id: SnapshotId, auth: AmbientAuth): Array[ByteSeq] val ?
+    checkpoint_id: CheckpointId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     One worker is contacted by all joining workers and initially coordinates
     state migration to those workers. When it is ready to migrate steps, it
     sends this message to every other current worker informing them to begin
-    migration as well. We include the next snapshot id so that local key
+    migration as well. We include the next checkpoint id so that local key
     changes can be logged correctly.
     """
-    _encode(InitiateJoinMigrationMsg(new_workers, snapshot_id), auth)?
+    _encode(InitiateJoinMigrationMsg(new_workers, checkpoint_id), auth)?
 
   fun autoscale_complete(auth: AmbientAuth): Array[ByteSeq] val ? =>
     """
@@ -444,27 +444,27 @@ primitive ChannelMsgEncoder
   =>
     _encode(BarrierCompleteMsg(token), auth)?
 
-  fun event_log_initiate_snapshot(snapshot_id: SnapshotId, sender: String,
+  fun event_log_initiate_checkpoint(checkpoint_id: CheckpointId, sender: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(EventLogInitiateSnapshotMsg(snapshot_id, sender), auth)?
+    _encode(EventLogInitiateCheckpointMsg(checkpoint_id, sender), auth)?
 
-  fun event_log_write_snapshot_id(snapshot_id: SnapshotId, sender: String,
+  fun event_log_write_checkpoint_id(checkpoint_id: CheckpointId, sender: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(EventLogWriteSnapshotIdMsg(snapshot_id, sender), auth)?
+    _encode(EventLogWriteCheckpointIdMsg(checkpoint_id, sender), auth)?
 
-  fun event_log_ack_snapshot(snapshot_id: SnapshotId, sender: String,
+  fun event_log_ack_checkpoint(checkpoint_id: CheckpointId, sender: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(EventLogAckSnapshotMsg(snapshot_id, sender), auth)?
+    _encode(EventLogAckCheckpointMsg(checkpoint_id, sender), auth)?
 
-  fun commit_snapshot_id(snapshot_id: SnapshotId, rollback_id: RollbackId,
+  fun commit_checkpoint_id(checkpoint_id: CheckpointId, rollback_id: RollbackId,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(CommitSnapshotIdMsg(snapshot_id, rollback_id, sender), auth)?
+    _encode(CommitCheckpointIdMsg(checkpoint_id, rollback_id, sender), auth)?
 
-  fun recovery_initiated(token: SnapshotRollbackBarrierToken,
+  fun recovery_initiated(token: CheckpointRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -473,7 +473,7 @@ primitive ChannelMsgEncoder
     """
     _encode(RecoveryInitiatedMsg(token, sender), auth)?
 
-  fun ack_recovery_initiated(token: SnapshotRollbackBarrierToken,
+  fun ack_recovery_initiated(token: CheckpointRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -485,7 +485,7 @@ primitive ChannelMsgEncoder
     Array[ByteSeq] val ?
   =>
     """
-    Sent to the primary snapshot worker from a recovering worker to initiate
+    Sent to the primary checkpoint worker from a recovering worker to initiate
     rollback during rollback recovery phase.
     """
     _encode(InitiateRollbackBarrierMsg(sender), auth)?
@@ -498,21 +498,21 @@ primitive ChannelMsgEncoder
     """
     _encode(PrepareForRollbackMsg(sender), auth)?
 
-  fun rollback_topology_graph(sender: WorkerName, snapshot_id: SnapshotId,
+  fun rollback_topology_graph(sender: WorkerName, checkpoint_id: CheckpointId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     Sent to all workers in cluster by recovering worker.
     """
-    _encode(RollbackTopologyGraphMsg(sender, snapshot_id), auth)?
+    _encode(RollbackTopologyGraphMsg(sender, checkpoint_id), auth)?
 
-  fun ack_rollback_topology_graph(sender: WorkerName, snapshot_id: SnapshotId,
+  fun ack_rollback_topology_graph(sender: WorkerName, checkpoint_id: CheckpointId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     Sent to ack rolling back topology graph.
     """
-    _encode(AckRollbackTopologyGraphMsg(sender, snapshot_id), auth)?
+    _encode(AckRollbackTopologyGraphMsg(sender, checkpoint_id), auth)?
 
   fun register_producers(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -530,29 +530,29 @@ primitive ChannelMsgEncoder
     """
     _encode(AckRegisterProducersMsg(sender), auth)?
 
-  fun rollback_barrier_complete(token: SnapshotRollbackBarrierToken,
+  fun rollback_barrier_complete(token: CheckpointRollbackBarrierToken,
     sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
-    Sent from the primary snapshot worker to the recovering worker to indicate
+    Sent from the primary checkpoint worker to the recovering worker to indicate
     that rollback barrier is complete.
     """
     _encode(RollbackBarrierCompleteMsg(token, sender), auth)?
 
-  fun event_log_initiate_rollback(token: SnapshotRollbackBarrierToken,
+  fun event_log_initiate_rollback(token: CheckpointRollbackBarrierToken,
     sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogInitiateRollbackMsg(token, sender), auth)?
 
-  fun event_log_ack_rollback(token: SnapshotRollbackBarrierToken,
+  fun event_log_ack_rollback(token: CheckpointRollbackBarrierToken,
     sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogAckRollbackMsg(token, sender), auth)?
 
-  fun resume_snapshot(sender: WorkerName, auth: AmbientAuth):
+  fun resume_checkpoint(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(ResumeSnapshotMsg(sender), auth)?
+    _encode(ResumeCheckpointMsg(sender), auth)?
 
   fun resume_processing(sender: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -709,7 +709,7 @@ class val ReplayCompleteMsg is ChannelMsg
 trait val StepMigrationMsg is ChannelMsg
   fun state_name(): String
   fun step_id(): RoutingId
-  fun snapshot_id(): SnapshotId
+  fun checkpoint_id(): CheckpointId
   fun state(): ByteSeq val
   fun worker(): String
   fun update_router_registry(router_registry: RouterRegistry ref,
@@ -719,31 +719,31 @@ class val KeyedStepMigrationMsg is StepMigrationMsg
   let _state_name: String
   let _key: Key
   let _step_id: RoutingId
-  // The next snapshot that this migrated step will be a part of
-  let _snapshot_id: SnapshotId
+  // The next checkpoint that this migrated step will be a part of
+  let _checkpoint_id: CheckpointId
   let _state: ByteSeq val
   let _worker: String
 
   new val create(step_id': U128, state_name': String, key': Key,
-    snapshot_id': SnapshotId, state': ByteSeq val, worker': String)
+    checkpoint_id': CheckpointId, state': ByteSeq val, worker': String)
   =>
     _state_name = state_name'
     _key = key'
     _step_id = step_id'
-    _snapshot_id = snapshot_id'
+    _checkpoint_id = checkpoint_id'
     _state = state'
     _worker = worker'
 
   fun state_name(): String => _state_name
   fun step_id(): RoutingId => _step_id
-  fun snapshot_id(): SnapshotId => _snapshot_id
+  fun checkpoint_id(): CheckpointId => _checkpoint_id
   fun state(): ByteSeq val => _state
   fun worker(): String => _worker
   fun update_router_registry(router_registry: RouterRegistry ref,
     step: Step)
   =>
     router_registry.move_proxy_to_stateful_step(_step_id, step, _key,
-      _state_name, _worker, _snapshot_id)
+      _state_name, _worker, _checkpoint_id)
 
 class val MigrationBatchCompleteMsg is ChannelMsg
   let sender_name: String
@@ -1071,11 +1071,11 @@ class val InformRecoveringWorkerMsg is ChannelMsg
   This message is sent as a response to a RequestRecoveryInfo message.
   """
   let sender: String
-  let snapshot_id: SnapshotId
+  let checkpoint_id: CheckpointId
 
-  new val create(sender': String, s_id: SnapshotId) =>
+  new val create(sender': String, s_id: CheckpointId) =>
     sender = sender'
-    snapshot_id = s_id
+    checkpoint_id = s_id
 
 class val JoinClusterMsg is ChannelMsg
   """
@@ -1101,8 +1101,8 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let control_addrs: Map[WorkerName, (String, String)] val
   let data_addrs: Map[WorkerName, (String, String)] val
   let worker_names: Array[WorkerName] val
-  // The worker currently in control of snapshots
-  let primary_snapshot_worker: WorkerName
+  // The worker currently in control of checkpoints
+  let primary_checkpoint_worker: WorkerName
   let partition_router_blueprints: Map[StateName, PartitionRouterBlueprint] val
   let stateless_partition_router_blueprints:
     Map[U128, StatelessPartitionRouterBlueprint] val
@@ -1113,7 +1113,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
     c_addrs: Map[WorkerName, (String, String)] val,
     d_addrs: Map[WorkerName, (String, String)] val,
     w_names: Array[String] val,
-    p_snapshot_worker: WorkerName,
+    p_checkpoint_worker: WorkerName,
     p_blueprints: Map[StateName, PartitionRouterBlueprint] val,
     stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
     tidr_blueprints: Map[StateName, TargetIdRouterBlueprint] val)
@@ -1126,7 +1126,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
     control_addrs = c_addrs
     data_addrs = d_addrs
     worker_names = w_names
-    primary_snapshot_worker = p_snapshot_worker
+    primary_checkpoint_worker = p_checkpoint_worker
     partition_router_blueprints = p_blueprints
     stateless_partition_router_blueprints = stateless_p_blueprints
     target_id_router_blueprints = tidr_blueprints
@@ -1160,11 +1160,11 @@ class val InitiateStopTheWorldForJoinMigrationMsg is ChannelMsg
 
 class val InitiateJoinMigrationMsg is ChannelMsg
   let new_workers: Array[String] val
-  let snapshot_id: SnapshotId
+  let checkpoint_id: CheckpointId
 
-  new val create(ws: Array[String] val, s_id: SnapshotId) =>
+  new val create(ws: Array[String] val, s_id: CheckpointId) =>
     new_workers = ws
-    snapshot_id = s_id
+    checkpoint_id = s_id
 
 primitive AutoscaleCompleteMsg is ChannelMsg
 
@@ -1317,71 +1317,71 @@ class val BarrierCompleteMsg is ChannelMsg
   =>
     token = token'
 
-class val EventLogInitiateSnapshotMsg is ChannelMsg
-  let snapshot_id: SnapshotId
+class val EventLogInitiateCheckpointMsg is ChannelMsg
+  let checkpoint_id: CheckpointId
   let sender: WorkerName
 
-  new val create(snapshot_id': SnapshotId, sender': WorkerName) =>
-    snapshot_id = snapshot_id'
+  new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
+    checkpoint_id = checkpoint_id'
     sender = sender'
 
-class val EventLogWriteSnapshotIdMsg is ChannelMsg
-  let snapshot_id: SnapshotId
+class val EventLogWriteCheckpointIdMsg is ChannelMsg
+  let checkpoint_id: CheckpointId
   let sender: WorkerName
 
-  new val create(snapshot_id': SnapshotId, sender': WorkerName) =>
-    snapshot_id = snapshot_id'
+  new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
+    checkpoint_id = checkpoint_id'
     sender = sender'
 
-class val EventLogAckSnapshotMsg is ChannelMsg
-  let snapshot_id: SnapshotId
+class val EventLogAckCheckpointMsg is ChannelMsg
+  let checkpoint_id: CheckpointId
   let sender: WorkerName
 
-  new val create(snapshot_id': SnapshotId, sender': WorkerName) =>
-    snapshot_id = snapshot_id'
+  new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
+    checkpoint_id = checkpoint_id'
     sender = sender'
 
-class val CommitSnapshotIdMsg is ChannelMsg
-  let snapshot_id: SnapshotId
+class val CommitCheckpointIdMsg is ChannelMsg
+  let checkpoint_id: CheckpointId
   let rollback_id: RollbackId
   let sender: WorkerName
 
-  new val create(snapshot_id': SnapshotId, rollback_id': RollbackId,
+  new val create(checkpoint_id': CheckpointId, rollback_id': RollbackId,
     sender': WorkerName)
   =>
-    snapshot_id = snapshot_id'
+    checkpoint_id = checkpoint_id'
     rollback_id = rollback_id'
     sender = sender'
 
 class val RecoveryInitiatedMsg is ChannelMsg
-  let token: SnapshotRollbackBarrierToken
+  let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
-  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+  new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
 
 class val AckRecoveryInitiatedMsg is ChannelMsg
-  let token: SnapshotRollbackBarrierToken
+  let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
-  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+  new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
 
 class val EventLogInitiateRollbackMsg is ChannelMsg
-  let token: SnapshotRollbackBarrierToken
+  let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
-  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+  new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
 
 class val EventLogAckRollbackMsg is ChannelMsg
-  let token: SnapshotRollbackBarrierToken
+  let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
-  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+  new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
 
@@ -1399,19 +1399,19 @@ class val PrepareForRollbackMsg is ChannelMsg
 
 class val RollbackTopologyGraphMsg is ChannelMsg
   let sender: WorkerName
-  let snapshot_id: SnapshotId
+  let checkpoint_id: CheckpointId
 
-  new val create(sender': WorkerName, s_id: SnapshotId) =>
+  new val create(sender': WorkerName, s_id: CheckpointId) =>
     sender = sender'
-    snapshot_id = s_id
+    checkpoint_id = s_id
 
 class val AckRollbackTopologyGraphMsg is ChannelMsg
   let sender: WorkerName
-  let snapshot_id: SnapshotId
+  let checkpoint_id: CheckpointId
 
-  new val create(sender': WorkerName, s_id: SnapshotId) =>
+  new val create(sender': WorkerName, s_id: CheckpointId) =>
     sender = sender'
-    snapshot_id = s_id
+    checkpoint_id = s_id
 
 class val RegisterProducersMsg is ChannelMsg
   let sender: WorkerName
@@ -1426,14 +1426,14 @@ class val AckRegisterProducersMsg is ChannelMsg
     sender = sender'
 
 class val RollbackBarrierCompleteMsg is ChannelMsg
-  let token: SnapshotRollbackBarrierToken
+  let token: CheckpointRollbackBarrierToken
   let sender: WorkerName
 
-  new val create(token': SnapshotRollbackBarrierToken, sender': WorkerName) =>
+  new val create(token': CheckpointRollbackBarrierToken, sender': WorkerName) =>
     token = token'
     sender = sender'
 
-class val ResumeSnapshotMsg is ChannelMsg
+class val ResumeCheckpointMsg is ChannelMsg
   let sender: String
 
   new val create(sender': String) =>

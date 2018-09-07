@@ -46,8 +46,8 @@ class StartupOptions
   var is_joining: Bool = false
   var a_arg: (String | None) = None
   var stop_the_world_pause: U64 = 2_000_000_000
-  var snapshots_enabled: Bool = true
-  var time_between_snapshots: U64 = 1_000_000_000
+  var checkpoints_enabled: Bool = true
+  var time_between_checkpoints: U64 = 1_000_000_000
   var spike_config: (SpikeConfig | None) = None
 
 primitive WallarooConfig
@@ -102,7 +102,7 @@ primitive WallarooConfig
       .add("spike-drop", "", None)
       .add("spike-prob", "", F64Argument)
       .add("spike-margin", "", I64Argument)
-      .add("time-between-snapshots", "", I64Argument)
+      .add("time-between-checkpoints", "", I64Argument)
 
     if handle_help then
       options.add("help", "h", None)
@@ -178,8 +178,8 @@ primitive WallarooConfig
         spike_prob = arg
       | ("spike-margin", let arg: I64) =>
         spike_margin = arg.usize()
-      | ("time-between-snapshots", let arg: I64) =>
-        so.time_between_snapshots = arg.u64()
+      | ("time-between-checkpoints", let arg: I64) =>
+        so.time_between_checkpoints = arg.u64()
       end
     end
 
