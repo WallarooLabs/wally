@@ -47,6 +47,8 @@ actor CheckpointInitiator is Initializable
   var _timers: Timers = Timers
   let _workers: _StringSet = _workers.create()
   let _wb: Writer = Writer
+  let _the_journal: SimpleJournal
+  let _do_local_file_io: Bool
 
   var _is_recovering: Bool
   var _checkpoints_paused: Bool = false
@@ -57,6 +59,7 @@ actor CheckpointInitiator is Initializable
     primary_worker: WorkerName, connections: Connections,
     time_between_checkpoints: U64, event_log: EventLog,
     barrier_initiator: BarrierInitiator, checkpoint_ids_file: String,
+    the_journal: SimpleJournal, do_local_file_io: Bool,
     is_active: Bool = true, is_recovering: Bool = false)
   =>
     _auth = auth
@@ -68,6 +71,8 @@ actor CheckpointInitiator is Initializable
     _barrier_initiator = barrier_initiator
     _connections = connections
     _checkpoint_id_file = checkpoint_ids_file
+    _the_journal = the_journal
+    _do_local_file_io = do_local_file_io
     _is_recovering = is_recovering
     @printf[I32]("!@ CheckpointInitiator: is_recovering: %s\n".cstring(), _is_recovering.string().cstring())
     _event_log.set_checkpoint_initiator(this)
@@ -365,7 +370,8 @@ actor CheckpointInitiator is Initializable
       let filepath = FilePath(_auth, _checkpoint_id_file)?
       // TODO: We'll need to rotate this file since it will grow.
       // !@ Hold onto this in a field so we don't open it every time.
-      let file = File(filepath)
+      let file = AsyncJournalledFile(filepath, _the_journal, _auth,
+        _do_local_file_io)
       file.seek_end(0)
 
       _wb.u64_be(checkpoint_id)

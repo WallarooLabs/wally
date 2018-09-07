@@ -49,6 +49,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
+  let _the_journal: SimpleJournal
+  let _do_local_file_io: Bool
   let _joining_existing_cluster: Bool
 
   new iso create(name: String, auth: AmbientAuth,
@@ -57,7 +59,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
     recovery_file: FilePath,
     layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
-    router_registry: RouterRegistry, joining: Bool = false)
+    router_registry: RouterRegistry, the_journal: SimpleJournal,
+    do_local_file_io: Bool, joining: Bool = false)
   =>
     _name = name
     _auth = auth
@@ -69,6 +72,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _the_journal = the_journal
+    _do_local_file_io = do_local_file_io
     _joining_existing_cluster = joining
 
   fun ref listening(listen: DataChannelListener ref) =>
@@ -99,11 +104,12 @@ class DataChannelListenNotifier is DataChannelListenNotify
           _connections.send_control_to_cluster(message)
         end
       end
-      let f = File(_recovery_file)
+      let f = AsyncJournalledFile(_recovery_file, _the_journal, _auth, _do_local_file_io)
       f.print(_host)
       f.print(_service)
       f.sync()
       f.dispose()
+      // TODO: AsyncJournalledFile does not provide implicit sync semantics here
     else
       @printf[I32]((_name + " data: couldn't get local address\n").cstring())
       listen.close()
