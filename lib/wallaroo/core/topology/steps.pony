@@ -632,7 +632,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     _next_checkpoint_id = checkpoint_id + 1
     ifdef "resilience" then
-      StepStateCheckpointter(_runner, _id, checkpoint_id, _event_log)
+      StepStateCheckpointer(_runner, _id, checkpoint_id, _event_log)
     end
 
   be prepare_for_rollback() =>

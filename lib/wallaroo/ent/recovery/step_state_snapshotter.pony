@@ -16,7 +16,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
-primitive StepStateCheckpointter
+primitive StepStateCheckpointer
   fun apply(runner: Runner, id: RoutingId, checkpoint_id: CheckpointId,
     event_log: EventLog, wb: Writer = Writer)
   =>
