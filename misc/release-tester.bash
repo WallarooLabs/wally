@@ -133,20 +133,33 @@ print_results() {
   log "${o}"
   failed_count=0
   total_count=0
+  example_failed_count=0
+  example_total_count=0
   # find all result files
   # shellcheck disable=SC2044
-  for result_file in $(find "${TESTING_TMP}" -name result); do
+  for result_file in $(find "${TESTING_TMP}" -name result  -depth 3 | xargs ls -rt); do
     print_result "$result_file"
     # keep track of number failed and number total
+    (( total_count = total_count + 1 ))
     if [[ "$(cat "$result_file")" == "FAILURE" ]]; then
       (( failed_count = failed_count + 1 ))
+    else
+      # shellcheck disable=SC2044
+      for rf in $(find "${result_dir}/wallaroo-example-tester" -name result | xargs ls -rt); do
+        print_result "$rf"
+        # keep track of number failed and number total
+        (( example_total_count = example_total_count + 1 ))
+        if [[ "$(cat "$rf")" == "FAILURE" ]]; then
+          (( example_failed_count = example_failed_count + 1 ))
+        fi
+      done
     fi
-    (( total_count = total_count + 1 ))
   done
   log "======================================================================="
   log ""
   log "=============================== SUMMARY ==============================="
-  log "${failed_count} out of ${total_count} failed."
+  log "${failed_count} out of ${total_count} distros failed (wallaroo-up or some example)."
+  log "${example_failed_count} out of ${example_total_count} examples failed."
   log "======================================================================="
 
   # if number failed is greater than 0 then exit with an error code
