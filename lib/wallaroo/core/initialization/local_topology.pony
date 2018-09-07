@@ -32,7 +32,7 @@ use "wallaroo/ent/cluster_manager"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/core/data_channel"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
@@ -266,7 +266,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _event_log: EventLog
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReconnecter
-  let _snapshot_initiator: SnapshotInitiator
+  let _checkpoint_initiator: CheckpointInitiator
   let _barrier_initiator: BarrierInitiator
   var _is_initializer: Bool
   var _outgoing_boundary_builders:
@@ -326,7 +326,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     is_initializer: Bool, data_receivers: DataReceivers,
     event_log: EventLog, recovery: Recovery,
     recovery_replayer: RecoveryReconnecter,
-    snapshot_initiator: SnapshotInitiator, barrier_initiator: BarrierInitiator,
+    checkpoint_initiator: CheckpointInitiator, barrier_initiator: BarrierInitiator,
     local_topology_file: String, data_channel_file: String,
     worker_names_file: String, local_keys_filepath: FilePath,
     state_step_creator: StateStepCreator,
@@ -346,7 +346,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _event_log = event_log
     _recovery = recovery
     _recovery_replayer = recovery_replayer
-    _snapshot_initiator = snapshot_initiator
+    _checkpoint_initiator = checkpoint_initiator
     _barrier_initiator = barrier_initiator
     _local_topology_file = local_topology_file
     _data_channel_file = data_channel_file
@@ -358,7 +358,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _router_registry.register_local_topology_initializer(this)
     _state_step_creator = state_step_creator
     _initializables.set(_state_step_creator)
-    _initializables.set(_snapshot_initiator)
+    _initializables.set(_checkpoint_initiator)
     _initializables.set(_barrier_initiator)
 
   be update_topology(t: LocalTopology) =>
@@ -655,15 +655,15 @@ actor LocalTopologyInitializer is LayoutInitializer
   =>
     _target_id_router_blueprints(state_name) = target_id_router.blueprint()
 
-  be rollback_topology_graph(snapshot_id: SnapshotId, action: Promise[None])
+  be rollback_topology_graph(checkpoint_id: CheckpointId, action: Promise[None])
   =>
     @printf[I32]("Rolling back topology graph.\n".cstring())
     let local_keys = _local_keys_file.read_local_keys_and_truncate(
-      snapshot_id)
+      checkpoint_id)
     _router_registry.rollback_state_steps(local_keys, action)
 
   be recover_and_initialize(ws: Array[String] val,
-    target_snapshot_id: SnapshotId,
+    target_checkpoint_id: CheckpointId,
     cluster_initializer: (ClusterInitializer | None) = None)
   =>
     _recovering = true
@@ -696,22 +696,22 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be register_state_step(state_name: StateName, key: Key, r_id: RoutingId,
-    snapshot_id: (SnapshotId | None) = None)
+    checkpoint_id: (CheckpointId | None) = None)
   =>
     // We only add an entry to the local keys file if this is part of a
-    // snapshot.
-    match snapshot_id
-    | let s_id: SnapshotId =>
+    // checkpoint.
+    match checkpoint_id
+    | let s_id: CheckpointId =>
       _local_keys_file.add_key(state_name, key, r_id, s_id)
     end
 
   be unregister_state_step(state_name: StateName, key: Key,
-    snapshot_id: (SnapshotId | None) = None)
+    checkpoint_id: (CheckpointId | None) = None)
   =>
     // We only add an entry to the local keys file if this is part of a
-    // snapshot.
-    match snapshot_id
-    | let s_id: SnapshotId =>
+    // checkpoint.
+    match checkpoint_id
+    | let s_id: CheckpointId =>
       _local_keys_file.remove_key(state_name, key, s_id)
     end
 
@@ -784,12 +784,12 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
-    snapshot_target: (SnapshotId | None) = None)
+    checkpoint_target: (CheckpointId | None) = None)
   =>
     _recovering =
-      match snapshot_target
-      | let id: SnapshotId =>
-        _recovery.update_snapshot_id(id)
+      match checkpoint_target
+      | let id: CheckpointId =>
+        _recovery.update_checkpoint_id(id)
         true
       else
         false
@@ -852,7 +852,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         for w in t.worker_names.values() do
           _barrier_initiator.add_worker(w)
-          _snapshot_initiator.add_worker(w)
+          _checkpoint_initiator.add_worker(w)
         end
 
         _router_registry.set_pre_state_data(t.pre_state_data())
@@ -881,7 +881,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             @printf[I32]("Reading local keys from file.\n".cstring())
             try
               _local_keys_file.read_local_keys_and_truncate(
-                snapshot_target as SnapshotId)
+                checkpoint_target as CheckpointId)
             else
               Fail()
               recover val Map[StateName, Map[Key, RoutingId] val] end
@@ -937,7 +937,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         let state_step_routers = Map[String, TargetIdRouter]
 
         // If this worker has at least one Source, then we'll also need a
-        // a BarrierSource to ensure that snapshot barriers always get to
+        // a BarrierSource to ensure that checkpoint barriers always get to
         // source targets (even if our local Sources pop out of existence
         // for some reason, as when TCPSources disconnect).
         var barrier_source: (BarrierSource | None) = None
@@ -1306,7 +1306,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   try
                     egress_builder(_worker_name, consume sink_reporter,
                       _event_log, _recovering, _barrier_initiator,
-                      _snapshot_initiator, _env, _auth, _outgoing_boundaries)?
+                      _checkpoint_initiator, _env, _auth, _outgoing_boundaries)?
                   else
                     @printf[I32]("Failed to build sink from egress_builder\n"
                       .cstring())
@@ -1791,7 +1791,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               // egress_builder finds it from _outgoing_boundaries
               let sink = egress_builder(_worker_name,
                 consume sink_reporter, _event_log, _recovering,
-                _barrier_initiator, _snapshot_initiator, _env, _auth,
+                _barrier_initiator, _checkpoint_initiator, _env, _auth,
                 _outgoing_boundaries)?
 
               _initializables.set(sink)

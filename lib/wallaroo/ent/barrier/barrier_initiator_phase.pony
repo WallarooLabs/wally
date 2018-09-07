@@ -31,7 +31,7 @@ trait _BarrierInitiatorPhase
     higher priority than any other tokens in progress.
     """
     match t
-    | let srt: SnapshotRollbackBarrierToken =>
+    | let srt: CheckpointRollbackBarrierToken =>
       true
     else
       false
@@ -101,7 +101,7 @@ class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
     result_promise: BarrierResultPromise)
   =>
     match barrier_token
-    | let rbt: SnapshotRollbackBarrierToken =>
+    | let rbt: CheckpointRollbackBarrierToken =>
       _initiator.initiate_barrier(barrier_token, result_promise)
     else
       @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
@@ -112,7 +112,7 @@ class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
     active_barriers: ActiveBarriers)
   =>
     match barrier_token
-    | let rbt: SnapshotRollbackBarrierToken =>
+    | let rbt: CheckpointRollbackBarrierToken =>
       _pending_rollback_barrier_acks.ack_barrier(s, rbt)
     else
       @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
@@ -123,7 +123,7 @@ class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
     active_barriers: ActiveBarriers)
   =>
     match barrier_token
-    | let rbt: SnapshotRollbackBarrierToken =>
+    | let rbt: CheckpointRollbackBarrierToken =>
       _pending_rollback_barrier_acks.worker_ack_barrier_start(w, rbt)
     else
       @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
@@ -134,7 +134,7 @@ class _RecoveringBarrierInitiatorPhase is _BarrierInitiatorPhase
     active_barriers: ActiveBarriers)
   =>
     match barrier_token
-    | let rbt: SnapshotRollbackBarrierToken =>
+    | let rbt: CheckpointRollbackBarrierToken =>
       _pending_rollback_barrier_acks.worker_ack_barrier(w, rbt)
     else
       @printf[I32](("Barrier Initiator recovering so ignoring non-rollback " +
@@ -190,7 +190,7 @@ class _BlockingBarrierInitiatorPhase is _BarrierInitiatorPhase
       _initiator.initiate_barrier(barrier_token, result_promise)
     else
       @printf[I32]("!@ BlockPhase: Queuing barrier %s!\n".cstring(), barrier_token.string().cstring())
-      // !@ We need to ensure that we don't queue snapshots when we're
+      // !@ We need to ensure that we don't queue checkpoints when we're
       // rolling back. This is a crude way to test that.
       if not (_wait_for_token > barrier_token) then
         _initiator.queue_barrier(barrier_token, result_promise)

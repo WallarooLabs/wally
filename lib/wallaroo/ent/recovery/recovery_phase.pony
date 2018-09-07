@@ -18,7 +18,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
@@ -44,7 +44,7 @@ trait _RecoveryPhase
     _invalid_call()
     Fail()
 
-  fun ref worker_ack_topology_rollback(w: WorkerName, snapshot_id: SnapshotId)
+  fun ref worker_ack_topology_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
     _invalid_call()
     Fail()
@@ -53,7 +53,7 @@ trait _RecoveryPhase
     _invalid_call()
     Fail()
 
-  fun ref rollback_barrier_complete(token: SnapshotRollbackBarrierToken) =>
+  fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     _invalid_call()
     Fail()
 
@@ -62,19 +62,19 @@ trait _RecoveryPhase
     Fail()
 
   fun ref ack_recovery_initiated(w: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     _invalid_call()
     Fail()
 
   fun ref rollback_complete(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     _invalid_call()
     Fail()
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
+    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
     recovery._abort_early(worker)
     true
@@ -118,7 +118,7 @@ class _BoundariesReconnect is _RecoveryPhase
     end
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
+    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
     _override_received = true
     _override_worker = worker
@@ -137,32 +137,32 @@ class _PrepareRollback is _RecoveryPhase
 
 class _RollbackTopology is _RecoveryPhase
   let _recovery: Recovery ref
-  let _snapshot_id: SnapshotId
+  let _checkpoint_id: CheckpointId
   let _workers: Array[WorkerName] val
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
-  new create(recovery: Recovery ref, snapshot_id: SnapshotId,
+  new create(recovery: Recovery ref, checkpoint_id: CheckpointId,
     workers: Array[WorkerName] val)
   =>
     _recovery = recovery
     _workers = workers
-    _snapshot_id = snapshot_id
+    _checkpoint_id = checkpoint_id
 
   fun name(): String => "_RollbackTopology"
 
-  fun ref worker_ack_topology_rollback(w: WorkerName, snapshot_id: SnapshotId)
+  fun ref worker_ack_topology_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
     @printf[I32]("!@ _RollbackTopology rcvd ack from %s\n".cstring(), w.cstring())
     //!@ Should we just ignore misses here (which indicate an overlapping
     // recovery)?
-    if snapshot_id == _snapshot_id then
+    if checkpoint_id == _checkpoint_id then
       _acked_workers.set(w)
       _check_completion()
     else
       @printf[I32](("_RollbackTopology received topology rollback ack for " +
-        "snapshot %s, but we're waiting for snapshot %s. Ignoring\n")
-        .cstring(), snapshot_id.string().cstring(),
-        _snapshot_id.string().cstring())
+        "checkpoint %s, but we're waiting for checkpoint %s. Ignoring\n")
+        .cstring(), checkpoint_id.string().cstring(),
+        _checkpoint_id.string().cstring())
     end
 
   fun ref _check_completion() =>
@@ -204,14 +204,14 @@ class _RollbackBarrier is _RecoveryPhase
 
   fun name(): String => "_RollbackBarrier"
 
-  fun ref rollback_barrier_complete(token: SnapshotRollbackBarrierToken) =>
+  fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     _recovery._rollback_barrier_complete(token)
 
 class _AwaitDataReceiversAck is _RecoveryPhase
   let _recovery: Recovery ref
-  let _token: SnapshotRollbackBarrierToken
+  let _token: CheckpointRollbackBarrierToken
 
-  new create(recovery: Recovery ref, token: SnapshotRollbackBarrierToken) =>
+  new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken) =>
     _recovery = recovery
     _token = token
 
@@ -222,11 +222,11 @@ class _AwaitDataReceiversAck is _RecoveryPhase
 
 class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
   let _workers: Array[WorkerName] val
-  let _token: SnapshotRollbackBarrierToken
+  let _token: CheckpointRollbackBarrierToken
   let _recovery: Recovery ref
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
-  new create(token: SnapshotRollbackBarrierToken,
+  new create(token: CheckpointRollbackBarrierToken,
     workers: Array[WorkerName] val, recovery: Recovery ref)
   =>
     _token = token
@@ -236,7 +236,7 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
   fun name(): String => "_AwaitRecoveryInitiatedAcks"
 
   fun ref ack_recovery_initiated(w: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     if token != _token then
       Fail()
@@ -248,11 +248,11 @@ class _AwaitRecoveryInitiatedAcks is _RecoveryPhase
 
 class _Rollback is _RecoveryPhase
   let _recovery: Recovery ref
-  let _token: SnapshotRollbackBarrierToken
+  let _token: CheckpointRollbackBarrierToken
   let _workers: Array[WorkerName] box
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
-  new create(recovery: Recovery ref, token: SnapshotRollbackBarrierToken,
+  new create(recovery: Recovery ref, token: CheckpointRollbackBarrierToken,
     workers: Array[WorkerName] box)
   =>
     _recovery = recovery
@@ -262,7 +262,7 @@ class _Rollback is _RecoveryPhase
   fun name(): String => "_Rollback"
 
   fun ref rollback_complete(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     ifdef debug then
       Invariant(token == _token)
@@ -274,7 +274,7 @@ class _Rollback is _RecoveryPhase
     end
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
+    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
     if token > _token then
       _recovery._abort_early(worker)
@@ -290,7 +290,7 @@ class _FinishedRecovering is _RecoveryPhase
     None
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
+    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
     true
 
@@ -303,27 +303,27 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
   fun ref rollback_prep_complete() =>
     None
 
-  fun ref worker_ack_topology_rollback(w: WorkerName, snapshot_id: SnapshotId)
+  fun ref worker_ack_topology_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
     None
 
-  fun ref rollback_barrier_complete(token: SnapshotRollbackBarrierToken) =>
+  fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     None
 
   fun ref data_receivers_ack() =>
     None
 
   fun ref rollback_complete(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     None
 
   fun ref try_override_recovery(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken, recovery: Recovery ref): Bool
+    token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
     true
 
   fun ref ack_recovery_initiated(w: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     None

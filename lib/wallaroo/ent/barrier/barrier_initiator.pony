@@ -37,7 +37,7 @@ actor BarrierInitiator is Initializable
   of the protocol depend on the BarrierToken and are opaque to the
   BarrierInitiator. That means it can be used as part of different protocols
   if they require general barrier processing behavior (for example,
-  the snapshotting protocol and the protocol checking that all in flight
+  the checkpointting protocol and the protocol checking that all in flight
   messages have been processed).
   """
   let _auth: AmbientAuth
@@ -169,7 +169,7 @@ actor BarrierInitiator is Initializable
       // the system. On a successful match here, we transition to the
       // rollback phase.
       match barrier_token
-      | let srt: SnapshotRollbackBarrierToken =>
+      | let srt: CheckpointRollbackBarrierToken =>
         // Check if this rollback token is higher priority than a current
         // rollback token, in case one is being processed. If it's not, drop
         // it.
@@ -177,7 +177,7 @@ actor BarrierInitiator is Initializable
           _clear_barriers()
           _phase = _RollbackBarrierInitiatorPhase(this, srt)
         end
-      | let srrt: SnapshotRollbackResumeBarrierToken =>
+      | let srrt: CheckpointRollbackResumeBarrierToken =>
         // Check if this rollback token is higher priority than a current
         // rollback token, in case one is being processed. If it's not, drop
         // it.
@@ -216,7 +216,7 @@ actor BarrierInitiator is Initializable
       // the system. On a successful match here, we transition to the
       // rollback phase.
       match barrier_token
-      | let srt: SnapshotRollbackBarrierToken =>
+      | let srt: CheckpointRollbackBarrierToken =>
         // Check if this rollback token is higher priority than a current
         // rollback token, in case one is being processed. If it's not, drop
         // it.
@@ -326,7 +326,7 @@ actor BarrierInitiator is Initializable
     // the system. On a successful match here, we transition to the
     // rollback phase.
     match barrier_token
-    | let srt: SnapshotRollbackBarrierToken =>
+    | let srt: CheckpointRollbackBarrierToken =>
       // Check if this rollback token is higher priority than a current
       // rollback token, in case one is being processed. If it's not, drop
       // it.
@@ -336,7 +336,7 @@ actor BarrierInitiator is Initializable
         @printf[I32]("!@ Switching to _RollbackBarrierInitiatorPhase for %s\n".cstring(), srt.string().cstring())
         _phase = _RollbackBarrierInitiatorPhase(this, srt)
       end
-    | let srrt: SnapshotRollbackResumeBarrierToken =>
+    | let srrt: CheckpointRollbackResumeBarrierToken =>
       // Check if this rollback token is higher priority than a current
       // rollback token, in case one is being processed. If it's not, drop
       // it.
@@ -541,7 +541,7 @@ actor BarrierInitiator is Initializable
     """
     Called in response to primary worker for this barrier token sending
     message that this barrier is complete. We can now inform all local
-    sources (for example, so they can ack messages up to a snapshot).
+    sources (for example, so they can ack messages up to a checkpoint).
     """
     for s in _sources.values() do
       s.barrier_complete(barrier_token)

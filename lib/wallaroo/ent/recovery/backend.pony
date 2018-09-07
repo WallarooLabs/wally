@@ -18,7 +18,7 @@ use "wallaroo_labs/conversions"
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 
@@ -69,23 +69,23 @@ trait Backend
   fun ref sync() ?
   fun ref datasync() ?
   // Rollback from recovery file and return number of entries replayed.
-  fun ref start_rollback(snapshot_id: SnapshotId): USize
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize
   fun ref write(): USize ?
-  fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
-  fun ref encode_snapshot_id(snapshot_id: SnapshotId)
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId)
   fun bytes_written(): USize
 
 class EmptyBackend is Backend
   fun ref sync() => Fail()
   fun ref datasync() => Fail()
-  fun ref start_rollback(snapshot_id: SnapshotId): USize => Fail(); 0
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize => Fail(); 0
   fun ref write(): USize => Fail(); 0
-  fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
     Fail()
-  fun ref encode_snapshot_id(snapshot_id: SnapshotId) => Fail()
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) => Fail()
   fun bytes_written(): USize => 0
 
 class DummyBackend is Backend
@@ -96,13 +96,13 @@ class DummyBackend is Backend
 
   fun ref sync() => None
   fun ref datasync() => None
-  fun ref start_rollback(snapshot_id: SnapshotId): USize => 0
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize => 0
   fun ref write(): USize => 0
-  fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
     None
-  fun ref encode_snapshot_id(snapshot_id: SnapshotId) => None
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) => None
   fun bytes_written(): USize => 0
 
 class FileBackend is Backend
@@ -110,7 +110,7 @@ class FileBackend is Backend
   let _filepath: FilePath
   let _event_log: EventLog ref
   let _writer: Writer iso
-  let _snapshot_id_entry_len: USize = 9 // Bool -- U64
+  let _checkpoint_id_entry_len: USize = 9 // Bool -- U64
   let _log_entry_len: USize = 17 // Bool -- U128
   var _bytes_written: USize = 0
 
@@ -126,10 +126,10 @@ class FileBackend is Backend
   fun bytes_written(): USize =>
     _bytes_written
 
-  fun ref start_rollback(snapshot_id: SnapshotId): USize =>
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize =>
     if _filepath.exists() then
-      @printf[I32](("RESILIENCE: Rolling back to snapshot %s from recovery " +
-        "log file: \n").cstring(), snapshot_id.string().cstring(),
+      @printf[I32](("RESILIENCE: Rolling back to checkpoint %s from recovery " +
+        "log file: \n").cstring(), checkpoint_id.string().cstring(),
         _filepath.path.cstring())
 
       let r = Reader
@@ -143,27 +143,27 @@ class FileBackend is Backend
       var replay_buffer: Array[(RoutingId, ByteSeq val)] ref =
         replay_buffer.create()
 
-      var current_snapshot_id: SnapshotId = 0
+      var current_checkpoint_id: CheckpointId = 0
       if _file.size() > 0 then
-        // Read the initial entry in the file, which should be a snapshot_id,
+        // Read the initial entry in the file, which should be a checkpoint_id,
         // skipping the is_watermark byte
         _file.seek(1)
         r.append(_file.read(8))
-        current_snapshot_id = try r.u64_be()? else Fail(); 0 end
+        current_checkpoint_id = try r.u64_be()? else Fail(); 0 end
 
-        // We need to get to the data for the provided snapshot id. We'll
-        // keep reading until we find the prior snapshot id, at which point
-        // we're lined up with entries for this snapshot.
-        while current_snapshot_id < (snapshot_id - 1) do
+        // We need to get to the data for the provided checkpoint id. We'll
+        // keep reading until we find the prior checkpoint id, at which point
+        // we're lined up with entries for this checkpoint.
+        while current_checkpoint_id < (checkpoint_id - 1) do
           r.append(_file.read(1))
           let is_watermark = BoolConverter.u8_to_bool(
             try r.u8()? else Fail(); 0 end)
 
           if is_watermark then
             r.append(_file.read(8))
-            current_snapshot_id = try r.u64_be()? else Fail(); 0 end
+            current_checkpoint_id = try r.u64_be()? else Fail(); 0 end
           else
-            // Skip this entry since we're looking for the next snapshot id.
+            // Skip this entry since we're looking for the next checkpoint id.
             // First skip resilient_id
             _file.seek(16)
             // Read payload size
@@ -173,11 +173,11 @@ class FileBackend is Backend
             _file.seek(size.isize())
           end
         end
-        @printf[I32]("!@ Backend: Found end of entries for snapshot %s.\n".cstring(), current_snapshot_id.string().cstring())
+        @printf[I32]("!@ Backend: Found end of entries for checkpoint %s.\n".cstring(), current_checkpoint_id.string().cstring())
         r.append(_file.read(1))
-        var end_of_snapshot = BoolConverter.u8_to_bool(
+        var end_of_checkpoint = BoolConverter.u8_to_bool(
           try r.u8()? else Fail(); 0 end)
-        while not end_of_snapshot do
+        while not end_of_checkpoint do
           r.append(_file.read(20))
           let resilient_id = try r.u128_be()? else Fail(); 0 end
           let payload_length = try r.u32_be()? else Fail(); 0 end
@@ -191,14 +191,14 @@ class FileBackend is Backend
           // put entry into temporary recovered buffer
           replay_buffer.push((resilient_id, payload))
 
-          // Check if we're at the end of this snapshot
+          // Check if we're at the end of this checkpoint
           r.append(_file.read(1))
-          end_of_snapshot = BoolConverter.u8_to_bool(
+          end_of_checkpoint = BoolConverter.u8_to_bool(
             try r.u8()? else Fail(); 0 end)
         end
       else
-        @printf[I32](("Trying to rollback to snapshot %s from empty " +
-          "recovery file %s\n").cstring(), snapshot_id.string().cstring())
+        @printf[I32](("Trying to rollback to checkpoint %s from empty " +
+          "recovery file %s\n").cstring(), checkpoint_id.string().cstring())
         Fail()
       end
 
@@ -213,14 +213,14 @@ class FileBackend is Backend
       _event_log.expect_rollback_count(replay_buffer.size())
       for entry in replay_buffer.values() do
         num_replayed = num_replayed + 1
-        _event_log.rollback_from_log_entry(entry._1, entry._2, snapshot_id)
+        _event_log.rollback_from_log_entry(entry._1, entry._2, checkpoint_id)
       end
 
       //!@
       // _file.seek_end(0)
 
       // Truncate rest of file since we are rolling back to an earlier
-      // snapshot.
+      // checkpoint.
       _file.set_length(_file.position())
 
       @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
@@ -243,7 +243,7 @@ class FileBackend is Backend
     end
     _bytes_written
 
-  fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
     ifdef debug then
@@ -252,8 +252,8 @@ class FileBackend is Backend
     end
 
     ifdef "trace" then
-      @printf[I32]("EventLog: Writing Entry for SnapshotId %s\n".cstring(),
-        snapshot_id.string().cstring())
+      @printf[I32]("EventLog: Writing Entry for CheckpointId %s\n".cstring(),
+        checkpoint_id.string().cstring())
     end
 
     var payload_size: USize = 0
@@ -267,15 +267,15 @@ class FileBackend is Backend
     _writer.u32_be(payload_size.u32())
     _writer.writev(payload)
 
-  fun ref encode_snapshot_id(snapshot_id: SnapshotId) =>
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) =>
     ifdef "trace" then
-      @printf[I32]("EventLog: Writing SnapshotId for SnapshotId %s\n"
-        .cstring(), snapshot_id.string().cstring())
+      @printf[I32]("EventLog: Writing CheckpointId for CheckpointId %s\n"
+        .cstring(), checkpoint_id.string().cstring())
     end
 
     // This is a watermark so write true
     _writer.u8(BoolConverter.bool_to_u8(true))
-    _writer.u64_be(snapshot_id)
+    _writer.u64_be(checkpoint_id)
 
   fun ref sync() ? =>
     _file.sync()
@@ -293,7 +293,7 @@ class FileBackend is Backend
       error
     end
 
-//!@ Manage this with new snapshot approach.
+//!@ Manage this with new checkpoint approach.
 class RotatingFileBackend is Backend
   // _basepath identifies the worker
   // For unique file identifier, we use the sum of payload sizes saved as a
@@ -337,8 +337,8 @@ class RotatingFileBackend is Backend
 
   fun ref datasync() ? => _backend.datasync()?
 
-  fun ref start_rollback(snapshot_id: SnapshotId): USize =>
-    _backend.start_rollback(snapshot_id)
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize =>
+    _backend.start_rollback(checkpoint_id)
 
   fun ref write(): USize ? =>
     let bytes_written' = _backend.write()?
@@ -353,13 +353,13 @@ class RotatingFileBackend is Backend
     end
     bytes_written'
 
-  fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
-    _backend.encode_entry(resilient_id, snapshot_id, payload)
+    _backend.encode_entry(resilient_id, checkpoint_id, payload)
 
-  fun ref encode_snapshot_id(snapshot_id: SnapshotId) =>
-    _backend.encode_snapshot_id(snapshot_id)
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) =>
+    _backend.encode_checkpoint_id(checkpoint_id)
 
   fun ref rotate_file() ? =>
     // only do this if current backend has actually written anything

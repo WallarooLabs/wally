@@ -87,9 +87,9 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
   =>
     // Drop anything that's not related to rollback
     match token
-    | let srt: SnapshotRollbackBarrierToken =>
+    | let srt: CheckpointRollbackBarrierToken =>
       _data_receiver.send_barrier(input_id, output_id, token, seq_id)
-    | let srt: SnapshotRollbackResumeBarrierToken =>
+    | let srt: CheckpointRollbackResumeBarrierToken =>
       _data_receiver.send_barrier(input_id, output_id, token, seq_id)
     else
       ifdef debug then

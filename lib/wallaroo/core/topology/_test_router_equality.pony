@@ -28,7 +28,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
@@ -246,7 +246,7 @@ primitive _RouterRegistryGenerator
       _ConnectionsGenerator(env, auth), _StateStepCreatorGenerator(auth),
       _DummyRecoveryFileCleaner, 0,
       false, "", _BarrierInitiatorGenerator(env, auth),
-      _SnapshotInitiatorGenerator(env, auth),
+      _CheckpointInitiatorGenerator(env, auth),
       _AutoscaleInitiatorGenerator(env, auth))
 
 primitive _BarrierInitiatorGenerator
@@ -258,9 +258,9 @@ primitive _AutoscaleInitiatorGenerator
   fun apply(env: Env, auth: AmbientAuth): AutoscaleInitiator =>
     AutoscaleInitiator("w", _BarrierInitiatorGenerator(env, auth))
 
-primitive _SnapshotInitiatorGenerator
-  fun apply(env: Env, auth: AmbientAuth): SnapshotInitiator =>
-    SnapshotInitiator(auth, "", "", _ConnectionsGenerator(env, auth), 1,
+primitive _CheckpointInitiatorGenerator
+  fun apply(env: Env, auth: AmbientAuth): CheckpointInitiator =>
+    CheckpointInitiator(auth, "", "", _ConnectionsGenerator(env, auth), 1,
       EventLog("w1"), _BarrierInitiatorGenerator(env, auth), "", false)
 
 primitive _DataReceiversGenerator

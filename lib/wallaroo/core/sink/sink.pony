@@ -23,7 +23,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 
 trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
   fun inputs(): Map[RoutingId, Producer] box
@@ -34,5 +34,5 @@ interface val SinkConfig[Out: Any val]
 interface val SinkBuilder
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
-    barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
+    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
     recovering: Bool): Sink

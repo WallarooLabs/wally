@@ -4,33 +4,33 @@ use "promises"
 use "wallaroo/core/common"
 use "wallaroo/core/invariant"
 use "wallaroo/ent/barrier"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 
 trait _EventLogPhase
   fun name(): String
 
-  fun ref initiate_snapshot(snapshot_id: SnapshotId,
-    action: Promise[SnapshotId], event_log: EventLog ref)
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
+    action: Promise[CheckpointId], event_log: EventLog ref)
   =>
-    event_log._initiate_snapshot(snapshot_id, action)
+    event_log._initiate_checkpoint(checkpoint_id, action)
 
-  fun ref snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
     _invalid_call()
     Fail()
 
-  fun ref write_initial_snapshot_id(snapshot_id: SnapshotId) =>
+  fun ref write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
     _invalid_call()
     Fail()
 
-  fun ref write_snapshot_id(snapshot_id: SnapshotId) =>
+  fun ref write_checkpoint_id(checkpoint_id: CheckpointId) =>
     _invalid_call()
     Fail()
 
-  fun ref snapshot_id_written(snapshot_id: SnapshotId) =>
+  fun ref checkpoint_id_written(checkpoint_id: CheckpointId) =>
     _invalid_call()
     Fail()
 
@@ -54,35 +54,35 @@ class _InitialEventLogPhase is _EventLogPhase
   fun name(): String => "_InitialEventLogPhase"
 
 class _NormalEventLogPhase is _EventLogPhase
-  let _next_snapshot_id: SnapshotId
+  let _next_checkpoint_id: CheckpointId
   let _event_log: EventLog ref
 
-  new create(next_snapshot_id: SnapshotId, event_log: EventLog ref) =>
-    _next_snapshot_id = next_snapshot_id
+  new create(next_checkpoint_id: CheckpointId, event_log: EventLog ref) =>
+    _next_checkpoint_id = next_checkpoint_id
     _event_log = event_log
 
-  fun ref write_initial_snapshot_id(snapshot_id: SnapshotId) =>
-    _event_log._write_snapshot_id(snapshot_id)
+  fun ref write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
+    _event_log._write_checkpoint_id(checkpoint_id)
 
-  fun ref snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
-    // @printf[I32]("!@ _NormalEventLogPhase: snapshot_state() for snapshot_id %s\n".cstring(), snapshot_id.string().cstring())
+    // @printf[I32]("!@ _NormalEventLogPhase: checkpoint_state() for checkpoint_id %s\n".cstring(), checkpoint_id.string().cstring())
 
     ifdef debug then
-      Invariant(snapshot_id == _next_snapshot_id)
+      Invariant(checkpoint_id == _next_checkpoint_id)
     end
     ifdef "trace" then
-      @printf[I32]("Snapshotting state for resilient %s, snapshot id %s\n"
+      @printf[I32]("Checkpointting state for resilient %s, checkpoint id %s\n"
         .cstring(), resilient_id.string().cstring(),
-        _next_snapshot_id.string().cstring())
+        _next_checkpoint_id.string().cstring())
     end
 
     if payload.size() > 0 then
-      _event_log._snapshot_state(resilient_id, snapshot_id, payload)
+      _event_log._checkpoint_state(resilient_id, checkpoint_id, payload)
     end
 
-  fun ref snapshot_id_written(snapshot_id: SnapshotId) =>
+  fun ref checkpoint_id_written(checkpoint_id: CheckpointId) =>
     None
 
   fun name(): String => "_NormalEventLogPhase"
@@ -95,75 +95,75 @@ class _RecoveringEventLogPhase is _EventLogPhase
 
   fun name(): String => "_RecoveringEventLogPhase"
 
-  fun ref initiate_snapshot(snapshot_id: SnapshotId,
-    action: Promise[SnapshotId], event_log: EventLog ref)
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
+    action: Promise[CheckpointId], event_log: EventLog ref)
   =>
-    @printf[I32]("EventLog: Recovering so ignoring initiate snapshot id %s\n"
-      .cstring(), snapshot_id.string().cstring())
+    @printf[I32]("EventLog: Recovering so ignoring initiate checkpoint id %s\n"
+      .cstring(), checkpoint_id.string().cstring())
 
-  fun ref snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
-    @printf[I32](("EventLog: Recovering so ignoring snapshot state for " +
+    @printf[I32](("EventLog: Recovering so ignoring checkpoint state for " +
       "resilient %s\n").cstring(), resilient_id.string().cstring())
 
-class _SnapshotEventLogPhase is _EventLogPhase
+class _CheckpointEventLogPhase is _EventLogPhase
   let _event_log: EventLog ref
-  let _snapshot_id: SnapshotId
-  let _action: Promise[SnapshotId]
+  let _checkpoint_id: CheckpointId
+  let _action: Promise[CheckpointId]
 
-  new create(event_log: EventLog ref, snapshot_id: SnapshotId,
-    action: Promise[SnapshotId])
+  new create(event_log: EventLog ref, checkpoint_id: CheckpointId,
+    action: Promise[CheckpointId])
   =>
     _event_log = event_log
-    _snapshot_id = snapshot_id
+    _checkpoint_id = checkpoint_id
     _action = action
 
-  fun name(): String => "_SnapshotEventLogPhase"
+  fun name(): String => "_CheckpointEventLogPhase"
 
-  fun ref snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
-    // @printf[I32]("!@ _SnapshotEventLogPhase: snapshot_state()\n".cstring())
+    // @printf[I32]("!@ _CheckpointEventLogPhase: checkpoint_state()\n".cstring())
 
     ifdef debug then
-      Invariant(snapshot_id == _snapshot_id)
+      Invariant(checkpoint_id == _checkpoint_id)
     end
     ifdef "trace" then
-      @printf[I32]("Snapshotting state for resilient %s, snapshot id %s\n"
+      @printf[I32]("Checkpointting state for resilient %s, checkpoint id %s\n"
         .cstring(), resilient_id.string().cstring(),
-        _snapshot_id.string().cstring())
+        _checkpoint_id.string().cstring())
     end
 
     if payload.size() > 0 then
-      _event_log._snapshot_state(resilient_id, snapshot_id, payload)
+      _event_log._checkpoint_state(resilient_id, checkpoint_id, payload)
     end
 
-  fun ref write_snapshot_id(snapshot_id: SnapshotId) =>
+  fun ref write_checkpoint_id(checkpoint_id: CheckpointId) =>
     ifdef debug then
-      Invariant(snapshot_id == _snapshot_id)
+      Invariant(checkpoint_id == _checkpoint_id)
     end
-    _event_log._write_snapshot_id(snapshot_id)
+    _event_log._write_checkpoint_id(checkpoint_id)
 
-  fun ref snapshot_id_written(snapshot_id: SnapshotId) =>
-    // @printf[I32]("!@ _SnapshotEventLogPhase: snapshot_id_written()\n".cstring())
+  fun ref checkpoint_id_written(checkpoint_id: CheckpointId) =>
+    // @printf[I32]("!@ _CheckpointEventLogPhase: checkpoint_id_written()\n".cstring())
     ifdef debug then
-      Invariant(snapshot_id == _snapshot_id)
+      Invariant(checkpoint_id == _checkpoint_id)
     end
-    _action(snapshot_id)
-    _event_log.snapshot_complete(snapshot_id)
+    _action(checkpoint_id)
+    _event_log.checkpoint_complete(checkpoint_id)
 
 class _RollbackEventLogPhase is _EventLogPhase
   let _event_log: EventLog ref
-  let _action: Promise[SnapshotRollbackBarrierToken]
-  let _token: SnapshotRollbackBarrierToken
+  let _action: Promise[CheckpointRollbackBarrierToken]
+  let _token: CheckpointRollbackBarrierToken
   let _resilients_acked: SetIs[RoutingId] = _resilients_acked.create()
 
   // !@ This indicates we need another phase
   var _rollback_count: USize = 0
 
-  new create(event_log: EventLog ref, token: SnapshotRollbackBarrierToken,
-    action: Promise[SnapshotRollbackBarrierToken])
+  new create(event_log: EventLog ref, token: CheckpointRollbackBarrierToken,
+    action: Promise[CheckpointRollbackBarrierToken])
   =>
     _event_log = event_log
     _action = action
@@ -190,4 +190,4 @@ class _RollbackEventLogPhase is _EventLogPhase
 
   fun ref _complete() =>
     _action(_token)
-    _event_log.rollback_complete(_token.snapshot_id)
+    _event_log.rollback_complete(_token.checkpoint_id)

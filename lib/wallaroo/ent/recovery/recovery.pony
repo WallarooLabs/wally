@@ -18,7 +18,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
 
@@ -51,30 +51,30 @@ actor Recovery
   //!@ Can we remove this?
   let _event_log: EventLog
   let _recovery_reconnecter: RecoveryReconnecter
-  let _snapshot_initiator: SnapshotInitiator
+  let _checkpoint_initiator: CheckpointInitiator
   let _connections: Connections
   let _router_registry: RouterRegistry
   var _initializer: (LocalTopologyInitializer | None) = None
   let _data_receivers: DataReceivers
-  // The snapshot id we are recovering to if we're recovering
-  var _snapshot_id: (SnapshotId | None) = None
+  // The checkpoint id we are recovering to if we're recovering
+  var _checkpoint_id: (CheckpointId | None) = None
 
   new create(auth: AmbientAuth, worker_name: WorkerName, event_log: EventLog,
     recovery_reconnecter: RecoveryReconnecter,
-    snapshot_initiator: SnapshotInitiator, connections: Connections,
+    checkpoint_initiator: CheckpointInitiator, connections: Connections,
     router_registry: RouterRegistry, data_receivers: DataReceivers)
   =>
     _auth = auth
     _worker_name = worker_name
     _event_log = event_log
     _recovery_reconnecter = recovery_reconnecter
-    _snapshot_initiator = snapshot_initiator
+    _checkpoint_initiator = checkpoint_initiator
     _connections = connections
     _router_registry = router_registry
     _data_receivers = data_receivers
 
-  be update_snapshot_id(s_id: SnapshotId) =>
-    _snapshot_id = s_id
+  be update_checkpoint_id(s_id: CheckpointId) =>
+    _checkpoint_id = s_id
 
   be start_recovery(initializer: LocalTopologyInitializer,
     workers: Array[WorkerName] val)
@@ -90,25 +90,25 @@ actor Recovery
   be rollback_prep_complete() =>
     _recovery_phase.rollback_prep_complete()
 
-  be worker_ack_topology_rollback(w: WorkerName, s_id: SnapshotId) =>
+  be worker_ack_topology_rollback(w: WorkerName, s_id: CheckpointId) =>
     _recovery_phase.worker_ack_topology_rollback(w, s_id)
 
   be worker_ack_register_producers(w: WorkerName) =>
     _recovery_phase.worker_ack_register_producers(w)
 
-  be rollback_barrier_complete(token: SnapshotRollbackBarrierToken) =>
+  be rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     _recovery_phase.rollback_barrier_complete(token)
 
   be data_receivers_ack() =>
     _recovery_phase.data_receivers_ack()
 
   be rollback_complete(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     _recovery_phase.rollback_complete(worker, token)
 
   be recovery_initiated_at_worker(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     let overriden = _recovery_phase.try_override_recovery(worker, token,
       this)
@@ -127,7 +127,7 @@ actor Recovery
     end
 
   be ack_recovery_initiated(worker: WorkerName,
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     _recovery_phase.ack_recovery_initiated(worker, token)
 
@@ -162,21 +162,21 @@ actor Recovery
       @printf[I32]("|~~ - Recovery Phase: Rollback Topology Graph - ~~|\n"
         .cstring())
       try
-        let snapshot_id = _snapshot_id as SnapshotId
-        _recovery_phase = _RollbackTopology(this, snapshot_id, _workers)
+        let checkpoint_id = _checkpoint_id as CheckpointId
+        _recovery_phase = _RollbackTopology(this, checkpoint_id, _workers)
 
         //!@ Tell someone to start rolling back topology
         let action = Promise[None]
         action.next[None]({(n: None) =>
-          _self.worker_ack_topology_rollback(_worker_name, snapshot_id)
+          _self.worker_ack_topology_rollback(_worker_name, checkpoint_id)
         })
         (_initializer as LocalTopologyInitializer)
-          .rollback_topology_graph(snapshot_id, action)
+          .rollback_topology_graph(checkpoint_id, action)
 
         // Inform cluster to rollback topology graph
         try
           let msg = ChannelMsgEncoder.rollback_topology_graph(_worker_name,
-            snapshot_id, _auth)?
+            checkpoint_id, _auth)?
           _connections.send_control_to_cluster(msg)
         else
           Fail()
@@ -213,18 +213,18 @@ actor Recovery
   fun ref _register_producers_complete() =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
-      let action = Promise[SnapshotRollbackBarrierToken]
-      action.next[None]({(token: SnapshotRollbackBarrierToken) =>
+      let action = Promise[CheckpointRollbackBarrierToken]
+      action.next[None]({(token: CheckpointRollbackBarrierToken) =>
         _self.rollback_barrier_complete(token)
       })
-      _snapshot_initiator.initiate_rollback(action, _worker_name)
+      _checkpoint_initiator.initiate_rollback(action, _worker_name)
 
       _recovery_phase = _RollbackBarrier(this)
     else
       _recovery_complete()
     end
 
-  fun ref _rollback_barrier_complete(token: SnapshotRollbackBarrierToken) =>
+  fun ref _rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: AwaitDataReceiversAck - ~~|\n"
         .cstring())
@@ -232,7 +232,7 @@ actor Recovery
       _recovery_phase = _AwaitDataReceiversAck(this, token)
     end
 
-  fun ref _data_receivers_ack_complete(token: SnapshotRollbackBarrierToken) =>
+  fun ref _data_receivers_ack_complete(token: CheckpointRollbackBarrierToken) =>
     ifdef "resilience" then
       @printf[I32](("|~~ - Recovery Phase: Await Recovery Initiated Acks " +
         "- ~~| \n").cstring())
@@ -250,13 +250,13 @@ actor Recovery
     end
 
   fun ref _recovery_initiated_acks_complete(
-    token: SnapshotRollbackBarrierToken)
+    token: CheckpointRollbackBarrierToken)
   =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback - ~~|\n".cstring())
 
       _recovery_phase = _Rollback(this, token, _workers)
-      let action = Promise[SnapshotRollbackBarrierToken]
+      let action = Promise[CheckpointRollbackBarrierToken]
       action.next[None](recover this~rollback_complete(_worker_name) end)
       _event_log.initiate_rollback(token, action)
 
@@ -288,7 +288,7 @@ actor Recovery
       Fail()
     end
 
-    _snapshot_initiator.resume_snapshot()
+    _checkpoint_initiator.resume_checkpoint()
 
   fun ref _abort_early(worker: WorkerName) =>
     """

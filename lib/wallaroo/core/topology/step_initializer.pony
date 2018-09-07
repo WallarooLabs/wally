@@ -24,7 +24,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
@@ -171,7 +171,7 @@ class val EgressBuilder
   fun apply(worker_name: String, reporter: MetricsReporter ref,
     event_log: EventLog, recovering: Bool,
     barrier_initiator: BarrierInitiator,
-    snapshot_initiator: SnapshotInitiator, env: Env, auth: AmbientAuth,
+    checkpoint_initiator: CheckpointInitiator, env: Env, auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val =
       recover Map[String, OutgoingBoundary] end): Consumer ?
   =>
@@ -187,7 +187,7 @@ class val EgressBuilder
       match _sink_builder
       | let sb: SinkBuilder =>
         sb(_name, event_log, reporter.clone(), env, barrier_initiator,
-          snapshot_initiator, recovering)
+          checkpoint_initiator, recovering)
       else
         EmptySink
       end

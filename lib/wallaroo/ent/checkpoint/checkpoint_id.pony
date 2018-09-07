@@ -10,6 +10,4 @@ the License. You may obtain a copy of the License at
 
 */
 
-
-trait tag Snapshottable
-  fun ref snapshot_state(snapshot_id: SnapshotId)
+type CheckpointId is U64

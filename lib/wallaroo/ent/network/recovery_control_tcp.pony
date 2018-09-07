@@ -58,7 +58,7 @@ class RecoveryControlSenderConnectNotifier is TCPConnectionNotify
       match msg
       | let m: InformRecoveringWorkerMsg =>
         @printf[I32]("***Received cluster information!***\n".cstring())
-        _startup.recover_and_initialize(m.snapshot_id)
+        _startup.recover_and_initialize(m.checkpoint_id)
       | let m: CleanShutdownMsg =>
         @printf[I32]("Shutting down early: %s\n".cstring(), m.msg.cstring())
         _startup.dispose()

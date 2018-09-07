@@ -38,7 +38,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
@@ -82,7 +82,7 @@ actor TCPSink is Sink
   var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
   let _barrier_initiator: BarrierInitiator
   var _barrier_acker: (BarrierSinkAcker | None) = None
-  let _snapshot_initiator: SnapshotInitiator
+  let _checkpoint_initiator: CheckpointInitiator
   // Steplike
   let _sink_id: RoutingId
   let _event_log: EventLog
@@ -142,7 +142,7 @@ actor TCPSink is Sink
   new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: TCPEncoderWrapper,
     metrics_reporter: MetricsReporter iso,
-    barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
+    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
     host: String, service: String, initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
     reconnect_pause: U64 = 10_000_000_000)
@@ -159,7 +159,7 @@ actor TCPSink is Sink
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _barrier_initiator = barrier_initiator
-    _snapshot_initiator = snapshot_initiator
+    _checkpoint_initiator = checkpoint_initiator
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
@@ -288,7 +288,7 @@ actor TCPSink is Sink
 
   be register_producer(id: RoutingId, producer: Producer) =>
     @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
-    // If we have at least one input, then we are involved in snapshotting.
+    // If we have at least one input, then we are involved in checkpointting.
     if _inputs.size() == 0 then
       _barrier_initiator.register_sink(this)
       _event_log.register_resilient(_sink_id, this)
@@ -319,7 +319,7 @@ actor TCPSink is Sink
         _upstreams.unset(producer)
       end
 
-      // If we have no inputs, then we are not involved in snapshotting.
+      // If we have no inputs, then we are not involved in checkpointting.
       if _inputs.size() == 0 then
         _barrier_initiator.unregister_sink(this)
         _event_log.unregister_resilient(_sink_id, this)
@@ -342,7 +342,7 @@ actor TCPSink is Sink
     barrier_token: BarrierToken)
   =>
     match barrier_token
-    | let srt: SnapshotRollbackBarrierToken =>
+    | let srt: CheckpointRollbackBarrierToken =>
       try
         let b_acker = _barrier_acker as BarrierSinkAcker
         if b_acker.higher_priority(srt) then
@@ -378,20 +378,20 @@ actor TCPSink is Sink
       Invariant(_message_processor.barrier_in_progress())
     end
     match barrier_token
-    | let sbt: SnapshotBarrierToken =>
-      snapshot_state(sbt.id)
+    | let sbt: CheckpointBarrierToken =>
+      checkpoint_state(sbt.id)
     end
     _message_processor.flush()
     _message_processor = NormalSinkMessageProcessor(this)
 
   ///////////////
-  // SNAPSHOTS
+  // CHECKPOINTS
   ///////////////
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     """
-    TCPSinks don't currently write out any data as part of the snapshot.
+    TCPSinks don't currently write out any data as part of the checkpoint.
     """
-    _event_log.snapshot_state(_sink_id, snapshot_id,
+    _event_log.checkpoint_state(_sink_id, checkpoint_id,
       recover val Array[ByteSeq] end)
 
   be prepare_for_rollback() =>
@@ -407,7 +407,7 @@ actor TCPSink is Sink
     _message_processor = NormalSinkMessageProcessor(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     """
     There is nothing for a TCPSink to rollback to.

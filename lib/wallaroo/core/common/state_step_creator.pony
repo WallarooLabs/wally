@@ -24,7 +24,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 class _PendingStep
@@ -32,16 +32,16 @@ class _PendingStep
   let key: Key
   let routing_id: RoutingId
   // If this is a step being created during normal operation (i.e. not during
-  // recovery), then we need to mark which snapshot it belongs to.
-  let snapshot_id: (SnapshotId | None)
+  // recovery), then we need to mark which checkpoint it belongs to.
+  let checkpoint_id: (CheckpointId | None)
 
   new create(s: StateName, k: Key, r_id: RoutingId,
-    s_id: (SnapshotId | None) = None)
+    s_id: (CheckpointId | None) = None)
   =>
     state_name = s
     key = k
     routing_id = r_id
-    snapshot_id = s_id
+    checkpoint_id = s_id
 
 actor StateStepCreator is Initializable
   var _keys_to_steps: LocalStatePartitions = _keys_to_steps.create()
@@ -116,7 +116,7 @@ actor StateStepCreator is Initializable
     end
 
   be report_unknown_key(producer: Producer, state_name: String, key: Key,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     """
     Creates a new step to handle a previously unknown key if a step does not
@@ -128,7 +128,7 @@ actor StateStepCreator is Initializable
     """
     if not _state_key_is_known(state_name, key) then
       let id = _routing_id_gen()
-      _create_state_step(state_name, key, id, snapshot_id)
+      _create_state_step(state_name, key, id, checkpoint_id)
     end
 
   be set_router_registry(router_registry: RouterRegistry) =>
@@ -167,7 +167,7 @@ actor StateStepCreator is Initializable
       try
         (_router_registry as RouterRegistry).register_state_step(step,
           pending_step.state_name, pending_step.key,
-          pending_step.routing_id, pending_step.snapshot_id)
+          pending_step.routing_id, pending_step.checkpoint_id)
       else
         @printf[I32]("StateStepCreator must have a RouterRegistry.\n"
           .cstring())
@@ -209,7 +209,7 @@ actor StateStepCreator is Initializable
     promise(None)
 
   fun ref _create_state_step(state_name: StateName, key: Key, id: RoutingId,
-    snapshot_id: (SnapshotId | None) = None)
+    checkpoint_id: (CheckpointId | None) = None)
   =>
     _state_key_known(state_name, key)
 
@@ -231,7 +231,7 @@ actor StateStepCreator is Initializable
       _keys_to_step_ids.add(state_name, key, id)
 
       _pending_steps(state_step) =
-        _PendingStep(state_name, key, id, snapshot_id)
+        _PendingStep(state_name, key, id, checkpoint_id)
       state_step.quick_initialize(this)
     else
       @printf[I32]("Failed to create new step\n".cstring())

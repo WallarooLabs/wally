@@ -20,14 +20,14 @@ use "wallaroo/core/messages"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 
 trait tag Resilient
   be prepare_for_rollback()
   be rollback(payload: ByteSeq val, event_log: EventLog,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
 
 class val EventLogConfig
   let log_dir: (FilePath | AmbientAuth | None)
@@ -67,11 +67,11 @@ actor EventLog
   //!@ I don't think we need this
   var _initialized: Bool = false
   var _recovery: (Recovery | None) = None
-  var _resilients_to_snapshot: SetIs[RoutingId] =
-    _resilients_to_snapshot.create()
+  var _resilients_to_checkpoint: SetIs[RoutingId] =
+    _resilients_to_checkpoint.create()
   var _rotating: Bool = false
   //!@ What do we do with this?
-  var _backend_bytes_after_snapshot: USize
+  var _backend_bytes_after_checkpoint: USize
 
   var _phase: _EventLogPhase = _InitialEventLogPhase
 
@@ -82,7 +82,7 @@ actor EventLog
   =>
     _worker_name = worker
     _config = event_log_config
-    _backend_bytes_after_snapshot = _backend.bytes_written()
+    _backend_bytes_after_checkpoint = _backend.bytes_written()
     _backend = match _config.filename
       | let f: String val =>
         try
@@ -140,35 +140,35 @@ actor EventLog
     end
 
   /////////////////
-  // SNAPSHOT
+  // CHECKPOINT
   /////////////////
-  be initiate_snapshot(snapshot_id: SnapshotId, action: Promise[SnapshotId]) =>
-    @printf[I32]("!@ EventLog: initiate_snapshot\n".cstring())
-    _phase.initiate_snapshot(snapshot_id, action, this)
+  be initiate_checkpoint(checkpoint_id: CheckpointId, action: Promise[CheckpointId]) =>
+    @printf[I32]("!@ EventLog: initiate_checkpoint\n".cstring())
+    _phase.initiate_checkpoint(checkpoint_id, action, this)
 
-  be snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  be checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
-    _phase.snapshot_state(resilient_id, snapshot_id, payload)
+    _phase.checkpoint_state(resilient_id, checkpoint_id, payload)
 
-  fun ref _initiate_snapshot(snapshot_id: SnapshotId,
-    action: Promise[SnapshotId])
+  fun ref _initiate_checkpoint(checkpoint_id: CheckpointId,
+    action: Promise[CheckpointId])
   =>
-    _phase = _SnapshotEventLogPhase(this, snapshot_id, action)
+    _phase = _CheckpointEventLogPhase(this, checkpoint_id, action)
 
-  fun ref _snapshot_state(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref _checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
   =>
-    _queue_log_entry(resilient_id, snapshot_id, payload)
+    _queue_log_entry(resilient_id, checkpoint_id, payload)
 
-  fun ref _queue_log_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
+  fun ref _queue_log_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val, force_write: Bool = false)
   =>
     ifdef "resilience" then
       // add to backend buffer after encoding
       // encode right away to amortize encoding cost per entry when received
       // as opposed to when writing a batch to disk
-      _backend.encode_entry(resilient_id, snapshot_id, payload)
+      _backend.encode_entry(resilient_id, checkpoint_id, payload)
 
       num_encoded = num_encoded + 1
 
@@ -180,21 +180,21 @@ actor EventLog
       None
     end
 
-  be write_initial_snapshot_id(snapshot_id: SnapshotId) =>
-    _phase.write_initial_snapshot_id(snapshot_id)
+  be write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
+    _phase.write_initial_checkpoint_id(checkpoint_id)
 
-  be write_snapshot_id(snapshot_id: SnapshotId) =>
-    _phase.write_snapshot_id(snapshot_id)
+  be write_checkpoint_id(checkpoint_id: CheckpointId) =>
+    _phase.write_checkpoint_id(checkpoint_id)
 
-  fun ref _write_snapshot_id(snapshot_id: SnapshotId) =>
-    // @printf[I32]("!@ EventLog: write_snapshot_id\n".cstring())
-    _backend.encode_snapshot_id(snapshot_id)
-    _phase.snapshot_id_written(snapshot_id)
+  fun ref _write_checkpoint_id(checkpoint_id: CheckpointId) =>
+    // @printf[I32]("!@ EventLog: write_checkpoint_id\n".cstring())
+    _backend.encode_checkpoint_id(checkpoint_id)
+    _phase.checkpoint_id_written(checkpoint_id)
 
-  fun ref snapshot_complete(snapshot_id: SnapshotId) =>
-    // @printf[I32]("!@ EventLog: snapshot_complete()\n".cstring())
+  fun ref checkpoint_complete(checkpoint_id: CheckpointId) =>
+    // @printf[I32]("!@ EventLog: checkpoint_complete()\n".cstring())
     write_log()
-    _phase = _NormalEventLogPhase(snapshot_id + 1, this)
+    _phase = _NormalEventLogPhase(checkpoint_id + 1, this)
 
   /////////////////
   // ROLLBACK
@@ -212,15 +212,15 @@ actor EventLog
       p(None)
     end
 
-  be initiate_rollback(token: SnapshotRollbackBarrierToken,
-    action: Promise[SnapshotRollbackBarrierToken])
+  be initiate_rollback(token: CheckpointRollbackBarrierToken,
+    action: Promise[CheckpointRollbackBarrierToken])
   =>
     _phase = _RollbackEventLogPhase(this, token, action)
 
     // If we have no resilients on this worker for some reason, then we
     // should abort rollback early.
     if _resilients.size() > 0 then
-      let entries = _backend.start_rollback(token.snapshot_id)
+      let entries = _backend.start_rollback(token.checkpoint_id)
       if entries == 0 then
         _phase.complete_early()
       end
@@ -232,10 +232,10 @@ actor EventLog
     _phase.expect_rollback_count(count)
 
   fun ref rollback_from_log_entry(resilient_id: RoutingId,
-    payload: ByteSeq val, snapshot_id: SnapshotId)
+    payload: ByteSeq val, checkpoint_id: CheckpointId)
   =>
     try
-      _resilients(resilient_id)?.rollback(payload, this, snapshot_id)
+      _resilients(resilient_id)?.rollback(payload, this, checkpoint_id)
     else
       //!@ Update message
       @printf[I32](("Can't find resilient for rollback data\n").cstring())
@@ -246,8 +246,8 @@ actor EventLog
   be ack_rollback(resilient_id: RoutingId) =>
     _phase.ack_rollback(resilient_id)
 
-  fun ref rollback_complete(snapshot_id: SnapshotId) =>
-    _phase = _NormalEventLogPhase(snapshot_id + 1, this)
+  fun ref rollback_complete(checkpoint_id: CheckpointId) =>
+    _phase = _NormalEventLogPhase(checkpoint_id + 1, this)
 
 
 
@@ -362,7 +362,7 @@ actor EventLog
     if _rotating then
       @printf[I32](("Event log rotation already ongoing. Rotate log request "
         + "ignored.\n").cstring())
-    elseif _backend.bytes_written() > _backend_bytes_after_snapshot then
+    elseif _backend.bytes_written() > _backend_bytes_after_checkpoint then
       @printf[I32]("Starting event log rotation.\n".cstring())
       _rotating = true
       _log_rotation_id = _log_rotation_id + 1
@@ -413,7 +413,7 @@ actor EventLog
     try
       _backend.sync()?
       _backend.datasync()?
-      _backend_bytes_after_snapshot = _backend.bytes_written()
+      _backend_bytes_after_checkpoint = _backend.bytes_written()
       let rotation_resume_action = Promise[BarrierToken]
       try
         (_barrier_initiator as BarrierInitiator).inject_barrier(

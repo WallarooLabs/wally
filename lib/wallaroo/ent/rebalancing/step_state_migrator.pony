@@ -15,7 +15,7 @@ use "serialise"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 class val ShippedState
@@ -39,7 +39,7 @@ primitive StepStateMigrator
     end
 
   fun send_state(runner: Runner, id: RoutingId, boundary: OutgoingBoundary,
-    state_name: String, key: Key, snapshot_id: SnapshotId, auth: AmbientAuth)
+    state_name: String, key: Key, checkpoint_id: CheckpointId, auth: AmbientAuth)
   =>
     match runner
     | let r: SerializableStateRunner =>
@@ -52,7 +52,7 @@ primitive StepStateMigrator
           Fail()
           recover val Array[U8] end
         end
-      boundary.migrate_step(id, state_name, key, snapshot_id,
+      boundary.migrate_step(id, state_name, key, checkpoint_id,
         shipped_state_bytes)
     else
       Fail()

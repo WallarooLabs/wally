@@ -28,7 +28,7 @@ use "wallaroo/core/source"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
@@ -87,8 +87,8 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
-  // Snapshot
-  var _next_snapshot_id: SnapshotId = 1
+  // Checkpoint
+  var _next_checkpoint_id: CheckpointId = 1
 
   let _topic: String
   let _partition_id: KafkaPartitionId
@@ -213,7 +213,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   =>
     if not _pending_message_store.has_pending_state_key(state_name, key) then
       _state_step_creator.report_unknown_key(this, state_name, key,
-        _next_snapshot_id)
+        _next_checkpoint_id)
     end
     _pending_message_store.add(state_name, key, routing_args)
 
@@ -378,14 +378,14 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   fun ref _initiate_barrier(token: BarrierToken) =>
     if not _disposed then
       match token
-      | let srt: SnapshotRollbackBarrierToken =>
+      | let srt: CheckpointRollbackBarrierToken =>
         _prepare_for_rollback()
       end
 
       if not _pending_message_store.has_pending() then
         match token
-        | let sbt: SnapshotBarrierToken =>
-          snapshot_state(sbt.id)
+        | let sbt: CheckpointBarrierToken =>
+          checkpoint_state(sbt.id)
         end
         for (o_id, o) in _outputs.pairs() do
           match o
@@ -402,22 +402,22 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     end
 
   be barrier_complete(token: BarrierToken) =>
-    // !@ Here's where we could ack finished messages up to snapshot point.
+    // !@ Here's where we could ack finished messages up to checkpoint point.
     // We should also match for rollback token.
     None
 
   //////////////
-  // SNAPSHOTS
+  // CHECKPOINTS
   //////////////
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    //!@ We probably need to snapshot info about last seq id for snapshot.
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    //!@ We probably need to checkpoint info about last seq id for checkpoint.
     ifdef "trace" then
-      @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
+      @printf[I32]("checkpoint_state in %s\n".cstring(), _name.cstring())
     end
-    _next_snapshot_id = snapshot_id + 1
+    _next_checkpoint_id = checkpoint_id + 1
     _wb.i64_le(_last_flushed_offset)
     let payload = _wb.done()
-    _event_log.snapshot_state(_source_id, snapshot_id, consume payload)
+    _event_log.checkpoint_state(_source_id, checkpoint_id, consume payload)
 
   be prepare_for_rollback() =>
     _prepare_for_rollback()
@@ -426,10 +426,10 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _pending_message_store.clear()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     //!@ Rollback!
-    _next_snapshot_id = snapshot_id + 1
+    _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_source_id)
 
 

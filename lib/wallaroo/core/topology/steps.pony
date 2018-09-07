@@ -32,7 +32,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/rebalancing"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
@@ -82,8 +82,8 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
 
   let _state_step_creator: StateStepCreator
 
-  // Snapshot
-  var _next_snapshot_id: SnapshotId = 1
+  // Checkpoint
+  var _next_checkpoint_id: CheckpointId = 1
 
   let _pending_message_store: PendingMessageStore =
     _pending_message_store.create()
@@ -425,7 +425,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   =>
     if not _pending_message_store.has_pending_state_key(state_name, key) then
       _state_step_creator.report_unknown_key(this, state_name, key,
-        _next_snapshot_id)
+        _next_checkpoint_id)
     end
     _pending_message_store.add(state_name, key, routing_args)
 
@@ -548,7 +548,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     end
 
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Key,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     ifdef "autoscale" then
       //@!
@@ -556,7 +556,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
         StepStateMigrator.send_state(_runner, _id, boundary, state_name,
-          key, snapshot_id, _auth)
+          key, checkpoint_id, _auth)
       else
         Fail()
       end
@@ -578,7 +578,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     if _inputs.contains(step_id) then
       // @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
       match barrier_token
-      | let srt: SnapshotRollbackBarrierToken =>
+      | let srt: CheckpointRollbackBarrierToken =>
         try
           let b_forwarder = _barrier_forwarder as BarrierStepForwarder
           if b_forwarder.higher_priority(srt)
@@ -621,18 +621,18 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
       Invariant(_step_message_processor.barrier_in_progress())
     end
     match barrier_token
-    | let sbt: SnapshotBarrierToken =>
-      snapshot_state(sbt.id)
+    | let sbt: CheckpointBarrierToken =>
+      checkpoint_state(sbt.id)
     end
     _step_message_processor = NormalStepMessageProcessor(this)
 
   //////////////
-  // SNAPSHOTS
+  // CHECKPOINTS
   //////////////
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
-    _next_snapshot_id = snapshot_id + 1
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    _next_checkpoint_id = checkpoint_id + 1
     ifdef "resilience" then
-      StepStateSnapshotter(_runner, _id, snapshot_id, _event_log)
+      StepStateCheckpointter(_runner, _id, checkpoint_id, _event_log)
     end
 
   be prepare_for_rollback() =>
@@ -649,9 +649,9 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     _step_message_processor = NormalStepMessageProcessor(this)
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
-    _next_snapshot_id = snapshot_id + 1
+    _next_checkpoint_id = checkpoint_id + 1
     ifdef "resilience" then
       StepRollbacker(payload, _runner)
     end
