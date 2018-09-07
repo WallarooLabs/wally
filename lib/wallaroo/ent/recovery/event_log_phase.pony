@@ -84,7 +84,7 @@ class _NormalEventLogPhase is _EventLogPhase
       Invariant(checkpoint_id == _next_checkpoint_id)
     end
     ifdef "trace" then
-      @printf[I32]("Checkpointting state for resilient %s, checkpoint id %s\n"
+      @printf[I32]("Checkpointing state for resilient %s, checkpoint id %s\n"
         .cstring(), resilient_id.string().cstring(),
         _next_checkpoint_id.string().cstring())
     end
@@ -141,7 +141,7 @@ class _CheckpointEventLogPhase is _EventLogPhase
       Invariant(checkpoint_id == _checkpoint_id)
     end
     ifdef "trace" then
-      @printf[I32]("Checkpointting state for resilient %s, checkpoint id %s\n"
+      @printf[I32]("Checkpointing state for resilient %s, checkpoint id %s\n"
         .cstring(), resilient_id.string().cstring(),
         _checkpoint_id.string().cstring())
     end

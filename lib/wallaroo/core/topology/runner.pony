@@ -603,37 +603,14 @@ class StateRunner[S: State ref] is (Runner & RollbackableRunner &
       metrics_reporter.step_metric(metric_name, sp.name(), latest_metrics_id,
         sc_start_ts, sc_end_ts)
 
-      //!@ This applies the state change but doesn't write it to disk since
-      // that's not currently supported with our new recovery protocol.
+      // TODO: This applies the state change but doesn't write it to disk since
+      // that's not currently supported with our new recovery protocol. Either
+      // remove the StateChange from API or implement this feature.
       match state_change
       | let sc: StateChange[S] ref =>
-        //!@ StateChange logging not supported
-        // ifdef "resilience" then
-        //   sc.write_log_entry(_wb)
-        //   let payload = _wb.done()
-        //   match _id
-        //   | let buffer_id: U128 =>
-        //     _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
-        //       sc.id(), producer.current_sequence_id(), consume payload)
-        //   else
-        //     @printf[I32]("StateRunner with unassigned EventLogBuffer!"
-        //       .cstring())
-        //   end
-        // end
         sc.apply(_state)
       | let dsc: DirectStateChange =>
         None
-        //!@ StateChange logging not supported
-        // ifdef "resilience" then
-        //   // TODO: Replace this with calling provided serialization method
-        //   match _id
-        //   | let buffer_id: U128 =>
-        //     _state.write_log_entry(_wb, _auth)
-        //     let payload = _wb.done()
-        //     _event_log.queue_log_entry(buffer_id, i_msg_uid, frac_ids,
-        //       U64.max_value(), producer.current_sequence_id(), consume payload)
-        //   end
-        // end
       end
 
       (is_finished, last_ts)
