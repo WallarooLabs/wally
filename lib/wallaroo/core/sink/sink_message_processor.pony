@@ -21,7 +21,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/invariant"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 
 trait SinkMessageProcessor
   fun ref process_message[D: Any val](metric_name: String,

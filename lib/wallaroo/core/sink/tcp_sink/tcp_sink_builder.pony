@@ -24,7 +24,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 
 
 primitive TCPSinkConfigCLIParser
@@ -111,7 +111,7 @@ class val TCPSinkBuilder
 
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
-    barrier_initiator: BarrierInitiator, snapshot_initiator: SnapshotInitiator,
+    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
     recovering: Bool): Sink
   =>
     @printf[I32](("Connecting to sink at " + _host + ":" + _service + "\n")
@@ -120,5 +120,5 @@ class val TCPSinkBuilder
     let id: RoutingId = RoutingIdGenerator()
 
     TCPSink(id, sink_name, event_log, recovering, env, _encoder_wrapper,
-      consume reporter, barrier_initiator, snapshot_initiator, _host, _service,
+      consume reporter, barrier_initiator, checkpoint_initiator, _host, _service,
       _initial_msgs)

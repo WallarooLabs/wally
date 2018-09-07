@@ -24,7 +24,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 
 
 trait tag StatusReporter
@@ -47,7 +47,7 @@ interface tag BoundaryUpdatable
   be remove_boundary(worker: String)
 
 trait tag Consumer is (Runnable & StateReceiver & Initializable &
-  StatusReporter & Snapshottable & BarrierReceiver & Resilient)
+  StatusReporter & Checkpointable & BarrierReceiver & Resilient)
   // TODO: For now, since we do not allow application graph cycles, all back
   // edges are from DataReceivers. This allows us to simply identify them
   // directly. Once we allow application cycles, we will need a more

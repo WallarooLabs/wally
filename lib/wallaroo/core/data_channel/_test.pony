@@ -36,7 +36,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
 
@@ -92,7 +92,7 @@ class _TestDataChannel is DataChannelListenNotify
       let ssc = StateStepCreator(auth, app_name, worker_name, metrics_sink, event_log)
       let dr = DataReceivers(auth, conns, worker_name, ssc)
       let b_initiator = BarrierInitiator(auth, worker_name, conns, "init")
-      let s_initiator = SnapshotInitiator(auth, "", "", conns, 0, event_log,
+      let s_initiator = CheckpointInitiator(auth, "", "", conns, 0, event_log,
         b_initiator, "")
       let a_initiator = AutoscaleInitiator(worker_name, b_initiator)
       let rr = RouterRegistry(auth, worker_name, dr, conns, ssc,

@@ -29,7 +29,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/ent/spike"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
@@ -378,16 +378,16 @@ actor Connections is Cluster
   //     Fail()
   //   end
 
-  // TODO: Passing in snapshot target here is a hack because we currently
+  // TODO: Passing in checkpoint target here is a hack because we currently
   // do recovery initialization at the point boundary updates are complete.
   // We need to move this out to another place.
   be update_boundaries(layout_initializer: LayoutInitializer,
-    snapshot_target: (SnapshotId | None) = None)
+    checkpoint_target: (CheckpointId | None) = None)
   =>
-    _update_boundaries(layout_initializer, snapshot_target)
+    _update_boundaries(layout_initializer, checkpoint_target)
 
   fun _update_boundaries(layout_initializer: LayoutInitializer,
-    snapshot_target: (SnapshotId | None) = None,
+    checkpoint_target: (CheckpointId | None) = None,
     router_registry: (RouterRegistry | None) = None)
   =>
     let out_bs_trn = recover trn Map[String, OutgoingBoundary] end
@@ -422,9 +422,9 @@ actor Connections is Cluster
     if _is_joining then
       layout_initializer.initialize()
     else
-      match snapshot_target
-      | let s_id: SnapshotId => layout_initializer.initialize(
-        where snapshot_target = s_id)
+      match checkpoint_target
+      | let s_id: CheckpointId => layout_initializer.initialize(
+        where checkpoint_target = s_id)
       end
     end
 
@@ -553,7 +553,7 @@ actor Connections is Cluster
       spr_blueprints)
 
   be recover_connections(layout_initializer: LayoutInitializer,
-    snapshot_target: SnapshotId)
+    checkpoint_target: CheckpointId)
   =>
     var addresses: Map[String, Map[String, (String, String)]] val =
       recover val Map[String, Map[String, (String, String)]] end
@@ -595,7 +595,7 @@ actor Connections is Cluster
       end
 
       _update_boundaries(layout_initializer
-        where snapshot_target = snapshot_target)
+        where checkpoint_target = checkpoint_target)
 
       @printf[I32]((_worker_name +
         ": Interconnections with other workers created.\n").cstring())
@@ -687,7 +687,7 @@ actor Connections is Cluster
     end
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
-    local_topology: LocalTopology, primary_snapshot_worker: String,
+    local_topology: LocalTopology, primary_checkpoint_worker: String,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
@@ -711,7 +711,7 @@ actor Connections is Cluster
         let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
           _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
           _metrics_service, consume c_addrs, consume d_addrs,
-          local_topology.worker_names, primary_snapshot_worker,
+          local_topology.worker_names, primary_checkpoint_worker,
           partition_blueprints, stateless_partition_blueprints,
           tidr_blueprints, _auth)?
         conn.writev(inform_msg)

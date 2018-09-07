@@ -12,7 +12,7 @@ the License. You may obtain a copy of the License at
 
 use "collections"
 use "wallaroo/ent/autoscale"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/partial_order"
 
 
@@ -137,15 +137,15 @@ class val AutoscaleResumeBarrierToken is BarrierToken
   fun string(): String =>
     "AutoscaleResumeBarrierToken(" + _worker + ", " + _id.string() + ")"
 
-class val SnapshotBarrierToken is BarrierToken
-  let id: SnapshotId
+class val CheckpointBarrierToken is BarrierToken
+  let id: CheckpointId
 
-  new val create(id': SnapshotId) =>
+  new val create(id': CheckpointId) =>
     id = id'
 
   fun eq(that: box->BarrierToken): Bool =>
     match that
-    | let sbt: SnapshotBarrierToken =>
+    | let sbt: CheckpointBarrierToken =>
       id == sbt.id
     else
       false
@@ -156,7 +156,7 @@ class val SnapshotBarrierToken is BarrierToken
 
   fun lt(that: box->BarrierToken): Bool =>
     match that
-    | let sbt: SnapshotBarrierToken =>
+    | let sbt: CheckpointBarrierToken =>
       id < sbt.id
     else
       false
@@ -164,39 +164,39 @@ class val SnapshotBarrierToken is BarrierToken
 
   fun gt(that: box->BarrierToken): Bool =>
     match that
-    | let sbt: SnapshotBarrierToken =>
+    | let sbt: CheckpointBarrierToken =>
       id > sbt.id
     else
       false
     end
 
   fun string(): String =>
-    "SnapshotBarrierToken(" + id.string() + ")"
+    "CheckpointBarrierToken(" + id.string() + ")"
 
-class val SnapshotRollbackBarrierToken is BarrierToken
+class val CheckpointRollbackBarrierToken is BarrierToken
   let rollback_id: RollbackId
-  let snapshot_id: SnapshotId
+  let checkpoint_id: CheckpointId
 
-  new val create(rollback_id': RollbackId, snapshot_id': SnapshotId) =>
+  new val create(rollback_id': RollbackId, checkpoint_id': CheckpointId) =>
     rollback_id = rollback_id'
-    snapshot_id = snapshot_id'
+    checkpoint_id = checkpoint_id'
 
   fun eq(that: box->BarrierToken): Bool =>
     match that
-    | let sbt: SnapshotRollbackBarrierToken =>
-      (snapshot_id == sbt.snapshot_id) and (rollback_id == sbt.rollback_id)
+    | let sbt: CheckpointRollbackBarrierToken =>
+      (checkpoint_id == sbt.checkpoint_id) and (rollback_id == sbt.rollback_id)
     else
       false
     end
 
   fun hash(): USize =>
-    rollback_id.hash() xor snapshot_id.hash()
+    rollback_id.hash() xor checkpoint_id.hash()
 
   fun lt(that: box->BarrierToken): Bool =>
     match that
-    | let sbt: SnapshotRollbackBarrierToken =>
+    | let sbt: CheckpointRollbackBarrierToken =>
       rollback_id < sbt.rollback_id
-    | let srbt: SnapshotRollbackResumeBarrierToken =>
+    | let srbt: CheckpointRollbackResumeBarrierToken =>
       rollback_id <= srbt.rollback_id
     else
       false
@@ -204,9 +204,9 @@ class val SnapshotRollbackBarrierToken is BarrierToken
 
   fun gt(that: box->BarrierToken): Bool =>
     match that
-    | let sbt: SnapshotRollbackBarrierToken =>
+    | let sbt: CheckpointRollbackBarrierToken =>
       rollback_id > sbt.rollback_id
-    | let srbt: SnapshotRollbackResumeBarrierToken =>
+    | let srbt: CheckpointRollbackResumeBarrierToken =>
       rollback_id > srbt.rollback_id
     else
       // A Rollback token is greater than any non-rollback token since it
@@ -215,31 +215,31 @@ class val SnapshotRollbackBarrierToken is BarrierToken
     end
 
   fun string(): String =>
-    "SnapshotRollbackBarrierToken(Rollback " + rollback_id.string() +
-      ", Snapshot " + snapshot_id.string() + ")"
+    "CheckpointRollbackBarrierToken(Rollback " + rollback_id.string() +
+      ", Checkpoint " + checkpoint_id.string() + ")"
 
-class val SnapshotRollbackResumeBarrierToken is BarrierToken
+class val CheckpointRollbackResumeBarrierToken is BarrierToken
   let rollback_id: RollbackId
-  let snapshot_id: SnapshotId
+  let checkpoint_id: CheckpointId
 
-  new val create(rollback_id': RollbackId, snapshot_id': SnapshotId) =>
+  new val create(rollback_id': RollbackId, checkpoint_id': CheckpointId) =>
     rollback_id = rollback_id'
-    snapshot_id = snapshot_id'
+    checkpoint_id = checkpoint_id'
 
   fun eq(that: box->BarrierToken): Bool =>
     match that
-    | let sbt: SnapshotRollbackResumeBarrierToken =>
-      (snapshot_id == sbt.snapshot_id) and (rollback_id == sbt.rollback_id)
+    | let sbt: CheckpointRollbackResumeBarrierToken =>
+      (checkpoint_id == sbt.checkpoint_id) and (rollback_id == sbt.rollback_id)
     else
       false
     end
 
   fun hash(): USize =>
-    rollback_id.hash() xor snapshot_id.hash()
+    rollback_id.hash() xor checkpoint_id.hash()
 
   fun lt(that: box->BarrierToken): Bool =>
     match that
-    | let sbt: SnapshotRollbackResumeBarrierToken =>
+    | let sbt: CheckpointRollbackResumeBarrierToken =>
       rollback_id < sbt.rollback_id
     else
       false
@@ -247,9 +247,9 @@ class val SnapshotRollbackResumeBarrierToken is BarrierToken
 
   fun gt(that: box->BarrierToken): Bool =>
     match that
-    | let srbt: SnapshotRollbackResumeBarrierToken =>
+    | let srbt: CheckpointRollbackResumeBarrierToken =>
       rollback_id > srbt.rollback_id
-    | let sbt: SnapshotRollbackBarrierToken =>
+    | let sbt: CheckpointRollbackBarrierToken =>
       rollback_id >= sbt.rollback_id
     else
       // A Rollback token is greater than any non-rollback token since it
@@ -258,4 +258,4 @@ class val SnapshotRollbackResumeBarrierToken is BarrierToken
     end
 
   fun string(): String =>
-    "SnapshotRollbackResumeBarrierToken(Rollback " + rollback_id.string() + ", Snapshot " + snapshot_id.string() + ")"
+    "CheckpointRollbackResumeBarrierToken(Rollback " + rollback_id.string() + ", Checkpoint " + checkpoint_id.string() + ")"

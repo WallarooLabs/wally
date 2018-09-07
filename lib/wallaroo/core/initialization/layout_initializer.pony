@@ -22,11 +22,11 @@ use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/messages"
 use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 
 trait tag LayoutInitializer
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
-    snapshot_target: (SnapshotId | None) = None)
+    checkpoint_target: (CheckpointId | None) = None)
 
   be report_created(initializable: Initializable)
 
@@ -45,4 +45,4 @@ trait tag LayoutInitializer
 
   be ack_migration_batch_complete(sender: String)
 
-  be rollback_topology_graph(snapshot_id: SnapshotId, action: Promise[None])
+  be rollback_topology_graph(checkpoint_id: CheckpointId, action: Promise[None])

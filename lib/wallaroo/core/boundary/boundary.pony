@@ -41,7 +41,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/ent/spike"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/mort"
@@ -268,11 +268,11 @@ actor OutgoingBoundary is Consumer
     @printf[I32]("!@ reconnect() RE-Connecting OutgoingBoundary %s to %s:%s on %s\n".cstring(), _step_id.string().cstring(), _host.cstring(), _service.cstring(), _target_worker.cstring())
 
   be migrate_step(step_id: RoutingId, state_name: String, key: Key,
-    snapshot_id: SnapshotId, state: ByteSeq val)
+    checkpoint_id: CheckpointId, state: ByteSeq val)
   =>
     try
       let outgoing_msg = ChannelMsgEncoder.migrate_step(step_id,
-        state_name, key, snapshot_id, state, _worker_name, _auth)?
+        state_name, key, checkpoint_id, state, _worker_name, _auth)?
       _writev(outgoing_msg)
     else
       Fail()
@@ -534,7 +534,7 @@ actor OutgoingBoundary is Consumer
     barrier_token: BarrierToken)
   =>
     match barrier_token
-    | let srt: SnapshotRollbackBarrierToken =>
+    | let srt: CheckpointRollbackBarrierToken =>
       _queue.clear()
     end
 
@@ -564,11 +564,11 @@ actor OutgoingBoundary is Consumer
     Fail()
 
   ///////////////
-  // SNAPSHOTS
+  // CHECKPOINTS
   ///////////////
-  fun ref snapshot_state(snapshot_id: SnapshotId) =>
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     """
-    Boundaries don't currently write out any data as part of the snapshot.
+    Boundaries don't currently write out any data as part of the checkpoint.
     """
     None
 
@@ -580,7 +580,7 @@ actor OutgoingBoundary is Consumer
     _registered_producers.clear()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     """
     There is nothing for a Boundary to rollback to.

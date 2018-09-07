@@ -26,7 +26,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/rebalancing"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/routing"
@@ -1225,12 +1225,12 @@ trait val PartitionRouter is Router
   fun rebalance_steps_grow(auth: AmbientAuth,
     target_workers: Array[(String, OutgoingBoundary)] val,
     router_registry: RouterRegistry ref,
-    snapshot_id: SnapshotId): (PartitionRouter, Bool)
+    checkpoint_id: CheckpointId): (PartitionRouter, Bool)
   fun rebalance_steps_shrink(
     target_workers: Array[(String, OutgoingBoundary)] val,
     leaving_workers: Array[String] val,
     router_registry: RouterRegistry ref,
-    snapshot_id: SnapshotId): Bool
+    checkpoint_id: CheckpointId): Bool
   fun recalculate_hash_partitions_for_join(auth: AmbientAuth,
     joining_workers: Array[String] val,
     outgoing_boundaries: Map[String, OutgoingBoundary]): PartitionRouter
@@ -1506,7 +1506,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
   fun rebalance_steps_grow(auth: AmbientAuth,
     target_workers: Array[(String, OutgoingBoundary)] val,
     router_registry: RouterRegistry ref,
-    snapshot_id: SnapshotId): (PartitionRouter, Bool)
+    checkpoint_id: CheckpointId): (PartitionRouter, Bool)
   =>
     """
     Begin migration of state steps known to this router that we determine
@@ -1585,7 +1585,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
 
     // Actually initiate migration of steps
     let had_steps_to_migrate = migrate_steps(router_registry,
-      steps_to_migrate, target_workers.size(), snapshot_id)
+      steps_to_migrate, target_workers.size(), checkpoint_id)
 
     let new_router = LocalPartitionRouter[In, S](_state_name,
       _worker_name, consume new_local_routes, consume new_step_ids,
@@ -1597,7 +1597,7 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
     target_workers: Array[(String, OutgoingBoundary)] val,
     leaving_workers: Array[String] val,
     router_registry: RouterRegistry ref,
-    snapshot_id: SnapshotId): Bool
+    checkpoint_id: CheckpointId): Bool
   =>
     let remaining_workers_trn = recover trn Array[String] end
     let remaining_boundaries = Map[String, OutgoingBoundary]
@@ -1645,11 +1645,11 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
       end
     end
     migrate_steps(router_registry, steps_to_migrate, target_workers.size(),
-      snapshot_id)
+      checkpoint_id)
 
   fun migrate_steps(router_registry: RouterRegistry ref,
     steps_to_migrate': Array[(String, OutgoingBoundary, Key, RoutingId, Step)],
-    target_worker_count: USize, snapshot_id: SnapshotId): Bool
+    target_worker_count: USize, checkpoint_id: CheckpointId): Bool
   =>
     """
     Actually initiate the migration of steps. Return false if none were
@@ -1662,9 +1662,9 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
         in steps_to_migrate'.values()
       do
         router_registry.add_to_step_waiting_list(step_id)
-        step.send_state(boundary, _state_name, key, snapshot_id)
+        step.send_state(boundary, _state_name, key, checkpoint_id)
         router_registry.move_stateful_step_to_proxy(step_id, step,
-          key, _state_name, snapshot_id)
+          key, _state_name, checkpoint_id)
         @printf[I32](
           "^^Migrating step %s for key %s to outgoing boundary %s/%lx\n"
             .cstring(), step_id.string().cstring(), key.cstring(),

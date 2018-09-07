@@ -4,19 +4,19 @@ use "wallaroo/core/common"
 
 class PendingRollbackBarrierAcks
   // We only want to keep acks for the latest rollback token.
-  var latest_rollback_token: SnapshotRollbackBarrierToken =
-    SnapshotRollbackBarrierToken(0, 0)
+  var latest_rollback_token: CheckpointRollbackBarrierToken =
+    CheckpointRollbackBarrierToken(0, 0)
 
-  let barrier_acks: Array[(BarrierReceiver, SnapshotRollbackBarrierToken)] =
+  let barrier_acks: Array[(BarrierReceiver, CheckpointRollbackBarrierToken)] =
     barrier_acks.create()
   let worker_barrier_start_acks:
-    Array[(WorkerName, SnapshotRollbackBarrierToken)] =
+    Array[(WorkerName, CheckpointRollbackBarrierToken)] =
       worker_barrier_start_acks.create()
-  let worker_barrier_acks: Array[(WorkerName, SnapshotRollbackBarrierToken)] =
+  let worker_barrier_acks: Array[(WorkerName, CheckpointRollbackBarrierToken)] =
     worker_barrier_acks.create()
 
   fun ref ack_barrier(s: BarrierReceiver,
-    barrier_token: SnapshotRollbackBarrierToken)
+    barrier_token: CheckpointRollbackBarrierToken)
   =>
     if barrier_token > latest_rollback_token then
       latest_rollback_token = barrier_token
@@ -25,7 +25,7 @@ class PendingRollbackBarrierAcks
     barrier_acks.push((s, barrier_token))
 
   fun ref worker_ack_barrier_start(w: WorkerName,
-    barrier_token: SnapshotRollbackBarrierToken)
+    barrier_token: CheckpointRollbackBarrierToken)
   =>
     if barrier_token > latest_rollback_token then
       latest_rollback_token = barrier_token
@@ -34,7 +34,7 @@ class PendingRollbackBarrierAcks
     worker_barrier_start_acks.push((w, barrier_token))
 
   fun ref worker_ack_barrier(w: WorkerName,
-    barrier_token: SnapshotRollbackBarrierToken)
+    barrier_token: CheckpointRollbackBarrierToken)
   =>
     if barrier_token > latest_rollback_token then
       latest_rollback_token = barrier_token
@@ -58,7 +58,7 @@ class PendingRollbackBarrierAcks
     else
       // @printf[I32]("!@ PendingRollbackBarrierAcks: Flushing but acks are outdated.\n".cstring())
       match token
-      | let srbt: SnapshotRollbackBarrierToken =>
+      | let srbt: CheckpointRollbackBarrierToken =>
         if srbt > latest_rollback_token then
           clear()
           latest_rollback_token = srbt

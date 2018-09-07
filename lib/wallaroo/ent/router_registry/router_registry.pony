@@ -30,7 +30,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/snapshot"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
@@ -52,7 +52,7 @@ actor RouterRegistry
   let _state_step_creator: StateStepCreator
   let _recovery_file_cleaner: RecoveryFileCleaner
   let _barrier_initiator: BarrierInitiator
-  let _snapshot_initiator: SnapshotInitiator
+  let _checkpoint_initiator: CheckpointInitiator
   let _autoscale_initiator: AutoscaleInitiator
   var _data_router: DataRouter
   var _pre_state_data: (Array[PreStateData] val | None) = None
@@ -65,10 +65,10 @@ actor RouterRegistry
 
   //!@
   // TODO: Remove this. This is here to be threaded to joining workers as
-  // the primary snapshot initiator worker. We need to enable this role to
-  // shift to other workers, and this means we need our SnapshotInitiator
+  // the primary checkpoint initiator worker. We need to enable this role to
+  // shift to other workers, and this means we need our CheckpointInitiator
   // to add to the information we send to a joining worker (since it will
-  // know who the primary snapshot worker is).
+  // know who the primary checkpoint worker is).
   let _initializer_name: WorkerName
 
   var _local_topology_initializer: (LocalTopologyInitializer | None) = None
@@ -172,7 +172,7 @@ actor RouterRegistry
     recovery_file_cleaner: RecoveryFileCleaner, stop_the_world_pause: U64,
     is_joining: Bool, initializer_name: WorkerName,
     barrier_initiator: BarrierInitiator,
-    snapshot_initiator: SnapshotInitiator,
+    checkpoint_initiator: CheckpointInitiator,
     autoscale_initiator: AutoscaleInitiator,
     contacted_worker: (WorkerName | None) = None,
     joining_state_routing_ids: (Map[StateName, RoutingId] val | None) = None)
@@ -186,7 +186,7 @@ actor RouterRegistry
     _all_target_id_router_subs.set(_state_step_creator)
     _recovery_file_cleaner = recovery_file_cleaner
     _barrier_initiator = barrier_initiator
-    _snapshot_initiator = snapshot_initiator
+    _checkpoint_initiator = checkpoint_initiator
     _autoscale_initiator = autoscale_initiator
     _stop_the_world_pause = stop_the_world_pause
     _connections.register_disposable(this)
@@ -474,17 +474,17 @@ actor RouterRegistry
     _data_receiver_map(worker) = dr
 
   be register_state_step(step: Step, state_name: StateName, key: Key,
-    step_id: RoutingId, snapshot_id: (SnapshotId | None) = None)
+    step_id: RoutingId, checkpoint_id: (CheckpointId | None) = None)
   =>
-    _register_state_step(step, state_name, key, step_id, snapshot_id)
+    _register_state_step(step, state_name, key, step_id, checkpoint_id)
 
   fun ref _register_state_step(step: Step, state_name: StateName, key: Key,
-    step_id: RoutingId, snapshot_id: (SnapshotId | None) = None)
+    step_id: RoutingId, checkpoint_id: (CheckpointId | None) = None)
   =>
     @printf[I32]("!@ RouterRegistry: register_state_step, key: %s\n".cstring(), key.cstring())
     try
       (_local_topology_initializer as LocalTopologyInitializer)
-        .register_state_step(state_name, key, step_id, snapshot_id)
+        .register_state_step(state_name, key, step_id, checkpoint_id)
     else
       Fail()
     end
@@ -493,21 +493,21 @@ actor RouterRegistry
     _state_step_creator.register_state_step(state_name, key, step_id, step)
 
   be unregister_state_step(state_name: StateName, key: Key, step_id: RoutingId,
-    step: Step, snapshot_id: (SnapshotId | None) = None)
+    step: Step, checkpoint_id: (CheckpointId | None) = None)
   =>
-    _unregister_state_step(state_name, key, step_id, step, snapshot_id)
+    _unregister_state_step(state_name, key, step_id, step, checkpoint_id)
 
   fun ref _unregister_state_step(state_name: StateName, key: Key,
-    id: RoutingId, step: Step, snapshot_id: (SnapshotId | None) = None)
+    id: RoutingId, step: Step, checkpoint_id: (CheckpointId | None) = None)
   =>
     @printf[I32]("!@ RouterRegistry: unregister_state_step, key: %s\n".cstring(), key.cstring())
     try
       (_local_topology_initializer as LocalTopologyInitializer)
-        .unregister_state_step(state_name, key, snapshot_id)
+        .unregister_state_step(state_name, key, checkpoint_id)
     else
       Fail()
     end
-    move_stateful_step_to_proxy(id, step, key, state_name, snapshot_id)
+    move_stateful_step_to_proxy(id, step, key, state_name, checkpoint_id)
     _unregister_producer(id)
 
   be register_producer(id: RoutingId, p: Producer) =>
@@ -1055,7 +1055,7 @@ actor RouterRegistry
     end
 
   be remote_join_migration_request(joining_workers: Array[WorkerName] val,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     """
     Only one worker is contacted by all joining workers to indicate that a
@@ -1069,7 +1069,7 @@ actor RouterRegistry
     then
       try
         (_autoscale as Autoscale).join_migration_initiated(joining_workers,
-          snapshot_id)
+          checkpoint_id)
       else
         Fail()
       end
@@ -1094,35 +1094,35 @@ actor RouterRegistry
   be prepare_join_migration(target_workers: Array[WorkerName] val) =>
     @printf[I32]("!@ prepare_join_migration\n".cstring())
 
-    let lookup_next_snapshot_id = Promise[SnapshotId]
-    lookup_next_snapshot_id.next[None](
+    let lookup_next_checkpoint_id = Promise[CheckpointId]
+    lookup_next_checkpoint_id.next[None](
       _self~initiate_join_migration(target_workers))
-    _snapshot_initiator.lookup_next_snapshot_id(lookup_next_snapshot_id)
+    _checkpoint_initiator.lookup_next_checkpoint_id(lookup_next_checkpoint_id)
 
   be initiate_join_migration(target_workers: Array[WorkerName] val,
-    next_snapshot_id: SnapshotId)
+    next_checkpoint_id: CheckpointId)
   =>
     @printf[I32]("!@ initiate_join_migration\n".cstring())
 
     // Update BarrierInitiator about new workers
     for w in target_workers.values() do
       _barrier_initiator.add_worker(w)
-      _snapshot_initiator.add_worker(w)
+      _checkpoint_initiator.add_worker(w)
     end
 
     // Inform other current workers to begin migration
     try
       let msg =
         ChannelMsgEncoder.initiate_join_migration(target_workers,
-          next_snapshot_id, _auth)?
+          next_checkpoint_id, _auth)?
       _connections.send_control_to_cluster_with_exclusions(msg, target_workers)
     else
       Fail()
     end
-    begin_join_migration(target_workers, next_snapshot_id)
+    begin_join_migration(target_workers, next_checkpoint_id)
 
   fun ref begin_join_migration(target_workers: Array[WorkerName] val,
-    next_snapshot_id: SnapshotId)
+    next_checkpoint_id: CheckpointId)
   =>
     """
     Begin partition migration to joining workers
@@ -1141,7 +1141,7 @@ actor RouterRegistry
     for state_name in _partition_routers.keys() do
       let had_steps_to_migrate_for_this_state =
         _migrate_partition_steps(state_name, target_workers,
-          next_snapshot_id)
+          next_checkpoint_id)
       if had_steps_to_migrate_for_this_state then
         had_steps_to_migrate = true
       end
@@ -1235,7 +1235,7 @@ actor RouterRegistry
     _connections.ack_migration_batch_complete(sender_name)
 
   fun ref _migrate_partition_steps(state_name: StateName,
-    target_workers: Array[WorkerName] val, next_snapshot_id: SnapshotId): Bool
+    target_workers: Array[WorkerName] val, next_checkpoint_id: CheckpointId): Bool
   =>
     """
     Called to initiate migrating partition steps to a target worker in order
@@ -1261,7 +1261,7 @@ actor RouterRegistry
       // indicating whether any steps were migrated.
       (let new_partition_router, let had_steps_to_migrate) =
         partition_router.rebalance_steps_grow(_auth, consume tws, this,
-          next_snapshot_id)
+          next_checkpoint_id)
       // TODO: It could be if had_steps_to_migrate is false then we don't
       // need to distribute the router because it didn't change. Investigate.
       _distribute_partition_router(new_partition_router)
@@ -1275,7 +1275,7 @@ actor RouterRegistry
   fun ref _migrate_all_partition_steps(state_name: StateName,
     target_workers: Array[(WorkerName, OutgoingBoundary)] val,
     leaving_workers: Array[WorkerName] val,
-    next_snapshot_id: SnapshotId): Bool
+    next_checkpoint_id: CheckpointId): Bool
   =>
     """
     Called to initiate migrating all partition steps the set of remaining
@@ -1286,7 +1286,7 @@ actor RouterRegistry
         .cstring(), state_name.cstring(), target_workers.size())
       let partition_router = _partition_routers(state_name)?
       partition_router.rebalance_steps_shrink(target_workers, leaving_workers,
-        this, next_snapshot_id)
+        this, next_checkpoint_id)
     else
       Fail()
       false
@@ -1387,13 +1387,13 @@ actor RouterRegistry
   be prepare_leaving_migration(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    let lookup_next_snapshot_id = Promise[SnapshotId]
-    lookup_next_snapshot_id.next[None](
+    let lookup_next_checkpoint_id = Promise[CheckpointId]
+    lookup_next_checkpoint_id.next[None](
       _self~begin_leaving_migration(remaining_workers, leaving_workers))
-    _snapshot_initiator.lookup_next_snapshot_id(lookup_next_snapshot_id)
+    _checkpoint_initiator.lookup_next_checkpoint_id(lookup_next_checkpoint_id)
 
   be begin_leaving_migration(remaining_workers: Array[WorkerName] val,
-    leaving_workers: Array[WorkerName] val, next_snapshot_id: SnapshotId)
+    leaving_workers: Array[WorkerName] val, next_checkpoint_id: CheckpointId)
   =>
     """
     This should only be called on a worker designated to leave the cluster
@@ -1439,7 +1439,7 @@ actor RouterRegistry
     for state_name in _partition_routers.keys() do
       let steps_to_migrate_for_this_state =
         _migrate_all_partition_steps(state_name, rws, leaving_workers,
-          next_snapshot_id)
+          next_checkpoint_id)
       if steps_to_migrate_for_this_state then
         had_steps_to_migrate = true
       end
@@ -1513,7 +1513,7 @@ actor RouterRegistry
   =>
     for w in leaving_workers.values() do
       _barrier_initiator.remove_worker(w)
-      _snapshot_initiator.remove_worker(w)
+      _checkpoint_initiator.remove_worker(w)
     end
     for (state_name, pr) in _partition_routers.pairs() do
       let new_pr = pr.recalculate_hash_partitions_for_shrink(leaving_workers)
@@ -1528,7 +1528,7 @@ actor RouterRegistry
   // Step moved off this worker or new step added to another worker
   /////////////////////////////////////////////////////////////////////////////
   fun ref move_stateful_step_to_proxy(id: RoutingId, step: Step, key: Key,
-    state_name: StateName, snapshot_id: (SnapshotId | None) = None)
+    state_name: StateName, checkpoint_id: (CheckpointId | None) = None)
   =>
     """
     Called when a stateful step has been migrated off this worker to another
@@ -1544,7 +1544,7 @@ actor RouterRegistry
     _data_router.remove_routes_to_consumer(id, step)
 
   fun ref _move_step_to_proxy(id: RoutingId, state_name: StateName, key: Key,
-    snapshot_id: (SnapshotId | None) = None)
+    checkpoint_id: (CheckpointId | None) = None)
   =>
     """
     Called when a step has been migrated off this worker to another worker
@@ -1552,7 +1552,7 @@ actor RouterRegistry
     _remove_step_from_data_router(state_name, key)
     try
       (_local_topology_initializer as LocalTopologyInitializer)
-        .unregister_state_step(state_name, key, snapshot_id)
+        .unregister_state_step(state_name, key, checkpoint_id)
     else
       Fail()
     end
@@ -1605,13 +1605,13 @@ actor RouterRegistry
 
   fun ref move_proxy_to_stateful_step(id: RoutingId, step: Step,
     key: Key, state_name: StateName, source_worker: WorkerName,
-    snapshot_id: SnapshotId)
+    checkpoint_id: CheckpointId)
   =>
     """
     Called when a stateful step has been migrated to this worker from another
     worker
     """
-    _register_state_step(step, state_name, key, id, snapshot_id)
+    _register_state_step(step, state_name, key, id, checkpoint_id)
     _connections.notify_cluster_of_new_stateful_step(id, key, state_name,
       recover [source_worker] end)
 
