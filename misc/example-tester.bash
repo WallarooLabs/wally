@@ -37,6 +37,16 @@ if ! have_cmd route; then
   fi
 fi
 
+# install ip if it doesn't exist
+if ! have_cmd ip; then
+  if have_cmd yum; then
+    sudo yum install iproute -y
+  else
+    sudo apt-get update
+    sudo apt-get install iproute2 -y
+  fi
+fi
+
 # install docker if it doesn't exist
 if ! have_cmd docker; then
   if [ -f /.dockerenv ]; then
@@ -46,7 +56,7 @@ if ! have_cmd docker; then
     tar xzvf docker-${DOCKERVERSION}.tgz --strip 1 \
                  -C /usr/local/bin docker/docker
     rm docker-${DOCKERVERSION}.tgz
-    DOCKER_PREFIX=
+    DOCKER_PREFIX="bash -c "
   else
     # if in vagrant, do a full docker install
     curl -fsSL get.docker.com -o /tmp/get-docker.sh
@@ -404,7 +414,7 @@ print_results() {
   total_count=0
   # find all result files
   # shellcheck disable=SC2044
-  for result_file in $(find "${TESTING_TMP}" -name result); do
+  for result_file in $(find "${TESTING_TMP}" -name result | xargs ls -rt); do
     print_result "$result_file"
     # keep track of number failed and number total
     if [[ "$(cat "$result_file")" == "FAILURE" ]]; then
