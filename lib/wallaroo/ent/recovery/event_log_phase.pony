@@ -23,12 +23,12 @@ trait _EventLogPhase
   fun name(): String
 
   fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
-    action: Promise[CheckpointId], event_log: EventLog ref)
+    promise: Promise[CheckpointId], event_log: EventLog ref)
   =>
-    event_log._initiate_checkpoint(checkpoint_id, action)
+    event_log._initiate_checkpoint(checkpoint_id, promise)
 
-  fun ref checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+  fun ref checkpoint_state(resilient_id: RoutingId,
+    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
   =>
     _invalid_call()
     Fail()
@@ -75,8 +75,8 @@ class _NormalEventLogPhase is _EventLogPhase
   fun ref write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
     _event_log._write_checkpoint_id(checkpoint_id)
 
-  fun ref checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+  fun ref checkpoint_state(resilient_id: RoutingId,
+    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
   =>
     // @printf[I32]("!@ _NormalEventLogPhase: checkpoint_state() for checkpoint_id %s\n".cstring(), checkpoint_id.string().cstring())
 
@@ -107,13 +107,13 @@ class _RecoveringEventLogPhase is _EventLogPhase
   fun name(): String => "_RecoveringEventLogPhase"
 
   fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
-    action: Promise[CheckpointId], event_log: EventLog ref)
+    promise: Promise[CheckpointId], event_log: EventLog ref)
   =>
     @printf[I32]("EventLog: Recovering so ignoring initiate checkpoint id %s\n"
       .cstring(), checkpoint_id.string().cstring())
 
-  fun ref checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+  fun ref checkpoint_state(resilient_id: RoutingId,
+    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
   =>
     @printf[I32](("EventLog: Recovering so ignoring checkpoint state for " +
       "resilient %s\n").cstring(), resilient_id.string().cstring())
@@ -121,19 +121,19 @@ class _RecoveringEventLogPhase is _EventLogPhase
 class _CheckpointEventLogPhase is _EventLogPhase
   let _event_log: EventLog ref
   let _checkpoint_id: CheckpointId
-  let _action: Promise[CheckpointId]
+  let _promise: Promise[CheckpointId]
 
   new create(event_log: EventLog ref, checkpoint_id: CheckpointId,
-    action: Promise[CheckpointId])
+    promise: Promise[CheckpointId])
   =>
     _event_log = event_log
     _checkpoint_id = checkpoint_id
-    _action = action
+    _promise = promise
 
   fun name(): String => "_CheckpointEventLogPhase"
 
-  fun ref checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+  fun ref checkpoint_state(resilient_id: RoutingId,
+    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
   =>
     // @printf[I32]("!@ _CheckpointEventLogPhase: checkpoint_state()\n".cstring())
 
@@ -161,12 +161,12 @@ class _CheckpointEventLogPhase is _EventLogPhase
     ifdef debug then
       Invariant(checkpoint_id == _checkpoint_id)
     end
-    _action(checkpoint_id)
+    _promise(checkpoint_id)
     _event_log.checkpoint_complete(checkpoint_id)
 
 class _RollbackEventLogPhase is _EventLogPhase
   let _event_log: EventLog ref
-  let _action: Promise[CheckpointRollbackBarrierToken]
+  let _promise: Promise[CheckpointRollbackBarrierToken]
   let _token: CheckpointRollbackBarrierToken
   let _resilients_acked: SetIs[RoutingId] = _resilients_acked.create()
 
@@ -174,10 +174,10 @@ class _RollbackEventLogPhase is _EventLogPhase
   var _rollback_count: USize = 0
 
   new create(event_log: EventLog ref, token: CheckpointRollbackBarrierToken,
-    action: Promise[CheckpointRollbackBarrierToken])
+    promise: Promise[CheckpointRollbackBarrierToken])
   =>
     _event_log = event_log
-    _action = action
+    _promise = promise
     _token = token
 
   fun name(): String => "_RollbackEventLogPhase"
@@ -200,5 +200,5 @@ class _RollbackEventLogPhase is _EventLogPhase
     _complete()
 
   fun ref _complete() =>
-    _action(_token)
+    _promise(_token)
     _event_log.rollback_complete(_token.checkpoint_id)

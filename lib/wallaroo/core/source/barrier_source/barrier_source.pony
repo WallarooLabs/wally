@@ -148,7 +148,7 @@ actor BarrierSource is Source
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     None
 
-  be register_downstreams(action: Promise[Source]) =>
+  be register_downstreams(promise: Promise[Source]) =>
     """
     We register during initialization without need for explicit management
     here (unlike, say, TCPSource).

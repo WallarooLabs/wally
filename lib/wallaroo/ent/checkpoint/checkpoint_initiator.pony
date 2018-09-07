@@ -121,10 +121,10 @@ actor CheckpointInitiator is Initializable
     let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
     @printf[I32]("!@ Initiating checkpoint %s at %s\n".cstring(), _current_checkpoint_id.string().cstring(), ts.string().cstring())
 
-    let event_log_action = Promise[CheckpointId]
-    event_log_action.next[None](
+    let event_log_promise = Promise[CheckpointId]
+    event_log_promise.next[None](
       recover this~event_log_checkpoint_complete(_worker_name) end)
-    _event_log.initiate_checkpoint(_current_checkpoint_id, event_log_action)
+    _event_log.initiate_checkpoint(_current_checkpoint_id, event_log_promise)
 
     try
       let msg = ChannelMsgEncoder.event_log_initiate_checkpoint(
@@ -136,20 +136,20 @@ actor CheckpointInitiator is Initializable
 
     let token = CheckpointBarrierToken(_current_checkpoint_id)
 
-    let barrier_action = Promise[BarrierToken]
-    barrier_action.next[None](recover this~checkpoint_barrier_complete() end)
-    _barrier_initiator.inject_barrier(token, barrier_action)
+    let barrier_promise = Promise[BarrierToken]
+    barrier_promise.next[None](recover this~checkpoint_barrier_complete() end)
+    _barrier_initiator.inject_barrier(token, barrier_promise)
 
     _phase = _ActiveCheckpointInitiatorPhase(token, this, _workers)
 
   be resume_checkpoint() =>
     @printf[I32]("!@ CheckpointInitiator: resume_checkpoint()\n".cstring())
     if _is_active and (_worker_name == _primary_worker) then
-      let action = Promise[BarrierToken]
-      action.next[None]({(t: BarrierToken) => _self.initiate_checkpoint()})
+      let promise = Promise[BarrierToken]
+      promise.next[None]({(t: BarrierToken) => _self.initiate_checkpoint()})
       _barrier_initiator.inject_barrier(
         CheckpointRollbackResumeBarrierToken(_last_rollback_id,
-          _last_complete_checkpoint_id), action)
+          _last_complete_checkpoint_id), promise)
     else
       try
         let msg = ChannelMsgEncoder.resume_checkpoint(_worker_name, _auth)?
@@ -166,7 +166,8 @@ actor CheckpointInitiator is Initializable
     end
     _phase.checkpoint_barrier_complete(token)
 
-  be event_log_checkpoint_complete(worker: WorkerName, checkpoint_id: CheckpointId)
+  be event_log_checkpoint_complete(worker: WorkerName,
+    checkpoint_id: CheckpointId)
   =>
     ifdef debug then
       @printf[I32](("Checkpoint_Initiator: Event Log CheckpointId %s complete " +
@@ -229,7 +230,8 @@ actor CheckpointInitiator is Initializable
     end
     _phase = _WaitingCheckpointInitiatorPhase
 
-  be initiate_rollback(recovery_action: Promise[CheckpointRollbackBarrierToken],
+  be initiate_rollback(
+    recovery_promise: Promise[CheckpointRollbackBarrierToken],
     worker: WorkerName)
   =>
     if (_primary_worker == _worker_name) then
@@ -252,11 +254,11 @@ actor CheckpointInitiator is Initializable
       if _current_checkpoint_id < _last_complete_checkpoint_id then
         _current_checkpoint_id = _last_complete_checkpoint_id
       end
-      let barrier_action = Promise[BarrierToken]
-      barrier_action.next[None]({(t: BarrierToken) =>
+      let barrier_promise = Promise[BarrierToken]
+      barrier_promise.next[None]({(t: BarrierToken) =>
         match t
         | let srbt: CheckpointRollbackBarrierToken =>
-          recovery_action(srbt)
+          recovery_promise(srbt)
           _self.rollback_complete(srbt.rollback_id)
         else
           Fail()
@@ -264,7 +266,7 @@ actor CheckpointInitiator is Initializable
       })
       let resume_token = CheckpointRollbackResumeBarrierToken(rollback_id,
         _last_complete_checkpoint_id)
-      _barrier_initiator.inject_blocking_barrier(token, barrier_action,
+      _barrier_initiator.inject_blocking_barrier(token, barrier_promise,
         resume_token)
     else
       try
@@ -293,16 +295,21 @@ actor CheckpointInitiator is Initializable
         "not the primary for checkpoints. Ignoring.\n").cstring())
     end
 
-  fun ref _save_checkpoint_id(checkpoint_id: CheckpointId, rollback_id: RollbackId)
+  fun ref _save_checkpoint_id(checkpoint_id: CheckpointId,
+    rollback_id: RollbackId)
   =>
     try
       @printf[I32]("!@ Saving CheckpointId %s and RollbackId %s\n".cstring(), checkpoint_id.string().cstring(), rollback_id.string().cstring())
       let filepath = FilePath(_auth, _checkpoint_id_file)?
-      // TODO: We'll need to rotate this file since it will grow rapidly.
+      // TODO: We'll need to rotate this file since it will grow.
+      // !@ Hold onto this in a field so we don't open it every time.
       let file = File(filepath)
+      file.seek_end(0)
 
       _wb.u64_be(checkpoint_id)
       _wb.u64_be(rollback_id)
+      // TODO: We can't be sure we actually wrote all this out given the
+      // way this code works.
       file.writev(_wb.done())
       file.sync()
       file.dispose()

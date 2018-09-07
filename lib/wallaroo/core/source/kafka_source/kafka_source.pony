@@ -205,8 +205,8 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       _unmute_local()
     end
 
-  be register_downstreams(action: Promise[Source]) =>
-    action(this)
+  be register_downstreams(promise: Promise[Source]) =>
+    promise(this)
 
   fun ref unknown_key(state_name: String, key: Key,
     routing_args: RoutingArguments)

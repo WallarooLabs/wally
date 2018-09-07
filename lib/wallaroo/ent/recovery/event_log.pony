@@ -154,9 +154,11 @@ actor EventLog
   /////////////////
   // CHECKPOINT
   /////////////////
-  be initiate_checkpoint(checkpoint_id: CheckpointId, action: Promise[CheckpointId]) =>
+  be initiate_checkpoint(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId])
+  =>
     @printf[I32]("!@ EventLog: initiate_checkpoint\n".cstring())
-    _phase.initiate_checkpoint(checkpoint_id, action, this)
+    _phase.initiate_checkpoint(checkpoint_id, promise, this)
 
   be checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
     payload: Array[ByteSeq] val)
@@ -164,17 +166,18 @@ actor EventLog
     _phase.checkpoint_state(resilient_id, checkpoint_id, payload)
 
   fun ref _initiate_checkpoint(checkpoint_id: CheckpointId,
-    action: Promise[CheckpointId])
+    promise: Promise[CheckpointId])
   =>
-    _phase = _CheckpointEventLogPhase(this, checkpoint_id, action)
+    _phase = _CheckpointEventLogPhase(this, checkpoint_id, promise)
 
-  fun ref _checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val)
+  fun ref _checkpoint_state(resilient_id: RoutingId,
+    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
   =>
     _queue_log_entry(resilient_id, checkpoint_id, payload)
 
-  fun ref _queue_log_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
-    payload: Array[ByteSeq] val, force_write: Bool = false)
+  fun ref _queue_log_entry(resilient_id: RoutingId,
+    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val,
+    force_write: Bool = false)
   =>
     ifdef "resilience" then
       // add to backend buffer after encoding
@@ -225,9 +228,9 @@ actor EventLog
     end
 
   be initiate_rollback(token: CheckpointRollbackBarrierToken,
-    action: Promise[CheckpointRollbackBarrierToken])
+    promise: Promise[CheckpointRollbackBarrierToken])
   =>
-    _phase = _RollbackEventLogPhase(this, token, action)
+    _phase = _RollbackEventLogPhase(this, token, promise)
 
     // If we have no resilients on this worker for some reason, then we
     // should abort rollback early.
@@ -330,43 +333,6 @@ actor EventLog
       Fail()
     end
 
-
-  //!@We probably need to be flushing at certain points. Or do we?
-  // be flush_buffer(resilient_id: RoutingId, low_watermark: U64) =>
-  //   _flush_buffer(resilient_id, low_watermark)
-
-  // fun ref _flush_buffer(resilient_id: RoutingId, low_watermark: U64) =>
-  //   ifdef "trace" then
-  //     @printf[I32](("flush_buffer for id: " + resilient_id.string() +
-  //  "\n\n")
-  //       .cstring())
-  //   end
-
-    //!@
-    // try
-    //   // Add low watermark ack to buffer
-    //   _backend.encode_entry((true, resilient_id, 0, None, 0, low_watermark,
-    //     recover Array[ByteSeq] end))
-
-    //   num_encoded = num_encoded + 1
-    //   _flush_waiting = _flush_waiting + 1
-    //   //write buffer to disk
-    //   write_log()
-
-    //   // if (_flush_waiting % 50) == 0 then
-    //   //   //sync any written data to disk
-    //   //   _backend.sync()
-    //   //   _backend.datasync()
-    //   // end
-
-    //   _resilients(resilient_id)?.log_flushed(low_watermark)
-    // else
-    //   @printf[I32]("Errror writing/flushing/syncing ack to disk!\n"
-    //.cstring())
-    //   Fail()
-    // end
-
-
   be start_rotation() =>
     _start_rotation()
 
@@ -378,12 +344,12 @@ actor EventLog
       @printf[I32]("Starting event log rotation.\n".cstring())
       _rotating = true
       _log_rotation_id = _log_rotation_id + 1
-      let rotation_action = Promise[BarrierToken]
-      rotation_action.next[None](recover this~rotate_file() end)
+      let rotation_promise = Promise[BarrierToken]
+      rotation_promise.next[None](recover this~rotate_file() end)
       try
         (_barrier_initiator as BarrierInitiator).inject_blocking_barrier(
           LogRotationBarrierToken(_log_rotation_id, _worker_name),
-            rotation_action, LogRotationResumeBarrierToken(_log_rotation_id,
+            rotation_promise, LogRotationResumeBarrierToken(_log_rotation_id,
             _worker_name))
       else
         Fail()
@@ -426,11 +392,11 @@ actor EventLog
       _backend.sync()?
       _backend.datasync()?
       _backend_bytes_after_checkpoint = _backend.bytes_written()
-      let rotation_resume_action = Promise[BarrierToken]
+      let rotation_resume_promise = Promise[BarrierToken]
       try
         (_barrier_initiator as BarrierInitiator).inject_barrier(
           LogRotationResumeBarrierToken(_log_rotation_id, _worker_name),
-            rotation_resume_action)
+            rotation_resume_promise)
       else
         Fail()
       end
