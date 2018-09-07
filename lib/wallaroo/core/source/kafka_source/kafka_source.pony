@@ -358,6 +358,17 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     // update to use correct seq_id for recovery
     _seq_id = seq_id
 
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
+  =>
+    @printf[I32]("SLF: TCPSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    try
+      let b = _outgoing_boundaries(worker)?
+      b.update_worker_data_service(worker, host, service)
+    else
+      Fail()
+    end
+
   //////////////
   // BARRIER
   //////////////
