@@ -655,12 +655,13 @@ actor LocalTopologyInitializer is LayoutInitializer
   =>
     _target_id_router_blueprints(state_name) = target_id_router.blueprint()
 
-  be rollback_topology_graph(checkpoint_id: CheckpointId, action: Promise[None])
+  be rollback_topology_graph(checkpoint_id: CheckpointId,
+    promise: Promise[None])
   =>
     @printf[I32]("Rolling back topology graph.\n".cstring())
     let local_keys = _local_keys_file.read_local_keys_and_truncate(
       checkpoint_id)
-    _router_registry.rollback_state_steps(local_keys, action)
+    _router_registry.rollback_state_steps(local_keys, promise)
 
   be recover_and_initialize(ws: Array[String] val,
     target_checkpoint_id: CheckpointId,

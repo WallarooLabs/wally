@@ -781,10 +781,10 @@ actor RouterRegistry
     _stop_the_world_for_grow_migration(new_workers)
     @printf[I32]("!@ setting up migration action\n".cstring())
 
-    let action = Promise[None]
-    action.next[None]({(_: None) =>
+    let promise = Promise[None]
+    promise.next[None]({(_: None) =>
       _self.prepare_join_migration(new_workers)})
-    _autoscale_initiator.initiate_autoscale(action)
+    _autoscale_initiator.initiate_autoscale(promise)
 
   fun ref stop_the_world_for_grow_migration(
     new_workers: Array[WorkerName] val)
@@ -824,9 +824,9 @@ actor RouterRegistry
       // world to distribute it until here to avoid unnecessary messaging.
       // _distribute_target_id_router()
 
-      let action = Promise[None]
-      action.next[None]({(_: None) => _self.initiate_autoscale_complete()})
-      _autoscale_initiator.initiate_autoscale_resume_acks(action)
+      let promise = Promise[None]
+      promise.next[None]({(_: None) => _self.initiate_autoscale_complete()})
+      _autoscale_initiator.initiate_autoscale_resume_acks(promise)
 
       // We are done with this round of leaving workers
       _leaving_workers = recover Array[WorkerName] end
@@ -1348,10 +1348,10 @@ actor RouterRegistry
       end
       _prepare_shrink(remaining_workers, leaving_workers)
 
-      let action = Promise[None]
-      action.next[None]({(_: None) =>
+      let promise = Promise[None]
+      promise.next[None]({(_: None) =>
         _self.announce_leaving_migration(remaining_workers, leaving_workers)})
-      _autoscale_initiator.initiate_autoscale(action)
+      _autoscale_initiator.initiate_autoscale(promise)
     end
 
   be prepare_shrink(remaining_workers: Array[WorkerName] val,

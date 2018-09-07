@@ -54,9 +54,9 @@ actor BarrierInitiator is Initializable
   let _workers: _StringSet = _workers.create()
 
   // When we send barriers to a different primary worker, we use this map
-  // to call the correct action when those barriers are complete.
-  let _pending_actions: Map[BarrierToken, Promise[BarrierToken]] =
-    _pending_actions.create()
+  // to call the correct promise when those barriers are complete.
+  let _pending_promises: Map[BarrierToken, Promise[BarrierToken]] =
+    _pending_promises.create()
 
   // TODO: Currently, we can only inject barriers from one primary worker
   // in the cluster. This is because otherwise they might be injected in
@@ -138,9 +138,9 @@ actor BarrierInitiator is Initializable
     if _active_barriers.barrier_in_progress() then
       _pending.push(_PendingSourceInit(s))
     else
-      let action = Promise[Source]
-      action.next[None](recover this~source_registration_complete() end)
-      s.register_downstreams(action)
+      let promise = Promise[Source]
+      promise.next[None](recover this~source_registration_complete() end)
+      s.register_downstreams(promise)
     end
 
   be source_registration_complete(s: Source) =>
@@ -189,7 +189,7 @@ actor BarrierInitiator is Initializable
 
       _phase.initiate_barrier(barrier_token, result_promise)
     else
-      _pending_actions(barrier_token) = result_promise
+      _pending_promises(barrier_token) = result_promise
       try
         let msg = ChannelMsgEncoder.forward_inject_barrier(barrier_token,
           _worker_name, _auth)?
@@ -230,7 +230,7 @@ actor BarrierInitiator is Initializable
         wait_for_token)
       _phase.initiate_barrier(barrier_token, result_promise)
     else
-      _pending_actions(barrier_token) = result_promise
+      _pending_promises(barrier_token) = result_promise
       try
         let msg = ChannelMsgEncoder.forward_inject_blocking_barrier(
           barrier_token, wait_for_token, _worker_name, _auth)?
@@ -242,8 +242,8 @@ actor BarrierInitiator is Initializable
 
   be forwarded_inject_barrier_complete(barrier_token: BarrierToken) =>
     try
-      let action = _pending_actions.remove(barrier_token)?._2
-      action(barrier_token)
+      let promise = _pending_promises.remove(barrier_token)?._2
+      promise(barrier_token)
     else
       Fail()
     end
@@ -521,9 +521,9 @@ actor BarrierInitiator is Initializable
         match next
         | let p: _PendingSourceInit =>
           _phase = _SourcePendingBarrierInitiatorPhase(this)
-          let action = Promise[Source]
-          action.next[None](recover this~source_registration_complete() end)
-          p.source.register_downstreams(action)
+          let promise = Promise[Source]
+          promise.next[None](recover this~source_registration_complete() end)
+          p.source.register_downstreams(promise)
           return
         | let p: _PendingBarrier =>
           _inject_barrier(p.token, p.promise)

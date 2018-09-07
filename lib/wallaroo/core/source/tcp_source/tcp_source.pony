@@ -294,8 +294,8 @@ actor TCPSource is Source
     end
 
   //!@ rename
-  be register_downstreams(action: Promise[Source]) =>
-    action(this)
+  be register_downstreams(promise: Promise[Source]) =>
+    promise(this)
 
   fun router(): Router =>
     _router

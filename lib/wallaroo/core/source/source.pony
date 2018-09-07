@@ -97,7 +97,7 @@ interface val SourceConfig[In: Any val]
 
 trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   StatusReporter)
-  be register_downstreams(action: Promise[Source])
+  be register_downstreams(promise: Promise[Source])
   be update_router(router: PartitionRouter)
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
   be add_boundary_builders(

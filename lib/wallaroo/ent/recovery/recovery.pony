@@ -166,12 +166,12 @@ actor Recovery
         _recovery_phase = _RollbackTopology(this, checkpoint_id, _workers)
 
         //!@ Tell someone to start rolling back topology
-        let action = Promise[None]
-        action.next[None]({(n: None) =>
+        let promise = Promise[None]
+        promise.next[None]({(n: None) =>
           _self.worker_ack_topology_rollback(_worker_name, checkpoint_id)
         })
         (_initializer as LocalTopologyInitializer)
-          .rollback_topology_graph(checkpoint_id, action)
+          .rollback_topology_graph(checkpoint_id, promise)
 
         // Inform cluster to rollback topology graph
         try
@@ -192,10 +192,10 @@ actor Recovery
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Register Producers - ~~|\n"
         .cstring())
-      let action = Promise[None]
-      action.next[None]({(n: None) =>
+      let promise = Promise[None]
+      promise.next[None]({(n: None) =>
         _self.worker_ack_register_producers(_worker_name)})
-      _router_registry.producers_register_downstream(action)
+      _router_registry.producers_register_downstream(promise)
 
       // Inform cluster to register_producers
       try
@@ -213,11 +213,11 @@ actor Recovery
   fun ref _register_producers_complete() =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
-      let action = Promise[CheckpointRollbackBarrierToken]
-      action.next[None]({(token: CheckpointRollbackBarrierToken) =>
+      let promise = Promise[CheckpointRollbackBarrierToken]
+      promise.next[None]({(token: CheckpointRollbackBarrierToken) =>
         _self.rollback_barrier_complete(token)
       })
-      _checkpoint_initiator.initiate_rollback(action, _worker_name)
+      _checkpoint_initiator.initiate_rollback(promise, _worker_name)
 
       _recovery_phase = _RollbackBarrier(this)
     else
@@ -256,9 +256,9 @@ actor Recovery
       @printf[I32]("|~~ - Recovery Phase: Rollback - ~~|\n".cstring())
 
       _recovery_phase = _Rollback(this, token, _workers)
-      let action = Promise[CheckpointRollbackBarrierToken]
-      action.next[None](recover this~rollback_complete(_worker_name) end)
-      _event_log.initiate_rollback(token, action)
+      let promise = Promise[CheckpointRollbackBarrierToken]
+      promise.next[None](recover this~rollback_complete(_worker_name) end)
+      _event_log.initiate_rollback(token, promise)
 
       try
         let msg = ChannelMsgEncoder.event_log_initiate_rollback(token,
