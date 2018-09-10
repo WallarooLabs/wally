@@ -43,7 +43,7 @@ trait StepMessageProcessor
   =>
     Fail()
 
-  fun ref flush(target_id_router: TargetIdRouter)
+  fun ref flush()
 
 class EmptyStepMessageProcessor is StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
@@ -53,7 +53,7 @@ class EmptyStepMessageProcessor is StepMessageProcessor
   =>
     Fail()
 
-  fun ref flush(target_id_router: TargetIdRouter) =>
+  fun ref flush() =>
     Fail()
 
 class NormalStepMessageProcessor is StepMessageProcessor
@@ -71,7 +71,7 @@ class NormalStepMessageProcessor is StepMessageProcessor
       i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
       latest_ts, metrics_id, worker_ingress_ts)
 
-  fun ref flush(target_id_router: TargetIdRouter) =>
+  fun ref flush() =>
     ifdef debug then
       @printf[I32]("Flushing NormalStepMessageProcessor does nothing.\n"
         .cstring())
@@ -84,7 +84,7 @@ class NoProcessingStepMessageProcessor is StepMessageProcessor
   new create(s: Step ref) =>
     step = s
 
-  fun ref flush(target_id_router: TargetIdRouter) =>
+  fun ref flush() =>
     ifdef debug then
       @printf[I32]("Flushing NoProcessingStepMessageProcessor does nothing.\n"
         .cstring())
@@ -135,7 +135,7 @@ class BarrierStepMessageProcessor is StepMessageProcessor
       _barrier_forwarder.receive_barrier(input_id, producer, barrier_token)
     end
 
-  fun ref flush(target_id_router: TargetIdRouter) =>
+  fun ref flush() =>
     for q in _queued.values() do
       match q
       | let qm: QueuedMessage =>
