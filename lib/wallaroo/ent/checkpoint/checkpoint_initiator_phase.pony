@@ -41,17 +41,17 @@ class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
 
 class _ActiveCheckpointInitiatorPhase is _CheckpointInitiatorPhase
   let _token: CheckpointBarrierToken
-  let _s_initiator: CheckpointInitiator ref
+  let _c_initiator: CheckpointInitiator ref
   var _barrier_complete: Bool = false
   var _event_log_complete: Bool = false
   let _workers: SetIs[WorkerName] = _workers.create()
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
-  new create(token: CheckpointBarrierToken, s_initiator: CheckpointInitiator ref,
-    workers: _StringSet box)
+  new create(token: CheckpointBarrierToken,
+    c_initiator: CheckpointInitiator ref, workers: _StringSet box)
   =>
     _token = token
-    _s_initiator = s_initiator
+    _c_initiator = c_initiator
     for w in workers.values() do
       _workers.set(w)
     end
@@ -63,7 +63,11 @@ class _ActiveCheckpointInitiatorPhase is _CheckpointInitiatorPhase
       Invariant(token == _token)
     end
     _barrier_complete = true
-    _s_initiator.event_log_write_checkpoint_id(_token.id)
+    let ws = recover iso Array[WorkerName] end
+    for w in _workers.values() do
+      ws.push(w)
+    end
+    _c_initiator.event_log_write_checkpoint_id(_token.id, consume ws)
 
   fun ref event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)
@@ -77,5 +81,5 @@ class _ActiveCheckpointInitiatorPhase is _CheckpointInitiatorPhase
     @printf[I32]("!@ _CheckpointInitiatorPhase: acked_workers: %s, workers: %s\n".cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
     if _acked_workers.size() == _workers.size() then
       _event_log_complete = true
-      _s_initiator.checkpoint_complete(_token)
+      _c_initiator.checkpoint_complete(_token)
     end
