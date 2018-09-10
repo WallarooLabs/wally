@@ -120,6 +120,9 @@ class _BoundariesReconnect is _RecoveryPhase
   fun ref try_override_recovery(worker: WorkerName,
     token: CheckpointRollbackBarrierToken, recovery: Recovery ref): Bool
   =>
+    @printf[I32](("RECOVERY: Received override recovery message during " +
+      "Reconnect Phase. Waiting to cede control until " +
+      "boundaries are reconnected.\n").cstring())
     _override_received = true
     _override_worker = worker
     true

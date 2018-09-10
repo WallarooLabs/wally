@@ -73,6 +73,9 @@ actor Recovery
     _router_registry = router_registry
     _data_receivers = data_receivers
 
+  be update_initializer(initializer: LocalTopologyInitializer) =>
+    _initializer = initializer
+
   be update_checkpoint_id(s_id: CheckpointId) =>
     _checkpoint_id = s_id
 
@@ -280,9 +283,11 @@ actor Recovery
     _router_registry.resume_the_world(_worker_name)
     _data_receivers.recovery_complete(this)
     _recovery_phase = _FinishedRecovering
-    //!@ Do we still want to do this?
     match _initializer
     | let lti: LocalTopologyInitializer =>
+      lti.report_recovery_ready_to_work()
+
+      //!@ Do we still want to do this?
       _event_log.quick_initialize(lti)
     else
       Fail()
@@ -299,4 +304,16 @@ actor Recovery
     _data_receivers.recovery_complete(this)
     @printf[I32]("|~~ - Recovery initiated at %s. Ceding control. - ~~|\n"
       .cstring(), worker.cstring())
+    match _initializer
+    | let lti: LocalTopologyInitializer =>
+      // TODO: This is not really correct. If we cede control to another worker
+      // midway through recovery, then we are still in an incomplete state and
+      // will only be ready to work once that other worker completes its
+      // recovery process. At the moment, the only impact of this is that the
+      // message indicating the application is ready to work will be printed
+      // to STDOUT too early.
+      lti.report_recovery_ready_to_work()
+    else
+      Fail()
+    end
     _recovery_phase = _RecoveryOverrideAccepted

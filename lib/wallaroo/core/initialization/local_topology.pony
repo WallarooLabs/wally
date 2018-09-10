@@ -296,7 +296,10 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
   let _initializables: Initializables = Initializables
   let _state_step_creator: StateStepCreator
+  var _event_log_ready_to_work: Bool = false
+  var _recovery_ready_to_work: Bool = false
   var _initialization_lifecycle_complete: Bool = false
+
 
   // Partition router blueprints
   var _partition_router_blueprints:
@@ -360,6 +363,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     _initializables.set(_state_step_creator)
     _initializables.set(_checkpoint_initiator)
     _initializables.set(_barrier_initiator)
+    _recovery.update_initializer(this)
 
   be update_topology(t: LocalTopology) =>
     _topology = t
@@ -2056,6 +2060,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         Fail()
       end
     else
+      _recovery_ready_to_work = true
       _event_log.quick_initialize(this)
     end
     _router_registry.application_ready_to_work()
@@ -2073,13 +2078,20 @@ actor LocalTopologyInitializer is LayoutInitializer
     _initialization_lifecycle_complete = true
 
   be report_event_log_ready_to_work() =>
+    _event_log_ready_to_work = true
     // This should only get called after all initializables have reported
     // they are ready to work, at which point we would have told the EventLog
     // to start pipeline logging.
-    if _ready_to_work.size() == _initializables.size() then
+    Invariant(_ready_to_work.size() == _initializables.size())
+
+    if _recovery_ready_to_work then
       _application_ready_to_work()
-    else
-      Fail()
+    end
+
+  be report_recovery_ready_to_work() =>
+    _recovery_ready_to_work = true
+    if _event_log_ready_to_work then
+      _application_ready_to_work()
     end
 
   fun ref _application_ready_to_work() =>
