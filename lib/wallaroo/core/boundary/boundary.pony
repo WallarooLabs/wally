@@ -129,6 +129,8 @@ actor OutgoingBoundary is Consumer
   var _muted: Bool = false
   var _no_more_reconnect: Bool = false
   var _expect_read_buf: Reader = Reader
+  var _delayed_writes: Bool = false
+  let _delayed_flush_threshold: USize = 4000
 
   // Connection, Acking and Replay
   var _connection_initialized: Bool = false
@@ -360,6 +362,10 @@ actor OutgoingBoundary is Consumer
 
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
+
+  be flush_pending_writes() =>
+    _pending_writes()
+    _delayed_writes = false
 
   be receive_state(state: ByteSeq val) => Fail()
 
@@ -664,7 +670,14 @@ actor OutgoingBoundary is Consumer
       data_size = data_size + bytes.size()
     end
 
-    _pending_writes()
+    if _pending_writev_total > _delayed_flush_threshold then
+      _pending_writes()
+    elseif _delayed_writes == false then
+      // Allow the mailbox to drain a bit before calling writev
+      // to reduce system call overhead.
+      _delayed_writes = true
+      this.flush_pending_writes()
+    end
 
     _in_sent = false
 
@@ -697,6 +710,10 @@ actor OutgoingBoundary is Consumer
     Perform a graceful shutdown. Don't accept new writes, but don't finish
     closing until we get a zero length read.
     """
+    if _delayed_writes then
+      _pending_writes()
+      _delayed_writes = false
+    end
     _closed = true
     _try_shutdown()
 
