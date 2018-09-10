@@ -25,7 +25,8 @@ trait _EventLogPhase
   fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId], event_log: EventLog ref)
   =>
-    event_log._initiate_checkpoint(checkpoint_id, promise)
+    _invalid_call()
+    Fail()
 
   fun ref checkpoint_state(resilient_id: RoutingId,
     checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
@@ -64,6 +65,11 @@ trait _EventLogPhase
 class _InitialEventLogPhase is _EventLogPhase
   fun name(): String => "_InitialEventLogPhase"
 
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId], event_log: EventLog ref)
+  =>
+    event_log._initiate_checkpoint(checkpoint_id, promise)
+
 class _NormalEventLogPhase is _EventLogPhase
   let _next_checkpoint_id: CheckpointId
   let _event_log: EventLog ref
@@ -71,6 +77,11 @@ class _NormalEventLogPhase is _EventLogPhase
   new create(next_checkpoint_id: CheckpointId, event_log: EventLog ref) =>
     _next_checkpoint_id = next_checkpoint_id
     _event_log = event_log
+
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId], event_log: EventLog ref)
+  =>
+    event_log._initiate_checkpoint(checkpoint_id, promise)
 
   fun ref write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
     _event_log._write_checkpoint_id(checkpoint_id)
@@ -132,6 +143,11 @@ class _CheckpointEventLogPhase is _EventLogPhase
 
   fun name(): String => "_CheckpointEventLogPhase"
 
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId], event_log: EventLog ref)
+  =>
+    event_log._initiate_checkpoint(checkpoint_id, promise)
+
   fun ref checkpoint_state(resilient_id: RoutingId,
     checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
   =>
@@ -181,6 +197,12 @@ class _RollbackEventLogPhase is _EventLogPhase
     _token = token
 
   fun name(): String => "_RollbackEventLogPhase"
+
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId], event_log: EventLog ref)
+  =>
+    @printf[I32](("EventLog: Rolling back so ignoring initiate checkpoint " +
+      "id %s\n").cstring(), checkpoint_id.string().cstring())
 
   fun ref expect_rollback_count(count: USize) =>
     _rollback_count = count
