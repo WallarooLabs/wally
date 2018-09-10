@@ -187,14 +187,20 @@ actor CheckpointInitiator is Initializable
       Fail()
     end
 
-  fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId) =>
+  fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
+    workers: Array[WorkerName] val)
+  =>
     @printf[I32]("!@ CheckpointInitiator: event_log_write_checkpoint_id()\n".cstring())
     _event_log.write_checkpoint_id(checkpoint_id)
 
     try
       let msg = ChannelMsgEncoder.event_log_write_checkpoint_id(
         checkpoint_id, _worker_name, _auth)?
-      _connections.send_control_to_cluster(msg)
+      for w in workers.values() do
+        if w != _worker_name then
+          _connections.send_control(w, msg)
+        end
+      end
     else
       Fail()
     end
