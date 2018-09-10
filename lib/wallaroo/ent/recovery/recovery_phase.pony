@@ -310,6 +310,9 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
   =>
     None
 
+  fun ref worker_ack_register_producers(w: WorkerName) =>
+    None
+
   fun ref rollback_barrier_complete(token: CheckpointRollbackBarrierToken) =>
     None
 
