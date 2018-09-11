@@ -174,26 +174,30 @@ class val SnapshotBarrierToken is BarrierToken
     "SnapshotBarrierToken(" + id.string() + ")"
 
 class val SnapshotRollbackBarrierToken is BarrierToken
-  let id: SnapshotId
+  let rollback_id: RollbackId
+  let snapshot_id: SnapshotId
 
-  new val create(id': SnapshotId) =>
-    id = id'
+  new val create(rollback_id': RollbackId, snapshot_id': SnapshotId) =>
+    rollback_id = rollback_id'
+    snapshot_id = snapshot_id'
 
   fun eq(that: box->BarrierToken): Bool =>
     match that
     | let sbt: SnapshotRollbackBarrierToken =>
-      id == sbt.id
+      (snapshot_id == sbt.snapshot_id) and (rollback_id == sbt.rollback_id)
     else
       false
     end
 
   fun hash(): USize =>
-    id.hash()
+    rollback_id.hash() xor snapshot_id.hash()
 
   fun lt(that: box->BarrierToken): Bool =>
     match that
     | let sbt: SnapshotRollbackBarrierToken =>
-      id < sbt.id
+      rollback_id < sbt.rollback_id
+    | let srbt: SnapshotRollbackResumeBarrierToken =>
+      rollback_id <= srbt.rollback_id
     else
       false
     end
@@ -201,10 +205,57 @@ class val SnapshotRollbackBarrierToken is BarrierToken
   fun gt(that: box->BarrierToken): Bool =>
     match that
     | let sbt: SnapshotRollbackBarrierToken =>
-      id > sbt.id
+      rollback_id > sbt.rollback_id
+    | let srbt: SnapshotRollbackResumeBarrierToken =>
+      rollback_id > srbt.rollback_id
+    else
+      // A Rollback token is greater than any non-rollback token since it
+      // always takes precedence.
+      true
+    end
+
+  fun string(): String =>
+    "SnapshotRollbackBarrierToken(Rollback " + rollback_id.string() +
+      ", Snapshot " + snapshot_id.string() + ")"
+
+class val SnapshotRollbackResumeBarrierToken is BarrierToken
+  let rollback_id: RollbackId
+  let snapshot_id: SnapshotId
+
+  new val create(rollback_id': RollbackId, snapshot_id': SnapshotId) =>
+    rollback_id = rollback_id'
+    snapshot_id = snapshot_id'
+
+  fun eq(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotRollbackResumeBarrierToken =>
+      (snapshot_id == sbt.snapshot_id) and (rollback_id == sbt.rollback_id)
     else
       false
     end
 
+  fun hash(): USize =>
+    rollback_id.hash() xor snapshot_id.hash()
+
+  fun lt(that: box->BarrierToken): Bool =>
+    match that
+    | let sbt: SnapshotRollbackResumeBarrierToken =>
+      rollback_id < sbt.rollback_id
+    else
+      false
+    end
+
+  fun gt(that: box->BarrierToken): Bool =>
+    match that
+    | let srbt: SnapshotRollbackResumeBarrierToken =>
+      rollback_id > srbt.rollback_id
+    | let sbt: SnapshotRollbackBarrierToken =>
+      rollback_id >= sbt.rollback_id
+    else
+      // A Rollback token is greater than any non-rollback token since it
+      // always takes precedence.
+      true
+    end
+
   fun string(): String =>
-    "SnapshotRollbackBarrierToken(" + id.string() + ")"
+    "SnapshotRollbackResumeBarrierToken(Rollback " + rollback_id.string() + ", Snapshot " + snapshot_id.string() + ")"

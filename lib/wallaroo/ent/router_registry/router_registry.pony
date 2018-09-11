@@ -661,17 +661,42 @@ actor RouterRegistry
   fun ref clean_shutdown() =>
     _recovery_file_cleaner.clean_recovery_files()
 
+  // TODO: Move management of stop the world to another actor
   /////////////////////////////////////////////////////////////////////////////
   // STOP THE WORLD
   /////////////////////////////////////////////////////////////////////////////
-  fun ref initiate_stop_the_world() =>
-    _initiated_stop_the_world = true
+  be stop_the_world(exclusions: Array[WorkerName] val =
+    recover Array[WorkerName] end)
+  =>
+    // !@ TODO: What do we do if one is already in progress?
+    _stop_the_world(exclusions)
+
+  be resume_the_world(initiator: WorkerName) =>
+    """
+    Stop the world is complete and we're ready to resume message processing
+    and notify the cluster.
+    """
+    _resume_all_remote()
+    _resume_the_world(initiator)
+
+  be resume_processing(initiator: WorkerName) =>
+    """
+    Received when another worker has decided the cluster is ready to resume
+    the world.
+    """
+    _resume_the_world(initiator)
+
+  fun ref _stop_the_world(exclusions: Array[WorkerName] val =
+    recover Array[WorkerName] end)
+  =>
     _stop_the_world_in_process = true
+    _mute_request(_worker_name)
+    _connections.stop_the_world(exclusions)
 
   fun ref initiate_stop_the_world_for_grow_migration(
     new_workers: Array[String] val)
   =>
-    initiate_stop_the_world()
+    _initiated_stop_the_world = true
     try
       let msg = ChannelMsgEncoder.initiate_stop_the_world_for_join_migration(
         new_workers, _auth)?
@@ -687,24 +712,25 @@ actor RouterRegistry
       _self.initiate_join_migration(new_workers)})
     _autoscale_initiator.initiate_autoscale(action)
 
-  fun ref stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
+  fun ref stop_the_world_for_grow_migration(
+    new_workers: Array[WorkerName] val)
+  =>
     """
     Called when new workers join the cluster and we are ready to start
     the partition migration process. We first check that all
     in-flight messages have finished processing.
     """
-    _stop_the_world_in_process = true
     _stop_the_world_for_grow_migration(new_workers)
 
-  fun ref _stop_the_world_for_grow_migration(new_workers: Array[String] val) =>
+  fun ref _stop_the_world_for_grow_migration(exclusions: Array[WorkerName] val)
+  =>
     """
     We currently stop all message processing before migrating partitions and
     updating routers/routes.
     """
     @printf[I32]("~~~Stopping message processing for state migration.~~~\n"
       .cstring())
-    _mute_request(_worker_name)
-    _connections.stop_the_world(new_workers)
+    _stop_the_world(exclusions)
 
   fun ref _stop_the_world_for_shrink_migration() =>
     """
@@ -713,8 +739,7 @@ actor RouterRegistry
     """
     @printf[I32]("~~~Stopping message processing for leaving workers.~~~\n"
       .cstring())
-    _mute_request(_worker_name)
-    _connections.stop_the_world()
+    _stop_the_world()
 
   fun ref _try_resume_the_world() =>
     @printf[I32]("!@ _try_resume_the_world\n".cstring())
@@ -730,40 +755,34 @@ actor RouterRegistry
       _autoscale_initiator.initiate_autoscale_resume_acks(action)
 
       // We are done with this round of leaving workers
-      _leaving_workers = recover Array[String] end
+      _leaving_workers = recover Array[WorkerName] end
     else
       @printf[I32]("!@ but I didn't initiate\n".cstring())
     end
 
-  be resume_the_world(initiator: String) =>
-    """
-    Stop the world is complete and we're ready to resume message processing
-    """
-    _resume_the_world(initiator)
-
-  fun ref _resume_the_world(initiator: String) =>
+  fun ref _resume_the_world(initiator: WorkerName) =>
     _initiated_stop_the_world = false
     _stop_the_world_in_process = false
     _resume_all_local()
     @printf[I32]("~~~Resuming message processing.~~~\n".cstring())
 
-  be remote_mute_request(originating_worker: String) =>
+  be remote_mute_request(originating_worker: WorkerName) =>
     """
     A remote worker requests that we mute all sources and data channel.
     """
     _mute_request(originating_worker)
 
-  fun ref _mute_request(originating_worker: String) =>
+  fun ref _mute_request(originating_worker: WorkerName) =>
     _stopped_worker_waiting_list.set(originating_worker)
     _stop_all_local()
 
-  be remote_unmute_request(originating_worker: String) =>
+  be remote_unmute_request(originating_worker: WorkerName) =>
     """
     A remote worker requests that we unmute all sources and data channel.
     """
     _unmute_request(originating_worker)
 
-  fun ref _unmute_request(originating_worker: String) =>
+  fun ref _unmute_request(originating_worker: WorkerName) =>
     if _stopped_worker_waiting_list.size() > 0 then
       _stopped_worker_waiting_list.unset(originating_worker)
       if (_stopped_worker_waiting_list.size() == 0) then
@@ -795,7 +814,7 @@ actor RouterRegistry
 
   fun _resume_all_remote() =>
     try
-      let msg = ChannelMsgEncoder.resume_the_world(_worker_name, _auth)?
+      let msg = ChannelMsgEncoder.resume_processing(_worker_name, _auth)?
       _connections.send_control_to_cluster(msg)
     else
       Fail()
@@ -1175,8 +1194,7 @@ actor RouterRegistry
       for w in leaving_workers.values() do
         @printf[I32]("-- -- %s\n".cstring(), w.cstring())
       end
-      _stop_the_world_in_process = true
-      initiate_stop_the_world()
+      _initiated_stop_the_world = true
       _stop_the_world_for_shrink_migration()
       try
         let msg = ChannelMsgEncoder.prepare_shrink(remaining_workers,
@@ -1216,7 +1234,6 @@ actor RouterRegistry
     leaving_workers: Array[String] val)
   =>
     if not _stop_the_world_in_process then
-      _stop_the_world_in_process = true
       _stop_the_world_for_shrink_migration()
     end
 

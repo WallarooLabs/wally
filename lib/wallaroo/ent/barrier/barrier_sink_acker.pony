@@ -33,6 +33,7 @@ class BarrierSinkAcker
     _barrier_initiator = barrier_initiator
 
   fun ref higher_priority(token: BarrierToken): Bool =>
+    @printf[I32]("!@ SINKACKER: Comparing %s to %s. higher_priority: %s\n".cstring(), token.string().cstring(), _barrier_token.string().cstring(), (token > _barrier_token).string().cstring())
     token > _barrier_token
 
   fun input_blocking(id: RoutingId): Bool =>

@@ -27,8 +27,7 @@ primitive StepStateSnapshotter
       let payload = wb.done()
       event_log.snapshot_state(id, snapshot_id, consume payload)
     else
-      //!@ What does this mean?
-      @printf[I32](("Could not complete log rotation. StateRunner is not " +
-        "Serializable.\n").cstring())
-      Fail()
+      // Currently, non-state steps don't have anything to snapshot.
+      event_log.snapshot_state(id, snapshot_id,
+        recover val Array[ByteSeq] end)
     end

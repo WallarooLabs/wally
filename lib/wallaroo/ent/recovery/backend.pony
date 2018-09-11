@@ -122,13 +122,11 @@ class FileBackend is Backend
   let _writer: Writer iso
   let _snapshot_id_entry_len: USize = 9 // Bool -- U64
   let _log_entry_len: USize = 17 // Bool -- U128
-  var _replay_log_exists: Bool
   var _bytes_written: USize = 0
 
   new create(filepath: FilePath, event_log: EventLog ref) =>
     _writer = recover iso Writer end
     _filepath = filepath
-    _replay_log_exists = _filepath.exists()
     _file = recover iso File(filepath) end
     _event_log = event_log
 
@@ -139,89 +137,98 @@ class FileBackend is Backend
     _bytes_written
 
   fun ref start_rollback(snapshot_id: SnapshotId) =>
-    if _replay_log_exists then
+    if _filepath.exists() then
       @printf[I32](("RESILIENCE: Rolling back to snapshot %s from recovery " +
-        " log file: \n").cstring(), snapshot_id.string().cstring(),
+        "log file: \n").cstring(), snapshot_id.string().cstring(),
         _filepath.path.cstring())
 
-      try
-        let r = Reader
+      let r = Reader
 
-        //seek beginning of file
-        _file.seek_start(0)
+      //seek beginning of file
+      _file.seek_start(0)
 
-        // array to hold recovered data temporarily until we've sent it off to
-        // be replayed.
-        // (resilient_id, payload)
-        var replay_buffer: Array[(RoutingId, ByteSeq val)] ref =
-          replay_buffer.create()
+      // array to hold recovered data temporarily until we've sent it off to
+      // be replayed.
+      // (resilient_id, payload)
+      var replay_buffer: Array[(RoutingId, ByteSeq val)] ref =
+        replay_buffer.create()
 
-        let watermarks_trn = recover trn Map[RoutingId, SeqId] end
+      var current_snapshot_id: SnapshotId = 0
+      if _file.size() > 0 then
+        // Read the initial entry in the file, which should be a snapshot_id,
+        // skipping the is_watermark byte
+        _file.seek(1)
+        r.append(_file.read(8))
+        current_snapshot_id = try r.u64_be()? else Fail(); 0 end
 
-        var current_snapshot_id: SnapshotId = 0
-        if _file.size() > 0 then
-          r.append(_file.read(16))
-          current_snapshot_id = r.u64_be()?
-          // We need to get to the data for the provided snapshot id. We'll
-          // keep reading until we find the prior snapshot id, at which point
-          // we're lined up with entries for this snapshot.
-          while current_snapshot_id < (snapshot_id - 1) do
-            let is_watermark = BoolConverter.u8_to_bool(r.u8()?)
-            if is_watermark then
-              r.append(_file.read(16))
-              current_snapshot_id = r.u64_be()?
+        // We need to get to the data for the provided snapshot id. We'll
+        // keep reading until we find the prior snapshot id, at which point
+        // we're lined up with entries for this snapshot.
+        while current_snapshot_id < (snapshot_id - 1) do
+          r.append(_file.read(1))
+          let is_watermark = BoolConverter.u8_to_bool(
+            try r.u8()? else Fail(); 0 end)
+
+          if is_watermark then
+            r.append(_file.read(8))
+            current_snapshot_id = try r.u64_be()? else Fail(); 0 end
+          else
+            // Skip this entry since we're looking for the next snapshot id.
+            // First skip resilient_id
+            _file.seek(16)
+            // Read payload size
+            r.append(_file.read(4))
+            let size = try r.u32_be()? else Fail(); 0 end
+            // Skip payload
+            _file.seek(size.isize())
+          end
+        end
+        var end_of_snapshot = false
+        // Skip our watermark:false byte
+        _file.seek(1)
+        while not end_of_snapshot do
+          r.append(_file.read(20))
+          let resilient_id = try r.u128_be()? else Fail(); 0 end
+          let payload_length = try r.u32_be()? else Fail(); 0 end
+          let payload = recover val
+            if payload_length > 0 then
+              _file.read(payload_length.usize())
             else
-              // Skip this entry since we're looking for the next snapshot id.
-              // We use entry length - 1 since we just read the Bool at the
-              // start of this entry.
-              _file.seek(_log_entry_len.isize() - 1)
+              Array[U8]
             end
           end
-          var end_of_snapshot = false
-          while not end_of_snapshot do
-            r.append(_file.read(32))
-            let resilient_id = r.u128_be()?
-            let payload_length = r.u32_be()?
-            let payload = recover val
-              if payload_length > 0 then
-                _file.read(payload_length.usize())
-              else
-                Array[U8]
-              end
-            end
-            // put entry into temporary recovered buffer
-            replay_buffer.push((resilient_id, payload))
+          // put entry into temporary recovered buffer
+          replay_buffer.push((resilient_id, payload))
 
-            // Check if we're at the end of this snapshot
-            r.append(_file.read(1))
-            end_of_snapshot = BoolConverter.u8_to_bool(r.u8()?)
-          end
-        else
-          @printf[I32](("Trying to rollback to snapshot %s from empty " +
-            "recovery file %s\n").cstring(), snapshot_id.string().cstring())
-          Fail()
+          // Check if we're at the end of this snapshot
+          r.append(_file.read(1))
+          end_of_snapshot = BoolConverter.u8_to_bool(
+            try r.u8()? else Fail(); 0 end)
         end
-
-        // clear read buffer to free file data read so far
-        if r.size() > 0 then
-          Fail()
-        else
-          r.clear()
-        end
-
-        var num_replayed: USize = 0
-        for entry in replay_buffer.values() do
-          num_replayed = num_replayed + 1
-          _event_log.rollback_from_log_entry(entry._1, entry._2)
-        end
-
-        @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
-          "file.\n").cstring(), num_replayed)
-
-        _file.seek_end(0)
       else
-        @printf[I32]("Cannot recover state from eventlog\n".cstring())
+        @printf[I32](("Trying to rollback to snapshot %s from empty " +
+          "recovery file %s\n").cstring(), snapshot_id.string().cstring())
+        Fail()
       end
+
+      // clear read buffer to free file data read so far
+      if r.size() > 0 then
+        Fail()
+      else
+        r.clear()
+      end
+
+      var num_replayed: USize = 0
+      _event_log.expect_rollback_count(replay_buffer.size())
+      for entry in replay_buffer.values() do
+        num_replayed = num_replayed + 1
+        _event_log.rollback_from_log_entry(entry._1, entry._2)
+      end
+
+      @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
+        "file.\n").cstring(), num_replayed)
+
+      _file.seek_end(0)
     else
       @printf[I32]("RESILIENCE: Could not find log file to rollback from.\n"
         .cstring())
@@ -241,19 +248,25 @@ class FileBackend is Backend
   fun ref encode_entry(resilient_id: RoutingId, snapshot_id: SnapshotId,
     payload: Array[ByteSeq] val)
   =>
+    ifdef debug then
+      Invariant(payload.size() > 0)
+      Invariant(payload.size() <= U32.max_value().usize())
+    end
+
     ifdef "trace" then
       @printf[I32]("EventLog: Writing Entry for SnapshotId %s\n".cstring(),
         snapshot_id.string().cstring())
     end
 
-    ifdef debug then
-      Invariant(payload.size() <= U32.max_value().usize())
+    var payload_size: USize = 0
+    for p in payload.values() do
+      payload_size = payload_size + p.size()
     end
 
     // This is not a watermark so write false
     _writer.u8(BoolConverter.bool_to_u8(false))
     _writer.u128_be(resilient_id)
-    _writer.u32_be(payload.size().u32())
+    _writer.u32_be(payload_size.u32())
     _writer.writev(payload)
 
   fun ref encode_snapshot_id(snapshot_id: SnapshotId) =>

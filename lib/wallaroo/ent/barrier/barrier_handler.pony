@@ -21,19 +21,24 @@ trait BarrierHandler
   fun name(): String
   fun in_progress(): Bool
   fun ref ack_barrier(s: BarrierReceiver) =>
-    _print_invalid_call_debug_info()
+    _invalid_call()
     Fail()
+
   fun ref worker_ack_barrier_start(w: String)
   =>
-    _print_invalid_call_debug_info()
+    _invalid_call()
     Fail()
+
   fun ref worker_ack_barrier(w: String)
   =>
-    _print_invalid_call_debug_info()
+    _invalid_call()
     Fail()
+
   fun ref check_for_completion() =>
+    _invalid_call()
     Fail()
-  fun ref _print_invalid_call_debug_info() =>
+
+  fun ref _invalid_call() =>
     @printf[I32]("Invalid call on BarrierHandler %s\n".cstring(),
       name().cstring())
 

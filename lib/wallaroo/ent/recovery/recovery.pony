@@ -16,6 +16,7 @@ use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
+use "wallaroo/ent/router_registry"
 use "wallaroo/ent/snapshot"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
@@ -41,11 +42,13 @@ actor Recovery
   let _recovery_reconnecter: RecoveryReconnecter
   let _snapshot_initiator: SnapshotInitiator
   let _connections: Connections
+  let _router_registry: RouterRegistry
   var _initializer: (LocalTopologyInitializer | None) = None
 
   new create(auth: AmbientAuth, worker_name: WorkerName, event_log: EventLog,
     recovery_reconnecter: RecoveryReconnecter,
-    snapshot_initiator: SnapshotInitiator, connections: Connections)
+    snapshot_initiator: SnapshotInitiator, connections: Connections,
+    router_registry: RouterRegistry)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -53,19 +56,14 @@ actor Recovery
     _recovery_reconnecter = recovery_reconnecter
     _snapshot_initiator = snapshot_initiator
     _connections = connections
+    _router_registry = router_registry
 
-  be start_recovery(
-    initializer: LocalTopologyInitializer,
+  be start_recovery(initializer: LocalTopologyInitializer,
     workers: Array[WorkerName] val)
   =>
-    //!@ Not sure we need to thread workers through anymore
-    let other_workers = recover trn Array[WorkerName] end
-    for w in workers.values() do
-      if w != _worker_name then other_workers.push(w) end
-    end
-    _workers = consume other_workers
-
+    _workers = workers
     _initializer = initializer
+    _router_registry.stop_the_world()
     _recovery_phase.start_recovery(_workers, this)
 
   be recovery_reconnect_finished() =>
@@ -99,14 +97,6 @@ actor Recovery
       _recovery_phase = _PrepareRollback(this)
       let action = Promise[SnapshotRollbackBarrierToken]
       action.next[None]({(token: SnapshotRollbackBarrierToken) =>
-        // Inform cluster we've initiated recovery
-        try
-          let msg = ChannelMsgEncoder.recovery_initiated(token, _worker_name,
-            _auth)?
-          _connections.send_control_to_cluster(msg)
-        else
-          Fail()
-        end
         _self.rollback_prep_complete(token)
       })
       _snapshot_initiator.initiate_rollback(action)
@@ -117,6 +107,15 @@ actor Recovery
   fun ref _rollback_prep_complete(token: SnapshotRollbackBarrierToken) =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback - ~~|\n".cstring())
+      // Inform cluster we've initiated recovery
+      try
+        let msg = ChannelMsgEncoder.recovery_initiated(token, _worker_name,
+          _auth)?
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
+
       _recovery_phase = _Rollback(this, token, _workers)
       let action = Promise[SnapshotRollbackBarrierToken]
       action.next[None](recover this~rollback_complete(_worker_name) end)
@@ -139,6 +138,7 @@ actor Recovery
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())
     end
+    _router_registry.resume_the_world(_worker_name)
     _recovery_phase = _FinishedRecovering
     //!@ Do we still want to do this?
     match _initializer
@@ -147,6 +147,8 @@ actor Recovery
     else
       Fail()
     end
+
+    _snapshot_initiator.resume_snapshot()
 
   fun ref _abort_early(worker: WorkerName) =>
     """
