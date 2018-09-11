@@ -61,6 +61,8 @@ class val LocalTopology
   let worker_names: Array[WorkerName] val
   // Workers that cannot be removed during shrink to fit
   let non_shrinkable: SetIs[WorkerName] val
+  // Each worker has one BarrierSource with a unique id
+  let barrier_source_id: RoutingId
 
   new val create(name': String, worker_name': WorkerName,
     graph': Dag[StepInitializer] val,
@@ -70,7 +72,8 @@ class val LocalTopology
     boundary_ids': Map[WorkerName, RoutingId] val,
     worker_names': Array[WorkerName] val,
     non_shrinkable': SetIs[WorkerName] val,
-    state_routing_ids': Map[StateName, Map[WorkerName, RoutingId] val] val)
+    state_routing_ids': Map[StateName, Map[WorkerName, RoutingId] val] val,
+    barrier_source_id': RoutingId)
   =>
     _app_name = name'
     _worker_name = worker_name'
@@ -82,6 +85,7 @@ class val LocalTopology
     worker_names = worker_names'
     non_shrinkable = non_shrinkable'
     state_routing_ids = state_routing_ids'
+    barrier_source_id = barrier_source_id'
 
   fun state_builders(): Map[StateName, StateSubpartitions] val =>
     _state_builders
@@ -149,7 +153,7 @@ class val LocalTopology
     new_state_builders(state_name) = new_subpartition
     LocalTopology(_app_name, _worker_name, _graph, _step_map,
       consume new_state_builders, _pre_state_data, _boundary_ids, worker_names,
-      non_shrinkable, state_routing_ids)
+      non_shrinkable, state_routing_ids, barrier_source_id)
 
   fun val add_worker_name(w: WorkerName): LocalTopology =>
     if not worker_names.contains(w) then
@@ -168,7 +172,8 @@ class val LocalTopology
 
       LocalTopology(_app_name, _worker_name, _graph, _step_map,
         consume new_state_builders, _pre_state_data, _boundary_ids,
-        consume new_worker_names, non_shrinkable, state_routing_ids)
+        consume new_worker_names, non_shrinkable, state_routing_ids,
+        barrier_source_id)
     else
       this
     end
@@ -184,7 +189,8 @@ class val LocalTopology
     end
     LocalTopology(_app_name, _worker_name, _graph, _step_map,
       _state_builders, _pre_state_data, _boundary_ids,
-      consume new_worker_names, non_shrinkable, state_routing_ids)
+      consume new_worker_names, non_shrinkable, state_routing_ids,
+      barrier_source_id)
 
   fun val for_new_worker(new_worker: WorkerName): LocalTopology ? =>
     let w_names =
@@ -205,7 +211,7 @@ class val LocalTopology
 
     LocalTopology(_app_name, new_worker, g.clone()?,
       _step_map, _state_builders, _pre_state_data, _boundary_ids,
-      w_names, non_shrinkable, state_routing_ids)
+      w_names, non_shrinkable, state_routing_ids, barrier_source_id)
 
   fun eq(that: box->LocalTopology): Bool =>
     // This assumes that _graph and _pre_state_data never change over time
@@ -1386,12 +1392,11 @@ actor LocalTopologyInitializer is LayoutInitializer
               // If there is no BarrierSource, we need to create one, since
               // this worker has at least one Source on it.
               if barrier_source is None then
-                let b_source_id = _routing_id_gen()
-                let b_source = BarrierSource(b_source_id, _router_registry,
-                  _event_log)
+                let b_source = BarrierSource(t.barrier_source_id,
+                  _router_registry, _event_log)
                 _barrier_initiator.register_barrier_source(b_source)
-                @printf[I32]("!@!! register_resilient: BarrierSource\n".cstring())
-                _event_log.register_resilient(b_source_id, b_source)
+                @printf[I32]("!@!! register_resilient: BarrierSource %s\n".cstring(), t.barrier_source_id.string().cstring())
+                _event_log.register_resilient(t.barrier_source_id, b_source)
                 barrier_source = b_source
               end
               try

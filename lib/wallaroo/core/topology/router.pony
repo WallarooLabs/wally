@@ -935,10 +935,6 @@ class val DataRouter is Equatable[DataRouter]
     end
     _keys_to_route_ids = consume kid_map
 
-  //!@
-  fun ll() =>
-    @printf[I32]("!@ DataRouter: LocalStatePartitions size: %s\n".cstring(), _keyed_routes.size().string().cstring())
-
   new val with_route_ids(worker: String,
     data_routes: Map[RoutingId, Consumer] val,
     keyed_routes: LocalStatePartitions val,

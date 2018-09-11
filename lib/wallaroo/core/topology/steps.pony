@@ -110,7 +110,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
-                @printf[I32]("!@!! register_resilient: Step\n".cstring())
+                @printf[I32]("!@!! register_resilient: Step %s\n".cstring(), _id.string().cstring())
     _event_log.register_resilient(id, this)
 
     let initial_router = _runner.clone_router_and_set_input_type(router')
@@ -583,6 +583,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
         match _step_message_processor
         | let nsmp: NormalStepMessageProcessor =>
           try
+            @printf[I32]("!@ Step starting new barrier!\n".cstring())
             _step_message_processor = BarrierStepMessageProcessor(this,
               _barrier_forwarder as BarrierStepForwarder)
             _step_message_processor.receive_new_barrier(step_id, producer,
@@ -624,4 +625,5 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     ifdef "resilience" then
       StepRollbacker(payload, _runner)
     end
+    @printf[I32]("!@ Step %s acking rollback\n".cstring(), _id.string().cstring())
     event_log.ack_rollback(_id)

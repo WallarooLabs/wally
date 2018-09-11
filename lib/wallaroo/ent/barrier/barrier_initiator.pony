@@ -66,13 +66,17 @@ actor BarrierInitiator is Initializable
   var _primary_worker: String
 
   new create(auth: AmbientAuth, worker_name: String, connections: Connections,
-    primary_worker: String)
+    primary_worker: String, is_recovering: Bool = false)
   =>
     _auth = auth
     _worker_name = worker_name
     _connections = connections
     _primary_worker = primary_worker
-    _phase = _NormalBarrierInitiatorPhase(this)
+    if is_recovering then
+      _phase = _RecoveringBarrierInitiatorPhase(this)
+    else
+      _phase = _NormalBarrierInitiatorPhase(this)
+    end
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
@@ -172,6 +176,14 @@ actor BarrierInitiator is Initializable
           _clear_barriers()
           _phase = _RollbackBarrierInitiatorPhase(this, srt)
         end
+      | let srrt: SnapshotRollbackResumeBarrierToken =>
+        // Check if this rollback token is higher priority than a current
+        // rollback token, in case one is being processed. If it's not, drop
+        // it.
+        if _phase.higher_priority(srrt) then
+          _clear_barriers()
+          _phase = _NormalBarrierInitiatorPhase(this)
+        end
       end
 
       _phase.initiate_barrier(barrier_token, result_promise)
@@ -232,8 +244,6 @@ actor BarrierInitiator is Initializable
       @printf[I32]("Initiating barrier protocol for %s.\n".cstring(),
         barrier_token.string().cstring())
     end
-    //!@
-    // _current_barrier_token = barrier_token
 
     let barrier_handler = PendingBarrierHandler(_worker_name, this,
       barrier_token, _sinks, _workers, result_promise
@@ -290,6 +300,36 @@ actor BarrierInitiator is Initializable
   =>
     // @printf[I32]("!@ remote_initiate_barrier called for %s\n".cstring(), barrier_token.string().cstring())
 
+    // If we're in recovery mode, we might need to collect some rollback
+    // acks before we receive a remote_initiate_barrier.
+    var pending_acks: (PendingRollbackBarrierAcks | None) = None
+
+    // We handle rollback barrier token as a special case. That's because
+    // in the presence of a rollback token, we need to cancel all other
+    // tokens in flight since we are rolling back to an earlier state of
+    // the system. On a successful match here, we transition to the
+    // rollback phase.
+    match barrier_token
+    | let srt: SnapshotRollbackBarrierToken =>
+      // Check if this rollback token is higher priority than a current
+      // rollback token, in case one is being processed. If it's not, drop
+      // it.
+      if _phase.higher_priority(srt) then
+        _clear_barriers()
+        pending_acks = _phase.pending_rollback_barrier_acks()
+        @printf[I32]("!@ Switching to _RollbackBarrierInitiatorPhase for %s\n".cstring(), srt.string().cstring())
+        _phase = _RollbackBarrierInitiatorPhase(this, srt)
+      end
+    | let srrt: SnapshotRollbackResumeBarrierToken =>
+      // Check if this rollback token is higher priority than a current
+      // rollback token, in case one is being processed. If it's not, drop
+      // it.
+      if _phase.higher_priority(srrt) then
+        _clear_barriers()
+        _phase = _NormalBarrierInitiatorPhase(this)
+      end
+    end
+
     let next_handler = PendingBarrierHandler(_worker_name, this,
       barrier_token, _sinks, _workers, EmptyBarrierResultPromise(),
       primary_worker)
@@ -297,6 +337,12 @@ actor BarrierInitiator is Initializable
       _active_barriers.add_barrier(barrier_token, next_handler)?
     else
       Fail()
+    end
+
+    match pending_acks
+    | let pa: PendingRollbackBarrierAcks =>
+      @printf[I32]("!@ Flushing PendingRollbackBarrierAcks\n".cstring())
+      pa.flush(barrier_token, _active_barriers)
     end
 
     try
@@ -365,6 +411,7 @@ actor BarrierInitiator is Initializable
     Called by sinks when they have received barrier barriers on all
     their inputs.
     """
+    @printf[I32]("!@ BarrierInitiator: ack_barrier on %s\n".cstring(), _phase.name().cstring())
     _phase.ack_barrier(s, barrier_token, _active_barriers)
 
   be worker_ack_barrier(w: String, barrier_token: BarrierToken) =>

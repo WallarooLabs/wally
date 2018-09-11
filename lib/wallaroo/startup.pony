@@ -291,6 +291,11 @@ actor Startup
         end
       end
 
+      //!@
+      if not event_log_dir_filepath.exists() then
+        Fail()
+      end
+
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
           EventLog(_startup_options.worker_name,
@@ -298,16 +303,19 @@ actor Startup
             _event_log_file_basename
             where backend_file_length' =
               _startup_options.event_log_file_length,
-            suffix' = _event_log_file_suffix, log_rotation' = true))
+            suffix' = _event_log_file_suffix, log_rotation' = true,
+            is_recovering' = is_recovering))
         else
           EventLog(_startup_options.worker_name,
             EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
-              _startup_options.event_log_file_length))
+              _startup_options.event_log_file_length,
+              is_recovering' = is_recovering))
         end
       else
-        EventLog(_startup_options.worker_name)
+        EventLog(_startup_options.worker_name,
+          EventLogConfig(where is_recovering' = is_recovering))
       end
       let event_log = _event_log as EventLog
 
@@ -323,7 +331,8 @@ actor Startup
       connections.register_disposable(this)
 
       let barrier_initiator = BarrierInitiator(auth,
-        _startup_options.worker_name, connections, initializer_name)
+        _startup_options.worker_name, connections, initializer_name,
+        is_recovering)
       connections.register_disposable(barrier_initiator)
       event_log.set_barrier_initiator(barrier_initiator)
 
@@ -361,7 +370,8 @@ actor Startup
         connections, is_recovering)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        event_log, recovery_reconnecter, snapshot_initiator, connections)
+        event_log, recovery_reconnecter, snapshot_initiator, connections,
+        router_registry)
 
       let local_topology_initializer =
         LocalTopologyInitializer(
@@ -547,7 +557,8 @@ actor Startup
         data_receivers, router_registry, connections)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        event_log, recovery_reconnecter, snapshot_initiator, connections)
+        event_log, recovery_reconnecter, snapshot_initiator, connections,
+        router_registry)
 
       let local_topology_initializer =
         LocalTopologyInitializer(
@@ -653,14 +664,17 @@ actor Startup
 
   fun ref _set_recovery_file_names(auth: AmbientAuth) =>
     try
+      @printf[I32]("!@ resilience_dir: %s\n".cstring(), _startup_options.resilience_dir.cstring())
       _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)?
     else
       Fail()
     end
     _event_log_file_basename = _app_name + "-" + _startup_options.worker_name
+    @printf[I32]("!@ Startup: _event_log_file_basename: %s\n".cstring(), _event_log_file_basename.string().cstring())
     _event_log_file_suffix = ".evlog"
     _event_log_file = _startup_options.resilience_dir + "/" + _app_name + "-" +
       _startup_options.worker_name + ".evlog"
+    @printf[I32]("!@ Startup: _event_log_file: %s\n".cstring(), _event_log_file.string().cstring())
     _local_topology_file = _startup_options.resilience_dir + "/" + _app_name +
       "-" + _startup_options.worker_name + ".local-topology"
     _data_channel_file = _startup_options.resilience_dir + "/" + _app_name +

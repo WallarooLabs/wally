@@ -386,8 +386,6 @@ class LocalStatePartitions
       for step in _info(state_name)?.values() do
         step.unregister_producer(input_id, producer)
       end
-    else
-      Fail()
     end
 
   fun receive_barrier(state_name: StateName, origin_step_id: RoutingId,

@@ -102,6 +102,7 @@ primitive WallarooConfig
       .add("spike-drop", "", None)
       .add("spike-prob", "", F64Argument)
       .add("spike-margin", "", I64Argument)
+      .add("time-between-snapshots", "", I64Argument)
 
     if handle_help then
       options.add("help", "h", None)
@@ -177,6 +178,8 @@ primitive WallarooConfig
         spike_prob = arg
       | ("spike-margin", let arg: I64) =>
         spike_margin = arg.usize()
+      | ("time-between-snapshots", let arg: I64) =>
+        so.time_between_snapshots = arg.u64()
       end
     end
 

@@ -473,11 +473,24 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _snapshot_initiator.event_log_snapshot_complete(m.sender,
           m.snapshot_id)
       | let m: CommitSnapshotIdMsg =>
-        _snapshot_initiator.commit_snapshot_id(m.snapshot_id, m.sender)
+        _snapshot_initiator.commit_snapshot_id(m.snapshot_id, m.rollback_id,
+          m.sender)
       | let m: RecoveryInitiatedMsg =>
         _recovery.recovery_initiated_at_worker(m.sender, m.token)
       | let m: InitiateRollbackMsg =>
-        _snapshot_initiator.initiate_snapshot()
+        let promise = Promise[SnapshotRollbackBarrierToken]
+        promise.next[None]({(t: SnapshotRollbackBarrierToken) =>
+          try
+            let msg = ChannelMsgEncoder.rollback_complete(t, _worker_name,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _snapshot_initiator.initiate_rollback(promise)
+      | let m: RollbackCompleteMsg =>
+        _recovery.rollback_prep_complete(m.token)
       | let m: EventLogInitiateRollbackMsg =>
         let promise = Promise[SnapshotRollbackBarrierToken]
         promise.next[None]({(t: SnapshotRollbackBarrierToken) =>
@@ -492,12 +505,15 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _event_log.initiate_rollback(m.token, promise)
       | let m: EventLogAckRollbackMsg =>
         _recovery.rollback_complete(m.sender, m.token)
-      | let m: ResumeTheWorldMsg =>
+      | let m: ResumeSnapshotMsg =>
+        @printf[I32]("!@ Rcvd ResumeSnapshotMsg!!\n".cstring())
+        _snapshot_initiator.resume_snapshot()
+      | let m: ResumeProcessingMsg =>
         ifdef "trace" then
           @printf[I32]("Received ResumeTheWorldMsg from %s\n".cstring(),
             m.sender.cstring())
         end
-        _router_registry.resume_the_world(m.sender)
+        _router_registry.resume_processing(m.sender)
       | let m: RotateLogFilesMsg =>
         @printf[I32]("Control Ch: Received Rotate Log Files request\n"
           .cstring())

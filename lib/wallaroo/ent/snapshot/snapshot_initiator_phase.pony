@@ -12,16 +12,17 @@ trait _SnapshotInitiatorPhase
 
   fun ref snapshot_barrier_complete(token: BarrierToken) =>
     _invalid_call()
+    Fail()
 
   fun ref event_log_snapshot_complete(worker: WorkerName,
     snapshot_id: SnapshotId)
   =>
     _invalid_call()
+    Fail()
 
   fun _invalid_call() =>
     @printf[I32]("Invalid call on snapshot initiator phase %s\n".cstring(),
       name().cstring())
-    Fail()
 
 class _WaitingSnapshotInitiatorPhase is _SnapshotInitiatorPhase
   fun name(): String => "_WaitingSnapshotInitiatorPhase"
