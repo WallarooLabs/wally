@@ -83,7 +83,7 @@ actor Main
             TCPSinkConfigCLIParser(env.args)?(0)?))
         consume a
       end
-      Startup(env, application, "Multi Partition Detector")
+      Startup(env, application, "multi_partition_detector")
     else
       env.out.print("Couldn't build topology!")
     end
