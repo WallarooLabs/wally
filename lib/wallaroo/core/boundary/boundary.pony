@@ -104,6 +104,8 @@ actor OutgoingBoundary is Consumer
   var _reported_ready_to_work: Bool = false
 
   // Consumer
+  var _registered_producers: RegisteredProducers =
+    _registered_producers.create()
   var _upstreams: SetIs[Producer] = _upstreams.create()
 
   var _mute_outstanding: Bool = false
@@ -455,7 +457,13 @@ actor OutgoingBoundary is Consumer
   be forward_register_producer(source_id: RoutingId, target_id: RoutingId,
     producer: Producer)
   =>
+    _forward_register_producer(source_id, target_id, producer)
+
+  fun ref _forward_register_producer(source_id: RoutingId,
+    target_id: RoutingId, producer: Producer)
+  =>
     @printf[I32]("!@ Forward Registered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
+    _registered_producers.register_producer(source_id, producer, target_id)
     try
       let msg = ChannelMsgEncoder.register_producer(_worker_name,
         source_id, target_id, _auth)?
@@ -470,6 +478,7 @@ actor OutgoingBoundary is Consumer
   =>
     @printf[I32]("!@ Forward UNRegistered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
 
+    _registered_producers.unregister_producer(source_id, producer, target_id)
     try
       let msg = ChannelMsgEncoder.unregister_producer(_worker_name,
         source_id, target_id, _auth)?
@@ -478,6 +487,13 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
     _upstreams.unset(producer)
+
+  fun ref resend_producer_registrations() =>
+    for (producer_id, producer, target_id) in
+      _registered_producers.registrations().values()
+    do
+      _forward_register_producer(producer_id, target_id, producer)
+    end
 
   be report_status(code: ReportStatusCode) =>
     try
@@ -1108,6 +1124,12 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
+    match conn
+    | let ob: OutgoingBoundary ref =>
+      ob.resend_producer_registrations()
+    else
+      Fail()
+    end
     conn.set_nodelay(true)
     conn.expect(4)
 

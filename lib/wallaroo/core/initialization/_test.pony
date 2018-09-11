@@ -68,7 +68,8 @@ primitive _BaseLocalTopologyGenerator
     LocalTopology("test", "w1", dag, _StepMapGenerator(),
       _BaseStateBuildersGenerator(rb, pf), psd, _ProxyIdsGenerator(),
       _BaseWorkerNamesGenerator(), recover val SetIs[String] end,
-      recover val Map[StateName, Map[WorkerName, RoutingId] val] end)
+      recover val Map[StateName, Map[WorkerName, RoutingId] val] end,
+      0)
 
 primitive _TargetLocalTopologyGenerator
   fun apply(dag: Dag[StepInitializer] val,
@@ -79,7 +80,8 @@ primitive _TargetLocalTopologyGenerator
     LocalTopology("test", "w1", dag, _StepMapGenerator(),
       _TargetStateBuildersGenerator(rb, pf), psd, _ProxyIdsGenerator(),
       _TargetWorkerNamesGenerator(), recover val SetIs[String] end,
-      recover val Map[StateName, Map[WorkerName, RoutingId] val] end)
+      recover val Map[StateName, Map[WorkerName, RoutingId] val] end,
+      0)
 
 primitive _DagGenerator
   fun apply(): Dag[StepInitializer] val =>
