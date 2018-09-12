@@ -384,6 +384,14 @@ actor TCPSink is Sink
     _message_processor.flush()
     _message_processor = NormalSinkMessageProcessor(this)
 
+  fun ref _clear_barriers() =>
+    try
+      (_barrier_acker as BarrierSinkAcker).clear()
+    else
+      Fail()
+    end
+    _message_processor = NormalSinkMessageProcessor(this)
+
   ///////////////
   // CHECKPOINTS
   ///////////////
@@ -399,12 +407,7 @@ actor TCPSink is Sink
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
-    try
-      (_barrier_acker as BarrierSinkAcker).clear()
-    else
-      Fail()
-    end
-    _message_processor = NormalSinkMessageProcessor(this)
+    _clear_barriers()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)

@@ -34,6 +34,9 @@ class BarrierStepForwarder
   fun ref higher_priority(token: BarrierToken): Bool =>
     token > _barrier_token
 
+  fun ref lower_priority(token: BarrierToken): Bool =>
+    token < _barrier_token
+
   fun barrier_in_progress(): Bool =>
     _barrier_token != InitialBarrierToken
 
@@ -69,8 +72,8 @@ class BarrierStepForwarder
     end
 
     if barrier_token != _barrier_token then
-      @printf[I32]("!@ Received %s when still processing %s\n".cstring(),
-        _barrier_token.string().cstring(), barrier_token.string().cstring())
+      @printf[I32]("!@ Received %s when still processing %s at step %s\n".cstring(),
+        _barrier_token.string().cstring(), barrier_token.string().cstring(), _step_id.string().cstring())
       Fail()
     end
 
