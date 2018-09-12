@@ -635,7 +635,12 @@ class StateRunner[S: State ref] is (Runner & RollbackableRunner &
       //!@
       match _state
       | let s: Stringablike =>
-        @printf[I32]("!@ SERIALIZE: %s on step %s with tag %s\n".cstring(), s.string().cstring(), _id.string().cstring(), (digestof this).string().cstring())
+        (let sec', let ns') = Time.now()
+        let us' = ns' / 1000
+        let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())
+        @printf[I32]("!@ SERIALIZE (%s): %s on step %s with tag %s\n".cstring(),
+          ts'.cstring(),s.string().cstring(), _id.string().cstring(),
+          (digestof this).string().cstring())
       end
       Serialised(SerialiseAuth(_auth), _state)?
         .output(OutputSerialisedAuth(_auth))
@@ -654,7 +659,14 @@ class StateRunner[S: State ref] is (Runner & RollbackableRunner &
         | let st: Stringablike =>
           match s
           | let st2: Stringablike =>
-            @printf[I32]("!@ DESERIALIZE: old %s replaced by new %s on step %s with tag %s\n".cstring(), st.string().cstring(), st2.string().cstring(), _id.string().cstring(), (digestof this).string().cstring())
+            (let sec', let ns') = Time.now()
+            let us' = ns' / 1000
+            let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." +
+              us'.string())
+            @printf[I32](("!@ DESERIALIZE (%s): old %s replaced by new %s on " +
+              "step %s with tag %s\n").cstring(), ts'.cstring(), st.string().cstring(),
+              st2.string().cstring(), _id.string().cstring(),
+              (digestof this).string().cstring())
           end
         end
         _state = s
