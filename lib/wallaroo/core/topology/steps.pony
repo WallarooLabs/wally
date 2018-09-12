@@ -575,6 +575,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   fun ref process_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
+    @printf[I32]("!@ Step %s process_barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
     if _inputs.contains(step_id) then
       // @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
       match barrier_token
@@ -627,6 +628,14 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     _step_message_processor.flush()
     _step_message_processor = NormalStepMessageProcessor(this)
 
+  fun ref _clear_barriers() =>
+    try
+      (_barrier_forwarder as BarrierStepForwarder).clear()
+    else
+      Fail()
+    end
+    _step_message_processor = NormalStepMessageProcessor(this)
+
   //////////////
   // CHECKPOINTS
   //////////////
@@ -641,13 +650,8 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
-    try
-      (_barrier_forwarder as BarrierStepForwarder).clear()
-    else
-      Fail()
-    end
     _pending_message_store.clear()
-    _step_message_processor = NormalStepMessageProcessor(this)
+    _clear_barriers()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)

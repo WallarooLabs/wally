@@ -36,6 +36,9 @@ class BarrierSinkAcker
     // @printf[I32]("!@ SINKACKER: Comparing %s to %s. higher_priority: %s\n".cstring(), token.string().cstring(), _barrier_token.string().cstring(), (token > _barrier_token).string().cstring())
     token > _barrier_token
 
+  fun ref lower_priority(token: BarrierToken): Bool =>
+    token < _barrier_token
+
   fun input_blocking(id: RoutingId): Bool =>
     _inputs_blocking.contains(id)
 
