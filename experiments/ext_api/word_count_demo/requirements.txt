@@ -1,3 +1,4 @@
 kafka-python
 redis
 boto
+boto3
