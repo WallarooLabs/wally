@@ -138,8 +138,8 @@ class SinkAwaitValue(StoppableThread):
             msgs = len(self.sink.data)
             if msgs and msgs > self.position:
                 while self.position < msgs:
+                    sink_data = self.func(self.sink.data[self.position])
                     for val in list(self.values):
-                        sink_data = self.func(self.sink.data[self.position])
                         if sink_data == val:
                             self.values.discard(val)
                             logging.log(1, "{} matched on value {!r}."
