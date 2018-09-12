@@ -121,7 +121,7 @@ actor ApplicationDistributor is Distributor
       let ssb_trn = recover trn Map[String, StateSubpartitions] end
       for (s_name, p_builder) in application.state_builders().pairs() do
         let worker_routing_ids = recover iso Map[WorkerName, RoutingId] end
-        for w in worker_names.values() do
+        for w in all_workers.values() do
           worker_routing_ids(w) = RoutingIdGenerator()
         end
         state_routing_ids(s_name) = consume worker_routing_ids
