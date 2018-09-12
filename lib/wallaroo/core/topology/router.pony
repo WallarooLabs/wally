@@ -1391,6 +1391,8 @@ class val LocalPartitionRouter[In: Any val, S: State ref]
       try
         m(_state_routing_ids(w)?) = hpr.target_boundary()
       else
+        @printf[I32](("LocalPartitionRouter: Failed to find state routing " +
+          "id for %s\n").cstring(), w.cstring())
         Fail()
       end
     end
@@ -1814,9 +1816,6 @@ class val LocalPartitionRouterBlueprint[In: Any val, S: State ref]
 
 trait val StatelessPartitionRouter is Router
   fun partition_id(): RoutingId
-  //!@
-  // fun update_route(partition_id': RoutingId, target: (Step | ProxyRouter)):
-    // StatelessPartitionRouter ?
   // // Total number of steps in partition
   fun size(): USize
   // Number of local steps in partition
@@ -1927,38 +1926,6 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
 
   fun has_state_partition(state_name: String, key: Key): Bool =>
     false
-
-//!@
-  // fun update_route(partition_id': RoutingId, target: (Step | ProxyRouter)):
-  //   StatelessPartitionRouter ?
-  // =>
-  //   // TODO: Using persistent maps for our fields would make this much more
-  //   // efficient
-  //   let target_id = _step_ids(partition_id')?
-  //   let new_partition_routes =
-  //     recover trn Map[RoutingId, (Step | ProxyRouter)] end
-  //   match target
-  //   | let step: Step =>
-  //     for (p_id, t) in _partition_routes.pairs() do
-  //       if p_id == partition_id' then
-  //         new_partition_routes(p_id) = target
-  //       else
-  //         new_partition_routes(p_id) = t
-  //       end
-  //     end
-  //     LocalStatelessPartitionRouter(_partition_id, _worker_name, _step_ids,
-  //       consume new_partition_routes, _steps_per_worker)
-  //   | let proxy_router: ProxyRouter =>
-  //     for (p_id, t) in _partition_routes.pairs() do
-  //       if p_id == partition_id' then
-  //         new_partition_routes(p_id) = target
-  //       else
-  //         new_partition_routes(p_id) = t
-  //       end
-  //     end
-  //     LocalStatelessPartitionRouter(_partition_id, _worker_name, _step_ids,
-  //       consume new_partition_routes, _steps_per_worker)
-  //   end
 
   fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
     StatelessPartitionRouter

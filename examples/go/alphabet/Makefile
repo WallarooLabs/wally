@@ -43,8 +43,8 @@ include $(rules_mk_path)
 
 build-examples-go-alphabet: alphabet_go_build
 unit-tests-examples-go-alphabet: build-examples-go-alphabet
-# integration-tests-examples-go-alphabet: build-examples-go-alphabet
-# integration-tests-examples-go-alphabet: alphabet_go_test
+integration-tests-examples-go-alphabet: build-examples-go-alphabet
+integration-tests-examples-go-alphabet: alphabet_go_test
 clean-examples-go-alphabet: alphabet_go_clean
 
 alphabet_go_build: $(ALPHABET_GO_PATH)/alphabet

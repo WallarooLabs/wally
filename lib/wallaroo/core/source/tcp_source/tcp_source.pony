@@ -163,20 +163,8 @@ actor TCPSource is Source
 
     _readable = true
 
-    let new_router =
-      match router'
-      | let pr: PartitionRouter =>
-        pr.update_boundaries(_auth, _outgoing_boundaries)
-      | let spr: StatelessPartitionRouter =>
-        spr.update_boundaries(_outgoing_boundaries)
-      else
-        router'
-      end
-    _router = new_router
-
-    for (c_id, consumer) in _router.routes().pairs() do
-      _register_output(c_id, consumer)
-    end
+    _router = router'
+    _update_router(router')
 
     _pending_reads()
     //TODO: either only accept when we are done recovering or don't start
@@ -202,6 +190,10 @@ actor TCPSource is Source
     _mute()
 
   be update_router(router': Router) =>
+    _update_router(router')
+    _try_to_clear_pending_message_store()
+
+  fun ref _update_router(router': Router) =>
     let new_router =
       match router'
       | let pr: PartitionRouter =>
@@ -227,6 +219,7 @@ actor TCPSource is Source
 
     _notify.update_router(_router)
 
+  fun ref _try_to_clear_pending_message_store() =>
     _pending_message_store.process_known_keys(this, _router)
 
     if not _pending_message_store.has_pending() then
