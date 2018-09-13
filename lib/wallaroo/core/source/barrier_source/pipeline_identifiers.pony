@@ -59,9 +59,6 @@ class val _PartitionRouterPId is _PipelineIdentifier
   fun eq(that: box->_PipelineIdentifier): Bool =>
     match that
     | let ir: _PartitionRouterPId =>
-      //!@ Once we allow more than one partition router per state collection
-      // this will no longer differentiate pipelines. But this might not
-      // matter since we only care about the consumer targets.
       _router.state_name() == ir._router.state_name()
     else
       false

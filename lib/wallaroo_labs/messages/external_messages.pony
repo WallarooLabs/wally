@@ -161,10 +161,19 @@ primitive ExternalMsgEncoder
     """
     _encode(_StateEntityQuery(), "", wb)
 
-  fun state_entity_query_response(state_routers: Map[String, PartitionRouter],
+  fun state_entity_query_response(
+    local_keys: Map[StateName, SetIs[Key]],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
-    let digest_map = _state_entity_digest(state_routers)
+    @printf[I32]("!@ Creating StateEntityQueryResponse with local keys\n".cstring())
+    //!@
+    for (k, v) in local_keys.pairs() do
+      for key in v.values() do
+        @printf[I32]("!@ -- %s\n".cstring(), key.cstring())
+      end
+    end
+
+    let digest_map = _state_entity_digest(local_keys)
     let seqr = StateEntityQueryEncoder.state_entity_keys(digest_map)
     _encode(_StateEntityQueryResponse(), seqr, wb)
 
@@ -191,10 +200,10 @@ primitive ExternalMsgEncoder
     _encode(_StateEntityCountQuery(), "", wb)
 
   fun state_entity_count_query_response(
-    state_routers: Map[String, PartitionRouter],
+    local_keys: Map[String, SetIs[Key]],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
-    let digest_map = _state_entity_digest(state_routers)
+    let digest_map = _state_entity_digest(local_keys)
     let secqr = StateEntityCountQueryEncoder.state_entity_count(digest_map)
     _encode(_StateEntityCountQueryResponse(), secqr, wb)
 
@@ -214,14 +223,14 @@ primitive ExternalMsgEncoder
       StatelessPartitionCountQueryEncoder.stateless_partition_count(digest_map)
     _encode(_StatelessPartitionCountQueryResponse(), spcqr, wb)
 
-  fun _partition_digest(state_routers: Map[String,
-    PartitionRouter], stateless_routers: Map[U128, StatelessPartitionRouter]):
+  fun _partition_digest(state_routers: Map[StateName, PartitionRouter],
+    stateless_routers: Map[U128, StatelessPartitionRouter]):
     Map[String, Map[String, Map[String, Array[String] val] val] val]
   =>
     let state_ps =
-      recover iso Map[String, Map[String, Array[String] val] val] end
+      recover iso Map[String, Map[WorkerName, Array[String] val] val] end
     let stateless_ps =
-      recover iso Map[String, Map[String, Array[String] val] val] end
+      recover iso Map[String, Map[WorkerName, Array[String] val] val] end
 
     for (k, v) in state_routers.pairs() do
       state_ps(k) = v.distribution_digest()
@@ -231,18 +240,22 @@ primitive ExternalMsgEncoder
       stateless_ps(k.string()) = v.distribution_digest()
     end
     let digest_map =
-      Map[String, Map[String, Map[String, Array[String] val] val] val]
+      Map[String, Map[String, Map[WorkerName, Array[String] val] val] val]
     digest_map("state_partitions") = consume state_ps
     digest_map("stateless_partitions") = consume stateless_ps
     digest_map
 
-  fun _state_entity_digest(state_routers: Map[String, PartitionRouter]):
-    Map[String, Array[String] val] val
+  fun _state_entity_digest(local_keys: Map[StateName, SetIs[Key]]):
+    Map[Key, Array[String] val] val
   =>
-    let state_ps = recover trn Map[String, Array[String] val] end
+    let state_ps = recover trn Map[StateName, Array[Key] val] end
 
-    for (k, v) in state_routers.pairs() do
-      state_ps(k) = v.state_entity_digest()
+    for (s_name, keys) in local_keys.pairs() do
+      let ks = recover iso Array[Key] end
+      for k in keys.values() do
+        ks.push(k)
+      end
+      state_ps(s_name) = consume ks
     end
 
     consume state_ps

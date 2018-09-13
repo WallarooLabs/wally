@@ -351,7 +351,7 @@ def _test_recovery_main(command, base_workers=2, first=1, delay=1, second=0):
                     logging.info("Runner {} is still alive. Sending SIGKILL."
                         .format(a.name))
                     a.kill()
-            clean_resilience_path(res_dir)
+            # clean_resilience_path(res_dir)
             if alive:
                 raise Exception("Runners [{}] failed to exit cleanly after"
                                         " {} seconds.\n"

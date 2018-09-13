@@ -59,9 +59,6 @@ actor DummyConsumer is Consumer
   =>
     None
 
-  be receive_state(state: ByteSeq val) =>
-    None
-
   be request_ack() =>
     None
 

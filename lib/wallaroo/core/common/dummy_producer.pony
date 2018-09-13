@@ -27,9 +27,6 @@ use "wallaroo/ent/checkpoint"
 
 
 actor DummyProducer is Producer
-  fun router(): Router =>
-    EmptyRouter
-
   // Producer
   fun ref route_to(c: Consumer): (Route | None) =>
     None
@@ -39,11 +36,6 @@ actor DummyProducer is Producer
 
   fun ref current_sequence_id(): SeqId =>
     0
-
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    None
 
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     None

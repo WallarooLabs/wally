@@ -168,18 +168,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun ref update_router(router': Router) =>
     _router = router'
 
-  fun ref update_route(step_id: RoutingId, key: Key, step: Step) ? =>
-    match _router
-    | let p_router: PartitionRouter =>
-      _router = p_router.update_route(step_id, key, step)?
-    else
-      ifdef "trace" then
-        @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +
-          " Updating route is a noop for this kind of Source.\n")
-          .cstring())
-      end
-    end
-
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
     match _router
     | let p_router: PartitionRouter =>

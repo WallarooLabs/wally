@@ -72,7 +72,7 @@ actor Main
           p.to[Votes val](DoubleVoteBuilder)
           p.to_parallel[Votes val](HalfVoteBuilder)
         end
-        p.to_state_partition[Votes val, LetterTotal val,
+        p.to_state_partition[LetterTotal val,
           LetterState](AddVotes, LetterStateBuilder, "letter-state",
             letter_partition where multi_worker = true)
         p.to_sink(TCPSinkConfig[LetterTotal val].from_options(

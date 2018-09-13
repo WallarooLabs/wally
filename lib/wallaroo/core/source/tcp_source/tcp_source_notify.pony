@@ -45,8 +45,6 @@ trait TCPSourceNotify
 
   fun ref update_router(router': Router)
 
-  fun ref update_route(step_id: RoutingId, key: Key, step: Step)?
-
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
 
   fun ref accepted(conn: TCPSource ref) =>

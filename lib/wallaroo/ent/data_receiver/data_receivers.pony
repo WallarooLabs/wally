@@ -39,18 +39,17 @@ actor DataReceivers
 
   var _router_registry: (RouterRegistry | None) = None
 
-  let _state_step_creator: StateStepCreator
+  var _updated_data_router: Bool = false
 
   new create(auth: AmbientAuth, connections: Connections, worker_name: String,
-    state_step_creator: StateStepCreator, is_recovering: Bool = false)
+    is_recovering: Bool = false)
   =>
     _auth = auth
     _connections = connections
     _worker_name = worker_name
-    _state_step_creator = state_step_creator
     _data_router =
       DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
-        recover LocalStatePartitions end, recover LocalStatePartitionIds end,
+        recover Map[StateName, Array[Step] val] end,
         recover Map[RoutingId, StateName] end)
     _is_recovering = is_recovering
     if not _is_recovering then
@@ -87,7 +86,7 @@ actor DataReceivers
         let id = RoutingIdGenerator()
 
         let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
-          _data_router, _state_step_creator, _initialized, _is_recovering)
+          _data_router, _initialized, _is_recovering)
         //!@
         // new_dr.update_router(_data_router)
         match _router_registry
@@ -122,6 +121,15 @@ actor DataReceivers
     _data_router = dr
     for data_receiver in _data_receivers.values() do
       data_receiver.update_router(_data_router)
+    end
+    if not _updated_data_router then
+      match _router_registry
+      | let rr: RouterRegistry =>
+        rr.data_receivers_initialized()
+        _updated_data_router = true
+      else
+        Fail()
+      end
     end
 
   be rollback_barrier_complete(recovery: Recovery) =>

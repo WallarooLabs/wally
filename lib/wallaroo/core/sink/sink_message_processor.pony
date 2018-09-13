@@ -126,7 +126,12 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
     end
 
   fun ref flush() =>
+    let queued = Array[_Queued]
     for q in _queued.values() do
+      queued.push(q)
+    end
+    _queued.clear()
+    for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
         qm.process_message(sink)
@@ -134,4 +139,3 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
         qb.inject_barrier(sink)
       end
     end
-    _queued.clear()

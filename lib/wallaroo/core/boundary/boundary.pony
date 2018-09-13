@@ -256,6 +256,9 @@ actor OutgoingBoundary is Consumer
     end
 
   be reconnect() =>
+    _reconnect()
+
+  fun ref _reconnect() =>
     if not _connected and not _no_more_reconnect then
       _connect_count = @pony_os_connect_tcp[U32](this,
         _host.cstring(), _service.cstring(),
@@ -267,12 +270,12 @@ actor OutgoingBoundary is Consumer
       + "\n").cstring())
     @printf[I32]("!@ reconnect() RE-Connecting OutgoingBoundary %s to %s:%s on %s\n".cstring(), _step_id.string().cstring(), _host.cstring(), _service.cstring(), _target_worker.cstring())
 
-  be migrate_step(step_id: RoutingId, state_name: String, key: Key,
+  be migrate_key(step_id: RoutingId, state_name: String, key: Key,
     checkpoint_id: CheckpointId, state: ByteSeq val)
   =>
     try
-      let outgoing_msg = ChannelMsgEncoder.migrate_step(step_id,
-        state_name, key, checkpoint_id, state, _worker_name, _auth)?
+      let outgoing_msg = ChannelMsgEncoder.migrate_key(state_name, key,
+        checkpoint_id, state, _worker_name, _auth)?
       _writev(outgoing_msg)
     else
       Fail()
@@ -373,8 +376,6 @@ actor OutgoingBoundary is Consumer
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 
-  be receive_state(state: ByteSeq val) => Fail()
-
   fun ref receive_ack(seq_id: SeqId) =>
     ifdef debug then
       Invariant(seq_id > _lowest_queue_id)
@@ -415,18 +416,6 @@ actor OutgoingBoundary is Consumer
     try
       var cur_id = _lowest_queue_id
       for msg in _queue.values() do
-        //!@
-        // match ChannelMsgDecoder(consume next, _auth)
-        // | let r: ReplayMsg =>
-          // try
-            // match r.msg(_auth)?
-            // | let fbm: ForwardBarrierMsg =>
-              // @printf[I32]("!@ Boundary %s: ForwardBarrierMsg %s\n".cstring(), _step_id.string().cstring(), fbm.token.string().cstring())
-            // end
-          // end
-        // end
-
-        // @printf[I32]("!@ Boundary %s: replaying message!\n".cstring(), _step_id.string().cstring())
         if cur_id >= idx then
           _writev(ChannelMsgEncoder.replay(msg, _auth)?)
         end
@@ -461,7 +450,7 @@ actor OutgoingBoundary is Consumer
     None
 
   be register_producer(id: RoutingId, producer: Producer) =>
-    @printf[I32]("!@ Registered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
+    // @printf[I32]("!@ Registered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
 
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
@@ -470,7 +459,7 @@ actor OutgoingBoundary is Consumer
     _upstreams.set(producer)
 
   be unregister_producer(id: RoutingId, producer: Producer) =>
-    @printf[I32]("!@ Unregistered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
+    // @printf[I32]("!@ Unregistered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
 
     // TODO: Determine if we need this Invariant.
     // ifdef debug then
@@ -487,7 +476,7 @@ actor OutgoingBoundary is Consumer
   fun ref _forward_register_producer(source_id: RoutingId,
     target_id: RoutingId, producer: Producer)
   =>
-    @printf[I32]("!@ Forward Registered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
+    // @printf[I32]("!@ Forward Registered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
     _registered_producers.register_producer(source_id, producer, target_id)
     try
       let msg = ChannelMsgEncoder.register_producer(_worker_name,
@@ -501,7 +490,7 @@ actor OutgoingBoundary is Consumer
   be forward_unregister_producer(source_id: RoutingId, target_id: RoutingId,
     producer: Producer)
   =>
-    @printf[I32]("!@ Forward UNRegistered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
+    // @printf[I32]("!@ Forward UNRegistered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
 
     _registered_producers.unregister_producer(source_id, producer, target_id)
     try
@@ -573,11 +562,8 @@ actor OutgoingBoundary is Consumer
     None
 
   be prepare_for_rollback() =>
-    """
-    There is nothing for a Boundary to rollback to.
-    """
-    // Clear inputs
-    _registered_producers.clear()
+    _lowest_queue_id = _lowest_queue_id + _queue.size().u64()
+    _queue.clear()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
@@ -596,6 +582,7 @@ actor OutgoingBoundary is Consumer
     end
     _host = host
     _service = service
+    _reconnect()
 
   ///////////
   // TCP
