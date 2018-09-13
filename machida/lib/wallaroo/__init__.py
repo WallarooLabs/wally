@@ -131,7 +131,7 @@ class _Computation(_BaseWrapped):
 def computation(name):
     def wrapped(func):
         _validate_arity_compatability(func, 1)
-        C = _wallaroo_wrap(name, func, _StateComputation)
+        C = _wallaroo_wrap(name, func, _Computation)
         return C()
     return wrapped
 
