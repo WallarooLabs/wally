@@ -20,9 +20,11 @@ primitive StepStateCheckpointer
   fun apply(runner: Runner, id: RoutingId, checkpoint_id: CheckpointId,
     event_log: EventLog, wb: Writer = Writer)
   =>
+    @printf[I32]("!@ StepStateCheckpointer apply()\n".cstring())
     match runner
     | let r: SerializableStateRunner =>
       let serialized: ByteSeq val = r.serialize_state()
+      @printf[I32]("!@ -- Got %s serialized bytes\n".cstring(), serialized.size().string().cstring())
       wb.write(serialized)
       let payload = wb.done()
       // @printf[I32]("!@ State Step %s calling EventLog.checkpoint_state()\n".cstring(), id.string().cstring())

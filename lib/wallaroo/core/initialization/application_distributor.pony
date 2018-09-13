@@ -57,7 +57,7 @@ actor ApplicationDistributor is Distributor
 
   fun ref _distribute(application: Application val,
     cluster_initializer: (ClusterInitializer | None), worker_count: USize,
-    worker_names: Array[String] val, initializer_name: String)
+    worker_names: Array[WorkerName] val, initializer_name: WorkerName)
   =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("vvvvvv|Initializing Topologies for Workers|vvvvvv\n\n".cstring())
@@ -68,17 +68,17 @@ actor ApplicationDistributor is Distributor
     end
 
     try
-      let all_workers_trn = recover trn Array[String] end
+      let all_workers_trn = recover trn Array[WorkerName] end
       all_workers_trn.push(initializer_name)
       for w in worker_names.values() do all_workers_trn.push(w) end
-      let all_workers: Array[String] val = consume all_workers_trn
+      let all_workers: Array[WorkerName] val = consume all_workers_trn
 
       // Keep track of all steps in the cluster and their proxy addresses.
       // This includes sinks but not sources, since we never send a message
       // directly to a source. For a sink, we don't keep a proxy address but
-      // a step id (U128), since every worker will have its own instance of
+      // a routing id, since every worker will have its own instance of
       // that sink.
-      let step_map = recover trn Map[U128, (ProxyAddress | U128)] end
+      let step_map = recover trn Map[RoutingId, (ProxyAddress | RoutingId)] end
 
       // Keep track of all prestate data so we can register routes
       let pre_state_data = recover trn Array[PreStateData] end
@@ -87,10 +87,11 @@ actor ApplicationDistributor is Distributor
       var pipeline_id: USize = 0
 
       // Map from step_id to worker name
-      let steps: Map[U128, String] = steps.create()
+      let steps: Map[RoutingId, WorkerName] = steps.create()
 
       // We use these graphs to build the local graphs for each worker
-      var local_graphs = recover trn Map[String, Dag[StepInitializer] trn] end
+      var local_graphs =
+        recover trn Map[WorkerName, Dag[StepInitializer] trn] end
 
       // Initialize values for local graphs
       local_graphs(initializer_name) = Dag[StepInitializer]
@@ -102,10 +103,10 @@ actor ApplicationDistributor is Distributor
       // edge at the time the producer node is created, in which case the
       // target node will not yet exist).
       // Map from worker name to all (from_id, to_id) pairs
-      let unbuilt_edges: Map[String, Array[(U128, U128)]] =
+      let unbuilt_edges: Map[WorkerName, Array[(RoutingId, RoutingId)]] =
         unbuilt_edges.create()
       for w in all_workers.values() do
-        unbuilt_edges(w) = Array[(U128, U128)]
+        unbuilt_edges(w) = Array[(RoutingId, RoutingId)]
       end
 
       // Since a worker doesn't know the specific routing ids of state
@@ -118,7 +119,7 @@ actor ApplicationDistributor is Distributor
 
       // Create StateSubpartitions
 
-      let ssb_trn = recover trn Map[String, StateSubpartitions] end
+      let ssb_trn = recover trn Map[StateName, StateSubpartitions] end
       for (s_name, p_builder) in application.state_builders().pairs() do
         let worker_routing_ids = recover iso Map[WorkerName, RoutingId] end
         for w in all_workers.values() do
@@ -127,17 +128,18 @@ actor ApplicationDistributor is Distributor
         state_routing_ids(s_name) = consume worker_routing_ids
         ssb_trn(s_name) = p_builder.state_subpartition(all_workers)
       end
-      let state_subpartitions: Map[String, StateSubpartitions] val =
+      let state_subpartitions: Map[StateName, StateSubpartitions] val =
         consume ssb_trn
 
       // Keep track of sink ids
       let sink_ids: Array[RoutingId] = sink_ids.create()
 
       // Keep track of proxy ids per worker
-      let boundary_ids: Map[String, Map[String, RoutingId]] = boundary_ids.create()
+      let boundary_ids: Map[WorkerName, Map[WorkerName, RoutingId]] =
+        boundary_ids.create()
 
       // Keep track of workers that cannot be removed during shrink to fit
-      let non_shrinkable = recover trn SetIs[String] end
+      let non_shrinkable = recover trn SetIs[WorkerName] end
 
 
       @printf[I32](("Found " + application.pipelines.size().string() +
@@ -932,12 +934,25 @@ actor ApplicationDistributor is Distributor
 
         let barrier_source_id = _routing_id_gen()
 
+        let worker_state_step_ids =
+          recover iso Map[StateName, Array[RoutingId] val] end
+        for state_name in state_routing_ids_to_send.keys() do
+          let next_state_step_ids = recover iso Array[RoutingId] end
+          let parallelism =
+            application.state_builder(state_name)?.per_worker_parallelism()
+          for _ in Range(0, parallelism) do
+            next_state_step_ids.push(_routing_id_gen())
+          end
+          worker_state_step_ids(state_name) = consume next_state_step_ids
+        end
+
         let local_topology =
           try
             LocalTopology(application.name(), w, g.clone()?,
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
-              consume p_ids, all_workers, non_shrinkable_to_send,
-              state_routing_ids_to_send, barrier_source_id)
+              consume p_ids, consume worker_state_step_ids, all_workers,
+              non_shrinkable_to_send, state_routing_ids_to_send,
+              barrier_source_id)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

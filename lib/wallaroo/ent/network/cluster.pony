@@ -39,9 +39,10 @@ trait tag Cluster
   be send_data_to_cluster(data: Array[ByteSeq] val) =>
     None
 
-  be notify_cluster_of_new_stateful_step(id: RoutingId, key: Key,
-    state_name: String, exclusions: Array[String] val =
-    recover Array[String] end)
+    //!@
+  // be notify_cluster_of_new_key(key: Key,
+  //   state_name: String, exclusions: Array[String] val =
+  //   recover Array[String] end)
 
   be stop_the_world(exclusions: Array[String] val) =>
     None

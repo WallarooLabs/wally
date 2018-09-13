@@ -30,12 +30,10 @@ use "wallaroo/ent/checkpoint"
 trait tag StatusReporter
   be report_status(code: ReportStatusCode)
 
-trait tag Producer is (Muteable & Rerouter & Resilient)
+trait tag Producer is (Muteable & Resilient)
   fun ref route_to(c: Consumer): (Route | None)
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
   be register_downstream()
 
@@ -46,8 +44,8 @@ interface tag BoundaryUpdatable
   be add_boundaries(bs: Map[String, OutgoingBoundary] val)
   be remove_boundary(worker: String)
 
-trait tag Consumer is (Runnable & StateReceiver & Initializable &
-  StatusReporter & Checkpointable & BarrierReceiver & Resilient)
+trait tag Consumer is (Runnable & Initializable & StatusReporter &
+  Checkpointable & BarrierReceiver & Resilient)
   // TODO: For now, since we do not allow application graph cycles, all back
   // edges are from DataReceivers. This allows us to simply identify them
   // directly. Once we allow application cycles, we will need a more
@@ -75,9 +73,6 @@ trait tag Runnable
 trait tag Muteable
   be mute(c: Consumer)
   be unmute(c: Consumer)
-
-trait tag StateReceiver
-  be receive_state(state: ByteSeq val)
 
 trait tag Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer)

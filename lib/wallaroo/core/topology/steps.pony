@@ -32,6 +32,7 @@ use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/rebalancing"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
 use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
@@ -40,7 +41,7 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 
-actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
+actor Step is (Producer & Consumer & BarrierProcessor)
   let _auth: AmbientAuth
   var _id: U128
   let _runner: Runner
@@ -69,7 +70,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   let _inputs: Map[RoutingId, Producer] = _inputs.create()
 
   // Lifecycle
-  var _initializer: (LocalTopologyInitializer | StateStepCreator | None) = None
+  var _initializer: (LocalTopologyInitializer | None) = None
   var _initialized: Bool = false
   var _seq_id_initialized_on_recovery: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
@@ -80,20 +81,17 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
 
-  let _state_step_creator: StateStepCreator
+  let _router_registry: RouterRegistry
 
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
-
-  let _pending_message_store: PendingMessageStore =
-    _pending_message_store.create()
 
   new create(auth: AmbientAuth, runner: Runner iso,
     metrics_reporter: MetricsReporter iso,
     id: U128, event_log: EventLog,
     recovery_replayer: RecoveryReconnecter,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_step_creator: StateStepCreator,
+    router_registry: RouterRegistry,
     router': Router = EmptyRouter,
     target_id_router: TargetIdRouter = EmptyTargetIdRouter)
   =>
@@ -107,7 +105,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     _event_log = event_log
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
-    _state_step_creator = state_step_creator
+    _router_registry = router_registry
     _id = id
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
@@ -142,14 +140,10 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   be application_initialized(initializer: LocalTopologyInitializer) =>
     _prepare_ready_to_work(initializer)
 
-  be quick_initialize(initializer:
-    (LocalTopologyInitializer | StateStepCreator))
-  =>
+  be quick_initialize(initializer: LocalTopologyInitializer) =>
     _prepare_ready_to_work(initializer)
 
-  fun ref _prepare_ready_to_work(initializer:
-    (LocalTopologyInitializer | StateStepCreator))
-  =>
+  fun ref _prepare_ready_to_work(initializer: LocalTopologyInitializer) =>
     _initializer = initializer
     if _routes.size() > 0 then
       for r in _routes.values() do
@@ -173,7 +167,7 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
 
   fun ref _report_ready_to_work() =>
     match _initializer
-    | let rrtw: (LocalTopologyInitializer | StateStepCreator) =>
+    | let rrtw: LocalTopologyInitializer =>
       rrtw.report_ready_to_work(this)
     else
       Fail()
@@ -198,16 +192,11 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     for (c_id, consumer) in _router.routes().pairs() do
       _register_output(c_id, consumer)
     end
-    _pending_message_store.process_known_keys(this, _router)
-    // If a barrier is in progress, it might have been blocked by these
-    // pending messages. Check to see if this is true and if we're now
-    // ready to forward the barrier.
-    if not _pending_message_store.has_pending() then
-      match _barrier_forwarder
-      | let bf: BarrierStepForwarder =>
-        if bf.barrier_in_progress() then
-          bf.check_completion(inputs())
-        end
+
+    match _barrier_forwarder
+    | let bf: BarrierStepForwarder =>
+      if bf.barrier_in_progress() then
+        bf.check_completion(inputs())
       end
     end
 
@@ -408,26 +397,11 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   fun outputs(): Map[RoutingId, Consumer] box =>
     _outputs
 
-  fun router(): Router =>
-    _router
-
-  fun has_pending_messages(): Bool =>
-    _pending_message_store.has_pending()
-
   fun ref next_sequence_id(): SeqId =>
     _seq_id_generator.new_id()
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id_generator.latest_for_run()
-
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    if not _pending_message_store.has_pending_state_key(state_name, key) then
-      _state_step_creator.report_unknown_key(this, state_name, key,
-        _next_checkpoint_id)
-    end
-    _pending_message_store.add(state_name, key, routing_args)
 
   ///////////
   // RECOVERY
@@ -471,13 +445,13 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     _routes.contains(c)
 
   be register_producer(id: RoutingId, producer: Producer) =>
-    @printf[I32]("!@ Registered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
+    // @printf[I32]("!@ Registered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
 
     _inputs(id) = producer
     _upstreams.set(producer)
 
   be unregister_producer(id: RoutingId, producer: Producer) =>
-    @printf[I32]("!@ Unregistered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
+    // @printf[I32]("!@ Unregistered producer %s at step %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _id.string().cstring(), _upstreams.size().string().cstring())
 
     if _inputs.contains(id) then
       try
@@ -525,43 +499,40 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     end
 
   be dispose() =>
+    @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
     _event_log.unregister_resilient(_id, this)
     _unregister_all_outputs()
 
   ///////////////
   // GROW-TO-FIT
-  be receive_state(state: ByteSeq val) =>
+  be receive_key_state(state_name: StateName, key: Key,
+    state_bytes: ByteSeq val)
+  =>
     ifdef "autoscale" then
-      try
-        match Serialised.input(InputSerialisedAuth(_auth),
-          state as Array[U8] val)(DeserialiseAuth(_auth))?
-        | let shipped_state: ShippedState =>
-          StepStateMigrator.receive_state(_runner, shipped_state.state_bytes)
-          @printf[I32]("Received state for step %s\n".cstring(),
-            _id.string().cstring())
-        else
-          Fail()
-        end
-      else
-        Fail()
-      end
+      StepStateMigrator.receive_state(this, _runner, state_name, key,
+        state_bytes)
+      @printf[I32]("Received state for step %s\n".cstring(),
+        _id.string().cstring())
     end
 
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Key,
     checkpoint_id: CheckpointId)
   =>
     ifdef "autoscale" then
-      //@!
-      // _unregister_all_outputs()
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
-        StepStateMigrator.send_state(_runner, _id, boundary, state_name,
+        StepStateMigrator.send_state(this, _runner, _id, boundary, state_name,
           key, checkpoint_id, _auth)
       else
         Fail()
       end
-      dispose()
     end
+
+  fun ref register_key(state_name: StateName, key: Key) =>
+    _router_registry.register_key(state_name, key)
+
+  fun ref unregister_key(state_name: StateName, key: Key) =>
+    _router_registry.unregister_key(state_name, key)
 
   //////////////
   // BARRIER
@@ -569,13 +540,13 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ Step %s received barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
+    // @printf[I32]("!@ Step %s received barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
     process_barrier(step_id, producer, barrier_token)
 
   fun ref process_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    @printf[I32]("!@ Step %s process_barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
+    // @printf[I32]("!@ >>Step %s PROCESS_barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
     if _inputs.contains(step_id) then
       // @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
       match barrier_token
@@ -625,8 +596,16 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
     end
-    _step_message_processor.flush()
+    let queued = _step_message_processor.queued()
     _step_message_processor = NormalStepMessageProcessor(this)
+    for q in queued.values() do
+      match q
+      | let qm: QueuedMessage =>
+        qm.process_message(this)
+      | let qb: QueuedBarrier =>
+        qb.inject_barrier(this)
+      end
+    end
 
   fun ref _clear_barriers() =>
     try
@@ -646,11 +625,9 @@ actor Step is (Producer & Consumer & Rerouter & BarrierProcessor)
     end
 
   be prepare_for_rollback() =>
-    _inputs.clear()
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
-    _pending_message_store.clear()
     _clear_barriers()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
