@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# change pwd to this script's folder
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+if [ ! -d _env ]; then
+  make _env
+fi
+. _env/bin/activate
+
+export PYTHONPATH=../../../machida/lib:$PWD:$PYTHONPATH
+../../../machida/build/machida --application-module celsius \
+  --celsius-stream 127.0.0.1:7100 --farenheit-stream 127.0.0.1:7200 \
+  --external 127.0.0.1:5000 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
+  --cluster-initializer --ponythreads=1
