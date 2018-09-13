@@ -27,20 +27,19 @@ actor Recovery
   Phases:
     1) _AwaitRecovering: Waiting for start_recovery() to be called
     2) _BoundariesReconnect: Wait for all boundaries to reconnect.
-    3) _PrepareRollback: Have EventLog tell all resilients to prepare for
        rollback.
-    4) _RollbackTopology: Roll back topology. Wait for acks from all workers.
-    5) _RegisterProducers: Every producer in the rolled back topology needs to
+    3) _PrepareRollback: Have EventLog tell all resilients to prepare for
+    4) _RollbackLocalKeys: Roll back topology. Wait for acks from all workers.
        register downstream.
-    6) _RollbackBarrier: Use barrier to ensure that all old data is cleared
+    5) _RollbackBarrier: Use barrier to ensure that all old data is cleared
        and all producers and consumers are ready to rollback state.
-    7) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
-    8) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
+    6) _AwaitDataReceiversAck: Put DataReceivers in non-recovery mode.
+    7) _AwaitRecoveryInitiatedAcks: Wait for all workers to acknowledge
        recovery is about to start. This gives currently recovering workers a
        chance to cede control to us if we're the latest recovering.
-    9) _Rollback: Rollback all state to last safe checkpoint.
-    10) _FinishedRecovering: Finished recovery
-    11) _RecoveryOverrideAccepted: If recovery was handed off to another worker
+    8) _Rollback: Rollback all state to last safe checkpoint.
+    9) _FinishedRecovering: Finished recovery
+    10) _RecoveryOverrideAccepted: If recovery was handed off to another worker
   """
   let _self: Recovery tag = this
   let _auth: AmbientAuth
@@ -93,8 +92,8 @@ actor Recovery
   be rollback_prep_complete() =>
     _recovery_phase.rollback_prep_complete()
 
-  be worker_ack_topology_rollback(w: WorkerName, s_id: CheckpointId) =>
-    _recovery_phase.worker_ack_topology_rollback(w, s_id)
+  be worker_ack_local_keys_rollback(w: WorkerName, s_id: CheckpointId) =>
+    _recovery_phase.worker_ack_local_keys_rollback(w, s_id)
 
   be worker_ack_register_producers(w: WorkerName) =>
     _recovery_phase.worker_ack_register_producers(w)
@@ -145,7 +144,7 @@ actor Recovery
   fun ref _prepare_rollback() =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Prepare Rollback - ~~|\n".cstring())
-      _event_log.prepare_for_rollback(this)
+      _event_log.prepare_for_rollback(this, _checkpoint_initiator)
 
       // Inform cluster to prepare for rollback
       try
@@ -160,25 +159,25 @@ actor Recovery
       _recovery_complete()
     end
 
-  fun ref _rollback_prep_complete() =>
+  fun ref _rollback_local_keys() =>
     ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Rollback Topology Graph - ~~|\n"
+      @printf[I32]("|~~ - Recovery Phase: Rollback Local Keys - ~~|\n"
         .cstring())
       try
         let checkpoint_id = _checkpoint_id as CheckpointId
-        _recovery_phase = _RollbackTopology(this, checkpoint_id, _workers)
+        _recovery_phase = _RollbackLocalKeys(this, checkpoint_id, _workers)
 
         //!@ Tell someone to start rolling back topology
         let promise = Promise[None]
         promise.next[None]({(n: None) =>
-          _self.worker_ack_topology_rollback(_worker_name, checkpoint_id)
+          _self.worker_ack_local_keys_rollback(_worker_name, checkpoint_id)
         })
         (_initializer as LocalTopologyInitializer)
-          .rollback_topology_graph(checkpoint_id, promise)
+          .rollback_local_keys(checkpoint_id, promise)
 
         // Inform cluster to rollback topology graph
         try
-          let msg = ChannelMsgEncoder.rollback_topology_graph(_worker_name,
+          let msg = ChannelMsgEncoder.rollback_local_keys(_worker_name,
             checkpoint_id, _auth)?
           _connections.send_control_to_cluster(msg)
         else
@@ -191,29 +190,7 @@ actor Recovery
       _recovery_complete()
     end
 
-  fun ref _topology_rollback_complete() =>
-    ifdef "resilience" then
-      @printf[I32]("|~~ - Recovery Phase: Register Producers - ~~|\n"
-        .cstring())
-      let promise = Promise[None]
-      promise.next[None]({(n: None) =>
-        _self.worker_ack_register_producers(_worker_name)})
-      _router_registry.producers_register_downstream(promise)
-
-      // Inform cluster to register_producers
-      try
-        let msg = ChannelMsgEncoder.register_producers(_worker_name, _auth)?
-        _connections.send_control_to_cluster(msg)
-      else
-        Fail()
-      end
-
-      _recovery_phase = _RegisterProducers(this, _workers)
-    else
-      _recovery_complete()
-    end
-
-  fun ref _register_producers_complete() =>
+  fun ref _local_keys_rollback_complete() =>
     ifdef "resilience" then
       @printf[I32]("|~~ - Recovery Phase: Rollback Barrier - ~~|\n".cstring())
       let promise = Promise[CheckpointRollbackBarrierToken]

@@ -128,10 +128,9 @@ actor Main
             TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
-            .to_state_partition[Symboly val,
-              (OrderResult val | None), SymbolData](CheckOrder,
-              SymbolDataBuilder, "symbol-data", symbol_data_partition
-              where multi_worker = true)
+            .to_state_partition[(OrderResult val | None), SymbolData](
+              CheckOrder, SymbolDataBuilder, "symbol-data",
+              symbol_data_partition where multi_worker = true)
             //!! TODO: Update to use command line for host/service
             .to_sink(TCPSinkConfig[OrderResult val].from_options(OrderResultEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?))
@@ -139,9 +138,9 @@ actor Main
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(1)?))
-            .to_state_partition[Symboly val, None,
-               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
-               symbol_data_partition where multi_worker = true)
+            .to_state_partition[None, SymbolData](UpdateNbbo,
+              SymbolDataBuilder, "symbol-data",
+              symbol_data_partition where multi_worker = true)
             .done()
       end
       Startup(env, application, "market-spread")

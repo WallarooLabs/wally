@@ -605,7 +605,7 @@ primitive Machida
         let partition = Partitions[PyData val](partition_function,
           partition_values)
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.to_state_partition[PyData val, PyData val, PyState](
+        latest = pb.to_state_partition[PyData val, PyState](
           state_computation, state_builder, state_name, partition)
       | "to_sink" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])

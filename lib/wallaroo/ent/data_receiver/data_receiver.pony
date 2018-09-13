@@ -26,12 +26,11 @@ use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 
-actor DataReceiver is (Producer & Rerouter)
+actor DataReceiver is (Producer)
   let _id: RoutingId
   let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
-  let _state_step_creator: StateStepCreator
   var _sender_step_id: RoutingId = 0
   var _router: DataRouter
   var _last_id_seen: SeqId = 0
@@ -41,12 +40,6 @@ actor DataReceiver is (Producer & Rerouter)
   var _ack_counter: USize = 0
 
   var _last_request: USize = 0
-
-  let _pending_message_store: PendingMessageStore =
-    _pending_message_store.create()
-
-  // (input_id, output_id, barrier)
-  let _pending_barriers: Array[(RoutingId, RoutingId, BarrierToken)] = _pending_barriers.create()
 
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
@@ -76,14 +69,12 @@ actor DataReceiver is (Producer & Rerouter)
 
   new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
     sender_name: String, data_router: DataRouter,
-    state_step_creator: StateStepCreator, initialized: Bool = false,
-    is_recovering: Bool = false)
+    initialized: Bool = false, is_recovering: Bool = false)
   =>
     _id = id
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
-    _state_step_creator = state_step_creator
     _router = data_router
     _state_routing_ids = _router.state_routing_ids()
     if is_recovering then
@@ -91,9 +82,6 @@ actor DataReceiver is (Producer & Rerouter)
     else
       _phase = _NormalDataReceiverPhase(this)
     end
-
-  fun router(): DataRouter =>
-    _router
 
   be update_router(router': DataRouter) =>
     _router = router'
@@ -128,22 +116,18 @@ actor DataReceiver is (Producer & Rerouter)
       end
     end
 
-    _pending_message_store.process_known_keys(this, _router)
-    if not _pending_message_store.has_pending() then
-      let resend = _phase.flush()
-      _phase = _NormalDataReceiverPhase(this)
-      for m in resend.values() do
-        match m
-        | let qdm: _QueuedDeliveryMessage =>
-          qdm.process_message(this)
-        | let qrdm: _QueuedReplayableDeliveryMessage =>
-          qrdm.replay_process_message(this)
-        | let pb: _QueuedBarrier =>
-          _forward_barrier(pb._1, pb._2, pb._3, pb._4)
-        end
+    let resend = _phase.flush()
+    _phase = _NormalDataReceiverPhase(this)
+    for m in resend.values() do
+      match m
+      | let qdm: _QueuedDeliveryMessage =>
+        qdm.process_message(this)
+      | let qrdm: _QueuedReplayableDeliveryMessage =>
+        qrdm.replay_process_message(this)
+      | let pb: _QueuedBarrier =>
+        _forward_barrier(pb._1, pb._2, pb._3, pb._4)
       end
     end
-
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     // DataReceiver doesn't have its own routes
     None
@@ -224,15 +208,6 @@ actor DataReceiver is (Producer & Rerouter)
       _router.replay_route(r, pipeline_time_spent, _id, this, seq_id,
         latest_ts, metrics_id, worker_ingress_ts)
     end
-
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    if not _pending_message_store.has_pending_state_key(state_name, key) then
-      _state_step_creator.report_unknown_key(this, state_name, key,
-        _next_checkpoint_id)
-    end
-    _pending_message_store.add(state_name, key, routing_args)
 
   fun ref _maybe_ack() =>
     if (_ack_counter % 512) == 0 then
@@ -366,13 +341,10 @@ actor DataReceiver is (Producer & Rerouter)
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
-    // @printf[I32]("!@ DataReceiver: forward_barrier -> seq id %s, last_seen: %s\n".cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
+    @printf[I32]("!@ DataReceiver: forward_barrier to %s -> seq id %s, last_seen: %s\n".cstring(), target_step_id.string().cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
     if seq_id > _last_id_seen then
       // @printf[I32]("!@ DataReceiver: received token %s from %s at DataReceiver %s\n".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring(), _id.string().cstring())
       match barrier_token
-      | let srt: CheckpointRollbackBarrierToken =>
-        _pending_message_store.clear()
-        _pending_barriers.clear()
       //!@ This isn't good enough. We need to ensure that we've been overriden
       // to make this change back from recovery phase. As it stands, this
       // introduces a race condition if we receive an old resume token in
@@ -399,22 +371,12 @@ actor DataReceiver is (Producer & Rerouter)
     if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
-      if not _pending_message_store.has_pending() then
-        match barrier_token
-        | let sbt: CheckpointBarrierToken =>
-          checkpoint_state(sbt.id)
-        end
-        _router.forward_barrier(target_step_id, origin_step_id, this,
-          barrier_token)
-      else
-        // @printf[I32]("!@ Queueing barrier %s\n".cstring(), barrier_token.string().cstring())
-        _pending_barriers.push((target_step_id, origin_step_id, barrier_token))
-        match _phase
-        | let qdr: _QueuingDataReceiverPhase => None
-        else
-          _phase = _QueuingDataReceiverPhase(this)
-        end
+      match barrier_token
+      | let sbt: CheckpointBarrierToken =>
+        checkpoint_state(sbt.id)
       end
+      _router.forward_barrier(target_step_id, origin_step_id, this,
+        barrier_token)
     end
 
   fun ref barrier_complete() =>
@@ -438,10 +400,6 @@ actor DataReceiver is (Producer & Rerouter)
     """
     There is nothing for a DataReceiver to rollback to.
     """
-    _pending_barriers.clear()
-    _state_partition_producers.clear()
-    _queued_register_producers.clear()
-    _queued_unregister_producers.clear()
     None
 
   be rollback(payload: ByteSeq val, event_log: EventLog,

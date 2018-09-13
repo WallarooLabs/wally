@@ -183,6 +183,7 @@ class _QueuingDataReceiverPhase is _DataReceiverPhase
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)
   =>
+    @printf[I32]("!@ DataReceiver: Queuing barrier to %s\n".cstring(), output_id.string().cstring())
     _queued.push((input_id, output_id, token, seq_id))
 
   fun ref data_connect(highest_seq_id: SeqId) =>
@@ -197,7 +198,6 @@ type _Queued is (_QueuedBarrier | _QueuedDeliveryMessage |
 
 type _QueuedBarrier is (RoutingId, RoutingId, BarrierToken, SeqId)
 
-// !@ We need to unify this with RoutingArguments
 class _QueuedDeliveryMessage
   let msg: DeliveryMsg
   let pipeline_time_spent: U64
@@ -220,7 +220,6 @@ class _QueuedDeliveryMessage
     dr.process_message(msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
-// !@ We need to unify this with RoutingArguments
 class _QueuedReplayableDeliveryMessage
   let msg: ReplayableDeliveryMsg
   let pipeline_time_spent: U64

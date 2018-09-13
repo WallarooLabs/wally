@@ -106,7 +106,7 @@ actor Main
           .new_pipeline[U64 val, String val]("Sequence Window",
             TCPSourceConfig[U64 val].from_options(U64FramedHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-          .to_state_partition[U64 val, String val,
+          .to_state_partition[String val,
             WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
               partition where multi_worker = true)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,

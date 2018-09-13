@@ -130,14 +130,18 @@ class BarrierStepMessageProcessor is StepMessageProcessor
     barrier_token: BarrierToken)
   =>
     if _barrier_forwarder.input_blocking(input_id) then
-      @printf[I32]("!@ StepMessageProcessor: Queuing barrier %s!\n".cstring(), barrier_token.string().cstring())
       _queued.push(QueuedBarrier(input_id, producer, barrier_token))
     else
       _barrier_forwarder.receive_barrier(input_id, producer, barrier_token)
     end
 
   fun ref flush() =>
+    let queued = Array[_Queued]
     for q in _queued.values() do
+      queued.push(q)
+    end
+    _queued.clear()
+    for q in queued.values() do
       match q
       | let qm: QueuedMessage =>
         qm.process_message(step)
@@ -145,4 +149,3 @@ class BarrierStepMessageProcessor is StepMessageProcessor
         qb.inject_barrier(step)
       end
     end
-    _queued.clear()

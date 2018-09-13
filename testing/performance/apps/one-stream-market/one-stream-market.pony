@@ -106,10 +106,9 @@ actor Main
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_state_partition[Symboly val,
-              (NbboResult val | None), SymbolData](ProcessNbbo,
-                SymbolDataBuilder, "symbol-data",
-                symbol_data_partition where multi_worker = true)
+            .to_state_partition[(NbboResult val | None), SymbolData](
+              ProcessNbbo, SymbolDataBuilder, "symbol-data",
+              symbol_data_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[NbboResult val].from_options(NbboResultEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?,
               initial_report_msgs))

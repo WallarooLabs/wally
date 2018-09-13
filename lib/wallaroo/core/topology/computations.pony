@@ -58,23 +58,32 @@ trait val StateProcessor[S: State ref] is BasicComputation
     metrics_id: U16, worker_ingress_ts: U64):
     (Bool, (StateChange[S] ref | DirectStateChange | None), U64,
       U64, U64)
+  fun state_name(): StateName
+  fun key(): Key
 
-trait InputWrapper
-  fun input(): Any val
+trait KeyWrapper
+  fun key(): Key
 
 class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
-  is (StateProcessor[S] & InputWrapper)
+  is (StateProcessor[S] & KeyWrapper)
   let _state_comp: StateComputation[In, Out, S] val
   let _input: In
+  let _state_name: StateName
+  let _key: Key
   let _target_ids: Array[RoutingId] val
 
-  new val create(input': In, state_comp: StateComputation[In, Out, S] val,
-    target_ids: Array[RoutingId] val) =>
+  new val create(input': In, state_name': StateName, key': Key,
+    state_comp: StateComputation[In, Out, S] val,
+    target_ids: Array[RoutingId] val)
+  =>
     _state_comp = state_comp
     _input = input'
+    _state_name = state_name'
+    _key = key'
     _target_ids = target_ids
 
-  fun input(): Any val => _input
+  fun state_name(): StateName => _state_name
+  fun key(): Key => _key
 
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     target_id_router: TargetIdRouter, metric_name: String,

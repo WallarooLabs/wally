@@ -80,13 +80,6 @@ actor BarrierSource is Source
     _event_log = event_log
     _router_registry.register_producer(_source_id, this)
 
-  fun router(): Router =>
-    let rs = recover iso Array[Router] end
-    for r in _routers.values() do
-      rs.push(r)
-    end
-    MultiRouter(consume rs)
-
   be register_pipeline(pipeline_name: String, router': Router) =>
     """
     On this worker, we need to keep track of every pipeline that has at least
@@ -152,14 +145,6 @@ actor BarrierSource is Source
     """
     We register during initialization without need for explicit management
     here (unlike, say, TCPSource).
-    """
-    None
-
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    """
-    We never route messages, only barriers.
     """
     None
 
@@ -284,7 +269,6 @@ actor BarrierSource is Source
   be update_worker_data_service(worker_name: String,
     host: String, service: String)
   =>
-    @printf[I32]("!@ update_worker_data_service at BarrierSource %s: %s -> %s %s\n".cstring(), _source_id.string().cstring(), worker_name.cstring(), host.cstring(), service.cstring())
     None
 
   be report_status(code: ReportStatusCode) =>
@@ -306,7 +290,6 @@ actor BarrierSource is Source
     BarrierSources don't currently write out any data as part of the checkpoint.
     """
     None
-    // @printf[I32]("!@ BarrierSource %s calling EventLog.checkpoint_state()\n".cstring(), _source_id.string().cstring())
     // _event_log.checkpoint_state(_source_id, checkpoint_id,
     //   recover val Array[ByteSeq] end)
 

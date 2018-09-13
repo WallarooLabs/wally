@@ -78,9 +78,6 @@ actor TCPSource is Source
 
   let _metrics_reporter: MetricsReporter
 
-  let _pending_message_store: PendingMessageStore =
-    _pending_message_store.create()
-
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
   // TCP
@@ -109,7 +106,6 @@ actor TCPSource is Source
   let _max_received_count: U8 = 50
 
   let _router_registry: RouterRegistry
-  let _state_step_creator: StateStepCreator
 
   let _event_log: EventLog
 
@@ -125,8 +121,7 @@ actor TCPSource is Source
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     fd: U32, init_size: USize = 64, max_size: USize = 16384,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
-    state_step_creator: StateStepCreator)
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
   =>
     """
     A new connection accepted on a server.
@@ -149,7 +144,6 @@ actor TCPSource is Source
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
-    _state_step_creator = state_step_creator
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -191,7 +185,6 @@ actor TCPSource is Source
 
   be update_router(router': Router) =>
     _update_router(router')
-    _try_to_clear_pending_message_store()
 
   fun ref _update_router(router': Router) =>
     let new_router =
@@ -218,21 +211,6 @@ actor TCPSource is Source
     end
 
     _notify.update_router(_router)
-
-  fun ref _try_to_clear_pending_message_store() =>
-    _pending_message_store.process_known_keys(this, _router)
-
-    if not _pending_message_store.has_pending() then
-      let bs = Array[BarrierToken]
-      for b in _pending_barriers.values() do
-        bs.push(b)
-      end
-      _pending_barriers.clear()
-      for b in bs.values() do
-        _initiate_barrier(b)
-      end
-      _unmute_local()
-    end
 
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
@@ -289,9 +267,6 @@ actor TCPSource is Source
   //!@ rename
   be register_downstreams(promise: Promise[Source]) =>
     promise(this)
-
-  fun router(): Router =>
-    _router
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
@@ -427,15 +402,6 @@ actor TCPSource is Source
   fun ref current_sequence_id(): SeqId =>
     _seq_id
 
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    if not _pending_message_store.has_pending_state_key(state_name, key) then
-      _state_step_creator.report_unknown_key(this, state_name, key,
-        _next_checkpoint_id)
-    end
-    _pending_message_store.add(state_name, key, routing_args)
-
   be report_status(code: ReportStatusCode) =>
     match code
     | BoundaryCountStatus =>
@@ -477,22 +443,17 @@ actor TCPSource is Source
         _prepare_for_rollback()
       end
 
-      if not _pending_message_store.has_pending() then
-        match token
-        | let sbt: CheckpointBarrierToken =>
-          checkpoint_state(sbt.id)
+      match token
+      | let sbt: CheckpointBarrierToken =>
+        checkpoint_state(sbt.id)
+      end
+      for (o_id, o) in _outputs.pairs() do
+        match o
+        | let ob: OutgoingBoundary =>
+          ob.forward_barrier(o_id, _source_id, token)
+        else
+          o.receive_barrier(_source_id, this, token)
         end
-        for (o_id, o) in _outputs.pairs() do
-          match o
-          | let ob: OutgoingBoundary =>
-            ob.forward_barrier(o_id, _source_id, token)
-          else
-            o.receive_barrier(_source_id, this, token)
-          end
-        end
-      else
-        _mute_local()
-        _pending_barriers.push(token)
       end
     end
 
@@ -517,7 +478,7 @@ actor TCPSource is Source
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
-    _pending_message_store.clear()
+    None
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)

@@ -80,11 +80,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
-  let _state_step_creator: StateStepCreator
-
-  let _pending_message_store: PendingMessageStore =
-    _pending_message_store.create()
-
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
   // Checkpoint
@@ -102,7 +97,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     metrics_reporter: MetricsReporter iso,
     topic: String, partition_id: KafkaPartitionId,
     kafka_client: KafkaClient tag, router_registry: RouterRegistry,
-    state_step_creator: StateStepCreator,
     recovering: Bool)
   =>
     _source_id = source_id
@@ -115,8 +109,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _listen = listen
     _notify = consume notify
     _event_log = event_log
-
-    _state_step_creator = state_step_creator
 
     _recovering = recovering
 
@@ -157,7 +149,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   be update_router(router': Router) =>
     _update_router(router')
-    _try_to_clear_pending_message_store()
 
   fun ref _update_router(router': Router) =>
     let new_router =
@@ -185,32 +176,8 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
     _notify.update_router(_router)
 
-  fun ref _try_to_clear_pending_message_store() =>
-    _pending_message_store.process_known_keys(this, _router)
-
-    if not _pending_message_store.has_pending() then
-      let bs = Array[BarrierToken]
-      for b in _pending_barriers.values() do
-        bs.push(b)
-      end
-      _pending_barriers.clear()
-      for b in bs.values() do
-        _initiate_barrier(b)
-      end
-      _unmute_local()
-    end
-
   be register_downstreams(promise: Promise[Source]) =>
     promise(this)
-
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    if not _pending_message_store.has_pending_state_key(state_name, key) then
-      _state_step_creator.report_unknown_key(this, state_name, key,
-        _next_checkpoint_id)
-    end
-    _pending_message_store.add(state_name, key, routing_args)
 
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
@@ -263,9 +230,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
         end
       end
     end
-
-  fun router(): Router =>
-    _router
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
@@ -377,22 +341,17 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
         _prepare_for_rollback()
       end
 
-      if not _pending_message_store.has_pending() then
-        match token
-        | let sbt: CheckpointBarrierToken =>
-          checkpoint_state(sbt.id)
+      match token
+      | let sbt: CheckpointBarrierToken =>
+        checkpoint_state(sbt.id)
+      end
+      for (o_id, o) in _outputs.pairs() do
+        match o
+        | let ob: OutgoingBoundary =>
+          ob.forward_barrier(o_id, _source_id, token)
+        else
+          o.receive_barrier(_source_id, this, token)
         end
-        for (o_id, o) in _outputs.pairs() do
-          match o
-          | let ob: OutgoingBoundary =>
-            ob.forward_barrier(o_id, _source_id, token)
-          else
-            o.receive_barrier(_source_id, this, token)
-          end
-        end
-      else
-        _mute_local()
-        _pending_barriers.push(token)
       end
     end
 
@@ -418,7 +377,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>
-    _pending_message_store.clear()
+    None
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)

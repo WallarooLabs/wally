@@ -92,11 +92,11 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _tcp_auth = tcp_auth
     _recovering = recovering
 
-  fun apply(state_step_creator: StateStepCreator, env: Env): SourceListener =>
+  fun apply(env: Env): SourceListener =>
     KafkaSourceListener[In](env, _source_builder, _router, _router_registry,
       _outgoing_boundary_builders, _event_log, _auth,
       _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      state_step_creator, _target_router, _ksco, _tcp_auth, _recovering)
+      _target_router, _ksco, _tcp_auth, _recovering)
 
 
 class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
@@ -122,7 +122,6 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _notify: KafkaSourceListenerNotify[In]
   let _event_log: EventLog
-  let _state_step_creator: StateStepCreator
   var _router: Router
   let _router_registry: RouterRegistry
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
@@ -143,7 +142,6 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter,
     ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth, recovering: Bool)
   =>
@@ -153,7 +151,6 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _event_log = event_log
     _notify = KafkaSourceListenerNotify[In](source_builder, event_log, auth,
       target_router)
-    _state_step_creator = state_step_creator
     _router = router
     _router_registry = router_registry
     _outgoing_boundary_builders = outgoing_boundary_builders
@@ -235,7 +232,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
                 _notify.build_source(source_id, _env)?, _event_log,
                 _router, _outgoing_boundary_builders,
                 _layout_initializer, _metrics_reporter.clone(), topic, part_id,
-                kc, _router_registry, _state_step_creator, _recovering)
+                kc, _router_registry, _recovering)
               partitions_sources(part_id) = source
               _router_registry.register_source(source, source_id)
               match _router
