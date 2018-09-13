@@ -44,7 +44,7 @@ trait _RecoveryPhase
     _invalid_call()
     Fail()
 
-  fun ref worker_ack_topology_rollback(w: WorkerName, checkpoint_id: CheckpointId)
+  fun ref worker_ack_local_keys_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
     _invalid_call()
     Fail()
@@ -136,9 +136,9 @@ class _PrepareRollback is _RecoveryPhase
   fun name(): String => "_PrepareRollback"
 
   fun ref rollback_prep_complete() =>
-    _recovery._rollback_prep_complete()
+    _recovery._rollback_local_keys()
 
-class _RollbackTopology is _RecoveryPhase
+class _RollbackLocalKeys is _RecoveryPhase
   let _recovery: Recovery ref
   let _checkpoint_id: CheckpointId
   let _workers: Array[WorkerName] val
@@ -153,9 +153,9 @@ class _RollbackTopology is _RecoveryPhase
 
   fun name(): String => "_RollbackTopology"
 
-  fun ref worker_ack_topology_rollback(w: WorkerName, checkpoint_id: CheckpointId)
+  fun ref worker_ack_local_keys_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
-    @printf[I32]("!@ _RollbackTopology rcvd ack from %s\n".cstring(), w.cstring())
+    @printf[I32]("!@ _RollbackLocalKeys rcvd ack from %s\n".cstring(), w.cstring())
     //!@ Should we just ignore misses here (which indicate an overlapping
     // recovery)?
     if checkpoint_id == _checkpoint_id then
@@ -170,33 +170,10 @@ class _RollbackTopology is _RecoveryPhase
 
   fun ref _check_completion() =>
     if _workers.size() == _acked_workers.size() then
-      _recovery._topology_rollback_complete()
+      _recovery._local_keys_rollback_complete()
     //!@
     else
       @printf[I32]("!@ _RollbackTopology: %s acked out of %s\n".cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
-    end
-
-class _RegisterProducers is _RecoveryPhase
-  let _recovery: Recovery ref
-  let _workers: Array[WorkerName] val
-  let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
-
-  new create(recovery: Recovery ref, workers: Array[WorkerName] val) =>
-    _recovery = recovery
-    _workers = workers
-
-  fun name(): String => "_RegisterProducers"
-
-  fun ref worker_ack_register_producers(w: WorkerName) =>
-    _acked_workers.set(w)
-    _check_completion()
-
-  fun ref _check_completion() =>
-    if _workers.size() == _acked_workers.size() then
-      _recovery._register_producers_complete()
-    //!@
-    else
-      @printf[I32]("!@ _RegisterProducers: %s acked out of %s\n".cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
     end
 
 class _RollbackBarrier is _RecoveryPhase
@@ -306,7 +283,7 @@ class _RecoveryOverrideAccepted is _RecoveryPhase
   fun ref rollback_prep_complete() =>
     None
 
-  fun ref worker_ack_topology_rollback(w: WorkerName, checkpoint_id: CheckpointId)
+  fun ref worker_ack_local_keys_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
     None
 

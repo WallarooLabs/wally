@@ -24,6 +24,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
 use "wallaroo/ent/checkpoint"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
@@ -73,8 +74,7 @@ class val StepBuilder
   fun apply(next: Router, metrics_conn: MetricsSink,
     event_log: EventLog, recovery_replayer: RecoveryReconnecter,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_step_creator: StateStepCreator,
-    router: Router = EmptyRouter,
+    router_registry: RouterRegistry, router: Router = EmptyRouter,
     target_id_router: TargetIdRouter = EmptyTargetIdRouter): Step tag
   =>
     let runner = _runner_builder(where event_log = event_log, auth = auth,
@@ -82,7 +82,7 @@ class val StepBuilder
     let step = Step(auth, consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
       event_log, recovery_replayer,
-      outgoing_boundaries, state_step_creator, router, target_id_router)
+      outgoing_boundaries, router_registry, router, target_id_router)
     step.update_router(next)
     step
 

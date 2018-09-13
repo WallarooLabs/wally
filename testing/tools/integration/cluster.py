@@ -272,7 +272,8 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
         join_block=CONTROL_CMD.format(control_addr=worker_addrs[0][0]),
         alt_block=alt_block if alt_func(x) else '',
         spike_block=spike_block)
-    runners.append(Runner(command=cmd, name='initializer',
+    runners.append(Runner(command=cmd,
+                          name='initializer',
                           control=worker_addrs[0][0],
                           data=worker_addrs[0][1],
                           external=worker_addrs[0][2]))
@@ -906,7 +907,7 @@ class Cluster(object):
         for s in self.senders:
             s.stop()
         self.metrics.stop()
-        clean_resilience_path(self.res_dir)
+        # clean_resilience_path(self.res_dir)
         self.runner_data.extend([RunnerData(r.name, r.command, r.pid,
                                             r.returncode(), r.get_output())
                                  for r in self.runners])

@@ -81,7 +81,7 @@ class _TestDataChannel is DataChannelListenNotify
       let app_name = "app_name"
       let worker_name = "worker_name"
       let auth = h.env.root as AmbientAuth
-      let event_log = EventLog(worker_name)
+      let event_log = EventLog(auth, worker_name)
       let metrics_sink = _NullMetricsSink
       let conns = Connections(app_name, worker_name, auth,
         "127.0.0.1", "0",
@@ -89,13 +89,12 @@ class _TestDataChannel is DataChannelListenNotify
         _NullMetricsSink, "127.0.0.1", "0",
         true, "/tmp/foo_connections.txt", false
         where event_log = event_log)
-      let ssc = StateStepCreator(auth, app_name, worker_name, metrics_sink, event_log)
-      let dr = DataReceivers(auth, conns, worker_name, ssc)
+      let dr = DataReceivers(auth, conns, worker_name)
       let b_initiator = BarrierInitiator(auth, worker_name, conns, "init")
       let s_initiator = CheckpointInitiator(auth, "", "", conns, 0, event_log,
         b_initiator, "")
       let a_initiator = AutoscaleInitiator(worker_name, b_initiator)
-      let rr = RouterRegistry(auth, worker_name, dr, conns, ssc,
+      let rr = RouterRegistry(auth, worker_name, dr, conns,
         _DummyRecoveryFileCleaner, 1, false, "",
         b_initiator, s_initiator, a_initiator)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))

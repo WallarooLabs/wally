@@ -332,9 +332,10 @@ primitive CheckCounts[Counted]
   =>
     try
       for (key, count) in expected_counts.pairs() do
-        ifdef debug then
-          Invariant(counted(key)?.size() <= count)
-        end
+        //!@ Safe??
+        // ifdef debug then
+        //   Invariant(counted(key)?.size() <= count)
+        // end
         if counted(key)?.size() < count then
           return false
         end

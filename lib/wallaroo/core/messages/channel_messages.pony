@@ -52,11 +52,11 @@ primitive ChannelMsgEncoder
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)?
 
-  fun migrate_step(step_id: RoutingId, state_name: String, key: Key,
-    checkpoint_id: CheckpointId, state: ByteSeq val, worker: String,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun migrate_key(state_name: String, key: Key, checkpoint_id: CheckpointId,
+    state: ByteSeq val, worker: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
-    _encode(KeyedStepMigrationMsg(step_id, state_name, key, checkpoint_id, state,
+    _encode(KeyMigrationMsg(state_name, key, checkpoint_id, state,
       worker), auth)?
 
   fun migration_batch_complete(sender: String,
@@ -76,13 +76,13 @@ primitive ChannelMsgEncoder
     """
     _encode(AckMigrationBatchCompleteMsg(worker), auth)?
 
-  fun step_migration_complete(step_id: RoutingId,
+  fun key_migration_complete(key: Key,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
-    Sent when the migration of step step_id is complete
+    Sent when the migration of key is complete
     """
-    _encode(StepMigrationCompleteMsg(step_id), auth)?
+    _encode(KeyMigrationCompleteMsg(key), auth)?
 
   fun begin_leaving_migration(remaining_workers: Array[String] val,
     leaving_workers: Array[String] val, auth: AmbientAuth):
@@ -257,8 +257,9 @@ primitive ChannelMsgEncoder
 
   // TODO: Update this once new workers become first class citizens
   fun inform_joining_worker(worker_name: String, metric_app_name: String,
-    l_topology: LocalTopology, metric_host: String,
-    metric_service: String, control_addrs: Map[String, (String, String)] val,
+    l_topology: LocalTopology, checkpoint_id: CheckpointId,
+    rollback_id: RollbackId, metric_host: String, metric_service: String,
+    control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
     worker_names: Array[String] val, primary_checkpoint_worker: String,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
@@ -271,9 +272,10 @@ primitive ChannelMsgEncoder
     This message is sent as a response to a JoinCluster message.
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
-      metric_host, metric_service, control_addrs, data_addrs, worker_names,
-      primary_checkpoint_worker, partition_blueprints,
-      stateless_partition_blueprints, target_id_router_blueprints), auth)?
+      checkpoint_id, rollback_id, metric_host, metric_service, control_addrs,
+      data_addrs, worker_names, primary_checkpoint_worker,
+      partition_blueprints, stateless_partition_blueprints,
+      target_id_router_blueprints), auth)?
 
   fun inform_join_error(msg: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -295,10 +297,11 @@ primitive ChannelMsgEncoder
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr,
       state_routing_ids), auth)?
 
-  fun initiate_stop_the_world_for_join_migration(
+  fun initiate_stop_the_world_for_join_migration(sender: WorkerName,
     new_workers: Array[String] val, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(InitiateStopTheWorldForJoinMigrationMsg(new_workers), auth)?
+    _encode(InitiateStopTheWorldForJoinMigrationMsg(sender, new_workers),
+      auth)?
 
   fun initiate_join_migration(new_workers: Array[String] val,
     checkpoint_id: CheckpointId, auth: AmbientAuth): Array[ByteSeq] val ?
@@ -318,6 +321,14 @@ primitive ChannelMsgEncoder
     complete.
     """
     _encode(AutoscaleCompleteMsg, auth)?
+
+  fun initiate_stop_the_world_for_shrink_migration(sender: WorkerName,
+    remaining_workers: Array[String] val,
+    leaving_workers: Array[String] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(InitiateStopTheWorldForShrinkMigrationMsg(sender,
+      remaining_workers, leaving_workers), auth)?
 
   fun leaving_worker_done_migrating(worker_name: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -432,25 +443,25 @@ primitive ChannelMsgEncoder
   =>
     _encode(WorkerAckBarrierMsg(sender, token), auth)?
 
-  fun forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
-    token: BarrierToken, seq_id: SeqId, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+  fun forward_barrier(target_step_id: RoutingId,
+    origin_step_id: RoutingId, token: BarrierToken, seq_id: SeqId,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token, seq_id),
-      auth)?
+    _encode(ForwardBarrierMsg(target_step_id, origin_step_id, token,
+      seq_id), auth)?
 
   fun barrier_complete(token: BarrierToken, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
     _encode(BarrierCompleteMsg(token), auth)?
 
-  fun event_log_initiate_checkpoint(checkpoint_id: CheckpointId, sender: String,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun event_log_initiate_checkpoint(checkpoint_id: CheckpointId,
+    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogInitiateCheckpointMsg(checkpoint_id, sender), auth)?
 
-  fun event_log_write_checkpoint_id(checkpoint_id: CheckpointId, sender: String,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
+    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(EventLogWriteCheckpointIdMsg(checkpoint_id, sender), auth)?
 
@@ -459,8 +470,14 @@ primitive ChannelMsgEncoder
   =>
     _encode(EventLogAckCheckpointMsg(checkpoint_id, sender), auth)?
 
-  fun commit_checkpoint_id(checkpoint_id: CheckpointId, rollback_id: RollbackId,
-    sender: WorkerName, auth: AmbientAuth): Array[ByteSeq] val ?
+  fun event_log_ack_checkpoint_id_written(checkpoint_id: CheckpointId,
+    sender: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(EventLogAckCheckpointIdWrittenMsg(checkpoint_id, sender), auth)?
+
+  fun commit_checkpoint_id(checkpoint_id: CheckpointId,
+    rollback_id: RollbackId, sender: WorkerName, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     _encode(CommitCheckpointIdMsg(checkpoint_id, rollback_id, sender), auth)?
 
@@ -498,21 +515,21 @@ primitive ChannelMsgEncoder
     """
     _encode(PrepareForRollbackMsg(sender), auth)?
 
-  fun rollback_topology_graph(sender: WorkerName, checkpoint_id: CheckpointId,
+  fun rollback_local_keys(sender: WorkerName, checkpoint_id: CheckpointId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     Sent to all workers in cluster by recovering worker.
     """
-    _encode(RollbackTopologyGraphMsg(sender, checkpoint_id), auth)?
+    _encode(RollbackLocalKeysMsg(sender, checkpoint_id), auth)?
 
-  fun ack_rollback_topology_graph(sender: WorkerName, checkpoint_id: CheckpointId,
+  fun ack_rollback_local_keys(sender: WorkerName, checkpoint_id: CheckpointId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     Sent to ack rolling back topology graph.
     """
-    _encode(AckRollbackTopologyGraphMsg(sender, checkpoint_id), auth)?
+    _encode(AckRollbackLocalKeysMsg(sender, checkpoint_id), auth)?
 
   fun register_producers(sender: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -705,45 +722,28 @@ class val ReplayCompleteMsg is ChannelMsg
     sender_name = from
     boundary_id = b_id
 
-
-trait val StepMigrationMsg is ChannelMsg
-  fun state_name(): String
-  fun step_id(): RoutingId
-  fun checkpoint_id(): CheckpointId
-  fun state(): ByteSeq val
-  fun worker(): String
-  fun update_router_registry(router_registry: RouterRegistry ref,
-    step: Step)
-
-class val KeyedStepMigrationMsg is StepMigrationMsg
+class val KeyMigrationMsg is ChannelMsg
   let _state_name: String
   let _key: Key
-  let _step_id: RoutingId
   // The next checkpoint that this migrated step will be a part of
   let _checkpoint_id: CheckpointId
   let _state: ByteSeq val
   let _worker: String
 
-  new val create(step_id': U128, state_name': String, key': Key,
+  new val create(state_name': String, key': Key,
     checkpoint_id': CheckpointId, state': ByteSeq val, worker': String)
   =>
     _state_name = state_name'
     _key = key'
-    _step_id = step_id'
     _checkpoint_id = checkpoint_id'
     _state = state'
     _worker = worker'
 
   fun state_name(): String => _state_name
-  fun step_id(): RoutingId => _step_id
   fun checkpoint_id(): CheckpointId => _checkpoint_id
   fun state(): ByteSeq val => _state
+  fun key(): Key => _key
   fun worker(): String => _worker
-  fun update_router_registry(router_registry: RouterRegistry ref,
-    step: Step)
-  =>
-    router_registry.move_proxy_to_stateful_step(_step_id, step, _key,
-      _state_name, _worker, _checkpoint_id)
 
 class val MigrationBatchCompleteMsg is ChannelMsg
   let sender_name: String
@@ -769,12 +769,12 @@ class val UnmuteRequestMsg is ChannelMsg
   new val create(worker: String) =>
     originating_worker = worker
 
-class val StepMigrationCompleteMsg is ChannelMsg
-  let step_id: RoutingId
+class val KeyMigrationCompleteMsg is ChannelMsg
+  let key: Key
 
-  new val create(step_id': U128)
+  new val create(k: Key)
   =>
-    step_id = step_id'
+    key = k
 
 class val BeginLeavingMigrationMsg is ChannelMsg
   let remaining_workers: Array[String] val
@@ -886,20 +886,19 @@ trait val DeliveryMsg is ChannelMsg
     producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    consumer_ids: MapIs[Consumer, RoutingId] val,
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, RoutingId] val,
-    keys_to_routes: LocalStatePartitions val,
-    keys_to_route_ids: StatePartitionRouteIds val
-  ): RouteId ?
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
 
 trait val ReplayableDeliveryMsg is DeliveryMsg
   fun val replay_deliver(pipeline_time_spent: U64,
     data_routes: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    consumer_ids: MapIs[Consumer, RoutingId] val,
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
     producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: LocalStatePartitions val,
-    keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
   fun input(): Any val
   fun metric_name(): String
   fun msg_uid(): MsgId
@@ -936,10 +935,10 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    consumer_ids: MapIs[Consumer, RoutingId] val,
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, RoutingId] val,
-    keys_to_routes: LocalStatePartitions val,
-    keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
     ifdef "trace" then
@@ -955,11 +954,11 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
 
   fun val replay_deliver(pipeline_time_spent: U64,
     data_routes: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    consumer_ids: MapIs[Consumer, RoutingId] val,
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
     producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: LocalStatePartitions val,
-    keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
     let route_id = target_ids_to_route_ids(_target_id)?
@@ -999,46 +998,48 @@ class val ForwardKeyedMsg[D: Any val] is ReplayableDeliveryMsg
     producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    consumer_ids: MapIs[Consumer, RoutingId] val,
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, RoutingId] val,
-    keys_to_routes: LocalStatePartitions val,
-    keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
   =>
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
 
     try
-      let target_step = keys_to_routes(_target_state_name, _target_key)?
-      let route_id = keys_to_route_ids(_target_state_name, _target_key)?
+      let local_state_steps = state_steps(_target_state_name)?
+      let idx =
+        (HashKey(_target_key) % local_state_steps.size().u128()).usize()
+      let target_step = local_state_steps(idx)?
+
+      let target_id = consumer_ids(target_step)?
+      let route_id = target_ids_to_route_ids(target_id)?
+
       target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
         producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
         worker_ingress_ts)
       route_id
     else
-      ifdef "trace" then
-        @printf[I32]("DataRouter could not find route for key %s\n".cstring(),
-          _target_key.cstring())
-      end
-      let ra = TypedDataRoutingArguments[ReplayableDeliveryMsg](_metric_name,
-        pipeline_time_spent,
-        this, producer_id, seq_id, _frac_ids, latest_ts, metrics_id,
-        worker_ingress_ts)
-      producer.unknown_key(_target_state_name, _target_key, ra)
       error
     end
 
   fun val replay_deliver(pipeline_time_spent: U64,
     data_routes: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    consumer_ids: MapIs[Consumer, RoutingId] val,
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
     producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    keys_to_routes: LocalStatePartitions val,
-    keys_to_route_ids: StatePartitionRouteIds val): RouteId ?
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
   =>
     try
-      let target_step = keys_to_routes(_target_state_name, _target_key)?
-      let route_id = keys_to_route_ids(_target_state_name, _target_key)?
+      let local_state_steps = state_steps(_target_state_name)?
+      let idx =
+        (HashKey(_target_key) % local_state_steps.size().u128()).usize()
+      let target_step = local_state_steps(idx)?
+
+      let target_id = consumer_ids(target_step)?
+      let route_id = target_ids_to_route_ids(target_id)?
 
       target_step.replay_run[D](_metric_name, pipeline_time_spent,
         _data, producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id,
@@ -1046,14 +1047,6 @@ class val ForwardKeyedMsg[D: Any val] is ReplayableDeliveryMsg
 
       route_id
     else
-      ifdef "trace" then
-        @printf[I32]("DataRouter could not find route for key %s\n".cstring(),
-          _target_key.cstring())
-      end
-      let ra = TypedDataReplayRoutingArguments[ReplayableDeliveryMsg](_metric_name, pipeline_time_spent,
-        this, producer_id, seq_id, _frac_ids, latest_ts, metrics_id,
-        worker_ingress_ts)
-      producer.unknown_key(_target_state_name, _target_key, ra)
       error
     end
 
@@ -1095,6 +1088,8 @@ class val InformJoiningWorkerMsg is ChannelMsg
   """
   let sender_name: WorkerName
   let local_topology: LocalTopology
+  let checkpoint_id: CheckpointId
+  let rollback_id: CheckpointId
   let metrics_app_name: String
   let metrics_host: String
   let metrics_service: String
@@ -1109,6 +1104,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let target_id_router_blueprints: Map[StateName, TargetIdRouterBlueprint] val
 
   new val create(sender: WorkerName, app: String, l_topology: LocalTopology,
+    checkpoint_id': CheckpointId, rollback_id': RollbackId,
     m_host: String, m_service: String,
     c_addrs: Map[WorkerName, (String, String)] val,
     d_addrs: Map[WorkerName, (String, String)] val,
@@ -1120,6 +1116,8 @@ class val InformJoiningWorkerMsg is ChannelMsg
   =>
     sender_name = sender
     local_topology = l_topology
+    checkpoint_id = checkpoint_id'
+    rollback_id = rollback_id'
     metrics_app_name = app
     metrics_host = m_host
     metrics_service = m_service
@@ -1153,9 +1151,11 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
     state_routing_ids = s_routing_ids
 
 class val InitiateStopTheWorldForJoinMigrationMsg is ChannelMsg
+  let sender: WorkerName
   let new_workers: Array[String] val
 
-  new val create(ws: Array[String] val) =>
+  new val create(s: WorkerName, ws: Array[String] val) =>
+    sender = s
     new_workers = ws
 
 class val InitiateJoinMigrationMsg is ChannelMsg
@@ -1167,6 +1167,18 @@ class val InitiateJoinMigrationMsg is ChannelMsg
     checkpoint_id = s_id
 
 primitive AutoscaleCompleteMsg is ChannelMsg
+
+class val InitiateStopTheWorldForShrinkMigrationMsg is ChannelMsg
+  let sender: WorkerName
+  let remaining_workers: Array[String] val
+  let leaving_workers: Array[String] val
+
+  new val create(s: WorkerName, r_ws: Array[String] val,
+    l_ws: Array[String] val)
+  =>
+    sender = s
+    remaining_workers = r_ws
+    leaving_workers = l_ws
 
 class val LeavingWorkerDoneMigratingMsg is ChannelMsg
   let worker_name: String
@@ -1341,6 +1353,14 @@ class val EventLogAckCheckpointMsg is ChannelMsg
     checkpoint_id = checkpoint_id'
     sender = sender'
 
+class val EventLogAckCheckpointIdWrittenMsg is ChannelMsg
+  let checkpoint_id: CheckpointId
+  let sender: WorkerName
+
+  new val create(checkpoint_id': CheckpointId, sender': WorkerName) =>
+    checkpoint_id = checkpoint_id'
+    sender = sender'
+
 class val CommitCheckpointIdMsg is ChannelMsg
   let checkpoint_id: CheckpointId
   let rollback_id: RollbackId
@@ -1397,7 +1417,7 @@ class val PrepareForRollbackMsg is ChannelMsg
   new val create(sender': WorkerName) =>
     sender = sender'
 
-class val RollbackTopologyGraphMsg is ChannelMsg
+class val RollbackLocalKeysMsg is ChannelMsg
   let sender: WorkerName
   let checkpoint_id: CheckpointId
 
@@ -1405,7 +1425,7 @@ class val RollbackTopologyGraphMsg is ChannelMsg
     sender = sender'
     checkpoint_id = s_id
 
-class val AckRollbackTopologyGraphMsg is ChannelMsg
+class val AckRollbackLocalKeysMsg is ChannelMsg
   let sender: WorkerName
   let checkpoint_id: CheckpointId
 

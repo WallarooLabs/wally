@@ -241,7 +241,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     None
 
   be register_producer(id: RoutingId, producer: Producer) =>
-    @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+    // @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
     // If we have at least one input, then we are involved in checkpointing.
     if _inputs.size() == 0 then
       _barrier_initiator.register_sink(this)
@@ -252,7 +252,7 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     _upstreams.set(producer)
 
   be unregister_producer(id: RoutingId, producer: Producer) =>
-    @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+    // @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
 
     ifdef debug then
       Invariant(_upstreams.contains(producer))
@@ -363,13 +363,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     // TODO: implement this once state save/recover is handled
     Fail()
 
-  be receive_state(state: ByteSeq val) =>
-    ifdef "trace" then
-      @printf[I32]("receive_state in %s\n".cstring(), _name.cstring())
-    end
-    // TODO: implement state recovery
-    Fail()
-
   be log_replay_finished()
   =>
     ifdef "trace" then
@@ -446,8 +439,16 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
     end
-    _message_processor.flush()
+    let queued = _message_processor.queued()
     _message_processor = NormalSinkMessageProcessor(this)
+    for q in queued.values() do
+      match q
+      | let qm: QueuedMessage =>
+        qm.process_message(this)
+      | let qb: QueuedBarrier =>
+        qb.inject_barrier(this)
+      end
+    end
 
   fun ref _clear_barriers() =>
     try
@@ -468,7 +469,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       recover val Array[ByteSeq] end)
 
   be prepare_for_rollback() =>
-    _inputs.clear()
     _prepare_for_rollback()
 
   fun ref _prepare_for_rollback() =>

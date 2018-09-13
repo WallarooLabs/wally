@@ -17,6 +17,7 @@ primitive StepRollbacker
   fun apply(payload: ByteSeq val, runner: Runner) =>
     match runner
     | let r: RollbackableRunner =>
+      @printf[I32]("!@ Step rolling back!\n".cstring())
       r.rollback(payload)
     else
       @printf[I32]("trying to rollback on a non-rollbackable runner!"

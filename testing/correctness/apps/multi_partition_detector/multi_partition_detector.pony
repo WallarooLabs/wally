@@ -74,7 +74,7 @@ actor Main
         for x in Range[USize](1, depth + 1) do
           env.out.print("Adding level " + x.string())
           p.to[t.Message]({(): TraceID => TraceID(x.string())})
-          p.to_state_partition[t.Message, t.Message,
+          p.to_state_partition[t.Message,
             WindowState](TraceWindow(x.string()), WindowStateBuilder,
             "state" + x.string(),
             partition where multi_worker = true)

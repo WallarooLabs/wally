@@ -137,15 +137,11 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
 
+  let _queue: Array[Array[U8] val] = _queue.create()
+
   // Initial state is an empty DataReceiver wrapper that should never
   // be used (we fail if it is).
   var _receiver: _DataReceiverWrapper = _InitDataReceiver
-
-  // Keep track of register_producer calls that we weren't ready to forward
-  let _queued_register_producers: Array[(RoutingId, RoutingId)] =
-    _queued_register_producers.create()
-  let _queued_unregister_producers: Array[(RoutingId, RoutingId)] =
-    _queued_register_producers.create()
 
   new iso create(connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso,
@@ -160,7 +156,10 @@ class DataChannelConnectNotifier is DataChannelNotify
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
-    _receiver = _WaitingDataReceiver(this)
+    _receiver = _WaitingDataReceiver(_auth, this, _data_receivers)
+
+  fun ref queue_msg(msg: Array[U8] val) =>
+    _queue.push(msg)
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
     highest_seq_id: SeqId, conn: DataChannel ref)
@@ -173,36 +172,19 @@ class DataChannelConnectNotifier is DataChannelNotify
     the DataChannel corresponding to this notify.
     """
     // State change to our real DataReceiver.
-    _receiver = _DataReceiver(dr)
-    _receiver.data_connect(sender_boundary_id, highest_seq_id, conn)
-
-    // If we have pending register_producer calls, then try to process them now
-    var retries = Array[(RoutingId, RoutingId)]
-    for r in _queued_register_producers.values() do
-      retries.push(r)
+    _receiver = _DataReceiver(_auth, _connections, _metrics_reporter.clone(),
+      _layout_initializer, _data_receivers, _recovery_replayer,
+      _router_registry, this, dr)
+    dr.data_connect(sender_boundary_id, highest_seq_id, conn)
+    //!@
+    if _queue.size() > 0 then @printf[I32]("!@ DataChannel: playing queued msgs:\n".cstring()) end
+    for msg in _queue.values() do
+      @printf[I32]("!@ -- Playing msg size %s\n".cstring(), msg.size().string().cstring())
+      _receiver.decode_and_process(conn, msg)
     end
-    _queued_register_producers.clear()
-    for (input, output) in retries.values() do
-      _receiver.register_producer(input, output)
-    end
-    // If we have pending unregister_producer calls, then try to process them
-    // now
-    retries = Array[(RoutingId, RoutingId)]
-    for r in _queued_unregister_producers.values() do
-      retries.push(r)
-    end
-    _queued_unregister_producers.clear()
-    for (input, output) in retries.values() do
-      _receiver.unregister_producer(input, output)
-    end
+    _queue.clear()
 
     conn._unmute(this)
-
-  fun ref queue_register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    _queued_register_producers.push((input_id, output_id))
-
-  fun ref queue_unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
-    _queued_unregister_producers.push((input_id, output_id))
 
   fun ref received(conn: DataChannel ref, data: Array[U8] iso): Bool
   =>
@@ -219,100 +201,10 @@ class DataChannelConnectNotifier is DataChannelNotify
       end
       true
     else
-      // because we received this from another worker
-      let ingest_ts = WallClock.nanoseconds()
-      let my_latest_ts = Time.nanos()
-
       ifdef "trace" then
         @printf[I32]("Rcvd msg on data channel\n".cstring())
       end
-      match ChannelMsgDecoder(consume data, _auth)
-      | let data_msg: DataMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received DataMsg on Data Channel\n".cstring())
-        end
-        _metrics_reporter.step_metric(data_msg.metric_name,
-          "Before receive on data channel (network time)", data_msg.metrics_id,
-          data_msg.latest_ts, ingest_ts)
-        _receiver.received(data_msg.delivery_msg,
-            data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
-            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
-            my_latest_ts)
-      | let dc: DataConnectMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
-        end
-        // Before we can begin processing messages on this data channel, we
-        // need to determine which DataReceiver we'll be forwarding data
-        // messages to.
-        conn._mute(this)
-        _data_receivers.request_data_receiver(dc.sender_name,
-          dc.sender_boundary_id, dc.highest_seq_id, conn)
-      | let sm: StepMigrationMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
-        end
-        _layout_initializer.receive_immigrant_step(sm)
-      | let m: MigrationBatchCompleteMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
-        end
-        // Go through layout_initializer and router_registry to make sure
-        // pending messages on registry are processed first. That's because
-        // the current message path for receiving immigrant steps is
-        // layout_initializer then router_registry.
-        _layout_initializer.ack_migration_batch_complete(m.sender_name)
-      | let aw: AckDataReceivedMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received AckDataReceivedMsg on Data Channel\n"
-            .cstring())
-        end
-        Fail()
-      | let r: ReplayMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
-        end
-        try
-          match r.msg(_auth)?
-          | let data_msg: DataMsg =>
-            _metrics_reporter.step_metric(data_msg.metric_name,
-              "Before replay receive on data channel (network time)",
-              data_msg.metrics_id, data_msg.latest_ts, ingest_ts)
-            _receiver.replay_received(data_msg.delivery_msg,
-              data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
-              data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
-              my_latest_ts)
-          | let fbm: ForwardBarrierMsg =>
-            _receiver.forward_barrier(fbm.target_id, fbm.origin_id, fbm.token,
-              fbm.seq_id)
-          end
-        else
-          Fail()
-        end
-      | let c: ReplayCompleteMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received ReplayCompleteMsg on Data Channel\n"
-            .cstring())
-        end
-        //!@ We should probably be removing this whole message
-        // _recovery_replayer.add_boundary_replay_complete(c.sender_name,
-        //   c.boundary_id)
-      | let m: SpinUpLocalTopologyMsg =>
-        @printf[I32]("Received spin up local topology message!\n".cstring())
-      | let m: ReportStatusMsg =>
-        _receiver.report_status(m.code)
-      | let m: RegisterProducerMsg =>
-        _receiver.register_producer(m.source_id, m.target_id)
-      | let m: UnregisterProducerMsg =>
-        _receiver.unregister_producer(m.source_id, m.target_id)
-      | let m: ForwardBarrierMsg =>
-        _receiver.forward_barrier(m.target_id, m.origin_id, m.token, m.seq_id)
-      | let m: UnknownChannelMsg =>
-        @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
-          .cstring())
-      else
-        @printf[I32]("Unknown Wallaroo data message type.\n".cstring())
-      end
+      _receiver.decode_and_process(conn, consume data)
 
       conn.expect(4)
       _header = true
@@ -338,78 +230,149 @@ class DataChannelConnectNotifier is DataChannelNotify
     //      create a new connection in OutgoingBoundary
 
 trait _DataReceiverWrapper
-  fun data_connect(sender_step_id: RoutingId, highest_seq_id: SeqId,
-    conn: DataChannel)
-  =>
-    Fail()
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    Fail()
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    Fail()
-  fun report_status(code: ReportStatusCode) =>
-    Fail()
-
-  fun ref register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    Fail()
-  fun ref unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
-    Fail()
-
-  fun forward_barrier(target_id: RoutingId, origin_id: RoutingId,
-    token: BarrierToken, seq_id: SeqId)
-  =>
+  fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>
     Fail()
 
 class _InitDataReceiver is _DataReceiverWrapper
 
 class _WaitingDataReceiver is _DataReceiverWrapper
+  let _auth: AmbientAuth
   let _dccn: DataChannelConnectNotifier ref
+  let _data_receivers: DataReceivers
 
-  new create(dccn: DataChannelConnectNotifier ref) =>
+  new create(auth: AmbientAuth, dccn: DataChannelConnectNotifier ref,
+    data_receivers: DataReceivers)
+  =>
+    _auth = auth
     _dccn = dccn
+    _data_receivers = data_receivers
 
-  fun ref register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    _dccn.queue_register_producer(input_id, output_id)
-
-  fun ref unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
-    _dccn.queue_unregister_producer(input_id, output_id)
+  fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>
+    match ChannelMsgDecoder(data, _auth)
+    | let dc: DataConnectMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
+      end
+      // Before we can begin processing messages on this data channel, we
+      // need to determine which DataReceiver we'll be forwarding data
+      // messages to.
+      conn._mute(_dccn)
+      _data_receivers.request_data_receiver(dc.sender_name,
+        dc.sender_boundary_id, dc.highest_seq_id, conn)
+    else
+      _dccn.queue_msg(data)
+    end
 
 class _DataReceiver is _DataReceiverWrapper
-  let data_receiver: DataReceiver
+  let _auth: AmbientAuth
+  let _connections: Connections
+  let _metrics_reporter: MetricsReporter
+  let _layout_initializer: LayoutInitializer tag
+  let _data_receivers: DataReceivers
+  let _recovery_replayer: RecoveryReconnecter
+  let _router_registry: RouterRegistry
+  let _dccn: DataChannelConnectNotifier ref
+  let _data_receiver: DataReceiver
 
-  new create(dr: DataReceiver) =>
-    data_receiver = dr
-
-  fun data_connect(sender_step_id: RoutingId, highest_seq_id: SeqId,
-    conn: DataChannel)
+  new create(auth: AmbientAuth, connections: Connections,
+    metrics_reporter: MetricsReporter iso,
+    layout_initializer: LayoutInitializer tag,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
+    router_registry: RouterRegistry,
+    dccn: DataChannelConnectNotifier ref, dr: DataReceiver)
   =>
-    data_receiver.data_connect(sender_step_id, highest_seq_id, conn)
+    _auth = auth
+    _connections = connections
+    _metrics_reporter = consume metrics_reporter
+    _layout_initializer = layout_initializer
+    _data_receivers = data_receivers
+    _recovery_replayer = recovery_replayer
+    _router_registry = router_registry
+    _dccn = dccn
+    _data_receiver = dr
 
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    data_receiver.received(d, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+  fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>
+    // because we received this from another worker
+    let ingest_ts = WallClock.nanoseconds()
+    let my_latest_ts = Time.nanos()
 
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
-
-  fun report_status(code: ReportStatusCode) =>
-    data_receiver.report_status(code)
-
-  fun ref register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    data_receiver.register_producer(input_id, output_id)
-
-  fun ref unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
-    data_receiver.unregister_producer(input_id, output_id)
-
-  fun forward_barrier(target_id: RoutingId, origin_id: RoutingId,
-    token: BarrierToken, seq_id: SeqId)
-  =>
-    data_receiver.forward_barrier(target_id, origin_id, token, seq_id)
+    match ChannelMsgDecoder(data, _auth)
+    | let data_msg: DataMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received DataMsg on Data Channel\n".cstring())
+      end
+      _metrics_reporter.step_metric(data_msg.metric_name,
+        "Before receive on data channel (network time)", data_msg.metrics_id,
+        data_msg.latest_ts, ingest_ts)
+      _data_receiver.received(data_msg.delivery_msg,
+          data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+          data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+          my_latest_ts)
+    | let dc: DataConnectMsg =>
+      @printf[I32](("Received DataConnectMsg on DataChannel, but we already " +
+        "have a DataReceiver for this connection.\n").cstring())
+    | let km: KeyMigrationMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received KeyMigrationMsg on Data Channel\n".cstring())
+      end
+      _layout_initializer.receive_immigrant_key(km)
+    | let m: MigrationBatchCompleteMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
+      end
+      // Go through layout_initializer and router_registry to make sure
+      // pending messages on registry are processed first. That's because
+      // the current message path for receiving immigrant steps is
+      // layout_initializer then router_registry.
+      _layout_initializer.ack_migration_batch_complete(m.sender_name)
+    | let aw: AckDataReceivedMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received AckDataReceivedMsg on Data Channel\n"
+          .cstring())
+      end
+      Fail()
+    | let r: ReplayMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
+      end
+      try
+        match r.msg(_auth)?
+        | let data_msg: DataMsg =>
+          _metrics_reporter.step_metric(data_msg.metric_name,
+            "Before replay receive on data channel (network time)",
+            data_msg.metrics_id, data_msg.latest_ts, ingest_ts)
+          _data_receiver.replay_received(data_msg.delivery_msg,
+            data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+            my_latest_ts)
+        | let fbm: ForwardBarrierMsg =>
+          _data_receiver.forward_barrier(fbm.target_id, fbm.origin_id,
+            fbm.token, fbm.seq_id)
+        end
+      else
+        Fail()
+      end
+    | let c: ReplayCompleteMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received ReplayCompleteMsg on Data Channel\n"
+          .cstring())
+      end
+      //!@ We should probably be removing this whole message
+      // _recovery_replayer.add_boundary_replay_complete(c.sender_name,
+      //   c.boundary_id)
+    | let m: SpinUpLocalTopologyMsg =>
+      @printf[I32]("Received spin up local topology message!\n".cstring())
+    | let m: ReportStatusMsg =>
+      _data_receiver.report_status(m.code)
+    | let m: RegisterProducerMsg =>
+      _data_receiver.register_producer(m.source_id, m.target_id)
+    | let m: UnregisterProducerMsg =>
+      _data_receiver.unregister_producer(m.source_id, m.target_id)
+    | let m: ForwardBarrierMsg =>
+      _data_receiver.forward_barrier(m.target_id, m.origin_id, m.token, m.seq_id)
+    | let m: UnknownChannelMsg =>
+      @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
+        .cstring())
+    else
+      @printf[I32]("Unknown Wallaroo data message type.\n".cstring())
+    end

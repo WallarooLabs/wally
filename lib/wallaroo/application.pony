@@ -200,7 +200,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     step_id_map("key") = routing_id_gen()
 
-    let next_builder = PreStateRunnerBuilder[Last, Next, Last, S](
+    let next_builder = PreStateRunnerBuilder[Last, Next, S](
       s_comp, state_name, SingleStepPartitionFunction[Last])
 
     _p.add_runner_builder(next_builder)
@@ -208,19 +208,19 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let state_builder = PartitionedStateRunnerBuilder[Last, S](_p.name(),
       state_name, consume step_id_map, single_step_partition,
       StateRunnerBuilder[S](s_initializer, state_name,
-        s_comp.state_change_builders()))
+        s_comp.state_change_builders()) where per_worker_parallelism' = 1)
 
     _a.add_state_builder(state_name, state_builder)
 
     PipelineBuilder[In, Out, Next](_a, _p)
 
-  fun ref to_state_partition[PIn: Any val, Next: Any val = PIn,
-    S: State ref](
+  fun ref to_state_partition[Next: Any val, S: State ref](
       s_comp: StateComputation[Last, Next, S] val,
       s_initializer: StateBuilder[S],
       state_name: StateName,
-      partition: Partitions[PIn],
-      multi_worker: Bool = false): PipelineBuilder[In, Out, Next]
+      partition: Partitions[Last],
+      multi_worker: Bool = false,
+      per_worker_parallelism: USize = 10): PipelineBuilder[In, Out, Next]
   =>
     if ArrayHelpers[StateName]
       .contains[StateName](_pipeline_state_names, state_name)
@@ -232,22 +232,22 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _pipeline_state_names.push(state_name)
 
     let routing_id_gen = RoutingIdGenerator
-    let step_id_map = recover trn Map[Key, U128] end
+    let step_id_map = recover trn Map[Key, RoutingId] end
 
     for key in partition.keys().values() do
       step_id_map(key) = routing_id_gen()
     end
 
-    let next_builder = PreStateRunnerBuilder[Last, Next, PIn, S](
+    let next_builder = PreStateRunnerBuilder[Last, Next, S](
       s_comp, state_name, partition.function()
       where multi_worker = multi_worker)
 
     _p.add_runner_builder(next_builder)
 
-    let state_builder = PartitionedStateRunnerBuilder[PIn, S](_p.name(),
+    let state_builder = PartitionedStateRunnerBuilder[Last, S](_p.name(),
       state_name, consume step_id_map, partition,
       StateRunnerBuilder[S](s_initializer, state_name,
-        s_comp.state_change_builders())
+        s_comp.state_change_builders()), per_worker_parallelism
       where multi_worker = multi_worker)
 
     _a.add_state_builder(state_name, state_builder)

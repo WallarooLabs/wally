@@ -303,16 +303,12 @@ actor Connections is Cluster
       Fail()
     end
 
-  be notify_cluster_of_new_stateful_step(id: RoutingId, key: Key,
-    state_name: String, exclusions: Array[String] val =
-    recover Array[String] end)
-  =>
+  be notify_cluster_of_new_key(key: Key, state_name: String) =>
     try
+      @printf[I32]("!@ Notify cluster about key %s\n".cstring(), key.cstring())
       let migration_complete_msg =
-        ChannelMsgEncoder.step_migration_complete(id, _auth)?
-      for producer in exclusions.values() do
-        _control_conns(producer)?.writev(migration_complete_msg)
-      end
+        ChannelMsgEncoder.key_migration_complete(key, _auth)?
+      _send_control_to_cluster(migration_complete_msg)
     else
       Fail()
     end
@@ -538,6 +534,8 @@ actor Connections is Cluster
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
     tidr_blueprints: Map[StateName, TargetIdRouterBlueprint] val,
     local_sinks: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
     router_registry: RouterRegistry, lti: LocalTopologyInitializer)
   =>
     // We delegate to router registry through here to ensure that we've
@@ -546,9 +544,9 @@ actor Connections is Cluster
 
     // We must create the target_id_router first
     router_registry.create_target_id_routers_from_blueprint(tidr_blueprints,
-      local_sinks, lti)
+      state_steps, local_sinks, lti)
     router_registry.create_partition_routers_from_blueprints(workers,
-      pr_blueprints)
+      state_steps, state_step_ids, pr_blueprints)
     router_registry.create_stateless_partition_routers_from_blueprints(
       spr_blueprints)
 
@@ -687,7 +685,8 @@ actor Connections is Cluster
     end
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
-    local_topology: LocalTopology, primary_checkpoint_worker: String,
+    local_topology: LocalTopology, checkpoint_id: CheckpointId,
+    rollback_id: RollbackId, primary_checkpoint_worker: String,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
@@ -709,8 +708,9 @@ actor Connections is Cluster
 
       try
         let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
-          _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
-          _metrics_service, consume c_addrs, consume d_addrs,
+          _app_name, local_topology.for_new_worker(worker)?,
+          checkpoint_id, rollback_id, _metrics_host, _metrics_service,
+          consume c_addrs, consume d_addrs,
           local_topology.worker_names, primary_checkpoint_worker,
           partition_blueprints, stateless_partition_blueprints,
           tidr_blueprints, _auth)?

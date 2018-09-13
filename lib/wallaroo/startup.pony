@@ -147,24 +147,6 @@ actor Startup
           _startup_options.log_rotation.string() + "|||\n").cstring())
       end
 
-      //!@
-      // if not _is_joining then
-      //   match _startup_options.worker_count
-      //   | let wc: USize =>
-      //     if wc == 1 then
-      //       @printf[I32]("Single worker topology\n".cstring())
-      //       _is_multi_worker = false
-      //     else
-      //       @printf[I32]((_startup_options.worker_count.string() +
-      //         " worker topology\n").cstring())
-      //     end
-      //   else
-      //     if _startup_options.is_initializer then
-      //       Unreachable()
-      //     end
-      //   end
-      // end
-
       if _is_joining then
         if _startup_options.worker_name == "" then
           @printf[I32](("You must specify a name for the worker " +
@@ -259,7 +241,7 @@ actor Startup
 
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
-          EventLog(_startup_options.worker_name,
+          EventLog(auth, _startup_options.worker_name,
             EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
             where backend_file_length' =
@@ -267,7 +249,7 @@ actor Startup
             suffix' = _event_log_file_suffix, log_rotation' = true,
             is_recovering' = _is_recovering))
         else
-          EventLog(_startup_options.worker_name,
+          EventLog(auth, _startup_options.worker_name,
             EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
@@ -275,7 +257,7 @@ actor Startup
               is_recovering' = _is_recovering))
         end
       else
-        EventLog(_startup_options.worker_name,
+        EventLog(auth, _startup_options.worker_name,
           EventLogConfig(where is_recovering' = _is_recovering))
       end
       let event_log = _event_log as EventLog
@@ -301,9 +283,11 @@ actor Startup
       // initializer.
       let checkpoint_initiator = CheckpointInitiator(auth,
         _startup_options.worker_name, initializer_name, connections,
-        _startup_options.time_between_checkpoints, event_log, barrier_initiator,
-        _checkpoint_ids_file, _startup_options.checkpoints_enabled
+        _startup_options.time_between_checkpoints, event_log,
+        barrier_initiator, _checkpoint_ids_file,
+        _startup_options.checkpoints_enabled
         where is_recovering = _is_recovering)
+      checkpoint_initiator.initialize_checkpoint_id()
       connections.register_disposable(checkpoint_initiator)
 
       let autoscale_initiator = AutoscaleInitiator(
@@ -312,15 +296,12 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
-      let state_step_creator = StateStepCreator(auth, _app_name,
-        _startup_options.worker_name, metrics_conn, event_log)
-
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name, state_step_creator, _is_recovering)
+        _startup_options.worker_name, _is_recovering)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
-        connections, state_step_creator, this,
+        connections, this,
         _startup_options.stop_the_world_pause, _is_joining, initializer_name,
         barrier_initiator, checkpoint_initiator, autoscale_initiator,
         initializer_name)
@@ -351,7 +332,7 @@ actor Startup
           _startup_options.is_initializer, data_receivers, event_log, recovery,
           recovery_reconnecter, checkpoint_initiator, barrier_initiator,
           _local_topology_file, _data_channel_file, _worker_names_file,
-          local_keys_filepath, state_step_creator)
+          local_keys_filepath)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -476,28 +457,29 @@ actor Startup
       let new_state_routing_ids_iso = recover iso Map[StateName, RoutingId] end
       let routing_id_gen = RoutingIdGenerator
       for state_name in m.partition_router_blueprints.keys() do
-        new_state_routing_ids_iso(state_name) = routing_id_gen()
+        let next_id = routing_id_gen()
+        new_state_routing_ids_iso(state_name) = next_id
       end
       let new_state_routing_ids = consume val new_state_routing_ids_iso
 
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
-          EventLog(_startup_options.worker_name,
+          EventLog(auth, _startup_options.worker_name,
             EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
             where backend_file_length' =
               _startup_options.event_log_file_length,
             suffix' = _event_log_file_suffix, log_rotation' = true))
         else
-          EventLog(_startup_options.worker_name,
+          EventLog(auth, _startup_options.worker_name,
             EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
               _startup_options.event_log_file_length))
         end
       else
-        EventLog(_startup_options.worker_name)
+        EventLog(auth, _startup_options.worker_name)
       end
       let event_log = _event_log as EventLog
 
@@ -518,23 +500,23 @@ actor Startup
 
       let checkpoint_initiator = CheckpointInitiator(auth,
         _startup_options.worker_name, m.primary_checkpoint_worker, connections,
-        _startup_options.time_between_checkpoints, event_log, barrier_initiator,
-        _checkpoint_ids_file, _startup_options.checkpoints_enabled)
+        _startup_options.time_between_checkpoints, event_log,
+        barrier_initiator, _checkpoint_ids_file,
+        _startup_options.checkpoints_enabled)
+      checkpoint_initiator.initialize_checkpoint_id(
+        (m.checkpoint_id, m.rollback_id))
 
       let autoscale_initiator = AutoscaleInitiator(
         _startup_options.worker_name, barrier_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
 
-      let state_step_creator = StateStepCreator(auth, _app_name,
-        _startup_options.worker_name, metrics_conn, event_log)
-
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name, state_step_creator)
+        _startup_options.worker_name)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
-        connections, state_step_creator, this,
+        connections, this,
         _startup_options.stop_the_world_pause, _is_joining, initializer_name,
         barrier_initiator, checkpoint_initiator, autoscale_initiator,
         m.sender_name where joining_state_routing_ids = new_state_routing_ids)
@@ -555,7 +537,7 @@ actor Startup
           _startup_options.is_initializer, data_receivers,
           event_log, recovery, recovery_reconnecter, checkpoint_initiator,
           barrier_initiator, _local_topology_file, _data_channel_file,
-          _worker_names_file, local_keys_filepath, state_step_creator
+          _worker_names_file, local_keys_filepath
           where is_joining = true,
           joining_state_routing_ids = new_state_routing_ids)
 
@@ -576,9 +558,9 @@ actor Startup
       end
 
       let data_router = DataRouter(_startup_options.worker_name,
-          recover Map[RoutingId, Consumer] end,
-          recover LocalStatePartitions end,
-          recover LocalStatePartitionIds end, consume dr_state_routing_ids)
+        recover Map[RoutingId, Consumer] end,
+        recover Map[StateName, Array[Step] val] end,
+        consume dr_state_routing_ids)
 
       router_registry.set_data_router(data_router)
       let updated_topology = m.local_topology.add_state_routing_ids(

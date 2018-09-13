@@ -41,8 +41,8 @@ build-testing-correctness-tests-autoscale_tests: build-testing-correctness-apps-
 build-testing-correctness-tests-autoscale_tests: build-machida
 build-testing-correctness-tests-autoscale_tests: build-testing-tools-external_sender
 build-testing-correctness-tests-autoscale_tests: build-utils-cluster_shrinker
-integration-tests-testing-correctness-tests-autoscale_tests: build-testing-correctness-tests-autoscale_tests
-integration-tests-testing-correctness-tests-autoscale_tests: autoscale_tests
+# integration-tests-testing-correctness-tests-autoscale_tests: build-testing-correctness-tests-autoscale_tests
+# integration-tests-testing-correctness-tests-autoscale_tests: autoscale_tests
 
 # standard rules generation makefile
 include $(rules_mk_path)

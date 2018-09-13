@@ -202,7 +202,7 @@ class _StepInfo
     state_builder: StateBuilder, name: String, partition: w.Partitions[GoData]):
     PipelineBuilder[GoData, GoData, GoData]
   =>
-    _pipeline_builder.to_state_partition[GoData, GoData, GoState](
+    _pipeline_builder.to_state_partition[GoData, GoState](
       computation, state_builder, name, partition)
 
   fun ref to_sink(sink_config: SinkConfig[GoData]) =>

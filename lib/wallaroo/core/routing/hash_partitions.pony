@@ -20,6 +20,14 @@ use "collections"
 use "crypto"
 use "wallaroo_labs/mort"
 
+primitive HashKey
+  fun apply(key: ByteSeq): U128 =>
+    var hashed_key: U128 = 0
+    for v in MD5(key).values() do
+      hashed_key = (hashed_key << 8) + v.u128()
+    end
+    hashed_key
+
 class val HashPartitions is (Equatable[HashPartitions] & Stringable)
   let _lower_bounds: Array[U128] = _lower_bounds.create()
   let _interval_sizes: Array[U128] = _interval_sizes.create()
@@ -275,11 +283,7 @@ fun ref create2(sizes: Array[(String, U128)] val) =>
     ""
 
   fun get_claimant_by_key(key: ByteSeq): String ? =>
-    var hashed_key: U128 = 0
-    for v in MD5(key).values() do
-      hashed_key = (hashed_key << 8) + v.u128()
-    end
-    get_claimant(hashed_key)?
+    get_claimant(HashKey(key))?
 
   fun claimants(): Iterator[String] ref =>
     _lb_to_c.values()

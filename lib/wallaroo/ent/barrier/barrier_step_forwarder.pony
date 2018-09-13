@@ -109,13 +109,13 @@ class BarrierStepForwarder
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
     if (inputs.size() == (_inputs_blocking.size() + _removed_inputs.size()))
-      and not _step.has_pending_messages()
     then
       // @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
       for (o_id, o) in _step.outputs().pairs() do
         match o
         | let ob: OutgoingBoundary =>
           // @printf[I32]("!@ FORWARDING TO BOUNDARY\n".cstring())
+          @printf[I32]("!@ BarrierStepForwarder: sending over OutgoingBoundary to %s\n".cstring(), o_id.string().cstring())
           ob.forward_barrier(o_id, _step_id,
             _barrier_token)
         else
@@ -123,8 +123,9 @@ class BarrierStepForwarder
           o.receive_barrier(_step_id, _step, _barrier_token)
         end
       end
-      _step.barrier_complete(_barrier_token)
+      let b_token = _barrier_token
       clear()
+      _step.barrier_complete(b_token)
     //!@
     else
       //!@

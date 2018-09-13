@@ -48,7 +48,7 @@ actor Main
             TCPSourceConfig[String].from_options(StringFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_parallel[String](SplitBuilder)
-            .to_state_partition[String, RunningTotal, WordTotals](
+            .to_state_partition[RunningTotal, WordTotals](
               AddCount, WordTotalsBuilder, "word-totals",
               word_totals_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[RunningTotal].from_options(

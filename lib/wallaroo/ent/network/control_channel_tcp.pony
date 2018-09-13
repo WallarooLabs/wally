@@ -349,8 +349,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _router_registry.report_connected_to_joining_worker(m.sender)
       | let m: AnnounceNewSourceMsg =>
         _router_registry.register_remote_source(m.sender, m.source_id)
-      | let m: StepMigrationCompleteMsg =>
-        _router_registry.step_migration_complete(m.step_id)
+      | let m: KeyMigrationCompleteMsg =>
+        _router_registry.key_migration_complete(m.key)
       | let m: JoiningWorkerInitializedMsg =>
         ifdef debug then
           @printf[I32](("Rcvd JoiningWorkerInitializedMsg on Control " +
@@ -370,12 +370,15 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
       | let m: InitiateStopTheWorldForJoinMigrationMsg =>
         _router_registry.remote_stop_the_world_for_join_migration_request(
-          m.new_workers)
+          m.sender, m.new_workers)
       | let m: InitiateJoinMigrationMsg =>
         _router_registry.remote_join_migration_request(m.new_workers,
           m.checkpoint_id)
       | let m: AutoscaleCompleteMsg =>
         _router_registry.autoscale_complete()
+      | let m: InitiateStopTheWorldForShrinkMigrationMsg =>
+        _router_registry.remote_stop_the_world_for_shrink_migration_request(
+          m.sender, m.remaining_workers, m.leaving_workers)
       | let m: LeavingMigrationAckRequestMsg =>
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
@@ -422,6 +425,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32](("Received PrepareShrinkMsg on Control " +
             "Channel\n").cstring())
         end
+        @printf[I32]("!@ Got PrepareShrinkMsg\n".cstring())
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
           lti.prepare_shrink(m.remaining_workers, m.leaving_workers)
@@ -484,10 +488,24 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         })
         _event_log.initiate_checkpoint(m.checkpoint_id, promise)
       | let m: EventLogWriteCheckpointIdMsg =>
-        _event_log.write_checkpoint_id(m.checkpoint_id)
+        let promise = Promise[CheckpointId]
+        promise.next[None]({(s_id: CheckpointId) =>
+          try
+            let msg = ChannelMsgEncoder.event_log_ack_checkpoint_id_written(
+              s_id, _worker_name, _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _event_log.write_checkpoint_id(m.checkpoint_id, promise)
       | let m: EventLogAckCheckpointMsg =>
         @printf[I32]("!@ Rcvd EventLogAckCheckpointMsg!!!\n".cstring())
         _checkpoint_initiator.event_log_checkpoint_complete(m.sender,
+          m.checkpoint_id)
+      | let m: EventLogAckCheckpointIdWrittenMsg =>
+        @printf[I32]("!@ Rcvd EventLogAckCheckpointIdWrittenMsg!!!\n".cstring())
+        _checkpoint_initiator.event_log_id_written(m.sender,
           m.checkpoint_id)
       | let m: CommitCheckpointIdMsg =>
         _checkpoint_initiator.commit_checkpoint_id(m.checkpoint_id, m.rollback_id,
@@ -512,22 +530,22 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         // !@ TODO: This promise can be used for acking. Right now it's a
         // placeholder.
         let promise = Promise[None]
-        _event_log.prepare_for_rollback(promise)
-      | let m: RollbackTopologyGraphMsg =>
-        @printf[I32]("!@ Rcvd RollbackTopologyGraphMsg\n".cstring())
+        _event_log.prepare_for_rollback(promise, _checkpoint_initiator)
+      | let m: RollbackLocalKeysMsg =>
+        @printf[I32]("!@ Rcvd RollbackLocalKeysMsg\n".cstring())
         let promise = Promise[None]
         promise.next[None]({(n: None) =>
           try
-            let msg = ChannelMsgEncoder.ack_rollback_topology_graph( _worker_name, m.checkpoint_id, _auth)?
+            let msg = ChannelMsgEncoder.ack_rollback_local_keys( _worker_name, m.checkpoint_id, _auth)?
             _connections.send_control(m.sender, msg)
           else
             Fail()
           end
         })
-        _layout_initializer.rollback_topology_graph(m.checkpoint_id,
+        _layout_initializer.rollback_local_keys(m.checkpoint_id,
           promise)
-      | let m: AckRollbackTopologyGraphMsg =>
-        _recovery.worker_ack_topology_rollback(m.sender, m.checkpoint_id)
+      | let m: AckRollbackLocalKeysMsg =>
+        _recovery.worker_ack_local_keys_rollback(m.sender, m.checkpoint_id)
       | let m: RegisterProducersMsg =>
         let promise = Promise[None]
         promise.next[None]({(n: None) =>

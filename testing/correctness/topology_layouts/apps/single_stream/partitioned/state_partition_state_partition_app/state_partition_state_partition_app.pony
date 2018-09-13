@@ -48,11 +48,11 @@ actor Main
           .new_pipeline[U64, U64]("U64 Counter",
             TCPSourceConfig[U64].from_options(U64Decoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_state_partition[U64, U64, U64Counter](
+            .to_state_partition[U64, U64Counter](
               UpdateU64Counter, U64CounterBuilder,
               "counter-state",
               powers_of_2_partition where multi_worker = true)
-            .to_state_partition[U64, U64, U64Counter](
+            .to_state_partition[U64, U64Counter](
               UpdateU64Counter2, U64CounterBuilder,
               "counter-state 2",
               powers_of_2_partition2 where multi_worker = true)

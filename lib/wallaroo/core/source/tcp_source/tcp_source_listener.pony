@@ -64,7 +64,6 @@ actor TCPSourceListener is SourceListener
   let _metrics_reporter: MetricsReporter
   var _source_builder: SourceBuilder
   let _event_log: EventLog
-  let _state_step_creator: StateStepCreator
   let _target_router: Router
 
   new create(env: Env, source_builder: SourceBuilder, router: Router,
@@ -73,7 +72,6 @@ actor TCPSourceListener is SourceListener
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter,
     host: String = "", service: String = "0", limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
@@ -95,7 +93,6 @@ actor TCPSourceListener is SourceListener
     _source_builder = source_builder
     _event_log = event_log
     _target_router = target_router
-    _state_step_creator = state_step_creator
 
     _init_size = init_size
     _max_size = max_size
@@ -218,8 +215,7 @@ actor TCPSourceListener is SourceListener
       let source = TCPSource._accept(source_id, _auth, this,
         _notify_connected(source_id)?, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,
-        ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry,
-        _state_step_creator)
+        ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry)
 
       // TODO: We need to figure out how to unregister this when the
       // connection dies
