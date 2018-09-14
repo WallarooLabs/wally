@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+import json
+import select
+import signal
+import sys
+import wallaroo.experimental
+import psycopg2
+import psycopg2.extensions
+
+
+connector = wallaroo.experimental.SourceConnector(required_params=['connection'], optional_params=[])
+connector.connect()
+connection_string = connector.params.connection
+
+conn = psycopg2.connect(connection_string)
+conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+
+curs = conn.cursor()
+
+# Adjust notification function to report the information you need.
+# You can also rename the function as long as it's consistent with
+# it's use in the trigger below.
+curs.execute("""
+    CREATE OR REPLACE FUNCTION NOTIFY() RETURNS trigger AS
+    $BODY$
+    BEGIN
+        PERFORM pg_notify('wallaroo_example', row_to_json(NEW)::text);
+        RETURN new;
+    END;
+    $BODY$
+    LANGUAGE 'plpgsql' VOLATILE COST 100;
+""")
+
+
+# Replace MY_TARGET_TABLE with your table name
+curs.execute("""
+    CREATE TRIGGER MY_TARGET_TABLE_AFTER
+    AFTER INSERT
+    ON MY_TARGET_TABLE
+    FOR EACH ROW
+    EXECUTE PROCEDURE NOTIFY();
+""")
+
+# Start listening for notifications
+curs.execute("LISTEN wallaroo_example;")
+print "Waiting for notifications on channel 'wallaroo_example'"
+while True:
+    if select.select([conn], [], [], 5) == ([], [], []):
+        print "Timeout"
+    else:
+        conn.poll()
+        while conn.notifies:
+            notify = conn.notifies.pop(0)
+            payload = json.loads(notify.payload)
+            connector.write(payload["content"])

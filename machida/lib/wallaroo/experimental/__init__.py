@@ -12,14 +12,15 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-from .streaming import (
-    # StreamDescription,
-    streaming_message_decoder,
-    streaming_message_encoder,
+from .stream import (
+    stream_message_decoder,
+    stream_message_encoder,
     StreamDecoderError
 )
+
 from .builder import (
-    SourceConfig as SourceExtensionConfig,
-    SinkConfig as SinkExtensionConfig
+    SourceConfig as SourceConnectorConfig,
+    SinkConfig as SinkConnectorConfig
 )
-from .extension import SourceExtension, SinkExtension
+
+from .connector import SourceConnector, SinkConnector

@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+import threading
+import sys
+import wallaroo.experimental
+from kafka import KafkaProducer
+
+connector = wallaroo.experimental.SinkConnector(required_params=['topic'], optional_params=['bootstrap_brokers'])
+connector.listen()
+bootstrap_brokers = connector.params.bootstrap_brokers or '127.0.0.1:9092'
+producer = KafkaProducer(bootstrap_servers=bootstrap_brokers)
+
+topic = connector.params.topic
+
+while True:
+    key, value = extension.read()
+    producer.send(topic, key=str(key), value=str(value))
