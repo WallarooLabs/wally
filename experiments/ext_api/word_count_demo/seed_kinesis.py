@@ -4,9 +4,9 @@ import os
 import sys
 import time
 
-from boto import kinesis
+import boto3
 
-conn = kinesis.connect_to_region(region_name = "us-east-1")
+conn = boto3.client('kinesis')
 
 project = os.path.dirname(__file__)
 bill_path = os.path.join(project, "data/bill_of_rights.txt")
@@ -21,7 +21,7 @@ print(conn.list_streams())
 
 print("Sending bill of rights to kinesis")
 while True:
-    conn.put_record('bill_of_rights', bill, 'bill_of_rights')
+    conn.put_record(StreamName='bill_of_rights', Data=bill, PartitionKey='bill_of_rights')
     print('.', end = '')
     sys.stdout.flush()
     time.sleep(0.5)
