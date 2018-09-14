@@ -1,4 +1,5 @@
-kafka-python
-redis
 boto
 boto3
+kafka-python
+psycopg2-binary
+redis
