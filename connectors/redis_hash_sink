@@ -1,0 +1,14 @@
+#!/usr/bin/env python
+import sys
+import wallaroo.experimental
+from redis import Redis
+
+connector = wallaroo.experimental.SinkConnector(required_params=['key'], optional_params=['host', 'port', 'password'])
+connector.listen()
+redis = Redis(connector.params.host, int(connector.params.port), connector.params.password)
+
+hkey = connector.params.key
+
+while True:
+    k, v  = conncetor.read()
+    redis.hset(hkey, k, v)

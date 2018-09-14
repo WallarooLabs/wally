@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+import threading
+import sys
+import socket
+import wallaroo.experimental
+
+
+connector = wallaroo.experimental.SinkConnector(required_params=['host', 'port'], optional_params=[])
+connector.listen()
+params = connector.params
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+print("sending to host: " + params.host + " port: " + str(params.port))
+while True:
+    value = extension.read()
+    sock.sendto(value, (params.host, int(params.port)))

@@ -13,10 +13,9 @@
 #  permissions and limitations under the License.
 
 import argparse
+import inspect
 import struct
 from functools import wraps
-
-from wallaroo.builder import _validate_arity_compatability
 
 
 class SourceConfig(object):
@@ -26,7 +25,7 @@ class SourceConfig(object):
         self._decoder = decoder
 
     def to_tuple(self):
-        return ("byoi", self._host, str(self._port), self._decoder)
+        return ("connector", self._host, str(self._port), self._decoder)
 
 
 class SinkConfig(object):
@@ -36,7 +35,7 @@ class SinkConfig(object):
         self._encoder = encoder
 
     def to_tuple(self):
-        return ("byoi", self._host, str(self._port), self._encoder)
+        return ("connector", self._host, str(self._port), self._encoder)
 
 
 def parse_input_addrs(args):
@@ -81,3 +80,22 @@ def encoder(encoder_function):
         def __call__(self, *args):
             return self
     return C()
+
+
+def _validate_arity_compatability(obj, arity):
+    """
+    To assist in proper API use, it's convenient to fail fast with erros as
+    soon as possible. We use this function to check things we decorate for
+    compatibility with our desired number of arguments.
+    """
+    if not callable(obj):
+        raise WallarooParameterError(
+            "Expected a callable object but got a {0}".format(obj))
+    spec = inspect.getargspec(obj)
+    upper_bound = len(spec.args)
+    lower_bound = upper_bound - (len(spec.defaults) if spec.defaults else 0)
+    if arity > upper_bound or arity < lower_bound:
+        raise WallarooParameterError((
+            "Incompatible function arity, your function must allow {0} "
+            "arguments."
+            ).format(arity))

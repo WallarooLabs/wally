@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+import sys
+import threading
+import wallaroo.experimental
+import boto3
+
+connector = wallaroo.experimental.SinkConnector(required_params=['bucket'], optional_params=[])
+connector.listen()
+s3 = boto3.client('s3')
+bucket_name = connector.params.bucket
+s3.create_bucket(Bucket=bucket_name)
+
+while True:
+    key, body = extension.read()
+    s3.put_object(Bucket=bucket_name, Body=body, Key=key, ACL='authenticated-read')

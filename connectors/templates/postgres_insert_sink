@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+import json
+import select
+import signal
+import sys
+import wallaroo.experimental
+import psycopg2
+import psycopg2.extensions
+
+connector = wallaroo.experimental.SinkConnector(required_params=['connection'], optional_params=[])
+connector.listen()
+connection_string = connector.params.connection
+
+conn = psycopg2.connect(connection_string)
+conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+
+curs = conn.cursor()
+
+# A simple example using a tuple of a key an value
+while True:
+    key, value = connector.read()
+    curs.execute("""
+        INSERT INTO COUNT (key, value)
+        VALUES (%s, %s);
+    """, (key, value))

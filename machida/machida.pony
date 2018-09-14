@@ -23,11 +23,11 @@ use "net"
 
 use "wallaroo"
 use "wallaroo/core/sink"
-use "wallaroo/core/sink/byoi_sink"
+use "wallaroo/core/sink/connector_sink"
 use "wallaroo/core/sink/kafka_sink"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
-use "wallaroo/core/source/byoi_source"
+use "wallaroo/core/source/connector_source"
 use "wallaroo/core/source/kafka_source"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
@@ -256,7 +256,9 @@ class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
     _header_length
 
   fun payload_length(data: Array[U8] iso): USize =>
-    Machida.framed_source_decoder_payload_length(_source_decoder, data.cpointer(),
+    Machida.framed_source_decoder_payload_length(
+      _source_decoder,
+      data.cpointer(),
       data.size())
 
   fun decode(data: Array[U8] val): (PyData val | None) =>
@@ -466,7 +468,7 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
   fun _final() =>
     Machida.dec_ref(_sink_encoder)
 
-class PyBYOIEncoder is BYOISinkEncoder[PyData val]
+class PyConnectorEncoder is ConnectorSinkEncoder[PyData val]
   var _sink_encoder: Pointer[U8] val
 
   new create(sink_encoder: Pointer[U8] val) =>
@@ -575,6 +577,10 @@ primitive Machida
       let action_p = @get_application_setup_action(item)
       let action = String.copy_cstring(action_p)
       match action
+      | "source_connector" =>
+        None
+      | "sink_connector" =>
+        None
       | "new_pipeline" =>
         let name = recover val
           String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(item, 1)))
@@ -932,7 +938,7 @@ primitive _SourceConfig
       end
 
       KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
-    | "byoi" =>
+    | "connector" =>
       let host = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
       end
@@ -947,7 +953,7 @@ primitive _SourceConfig
         PyFramedSourceHandler(d)?
       end
 
-      BYOISourceConfig[(PyData val | None)](decoder, host, port)
+      ConnectorSourceConfig[(PyData val | None)](decoder, host, port)
     else
       error
     end
@@ -1032,7 +1038,7 @@ primitive _SinkConfig
       end
 
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
-    | "byoi" =>
+    | "connector" =>
       let host = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 1)))
       end
@@ -1044,10 +1050,10 @@ primitive _SinkConfig
       let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
       Machida.inc_ref(encoderp)
       let encoder = recover val
-        PyBYOIEncoder(encoderp)
+        PyConnectorEncoder(encoderp)
       end
 
-      BYOISinkConfig[PyData val](encoder, host, port)
+      ConnectorSinkConfig[PyData val](encoder, host, port)
     else
       error
     end
