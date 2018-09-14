@@ -7,4 +7,4 @@ make _env
 . _env/bin/activate
 
 export PYTHONPATH=../../../machida/lib:$PWD:$PYTHONPATH
-python postgres_listner.py --topic=text --text-stream 127.0.0.1:7100
+python postgres_writer.py --topic counts --count-stream 127.0.0.1:7200
