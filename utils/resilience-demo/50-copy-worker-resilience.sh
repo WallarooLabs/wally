@@ -20,7 +20,7 @@ if [ $RESTORE_VIA_JOURNAL_DUMP = y ]; then
 
     echo Extract journalled I/O ops from the journal file
     # ssh -n $USER@$TARGET_EXT "echo BEFORE ; ls -l /tmp/mar*"
-    ssh -n $USER@$TARGET_EXT "cd wallaroo ; python ./utils/journal-dump/journal-dump.py /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.journal"
+    ssh -n $USER@$TARGET_EXT "cd wallaroo ; python ./utils/dos-dumb-object-service/journal-dump.py /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.journal"
     # ssh -n $USER@$TARGET_EXT "echo AFTER ; ls -l /tmp/mar*"
     # sleep 3
     echo Rename ${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog.journal '->' ${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog

@@ -48,7 +48,13 @@ REPO_URL=https://github.com/slfritchie/wallaroo.git
 ####REPO_BRANCH=slf-file-io-journal6
 #REPO_BRANCH=s-res-test-f+slf-worker-migration+issue-2370
 #REPO_BRANCH=res-merge-1
-REPO_BRANCH=res-merge-1+issue-2370
+#REPO_BRANCH=res-merge-1+dos
+#REPO_BRANCH=resilience-project+dos
+#REPO_BRANCH=resilience-project+dos2
+#REPO_BRANCH=static-key-graph+dos3
+#REPO_BRANCH=resilience-project+dos4
+#REPO_BRANCH=resilience-project+dos5
+REPO_BRANCH=static-key-graph+dos5b
 
 # If the environment variable WALLAROO_BIN is set, then use it
 # for the path to our Wallaroo executable.
@@ -68,7 +74,7 @@ ORDERS_PORT=7000
 
 # DOS server-related flags: if USE_DOS_SERVER=n then following two
 # variables will be ignored.
-USE_DOS_SERVER=n
+USE_DOS_SERVER=y
 DOS_SERVER_EXT=$SERVER1_EXT
 DOS_SERVER=$SERVER1
 
@@ -76,4 +82,4 @@ DOS_SERVER=$SERVER1
 # if "n", then rsync all /tmp/market-spread-worker2* files;
 # if "y", then only rsync the /tmp/market-spread-worker2*.journal files
 #         and then restore all recovery files via journal-dump.py.
-RESTORE_VIA_JOURNAL_DUMP=n
+RESTORE_VIA_JOURNAL_DUMP=y

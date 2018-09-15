@@ -5,7 +5,7 @@
 if [ ! -z "$START_SENDER_CMD" ]; then
     echo Start sender via external var
     CMD=`eval echo $START_SENDER_CMD`
-    echo "CMD = $CMD"
+    #echo "CMD = $CMD"
     if [ "$START_SENDER_BG" = n ]; then
         BG=""
     else
