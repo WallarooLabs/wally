@@ -155,7 +155,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   be first_checkpoint_complete() =>
     _unmute_local()
     _is_pending = false
-    for (id, c) in _outputs.values() do
+    for (id, c) in _outputs.pairs() do
       try
         let route = _routes(c)?
         route.register_producer(id)
