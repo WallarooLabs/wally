@@ -244,6 +244,7 @@ actor EventLog
     for r in _resilients.values() do
       r.prepare_for_rollback()
     end
+    checkpoint_initiator.clear_timers()
     match origin
     | let r: Recovery =>
       //!@ Currently we are immediately moving on without checking for other

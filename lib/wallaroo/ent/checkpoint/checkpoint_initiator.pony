@@ -288,6 +288,13 @@ actor CheckpointInitiator is Initializable
     _timers.dispose()
     _timers = Timers
 
+  be clear_timers() =>
+    _clear_timers()
+
+  fun ref _clear_timers() =>
+    _timers.dispose()
+    _timers = Timers
+
   be initiate_rollback(
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
     worker: WorkerName)
