@@ -82,11 +82,11 @@ actor Main
           symbols_file_path = arg
         end
       end
-      let symbol_data_partition = if symbols_file_path is None then
-          Partitions[Symboly val](
+      let nbbo_data_partition = if symbols_file_path is None then
+          Partitions[FixNbboMessage val](
             SymbolPartitionFunction, LegalSymbols.symbols)
         else
-          Partitions[Symboly val](
+          Partitions[FixNbboMessage val](
             SymbolPartitionFunction,
             PartitionsFileReader(symbols_file_path as String,
               env.root as AmbientAuth))
@@ -108,7 +108,7 @@ actor Main
               TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_state_partition[(NbboResult val | None), SymbolData](
               ProcessNbbo, SymbolDataBuilder, "symbol-data",
-              symbol_data_partition where multi_worker = true)
+              nbbo_data_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[NbboResult val].from_options(NbboResultEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?,
               initial_report_msgs))

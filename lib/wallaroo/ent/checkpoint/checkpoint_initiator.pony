@@ -288,7 +288,10 @@ actor CheckpointInitiator is Initializable
     _timers.dispose()
     _timers = Timers
 
-  be clear_timers() =>
+  be prepare_for_rollback() =>
+    if _is_active and (_worker_name == _primary_worker) then
+      _checkpoints_paused = true
+    end
     _clear_timers()
 
   fun ref _clear_timers() =>
