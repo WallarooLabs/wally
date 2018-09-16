@@ -288,16 +288,6 @@ actor CheckpointInitiator is Initializable
     _timers.dispose()
     _timers = Timers
 
-  be prepare_for_rollback() =>
-    if _is_active and (_worker_name == _primary_worker) then
-      _checkpoints_paused = true
-    end
-    _clear_timers()
-
-  fun ref _clear_timers() =>
-    _timers.dispose()
-    _timers = Timers
-
   be initiate_rollback(
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
     worker: WorkerName)
