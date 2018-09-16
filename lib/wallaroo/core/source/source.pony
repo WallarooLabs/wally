@@ -110,6 +110,9 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   be barrier_complete(token: BarrierToken)
   be update_worker_data_service(worker_name: String,
     host: String, service: String)
+  // Called to indicate that an in progress checkpoint when Source was created
+  // is complete.
+  be first_checkpoint_complete()
 
 interface tag SourceListener is (DisposableActor & BoundaryUpdatable)
   be update_router(router: PartitionRouter)

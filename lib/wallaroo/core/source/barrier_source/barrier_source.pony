@@ -80,6 +80,9 @@ actor BarrierSource is Source
     _event_log = event_log
     _router_registry.register_producer(_source_id, this)
 
+  be first_checkpoint_complete() =>
+    None
+
   be register_pipeline(pipeline_name: String, router': Router) =>
     """
     On this worker, we need to keep track of every pipeline that has at least

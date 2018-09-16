@@ -22,6 +22,9 @@ use "wallaroo_labs/mort"
 trait _EventLogPhase
   fun name(): String
 
+  fun ref unregister_resilient(id: RoutingId, resilient: Resilient) =>
+    None
+
   fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId], event_log: EventLog ref)
   =>
@@ -160,7 +163,7 @@ class _CheckpointEventLogPhase is _EventLogPhase
   let _checkpoint_id: CheckpointId
   let _promise: Promise[CheckpointId]
 
-  let _resilients: SetIs[RoutingId] val
+  let _resilients: SetIs[RoutingId] = _resilients.create()
   let _checkpointed_resilients: SetIs[RoutingId] =
     _checkpointed_resilients.create()
 
@@ -171,15 +174,19 @@ class _CheckpointEventLogPhase is _EventLogPhase
     _event_log = event_log
     _checkpoint_id = checkpoint_id
     _promise = promise
-    let rs = recover iso SetIs[RoutingId] end
     for id in resilients.keys() do
-      rs.set(id)
+      _resilients.set(id)
     end
-    _resilients = consume rs
 
     @printf[I32]("!@ Transition to _CheckpointEventLogPhase: checkpoint_id %s with %s resilients already checkpointed and %s total\n".cstring(), checkpoint_id.string().cstring(), _checkpointed_resilients.size().string().cstring(), _resilients.size().string().cstring())
 
   fun name(): String => "_CheckpointEventLogPhase"
+
+  fun ref unregister_resilient(id: RoutingId, resilient: Resilient) =>
+    if not _checkpointed_resilients.contains(id) then
+      _resilients.unset(id)
+    end
+    check_completion()
 
   fun ref checkpoint_state(resilient_id: RoutingId,
     checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
@@ -202,6 +209,7 @@ class _CheckpointEventLogPhase is _EventLogPhase
     check_completion()
 
   fun ref check_completion() =>
+    @printf[I32]("!@ _CheckpointEventLogPhase: check_completion() with %s checkpointed and %s total\n".cstring(), _checkpointed_resilients.size().string().cstring(), _resilients.size().string().cstring())
     if _checkpointed_resilients.size() == _resilients.size() then
       _promise(_checkpoint_id)
       _event_log.state_checkpoints_complete(_checkpoint_id)

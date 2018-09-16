@@ -17,6 +17,7 @@ use "promises"
 use "wallaroo/core/common"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
+use "wallaroo/core/source"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/router_registry"
@@ -79,6 +80,8 @@ actor EventLog
 
   var _log_rotation_id: LogRotationId = 0
 
+  var _pending_sources: SetIs[(RoutingId, Source)] = _pending_sources.create()
+
   new create(auth: AmbientAuth, worker: WorkerName,
     event_log_config: EventLogConfig = EventLogConfig())
   =>
@@ -134,12 +137,32 @@ actor EventLog
 
   be register_resilient(id: RoutingId, resilient: Resilient) =>
     // @printf[I32]("!@ EventLog register_resilient %s\n".cstring(), id.string().cstring())
+    ifdef debug then
+      match resilient
+      | let s: Source =>
+        // TODO: Sources need to be registered via register_source because they
+        // can come into and out of existence. Make them static to avoid this.
+        Fail()
+      end
+    end
     _resilients(id) = resilient
+
+  be register_resilient_source(id: RoutingId, source: Source) =>
+    ifdef "resilience" then
+      if _initialized == true then
+        _pending_sources.set((id, source))
+      else
+        source.first_checkpoint_complete()
+      end
+    else
+      source.first_checkpoint_complete()
+    end
 
   be unregister_resilient(id: RoutingId, resilient: Resilient) =>
     // @printf[I32]("!@ EventLog unregister_resilient %s\n".cstring(), id.string().cstring())
     try
       _resilients.remove(id)?
+      _phase.unregister_resilient(id, resilient)
     else
       @printf[I32]("Attempted to unregister non-registered resilient\n"
         .cstring())
@@ -167,6 +190,7 @@ actor EventLog
     _phase = _CheckpointEventLogPhase(this, checkpoint_id, promise,
       _resilients)
     for p in pending_checkpoint_states.values() do
+      @printf[I32]("!@ EventLog: Process pending checkpoint_state for resilient %s for checkpoint %s\n".cstring(), p.resilient_id.string().cstring(), checkpoint_id.string().cstring())
       _phase.checkpoint_state(p.resilient_id, checkpoint_id, p.payload)
     end
 
@@ -218,6 +242,11 @@ actor EventLog
   =>
     // @printf[I32]("!@ EventLog: write_checkpoint_id\n".cstring())
     _backend.encode_checkpoint_id(checkpoint_id)
+    for (r_id, s) in _pending_sources.values() do
+      s.first_checkpoint_complete()
+      _resilients(r_id) = s
+    end
+    _pending_sources.clear()
     _phase.checkpoint_id_written(checkpoint_id, promise)
 
 //!@

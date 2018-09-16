@@ -105,6 +105,8 @@ actor TCPSource is Source
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
   let _max_received_count: U8 = 50
 
+  var _is_pending: Bool = true
+
   let _router_registry: RouterRegistry
 
   let _event_log: EventLog
@@ -179,9 +181,28 @@ actor TCPSource is Source
     end
 
     // register resilient with event log
-    _event_log.register_resilient(_source_id, this)
+    _event_log.register_resilient_source(_source_id, this)
 
     _mute()
+    ifdef "resilience" then
+      _mute_local()
+    end
+
+  be first_checkpoint_complete() =>
+    """
+    In case we pop into existence midway through a checkpoint, we need to
+    wait until this is called to start processing.
+    """
+    _unmute_local()
+    _is_pending = false
+    for (id, c) in _outputs.pairs() do
+      try
+        let route = _routes(c)?
+        route.register_producer(id)
+      else
+        Fail()
+      end
+    end
 
   be update_router(router': Router) =>
     _update_router(router')
@@ -239,10 +260,14 @@ actor TCPSource is Source
       if not _routes.contains(c) then
         let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
         _routes(c) = new_route
-        new_route.register_producer(id)
+        if not _is_pending then
+          new_route.register_producer(id)
+        end
       else
         try
-          _routes(c)?.register_producer(id)
+          if not _is_pending then
+            _routes(c)?.register_producer(id)
+          end
         else
           Unreachable()
         end
@@ -257,9 +282,13 @@ actor TCPSource is Source
       for (id, c) in _outputs.pairs() do
         match c
         | let ob: OutgoingBoundary =>
-          ob.forward_register_producer(_source_id, id, this)
+          if not _is_pending then
+            ob.forward_register_producer(_source_id, id, this)
+          end
         else
-          c.register_producer(_source_id, this)
+          if not _is_pending then
+            c.register_producer(_source_id, this)
+          end
         end
       end
     end
@@ -270,7 +299,9 @@ actor TCPSource is Source
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
-      _routes(c)?.unregister_producer(id)
+      if not _is_pending then
+        _routes(c)?.unregister_producer(id)
+      end
       _outputs.remove(id)?
       _remove_route_if_no_output(c)
     else
@@ -434,7 +465,9 @@ actor TCPSource is Source
   //////////////
   be initiate_barrier(token: BarrierToken) =>
     @printf[I32]("!@ TCPSource received initiate_barrier %s\n".cstring(), token.string().cstring())
-    _initiate_barrier(token)
+    if not _is_pending then
+      _initiate_barrier(token)
+    end
 
   fun ref _initiate_barrier(token: BarrierToken) =>
     if not _disposed and not _shutdown then
