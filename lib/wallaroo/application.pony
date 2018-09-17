@@ -31,12 +31,13 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo_labs/collection_helpers"
 
 class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
-  // _state_builders maps from state_name to StateSubpartitions
-  let _state_builders: Map[String, PartitionsBuilder] = _state_builders.create()
+  let _state_builders: Map[StateName, PartitionsBuilder] =
+    _state_builders.create()
   var sink_count: USize = 0
 
   new create(name': String) =>
@@ -55,7 +56,7 @@ class Application
   fun ref add_pipeline(p: BasicPipeline) =>
     pipelines.push(p)
 
-  fun ref add_state_builder(state_name: String,
+  fun ref add_state_builder(state_name: StateName,
     state_partition: PartitionsBuilder)
   =>
     _state_builders(state_name) = state_partition
@@ -63,11 +64,11 @@ class Application
   fun ref increment_sink_count() =>
     sink_count = sink_count + 1
 
-  fun state_builder(state_name: String): PartitionsBuilder ? =>
+  fun state_builder(state_name: StateName): PartitionsBuilder ? =>
     _state_builders(state_name)?
 
-  fun state_builders(): Map[String, PartitionsBuilder] val =>
-    let builders = recover trn Map[String, PartitionsBuilder] end
+  fun state_builders(): Map[StateName, PartitionsBuilder] val =>
+    let builders = recover trn Map[StateName, PartitionsBuilder] end
     for (k, v) in _state_builders.pairs() do
       builders(k) = v
     end
@@ -89,10 +90,9 @@ trait BasicPipeline
   fun name(): String
   fun source_id(): USize
   fun source_builder(): SourceBuilderBuilder ?
-  fun source_route_builder(): RouteBuilder
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
   fun val sink_builders(): Array[SinkBuilder] val
-  fun val sink_ids(): Array[StepId] val
+  fun val sink_ids(): Array[RoutingId] val
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder ?
   fun size(): USize
@@ -103,11 +103,10 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _app_name: String
   let _runner_builders: Array[RunnerBuilder]
   var _source_builder: (SourceBuilderBuilder | None) = None
-  let _source_route_builder: RouteBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
   var _sink_builders: Array[SinkBuilder] = Array[SinkBuilder]
 
-  var _sink_ids: Array[StepId] = Array[StepId]
+  var _sink_ids: Array[RoutingId] = Array[RoutingId]
   let _is_coalesced: Bool
 
   new create(app_name: String, p_id: USize, n: String,
@@ -117,7 +116,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _runner_builders = Array[RunnerBuilder]
     _name = n
     _app_name = app_name
-    _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
     _source_listener_builder_builder = sc.source_listener_builder_builder()
     _source_builder = sc.source_builder(_app_name, _name)
@@ -136,17 +134,15 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun source_builder(): SourceBuilderBuilder ? =>
     _source_builder as SourceBuilderBuilder
 
-  fun source_route_builder(): RouteBuilder => _source_route_builder
-
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder
 
   fun val sink_builders(): Array[SinkBuilder] val => _sink_builders
 
-  fun val sink_ids(): Array[StepId] val => _sink_ids
+  fun val sink_ids(): Array[RoutingId] val => _sink_ids
 
   fun ref _add_sink_id() =>
-    _sink_ids.push(StepIdGenerator())
+    _sink_ids.push(RoutingIdGenerator())
 
   fun is_coalesced(): Bool => _is_coalesced
 
@@ -157,6 +153,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   let _a: Application
   let _p: Pipeline[In, Out]
+  let _pipeline_state_names: Array[String] = _pipeline_state_names.create()
 
   new create(a: Application, p: Pipeline[In, Out]) =>
     _a = a
@@ -166,8 +163,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     comp_builder: ComputationBuilder[Last, Next],
     id: U128 = 0): PipelineBuilder[In, Out, Next]
   =>
-    let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder,
-      TypedRouteBuilder[Next])
+    let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder)
     _p.add_runner_builder(next_builder)
     PipelineBuilder[In, Out, Next](_a, _p)
 
@@ -176,72 +172,82 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     id: U128 = 0): PipelineBuilder[In, Out, Next]
   =>
     let next_builder = ComputationRunnerBuilder[Last, Next](
-      comp_builder, TypedRouteBuilder[Next] where parallelized' = true)
+      comp_builder where parallelized' = true)
     _p.add_runner_builder(next_builder)
     PipelineBuilder[In, Out, Next](_a, _p)
 
   fun ref to_stateful[Next: Any val, S: State ref](
     s_comp: StateComputation[Last, Next, S] val,
     s_initializer: StateBuilder[S],
-    state_name: String): PipelineBuilder[In, Out, Next]
+    state_name: StateName): PipelineBuilder[In, Out, Next]
   =>
+    if ArrayHelpers[StateName]
+      .contains[StateName](_pipeline_state_names, state_name)
+    then
+      FatalUserError("Wallaroo does not currently support application " +
+        "cycles. You cannot use the same state name twice in the same " +
+        "pipeline.")
+    end
+    _pipeline_state_names.push(state_name)
+
     // TODO: This is a shortcut. Non-partitioned state is being treated as a
     // special case of partitioned state with one partition. This works but is
     // a bit confusing when reading the code.
-    let step_id_gen = StepIdGenerator
+    let routing_id_gen = RoutingIdGenerator
     let single_step_partition = Partitions[Last](
       SingleStepPartitionFunction[Last], recover ["key"] end)
-    let step_id_map = recover trn Map[Key, StepId] end
+    let step_id_map = recover trn Map[Key, RoutingId] end
 
-    step_id_map("key") = step_id_gen()
+    step_id_map("key") = routing_id_gen()
 
-
-    let next_builder = PreStateRunnerBuilder[Last, Next, Last, S](
-      s_comp, state_name, SingleStepPartitionFunction[Last],
-      TypedRouteBuilder[StateProcessor[S]],
-      TypedRouteBuilder[Next])
+    let next_builder = PreStateRunnerBuilder[Last, Next, S](
+      s_comp, state_name, SingleStepPartitionFunction[Last])
 
     _p.add_runner_builder(next_builder)
 
     let state_builder = PartitionedStateRunnerBuilder[Last, S](_p.name(),
       state_name, consume step_id_map, single_step_partition,
       StateRunnerBuilder[S](s_initializer, state_name,
-        s_comp.state_change_builders()),
-      TypedRouteBuilder[StateProcessor[S]],
-      TypedRouteBuilder[Next])
+        s_comp.state_change_builders()) where per_worker_parallelism' = 1)
 
     _a.add_state_builder(state_name, state_builder)
 
     PipelineBuilder[In, Out, Next](_a, _p)
 
-  fun ref to_state_partition[PIn: Any val, Next: Any val = PIn,
-    S: State ref](
+  fun ref to_state_partition[Next: Any val, S: State ref](
       s_comp: StateComputation[Last, Next, S] val,
       s_initializer: StateBuilder[S],
-      state_name: String,
-      partition: Partitions[PIn],
-      multi_worker: Bool = false): PipelineBuilder[In, Out, Next]
+      state_name: StateName,
+      partition: Partitions[Last],
+      multi_worker: Bool = false,
+      per_worker_parallelism: USize = 10): PipelineBuilder[In, Out, Next]
   =>
-    let step_id_gen = StepIdGenerator
-    let step_id_map = recover trn Map[Key, U128] end
+    if ArrayHelpers[StateName]
+      .contains[StateName](_pipeline_state_names, state_name)
+    then
+      FatalUserError("Wallaroo does not currently support application " +
+        "cycles. You cannot use the same state name twice in the same " +
+        "pipeline.")
+    end
+    _pipeline_state_names.push(state_name)
+
+    let routing_id_gen = RoutingIdGenerator
+    let step_id_map = recover trn Map[Key, RoutingId] end
 
     for key in partition.keys().values() do
-      step_id_map(key) = step_id_gen()
+      step_id_map(key) = routing_id_gen()
     end
 
-    let next_builder = PreStateRunnerBuilder[Last, Next, PIn, S](
-      s_comp, state_name, partition.function(),
-      TypedRouteBuilder[StateProcessor[S]],
-      TypedRouteBuilder[Next] where multi_worker = multi_worker)
+    let next_builder = PreStateRunnerBuilder[Last, Next, S](
+      s_comp, state_name, partition.function()
+      where multi_worker = multi_worker)
 
     _p.add_runner_builder(next_builder)
 
-    let state_builder = PartitionedStateRunnerBuilder[PIn, S](_p.name(),
+    let state_builder = PartitionedStateRunnerBuilder[Last, S](_p.name(),
       state_name, consume step_id_map, partition,
       StateRunnerBuilder[S](s_initializer, state_name,
-        s_comp.state_change_builders()),
-      TypedRouteBuilder[StateProcessor[S]],
-      TypedRouteBuilder[Next]
+        s_comp.state_change_builders()), per_worker_parallelism
       where multi_worker = multi_worker)
 
     _a.add_state_builder(state_name, state_builder)

@@ -19,32 +19,38 @@ Copyright 2017 The Wallaroo Authors.
 use "buffered"
 use "collections"
 use "pony-kafka"
+use "promises"
 use "wallaroo_labs/guid"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/invariant"
+use "wallaroo/core/source"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
-use "wallaroo/ent/watermarking"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
-  StatusReporter & KafkaConsumer)
-  let _source_id: StepId
+actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
+  let _source_id: RoutingId
   let _auth: AmbientAuth
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  var _router: Router
   let _routes: MapIs[Consumer, Route] = _routes.create()
-  let _route_builder: RouteBuilder
+  // _outputs keeps track of all output targets by step id. There might be
+  // duplicate consumers in this map (unlike _routes) since there might be
+  // multiple target step ids over a boundary
+  let _outputs: Map[RoutingId, Consumer] = _outputs.create()
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
   var _unregistered: Bool = false
 
   let _event_log: EventLog
-  let _acker_x: Acker
   let _map_seq_id_offset: Map[SeqId, KafkaOffset] = _map_seq_id_offset.create()
 
   var _last_flushed_offset: KafkaOffset = 0
@@ -66,33 +72,33 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
   let _notify: KafkaSourceNotify[In]
 
   var _muted: Bool = true
+  var _disposed: Bool = false
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
   let _router_registry: RouterRegistry
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-  var _in_flight_ack_waiter: InFlightAckWaiter
 
-  let _state_step_creator: StateStepCreator
+  let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
-  let _pending_message_store: PendingMessageStore =
-    _pending_message_store.create()
+  // Checkpoint
+  var _next_checkpoint_id: CheckpointId = 1
+
+  var _is_pending: Bool = true
 
   let _topic: String
   let _partition_id: KafkaPartitionId
   let _kc: KafkaClient tag
 
-  new create(source_id: StepId, auth: AmbientAuth, name: String,
+  new create(source_id: RoutingId, auth: AmbientAuth, name: String,
     listen: KafkaSourceListener[In], notify: KafkaSourceNotify[In] iso,
-    event_log: EventLog, routes: Array[Consumer] val,
-    route_builder: RouteBuilder,
+    event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     topic: String, partition_id: KafkaPartitionId,
     kafka_client: KafkaClient tag, router_registry: RouterRegistry,
-    state_step_creator: StateStepCreator,
     recovering: Bool)
   =>
     _source_id = source_id
@@ -105,41 +111,27 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     _listen = listen
     _notify = consume notify
     _event_log = event_log
-    _acker_x = Acker
-
-    _state_step_creator = state_step_creator
 
     _recovering = recovering
 
     _name = name
 
     // register resilient with event log
-    _event_log.register_resilient(this, _source_id)
+    _event_log.register_resilient_source(_source_id, this)
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
-    _route_builder = route_builder
-
-    _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
-
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       let new_boundary =
-        builder.build_and_initialize(_step_id_gen(), target_worker_name,
+        builder.build_and_initialize(_routing_id_gen(), target_worker_name,
           _layout_initializer)
       router_registry.register_disposable(new_boundary)
       _outgoing_boundaries(target_worker_name) = new_boundary
     end
 
-    for consumer in routes.values() do
-      _routes(consumer) =
-        _route_builder(this, consumer, _metrics_reporter)
-    end
-
-    for (worker, boundary) in _outgoing_boundaries.pairs() do
-      _routes(boundary) =
-        _route_builder(this, boundary, _metrics_reporter)
-    end
+    _router = router'
+    _update_router(router')
 
     _notify.update_boundaries(_outgoing_boundaries)
 
@@ -148,10 +140,7 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       // directly. route lifecycle needs to be broken out better from
       // application lifecycle
       r.application_created()
-      ifdef "resilience" then
-        _acker_x.add_route(r)
-      end
-    end
+     end
 
     for r in _routes.values() do
       r.application_initialized("KafkaSource-" + topic + "-"
@@ -159,41 +148,139 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     end
 
     _mute()
+    ifdef "resilience" then
+      _mute_local()
+    end
 
-  be update_router(router: Router) =>
+  be first_checkpoint_complete() =>
+    _unmute_local()
+    _is_pending = false
+    for (id, c) in _outputs.pairs() do
+      try
+        let route = _routes(c)?
+        route.register_producer(id)
+      else
+        Fail()
+      end
+    end
+
+  be update_router(router': Router) =>
+    _update_router(router')
+
+  fun ref _update_router(router': Router) =>
     let new_router =
-      match router
+      match router'
       | let pr: PartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
-        router
+        router'
       end
 
-    for target in new_router.routes().values() do
-      if not _routes.contains(target) then
-        let new_route = _route_builder(this, target, _metrics_reporter)
-        _acker_x.add_route(new_route)
-        _routes(target) = new_route
+    let old_router = _router
+    _router = new_router
+    for (old_id, outdated_consumer) in
+      old_router.routes_not_in(_router).pairs()
+    do
+      if _outputs.contains(old_id) then
+        _unregister_output(old_id, outdated_consumer)
       end
     end
-    _notify.update_router(new_router)
-    _pending_message_store.process_known_keys(this, _notify, new_router)
+    for (c_id, consumer) in _router.routes().pairs() do
+      _register_output(c_id, consumer)
+    end
 
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    _pending_message_store.add(state_name, key, routing_args)
-    _state_step_creator.report_unknown_key(this, state_name, key)
+    _notify.update_router(_router)
 
-  be remove_route_to_consumer(c: Consumer) =>
-    if _routes.contains(c) then
-      try
-        _routes.remove(c)?
-      else
-        Fail()
+  be register_downstreams(promise: Promise[Source]) =>
+    promise(this)
+
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
+    if _outputs.contains(id) then
+      ifdef debug then
+        Invariant(_routes.contains(c))
       end
+      _unregister_output(id, c)
+    end
+
+  fun ref _register_output(id: RoutingId, c: Consumer) =>
+    if not _disposed then
+      if _outputs.contains(id) then
+        try
+          let old_c = _outputs(id)?
+          if old_c is c then
+            // We already know about this output.
+            return
+          end
+          _unregister_output(id, old_c)
+        else
+          Unreachable()
+        end
+      end
+
+      _outputs(id) = c
+      if not _routes.contains(c) then
+        let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
+        _routes(c) = new_route
+        if not _is_pending then
+          new_route.register_producer(id)
+        end
+      else
+        try
+          if not _is_pending then
+            _routes(c)?.register_producer(id)
+          end
+        else
+          Unreachable()
+        end
+      end
+    end
+
+  be register_downstream() =>
+    _reregister_as_producer()
+
+  fun ref _reregister_as_producer() =>
+    if not _disposed then
+      for (id, c) in _outputs.pairs() do
+        match c
+        | let ob: OutgoingBoundary =>
+          if not _is_pending then
+            ob.forward_register_producer(_source_id, id, this)
+          end
+        else
+          if not _is_pending then
+            c.register_producer(_source_id, this)
+          end
+        end
+      end
+    end
+
+  fun ref _unregister_output(id: RoutingId, c: Consumer) =>
+    try
+      if not _is_pending then
+        _routes(c)?.unregister_producer(id)
+      end
+      _outputs.remove(id)?
+      _remove_route_if_no_output(c)
+    else
+      Fail()
+    end
+
+  fun ref _remove_route_if_no_output(c: Consumer) =>
+    var have_output = false
+    for consumer in _outputs.values() do
+      if consumer is c then have_output = true end
+    end
+    if not have_output then
+      _remove_route(c)
+    end
+
+  fun ref _remove_route(c: Consumer) =>
+    try
+      _routes.remove(c)?._2
+    else
+      Fail()
     end
 
   be add_boundary_builders(
@@ -206,29 +293,23 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        let boundary = builder.build_and_initialize(_step_id_gen(),
+        let boundary = builder.build_and_initialize(_routing_id_gen(),
           target_worker_name, _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
-        let new_route = _route_builder(this, boundary, _metrics_reporter)
-        _acker_x.add_route(new_route)
+        let new_route = RouteBuilder(_source_id, this, boundary,
+          _metrics_reporter)
         _routes(boundary) = new_route
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)
 
+  be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+    //!@ Should we fail here?
+    None
+
   be remove_boundary(worker: String) =>
-    if _outgoing_boundaries.contains(worker) then
-      try
-        let boundary = _outgoing_boundaries(worker)?
-        _routes(boundary)?.dispose()
-        _routes.remove(boundary)?
-        _outgoing_boundaries.remove(worker)?
-      else
-        Fail()
-      end
-    end
-    _notify.update_boundaries(_outgoing_boundaries)
+    None
 
   be reconnect_boundary(target_worker_name: String) =>
     try
@@ -237,44 +318,22 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
       Fail()
     end
 
+  be disconnect_boundary(worker: WorkerName) =>
+    try
+      _outgoing_boundaries(worker)?.dispose()
+      _outgoing_boundaries.remove(worker)?
+    else
+      ifdef debug then
+        @printf[I32]("KafkaSource couldn't find boundary to %s to disconnect\n"
+          .cstring(), worker.cstring())
+      end
+    end
+
   be remove_route_for(step: Consumer) =>
     try
       _routes.remove(step)?
     else
       Fail()
-    end
-
-  //////////////
-  // ORIGIN (resilience)
-  be request_ack() =>
-    ifdef "trace" then
-      @printf[I32]("request_ack in %s\n".cstring(), _name.cstring())
-    end
-    for route in _routes.values() do
-      route.request_ack()
-    end
-
-  be log_replay_finished()
-  =>
-    // now that log replay is finished, we are no longer "recovering"
-    _recovering = false
-
-    // try and unmute if downstreams are already unmuted
-    if _muted_downstream.size() == 0 then
-      _unmute()
-    end
-
-  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq)
-  =>
-    _rb.append(payload)
-    _last_processed_offset = try _rb.i64_le()?
-                             else Fail(); _last_processed_offset end
-
-    ifdef "trace" then
-      @printf[I32](("replaying log entry on recovery with last processed" +
-        " offset: %lld in %s\n").cstring(), _last_processed_offset,
-        _name.cstring())
     end
 
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
@@ -285,80 +344,79 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     // update to use correct seq_id for recovery
     _seq_id = seq_id
 
-  fun ref _acker(): Acker =>
-    _acker_x
-
-  fun ref flush(low_watermark: U64) =>
-    ifdef "trace" then
-      @printf[I32]("flushing at and below: %llu in %s\n".cstring(),
-        low_watermark, _name.cstring())
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
+  =>
+    @printf[I32]("SLF: TCPSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    try
+      let b = _outgoing_boundaries(worker)?
+      b.update_worker_data_service(worker, host, service)
+    else
+      Fail()
     end
 
-    (_, let offset) = try _map_seq_id_offset.remove(low_watermark)?
-                      else Fail(); (0, -1) end
+  //////////////
+  // BARRIER
+  //////////////
+  be initiate_barrier(token: BarrierToken) =>
+    if not _is_pending then
+      _initiate_barrier(token)
+    end
 
-    // remove all other lower seq_ids that we're tracking offsets for
-    for s in Range[U64](_last_flushed_seq_id, low_watermark) do
-      if _map_seq_id_offset.contains(s) then
-        try _map_seq_id_offset.remove(s)? else Fail() end
+  fun ref _initiate_barrier(token: BarrierToken) =>
+    if not _disposed then
+      match token
+      | let srt: CheckpointRollbackBarrierToken =>
+        _prepare_for_rollback()
+      end
+
+      match token
+      | let sbt: CheckpointBarrierToken =>
+        checkpoint_state(sbt.id)
+      end
+      for (o_id, o) in _outputs.pairs() do
+        match o
+        | let ob: OutgoingBoundary =>
+          ob.forward_barrier(o_id, _source_id, token)
+        else
+          o.receive_barrier(_source_id, this, token)
+        end
       end
     end
 
-    _wb.i64_le(offset)
-    let payload = _wb.done()
+  be barrier_complete(token: BarrierToken) =>
+    // !@ Here's where we could ack finished messages up to checkpoint point.
+    // We should also match for rollback token.
+    None
 
-    // store offset
-    _event_log.queue_log_entry(_source_id, 0, None, 0, low_watermark,
-      consume payload)
-
-    // store low watermark so it is properly replayed
-    _event_log.flush_buffer(_source_id, low_watermark)
-
-    _last_flushed_seq_id = low_watermark
-    _last_flushed_offset = offset
-
-
-  // Log-rotation
-  be snapshot_state() =>
+  //////////////
+  // CHECKPOINTS
+  //////////////
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    //!@ We probably need to checkpoint info about last seq id for checkpoint.
     ifdef "trace" then
-      @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
+      @printf[I32]("checkpoint_state in %s\n".cstring(), _name.cstring())
     end
+    _next_checkpoint_id = checkpoint_id + 1
     _wb.i64_le(_last_flushed_offset)
     let payload = _wb.done()
-    _event_log.snapshot_state(_source_id, 0, 0, _last_flushed_seq_id,
-      consume payload)
+    _event_log.checkpoint_state(_source_id, checkpoint_id, consume payload)
 
-  be log_flushed(low_watermark: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("log_flushed for: %llu in %s\n".cstring(), low_watermark,
-        _name.cstring())
-    end
-    _acker().flushed(low_watermark)
+  be prepare_for_rollback() =>
+    _prepare_for_rollback()
 
-  fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("Bookkeeping called for route %llu in %s\n".cstring(),
-        o_route_id, _name.cstring())
-    end
-    ifdef "resilience" then
-      _acker().sent(o_route_id, o_seq_id)
-    end
+  fun ref _prepare_for_rollback() =>
+    None
 
-  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef debug then
-      @printf[I32]("%s received update_watermark\n".cstring(), _name.cstring())
-    end
-    _update_watermark(route_id, seq_id)
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    //!@ Rollback!
+    _next_checkpoint_id = checkpoint_id + 1
+    event_log.ack_rollback(_source_id)
 
-  fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]((
-      "Update watermark called with " +
-      "route_id: " + route_id.string() +
-      "\tseq_id: " + seq_id.string() + " in %s\n\n").cstring(), _name.cstring())
-    end
 
-    _acker().ack_received(this, route_id, seq_id)
+
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
@@ -388,47 +446,6 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     for route in _routes.values() do
       route.report_status(code)
     end
-
-  be request_in_flight_ack(upstream_request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
-  =>
-    _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
-      requester)
-
-    if _routes.size() > 0 then
-      for route in _routes.values() do
-        let request_id = _in_flight_ack_waiter.add_consumer_request(
-          requester_id)
-        route.request_in_flight_ack(request_id, _source_id, this)
-      end
-    else
-      requester.try_finish_in_flight_request_early(requester_id)
-    end
-
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(
-      in_flight_resume_ack_id, request_id, requester_id, requester)
-    then
-      for route in _routes.values() do
-        let new_request_id =
-          _in_flight_ack_waiter.add_consumer_resume_request()
-        route.request_in_flight_resume_ack(in_flight_resume_ack_id,
-          new_request_id, _source_id, this, leaving_workers)
-      end
-    end
-
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
-
-  be receive_in_flight_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_request(request_id)
-
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
 
   fun ref _mute() =>
     ifdef debug then
@@ -461,6 +478,17 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     end
 
     _muted = false
+
+  fun ref _mute_local() =>
+    _muted_downstream.set(this)
+    _mute()
+
+  fun ref _unmute_local() =>
+    _muted_downstream.unset(this)
+
+    if _muted_downstream.size() == 0 then
+      _unmute()
+    end
 
   be mute(c: Consumer) =>
     _muted_downstream.set(c)
@@ -497,11 +525,30 @@ actor KafkaSource[In: Any val] is (Producer & InFlightAckResponder &
     end
     _map_seq_id_offset(current_sequence_id()) = msg_metadata.get_offset()
 
+  fun ref _unregister_all_outputs() =>
+    """
+    This method should only be called if we are removing this source from the
+    active graph (or on dispose())
+    """
+    let outputs_to_remove = Map[RoutingId, Consumer]
+    for (id, consumer) in _outputs.pairs() do
+      outputs_to_remove(id) = consumer
+    end
+    for (id, consumer) in outputs_to_remove.pairs() do
+      _unregister_output(id, consumer)
+    end
+
   be dispose() =>
     @printf[I32]("Shutting down %s\n".cstring(), _name.cstring())
 
-    for b in _outgoing_boundaries.values() do
-      b.dispose()
-    end
+    if not _disposed then
+      _unregister_all_outputs()
+      _router_registry.unregister_source(this, _source_id)
+      _event_log.unregister_resilient(_source_id, this)
+      for b in _outgoing_boundaries.values() do
+        b.dispose()
+      end
 
-    _kc.dispose()
+      _kc.dispose()
+      _disposed = true
+    end

@@ -50,7 +50,7 @@ actor Main
             TCPSourceConfig[U64].from_options(U64Decoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
             .to_parallel[U64]({(): Double => Double})
-            .to_state_partition[U64, CountMax, CountAndMax](
+            .to_state_partition[CountMax, CountAndMax](
               UpdateCountAndMax, CountAndMaxBuilder,
               "count-and-max",
               mod6partition where multi_worker = true)

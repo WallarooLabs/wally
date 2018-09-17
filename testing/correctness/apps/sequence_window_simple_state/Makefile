@@ -34,12 +34,12 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
-
 SEQUENCE_WINDOW_SIMPLE_STATE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
+sequence_window_simple_state_test: CUSTOM_PATH = $(VALIDATOR_PATH)
 
 # Reuse the validator from sequence_window
 build-testing-correctness-apps-sequence_window_simple_state: build-testing-correctness-apps-sequence_window-validator
@@ -61,12 +61,6 @@ sequence_window_simple_state_test:
 		--sink-await '[9994,9996,9998,10000]' \
 		--sink-await '[9993,9995,9997,9999]' \
 		--spike 0 0.1 200 1
-
-
-clean-testing-correctness-apps-sequence_window_simple_state: sequence_window_simple_state_clean
-
-sequence_window_simple_state_clean:
-	$(QUIET)rm -fr $(SEQUENCE_WINDOW_SIMPLE_STATE_PATH)/sequence_window_simple_state*
 
 # end of prevent rules from being evaluated/included multiple times
 endif

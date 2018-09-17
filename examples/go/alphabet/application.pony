@@ -22,6 +22,7 @@ actor Main
       let options = Options(WallarooConfig.application_args(env.args)?, false)
       let c_args = ArgsToCArgs(options.remaining())
       @WallarooApiSetArgs(c_args.cpointer(), c_args.size().u64())
+
       let application_json_string = ApplicationSetup()
 
       try

@@ -63,9 +63,6 @@ Alternatively, for a CLI style integration tester, you may use the
 `integration_test -h` for instructions.
 """
 
-from control import wait_for_cluster_to_resume_processing
-
-
 from cluster import (add_runner,
                      Cluster,
                      ClusterError,
@@ -76,8 +73,8 @@ from cluster import (add_runner,
 
 from control import (SinkAwaitValue,
                      SinkExpect,
-                     try_until_timeout,
-                     wait_for_cluster_to_resume_processing)
+                     TryUntilTimeout,
+                     WaitForClusterToResumeProcessing)
 
 from end_points import (Metrics,
                         MultiSequenceGenerator,

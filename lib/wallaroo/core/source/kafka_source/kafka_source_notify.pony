@@ -29,20 +29,20 @@ use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
 
 primitive KafkaSourceNotifyBuilder[In: Any val]
-  fun apply(source_id: StepId, pipeline_name: String, env: Env,
+  fun apply(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end):
     SourceNotify iso^
   =>
     KafkaSourceNotify[In](source_id, pipeline_name, env, auth, handler,
       runner_builder, router, consume metrics_reporter, event_log,
       target_router, pre_state_target_ids)
 
-class KafkaSourceNotify[In: Any val] is Rerouter
-  let _source_id: StepId
+class KafkaSourceNotify[In: Any val]
+  let _source_id: RoutingId
   let _env: Env
   let _auth: AmbientAuth
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
@@ -51,15 +51,15 @@ class KafkaSourceNotify[In: Any val] is Rerouter
   let _handler: SourceHandler[In] val
   let _runner: Runner
   var _router: Router
-  let _omni_router: OmniRouter = EmptyOmniRouter
+  let _target_id_router: TargetIdRouter = EmptyTargetIdRouter
   let _metrics_reporter: MetricsReporter
 
-  new iso create(source_id: StepId, pipeline_name: String, env: Env,
+  new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
   =>
     _source_id = source_id
     _pipeline_name = pipeline_name
@@ -72,7 +72,7 @@ class KafkaSourceNotify[In: Any val] is Rerouter
     _router = _runner.clone_router_and_set_input_type(router')
     _metrics_reporter = consume metrics_reporter
 
-  fun routes(): Array[Consumer] val =>
+  fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
 
   fun ref received(source: KafkaSource[In] ref, kafka_msg_value: Array[U8] iso,
@@ -120,7 +120,7 @@ class KafkaSourceNotify[In: Any val] is Rerouter
             " source\n").cstring())
         end
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          _source_id, source, _router, _omni_router, _msg_id_gen(), None,
+          _source_id, source, _router, _target_id_router, _msg_id_gen(), None,
           decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
       else
         @printf[I32](("Unable to decode message at " + _pipeline_name +
@@ -145,9 +145,6 @@ class KafkaSourceNotify[In: Any val] is Rerouter
         pipeline_time_spent)
       _metrics_reporter.worker_metric(_pipeline_name, time_spent)
     end
-
-  fun router(): Router =>
-    _router
 
   fun ref update_router(router': Router) =>
     _router = router'

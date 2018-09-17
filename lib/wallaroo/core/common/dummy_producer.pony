@@ -22,7 +22,8 @@ use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/watermarking"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/checkpoint"
 
 
 actor DummyProducer is Producer
@@ -36,12 +37,7 @@ actor DummyProducer is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    None
-
-  be remove_route_to_consumer(c: Consumer) =>
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     None
 
   // Muteable
@@ -51,35 +47,11 @@ actor DummyProducer is Producer
   be unmute(c: Consumer) =>
     None
 
-  // Ackable
-  fun ref _acker(): Acker =>
-    Acker
-
-  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    None
-
-  fun ref flush(low_watermark: SeqId) =>
-    None
-
-  // AckRequester
-  be request_ack() =>
-    None
-
-  // InFlightAckRequester
-  be receive_in_flight_ack(request_id: RequestId) =>
-    None
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    None
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    None
-
   // Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     None
 
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
+  be application_created(initializer: LocalTopologyInitializer)
   =>
     None
 
@@ -88,3 +60,18 @@ actor DummyProducer is Producer
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
+
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    None
+
+  be prepare_for_rollback() =>
+    None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    None
+
+  be register_downstream() =>
+    None
+

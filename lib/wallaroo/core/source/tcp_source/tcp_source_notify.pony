@@ -35,17 +35,15 @@ use "wallaroo/core/messages"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-trait TCPSourceNotify is Rerouter
+trait TCPSourceNotify
   // TODO: CREDITFLOW - this is weird that its here
   // It exists so that a TCPSource can get its routes
   // on startup. It probably makes more sense to make this
   // available via the source builder that Listener gets
   // and it can then make routes available
-  fun ref routes(): Array[Consumer] val
+  fun ref routes(): Map[RoutingId, Consumer] val
 
   fun ref update_router(router': Router)
-
-  fun ref update_route(step_id: StepId, key: Key, step: Step)?
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
 

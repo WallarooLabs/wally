@@ -34,21 +34,23 @@ class BoundaryRoute is Route
   // route 0 is used for filtered messages
   let _route_id: U64 = 1 + RouteIdGenerator()
   var _step_type: String = ""
+  let _step_id: RoutingId
   let _step: Producer ref
   let _consumer: OutgoingBoundary
   let _metrics_reporter: MetricsReporter
   var _route: RouteLogic = _EmptyRouteLogic
 
-  new create(step: Producer ref, consumer: OutgoingBoundary,
+  new create(step_id: RoutingId, step: Producer ref, consumer: OutgoingBoundary,
     metrics_reporter: MetricsReporter ref)
   =>
+    _step_id = step_id
     _step = step
     _consumer = consumer
     _metrics_reporter = metrics_reporter
-    _route = _RouteLogic(step, consumer, "Boundary")
+    _route = _RouteLogic(step_id, step, consumer, "Boundary")
 
   fun ref application_created() =>
-    _consumer.register_producer(_step)
+    None
 
   fun ref application_initialized(step_type: String) =>
     _step_type = step_type
@@ -60,8 +62,8 @@ class BoundaryRoute is Route
   fun ref dispose() =>
     None
 
-  fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
@@ -91,6 +93,12 @@ class BoundaryRoute is Route
       metric_name,
       worker_ingress_ts)
 
+  fun register_producer(target_id: RoutingId) =>
+    _consumer.forward_register_producer(_step_id, target_id, _step)
+
+  fun unregister_producer(target_id: RoutingId) =>
+    _consumer.forward_unregister_producer(_step_id, target_id, _step)
+
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
@@ -107,28 +115,5 @@ class BoundaryRoute is Route
       metrics_id,
       worker_ingress_ts)
 
-    ifdef "resilience" then
-      cfp.bookkeeping(_route_id, o_seq_id)
-    end
-
-  fun ref request_ack() =>
-    _consumer.request_ack()
-
   fun ref report_status(code: ReportStatusCode) =>
     _consumer.report_status(code)
-
-  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    producer: InFlightAckRequester)
-  =>
-    _consumer.request_in_flight_ack(request_id, requester_id, producer)
-
-  fun ref request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    _consumer.request_in_flight_resume_ack(in_flight_resume_ack_id, request_id,
-      requester_id, requester, leaving_workers)
-
-  fun ref receive_in_flight_ack(request_id: RequestId) =>
-    _step.receive_in_flight_ack(request_id)

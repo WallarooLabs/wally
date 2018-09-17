@@ -16,17 +16,23 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "collections"
 use "wallaroo/core/common"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/recovery"
+use "wallaroo/ent/checkpoint"
 
-type Sink is (Consumer & DisposableActor)
+trait tag Sink is (Consumer & DisposableActor & BarrierProcessor)
+  fun inputs(): Map[RoutingId, Producer] box
 
 interface val SinkConfig[Out: Any val]
   fun apply(): SinkBuilder
 
 interface val SinkBuilder
   fun apply(sink_name: String, event_log: EventLog,
-    reporter: MetricsReporter iso, env: Env, recovering: Bool): Sink
+    reporter: MetricsReporter iso, env: Env,
+    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
+    recovering: Bool): Sink

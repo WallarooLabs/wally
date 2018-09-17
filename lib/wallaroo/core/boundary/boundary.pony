@@ -31,19 +31,22 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
-use "wallaroo_labs/bytes"
-use "wallaroo_labs/time"
 use "wallaroo/core/common"
-use "wallaroo/ent/network"
-use "wallaroo/ent/spike"
-use "wallaroo/ent/watermarking"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/network"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/checkpoint"
+use "wallaroo/ent/spike"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/mort"
+use "wallaroo_labs/time"
+
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -55,40 +58,47 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
 class val OutgoingBoundaryBuilder
-  let _auth: AmbientAuth
-  let _worker_name: String
-  let _reporter: MetricsReporter val
-  let _host: String
-  let _service: String
-  let _spike_config: (SpikeConfig | None)
+  let auth: AmbientAuth
+  let worker_name: String
+  let reporter: MetricsReporter val
+  let host: String
+  let service: String
+  let spike_config_none: (SpikeConfig | None)
 
-  new val create(auth: AmbientAuth, name: String, r: MetricsReporter iso,
+  new val create(auth': AmbientAuth, name: String, r: MetricsReporter iso,
     h: String, s: String, spike_config: (SpikeConfig | None) = None)
   =>
-    _auth = auth
-    _worker_name = name
-    _reporter = consume r
-    _host = h
-    _service = s
-    _spike_config = spike_config
+    auth = auth'
+    worker_name = name
+    reporter = consume r
+    host = h
+    service = s
+    spike_config_none = spike_config
 
-  fun apply(step_id: StepId, target_worker: String): OutgoingBoundary =>
-    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
-      _reporter.clone(), _host, _service where spike_config = _spike_config)
+  fun apply(step_id: RoutingId, target_worker: String): OutgoingBoundary =>
+    let boundary = OutgoingBoundary(auth, worker_name, target_worker,
+      reporter.clone(), host, service where spike_config = spike_config_none)
     boundary.register_step_id(step_id)
     boundary
 
-  fun build_and_initialize(step_id: StepId, target_worker: String,
+  fun build_and_initialize(step_id: RoutingId, target_worker: String,
     layout_initializer: LayoutInitializer): OutgoingBoundary
   =>
     """
     Called when creating a boundary post cluster initialization
     """
-    let boundary = OutgoingBoundary(_auth, _worker_name, target_worker,
-      _reporter.clone(), _host, _service where spike_config = _spike_config)
+    let boundary = OutgoingBoundary(auth, worker_name, target_worker,
+      reporter.clone(), host, service where spike_config = spike_config_none)
     boundary.register_step_id(step_id)
     boundary.quick_initialize(layout_initializer)
     boundary
+
+  fun val clone_with_new_service(host': String, service': String)
+    : OutgoingBoundaryBuilder val
+  =>
+    let r = reporter.clone()
+    OutgoingBoundaryBuilder(auth, worker_name, consume r, host', service',
+      spike_config_none)
 
 actor OutgoingBoundary is Consumer
   // Steplike
@@ -101,9 +111,11 @@ actor OutgoingBoundary is Consumer
   var _reported_ready_to_work: Bool = false
 
   // Consumer
+  var _registered_producers: RegisteredProducers =
+    _registered_producers.create()
   var _upstreams: SetIs[Producer] = _upstreams.create()
+
   var _mute_outstanding: Bool = false
-  var _in_flight_ack_waiter: InFlightAckWaiter = InFlightAckWaiter
 
   // TCP
   var _notify: WallarooOutgoingNetworkActorNotify
@@ -134,20 +146,17 @@ actor OutgoingBoundary is Consumer
   var _connection_initialized: Bool = false
   var _replaying: Bool = false
   let _auth: AmbientAuth
-  let _worker_name: String
-  let _target_worker: String
-  var _step_id: StepId = 0
-  let _host: String
-  let _service: String
+  let _worker_name: WorkerName
+  let _target_worker: WorkerName
+  var _step_id: RoutingId = 0
+  var _host: String
+  var _service: String
   let _from: String
   let _queue: Array[Array[ByteSeq] val] = _queue.create()
   var _lowest_queue_id: SeqId = 0
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
-  var _seq_id: SeqId = 1
-
-  // Producer (Resilience)
-  let _terminus_route: TerminusRoute = TerminusRoute
+  var _seq_id: SeqId = 0
 
   var _reconnect_pause: U64 = 10_000_000_000
   let _timers: Timers = Timers
@@ -192,9 +201,7 @@ actor OutgoingBoundary is Consumer
     _initializer = initializer
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
-  =>
+  be application_created(initializer: LocalTopologyInitializer) =>
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
       _from.cstring())
@@ -210,7 +217,7 @@ actor OutgoingBoundary is Consumer
       end
 
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
-        _auth)?
+        _seq_id, _auth)?
       _writev(connect_msg)
     else
       Fail()
@@ -241,7 +248,7 @@ actor OutgoingBoundary is Consumer
         end
 
         let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-          _step_id, _auth)?
+          _step_id, _seq_id, _auth)?
         _writev(connect_msg)
       else
         Fail()
@@ -249,6 +256,9 @@ actor OutgoingBoundary is Consumer
     end
 
   be reconnect() =>
+    _reconnect()
+
+  fun ref _reconnect() =>
     if not _connected and not _no_more_reconnect then
       _connect_count = @pony_os_connect_tcp[U32](this,
         _host.cstring(), _service.cstring(),
@@ -258,13 +268,14 @@ actor OutgoingBoundary is Consumer
 
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
       + "\n").cstring())
+    @printf[I32]("!@ reconnect() RE-Connecting OutgoingBoundary %s to %s:%s on %s\n".cstring(), _step_id.string().cstring(), _host.cstring(), _service.cstring(), _target_worker.cstring())
 
-  be migrate_step(step_id: StepId, state_name: String, key: Key,
-    state: ByteSeq val)
+  be migrate_key(step_id: RoutingId, state_name: String, key: Key,
+    checkpoint_id: CheckpointId, state: ByteSeq val)
   =>
     try
-      let outgoing_msg = ChannelMsgEncoder.migrate_step(step_id,
-        state_name, key, state, _worker_name, _auth)?
+      let outgoing_msg = ChannelMsgEncoder.migrate_key(state_name, key,
+        checkpoint_id, state, _worker_name, _auth)?
       _writev(outgoing_msg)
     else
       Fail()
@@ -279,20 +290,28 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
-  be register_step_id(step_id: StepId) =>
+  be register_step_id(step_id: RoutingId) =>
     _step_id = step_id
-    _in_flight_ack_waiter = InFlightAckWaiter(_step_id)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    // Run should never be called on an OutgoingBoundary
+    // run() should never be called on an OutgoingBoundary
+    Fail()
+
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
+  =>
+    // process_message() should never be called on an OutgoingBoundary
     Fail()
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer, msg_uid: MsgId,
+    data: D, producer_id: RoutingId, producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -327,15 +346,11 @@ actor OutgoingBoundary is Consumer
       end
 
     try
-      let seq_id = ifdef "resilience" then
-        _terminus_route.terminate(i_producer, i_route_id, i_seq_id)
-      else
-        _seq_id = _seq_id + 1
-      end
+      _seq_id = _seq_id + 1
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
-        seq_id, _wb, _auth, WallClock.nanoseconds(),
+        _seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)?
       _add_to_upstream_backup(outgoing_msg)
 
@@ -361,8 +376,6 @@ actor OutgoingBoundary is Consumer
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 
-  be receive_state(state: ByteSeq val) => Fail()
-
   fun ref receive_ack(seq_id: SeqId) =>
     ifdef debug then
       Invariant(seq_id > _lowest_queue_id)
@@ -377,10 +390,6 @@ actor OutgoingBoundary is Consumer
     _queue.remove(0, flush_count)
     _maybe_mute_or_unmute_upstreams()
     _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-
-    ifdef "resilience" then
-      _terminus_route.receive_ack(seq_id)
-    end
 
   fun ref receive_connect_ack(last_id_seen: SeqId) =>
     _replay_from(last_id_seen)
@@ -400,6 +409,10 @@ actor OutgoingBoundary is Consumer
     _maybe_mute_or_unmute_upstreams()
 
   fun ref _replay_from(idx: SeqId) =>
+    // In case the downstream has failed and recovered, resend producer
+    // registrations.
+    resend_producer_registrations()
+
     try
       var cur_id = _lowest_queue_id
       for msg in _queue.values() do
@@ -426,6 +439,7 @@ actor OutgoingBoundary is Consumer
     silently discarded and not acknowleged.
     """
     @printf[I32]("Shutting down OutgoingBoundary\n".cstring())
+    _unmute_upstreams()
     _no_more_reconnect = true
     _timers.dispose()
     close()
@@ -435,14 +449,18 @@ actor OutgoingBoundary is Consumer
     // TODO: How do we propagate this down?
     None
 
-  be register_producer(producer: Producer) =>
+  be register_producer(id: RoutingId, producer: Producer) =>
+    // @printf[I32]("!@ Registered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
+
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
     end
 
     _upstreams.set(producer)
 
-  be unregister_producer(producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
+    // @printf[I32]("!@ Unregistered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
+
     // TODO: Determine if we need this Invariant.
     // ifdef debug then
     //   Invariant(_upstreams.contains(producer))
@@ -450,61 +468,125 @@ actor OutgoingBoundary is Consumer
 
     _upstreams.unset(producer)
 
+  be forward_register_producer(source_id: RoutingId, target_id: RoutingId,
+    producer: Producer)
+  =>
+    _forward_register_producer(source_id, target_id, producer)
+
+  fun ref _forward_register_producer(source_id: RoutingId,
+    target_id: RoutingId, producer: Producer)
+  =>
+    // @printf[I32]("!@ Forward Registered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
+    _registered_producers.register_producer(source_id, producer, target_id)
+    try
+      let msg = ChannelMsgEncoder.register_producer(_worker_name,
+        source_id, target_id, _auth)?
+      _writev(msg)
+    else
+      Fail()
+    end
+    _upstreams.set(producer)
+
+  be forward_unregister_producer(source_id: RoutingId, target_id: RoutingId,
+    producer: Producer)
+  =>
+    // @printf[I32]("!@ Forward UNRegistered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
+
+    _registered_producers.unregister_producer(source_id, producer, target_id)
+    try
+      let msg = ChannelMsgEncoder.unregister_producer(_worker_name,
+        source_id, target_id, _auth)?
+      _writev(msg)
+    else
+      Fail()
+    end
+    _upstreams.unset(producer)
+
+  fun ref resend_producer_registrations() =>
+    for (producer_id, producer, target_id) in
+      _registered_producers.registrations().values()
+    do
+      _forward_register_producer(producer_id, target_id, producer)
+    end
+
   be report_status(code: ReportStatusCode) =>
-    _in_flight_ack_waiter.report_status(code)
     try
       _writev(ChannelMsgEncoder.report_status(code, _auth)?)
     else
       Fail()
     end
 
-  be request_in_flight_ack(upstream_request_id: RequestId,
-    requester_id: StepId, upstream_requester: InFlightAckRequester)
+  //////////////
+  // BARRIER
+  //////////////
+  be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
+    barrier_token: BarrierToken)
   =>
-    if not _in_flight_ack_waiter.already_added_request(requester_id) then
-      try
-        _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
-          upstream_requester)
-        let request_id = _in_flight_ack_waiter.add_consumer_request(
-          requester_id)
-        _writev(ChannelMsgEncoder.request_in_flight_ack(_worker_name,
-          request_id, requester_id, _auth)?)
-      else
-        Fail()
-      end
+    match barrier_token
+    | let srt: CheckpointRollbackBarrierToken =>
+      _queue.clear()
+    end
+
+    try
+      // If our downstream DataReceiver requests we replay messages, we need
+      // to ensure we replay the barrier as well and in the correct place.
+      _seq_id = _seq_id + 1
+
+      let msg = ChannelMsgEncoder.forward_barrier(target_step_id,
+        origin_step_id, barrier_token, _seq_id, _auth)?
+      _writev(msg)
+      _add_to_upstream_backup(msg)
     else
-      upstream_requester.receive_in_flight_ack(upstream_request_id)
+      Fail()
     end
 
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  be receive_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
   =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(in_flight_resume_ack_id,
-      request_id, requester_id, requester)
-    then
-      try
-        let new_request_id =
-          _in_flight_ack_waiter.add_consumer_resume_request()
-        _writev(ChannelMsgEncoder.request_in_flight_resume_ack(_worker_name,
-          in_flight_resume_ack_id, new_request_id, _step_id,
-          leaving_workers, _auth)?)
-      else
-        Fail()
-      end
+    // We only forward barriers at the boundary. The OutgoingBoundary
+    // does not participate directly in the barrier protocol.
+    Fail()
+
+  fun ref barrier_complete(barrier_token: BarrierToken) =>
+    // We only forward barriers at the boundary. The OutgoingBoundary
+    // does not participate directly in the barrier protocol.
+    Fail()
+
+  ///////////////
+  // CHECKPOINTS
+  ///////////////
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    """
+    Boundaries don't currently write out any data as part of the checkpoint.
+    """
+    None
+
+  be prepare_for_rollback() =>
+    _lowest_queue_id = _lowest_queue_id + _queue.size().u64()
+    _queue.clear()
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    """
+    There is nothing for a Boundary to rollback to.
+    """
+    None
+
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
+  =>
+    @printf[I32]("SLF: OutgoingBoundary.update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    if worker != _target_worker then
+      Fail()
     end
+    _host = host
+    _service = service
+    _reconnect()
 
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
-
-  be receive_in_flight_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_request(request_id)
-
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
-
-  //
+  ///////////
   // TCP
+  ///////////
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
@@ -571,7 +653,7 @@ actor OutgoingBoundary is Consumer
 
             try
               let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
-                _step_id, _auth)?
+                _step_id, _seq_id, _auth)?
               _writev(connect_msg)
             else
               @printf[I32]("error creating data connect message on reconnect\n"
@@ -646,6 +728,7 @@ actor OutgoingBoundary is Consumer
     if (_host != "") and (_service != "") and not _no_more_reconnect then
       @printf[I32]("RE-Connecting OutgoingBoundary to %s:%s\n".cstring(),
         _host.cstring(), _service.cstring())
+        @printf[I32]("!@ _schedule_reconnect() RE-Connecting OutgoingBoundary %s to %s:%s on %s\n".cstring(), _step_id.string().cstring(), _host.cstring(), _service.cstring(), _target_worker.cstring())
       let timer = Timer(_PauseBeforeReconnect(this), _reconnect_pause)
       _timers(consume timer)
     end
@@ -1048,23 +1131,11 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         end
         conn.receive_connect_ack(sn.last_id_seen)
         conn.start_normal_sending()
-      | let aw: AckWatermarkMsg =>
+      | let aw: AckDataReceivedMsg =>
         ifdef "trace" then
-          @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
+          @printf[I32]("Received AckDataReceivedMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
-      | let fa: InFlightAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received InFlightAckMsg from %s\n".cstring(),
-            fa.sender.cstring())
-        end
-        _outgoing_boundary.receive_in_flight_ack(fa.request_id)
-      | let fa: FinishedCompleteAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received FinishedCompleteAckMsg from %s\n".cstring(),
-            fa.sender.cstring())
-        end
-        _outgoing_boundary.receive_in_flight_resume_ack(fa.request_id)
       else
         @printf[I32](("Unknown Wallaroo data message type received at " +
           "OutgoingBoundary.\n").cstring())
@@ -1085,6 +1156,12 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
+    match conn
+    | let ob: OutgoingBoundary ref =>
+      ob.resend_producer_registrations()
+    else
+      Fail()
+    end
     conn.set_nodelay(true)
     conn.expect(4)
 

@@ -41,7 +41,7 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
     _auth = auth
 
   fun apply(source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry, route_builder: RouteBuilder,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
@@ -49,18 +49,16 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
     target_router: Router = EmptyRouter): KafkaSourceListenerBuilder[In]
   =>
     KafkaSourceListenerBuilder[In](source_builder, router, router_registry,
-      route_builder,
       outgoing_boundary_builders, event_log, auth, pipeline_name,
       layout_initializer, consume metrics_reporter,
       target_router, _ksco, _auth, recovering)
 
 class val KafkaSourceListenerBuilder[In: Any val]
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _pipeline_name: String
   let _source_builder: SourceBuilder
   let _router: Router
   let _router_registry: RouterRegistry
-  let _route_builder: RouteBuilder
   let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
@@ -72,7 +70,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
   let _recovering: Bool
 
   new val create(source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry, route_builder: RouteBuilder,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
@@ -84,7 +82,6 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _pipeline_name = pipeline_name
     _router = router
     _router_registry = router_registry
-    _route_builder = route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _layout_initializer = layout_initializer
     _event_log = event_log
@@ -95,11 +92,11 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _tcp_auth = tcp_auth
     _recovering = recovering
 
-  fun apply(state_step_creator: StateStepCreator, env: Env): SourceListener =>
+  fun apply(env: Env): SourceListener =>
     KafkaSourceListener[In](env, _source_builder, _router, _router_registry,
-      _route_builder, _outgoing_boundary_builders, _event_log, _auth,
+      _outgoing_boundary_builders, _event_log, _auth,
       _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      state_step_creator, _target_router, _ksco, _tcp_auth, _recovering)
+      _target_router, _ksco, _tcp_auth, _recovering)
 
 
 class MapPartitionConsumerMessageHandler is KafkaConsumerMessageHandler
@@ -122,13 +119,11 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _env: Env
   let _auth: AmbientAuth
   let _pipeline_name: String
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _notify: KafkaSourceListenerNotify[In]
   let _event_log: EventLog
-  let _state_step_creator: StateStepCreator
   var _router: Router
   let _router_registry: RouterRegistry
-  let _route_builder: RouteBuilder
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
   let _metrics_reporter: MetricsReporter
@@ -141,14 +136,12 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   var _recovering: Bool
   let _rb: Reader = Reader
 
-  new create(env: Env, source_builder: SourceBuilder,
-    router: Router, router_registry: RouterRegistry,
-    route_builder: RouteBuilder,
+  new create(env: Env, source_builder: SourceBuilder, router: Router,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter,
     ksco: KafkaConfigOptions val, tcp_auth: TCPConnectionAuth, recovering: Bool)
   =>
@@ -158,10 +151,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _event_log = event_log
     _notify = KafkaSourceListenerNotify[In](source_builder, event_log, auth,
       target_router)
-    _state_step_creator = state_step_creator
     _router = router
     _router_registry = router_registry
-    _route_builder = route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _layout_initializer = layout_initializer
     _metrics_reporter = consume metrics_reporter
@@ -239,9 +230,9 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
 
               let source = KafkaSource[In](source_id, _auth, name, this,
                 _notify.build_source(source_id, _env)?, _event_log,
-                _router.routes(), _route_builder, _outgoing_boundary_builders,
+                _router, _outgoing_boundary_builders,
                 _layout_initializer, _metrics_reporter.clone(), topic, part_id,
-                kc, _router_registry, _state_step_creator, _recovering)
+                kc, _router_registry, _recovering)
               partitions_sources(part_id) = source
               _router_registry.register_source(source, source_id)
               match _router
@@ -317,6 +308,10 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       end
     end
     _outgoing_boundary_builders = consume new_builders
+
+  be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+    //!@ Should we fail here?
+    None
 
   be update_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)

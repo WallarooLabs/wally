@@ -23,38 +23,44 @@ use "pony-kafka"
 use "pony-kafka/customlogger"
 use "time"
 use "wallaroo/core/common"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/watermarking"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/core/sink"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/checkpoint"
+use "wallaroo_labs/mort"
 
-
-actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
+actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
   // Steplike
   let _name: String
-  let _sink_id: StepId
+  var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
+  let _sink_id: RoutingId
   let _event_log: EventLog
   var _recovering: Bool
   let _encoder: KafkaEncoderWrapper
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
   var _initializer: (LocalTopologyInitializer | None) = None
+  let _barrier_initiator: BarrierInitiator
+  var _barrier_acker: (BarrierSinkAcker | None) = None
+  let _checkpoint_initiator: CheckpointInitiator
 
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
+  // _inputs keeps track of all inputs by step id. There might be
+  // duplicate producers in this map (unlike upstreams) since there might be
+  // multiple upstream step ids over a boundary
+  let _inputs: Map[RoutingId, Producer] = _inputs.create()
   var _mute_outstanding: Bool = false
 
   var _kc: (KafkaClient tag | None) = None
   let _conf: KafkaConfig val
   let _auth: TCPConnectionAuth
-
-  // Producer (Resilience)
-  let _terminus_route: TerminusRoute = TerminusRoute
 
   // variable to hold producer mapping for sending requests to broker
   //  connections
@@ -65,14 +71,18 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
   let _topic: String
 
+  var _seq_id: SeqId = 0
+
   // Items in tuple are: metric_name, metrics_id, send_ts, worker_ingress_ts,
   //   pipeline_time_spent, tracking_id
   let _pending_delivery_report: MapIs[Any tag, (String, U16, U64, U64, U64,
     (U64 | None))] = _pending_delivery_report.create()
 
-  new create(sink_id: StepId, name: String, event_log: EventLog, recovering: Bool,
-    encoder_wrapper: KafkaEncoderWrapper, metrics_reporter: MetricsReporter iso,
-    conf: KafkaConfig val, auth: TCPConnectionAuth)
+  new create(sink_id: RoutingId, name: String, event_log: EventLog,
+    recovering: Bool, encoder_wrapper: KafkaEncoderWrapper,
+    metrics_reporter: MetricsReporter iso, conf: KafkaConfig val,
+    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
+    auth: TCPConnectionAuth)
   =>
     _name = name
     _recovering = recovering
@@ -81,6 +91,8 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _conf = conf
+    _barrier_initiator = barrier_initiator
+    _checkpoint_initiator = checkpoint_initiator
     _auth = auth
 
     _topic = try
@@ -90,8 +102,8 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
                ""
              end
 
-    // register resilient with event log
-    _event_log.register_resilient(this, _sink_id)
+    _message_processor = NormalSinkMessageProcessor(this)
+    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
 
   fun ref create_producer_mapping(client: KafkaClient, mapping: KafkaProducerMapping):
     (KafkaProducerMapping | None)
@@ -151,15 +163,6 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
         error
       end
 
-      // TODO: Resilience: log_flushed here to update low watermark for recovery?
-
-      ifdef "resilience" then
-        match tracking_id
-        | let sent: SeqId =>
-          _terminus_route.receive_ack(sent)
-        end
-      end
-
       let end_ts = Time.nanos()
       _metrics_reporter.step_metric(metric_name, "Kafka send time", metrics_id,
         send_ts, end_ts)
@@ -180,6 +183,9 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       @printf[I32]("Error handling kafka delivery report in Kakfa Sink\n"
         .cstring())
     end
+
+  fun inputs(): Map[RoutingId, Producer] box =>
+    _inputs
 
   fun ref _kafka_producer_throttled(client: KafkaClient, topic_partitions_throttled: Map[String, Set[KafkaPartitionId]] val)
   =>
@@ -209,9 +215,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     _initializer = initializer
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
-  =>
+  be application_created(initializer: LocalTopologyInitializer) =>
     _mute_upstreams()
 
     initializer.report_initialized(this)
@@ -236,53 +240,63 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be request_ack() =>
-    ifdef "trace" then
-      @printf[I32]("request_ack in %s\n".cstring(), _name.cstring())
+  be register_producer(id: RoutingId, producer: Producer) =>
+    // @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+    // If we have at least one input, then we are involved in checkpointing.
+    if _inputs.size() == 0 then
+      _barrier_initiator.register_sink(this)
+      _event_log.register_resilient(_sink_id, this)
     end
 
-    _terminus_route.request_ack()
-
-  fun ref _next_tracking_id(i_producer: Producer, i_route_id: RouteId,
-    i_seq_id: SeqId): (U64 | None)
-  =>
-    ifdef "resilience" then
-      return _terminus_route.terminate(i_producer, i_route_id, i_seq_id)
-    end
-
-    None
-
-  be register_producer(producer: Producer) =>
+    _inputs(id) = producer
     _upstreams.set(producer)
 
-  be unregister_producer(producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
+    // @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
 
-    _upstreams.unset(producer)
+    if _inputs.contains(id) then
+      try
+        _inputs.remove(id)?
+      else
+        Fail()
+      end
+
+      var have_input = false
+      for i in _inputs.values() do
+        if i is producer then have_input = true end
+      end
+      if not have_input then
+        _upstreams.unset(producer)
+      end
+
+      // If we have no inputs, then we are not involved in checkpointing.
+      if _inputs.size() == 0 then
+        _barrier_initiator.unregister_sink(this)
+        _event_log.unregister_resilient(_sink_id, this)
+      end
+    end
 
   be report_status(code: ReportStatusCode) =>
     None
 
-  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
-  =>
-    requester.receive_in_flight_ack(request_id)
-
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    requester.receive_in_flight_resume_ack(request_id)
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    None
-
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _message_processor.process_message[D](metric_name, pipeline_time_spent,
+      data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+      latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     var my_latest_ts: U64 = latest_ts
     var my_metrics_id = ifdef "detailed-metrics" then
@@ -324,7 +338,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
 
         // TODO: Resilience: Write data to event log for recovery purposes
 
-        let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
+        let next_tracking_id = (_seq_id = _seq_id + 1)
         _pending_delivery_report(any) = (metric_name, my_metrics_id,
           my_latest_ts, worker_ingress_ts, pipeline_time_spent,
           next_tracking_id)
@@ -339,7 +353,7 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     end
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -347,13 +361,6 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
       @printf[I32]("replay_run in %s\n".cstring(), _name.cstring())
     end
     // TODO: implement this once state save/recover is handled
-    Fail()
-
-  be receive_state(state: ByteSeq val) =>
-    ifdef "trace" then
-      @printf[I32]("receive_state in %s\n".cstring(), _name.cstring())
-    end
-    // TODO: implement state recovery
     Fail()
 
   be log_replay_finished()
@@ -382,20 +389,91 @@ actor KafkaSink is (Consumer & KafkaClientManager & KafkaProducer)
     // TODO: implement this for resilience/recovery
     Fail()
 
-  // Log-rotation
-  be snapshot_state() =>
-    ifdef "trace" then
-      @printf[I32]("snapshot_state in %s\n".cstring(), _name.cstring())
-    end
-    // TODO: implement this for resilience/recovery
-    Fail()
+  ///////////////
+  // BARRIER
+  ///////////////
+  be receive_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    process_barrier(input_id, producer, barrier_token)
 
-  be log_flushed(low_watermark: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("log_flushed in %s\n".cstring(), _name.cstring())
+  fun ref process_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    match barrier_token
+    | let srt: CheckpointRollbackBarrierToken =>
+      try
+        let b_acker = _barrier_acker as BarrierSinkAcker
+        if b_acker.higher_priority(srt) then
+          _prepare_for_rollback()
+        end
+      else
+        Fail()
+      end
     end
-    // TODO: implement this for resilience/recovery
-    Fail()
+
+    if _message_processor.barrier_in_progress() then
+      _message_processor.receive_barrier(input_id, producer,
+        barrier_token)
+    else
+      match _message_processor
+      | let nsmp: NormalSinkMessageProcessor =>
+        try
+           _message_processor = BarrierSinkMessageProcessor(this,
+             _barrier_acker as BarrierSinkAcker)
+           _message_processor.receive_new_barrier(input_id, producer,
+             barrier_token)
+        else
+          Fail()
+        end
+      else
+        Fail()
+      end
+    end
+
+  fun ref barrier_complete(barrier_token: BarrierToken) =>
+    ifdef debug then
+      Invariant(_message_processor.barrier_in_progress())
+    end
+    match barrier_token
+    | let sbt: CheckpointBarrierToken =>
+      checkpoint_state(sbt.id)
+    end
+    _message_processor.flush()
+    _message_processor = NormalSinkMessageProcessor(this)
+
+  fun ref _clear_barriers() =>
+    try
+      (_barrier_acker as BarrierSinkAcker).clear()
+    else
+      Fail()
+    end
+    _message_processor = NormalSinkMessageProcessor(this)
+
+  ///////////////
+  // CHECKPOINTS
+  ///////////////
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    """
+    KafkaSinks don't currently write out any data as part of the checkpoint.
+    """
+    _event_log.checkpoint_state(_sink_id, checkpoint_id,
+      recover val Array[ByteSeq] end)
+
+  be prepare_for_rollback() =>
+    _prepare_for_rollback()
+
+  fun ref _prepare_for_rollback() =>
+    _clear_barriers()
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    """
+    There is currently nothing for a KafkaSink to rollback to.
+    """
+    event_log.ack_rollback(_sink_id)
+
 
   be dispose() =>
     @printf[I32]("Shutting down KafkaSink\n".cstring())

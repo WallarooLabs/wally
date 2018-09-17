@@ -18,8 +18,10 @@ from integration import (Cluster,
                          Reader,
                          runner_data_format,
                          Sender)
+from integration.errors import (RunnerHasntStartedError,
+                                SinkAwaitTimeoutError,
+                                TimeoutError)
 from integration.logger import set_logging
-
 
 from collections import Counter
 from itertools import cycle
@@ -33,7 +35,7 @@ import time
 set_logging()
 
 
-FROM_TAIL = 10
+FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 
 
 fmt = '>I2sQ'
@@ -100,7 +102,8 @@ def lowest_point(ops):
 
 # Autoscale tests runner functions
 
-def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
+def autoscale_sequence(command, ops=[1], cycles=1, initial=None,
+    retry_count=5):
     """
     Run an autoscale test for a given command by performing grow and shrink
     operations, as denoted by positive and negative integers in the `ops`
@@ -112,23 +115,57 @@ def autoscale_sequence(command, ops=[1], cycles=1, initial=None):
     runner_data = []
     as_steps = []
     try:
-        _autoscale_run(command, ops, cycles, initial,
-                runner_data, as_steps)
+        try:
+            _autoscale_run(command, ops, cycles, initial,
+                    runner_data, as_steps)
+        except:
+            logging.error("Autoscale test failed after the operations {}."
+                .format(as_steps))
+            # Do this ugly thing to use proper exception handling here
+            try:
+                raise
+            except RunnerHasntStartedError as err:
+                logging.warn("Runner failed to start properly.")
+                if retry_count > 0:
+                    logging.info("Restarting the test!")
+                    autoscale_sequence(command, ops=ops, cycles=cycles,
+                        initial=initial, retry_count=retry_count-1)
+                else:
+                    logging.error("Max retry attempts reached.")
+                    raise
+            except SinkAwaitTimeoutError:
+                if runner_data:
+                    logging.error("TimeoutError encountered. The last {} lines"
+                        " of each worker were:\n\n{}".format(
+                            '<all>',
+                            runner_data_format(runner_data, from_tail=0,
+                                filter_fn=lambda r: True)))
+                raise
+            except TimeoutError:
+                if runner_data:
+                    logging.error("TimeoutError encountered. The last {} lines"
+                        " of each worker were:\n\n{}".format(
+                            FROM_TAIL,
+                            runner_data_format(runner_data, from_tail=FROM_TAIL,
+                                filter_fn=lambda r: True)))
+                raise
+            except Exception as err:
+                if runner_data:
+                    logging.error("Some workers exited badly. The last {} lines of "
+                        "each were:\n\n{}"
+                        .format(FROM_TAIL,
+                            runner_data_format(runner_data,
+                                               from_tail=FROM_TAIL,
+                                               filter_fn=lambda r: True)))
+                if hasattr(err, 'query_result') and 'PRINT_QUERY' in os.environ:
+                    logging.error("The test error had the following query result"
+                                  " attached:\n{}"
+                                  .format(json.dumps(err.query_result)))
+                raise
     except Exception as err:
-        logging.error("Autoscale test failed after the operations {}."
-            .format(as_steps))
-        if filter(lambda r: r.returncode not in (0,-9,-15), runner_data):
-            logging.error("Some workers exited badly. The last {} lines of "
-                "each were:\n\n{}"
-                .format(FROM_TAIL if FROM_TAIL > 0 else '-',
-                    runner_data_format(runner_data,
-                                       from_tail=FROM_TAIL,
-                                       filter_fn=lambda r: True)))
-        if hasattr(err, 'query_result') and 'PRINT_QUERY' in os.environ:
-            logging.error("The test error had the following query result"
-                          " attached:\n{}"
-                          .format(json.dumps(err.query_result)))
+        logging.exception(err)
         raise
+
 
 def _autoscale_run(command, ops=[], cycles=1, initial=None,
         runner_data=[], as_steps=[]):

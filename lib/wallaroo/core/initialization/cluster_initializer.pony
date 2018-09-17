@@ -44,7 +44,7 @@ actor ClusterInitializer
   var _interconnected: USize = 1
   var _initialized: USize = 0
   var _topology_ready: Bool = false
-  var _initializer_name: String = "initializer"
+  var _initializer_name: String
 
   let _worker_names: Array[String] = Array[String]
   let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
@@ -54,7 +54,7 @@ actor ClusterInitializer
     connections: Connections, distributor: Distributor,
     layout_initializer: LayoutInitializer,
     data_addr: Array[String] val, metrics_conn: MetricsSink,
-    is_recovering: Bool)
+    is_recovering: Bool, initializer_name: String)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -65,6 +65,7 @@ actor ClusterInitializer
     _distributor = distributor
     _layout_initializer = layout_initializer
     if is_recovering then _topology_ready = true end
+    _initializer_name = initializer_name
 
   be start(initializer_name: String = "") =>
     // TODO: Pipeline initialization needs to be updated so that we

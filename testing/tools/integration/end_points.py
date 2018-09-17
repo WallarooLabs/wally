@@ -182,7 +182,7 @@ class TCPReceiver(StoppableThread):
                                           name='{}-{}'.format(
                                               self.__base_name__,
                                               len(self.clients)))
-                logging.info("{}:{} accepting connection from ({}, {}) on "
+                logging.debug("{}:{} accepting connection from ({}, {}) on "
                              "port {}."
                              .format(self.__base_name__, self.name, self.host,
                                      self.port, address[1]))
@@ -237,6 +237,11 @@ class Sender(StoppableThread):
     """
     def __init__(self, address, reader, batch_size=1, interval=0.001,
                  header_fmt='>I', reconnect=False):
+        logging.info("Sender({address}, {reader}, {batch_size}, {interval},"
+            " {header_fmt}, {reconnect}) created".format(
+                address=address, reader=reader, batch_size=batch_size,
+                interval=interval, header_fmt=header_fmt,
+                reconnect=reconnect))
         super(Sender, self).__init__()
         self.daemon = True
         self.reader = reader
@@ -249,7 +254,6 @@ class Sender(StoppableThread):
         (host, port) = address.split(":")
         self.host = host
         self.port = int(port)
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.name = 'Sender'
         self.error = None
         self._bytes_sent = 0
@@ -290,6 +294,7 @@ class Sender(StoppableThread):
             try:
                 logging.info("Sender connecting to ({}, {})."
                              .format(self.host, self.port))
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.sock.connect((self.host, self.port))
                 while not self.stopped():
                     while self.paused():
@@ -367,6 +372,7 @@ class MultiSequenceGenerator(object):
         # self.seqs stores the last value sent for each sequence
         self._idx = 0  # the idx of the last sequence sent
         self._remaining = []
+        self.lock = threading.Lock()
 
     def format_value(self, value, partition):
         return struct.pack('>IQ7s', 15, value, '{:07d}'.format(partition))
@@ -390,7 +396,8 @@ class MultiSequenceGenerator(object):
             return (idx, self.seqs[idx])
         except NoNonzeroError:
             # reset self._remaining so it can be reused
-            self._remaining = []
+            if not self.max_val:
+                self._remaining = []
             logging.debug("MultiSequenceGenerator: Stop condition "
                 "reached. Final values are: {}".format(
                     self.seqs))
@@ -403,14 +410,18 @@ class MultiSequenceGenerator(object):
 
     def stop(self):
         logging.info("MultiSequenceGenerator: stop called")
-        self._remaining = [max_val - v for v in self.seqs]
+        logging.debug("seqs are: {}".format(self.seqs))
+        with self.lock:
+            self.max_val = max(self.seqs)
+            self._remaining = [self.max_val - v for v in self.seqs]
+            logging.debug("_remaining: {}".format(self._remaining))
 
     def send(self, ignored_arg):
-        if self._remaining:
-            idx, val = self._next_catchup_value()
-        else:
-            idx, val = self._next_value_()
-
+        with self.lock:
+            if self._remaining:
+                idx, val = self._next_catchup_value()
+            else:
+                idx, val = self._next_value_()
         return self.format_value(val, idx)
 
     def throw(self, type=None, value=None, traceback=None):
