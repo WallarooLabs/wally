@@ -152,9 +152,11 @@ actor EventLog
         _pending_sources.set((id, source))
       else
         source.first_checkpoint_complete()
+        _resilients(id) = source
       end
     else
       source.first_checkpoint_complete()
+      _resilients(id) = source
     end
 
   be unregister_resilient(id: RoutingId, resilient: Resilient) =>
