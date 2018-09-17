@@ -246,7 +246,7 @@ primitive ExternalMsgEncoder
     digest_map
 
   fun _state_entity_digest(local_keys: Map[StateName, SetIs[Key]]):
-    Map[Key, Array[String] val] val
+    Map[String, Array[String] val] val
   =>
     let state_ps = recover trn Map[StateName, Array[Key] val] end
 
