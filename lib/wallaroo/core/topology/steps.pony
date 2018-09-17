@@ -546,7 +546,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref process_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ Step %s process_barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
+    // @printf[I32]("!@ >>Step %s PROCESS_barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
     if _inputs.contains(step_id) then
       // @printf[I32]("!@ Receive Barrier %s at Step %s\n".cstring(), barrier_token.string().cstring(), _id.string().cstring())
       match barrier_token
@@ -596,8 +596,16 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
     end
-    _step_message_processor.flush()
+    let queued = _step_message_processor.queued()
     _step_message_processor = NormalStepMessageProcessor(this)
+    for q in queued.values() do
+      match q
+      | let qm: QueuedMessage =>
+        qm.process_message(this)
+      | let qb: QueuedBarrier =>
+        qb.inject_barrier(this)
+      end
+    end
 
   fun ref _clear_barriers() =>
     try

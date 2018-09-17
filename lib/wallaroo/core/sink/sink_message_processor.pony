@@ -43,7 +43,7 @@ trait SinkMessageProcessor
   =>
     Fail()
 
-  fun ref flush()
+  fun ref queued(): Array[_Queued]
 
 class EmptySinkMessageProcessor is SinkMessageProcessor
   fun ref process_message[D: Any val](metric_name: String,
@@ -54,8 +54,8 @@ class EmptySinkMessageProcessor is SinkMessageProcessor
   =>
     Fail()
 
-  fun ref flush() =>
-    Fail()
+  fun ref queued(): Array[_Queued] =>
+    Array[_Queued]
 
 class NormalSinkMessageProcessor is SinkMessageProcessor
   let sink: Sink ref
@@ -73,12 +73,8 @@ class NormalSinkMessageProcessor is SinkMessageProcessor
       i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
       latest_ts, metrics_id, worker_ingress_ts)
 
-  fun ref flush() =>
-    ifdef debug then
-      @printf[I32]("Flushing NormalSinkMessageProcessor does nothing.\n"
-        .cstring())
-    end
-    None
+  fun ref queued(): Array[_Queued] =>
+    Array[_Queued]
 
 type _Queued is (QueuedMessage | QueuedBarrier)
 
@@ -125,17 +121,9 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
       _barrier_acker.receive_barrier(input_id, producer, barrier_token)
     end
 
-  fun ref flush() =>
-    let queued = Array[_Queued]
+  fun ref queued(): Array[_Queued] =>
+    let qd = Array[_Queued]
     for q in _queued.values() do
-      queued.push(q)
+      qd.push(q)
     end
-    _queued.clear()
-    for q in queued.values() do
-      match q
-      | let qm: QueuedMessage =>
-        qm.process_message(sink)
-      | let qb: QueuedBarrier =>
-        qb.inject_barrier(sink)
-      end
-    end
+    qd

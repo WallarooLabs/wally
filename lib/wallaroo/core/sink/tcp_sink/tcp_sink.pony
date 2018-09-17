@@ -379,8 +379,16 @@ actor TCPSink is Sink
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
     end
-    _message_processor.flush()
+    let queued = _message_processor.queued()
     _message_processor = NormalSinkMessageProcessor(this)
+    for q in queued.values() do
+      match q
+      | let qm: QueuedMessage =>
+        qm.process_message(this)
+      | let qb: QueuedBarrier =>
+        qb.inject_barrier(this)
+      end
+    end
 
   fun ref _clear_barriers() =>
     try
