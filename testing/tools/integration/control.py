@@ -179,6 +179,7 @@ class TryUntilTimeout(StoppableThread):
         self.pre_process = pre_process
         self.timeout = timeout
         self.interval = interval
+        self.args = None
 
     def run(self):
         t0 = time.time()
@@ -189,10 +190,10 @@ class TryUntilTimeout(StoppableThread):
             try:
                 if self.pre_process:
                     if isfunction(self.pre_process):
-                        args = self.pre_process()
+                        self.args = self.pre_process()
                     else:
-                        args = self.pre_process
-                    self.test(*args)
+                        self.args = self.pre_process
+                    self.test(*self.args)
                 else:
                     self.test()
             except Exception as err:
@@ -200,6 +201,7 @@ class TryUntilTimeout(StoppableThread):
                 if time.time() - t0 > self.timeout:
                     logging.warn("Failed on attempt {} of test: {}..."
                           .format(c, get_func_name(self.test)))
+                    logging.exception(err)
                     self.stop(err)
                 else:
                     time.sleep(self.interval)

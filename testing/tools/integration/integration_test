@@ -2,6 +2,7 @@
 
 import argparse
 from collections import namedtuple
+import datetime
 import logging
 import os
 import random
@@ -9,12 +10,14 @@ import re
 import struct
 
 from cluster import runner_data_format
-from external import run_shell_cmd
+from external import (run_shell_cmd,
+                      save_logs_to_file)
 from end_points import (files_generator,
                         iter_generator,
                         sequence_generator)
 from integration import pipeline_test
-from logger import (INFO2,
+from logger import (add_in_memory_log_stream,
+                    INFO2,
                     set_logging)
 
 set_logging(name='integration', level=logging.DEBUG)
@@ -494,35 +497,44 @@ def CLI():
     else:
         validation_cmd = None
 
+
+    t0 = datetime.datetime.now()
+    base_dir = 'errors/{}'.format(t0.strftime('%Y%m%d_%H%M%S'))
+    log_stream = add_in_memory_log_stream()
+    persistent_data = {}
+
     logging.debug("Running integration test with the following options:")
     for k, v in args._get_kwargs():
         logging.debug('%s: %r' % (k, v))
 
     # Run the test!
     try:
-        outputs = (pipeline_test(
-                      generator = args.generators,
-                      expected = args.expected_val,
-                      command = args.command,
-                      workers = args.workers,
-                      sources = args.sources,
-                      sinks = args.sinks,
-                      mode = args.sink_mode,
-                      batch_size = args.batch_size,
-                      sink_expect = args.sink_expect,
-                      sink_stop_timeout = args.sink_stop_timeout,
-                      sink_await = args.sink_await,
-                      delay = args.delay,
-                      validate_file = (args.output if args.validation_cmd else
-                                       False),
-                      giles_mode = 'giles' if args.giles_mode else None,
-                      host=args.host,
-                      runner_join_timeout=args.runner_join_timeout,
-                      resilience_dir=args.resilience_dir,
-                      spikes=args.spike))
+        pipeline_test(
+            generator = args.generators,
+            expected = args.expected_val,
+            command = args.command,
+            workers = args.workers,
+            sources = args.sources,
+            sinks = args.sinks,
+            mode = args.sink_mode,
+            batch_size = args.batch_size,
+            sink_expect = args.sink_expect,
+            sink_stop_timeout = args.sink_stop_timeout,
+            sink_await = args.sink_await,
+            delay = args.delay,
+            validate_file = (args.output if args.validation_cmd else
+                             False),
+            giles_mode = 'giles' if args.giles_mode else None,
+            host=args.host,
+            runner_join_timeout=args.runner_join_timeout,
+            resilience_dir=args.resilience_dir,
+            spikes=args.spike,
+            persistent_data = persistent_data)
     except Exception as err:
         logging.exception("Encountered an error while running the test for %r\n===\n"
                       % args.command)
+        # Save logs to file in case of error
+        save_logs_to_file(base_dir, log_stream, persistent_data)
         parser.exit(1)
 
     if validation_cmd:
@@ -536,11 +548,13 @@ def CLI():
                 logging.info("Validation command '%s' completed successfully",
                              ' '.join(res.command))
         else:
-            outputs = runner_data_format(outputs)
+            outputs = runner_data_format(persistent_data.get('runner_data', []))
             logging.error("Application outputs:\n{}".format(outputs))
             logging.error("Validation command '%s' failed with the output:\n"
                           "--\n%s\nThe application output is shown above.\n",
                           res.command, res.output)
+            # Save logs to file in case of error
+            save_logs_to_file(base_dir, log_stream, persistent_data)
 
         if logging.root.level > logging.ERROR:
             # If failed, and logging level means we didn't log error, include it

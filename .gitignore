@@ -24,6 +24,10 @@ metrics-report.txt
 test.t
 tags
 
+# error log files
+*error.log
+*error.dat
+
 # partial compilation files
 *.o
 

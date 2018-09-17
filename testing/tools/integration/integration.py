@@ -49,7 +49,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                   ready_timeout=30,
                   runner_join_timeout=DEFAULT_RUNNER_JOIN_TIMEOUT,
                   resilience_dir=None,
-                  spikes={}):
+                  spikes={},
+                  runner_data=[]):
     """
     Run a pipeline test without having to instrument everything
     yourself. This only works for 1-source, 1-sink topologies.
@@ -122,7 +123,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
     e.g. if there are 2 sinks with the data [1,1,1] and [2,2,2] respectively,
     then expected should be [1,1,1,2,2,2].
     """
-    runner_data = []
     try:
         if sink_expect is not None:
             if not isinstance(sink_expect, (list, tuple)):
@@ -276,4 +276,4 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         raise
 
     # Return runner names and outputs if try block didn't have a return
-    return runner_data
+    return
