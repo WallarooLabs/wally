@@ -47,7 +47,6 @@ actor Recovery
   var _recovery_phase: _RecoveryPhase = _AwaitRecovering
   var _workers: Array[WorkerName] val = recover Array[WorkerName] end
 
-  //!@ Can we remove this?
   let _event_log: EventLog
   let _recovery_reconnecter: RecoveryReconnecter
   let _checkpoint_initiator: CheckpointInitiator

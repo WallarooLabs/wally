@@ -67,7 +67,6 @@ actor EventLog
   var _checkpoint_initiator: (CheckpointInitiator | None) = None
   var num_encoded: USize = 0
   var _flush_waiting: USize = 0
-  //!@ I don't think we need this
   var _initialized: Bool = false
   var _recovery: (Recovery | None) = None
   var _resilients_to_checkpoint: SetIs[RoutingId] =
