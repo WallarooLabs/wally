@@ -14,6 +14,7 @@
 
 
 from collections import namedtuple
+import datetime
 import logging
 import shlex
 import tempfile
@@ -125,8 +126,10 @@ class Runner(threading.Thread):
         self.control = control
         self.data = data
         self.external = external
+        self.start_time = None
 
     def run(self):
+        self.start_time = datetime.datetime.now()
         try:
             logging.log(INFO2, "{}: Running:\n{}".format(self.name,
                                                          self.command))
@@ -396,13 +399,17 @@ RunnerData = namedtuple('RunnerData',
                          'command',
                          'pid',
                          'returncode',
-                         'stdout'])
+                         'stdout',
+                         'start_time'])
+SenderData = namedtuple('SenderData',
+                        ['name', 'address', 'start_time', 'data'])
+SinkData = namedtuple('SinkData', ['name', 'address', 'start_time', 'data'])
 
 
 class Cluster(object):
     def __init__(self, command, host='127.0.0.1', sources=1, workers=1,
             sinks=1, sink_mode='framed', worker_join_timeout=30,
-            is_ready_timeout=30, res_dir=None, runner_data=[]):
+            is_ready_timeout=30, res_dir=None, persistent_data={}):
         # Create attributes
         self._finalized = False
         self._exited = False
@@ -426,7 +433,7 @@ class Cluster(object):
             self.res_dir = tempfile.mkdtemp(dir='/tmp/', prefix='res-data.')
         else:
             self.res_dir = res_dir
-        self.runner_data = runner_data
+        self.persistent_data = persistent_data
         # Run a continuous crash in a background thread
         self._stoppables = set()
         self.crash_checker = CrashChecker(self)
@@ -579,6 +586,10 @@ class Cluster(object):
         tut.join()
         self._stoppables.discard(tut)
         if tut.error:
+            logging.error("validate_partitions failed with inputs:"
+                "(pre_partitions: {!r}, post_partitions: {!r}, workers: {!r})"
+                .format(*(tut.args if tut.args is not None
+                                   else (None, None, None))))
             raise tut.error
 
 
@@ -908,9 +919,14 @@ class Cluster(object):
             s.stop()
         self.metrics.stop()
         # clean_resilience_path(self.res_dir)
-        self.runner_data.extend([RunnerData(r.name, r.command, r.pid,
-                                            r.returncode(), r.get_output())
-                                 for r in self.runners])
+        self.persistent_data['runner_data'] = [
+            RunnerData(r.name, r.command, r.pid, r.returncode(),
+                       r.get_output(), r.start_time)
+            for r in self.runners]
+        self.persistent_data['sender_data'] = [
+            SenderData(s.name, s.address, s.start_time, s.data) for s in self.senders]
+        self.persistent_data['sink_data'] = [
+            SinkData(s.name, s.address, s.start_time, s.data) for s in self.sinks]
         self._finalized = True
 
 
