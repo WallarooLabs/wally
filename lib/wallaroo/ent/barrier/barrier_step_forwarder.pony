@@ -123,8 +123,9 @@ class BarrierStepForwarder
           o.receive_barrier(_step_id, _step, _barrier_token)
         end
       end
-      _step.barrier_complete(_barrier_token)
+      let b_token = _barrier_token
       clear()
+      _step.barrier_complete(b_token)
     //!@
     else
       //!@

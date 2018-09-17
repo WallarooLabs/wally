@@ -239,7 +239,7 @@ actor EventLog
   fun ref _write_checkpoint_id(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId])
   =>
-    // @printf[I32]("!@ EventLog: write_checkpoint_id\n".cstring())
+    @printf[I32]("!@ EventLog: write_checkpoint_id !!!!!!!!!!!\n".cstring())
     _backend.encode_checkpoint_id(checkpoint_id)
     for (r_id, s) in _pending_sources.values() do
       s.first_checkpoint_complete()

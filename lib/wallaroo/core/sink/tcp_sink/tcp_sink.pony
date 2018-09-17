@@ -333,7 +333,7 @@ actor TCPSink is Sink
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ Receive barrier %s at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    @printf[I32]("!@ Receive barrier %s at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
     process_barrier(input_id, producer, barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,

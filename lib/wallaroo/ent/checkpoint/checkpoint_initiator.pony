@@ -251,7 +251,7 @@ actor CheckpointInitiator is Initializable
         match token
         | let st: CheckpointBarrierToken =>
           if st.id != _current_checkpoint_id then Fail() end
-          // @printf[I32]("!@ CheckpointInitiator: Checkpoint %s is complete!\n".cstring(), st.id.string().cstring())
+          @printf[I32]("!@ CheckpointInitiator: Checkpoint %s is complete!\n".cstring(), st.id.string().cstring())
           _save_checkpoint_id(st.id, _last_rollback_id)
           _last_complete_checkpoint_id = st.id
 
@@ -265,7 +265,7 @@ actor CheckpointInitiator is Initializable
 
           // Prepare for next checkpoint
           if _is_active and (_worker_name == _primary_worker) then
-            // @printf[I32]("!@ Creating _InitiateCheckpoint timer for future checkpoint %s\n".cstring(), (_current_checkpoint_id + 1).string().cstring())
+            @printf[I32]("!@ Creating _InitiateCheckpoint timer for future checkpoint %s\n".cstring(), (_current_checkpoint_id + 1).string().cstring())
             let t = Timer(_InitiateCheckpoint(this), _time_between_checkpoints)
             _timers(consume t)
           end

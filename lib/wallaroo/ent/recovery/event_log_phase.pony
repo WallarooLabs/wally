@@ -123,6 +123,8 @@ class _WaitingForCheckpointInitiationEventLogPhase is _EventLogPhase
   fun ref checkpoint_state(resilient_id: RoutingId,
     checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
   =>
+    @printf[I32]("!@ _WaitingForCheckpointInitiationEventLogPhase: checkpoint_state() for resilient %s, checkpoint_id %s\n".cstring(), resilient_id.string().cstring(), checkpoint_id.string().cstring())
+
     try
       let pending = _pending_checkpoint_states.insert_if_absent(checkpoint_id,
         Array[_QueuedCheckpointState])?
