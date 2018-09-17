@@ -99,7 +99,7 @@ def test_auto15():
     _test_resilience(command, ops, validate_output=True)
 
 
-some fixed tests:
+# some fixed tests:
 def test_grow1_shrink1_crash2_wait2_recover2():
     command = 'multi_partition_detector --depth 1'
     ops = [Grow(1), Wait(2), Shrink(1), Wait(2), Crash(2), Wait(2), Recover(2)]
