@@ -12,6 +12,15 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+
+import datetime
+import logging
+from numbers import Number
+import os
+import re
+import time
+
+
 # import requisite components for integration test
 from integration import (Cluster,
                          run_shell_cmd,
@@ -19,15 +28,15 @@ from integration import (Cluster,
                          Reader,
                          runner_data_format,
                          Sender)
+
+from integration.logger import add_in_memory_log_stream
+
 from integration.errors import (RunnerHasntStartedError,
                                 SinkAwaitTimeoutError,
                                 TimeoutError)
 
-import logging
-from numbers import Number
-import os
-import re
-import time
+from integration.external import save_logs_to_file
+
 
 try:
     basestring
@@ -259,13 +268,14 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
     `cycles` - how many times to repeat the list of operations
     `validate_output` - whether or not to validate the output
     """
-
-    runner_data = []
+    t0 = datetime.datetime.now()
+    log_stream = add_in_memory_log_stream()
+    persistent_data = {}
     res_ops = []
     try:
         try:
             _run(
-                runner_data=runner_data,
+                persistent_data=persistent_data,
                 res_ops=res_ops,
                 command=command,
                 ops=ops*cycles,
@@ -300,32 +310,42 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                     logging.error("Max retry attempts reached.")
                     raise
             except SinkAwaitTimeoutError:
-                if runner_data:
-                    logging.error("TimeoutError encountered. The last {} lines"
-                        " of each worker were:\n\n{}".format(
-                            '<all>',
-                            runner_data_format(runner_data, from_tail=0,
+                if persistent_data.get('runner_data'):
+                    logging.error("SinkAWaitTimeoutError encountered. The "
+                        "last {} lines of each worker were:\n\n{}".format(
+                            FROM_TAIL,
+                            runner_data_format(
+                                persistent_data.get('runner_data'),
+                                from_tail=FROM_TAIL,
                                 filter_fn=lambda r: True)))
                 raise
             except TimeoutError:
-                if runner_data:
+                if persistent_data.get('runner_data'):
                     logging.error("TimeoutError encountered. The last {} lines"
                         " of each worker were:\n\n{}".format(
                             FROM_TAIL,
-                            runner_data_format(runner_data, from_tail=FROM_TAIL,
+                            runner_data_format(
+                                persistent_data.get('runner_data'),
+                                from_tail=FROM_TAIL,
                                 filter_fn=lambda r: True)))
                 raise
             except:
-                if runner_data:
+                if persistent_data.get('runner_data'):
                     logging.error("Some workers exited badly. The last {} lines of "
                         "each were:\n\n{}"
                         .format(FROM_TAIL,
-                            runner_data_format(runner_data,
-                                               from_tail=FROM_TAIL,
-                                               filter_fn=lambda r: True)))
+                            runner_data_format(
+                                persistent_data.get('runner_data'),
+                                from_tail=FROM_TAIL,
+                                filter_fn=lambda r: True)))
                 raise
     except Exception as err:
         logging.exception(err)
+        # save log stream to file
+        base_dir = 'error/{ops}/{time}'.format(
+            time=t0.strftime('%Y%m%d_%H%M%S'),
+            ops='_'.join((o.name().replace(':','') for o in ops*cycles)))
+        save_logs_to_file(base_dir, log_stream, persistent_data)
         raise
 
 
@@ -333,7 +353,7 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
 # Test Runner
 #############
 
-def _run(runner_data, res_ops, command, ops=[], initial=None, sources=1,
+def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
          partition_multiplier=1, validate_output=True,
          sender_mps=1000, sender_interval=0.01):
     host = '127.0.0.1'
@@ -377,7 +397,7 @@ def _run(runner_data, res_ops, command, ops=[], initial=None, sources=1,
     logging.debug("Creating cluster")
     with Cluster(command=command, host=host, sources=sources,
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
-                 runner_data=runner_data) as cluster:
+                 persistent_data=persistent_data) as cluster:
 
         # start senders
         for s in range(sources):

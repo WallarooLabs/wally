@@ -13,8 +13,10 @@
 #  permissions and limitations under the License.
 
 from itertools import chain
+import logging
 
-from errors import NotEmptyError
+from errors import (MigrationError,
+                    NotEmptyError)
 
 
 def validate_migration(pre_partitions, post_partitions, workers):
@@ -28,34 +30,61 @@ def validate_migration(pre_partitions, post_partitions, workers):
       dynamic partitioning (new partitions may be created in real time).
     """
     # prepare some useful sets for set-wise comparison
-    pre_parts = {step: set(pre_partitions[step].keys()) for step in
+    pre_parts = {state: set(pre_partitions[state].keys()) for state in
                  pre_partitions}
-    post_parts = {step: set(post_partitions[step].keys()) for step in
+    post_parts = {state: set(post_partitions[state].keys()) for state in
                   post_partitions}
-    pre_workers = set(chain(*[pre_partitions[step].values() for step in
+    pre_workers = set(chain(*[pre_partitions[state].values() for state in
                              pre_partitions]))
-    post_workers = set(chain(*[post_partitions[step].values() for step in
+    post_workers = set(chain(*[post_partitions[state].values() for state in
                                post_partitions]))
     joining = set(workers.get('joining', []))
     leaving = set(workers.get('leaving', []))
 
     # test no joining workers are present in pre set
-    assert((pre_workers - joining) == pre_workers)
-
+    logging.debug("Test no joining workers are present in pre set")
+    try:
+        assert((pre_workers - joining) == pre_workers)
+    except:
+        raise MigrationError("Joining-workers-in-pre-set error.")
     # test no leaving workers are present in post set
-    assert((post_workers - leaving) == post_workers)
+    logging.debug("test no leaving workers are present in post set")
+    try:
+        assert((post_workers - leaving) == post_workers)
+    except:
+        raise MigrationError("Leaving-workers-in-the-post-set error.")
 
-    # test that no parts go missing after migration
-    for step in pre_parts:
-        assert(step in post_parts)
-        assert(post_parts[step] <= pre_parts[step])
+    # test that no keys go missing after migration
+    logging.debug("test that no keys go missing after migration")
+    for state in pre_parts:
+        # each state from before is still around:
+        try:
+            assert(state in post_parts)
+        except:
+            raise MigrationError("State {!r} is missing from post set"
+                .format(state))
+        # for each state, each key before migration existed after
+        try:
+            assert(pre_parts[state] <= post_parts[state]) # set.issubset
+        except:
+            raise MigrationError("Keys from before migration are missing: {!r}"
+                    .format(pre_parts[state] - post_parts[state]))
 
-    # test that state parts moved between pre and post (by step)
-    for step in pre_partitions:
+    # test that keys moved between pre and post (by state)
+    logging.debug("test that keys moved between pre and post (by state)")
+    for state in pre_partitions:
         # Test step did not disappear after migration
-        assert(step in post_partitions)
+        try:
+            assert(state in post_partitions)
+        except:
+            raise MigrationError("State {!r} is missing from post_partitions"
+                .format(state))
         # Test some partitions moved
-        assert(pre_partitions[step] != post_partitions[step])
+        try:
+            assert(pre_partitions[state] != post_partitions[state])
+        except:
+            raise MigrationError("Partitions for state {!r} did not move"
+                .format(state))
 
 
 def is_processing(status):
