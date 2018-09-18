@@ -311,9 +311,11 @@ actor LocalTopologyInitializer is LayoutInitializer
   var _initialized: SetIs[Initializable] = _initialized.create()
   var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
   let _initializables: Initializables = Initializables
+  // TODO: Replace with state machine approach
   var _event_log_ready_to_work: Bool = false
   var _recovery_ready_to_work: Bool = false
   var _initialization_lifecycle_complete: Bool = false
+  var _phase_3_complete: Bool = false
 
 
   // Partition router blueprints
@@ -2167,18 +2169,21 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   fun ref _application_ready_to_work() =>
-    @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
-      .cstring())
-    _initializables.application_ready_to_work(this)
+    if not _phase_3_complete then
+      @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
+        .cstring())
+      _initializables.application_ready_to_work(this)
+      _phase_3_complete = true
 
-    if _is_initializer then
-      match _cluster_initializer
-      | let ci: ClusterInitializer =>
-        ci.topology_ready("initializer")
-        _is_initializer = false
-      else
-        @printf[I32](("Need ClusterInitializer to inform that topology is " +
-          "ready\n").cstring())
+      if _is_initializer then
+        match _cluster_initializer
+        | let ci: ClusterInitializer =>
+          ci.topology_ready("initializer")
+          _is_initializer = false
+        else
+          @printf[I32](("Need ClusterInitializer to inform that topology is " +
+            "ready\n").cstring())
+        end
       end
     end
 
