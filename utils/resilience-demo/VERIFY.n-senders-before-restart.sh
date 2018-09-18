@@ -40,25 +40,36 @@ if [ $? -ne 0 ]; then
     echo STOP with non-zero status
 fi
 
+ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 500 20" & P2=$!
 env START_SENDER_CMD="$START_SENDER_CMD1" START_SENDER_BG=n \
-    ./30-start-sender.sh
-echo First sender has finished
-sleep 1
+    ./30-start-sender.sh & P1=$!
+wait $P2 ; if [ $? -ne 0 ]; then echo status check failed; exit 7; fi; wait $P1
+
+ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 600 20" & P2=$!
 env START_SENDER_CMD="$START_SENDER_CMD1b" START_SENDER_BG=n \
-    ./30-start-sender.sh
-echo Next sender has finished
+    ./30-start-sender.sh & P1=$!
+wait $P2 ; if [ $? -ne 0 ]; then echo status check failed; exit 7; fi; wait $P1
+
+ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 700 20" & P2=$!
 env START_SENDER_CMD="$START_SENDER_CMD1c" START_SENDER_BG=n \
-    ./30-start-sender.sh
-echo Next sender has finished
+    ./30-start-sender.sh & P1=$!
+wait $P2 ; if [ $? -ne 0 ]; then echo status check failed; exit 7; fi; wait $P1
+
+ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 800 20" & P2=$!
 env START_SENDER_CMD="$START_SENDER_CMD1d" START_SENDER_BG=n \
-    ./30-start-sender.sh
-echo Next sender has finished
+    ./30-start-sender.sh & P1=$!
+wait $P2 ; if [ $? -ne 0 ]; then echo status check failed; exit 7; fi; wait $P1
+
+ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 900 20" & P2=$!
 env START_SENDER_CMD="$START_SENDER_CMD1e" START_SENDER_BG=n \
-    ./30-start-sender.sh
-echo Next sender has finished
+    ./30-start-sender.sh & P1=$!
+wait $P2 ; if [ $? -ne 0 ]; then echo status check failed; exit 7; fi; wait $P1
+
+ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 1000 20" & P2=$!
 env START_SENDER_CMD="$START_SENDER_CMD1f" START_SENDER_BG=n \
-    ./30-start-sender.sh
-echo Next sender has finished
+    ./30-start-sender.sh & P1=$!
+wait $P2 ; if [ $? -ne 0 ]; then echo status check failed; exit 7; fi; wait $P1
+
 echo BONUS SLEEP 4; sleep 4
 
 echo Kill worker2
@@ -86,7 +97,8 @@ fi
 
 env START_SENDER_CMD="$START_SENDER_CMD2" START_SENDER_BG=n \
   ./30-start-sender.sh
-S=3; echo Second sender has finished, sleep $S; sleep $S
+ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 2000 20"
+if [ $? -ne 0 ]; then echo status check failed; exit 7; fi;
 
 echo Run validator to check for sequence validity.
 ssh -n $USER@$SERVER1_EXT "cd wallaroo; ./testing/correctness/apps/multi_partition_detector/validator/validator -e 2000  -i -k key_0,key_1,key_2,key_3,key_4,key_5,key_6,key_7,key_8,key_9,key_10"
