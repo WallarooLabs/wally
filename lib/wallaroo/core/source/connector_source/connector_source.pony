@@ -30,19 +30,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "buffered"
 use "collections"
 use "net"
+use "promises"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/ent/data_receiver"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/router_registry"
-use "wallaroo/ent/watermarking"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
+use "wallaroo/core/source"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/checkpoint"
+use "wallaroo_labs/mort"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -52,18 +55,22 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
+actor ConnectorSource is Source
   """
   # ConnectorSource
 
   ## Future work
   * Switch to requesting credits via promise
   """
-  let _source_id: StepId
+  let _source_id: RoutingId
   let _auth: AmbientAuth
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  var _router: Router
   let _routes: MapIs[Consumer, Route] = _routes.create()
-  let _route_builder: RouteBuilder
+  // _outputs keeps track of all output targets by step id. There might be
+  // duplicate consumers in this map (unlike _routes) since there might be
+  // multiple target step ids over a boundary
+  let _outputs: Map[RoutingId, Consumer] = _outputs.create()
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
@@ -71,8 +78,7 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
 
   let _metrics_reporter: MetricsReporter
 
-  let _pending_message_store: PendingMessageStore =
-    _pending_message_store.create()
+  let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
   // Connector
   let _listen: ConnectorSourceListener
@@ -94,35 +100,37 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
   var _shutdown: Bool = false
   // Start muted. Wait for unmute to begin processing
   var _muted: Bool = true
+  var _disposed: Bool = false
   var _expect_read_buf: Reader = Reader
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
   let _max_received_count: U8 = 50
 
+  var _is_pending: Bool = true
+
   let _router_registry: RouterRegistry
-  let _state_step_creator: StateStepCreator
 
   let _event_log: EventLog
-  let _acker_x: Acker
 
   // Producer (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-  var _in_flight_ack_waiter: InFlightAckWaiter
 
-  new _accept(source_id: StepId, auth: AmbientAuth, listen: ConnectorSourceListener,
-    notify: ConnectorSourceNotify iso, event_log: EventLog,
-    routes: Array[Consumer] val, route_builder: RouteBuilder,
+  // Checkpoint
+  var _next_checkpoint_id: CheckpointId = 1
+
+  new _accept(source_id: RoutingId, auth: AmbientAuth,
+    listen: ConnectorSourceListener, notify: ConnectorSourceNotify iso,
+    event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     fd: U32, init_size: USize = 64, max_size: USize = 16384,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
-    state_step_creator: StateStepCreator)
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
   =>
     """
     A new connection accepted on a server.
     """
+    @printf[I32]("!@ Spinning up ConnectorSource %s\n".cstring(), source_id.string().cstring())
     _source_id = source_id
     _auth = auth
-    _in_flight_ack_waiter = InFlightAckWaiter(_source_id)
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter
     _listen = listen
@@ -138,39 +146,26 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
 
     _layout_initializer = layout_initializer
     _router_registry = router_registry
-    _state_step_creator = state_step_creator
 
-    _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let new_boundary =
-          builder.build_and_initialize(_step_id_gen(), target_worker_name,
+          builder.build_and_initialize(_routing_id_gen(), target_worker_name,
             _layout_initializer)
         router_registry.register_disposable(new_boundary)
         _outgoing_boundaries(target_worker_name) = new_boundary
       end
     end
 
-    // register resilient with event log
-    _event_log.register_resilient(this, _source_id)
-    _acker_x = Acker
+    _readable = true
 
+    _router = router'
+    _update_router(router')
+
+    _pending_reads()
     //TODO: either only accept when we are done recovering or don't start
     //listening until we are done recovering
     _notify.accepted(this)
-
-    _readable = true
-    _pending_reads()
-
-    for consumer in routes.values() do
-      _routes(consumer) =
-        _route_builder(this, consumer, _metrics_reporter)
-    end
-
-    for (worker, boundary) in _outgoing_boundaries.pairs() do
-      _routes(boundary) =
-        _route_builder(this, boundary, _metrics_reporter)
-    end
 
     _notify.update_boundaries(_outgoing_boundaries)
 
@@ -179,46 +174,154 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
       // directly. route lifecycle needs to be broken out better from
       // application lifecycle
       r.application_created()
-      ifdef "resilience" then
-        _acker_x.add_route(r)
-      end
     end
 
     for r in _routes.values() do
       r.application_initialized("ConnectorSource")
     end
 
-    _mute()
+    // register resilient with event log
+    _event_log.register_resilient_source(_source_id, this)
 
-  be update_router(router: Router) =>
+    _mute()
+    ifdef "resilience" then
+      _mute_local()
+    end
+
+  be first_checkpoint_complete() =>
+    """
+    In case we pop into existence midway through a checkpoint, we need to
+    wait until this is called to start processing.
+    """
+    _unmute_local()
+    _is_pending = false
+    for (id, c) in _outputs.pairs() do
+      try
+        let route = _routes(c)?
+        route.register_producer(id)
+      else
+        Fail()
+      end
+    end
+
+  be update_router(router': Router) =>
+    _update_router(router')
+
+  fun ref _update_router(router': Router) =>
     let new_router =
-      match router
+      match router'
       | let pr: PartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
       else
-        router
+        router'
       end
 
-    for target in new_router.routes().values() do
-      if not _routes.contains(target) then
-        let new_route = _route_builder(this, target, _metrics_reporter)
-        _acker_x.add_route(new_route)
-        _routes(target) = new_route
+    let old_router = _router
+    _router = new_router
+    for (old_id, outdated_consumer) in
+      old_router.routes_not_in(_router).pairs()
+    do
+      if _outputs.contains(old_id) then
+        _unregister_output(old_id, outdated_consumer)
+      end
+    end
+    for (c_id, consumer) in _router.routes().pairs() do
+      _register_output(c_id, consumer)
+    end
+
+    _notify.update_router(_router)
+
+  be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
+    if _outputs.contains(id) then
+      ifdef debug then
+        Invariant(_routes.contains(c))
+      end
+      _unregister_output(id, c)
+    end
+
+  fun ref _register_output(id: RoutingId, c: Consumer) =>
+    if not _disposed then
+      if _outputs.contains(id) then
+        try
+          let old_c = _outputs(id)?
+          if old_c is c then
+            // We already know about this output.
+            return
+          end
+          _unregister_output(id, old_c)
+        else
+          Unreachable()
+        end
+      end
+
+      _outputs(id) = c
+      if not _routes.contains(c) then
+        let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
+        _routes(c) = new_route
+        if not _is_pending then
+          new_route.register_producer(id)
+        end
+      else
+        try
+          if not _is_pending then
+            _routes(c)?.register_producer(id)
+          end
+        else
+          Unreachable()
+        end
       end
     end
 
-    _notify.update_router(new_router)
-    _pending_message_store.process_known_keys(this, _notify, new_router)
+  be register_downstream() =>
+    _reregister_as_producer()
 
-  be remove_route_to_consumer(c: Consumer) =>
-    if _routes.contains(c) then
-      try
-        _routes.remove(c)?
-      else
-        Fail()
+  fun ref _reregister_as_producer() =>
+    if not _disposed then
+      for (id, c) in _outputs.pairs() do
+        match c
+        | let ob: OutgoingBoundary =>
+          if not _is_pending then
+            ob.forward_register_producer(_source_id, id, this)
+          end
+        else
+          if not _is_pending then
+            c.register_producer(_source_id, this)
+          end
+        end
       end
+    end
+
+  //!@ rename
+  be register_downstreams(promise: Promise[Source]) =>
+    promise(this)
+
+  fun ref _unregister_output(id: RoutingId, c: Consumer) =>
+    try
+      if not _is_pending then
+        _routes(c)?.unregister_producer(id)
+      end
+      _outputs.remove(id)?
+      _remove_route_if_no_output(c)
+    else
+      Fail()
+    end
+
+  fun ref _remove_route_if_no_output(c: Consumer) =>
+    var have_output = false
+    for consumer in _outputs.values() do
+      if consumer is c then have_output = true end
+    end
+    if not have_output then
+      _remove_route(c)
+    end
+
+  fun ref _remove_route(c: Consumer) =>
+    try
+      _routes.remove(c)?._2
+    else
+      Fail()
     end
 
   be add_boundary_builders(
@@ -231,38 +334,43 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
-        let boundary = builder.build_and_initialize(_step_id_gen(),
+        let boundary = builder.build_and_initialize(_routing_id_gen(),
           target_worker_name, _layout_initializer)
         _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
-        let new_route = _route_builder(this, boundary, _metrics_reporter)
-        _acker_x.add_route(new_route)
+        let new_route = RouteBuilder(_source_id, this, boundary,
+          _metrics_reporter)
         _routes(boundary) = new_route
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)
 
+  be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+    //!@ Should we fail here?
+    None
+
   be remove_boundary(worker: String) =>
     _remove_boundary(worker)
 
   fun ref _remove_boundary(worker: String) =>
-    if _outgoing_boundaries.contains(worker) then
-      try
-        let boundary = _outgoing_boundaries(worker)?
-        _routes(boundary)?.dispose()
-        _routes.remove(boundary)?
-        _outgoing_boundaries.remove(worker)?
-      else
-        Fail()
-      end
-    end
-    _notify.update_boundaries(_outgoing_boundaries)
+    None
 
   be reconnect_boundary(target_worker_name: String) =>
     try
       _outgoing_boundaries(target_worker_name)?.reconnect()
     else
       Fail()
+    end
+
+  be disconnect_boundary(worker: WorkerName) =>
+    try
+      _outgoing_boundaries(worker)?.dispose()
+      _outgoing_boundaries.remove(worker)?
+    else
+      ifdef debug then
+        @printf[I32]("ConnectorSource couldn't find boundary to %s to disconnect\n"
+          .cstring(), worker.cstring())
+      end
     end
 
   be remove_route_for(step: Consumer) =>
@@ -272,26 +380,6 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
       Fail()
     end
 
-  //////////////
-  // ORIGIN (resilience)
-  be request_ack() =>
-    ifdef "trace" then
-      @printf[I32]("request_ack in ConnectorSource\n".cstring())
-    end
-    for route in _routes.values() do
-      route.request_ack()
-    end
-
-  be log_replay_finished() => None
-
-  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq)
-  =>
-    ifdef "trace" then
-      @printf[I32]("replaying log entry on recovery: in ConnectorSource\n".cstring())
-    end
-    None
-
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
     ifdef "trace" then
       @printf[I32](("initializing sequence id on recovery: " + seq_id.string() +
@@ -300,67 +388,37 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
     // update to use correct seq_id for recovery
     _seq_id = seq_id
 
-  fun ref _acker(): Acker =>
-    _acker_x
-
-  // Override these for ConnectorSource as we are currently
-  // not resilient.
-  fun ref flush(low_watermark: U64) =>
-    ifdef "trace" then
-      @printf[I32]("flushing at and below: %llu in ConnectorSource\n".cstring(),
-        low_watermark)
+  fun ref _unregister_all_outputs() =>
+    """
+    This method should only be called if we are removing this source from the
+    active graph (or on dispose())
+    """
+    let outputs_to_remove = Map[RoutingId, Consumer]
+    for (id, consumer) in _outputs.pairs() do
+      outputs_to_remove(id) = consumer
     end
-    _event_log.flush_buffer(_source_id, low_watermark)
-
-  // Log-rotation
-  be snapshot_state() =>
-    ifdef "trace" then
-      @printf[I32]("snapshot_state in ConnectorSource\n".cstring())
+    for (id, consumer) in outputs_to_remove.pairs() do
+      _unregister_output(id, consumer)
     end
-    None
-
-  be log_flushed(low_watermark: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("log_flushed for: %llu in ConnectorSource\n".cstring(),
-        low_watermark)
-    end
-    _acker().flushed(low_watermark)
-
-  fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32](
-        "Bookkeeping called for route %llu, o_seq_id: %llu in ConnectorSource\n"
-        .cstring(), o_route_id, o_seq_id)
-    end
-    ifdef "resilience" then
-      _acker().sent(o_route_id, o_seq_id)
-    end
-
-  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]("ConnectorSource received update_watermark\n".cstring())
-    end
-    _update_watermark(route_id, seq_id)
-
-  fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32]((
-      "Update watermark called with " +
-      "route_id: " + route_id.string() +
-      "\tseq_id: " + seq_id.string() + " in ConnectorSource\n\n").cstring())
-    end
-
-    _acker().ack_received(this, route_id, seq_id)
 
   be dispose() =>
+    _dispose()
+
+  fun ref _dispose() =>
     """
     - Close the connection gracefully.
     """
-    @printf[I32]("Shutting down ConnectorSource\n".cstring())
-    for b in _outgoing_boundaries.values() do
-      b.dispose()
+    if not _disposed then
+      _router_registry.unregister_source(this, _source_id)
+      _event_log.unregister_resilient(_source_id, this)
+      _unregister_all_outputs()
+      @printf[I32]("Shutting down ConnectorSource\n".cstring())
+      for b in _outgoing_boundaries.values() do
+        b.dispose()
+      end
+      close()
+      _disposed = true
     end
-    close()
 
   fun ref route_to(c: Consumer): (Route | None) =>
     try
@@ -374,12 +432,6 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id
-
-  fun ref unknown_key(state_name: String, key: Key,
-    routing_args: RoutingArguments)
-  =>
-    _pending_message_store.add(state_name, key, routing_args)
-    _state_step_creator.report_unknown_key(this, state_name, key)
 
   be report_status(code: ReportStatusCode) =>
     match code
@@ -397,58 +449,82 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
       route.report_status(code)
     end
 
-  be request_in_flight_ack(upstream_request_id: RequestId,
-    requester_id: StepId, upstream_requester: InFlightAckRequester)
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
   =>
-    if not _in_flight_ack_waiter.already_added_request(requester_id) then
-      _in_flight_ack_waiter.add_new_request(requester_id, upstream_request_id,
-        upstream_requester)
-      if _routes.size() > 0 then
-        for route in _routes.values() do
-          let request_id = _in_flight_ack_waiter.add_consumer_request(
-            requester_id)
-          route.request_in_flight_ack(request_id, _source_id, this)
-        end
-      else
-        upstream_requester.try_finish_in_flight_request_early(requester_id)
-      end
+    @printf[I32]("SLF: ConnectorSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    try
+      let b = _outgoing_boundaries(worker)?
+      b.update_worker_data_service(worker, host, service)
     else
-      upstream_requester.receive_in_flight_ack(upstream_request_id)
+      Fail()
     end
 
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    if _in_flight_ack_waiter.request_in_flight_resume_ack(
-      in_flight_resume_ack_id, request_id, requester_id, requester)
-    then
-      for w in leaving_workers.values() do
-        _remove_boundary(w)
+  //////////////
+  // BARRIER
+  //////////////
+  be initiate_barrier(token: BarrierToken) =>
+    @printf[I32]("!@ ConnectorSource received initiate_barrier %s\n".cstring(), token.string().cstring())
+    if not _is_pending then
+      _initiate_barrier(token)
+    end
+
+  fun ref _initiate_barrier(token: BarrierToken) =>
+    if not _disposed and not _shutdown then
+      match token
+      | let srt: CheckpointRollbackBarrierToken =>
+        _prepare_for_rollback()
       end
-      if _routes.size() > 0 then
-        for route in _routes.values() do
-          let new_request_id =
-            _in_flight_ack_waiter.add_consumer_resume_request()
-          route.request_in_flight_resume_ack(in_flight_resume_ack_id,
-            new_request_id, _source_id, this, leaving_workers)
+
+      match token
+      | let sbt: CheckpointBarrierToken =>
+        checkpoint_state(sbt.id)
+      end
+      for (o_id, o) in _outputs.pairs() do
+        match o
+        | let ob: OutgoingBoundary =>
+          ob.forward_barrier(o_id, _source_id, token)
+        else
+          o.receive_barrier(_source_id, this, token)
         end
-      else
-        _in_flight_ack_waiter.try_finish_resume_request_early()
       end
     end
 
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    _in_flight_ack_waiter.try_finish_in_flight_request_early(requester_id)
+  be barrier_complete(token: BarrierToken) =>
+    // @printf[I32]("!@ barrier_complete at ConnectorSource %s\n".cstring(), _source_id.string().cstring())
+    // !@ Here's where we could ack finished messages up to checkpoint point.
+    // We should also match for rollback token.
+    None
 
-  be receive_in_flight_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_request(request_id)
+  //////////////
+  // CHECKPOINTS
+  //////////////
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    """
+    ConnectorSources don't currently write out any data as part of the checkpoint.
+    """
+    _next_checkpoint_id = checkpoint_id + 1
+    _event_log.checkpoint_state(_source_id, checkpoint_id,
+      recover val Array[ByteSeq] end)
 
-  be receive_in_flight_resume_ack(request_id: RequestId) =>
-    _in_flight_ack_waiter.unmark_consumer_resume_request(request_id)
+  be prepare_for_rollback() =>
+    _prepare_for_rollback()
 
-  //
+  fun ref _prepare_for_rollback() =>
+    None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    """
+    There is nothing for a ConnectorSource to rollback to.
+    """
+    _next_checkpoint_id = checkpoint_id + 1
+    event_log.ack_rollback(_source_id)
+
+  /////////
   // Connector
+  /////////
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
@@ -734,6 +810,17 @@ actor ConnectorSource is (Producer & InFlightAckResponder & StatusReporter)
     _muted = false
     if not _reading then
       _pending_reads()
+    end
+
+  fun ref _mute_local() =>
+    _muted_downstream.set(this)
+    _mute()
+
+  fun ref _unmute_local() =>
+    _muted_downstream.unset(this)
+
+    if _muted_downstream.size() == 0 then
+      _unmute()
     end
 
   be mute(c: Consumer) =>
