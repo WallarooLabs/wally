@@ -534,7 +534,9 @@ actor OutgoingBoundary is Consumer
 
       let msg = ChannelMsgEncoder.forward_barrier(target_step_id,
         origin_step_id, barrier_token, _seq_id, _auth)?
-      _writev(msg)
+      if _connection_initialized then
+        _writev(msg)
+      end
       _add_to_upstream_backup(msg)
     else
       Fail()
