@@ -19,15 +19,18 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
-actor EmptySink is Consumer
+actor EmptySink is Sink
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -36,8 +39,16 @@ actor EmptySink is Consumer
     end
     None
 
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
+  =>
+    None
+
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: StepId, producer: Producer, msg_uid: MsgId,
+    data: D, producer_id: RoutingId, producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -46,9 +57,7 @@ actor EmptySink is Consumer
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
-  =>
+  be application_created(initializer: LocalTopologyInitializer) =>
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
@@ -57,27 +66,13 @@ actor EmptySink is Consumer
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be register_producer(producer: Producer) =>
+  be register_producer(id: RoutingId, producer: Producer) =>
     None
 
-  be unregister_producer(producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
     None
 
   be report_status(code: ReportStatusCode) =>
-    None
-
-  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    producer: InFlightAckRequester)
-  =>
-    producer.receive_in_flight_ack(request_id)
-
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    None
-
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
     None
 
   be request_ack() =>
@@ -85,5 +80,33 @@ actor EmptySink is Consumer
 
   be receive_state(state: ByteSeq val) => Fail()
 
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    None
+
+  be prepare_for_rollback() =>
+    None
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    None
+
   be dispose() =>
     None
+
+  be receive_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref process_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref barrier_complete(barrier_token: BarrierToken) =>
+    None
+
+  fun inputs(): Map[RoutingId, Producer] box =>
+    Map[RoutingId, Producer]
+

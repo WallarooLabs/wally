@@ -15,76 +15,33 @@ use "serialise"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/topology"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
-class val ShippedState
-  let state_bytes: ByteSeq val
-  let pending_messages: Array[QueuedStepMessage] val
-
-  new create(state_bytes': ByteSeq val,
-    pending_messages': Array[QueuedStepMessage] val)
-  =>
-    state_bytes = state_bytes'
-    pending_messages = pending_messages'
-
 primitive StepStateMigrator
-  fun receive_state(runner: Runner, state: ByteSeq val)
+  fun receive_state(step: Step ref, runner: Runner, state_name: StateName,
+    key: Key, state_bytes: ByteSeq val)
   =>
     ifdef "trace" then
       @printf[I32]("Received new state\n".cstring())
     end
     match runner
     | let r: SerializableStateRunner =>
-      r.replace_serialized_state(state)
+      r.import_key_state(step, state_name, key, state_bytes)
     else
       Fail()
     end
 
-  fun send_state_to_neighbour(runner: Runner, neighbour: Step,
-    p_ms: Array[QueuedStepMessage], auth: AmbientAuth)
+  fun send_state(step: Step ref, runner: Runner, id: RoutingId,
+    boundary: OutgoingBoundary, state_name: String, key: Key,
+    checkpoint_id: CheckpointId, auth: AmbientAuth)
   =>
     match runner
     | let r: SerializableStateRunner =>
-      let pending_messages = recover iso Array[QueuedStepMessage] end
-      for m in p_ms.values() do
-        pending_messages.push(m)
-      end
-      let shipped_state = ShippedState(r.serialize_state(),
-        consume pending_messages)
-      let shipped_state_bytes =
-        try
-          Serialised(SerialiseAuth(auth), shipped_state)?
-            .output(OutputSerialisedAuth(auth))
-        else
-          Fail()
-          recover val Array[U8] end
-        end
-      neighbour.receive_state(shipped_state_bytes)
-    else
-      Fail()
-    end
-
-  fun send_state(runner: Runner, id: StepId, boundary: OutgoingBoundary,
-    state_name: String, key: Key, p_ms: Array[QueuedStepMessage],
-    auth: AmbientAuth)
-  =>
-    match runner
-    | let r: SerializableStateRunner =>
-      let pending_messages = recover iso Array[QueuedStepMessage] end
-      for m in p_ms.values() do
-        pending_messages.push(m)
-      end
-      let shipped_state = ShippedState(r.serialize_state(),
-        consume pending_messages)
-      let shipped_state_bytes =
-        try
-          Serialised(SerialiseAuth(auth), shipped_state)?
-            .output(OutputSerialisedAuth(auth))
-        else
-          Fail()
-          recover val Array[U8] end
-        end
-      boundary.migrate_step(id, state_name, key, shipped_state_bytes)
+      let state_bytes = r.export_key_state(step, key)
+      @printf[I32]("!@ READY TO EXPORT %s bytes for key %s\n".cstring(), state_bytes.size().string().cstring(), key.cstring())
+      boundary.migrate_key(id, state_name, key, checkpoint_id,
+        state_bytes)
     else
       Fail()
     end

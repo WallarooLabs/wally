@@ -41,7 +41,7 @@ actor Main
           .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes",
             TCPSourceConfig[Votes val].from_options(VotesDecoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_state_partition[Votes val, LetterTotal val,
+            .to_state_partition[LetterTotal val,
               LetterState](AddVotes, LetterStateBuilder, "letter-state",
               letter_partition where multi_worker = true)
             .to_sink(TCPSinkConfig[LetterTotal val].from_options(
@@ -143,6 +143,9 @@ class Votes
   new val create(l: String, c: U64) =>
     letter = l
     count = c
+
+  fun string(): String =>
+    letter + ": " + count.string()
 
 class LetterTotal
   let letter: String

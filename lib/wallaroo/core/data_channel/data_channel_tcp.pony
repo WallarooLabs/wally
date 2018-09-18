@@ -1,29 +1,18 @@
 /*
 
-Copyright (C) 2016-2017, Wallaroo Labs
-Copyright (C) 2016-2017, The Pony Developers
-Copyright (c) 2014-2015, Causality Ltd.
-All rights reserved.
+Copyright 2017 The Wallaroo Authors.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
 
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+     http://www.apache.org/licenses/LICENSE-2.0
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
 
 */
 
@@ -35,10 +24,12 @@ use "wallaroo_labs/bytes"
 use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
@@ -56,7 +47,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
   let _metrics_reporter: MetricsReporter
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
   let _joining_existing_cluster: Bool
 
@@ -65,7 +56,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     metrics_reporter: MetricsReporter iso,
     recovery_file: FilePath,
     layout_initializer: LayoutInitializer tag,
-    data_receivers: DataReceivers, recovery_replayer: RecoveryReplayer,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
     router_registry: RouterRegistry, joining: Bool = false)
   =>
     _name = name
@@ -143,8 +134,10 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _metrics_reporter: MetricsReporter
   let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
+
+  let _queue: Array[Array[U8] val] = _queue.create()
 
   // Initial state is an empty DataReceiver wrapper that should never
   // be used (we fail if it is).
@@ -153,7 +146,7 @@ class DataChannelConnectNotifier is DataChannelNotify
   new iso create(connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso,
     layout_initializer: LayoutInitializer tag,
-    data_receivers: DataReceivers, recovery_replayer: RecoveryReplayer,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
     router_registry: RouterRegistry)
   =>
     _connections = connections
@@ -163,9 +156,13 @@ class DataChannelConnectNotifier is DataChannelNotify
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _receiver = _WaitingDataReceiver(_auth, this, _data_receivers)
+
+  fun ref queue_msg(msg: Array[U8] val) =>
+    _queue.push(msg)
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
-    conn: DataChannel ref)
+    highest_seq_id: SeqId, conn: DataChannel ref)
   =>
     """
     Each abstract data channel (a connection from an OutgoingBoundary)
@@ -175,8 +172,18 @@ class DataChannelConnectNotifier is DataChannelNotify
     the DataChannel corresponding to this notify.
     """
     // State change to our real DataReceiver.
-    _receiver = _DataReceiver(dr)
-    _receiver.data_connect(sender_boundary_id, conn)
+    _receiver = _DataReceiver(_auth, _connections, _metrics_reporter.clone(),
+      _layout_initializer, _data_receivers, _recovery_replayer,
+      _router_registry, this, dr)
+    dr.data_connect(sender_boundary_id, highest_seq_id, conn)
+    //!@
+    if _queue.size() > 0 then @printf[I32]("!@ DataChannel: playing queued msgs:\n".cstring()) end
+    for msg in _queue.values() do
+      @printf[I32]("!@ -- Playing msg size %s\n".cstring(), msg.size().string().cstring())
+      _receiver.decode_and_process(conn, msg)
+    end
+    _queue.clear()
+
     conn._unmute(this)
 
   fun ref received(conn: DataChannel ref, data: Array[U8] iso): Bool
@@ -186,110 +193,18 @@ class DataChannelConnectNotifier is DataChannelNotify
         @printf[I32]("Rcvd msg header on data channel\n".cstring())
       end
       try
-        let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
+        let expect =
+          Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
 
         conn.expect(expect)
         _header = false
       end
       true
     else
-      // because we received this from another worker
-      let ingest_ts = WallClock.nanoseconds()
-      let my_latest_ts = Time.nanos()
-
       ifdef "trace" then
         @printf[I32]("Rcvd msg on data channel\n".cstring())
       end
-      match ChannelMsgDecoder(consume data, _auth)
-      | let data_msg: DataMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received DataMsg on Data Channel\n".cstring())
-        end
-        _metrics_reporter.step_metric(data_msg.metric_name,
-          "Before receive on data channel (network time)", data_msg.metrics_id,
-          data_msg.latest_ts, ingest_ts)
-        _receiver.received(data_msg.delivery_msg,
-            data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
-            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
-            my_latest_ts)
-      | let dc: DataConnectMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
-        end
-        // Before we can begin processing messages on this data channel, we
-        // need to determine which DataReceiver we'll be forwarding data
-        // messages to.
-        conn._mute(this)
-        _data_receivers.request_data_receiver(dc.sender_name,
-          dc.sender_boundary_id, conn)
-      | let sm: StepMigrationMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
-        end
-        _layout_initializer.receive_immigrant_step(sm)
-      | let m: MigrationBatchCompleteMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
-        end
-        // Go through layout_initializer and router_registry to make sure
-        // pending messages on registry are processed first. That's because
-        // the current message path for receiving immigrant steps is
-        // layout_initializer then router_registry.
-        _layout_initializer.ack_migration_batch_complete(m.sender_name)
-      | let aw: AckWatermarkMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
-        end
-        Fail()
-        // _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
-      | let r: ReplayMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
-        end
-        try
-          match r.data_msg(_auth)?
-          | let data_msg: DataMsg =>
-            _metrics_reporter.step_metric(data_msg.metric_name,
-              "Before replay receive on data channel (network time)",
-              data_msg.metrics_id, data_msg.latest_ts, ingest_ts)
-            _receiver.replay_received(data_msg.delivery_msg,
-              data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
-              data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
-              my_latest_ts)
-          end
-        else
-          Fail()
-        end
-      | let c: ReplayCompleteMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received ReplayCompleteMsg on Data Channel\n"
-            .cstring())
-        end
-        _recovery_replayer.add_boundary_replay_complete(c.sender_name,
-          c.boundary_id)
-      | let m: SpinUpLocalTopologyMsg =>
-        @printf[I32]("Received spin up local topology message!\n".cstring())
-      | let m: RequestInFlightAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received RequestInFlightAckMsg from %s\n".cstring(),
-            m.sender.cstring())
-        end
-        _receiver.request_in_flight_ack(m.request_id, m.requester_id)
-      | let m: ReportStatusMsg =>
-        _receiver.report_status(m.code)
-      | let m: RequestInFlightResumeAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received RequestInFlightResumeAckMsg from %s\n"
-            .cstring(), m.sender.cstring())
-        end
-        _receiver.request_in_flight_resume_ack(m.in_flight_resume_ack_id,
-          m.request_id, m.requester_id, m.leaving_workers)
-      | let m: UnknownChannelMsg =>
-        @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
-          .cstring())
-      else
-        @printf[I32]("Unknown Wallaroo data message type.\n".cstring())
-      end
+      _receiver.decode_and_process(conn, consume data)
 
       conn.expect(4)
       _header = true
@@ -315,80 +230,149 @@ class DataChannelConnectNotifier is DataChannelNotify
     //      create a new connection in OutgoingBoundary
 
 trait _DataReceiverWrapper
-  fun data_connect(sender_step_id: StepId, conn: DataChannel)
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun report_status(code: ReportStatusCode)
-
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId)
-  fun request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    leaving_workers: Array[String] val)
+  fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>
+    Fail()
 
 class _InitDataReceiver is _DataReceiverWrapper
-  fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
-    Fail()
 
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+class _WaitingDataReceiver is _DataReceiverWrapper
+  let _auth: AmbientAuth
+  let _dccn: DataChannelConnectNotifier ref
+  let _data_receivers: DataReceivers
+
+  new create(auth: AmbientAuth, dccn: DataChannelConnectNotifier ref,
+    data_receivers: DataReceivers)
   =>
-    Fail()
+    _auth = auth
+    _dccn = dccn
+    _data_receivers = data_receivers
 
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    Fail()
-
-  fun upstream_replay_finished() =>
-    Fail()
-
-  fun report_status(code: ReportStatusCode) =>
-    Fail()
-
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
-    Fail()
-
-  fun request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    leaving_workers: Array[String] val)
-  =>
-    Fail()
+  fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>
+    match ChannelMsgDecoder(data, _auth)
+    | let dc: DataConnectMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
+      end
+      // Before we can begin processing messages on this data channel, we
+      // need to determine which DataReceiver we'll be forwarding data
+      // messages to.
+      conn._mute(_dccn)
+      _data_receivers.request_data_receiver(dc.sender_name,
+        dc.sender_boundary_id, dc.highest_seq_id, conn)
+    else
+      _dccn.queue_msg(data)
+    end
 
 class _DataReceiver is _DataReceiverWrapper
-  let data_receiver: DataReceiver
+  let _auth: AmbientAuth
+  let _connections: Connections
+  let _metrics_reporter: MetricsReporter
+  let _layout_initializer: LayoutInitializer tag
+  let _data_receivers: DataReceivers
+  let _recovery_replayer: RecoveryReconnecter
+  let _router_registry: RouterRegistry
+  let _dccn: DataChannelConnectNotifier ref
+  let _data_receiver: DataReceiver
 
-  new create(dr: DataReceiver) =>
-    data_receiver = dr
-
-  fun data_connect(sender_step_id: StepId, conn: DataChannel) =>
-    data_receiver.data_connect(sender_step_id, conn)
-
-  fun received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: U64,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  new create(auth: AmbientAuth, connections: Connections,
+    metrics_reporter: MetricsReporter iso,
+    layout_initializer: LayoutInitializer tag,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReconnecter,
+    router_registry: RouterRegistry,
+    dccn: DataChannelConnectNotifier ref, dr: DataReceiver)
   =>
-    data_receiver.received(d, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+    _auth = auth
+    _connections = connections
+    _metrics_reporter = consume metrics_reporter
+    _layout_initializer = layout_initializer
+    _data_receivers = data_receivers
+    _recovery_replayer = recovery_replayer
+    _router_registry = router_registry
+    _dccn = dccn
+    _data_receiver = dr
 
-  fun replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+  fun ref decode_and_process(conn: DataChannel ref, data: Array[U8] val) =>
+    // because we received this from another worker
+    let ingest_ts = WallClock.nanoseconds()
+    let my_latest_ts = Time.nanos()
 
-  fun report_status(code: ReportStatusCode) =>
-    data_receiver.report_status(code)
-
-  fun request_in_flight_ack(request_id: RequestId, requester_id: StepId) =>
-    data_receiver.request_in_flight_ack(request_id, requester_id)
-
-  fun request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    leaving_workers: Array[String] val)
-  =>
-    data_receiver.request_in_flight_resume_ack(in_flight_resume_ack_id,
-      request_id, requester_id, leaving_workers)
+    match ChannelMsgDecoder(data, _auth)
+    | let data_msg: DataMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received DataMsg on Data Channel\n".cstring())
+      end
+      _metrics_reporter.step_metric(data_msg.metric_name,
+        "Before receive on data channel (network time)", data_msg.metrics_id,
+        data_msg.latest_ts, ingest_ts)
+      _data_receiver.received(data_msg.delivery_msg,
+          data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+          data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+          my_latest_ts)
+    | let dc: DataConnectMsg =>
+      @printf[I32](("Received DataConnectMsg on DataChannel, but we already " +
+        "have a DataReceiver for this connection.\n").cstring())
+    | let km: KeyMigrationMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received KeyMigrationMsg on Data Channel\n".cstring())
+      end
+      _layout_initializer.receive_immigrant_key(km)
+    | let m: MigrationBatchCompleteMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
+      end
+      // Go through layout_initializer and router_registry to make sure
+      // pending messages on registry are processed first. That's because
+      // the current message path for receiving immigrant steps is
+      // layout_initializer then router_registry.
+      _layout_initializer.ack_migration_batch_complete(m.sender_name)
+    | let aw: AckDataReceivedMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received AckDataReceivedMsg on Data Channel\n"
+          .cstring())
+      end
+      Fail()
+    | let r: ReplayMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
+      end
+      try
+        match r.msg(_auth)?
+        | let data_msg: DataMsg =>
+          _metrics_reporter.step_metric(data_msg.metric_name,
+            "Before replay receive on data channel (network time)",
+            data_msg.metrics_id, data_msg.latest_ts, ingest_ts)
+          _data_receiver.replay_received(data_msg.delivery_msg,
+            data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+            my_latest_ts)
+        | let fbm: ForwardBarrierMsg =>
+          _data_receiver.forward_barrier(fbm.target_id, fbm.origin_id,
+            fbm.token, fbm.seq_id)
+        end
+      else
+        Fail()
+      end
+    | let c: ReplayCompleteMsg =>
+      ifdef "trace" then
+        @printf[I32]("Received ReplayCompleteMsg on Data Channel\n"
+          .cstring())
+      end
+      //!@ We should probably be removing this whole message
+      // _recovery_replayer.add_boundary_replay_complete(c.sender_name,
+      //   c.boundary_id)
+    | let m: SpinUpLocalTopologyMsg =>
+      @printf[I32]("Received spin up local topology message!\n".cstring())
+    | let m: ReportStatusMsg =>
+      _data_receiver.report_status(m.code)
+    | let m: RegisterProducerMsg =>
+      _data_receiver.register_producer(m.source_id, m.target_id)
+    | let m: UnregisterProducerMsg =>
+      _data_receiver.unregister_producer(m.source_id, m.target_id)
+    | let m: ForwardBarrierMsg =>
+      _data_receiver.forward_barrier(m.target_id, m.origin_id, m.token, m.seq_id)
+    | let m: UnknownChannelMsg =>
+      @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
+        .cstring())
+    else
+      @printf[I32]("Unknown Wallaroo data message type.\n".cstring())
+    end

@@ -13,6 +13,10 @@
 #  permissions and limitations under the License.
 
 import logging
+try:
+    from cStringIO import StringIO      # Python 2
+except ImportError:
+    from io import StringIO
 
 INFO2 = logging.INFO + 1
 logging.addLevelName(INFO2, 'INFO2')
@@ -32,3 +36,21 @@ def set_logging(name='', level=logging.INFO, fmt=None):
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(logging.root.formatter)
     logging.root.addHandler(stream_handler)
+
+
+def add_in_memory_log_stream(name='', level=None, fmt=None):
+    log_stream = StringIO()
+    if not fmt:
+        if name:
+            fmt = DEFAULT_LOG_FMT_NAME
+        else:
+            fmt = DEFAULT_LOG_FMT
+    formatter = logging.Formatter(fmt)
+    sh = logging.StreamHandler(log_stream)
+    if level:
+        sh.setLevel(level)
+    else:
+        sh.setLevel(logging.root.level)
+    sh.setFormatter(formatter)
+    logging.root.addHandler(sh)
+    return log_stream

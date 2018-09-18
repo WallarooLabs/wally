@@ -12,6 +12,7 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
+import datetime
 import io
 import logging
 import threading
@@ -19,6 +20,7 @@ import time
 import socket
 import struct
 
+from errors import TimeoutError
 from logger import INFO2
 from stoppable_thread import StoppableThread
 
@@ -149,6 +151,7 @@ class TCPReceiver(StoppableThread):
         super(TCPReceiver, self).__init__()
         self.host = host
         self.port = port
+        self.address = '{}.{}'.format(host, port)
         self.max_connections = max_connections
         self.mode = mode
         self.header_fmt = header_fmt
@@ -161,6 +164,7 @@ class TCPReceiver(StoppableThread):
         self.clients = []
         self.err = None
         self.event = threading.Event()
+        self.start_time = None
 
     def get_connection_info(self, timeout=10):
         is_connected = self.event.wait(timeout)
@@ -170,6 +174,7 @@ class TCPReceiver(StoppableThread):
         return self.sock.getsockname()
 
     def run(self):
+        self.start_time = datetime.datetime.now()
         try:
             self.sock.bind((self.host, self.port))
             self.sock.listen(self.max_connections)
@@ -182,7 +187,7 @@ class TCPReceiver(StoppableThread):
                                           name='{}-{}'.format(
                                               self.__base_name__,
                                               len(self.clients)))
-                logging.info("{}:{} accepting connection from ({}, {}) on "
+                logging.debug("{}:{} accepting connection from ({}, {}) on "
                              "port {}."
                              .format(self.__base_name__, self.name, self.host,
                                      self.port, address[1]))
@@ -237,6 +242,11 @@ class Sender(StoppableThread):
     """
     def __init__(self, address, reader, batch_size=1, interval=0.001,
                  header_fmt='>I', reconnect=False):
+        logging.info("Sender({address}, {reader}, {batch_size}, {interval},"
+            " {header_fmt}, {reconnect}) created".format(
+                address=address, reader=reader, batch_size=batch_size,
+                interval=interval, header_fmt=header_fmt,
+                reconnect=reconnect))
         super(Sender, self).__init__()
         self.daemon = True
         self.reader = reader
@@ -246,15 +256,17 @@ class Sender(StoppableThread):
         self.header_fmt = header_fmt
         self.header_length = struct.calcsize(self.header_fmt)
         self.last_sent = 0
+        self.address = address
         (host, port) = address.split(":")
         self.host = host
         self.port = int(port)
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.name = 'Sender'
         self.error = None
         self._bytes_sent = 0
         self.reconnect = reconnect
         self.pause_event = threading.Event()
+        self.data = []
+        self.start_time = None
 
     def pause(self):
         self.pause_event.set()
@@ -267,6 +279,7 @@ class Sender(StoppableThread):
 
     def send(self, bs):
         self.sock.sendall(bs)
+        self.data.append(bs)
         self._bytes_sent += len(bs)
 
     def bytes_sent(self):
@@ -286,10 +299,12 @@ class Sender(StoppableThread):
             self.batch = []
 
     def run(self):
+        self.start_time = datetime.datetime.now()
         while not self.stopped():
             try:
                 logging.info("Sender connecting to ({}, {})."
                              .format(self.host, self.port))
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.sock.connect((self.host, self.port))
                 while not self.stopped():
                     while self.paused():
@@ -367,6 +382,7 @@ class MultiSequenceGenerator(object):
         # self.seqs stores the last value sent for each sequence
         self._idx = 0  # the idx of the last sequence sent
         self._remaining = []
+        self.lock = threading.Lock()
 
     def format_value(self, value, partition):
         return struct.pack('>IQ7s', 15, value, '{:07d}'.format(partition))
@@ -390,7 +406,8 @@ class MultiSequenceGenerator(object):
             return (idx, self.seqs[idx])
         except NoNonzeroError:
             # reset self._remaining so it can be reused
-            self._remaining = []
+            if not self.max_val:
+                self._remaining = []
             logging.debug("MultiSequenceGenerator: Stop condition "
                 "reached. Final values are: {}".format(
                     self.seqs))
@@ -403,14 +420,18 @@ class MultiSequenceGenerator(object):
 
     def stop(self):
         logging.info("MultiSequenceGenerator: stop called")
-        self._remaining = [max_val - v for v in self.seqs]
+        logging.debug("seqs are: {}".format(self.seqs))
+        with self.lock:
+            self.max_val = max(self.seqs)
+            self._remaining = [self.max_val - v for v in self.seqs]
+            logging.debug("_remaining: {}".format(self._remaining))
 
     def send(self, ignored_arg):
-        if self._remaining:
-            idx, val = self._next_catchup_value()
-        else:
-            idx, val = self._next_value_()
-
+        with self.lock:
+            if self._remaining:
+                idx, val = self._next_catchup_value()
+            else:
+                idx, val = self._next_value_()
         return self.format_value(val, idx)
 
     def throw(self, type=None, value=None, traceback=None):

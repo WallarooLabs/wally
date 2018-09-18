@@ -16,18 +16,11 @@ use "files"
 use "format"
 use "wallaroo_labs/conversions"
 use "wallaroo/core/common"
-use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
+use "wallaroo/ent/checkpoint"
+use "wallaroo_labs/mort"
 
-// (is_watermark, resilient_id, uid, frac_ids, statechange_id, seq_id, payload)
-type LogEntry is (Bool, StepId, U128, FractionalMessageId, U64, U64,
-  Array[ByteSeq] val)
-
-// used to hold a receovered log entry that might need to be replayed on
-// recovery
-// (resilient_id, uid, frac_ids, statechange_id, seq_id, payload)
-type ReplayEntry is (StepId, U128, FractionalMessageId, U64, U64, ByteSeq val)
 
 //////////////////////////////////
 // Helpers for RotatingFileBackend
@@ -75,45 +68,55 @@ primitive LastLogFilePath
 trait Backend
   fun ref sync() ?
   fun ref datasync() ?
-  fun ref start_log_replay()
+  // Rollback from recovery file and return number of entries replayed.
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize
   fun ref write(): USize ?
-  fun ref encode_entry(entry: LogEntry)
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
+    payload: Array[ByteSeq] val)
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId)
   fun bytes_written(): USize
 
+class EmptyBackend is Backend
+  fun ref sync() => Fail()
+  fun ref datasync() => Fail()
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize => Fail(); 0
+  fun ref write(): USize => Fail(); 0
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
+    payload: Array[ByteSeq] val)
+  =>
+    Fail()
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) => Fail()
+  fun bytes_written(): USize => 0
+
 class DummyBackend is Backend
-  let _event_log: EventLog
-  new create(event_log: EventLog) =>
+  let _event_log: EventLog ref
+
+  new create(event_log: EventLog ref) =>
     _event_log = event_log
+
   fun ref sync() => None
   fun ref datasync() => None
-  fun ref start_log_replay() =>
-    _event_log.log_replay_finished()
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize => 0
   fun ref write(): USize => 0
-  fun ref encode_entry(entry: LogEntry) => None
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
+    payload: Array[ByteSeq] val)
+  =>
+    None
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) => None
   fun bytes_written(): USize => 0
 
 class FileBackend is Backend
-  //a record looks like this:
-  // - is_watermark boolean
-  // - producer id
-  // - seq id (low watermark record ends here)
-  // - uid
-  // - size of fractional id list
-  // - fractional id list (may be empty)
-  // - statechange id
-  // - payload
-
   let _file: File iso
   let _filepath: FilePath
-  let _event_log: EventLog
+  let _event_log: EventLog ref
   let _writer: Writer iso
-  var _replay_log_exists: Bool
+  let _checkpoint_id_entry_len: USize = 9 // Bool -- U64
+  let _log_entry_len: USize = 17 // Bool -- U128
   var _bytes_written: USize = 0
 
-  new create(filepath: FilePath, event_log: EventLog) =>
+  new create(filepath: FilePath, event_log: EventLog ref) =>
     _writer = recover iso Writer end
     _filepath = filepath
-    _replay_log_exists = _filepath.exists()
     _file = recover iso File(filepath) end
     _event_log = event_log
 
@@ -123,122 +126,111 @@ class FileBackend is Backend
   fun bytes_written(): USize =>
     _bytes_written
 
-  fun ref start_log_replay() =>
-    if _replay_log_exists then
-      @printf[I32](("RESILIENCE: Replaying from recovery log file: " +
-        _filepath.path + "\n").cstring())
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize =>
+    if _filepath.exists() then
+      @printf[I32](("RESILIENCE: Rolling back to checkpoint %s from recovery " +
+        "log file: \n").cstring(), checkpoint_id.string().cstring(),
+        _filepath.path.cstring())
 
-      //replay log to EventLog
-      try
-        let r = Reader
+      let r = Reader
 
-        //seek beginning of file
-        _file.seek_start(0)
-        var size = _file.size()
-        _bytes_written = size
+      //seek beginning of file
+      _file.seek_start(0)
 
-        var num_replayed: USize = 0
-        var num_skipped: USize = 0
+      // array to hold recovered data temporarily until we've sent it off to
+      // be replayed.
+      // (resilient_id, payload)
+      var replay_buffer: Array[(RoutingId, ByteSeq val)] ref =
+        replay_buffer.create()
 
-        // array to hold recovered data temporarily until we've sent it off to
-        // be replayed
-        var replay_buffer: Array[ReplayEntry val] ref = replay_buffer.create()
+      var current_checkpoint_id: CheckpointId = 0
+      if _file.size() > 0 then
+        // Read the initial entry in the file, which should be a checkpoint_id,
+        // skipping the is_watermark byte
+        _file.seek(1)
+        r.append(_file.read(8))
+        current_checkpoint_id = try r.u64_be()? else Fail(); 0 end
 
-        let watermarks_trn = recover trn Map[StepId, SeqId] end
+        // We need to get to the data for the provided checkpoint id. We'll
+        // keep reading until we find the prior checkpoint id, at which point
+        // we're lined up with entries for this checkpoint.
+        while current_checkpoint_id < (checkpoint_id - 1) do
+          r.append(_file.read(1))
+          let is_watermark = BoolConverter.u8_to_bool(
+            try r.u8()? else Fail(); 0 end)
 
-        //start iterating until we reach original EOF
-        while _file.position() < size do
-          r.append(_file.read(25))
-          let is_watermark = BoolConverter.u8_to_bool(r.u8()?)
-          let resilient_id = r.u128_be()?
-          let seq_id = r.u64_be()?
           if is_watermark then
-            ifdef debug then
-              Invariant(
-                try
-                  let last_seq_id = watermarks_trn(resilient_id)?
-                  seq_id > last_seq_id
-                else
-                  true
-                end
-              )
-            end
-
-            // save last watermark read from file
-            watermarks_trn(resilient_id) = seq_id
+            r.append(_file.read(8))
+            current_checkpoint_id = try r.u64_be()? else Fail(); 0 end
           else
-            r.append(_file.read(24))
-            let uid = r.u128_be()?
-            let fractional_size = r.u64_be()?
-            let frac_ids = recover val
-              if fractional_size > 0 then
-                let bytes_to_read = fractional_size.usize() * 4
-                r.append(_file.read(bytes_to_read))
-                let l = Array[U32]
-                for i in Range(0,fractional_size.usize()) do
-                  l.push(r.u32_be()?)
-                end
-                l
-              else
-                //None is faster if we have no frac_ids, which will probably be
-                //true most of the time
-                None
-              end
-            end
-            r.append(_file.read(16))
-            let statechange_id = r.u64_be()?
-            let payload_length = r.u64_be()?
-            let payload = recover val
-              if payload_length > 0 then
-                _file.read(payload_length.usize())
-              else
-                Array[U8]
-              end
-            end
-
-            // put entry into temporary recovered buffer
-            replay_buffer.push((resilient_id, uid, frac_ids, statechange_id,
-              seq_id, payload))
-          end
-
-          // clear read buffer to free file data read so far
-          if r.size() > 0 then
-            Fail()
-          end
-          r.clear()
-        end
-
-        let watermarks = consume val watermarks_trn
-
-        _event_log.initialize_seq_ids(watermarks)
-
-        // iterate through recovered buffer and replay entries at or below
-        // watermark
-        for entry in replay_buffer.values() do
-          // only replay if at or below watermark
-          if entry._5 <= watermarks.get_or_else(entry._1, 0) then
-            num_replayed = num_replayed + 1
-            _event_log.replay_log_entry(entry._1, entry._2, entry._3,
-              entry._4, entry._6)
-          else
-            num_skipped = num_skipped + 1
+            // Skip this entry since we're looking for the next checkpoint id.
+            // First skip resilient_id
+            _file.seek(16)
+            // Read payload size
+            r.append(_file.read(4))
+            let size = try r.u32_be()? else Fail(); 0 end
+            // Skip payload
+            _file.seek(size.isize())
           end
         end
+        @printf[I32]("!@ Backend: Found end of entries for checkpoint %s.\n".cstring(), current_checkpoint_id.string().cstring())
+        r.append(_file.read(1))
+        var end_of_checkpoint = BoolConverter.u8_to_bool(
+          try r.u8()? else Fail(); 0 end)
+        while not end_of_checkpoint do
+          r.append(_file.read(20))
+          let resilient_id = try r.u128_be()? else Fail(); 0 end
+          let payload_length = try r.u32_be()? else Fail(); 0 end
+          let payload = recover val
+            if payload_length > 0 then
+              _file.read(payload_length.usize())
+            else
+              Array[U8]
+            end
+          end
+          // put entry into temporary recovered buffer
+          replay_buffer.push((resilient_id, payload))
 
-        @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
-          "file.\n").cstring(), num_replayed)
-        @printf[I32](("RESILIENCE: Skipped %d entries from recovery log " +
-          "file.\n").cstring(), num_skipped)
-
-        _file.seek_end(0)
-        _event_log.log_replay_finished()
+          // Check if we're at the end of this checkpoint
+          r.append(_file.read(1))
+          end_of_checkpoint = BoolConverter.u8_to_bool(
+            try r.u8()? else Fail(); 0 end)
+        end
       else
-        @printf[I32]("Cannot recover state from eventlog\n".cstring())
+        @printf[I32](("Trying to rollback to checkpoint %s from empty " +
+          "recovery file %s\n").cstring(), checkpoint_id.string().cstring())
+        Fail()
       end
+
+      // clear read buffer to free file data read so far
+      if r.size() > 0 then
+        Fail()
+      else
+        r.clear()
+      end
+
+      var num_replayed: USize = 0
+      _event_log.expect_rollback_count(replay_buffer.size())
+      for entry in replay_buffer.values() do
+        num_replayed = num_replayed + 1
+        _event_log.rollback_from_log_entry(entry._1, entry._2, checkpoint_id)
+      end
+
+      //!@
+      // _file.seek_end(0)
+
+      // Truncate rest of file since we are rolling back to an earlier
+      // checkpoint.
+      _file.set_length(_file.position())
+
+      @printf[I32](("RESILIENCE: Replayed %d entries from recovery log " +
+        "file.\n").cstring(), num_replayed)
+      num_replayed
     else
-      @printf[I32]("RESILIENCE: Could not find log file to replay.\n"
+      @printf[I32]("RESILIENCE: Could not find log file to rollback from.\n"
         .cstring())
       Fail()
+      0
     end
 
   fun ref write(): USize ?
@@ -251,50 +243,39 @@ class FileBackend is Backend
     end
     _bytes_written
 
-  fun ref encode_entry(entry: LogEntry)
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
+    payload: Array[ByteSeq] val)
   =>
-    (let is_watermark: Bool, let resilient_id: StepId,
-     let uid: U128, let frac_ids: FractionalMessageId,
-     let statechange_id: U64, let seq_id: U64,
-     let payload: Array[ByteSeq] val) = entry
+    ifdef debug then
+      Invariant(payload.size() > 0)
+      Invariant(payload.size() <= U32.max_value().usize())
+    end
 
     ifdef "trace" then
-      if is_watermark then
-        @printf[I32]("Writing Watermark: %d\n".cstring(), seq_id)
-      else
-        @printf[I32]("Writing Message: %d\n".cstring(), seq_id)
-      end
+      @printf[I32]("EventLog: Writing Entry for CheckpointId %s\n".cstring(),
+        checkpoint_id.string().cstring())
     end
 
-    _writer.u8(BoolConverter.bool_to_u8(is_watermark))
+    var payload_size: USize = 0
+    for p in payload.values() do
+      payload_size = payload_size + p.size()
+    end
+
+    // This is not a watermark so write false
+    _writer.u8(BoolConverter.bool_to_u8(false))
     _writer.u128_be(resilient_id)
-    _writer.u64_be(seq_id)
+    _writer.u32_be(payload_size.u32())
+    _writer.writev(payload)
 
-    if not is_watermark then
-      _writer.u128_be(uid)
-
-      match frac_ids
-      | None =>
-        _writer.u64_be(0)
-      | let x: Array[U32] val =>
-        let fractional_size = x.size().u64()
-        _writer.u64_be(fractional_size)
-
-        for frac_id in x.values() do
-          _writer.u32_be(frac_id)
-        end
-      end
-
-      _writer.u64_be(statechange_id)
-      var payload_size: USize = 0
-      for p in payload.values() do
-        payload_size = payload_size + p.size()
-      end
-      _writer.u64_be(payload_size.u64())
-
-      // write data to write buffer
-      _writer.writev(payload)
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) =>
+    ifdef "trace" then
+      @printf[I32]("EventLog: Writing CheckpointId for CheckpointId %s\n"
+        .cstring(), checkpoint_id.string().cstring())
     end
+
+    // This is a watermark so write true
+    _writer.u8(BoolConverter.bool_to_u8(true))
+    _writer.u64_be(checkpoint_id)
 
   fun ref sync() ? =>
     _file.sync()
@@ -312,6 +293,7 @@ class FileBackend is Backend
       error
     end
 
+//!@ Manage this with new checkpoint approach.
 class RotatingFileBackend is Backend
   // _basepath identifies the worker
   // For unique file identifier, we use the sum of payload sizes saved as a
@@ -321,13 +303,13 @@ class RotatingFileBackend is Backend
   let _base_dir: FilePath
   let _base_name: String
   let _suffix: String
-  let _event_log: EventLog
+  let _event_log: EventLog ref
   let _file_length: (USize | None)
   var _offset: U64
   var _rotate_requested: Bool = false
 
   new create(base_dir: FilePath, base_name: String, suffix: String = ".evlog",
-    event_log: EventLog, file_length: (USize | None)) ?
+    event_log: EventLog ref, file_length: (USize | None)) ?
   =>
     _base_dir = base_dir
     _base_name = base_name
@@ -355,7 +337,8 @@ class RotatingFileBackend is Backend
 
   fun ref datasync() ? => _backend.datasync()?
 
-  fun ref start_log_replay() => _backend.start_log_replay()
+  fun ref start_rollback(checkpoint_id: CheckpointId): USize =>
+    _backend.start_rollback(checkpoint_id)
 
   fun ref write(): USize ? =>
     let bytes_written' = _backend.write()?
@@ -364,13 +347,19 @@ class RotatingFileBackend is Backend
       if bytes_written' >= l then
         if not _rotate_requested then
           _rotate_requested = true
-          _event_log.start_rotation()
+          _event_log._start_rotation()
         end
       end
     end
     bytes_written'
 
-  fun ref encode_entry(entry: LogEntry) => _backend.encode_entry(consume entry)
+  fun ref encode_entry(resilient_id: RoutingId, checkpoint_id: CheckpointId,
+    payload: Array[ByteSeq] val)
+  =>
+    _backend.encode_entry(resilient_id, checkpoint_id, payload)
+
+  fun ref encode_checkpoint_id(checkpoint_id: CheckpointId) =>
+    _backend.encode_checkpoint_id(checkpoint_id)
 
   fun ref rotate_file() ? =>
     // only do this if current backend has actually written anything
@@ -386,5 +375,11 @@ class RotatingFileBackend is Backend
       let p = _base_name + "-" + HexOffset(_offset) + _suffix
       let fp = FilePath(_base_dir, p)?
       _backend = FileBackend(fp, _event_log)
+    else
+      ifdef debug then
+        @printf[I32]("Trying to rotate file but no bytes have been written\n"
+          .cstring())
+      end
     end
+    _event_log.rotation_complete()
     _rotate_requested = false

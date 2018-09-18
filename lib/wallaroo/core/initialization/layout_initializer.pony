@@ -17,14 +17,16 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core/messages"
+use "wallaroo/ent/data_receiver"
+use "wallaroo/ent/checkpoint"
 
 trait tag LayoutInitializer
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
-    recovering: Bool)
+    checkpoint_target: (CheckpointId | None) = None)
 
   be report_created(initializable: Initializable)
 
@@ -32,7 +34,7 @@ trait tag LayoutInitializer
 
   be report_ready_to_work(initializable: Initializable)
 
-  be receive_immigrant_step(msg: StepMigrationMsg)
+  be receive_immigrant_key(msg: KeyMigrationMsg)
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val,
     bbs: Map[String, OutgoingBoundaryBuilder] val)
@@ -42,3 +44,6 @@ trait tag LayoutInitializer
     cluster_initializer: (ClusterInitializer | None) = None)
 
   be ack_migration_batch_complete(sender: String)
+
+  be rollback_local_keys(checkpoint_id: CheckpointId,
+    promise: Promise[None])

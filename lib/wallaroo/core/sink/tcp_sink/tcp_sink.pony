@@ -33,10 +33,12 @@ use "net"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/sink"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
-use "wallaroo/ent/watermarking"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
@@ -53,7 +55,7 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSink is Consumer
+actor TCPSink is Sink
   """
   # TCPSink
 
@@ -77,8 +79,12 @@ actor TCPSink is Consumer
     was acknowleged.)
   """
   let _env: Env
+  var _message_processor: SinkMessageProcessor = EmptySinkMessageProcessor
+  let _barrier_initiator: BarrierInitiator
+  var _barrier_acker: (BarrierSinkAcker | None) = None
+  let _checkpoint_initiator: CheckpointInitiator
   // Steplike
-  let _sink_id: StepId
+  let _sink_id: RoutingId
   let _event_log: EventLog
   let _recovering: Bool
   let _name: String
@@ -89,6 +95,10 @@ actor TCPSink is Consumer
 
   // Consumer
   var _upstreams: SetIs[Producer] = _upstreams.create()
+  // _inputs keeps track of all inputs by step id. There might be
+  // duplicate producers in this map (unlike _upstreams) since there might be
+  // multiple upstream step ids over a boundary
+  let _inputs: Map[RoutingId, Producer] = _inputs.create()
   var _mute_outstanding: Bool = false
 
   // TCP
@@ -127,12 +137,13 @@ actor TCPSink is Consumer
   // Producer (Resilience)
   let _timers: Timers = Timers
 
-  let _terminus_route: TerminusRoute = TerminusRoute
+  var _seq_id: SeqId = 0
 
-  new create(sink_id: StepId, sink_name: String, event_log: EventLog,
+  new create(sink_id: RoutingId, sink_name: String, event_log: EventLog,
     recovering: Bool, env: Env, encoder_wrapper: TCPEncoderWrapper,
-    metrics_reporter: MetricsReporter iso, host: String, service: String,
-    initial_msgs: Array[Array[ByteSeq] val] val,
+    metrics_reporter: MetricsReporter iso,
+    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
+    host: String, service: String, initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384,
     reconnect_pause: U64 = 10_000_000_000)
   =>
@@ -147,6 +158,8 @@ actor TCPSink is Consumer
     _recovering = recovering
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
+    _barrier_initiator = barrier_initiator
+    _checkpoint_initiator = checkpoint_initiator
     _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
@@ -157,6 +170,8 @@ actor TCPSink is Consumer
     _service = service
     _from = from
     _connect_count = 0
+    _message_processor = NormalSinkMessageProcessor(this)
+    _barrier_acker = BarrierSinkAcker(_sink_id, this, _barrier_initiator)
     _mute_upstreams()
 
   //
@@ -167,9 +182,7 @@ actor TCPSink is Consumer
     _initializer = initializer
     initializer.report_created(this)
 
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter)
-  =>
+  be application_created(initializer: LocalTopologyInitializer) =>
     _mute_upstreams()
     initializer.report_initialized(this)
 
@@ -189,9 +202,19 @@ actor TCPSink is Consumer
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _message_processor.process_message[D](metric_name, pipeline_time_spent,
+      data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+      latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref process_message[D: Any val](metric_name: String,
+    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     var receive_ts: U64 = 0
     ifdef "detailed-metrics" then
@@ -206,8 +229,8 @@ actor TCPSink is Consumer
     try
       let encoded = _encoder.encode[D](data, _wb)?
 
-      let next_tracking_id = _next_tracking_id(i_producer, i_route_id, i_seq_id)
-      _writev(encoded, next_tracking_id)
+      let next_seq_id = (_seq_id = _seq_id + 1)
+      _writev(encoded, next_seq_id)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
@@ -228,17 +251,8 @@ actor TCPSink is Consumer
 
     _maybe_mute_or_unmute_upstreams()
 
-  fun ref _next_tracking_id(i_producer: Producer, i_route_id: RouteId,
-    i_seq_id: SeqId): (U64 | None)
-  =>
-    ifdef "resilience" then
-      return _terminus_route.terminate(i_producer, i_route_id, i_seq_id)
-    end
-
-    None
-
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: StepId, i_producer: Producer, msg_uid: MsgId,
+    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -255,8 +269,6 @@ actor TCPSink is Consumer
     """
     None
 
-  be receive_state(state: ByteSeq val) => Fail()
-
   be dispose() =>
     """
     Gracefully shuts down the sink. Allows all pending writes
@@ -269,64 +281,150 @@ actor TCPSink is Consumer
     close()
     _notify.dispose()
 
-  fun ref _unit_finished(number_finished: ISize,
-    number_tracked_finished: ISize,
-    tracking_id: (SeqId | None))
-  =>
-    """
-    Handles book keeping related to resilience. Called when
-    a collection of sends is completed. When backpressure hasn't been applied,
-    this would be called for each send. When backpressure has been applied and
-    there is pending work to send, this would be called once after we finish
-    attempting to catch up on sending pending data.
-    """
-    ifdef debug then
-      Invariant(number_finished > 0)
-      Invariant(number_tracked_finished <= number_finished)
-    end
-    ifdef "trace" then
-      @printf[I32]("Sent %d msgs over sink\n".cstring(), number_finished)
+  fun inputs(): Map[RoutingId, Producer] box =>
+    _inputs
+
+  be register_producer(id: RoutingId, producer: Producer) =>
+    // @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+    // If we have at least one input, then we are involved in checkpointing.
+    if _inputs.size() == 0 then
+      _barrier_initiator.register_sink(this)
+      _event_log.register_resilient(_sink_id, this)
     end
 
-    ifdef "resilience" then
-      match tracking_id
-      | let sent: SeqId =>
-        _terminus_route.receive_ack(sent)
-      end
-    end
-
-  be request_ack() =>
-    _terminus_route.request_ack()
-
-  be register_producer(producer: Producer) =>
+    _inputs(id) = producer
     _upstreams.set(producer)
 
-  be unregister_producer(producer: Producer) =>
+  be unregister_producer(id: RoutingId, producer: Producer) =>
+    // @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
+
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
 
-    _upstreams.unset(producer)
+    if _inputs.contains(id) then
+      try
+        _inputs.remove(id)?
+      else
+        Fail()
+      end
+
+      var have_input = false
+      for i in _inputs.values() do
+        if i is producer then have_input = true end
+      end
+      if not have_input then
+        _upstreams.unset(producer)
+      end
+
+      // If we have no inputs, then we are not involved in checkpointing.
+      if _inputs.size() == 0 then
+        _barrier_initiator.unregister_sink(this)
+        _event_log.unregister_resilient(_sink_id, this)
+      end
+    end
 
   be report_status(code: ReportStatusCode) =>
     None
 
-  be request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
+  ///////////////
+  // BARRIER
+  ///////////////
+  be receive_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
   =>
-    requester.receive_in_flight_ack(request_id)
+    // @printf[I32]("!@ Receive barrier %s at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    process_barrier(input_id, producer, barrier_token)
 
-  be request_in_flight_resume_ack(in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
+  fun ref process_barrier(input_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
   =>
-    requester.receive_in_flight_resume_ack(request_id)
+    match barrier_token
+    | let srt: CheckpointRollbackBarrierToken =>
+      try
+        let b_acker = _barrier_acker as BarrierSinkAcker
+        if b_acker.higher_priority(srt) then
+          _prepare_for_rollback()
+        end
+      else
+        Fail()
+      end
+    end
 
-  be try_finish_in_flight_request_early(requester_id: StepId) =>
-    None
+    if _message_processor.barrier_in_progress() then
+      _message_processor.receive_barrier(input_id, producer,
+        barrier_token)
+    else
+      match _message_processor
+      | let nsmp: NormalSinkMessageProcessor =>
+        try
+           _message_processor = BarrierSinkMessageProcessor(this,
+             _barrier_acker as BarrierSinkAcker)
+           _message_processor.receive_new_barrier(input_id, producer,
+             barrier_token)
+        else
+          Fail()
+        end
+      else
+        Fail()
+      end
+    end
 
-  //
+  fun ref barrier_complete(barrier_token: BarrierToken) =>
+    @printf[I32]("!@ Barrier %s complete at TCPSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    ifdef debug then
+      Invariant(_message_processor.barrier_in_progress())
+    end
+    match barrier_token
+    | let sbt: CheckpointBarrierToken =>
+      checkpoint_state(sbt.id)
+    end
+    let queued = _message_processor.queued()
+    _message_processor = NormalSinkMessageProcessor(this)
+    for q in queued.values() do
+      match q
+      | let qm: QueuedMessage =>
+        qm.process_message(this)
+      | let qb: QueuedBarrier =>
+        qb.inject_barrier(this)
+      end
+    end
+
+  fun ref _clear_barriers() =>
+    try
+      (_barrier_acker as BarrierSinkAcker).clear()
+    else
+      Fail()
+    end
+    _message_processor = NormalSinkMessageProcessor(this)
+
+  ///////////////
+  // CHECKPOINTS
+  ///////////////
+  fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
+    """
+    TCPSinks don't currently write out any data as part of the checkpoint.
+    """
+    _event_log.checkpoint_state(_sink_id, checkpoint_id,
+      recover val Array[ByteSeq] end)
+
+  be prepare_for_rollback() =>
+    _prepare_for_rollback()
+
+  fun ref _prepare_for_rollback() =>
+    _clear_barriers()
+
+  be rollback(payload: ByteSeq val, event_log: EventLog,
+    checkpoint_id: CheckpointId)
+  =>
+    """
+    There is nothing for a TCPSink to rollback to.
+    """
+    event_log.ack_rollback(_sink_id)
+
+  ///////////////
   // TCP
+  ///////////////
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
@@ -726,14 +824,7 @@ actor TCPSink is Consumer
 
     false
 
-
   fun ref _tracking_finished(num_bytes_sent: USize) =>
-    """
-    Call _unit_finished with:
-      number of sent messages,
-      number of tracked messages sent
-      last tracking_id
-    """
     ifdef "resilience" then
       var num_sent: ISize = 0
       var tracked_sent: ISize = 0
@@ -759,10 +850,6 @@ actor TCPSink is Consumer
             // update remaining for this message
             node()? = (bytes_remaining, tracking_id)
           end
-        end
-
-        if num_sent > 0 then
-          _unit_finished(num_sent, tracked_sent, final_pending_sent)
         end
       end
     end

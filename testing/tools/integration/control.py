@@ -13,9 +13,11 @@
 #  permissions and limitations under the License.
 
 import logging
+from inspect import isfunction
 import time
 
-from errors import (ExpectationError,
+from errors import (ClusterError,
+                    ExpectationError,
                     TimeoutError)
 from stoppable_thread import StoppableThread
 from observability import (cluster_status_query,
@@ -25,37 +27,49 @@ from observability import (cluster_status_query,
 from validations import is_processing
 
 
-def wait_for_cluster_to_resume_processing(runners, timeout=30):
-    # Wait until all workers have resumed processing
-    waiting = set()
-    for r in runners:
-        if not r.is_alive():
-            continue
-        obs = ObservabilityNotifier(cluster_status_query,
-            r.external,
-            tests=is_processing, timeout=timeout)
-        waiting.add(obs)
-        obs.start()
-    # Cycle through waiting until its empty or error
-    t0 = time.time()
-    while True:
-        for obs in list(waiting):
-            # short join
-            obs.join(0.05)
-            if obs.error:
-                raise obs.error
-            if obs.is_alive():
+class WaitForClusterToResumeProcessing(StoppableThread):
+    def __init__(self, runners, timeout=30, interval=0.05):
+        super(WaitForClusterToResumeProcessing, self).__init__()
+        self.name = 'WaitForClusterToResumeProcessing'
+        # Wait until all workers have resumed processing
+        self.runners = runners
+        self.timeout = timeout
+        self.interval = interval
+
+    def run(self):
+        waiting = set()
+        for r in self.runners:
+            if not r.is_alive():
                 continue
+            obs = ObservabilityNotifier(cluster_status_query,
+                r.external,
+                tests=is_processing, timeout=self.timeout)
+            waiting.add(obs)
+            obs.start()
+        # Cycle through waiting until its empty or error
+        t0 = time.time()
+        while not self.stopped():
+            for obs in list(waiting):
+                # short join
+                obs.join(self.interval)
+                if obs.error:
+                    self.stop(obs.error)
+                    break
+                if obs.is_alive():
+                    continue
+                else:
+                    logging.log(1, "ObservabilityNotifier completed: {}"
+                        .format(obs))
+                    waiting.remove(obs)
+            # check completion
+            if waiting:
+                # check timeout!
+                if time.time() - t0 > self.timeout:
+                    self.stop(TimeoutError("Timed out after {} seconds while waiting "
+                        "for cluster to resume processing.".format(self.timeout)))
+                    break
             else:
-                waiting.remove(obs)
-        # check completion
-        if waiting:
-            # check timeout!
-            if time.time() - t0 > timeout:
-                raise TimeoutError("Timed out after {} seconds while waiting "
-                    "for cluster to resume processing.".format(timeout))
-        else:
-            return  # done!
+                break  # done!
 
 
 class SinkExpect(StoppableThread):
@@ -98,9 +112,6 @@ class SinkExpect(StoppableThread):
                 break
             time.sleep(0.1)
 
-    def stop(self):
-        super(SinkExpect, self).stop()
-
 
 class SinkAwaitValue(StoppableThread):
     """
@@ -131,9 +142,9 @@ class SinkAwaitValue(StoppableThread):
                         sink_data = self.func(self.sink.data[self.position])
                         if sink_data == val:
                             self.values.discard(val)
-                            logging.debug("{} matched on value {!r}."
-                                          .format(self.name,
-                                                  val))
+                            logging.log(1, "{} matched on value {!r}."
+                                           .format(self.name,
+                                                   val))
                     if not self.values:
                         self.stop()
                         break
@@ -150,38 +161,78 @@ class SinkAwaitValue(StoppableThread):
                 break
             time.sleep(0.1)
 
-    def stop(self):
-        super(SinkAwaitValue, self).stop()
 
+class TryUntilTimeout(StoppableThread):
+    def __init__(self, test, pre_process=None, timeout=30, interval=0.1):
+        """
+        Try a test until it passes or the time runs out
 
-def try_until_timeout(test, pre_process=None, timeout=30):
-    """
-    Try a test until it passes or the time runs out
+        :parameters
+        `test` - a runnable test function that raises an error if it fails
+        `pre_process` - a runnable function that generates test input.
+            The test input is used as the parameters for the function given by
+            `test`.
+        `timeout` - the timeout, in seconds, before the test is failed.
+        """
+        super(TryUntilTimeout, self).__init__()
+        self.test = test
+        self.pre_process = pre_process
+        self.timeout = timeout
+        self.interval = interval
+        self.args = None
 
-    :parameters
-    `test` - a runnable test function that raises an error if it fails
-    `pre_process` - a runnable function that generates test input.
-        The test input is used as the parameters for the function given by
-        `test`.
-    `timeout` - the timeout, in seconds, before the test is failed.
-    """
-    t0 = time.time()
-    c = 0
-    while True:
-        c += 1
-        logging.debug("try_until iteration {}".format(c))
-        try:
-            if pre_process:
-                args = pre_process()
-                test(*args)
+    def run(self):
+        t0 = time.time()
+        c = 0
+        while not self.stopped():
+            c += 1
+            logging.log(1, "try_until iteration {}".format(c))
+            try:
+                if self.pre_process:
+                    if isfunction(self.pre_process):
+                        self.args = self.pre_process()
+                    else:
+                        self.args = self.pre_process
+                    self.test(*self.args)
+                else:
+                    self.test()
+            except Exception as err:
+                logging.log(1, "iteration failed...")
+                if time.time() - t0 > self.timeout:
+                    logging.warn("Failed on attempt {} of test: {}..."
+                          .format(c, get_func_name(self.test)))
+                    logging.exception(err)
+                    self.stop(err)
+                else:
+                    time.sleep(self.interval)
             else:
-                test()
-        except Exception as err:
-            logging.debug("iteration failed...")
-            if time.time() - t0 > timeout:
-                logging.warn("Failed on attempt {} of test: {}..."
-                      .format(c, get_func_name(test)))
-                raise
-            time.sleep(2)
-        else:
-            return
+                return
+
+
+class CrashChecker(StoppableThread):
+    """
+    Continuously check for crashed workers
+    """
+    __base_name__ = 'CrashChecker'
+
+    def __init__(self, cluster, func=None):
+        super(CrashChecker, self).__init__()
+        self.cluster = cluster
+        self.func = func
+
+    def run(self):
+        while not self.stopped():
+            if self.func:
+                crashed = self.cluster.get_crashed_workers(self.func)
+            else:
+                crashed = self.cluster.get_crashed_workers()
+            if crashed:
+                logging.debug("CrashChecker, results: {}".format(crashed))
+                err = ClusterError("A crash was detected in the workers: {}"
+                        .format(",".join(("{} ({}): {}")
+                            .format(w.name, w.pid, w.returncode())
+                                    for w in crashed)))
+                self.cluster.raise_from_error(err)
+                self.stop()
+                break
+            time.sleep(0.5)

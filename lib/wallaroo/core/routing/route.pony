@@ -31,8 +31,8 @@ trait Route
   fun ref dispose()
   // Return false to indicate queue is full and if producer is a Source, it
   // should mute
-  fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
 
@@ -41,28 +41,26 @@ trait Route
     latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64)
 
-  fun ref request_ack()
+  fun register_producer(target_id: RoutingId)
+  fun unregister_producer(target_id: RoutingId)
 
   fun ref report_status(code: ReportStatusCode)
-  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
-  fun ref request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  fun ref receive_in_flight_ack(request_id: RequestId)
 
 trait RouteLogic
   fun ref application_initialized(step_type: String)
   fun ref dispose()
 
 class _RouteLogic is RouteLogic
+  let _step_id: RoutingId
   let _step: Producer ref
   let _consumer: Consumer
   var _step_type: String = ""
   var _route_type: String = ""
 
-  new create(step: Producer ref, consumer: Consumer, r_type: String) =>
+  new create(step_id: RoutingId, step: Producer ref, consumer: Consumer,
+    r_type: String)
+  =>
+    _step_id = step_id
     _step = step
     _consumer = consumer
     _route_type = r_type
@@ -72,10 +70,7 @@ class _RouteLogic is RouteLogic
     _report_ready_to_work()
 
   fun ref dispose() =>
-    """
-    Return unused credits to downstream consumer
-    """
-    _consumer.unregister_producer(_step)
+    None
 
   fun ref _report_ready_to_work() =>
     match _step
@@ -103,10 +98,9 @@ class EmptyRoute is Route
 
   fun id(): U64 => _route_id
   fun ref dispose() => None
-  fun ref request_ack() => None
 
-  fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp_id: StepId, cfp: Producer ref, msg_uid: MsgId,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
@@ -121,20 +115,12 @@ class EmptyRoute is Route
     Fail()
     true
 
+
+  fun register_producer(target_id: RoutingId) =>
+    Fail()
+
+  fun unregister_producer(target_id: RoutingId) =>
+    Fail()
+
   fun ref report_status(code: ReportStatusCode) =>
     Fail()
-
-  fun ref request_in_flight_ack(request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester)
-  =>
-    Fail()
-
-  fun ref request_in_flight_resume_ack(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    request_id: RequestId, requester_id: StepId,
-    requester: InFlightAckRequester, leaving_workers: Array[String] val)
-  =>
-    Fail()
-
-  fun ref receive_in_flight_ack(request_id: RequestId) =>
-    None

@@ -51,12 +51,12 @@ actor Main
           .new_pipeline[U64, U64]("U64 CountAndMax DoubleCountMax",
             TCPSourceConfig[U64].from_options(U64Decoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_state_partition[U64, CountMax, CountAndMax](
+            .to_state_partition[CountMax, CountAndMax](
               UpdateCountAndMax, CountAndMaxBuilder,
               "count-and-max",
               mod3partition where multi_worker = true)
             .to_parallel[CountMax]({(): DoubleCountMax => DoubleCountMax})
-            .to_state_partition[CountMax, CountMax, CountAndMax](
+            .to_state_partition[CountMax, CountAndMax](
               UpdateCountAndMaxFromCountMax, CountAndMaxBuilder,
               "count-and-max-from-countmax",
               mod6partition where multi_worker = true)
