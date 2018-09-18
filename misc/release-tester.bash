@@ -137,13 +137,14 @@ print_results() {
   example_total_count=0
   # find all result files
   # shellcheck disable=SC2044
-  for result_file in $(find "${TESTING_TMP}" -name result  -depth 3 | xargs ls -rt); do
+  for result_file in $(find "${TESTING_TMP}" -maxdepth 4 -name result | xargs ls -rt); do
     print_result "$result_file"
     # keep track of number failed and number total
     (( total_count = total_count + 1 ))
     if [[ "$(cat "$result_file")" == "FAILURE" ]]; then
       (( failed_count = failed_count + 1 ))
-    else
+    fi
+    if [[ -e "${result_dir}/wallaroo-example-tester" ]]; then
       # shellcheck disable=SC2044
       for rf in $(find "${result_dir}/wallaroo-example-tester" -name result | xargs ls -rt); do
         print_result "$rf"

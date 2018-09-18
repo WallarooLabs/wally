@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="9e01ca7e71174d8b9faa457817352286  -"
+MD5="77658c3c07be92d1eebc9693666e8e22  -"
 
 set -eEuo pipefail
 
@@ -421,7 +421,7 @@ install_required_dependencies() {
       fi
       if [ "$PREREQS_TO_INSTALL" != "" ]; then
         run_cmd "apt-get update $REDIRECT" root retry
-        run_cmd "apt-get install -y $PREREQS_TO_INSTALL $REDIRECT" root
+        run_cmd "apt-get install -y $PREREQS_TO_INSTALL $REDIRECT" root retry
       fi
 
       # figure out which packages need installing
@@ -451,7 +451,7 @@ install_required_dependencies() {
 
       # install dependencies for wallaroo
       run_cmd "apt-get update $REDIRECT" root retry
-      run_cmd "apt-get install -y $PKGS_TO_INSTALL $REDIRECT" root
+      run_cmd "apt-get install -y $PKGS_TO_INSTALL $REDIRECT" root retry
     ;;
 
     centos|rhel|ol|amzn)
@@ -476,7 +476,7 @@ install_required_dependencies() {
       # enable ponylang copr repo
       if ! yum list installed -q yum-plugin-copr > /dev/null 2>&1; then
         run_cmd "yum makecache -y $REDIRECT" root retry
-        run_cmd "yum install -y yum-plugin-copr $REDIRECT" root
+        run_cmd "yum install -y yum-plugin-copr $REDIRECT" root retry
       fi
       if ! yum repolist 2>&1 | grep ponylang-ponylang > /dev/null 2>&1; then
         run_cmd "yum copr enable ponylang/ponylang epel-7 -y $REDIRECT" root
@@ -485,7 +485,7 @@ install_required_dependencies() {
 
       ## install one at a time or else yum doesn't throw an error for missing packages
       for pkg in $PKGS_TO_INSTALL; do
-        run_cmd "yum install -y $pkg $REDIRECT" root
+        run_cmd "yum install -y $pkg $REDIRECT" root retry
       done
     ;;
 
@@ -503,7 +503,7 @@ install_required_dependencies() {
       # enable ponylang copr repo
       if ! dnf list installed -q 'dnf-plugins-core' > /dev/null 2>&1; then
         run_cmd "dnf makecache -y >/dev/null $REDIRECT" root retry
-        run_cmd "dnf install 'dnf-command(copr)' -y $REDIRECT" root
+        run_cmd "dnf install 'dnf-command(copr)' -y $REDIRECT" root retry
       fi
       if ! dnf repolist 2>&1 | grep ponylang-ponylang > /dev/null 2>&1; then
         run_cmd "dnf copr enable ponylang/ponylang -y $REDIRECT" root
@@ -511,7 +511,7 @@ install_required_dependencies() {
       run_cmd "dnf makecache -y $REDIRECT" root retry
 
       # install dependencies for wallaroo
-      run_cmd "dnf install -y $PKGS_TO_INSTALL $REDIRECT" root
+      run_cmd "dnf install -y $PKGS_TO_INSTALL $REDIRECT" root retry
     ;;
 
     *)
@@ -692,7 +692,7 @@ configure_wallaroo() {
 
   if [ "$PYTHON_INSTALL" == "true" ]; then
     run_cmd "cp machida/build/machida bin $REDIRECT"
-    run_cmd "cp machida/wallaroo.py bin $REDIRECT"
+    run_cmd "cp -r machida/lib bin/pylib $REDIRECT"
   fi
 
   # clean up built artifacts

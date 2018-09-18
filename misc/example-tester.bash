@@ -47,6 +47,8 @@ if ! have_cmd ip; then
   fi
 fi
 
+DOCKER_PREFIX="bash -c "
+
 # install docker if it doesn't exist
 if ! have_cmd docker; then
   if [ -f /.dockerenv ]; then
@@ -229,14 +231,17 @@ parse_and_run() {
     LAST_CMD="${LAST_CMD%"${LAST_CMD##*[![:space:]]}"}"
 
     # run script for this shell taking into account docker security group
-    ${DOCKER_PREFIX} "$MY_TMP/shell${d}.bash" > "$MY_TMP/shell${d}.log" 2>&1 &
+    SHELL_LOG_FILE="$MY_TMP/shell${d}.log"
+    ${DOCKER_PREFIX} "$MY_TMP/shell${d}.bash" > "$SHELL_LOG_FILE" 2>&1 &
     last_pid=$!
     subshell_finished="false"
 
     # wait for bash to have executed the last command before proceeding
     j=1
     i=1
-    while ! grep -F "+ $LAST_CMD" "$MY_TMP/shell${d}.log" > /dev/null 2>&1;
+    grep_match="+ $LAST_CMD
++$LAST_CMD"
+    while ! grep -F "$grep_match" "$SHELL_LOG_FILE" > /dev/null 2>&1;
     do
       # grep failed.. check to see if process is still running; if not, we might have a failure
       if ! ps -p $last_pid > /dev/null; then
@@ -248,18 +253,25 @@ parse_and_run() {
           # process failed; if not metrics ui, stop running this example and move on to next one
           if [[ "$LAST_CMD" != "metrics_reporter_ui start" ]]; then
             log "Error! Script for shell${d} failed with ${RET_CODE}!"
+            if [[ "$VERBOSE_ERROR" == "true" ]]; then
+              cat "$SHELL_LOG_FILE"
+            fi
             return
           fi
           # process failed; if metrics ui, retry a few times just in case of a transient issue (port conflict, etc)
           if [[ $j -gt 3 ]]; then
             log "Error! Script for shell${d} failed with ${RET_CODE}! Tried multiple times (because it is the metrics_ui) with no success!"
+            if [[ "$VERBOSE_ERROR" == "true" ]]; then
+              cat "$SHELL_LOG_FILE"
+            fi
             return
           fi
           ## we have a failure for metrics_ui... try it again in case it was a weird transient thing..
           # call cleanup to kill any dangling processes since nothing should be running at this point
           cleanup
           rm -f "${WALLAROO_DIR}/tmp/log/"*
-          ${DOCKER_PREFIX} "$MY_TMP/shell${d}.bash" > "$MY_TMP/shell${d}.log.${j}" 2>&1 &
+          SHELL_LOG_FILE="$MY_TMP/shell${d}.log.${j}"
+          ${DOCKER_PREFIX} "$MY_TMP/shell${d}.bash" > "$SHELL_LOG_FILE" 2>&1 &
           last_pid=$!
           sleep 1
           (( j=j+1 ))
@@ -276,6 +288,9 @@ parse_and_run() {
             else
               # if no, this means the example failed
               log "Error! Script for shell${d} finished successfully without expected output in log!"
+              if [[ "$VERBOSE_ERROR" == "true" ]]; then
+                cat "$SHELL_LOG_FILE"
+              fi
               return
             fi
           fi
@@ -317,13 +332,17 @@ parse_and_run() {
           # if error and tried too many times, the example failed
           if [[ $j -gt 3 ]]; then
             log "Error! Script for shell${d} failed with ${RET_CODE}! Tried multiple times (because it is the metrics_ui) with no success!"
+            if [[ "$VERBOSE_ERROR" == "true" ]]; then
+              cat "$SHELL_LOG_FILE"
+            fi
             return
           fi
           ## else, we have a failure for metrics_ui... try it again in case it was a weird transient thing..
           # call cleanup to kill any dangling processes since nothing should be running at this point
           cleanup
           rm -f "${WALLAROO_DIR}/tmp/log/"*
-          ${DOCKER_PREFIX} "$MY_TMP/shell${d}.bash" > "$MY_TMP/shell${d}.log.${j}" 2>&1 &
+          SHELL_LOG_FILE="$MY_TMP/shell${d}.log.${j}"
+          ${DOCKER_PREFIX} "$MY_TMP/shell${d}.bash" > "$SHELL_LOG_FILE" 2>&1 &
           last_pid=$!
           sleep 1
           (( i=1 ))
@@ -334,13 +353,17 @@ parse_and_run() {
           # if timed out and tried too many times, the example failed
           if [[ $j -gt 3 ]]; then
             log "Error! Metrics reporter taking too long to start! Tried multiple times (because it is the metrics_ui) with no success!"
+            if [[ "$VERBOSE_ERROR" == "true" ]]; then
+              cat "$SHELL_LOG_FILE"
+            fi
             return
           fi
           ## we have a time out for metrics_ui... try it again in case it was a weird transient thing..
           # call cleanup to kill any dangling processes since nothing should be running at this point
           cleanup
           rm -f "${WALLAROO_DIR}/tmp/log/"*
-          ${DOCKER_PREFIX} "$MY_TMP/shell${d}.bash" > "$MY_TMP/shell${d}.log.${j}" 2>&1 &
+          SHELL_LOG_FILE="$MY_TMP/shell${d}.log.${j}"
+          ${DOCKER_PREFIX} "$MY_TMP/shell${d}.bash" > "$SHELL_LOG_FILE" 2>&1 &
           last_pid=$!
           sleep 1
           (( i=1 ))
@@ -357,6 +380,9 @@ parse_and_run() {
       wait ${last_pid} || RET_CODE=$?
       if [[ "${RET_CODE}" != "0" ]]; then
         log "Error! Script for shell${d} failed with ${RET_CODE}!"
+        if [[ "$VERBOSE_ERROR" == "true" ]]; then
+          cat "$SHELL_LOG_FILE"
+        fi
         return
       fi
     fi
@@ -369,6 +395,9 @@ parse_and_run() {
       wait ${last_pid} || RET_CODE=$?
       if [[ "${RET_CODE}" != "0" ]]; then
         log "Error! Script for shell${d} failed with ${RET_CODE}!"
+        if [[ "$VERBOSE_ERROR" == "true" ]]; then
+          cat "$SHELL_LOG_FILE"
+        fi
         return
       fi
       # log the fact that everything ran successfully for this example
