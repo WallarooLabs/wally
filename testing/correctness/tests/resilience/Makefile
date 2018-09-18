@@ -38,6 +38,7 @@ resilience_tests : CUSTOM_PATH = $(MULTI_PARTITION_DETECTOR_PATH):$(MULTI_PART_V
 
 build-testing-correctness-tests-resilience: build-testing-correctness-apps-multi_partition_detector
 build-testing-correctness-tests-resilience: build-utils-cluster_shrinker
+build-testing-correctness-tests-resilience: build-testing-tools-external_sender
 integration-tests-testing-correctness-tests-resilience: build-testing-correctness-tests-resilience
 integration-tests-testing-correctness-tests-resilience: resilience_tests
 
