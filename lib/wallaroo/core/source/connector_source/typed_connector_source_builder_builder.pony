@@ -41,7 +41,7 @@ class val TypedConnectorSourceBuilderBuilder[In: Any val]
 
   fun apply(runner_builder: RunnerBuilder, router: Router,
     metrics_conn: MetricsSink,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end,
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end,
     worker_name: String, metrics_reporter: MetricsReporter iso):
       SourceBuilder
   =>

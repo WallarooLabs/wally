@@ -1,3 +1,4 @@
+
 /*
 
 Copyright (C) 2016-2017, Wallaroo Labs
@@ -37,7 +38,7 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
-use "wallaroo/core/sink/connector_sink"
+use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
@@ -45,13 +46,12 @@ actor ConnectorSourceListener is SourceListener
   """
   # ConnectorSourceListener
   """
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
   let _auth: AmbientAuth
   let _pipeline_name: String
   var _router: Router
   let _router_registry: RouterRegistry
-  let _route_builder: RouteBuilder
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
   var _fd: U32
@@ -64,17 +64,14 @@ actor ConnectorSourceListener is SourceListener
   let _metrics_reporter: MetricsReporter
   var _source_builder: SourceBuilder
   let _event_log: EventLog
-  let _state_step_creator: StateStepCreator
   let _target_router: Router
 
-  new create(env: Env, source_builder: SourceBuilder,
-    router: Router, router_registry: RouterRegistry,
-    route_builder: RouteBuilder,
+  new create(env: Env, source_builder: SourceBuilder, router: Router,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    state_step_creator: StateStepCreator,
     target_router: Router = EmptyRouter,
     host: String = "", service: String = "0", limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
@@ -87,7 +84,6 @@ actor ConnectorSourceListener is SourceListener
     _pipeline_name = pipeline_name
     _router = router
     _router_registry = router_registry
-    _route_builder = route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _layout_initializer = layout_initializer
     _event = @pony_os_listen_tcp[AsioEventID](this,
@@ -97,7 +93,6 @@ actor ConnectorSourceListener is SourceListener
     _source_builder = source_builder
     _event_log = event_log
     _target_router = target_router
-    _state_step_creator = state_step_creator
 
     _init_size = init_size
     _max_size = max_size
@@ -137,6 +132,10 @@ actor ConnectorSourceListener is SourceListener
       end
     end
     _outgoing_boundary_builders = consume new_builders
+
+  be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+    //!@ Should we fail here?
+    None
 
   be update_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
@@ -212,12 +211,11 @@ actor ConnectorSourceListener is SourceListener
     Spawn a new connection.
     """
     try
-      let source_id = _step_id_gen()
+      let source_id = _routing_id_gen()
       let source = ConnectorSource._accept(source_id, _auth, this,
-        _notify_connected(source_id)?, _event_log, _router.routes(),
-        _route_builder, _outgoing_boundary_builders, _layout_initializer,
-        ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry,
-        _state_step_creator)
+        _notify_connected(source_id)?, _event_log, _router,
+        _outgoing_boundary_builders, _layout_initializer,
+        ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry)
 
       // TODO: We need to figure out how to unregister this when the
       // connection dies
@@ -249,7 +247,7 @@ actor ConnectorSourceListener is SourceListener
       Fail()
     end
 
-  fun ref _notify_connected(source_id: StepId): ConnectorSourceNotify iso^ ? =>
+  fun ref _notify_connected(source_id: RoutingId): ConnectorSourceNotify iso^ ? =>
     try
       _source_builder(source_id, _event_log, _auth, _target_router, _env)
         as ConnectorSourceNotify iso^

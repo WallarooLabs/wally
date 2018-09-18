@@ -32,7 +32,6 @@ class val ConnectorSourceListenerBuilder
   let _pipeline_name: String
   let _router: Router
   let _router_registry: RouterRegistry
-  let _route_builder: RouteBuilder
   let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
@@ -43,7 +42,7 @@ class val ConnectorSourceListenerBuilder
   let _metrics_reporter: MetricsReporter
 
   new val create(source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry, route_builder: RouteBuilder,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
@@ -55,7 +54,6 @@ class val ConnectorSourceListenerBuilder
     _pipeline_name = pipeline_name
     _router = router
     _router_registry = router_registry
-    _route_builder = route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _layout_initializer = layout_initializer
     _event_log = event_log
@@ -65,11 +63,11 @@ class val ConnectorSourceListenerBuilder
     _service = service
     _metrics_reporter = consume metrics_reporter
 
-  fun apply(state_step_creator: StateStepCreator, env: Env): SourceListener =>
+  fun apply(env: Env): SourceListener =>
     ConnectorSourceListener(env, _source_builder, _router, _router_registry,
-      _route_builder, _outgoing_boundary_builders, _event_log, _auth,
+      _outgoing_boundary_builders, _event_log, _auth,
       _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      state_step_creator, _target_router, _host, _service)
+      _target_router, _host, _service)
 
 class val ConnectorSourceListenerBuilderBuilder
   let _host: String
@@ -80,7 +78,7 @@ class val ConnectorSourceListenerBuilderBuilder
     _service = service
 
   fun apply(source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry, route_builder: RouteBuilder,
+    router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
@@ -88,7 +86,6 @@ class val ConnectorSourceListenerBuilderBuilder
     target_router: Router = EmptyRouter): ConnectorSourceListenerBuilder
   =>
     ConnectorSourceListenerBuilder(source_builder, router, router_registry,
-      route_builder,
       outgoing_boundary_builders, event_log, auth, pipeline_name,
       layout_initializer, consume metrics_reporter,
       target_router, _host, _service)
