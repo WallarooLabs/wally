@@ -53,11 +53,11 @@ def _test_restart(command):
 
 
 
-    runner_data = []
+    persistent_data = {}
     # Start cluster
     with Cluster(command=command, host=host, sources=sources,
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
-                 runner_data=runner_data) as cluster:
+                 persistent_data=persistent_data) as cluster:
 
         # Create sender
         logging.debug("Creating sender")
@@ -94,7 +94,9 @@ def _test_restart(command):
     # Validate worker actually underwent recovery
     pattern_restarting = "Restarting a listener ..."
     try:
-        assert(re.search(pattern_restarting, runner_data[2].stdout) is not None)
+        assert(re.search(pattern_restarting,
+                         persistent_data['runner_data'][2].stdout)
+               is not None)
     except AssertionError:
         raise AssertionError('Worker does not appear to have reconnected '
                              'as expected. Worker output is '
