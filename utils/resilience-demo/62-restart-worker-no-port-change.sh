@@ -11,7 +11,7 @@ else
     eval 'TARGET_EXT=$SERVER'$2'_EXT'
 fi
 
-ssh -n $USER@$TARGET_EXT "cd wallaroo ; ulimit -c unlimited ; ulimit -a ; $WALLAROO_BIN -i ${SERVER1}:7000,${SERVER1}:7001 -o ${SERVER1}:5555 -m ${SERVER1}:5001 -c ${SERVER1}:12500 -n worker${SOURCE_WORKER} --my-control ${TARGET}:13131 --my-data ${TARGET}:13132 --ponynoblock --resilience-disable-io-journal > /tmp/run-dir/${WALLAROO_NAME}${SOURCE_WORKER}.`date +%s`.out 2>&1" > /dev/null 2>&1 &
+ssh -n $USER@$TARGET_EXT "cd wallaroo ; ulimit -c unlimited ; ulimit -a ; $WALLAROO_BIN -i ${SERVER1}:7000,${SERVER1}:7001 -o ${SERVER1}:5555 -m ${SERVER1}:5001 -c ${SERVER1}:12500 -n worker${SOURCE_WORKER} --my-control ${TARGET}:13131 --my-data ${TARGET}:13132 $W_DOS_SERVER_ARG --ponynoblock > /tmp/run-dir/${WALLAROO_NAME}${SOURCE_WORKER}.`date +%s`.out 2>&1" > /dev/null 2>&1 &
 if [ -z "$RESTART_SLEEP" ]; then
     sleep 2
 else
