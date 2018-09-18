@@ -6,60 +6,20 @@ rvm:
 notifications:
   email: false
 
-branches:
-  only:
-    - release
-    - /^release-(\d).(\d).(\d)$/
-
 dist: trusty
 sudo: required
 
 services: docker
 
-addons:
-  apt:
-    sources:
-      - ubuntu-toolchain-r-test
-    packages:
-      - g++-5
-
-env:
-  global:
-    - secure: "eTz/Pyr9eXCuLbawMo4bkhD3bmmzoCIxnZ2XHHl4oV7HQ33cdioGaEsdU9cYZ5dNTWD5X0ufYfbLi03pKhXuIowR04emDJcC0TCKAJ73hMZZGRC9aiEYbMXP0GWb/IpkXDcoKhxk28HFD9fCUnpth6t4zA8SmcSvjJ9A8bmCsXsT18fx+6g9h6ODL9vb1mlv7zL7u26Ux9pOoIAa6/lSQgTyKLZK5g4Mf0YTrut+EXqYRscr/KVEVeabo/Cxk/TX4G/VI5ZRtHn9aRQw0lpn9K5ShSK7Jsu5WM9/i3vVBDSgjlBiM+kVFkN65CsDJ8KmtjLRW2bLsBzotOUY5r+GmSlhfw8KnOPHVKP+glbqj1Y7g3VnrodgdRqDoCALNhZPknOQ77UOa6BUuXxDG/qpkW1Phufkh4dKkDsPPjLzZoRK6FudXN9PFiPzZzWhslsJhXvpMFwJtHkrpFzQ/DFI1SysJrwWY4m9TKbMsfwIP7NrMKO9WTARmOeTrqNLcIrSgAfBMwRLl6GYXoydFv6b9bEGw2hiDfEwsJWsCb/BakphGnXQ4HNibS9QsH3J2dpsNkzyihavIN4goJ3DZCYFJ0kw8WjkykGMJorkVYW2qzStVKKRQBL8LinJ1KhYhA8cdzswCLbOoJdGCsUFrzoUbShtbgGbBKkhYZT1wYKdE+I="
-    # bintray or source
-    - INSTALL_PONYC_FROM: "bintray"
-    # ponyc version to install
-    # needs to be a version in bintray or
-    # a valid `git checkout` value if from source
-    - PONYC_VERSION: "0.24.4"
-    # ponyc from source variables
-    # LLVM version used if building ponyc from source
-    - LLVM_VERSION: "3.9.1"
-    - LLVM_CONFIG: "llvm-config-3.9"
-    # gcc version to use as linker if building ponyc from source
-    - CC1: gcc-5
-    - CXX: g++-5
-    # don't use LTO if building ponyc from source
-    - lto: no
-    # erlang and elixir versions to install
-    - OTP_VERSION: "1:20.1-1"
-    - ELIXIR_VERSION: "1.5.2-1"
-
-install:
-  - bash travis/install.sh
-
 stages:
   - tests
-  - deploy
-  - gitbook
 
 jobs:
   include:
     - stage: tests
-      script: bash travis/unit-tests.sh
-      env:
-        - UNIT_TESTS=t
-    - stage: tests
-      script: bash travis/integration-tests.sh
-      env:
-        - INTEGRATION_TESTS=t
+      script: bash travis/wallaroo-up-example-tester.bash python
+      name: "Python Examples"
+    - script: bash travis/wallaroo-up-example-tester.bash go
+      name: "Go Examples"
+    - script: bash travis/wallaroo-up-example-tester.bash pony
+      name: "Pony Examples"
