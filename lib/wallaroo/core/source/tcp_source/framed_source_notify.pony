@@ -32,12 +32,12 @@ use "wallaroo/core/topology"
 
 
 primitive TCPFramedSourceNotifyBuilder[In: Any val]
-  fun apply(source_id: StepId, pipeline_name: String, env: Env,
+  fun apply(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end):
     SourceNotify iso^
   =>
     TCPFramedSourceNotify[In](source_id, pipeline_name, env, auth, handler,
@@ -45,7 +45,7 @@ primitive TCPFramedSourceNotifyBuilder[In: Any val]
       target_router, pre_state_target_ids)
 
 class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
-  let _source_id: StepId
+  let _source_id: RoutingId
   let _env: Env
   let _auth: AmbientAuth
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
@@ -55,16 +55,16 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _handler: FramedSourceHandler[In] val
   let _runner: Runner
   var _router: Router
-  let _omni_router: OmniRouter = EmptyOmniRouter
+  let _target_id_router: TargetIdRouter = EmptyTargetIdRouter
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
-  new iso create(source_id: StepId, pipeline_name: String, env: Env,
+  new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end)
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
   =>
     _source_id = source_id
     _pipeline_name = pipeline_name
@@ -78,11 +78,8 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
 
-  fun routes(): Array[Consumer] val =>
+  fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
-
-  fun router(): Router =>
-    _router
 
   fun ref received(source: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -128,8 +125,9 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
           end
           if decoded isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              _source_id, source, _router, _omni_router, _msg_id_gen(), None,
-              decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
+              _source_id, source, _router, _target_id_router, _msg_id_gen(),
+              None, decode_end_ts, latest_metrics_id, ingest_ts,
+              _metrics_reporter)
           else
             (true, ingest_ts)
           end
@@ -170,18 +168,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   fun ref update_router(router': Router) =>
     _router = router'
 
-  fun ref update_route(step_id: StepId, key: Key, step: Step) ? =>
-    match _router
-    | let p_router: PartitionRouter =>
-      _router = p_router.update_route(step_id, key, step)?
-    else
-      ifdef "trace" then
-        @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +
-          " Updating route is a noop for this kind of Source.\n")
-          .cstring())
-      end
-    end
-
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
     match _router
     | let p_router: PartitionRouter =>
@@ -200,5 +186,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun ref closed(source: TCPSource ref) =>
     @printf[I32]("TCPSource connection closed\n".cstring())
+    source._dispose()
 
   // TODO: implement connect_failed

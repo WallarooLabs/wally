@@ -29,6 +29,7 @@ use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/ent/spike"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
@@ -41,20 +42,21 @@ actor Connections is Cluster
   let _is_initializer: Bool
   var _my_control_addr: (String, String) = ("", "")
   var _my_data_addr: (String, String) = ("", "")
-  let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
-  let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
-  let _control_conns: Map[String, ControlConnection] =
+  let _control_addrs: Map[WorkerName, (String, String)] =
+    _control_addrs.create()
+  let _data_addrs: Map[WorkerName, (String, String)] = _data_addrs.create()
+  let _control_conns: Map[WorkerName, ControlConnection] =
     _control_conns.create()
-  let _data_conn_builders: Map[String, OutgoingBoundaryBuilder] =
+  let _data_conn_builders: Map[WorkerName, OutgoingBoundaryBuilder] =
     _data_conn_builders.create()
-  let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
+  let _data_conns: Map[WorkerName, OutgoingBoundary] = _data_conns.create()
   let _metrics_conn: MetricsSink
   let _metrics_host: String
   let _metrics_service: String
   let _init_d_host: String
   let _init_d_service: String
   let _disposables: SetIs[DisposableActor] = _disposables.create()
-  let _step_id_gen: StepIdGenerator = StepIdGenerator
+  let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
@@ -160,7 +162,7 @@ actor Connections is Cluster
 
   be create_initializer_data_channel_listener(
     data_receivers: DataReceivers,
-    recovery_replayer: RecoveryReplayer,
+    recovery_replayer: RecoveryReconnecter,
     router_registry: RouterRegistry,
     cluster_initializer: ClusterInitializer, data_channel_file: FilePath,
     layout_initializer: LayoutInitializer tag)
@@ -239,7 +241,7 @@ actor Connections is Cluster
       _send_data(worker, data)
     end
 
-  be disconnect_from(worker: String) =>
+  be disconnect_from(worker: WorkerName) =>
     try
       (_, let d) = _data_conns.remove(worker)?
       d.dispose()
@@ -253,12 +255,13 @@ actor Connections is Cluster
         worker.cstring())
     end
 
-  be notify_joining_workers_of_joining_addresses(joining_workers:
-    Array[String] val)
+  be notify_joining_workers_of_joining_addresses(
+    joining_workers: Array[WorkerName] val,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
     for w1 in joining_workers.values() do
-      let others_control = recover iso Map[String, (String, String)] end
-      let others_data = recover iso Map[String, (String, String)] end
+      let others_control = recover iso Map[WorkerName, (String, String)] end
+      let others_data = recover iso Map[WorkerName, (String, String)] end
       for w2 in joining_workers.values() do
         try
           if w1 != w2 then others_control(w2) = _control_addrs(w2)? end
@@ -269,18 +272,20 @@ actor Connections is Cluster
       end
       try
         let msg = ChannelMsgEncoder.announce_connections(
-          consume others_control, consume others_data, _auth)?
+          consume others_control, consume others_data,
+          new_state_routing_ids, _auth)?
         _send_control(w1, msg)
       else
         Fail()
       end
     end
 
-  be notify_current_workers_of_joining_addresses(joining_workers:
-    Array[String] val)
+  be notify_current_workers_of_joining_addresses(
+    joining_workers: Array[WorkerName] val,
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
-    let joining_control = recover iso Map[String, (String, String)] end
-    let joining_data = recover iso Map[String, (String, String)] end
+    let joining_control = recover iso Map[WorkerName, (String, String)] end
+    let joining_data = recover iso Map[WorkerName, (String, String)] end
     for jw in joining_workers.values() do
       try
         joining_control(jw) = _control_addrs(jw)?
@@ -291,35 +296,24 @@ actor Connections is Cluster
     end
     try
       let msg = ChannelMsgEncoder.announce_joining_workers(_worker_name,
-        consume joining_control, consume joining_data, _auth)?
+        consume joining_control, consume joining_data,
+        new_state_routing_ids, _auth)?
       _send_control_to_cluster(msg where exclusions = joining_workers)
     else
       Fail()
     end
 
-  be notify_cluster_of_new_stateful_step(id: StepId, key: Key,
-    state_name: String, exclusions: Array[String] val =
-    recover Array[String] end)
-  =>
+  be notify_cluster_of_new_key(key: Key, state_name: String) =>
     try
-      let new_step_msg = ChannelMsgEncoder.announce_new_stateful_step(id,
-        _worker_name, key, state_name, _auth)?
-      for (target, ch) in _control_conns.pairs() do
-        // Only send to workers that don't already know about this step
-        if not exclusions.contains(target) then
-          ch.writev(new_step_msg)
-        end
-      end
+      @printf[I32]("!@ Notify cluster about key %s\n".cstring(), key.cstring())
       let migration_complete_msg =
-        ChannelMsgEncoder.step_migration_complete(id, _auth)?
-      for producer in exclusions.values() do
-        _control_conns(producer)?.writev(migration_complete_msg)
-      end
+        ChannelMsgEncoder.key_migration_complete(key, _auth)?
+      _send_control_to_cluster(migration_complete_msg)
     else
       Fail()
     end
 
-  be notify_cluster_of_new_source(id: StepId) =>
+  be notify_cluster_of_new_source(id: RoutingId) =>
     try
       let msg = ChannelMsgEncoder.announce_new_source(_worker_name, id,
         _auth)?
@@ -346,74 +340,6 @@ actor Connections is Cluster
       Fail()
     end
 
-  be request_in_flight_acks(requester_id: StepId,
-    router_registry: RouterRegistry,
-    exclusions: Array[String] val = recover Array[String] end)
-  =>
-    let id_gen = RequestIdGenerator
-    let request_ids = recover Array[RequestId] end
-    var sent_request_msg = false
-    try
-      for (target, ch) in _control_conns.pairs() do
-        if
-          (target != _worker_name) and
-          (not exclusions.contains(target,
-            {(a: String, b: String): Bool => a == b}))
-        then
-          let next_request_id = id_gen()
-          request_ids.push(next_request_id)
-          let in_flight_ack_request_msg =
-            ChannelMsgEncoder.request_in_flight_ack(_worker_name,
-              next_request_id, requester_id, _auth)?
-          ch.writev(in_flight_ack_request_msg)
-          sent_request_msg = true
-        end
-      end
-    else
-      Fail()
-    end
-    if sent_request_msg then
-      router_registry.add_connection_request_ids(consume request_ids)
-    else
-      router_registry.try_finish_in_flight_request_early(requester_id)
-    end
-
-  be request_in_flight_resume_acks(
-    in_flight_resume_ack_id: InFlightResumeAckId,
-    requester_id: StepId, leaving_workers: Array[String] val,
-    router_registry: RouterRegistry,
-    exclusions: Array[String] val = recover Array[String] end)
-  =>
-    let id_gen = RequestIdGenerator
-    let request_ids = recover Array[RequestId] end
-    var sent_request_msg = false
-    try
-      for (target, ch) in _control_conns.pairs() do
-        if
-          (target != _worker_name) and
-          (not exclusions.contains(target,
-            {(a: String, b: String): Bool => a == b}))
-        then
-          let next_request_id = id_gen()
-          request_ids.push(next_request_id)
-          let in_flight_resume_ack_request_msg =
-            ChannelMsgEncoder.request_in_flight_resume_ack(_worker_name,
-              in_flight_resume_ack_id, next_request_id, requester_id,
-              leaving_workers, _auth)?
-          ch.writev(in_flight_resume_ack_request_msg)
-          sent_request_msg = true
-        end
-      end
-    else
-      Fail()
-    end
-    if sent_request_msg then
-      router_registry.add_connection_request_ids_for_complete(
-        consume request_ids)
-    else
-      router_registry.try_finish_resume_request_early()
-    end
-
   be request_cluster_unmute() =>
     try
       let unmute_request_msg = ChannelMsgEncoder.unmute_request(_worker_name,
@@ -427,32 +353,38 @@ actor Connections is Cluster
       Fail()
     end
 
-  be create_boundary_to_joining_worker(target: String, boundary_id: U128,
-    local_topology_initializer: LocalTopologyInitializer)
-  =>
-    try
-      (let host, let service) = _data_addrs(target)?
-      let reporter = MetricsReporter(_app_name,
-        _worker_name, _metrics_conn)
-      let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-        consume reporter, host, service, _spike_config)
-      let boundary = builder.build_and_initialize(boundary_id, target,
-        local_topology_initializer)
-      _register_disposable(boundary)
-      local_topology_initializer.add_boundary_to_joining_worker(target,
-        boundary, builder)
-    else
-      @printf[I32]("Can't find data address for worker\n".cstring())
-      Fail()
-    end
+//!@
+  // be create_boundary_to_joining_worker(target: String, boundary_id: U128,
+  //   state_routing_ids: Map[StateName, RoutingId] val,
+  //   local_topology_initializer: LocalTopologyInitializer)
+  // =>
+  //   try
+  //     (let host, let service) = _data_addrs(target)?
+  //     let reporter = MetricsReporter(_app_name,
+  //       _worker_name, _metrics_conn)
+  //     let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
+  //       consume reporter, host, service, _spike_config)
+  //     let boundary = builder.build_and_initialize(boundary_id, target,
+  //       local_topology_initializer)
+  //     _register_disposable(boundary)
+  //     local_topology_initializer.add_boundary_to_joining_worker(target,
+  //       boundary, builder, state_routing_ids)
+  //   else
+  //     @printf[I32]("Can't find data address for worker\n".cstring())
+  //     Fail()
+  //   end
 
+  // TODO: Passing in checkpoint target here is a hack because we currently
+  // do recovery initialization at the point boundary updates are complete.
+  // We need to move this out to another place.
   be update_boundaries(layout_initializer: LayoutInitializer,
-    recovering: Bool = false)
+    checkpoint_target: (CheckpointId | None) = None)
   =>
-    _update_boundaries(layout_initializer, recovering)
+    _update_boundaries(layout_initializer, checkpoint_target)
 
   fun _update_boundaries(layout_initializer: LayoutInitializer,
-    recovering: Bool = false, router_registry: (RouterRegistry | None) = None)
+    checkpoint_target: (CheckpointId | None) = None,
+    router_registry: (RouterRegistry | None) = None)
   =>
     let out_bs_trn = recover trn Map[String, OutgoingBoundary] end
 
@@ -483,8 +415,13 @@ actor Connections is Cluster
     // boundaries should trigger initialization, but this is the point
     // at which initialization is possible for a joining or recovering
     // worker in a multiworker cluster.
-    if _is_joining or recovering then
-      layout_initializer.initialize(where recovering = recovering)
+    if _is_joining then
+      layout_initializer.initialize()
+    else
+      match checkpoint_target
+      | let s_id: CheckpointId => layout_initializer.initialize(
+        where checkpoint_target = s_id)
+      end
     end
 
   be create_connections(
@@ -529,33 +466,53 @@ actor Connections is Cluster
         .cstring())
     end
 
+  be remove_worker_connection_info(worker: WorkerName) =>
+    try
+      _control_addrs.remove(worker)?
+      _data_addrs.remove(worker)?
+      _control_conns.remove(worker)?
+      _data_conn_builders.remove(worker)?
+      _data_conns.remove(worker)?
+    else
+      ifdef debug then
+        @printf[I32]("Couldn't find all worker connections to remove\n"
+          .cstring())
+      end
+    end
+
   be save_connections() =>
     _save_connections(_control_addrs, _data_addrs)
 
-  fun _save_connections(control_addrs: Map[String, (String, String)] box,
-    data_addrs: Map[String, (String, String)] box)
+  fun _save_connections(control_addrs: Map[WorkerName, (String, String)] box,
+    data_addrs: Map[WorkerName, (String, String)] box)
   =>
     @printf[I32]("Saving connection addresses!\n".cstring())
 
-    let map = recover trn Map[String, Map[String, (String, String)]] end
-    let control_map = recover trn Map[String, (String, String)] end
+    let map = recover trn Map[String, Map[WorkerName, (String, String)]] end
+    let control_map = recover trn Map[WorkerName, (String, String)] end
     for (key, value) in control_addrs.pairs() do
       control_map(key) = value
     end
-    let data_map = recover trn Map[String, (String, String)] end
+    let data_map = recover trn Map[WorkerName, (String, String)] end
     for (key, value) in data_addrs.pairs() do
       data_map(key) = value
     end
 
+    //!@
+    for (w, a) in control_map.pairs() do
+      @printf[I32]("!@ CONN TO WORKER WWW %s\n".cstring(), w.cstring())
+    end
+
     map("control") = consume control_map
     map("data") = consume data_map
-    let addresses: Map[String, Map[String, (String, String)]] val =
+    let addresses: Map[String, Map[WorkerName, (String, String)]] val =
       consume map
 
     try
       let connection_addresses_file = FilePath(_auth,
         _connection_addresses_file)?
       let file = File(connection_addresses_file)
+      file.set_length(0)
       let wb = Writer
       let serialised_connection_addresses: Array[U8] val =
         Serialised(SerialiseAuth(_auth), addresses)?.output(
@@ -572,25 +529,29 @@ actor Connections is Cluster
       boundary.quick_initialize(li)
     end
 
-  be create_routers_from_blueprints(workers: Array[String] val,
-    pr_blueprints: Map[String, PartitionRouterBlueprint] val,
+  be create_routers_from_blueprints(workers: Array[WorkerName] val,
+    pr_blueprints: Map[StateName, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    omr_blueprint: OmniRouterBlueprint, local_sinks: Map[StepId, Consumer] val,
+    tidr_blueprints: Map[StateName, TargetIdRouterBlueprint] val,
+    local_sinks: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
     router_registry: RouterRegistry, lti: LocalTopologyInitializer)
   =>
     // We delegate to router registry through here to ensure that we've
     // already sent the outgoing boundaries to the router registry when
     // create_connections was called.
 
-    // We must create the omni_router first
-    router_registry.create_omni_router_from_blueprint(omr_blueprint,
-      local_sinks, lti)
+    // We must create the target_id_router first
+    router_registry.create_target_id_routers_from_blueprint(tidr_blueprints,
+      state_steps, local_sinks, lti)
     router_registry.create_partition_routers_from_blueprints(workers,
-      pr_blueprints)
+      state_steps, state_step_ids, pr_blueprints)
     router_registry.create_stateless_partition_routers_from_blueprints(
       spr_blueprints)
 
-  be recover_connections(layout_initializer: LayoutInitializer)
+  be recover_connections(layout_initializer: LayoutInitializer,
+    checkpoint_target: CheckpointId)
   =>
     var addresses: Map[String, Map[String, (String, String)]] val =
       recover val Map[String, Map[String, (String, String)]] end
@@ -631,7 +592,8 @@ actor Connections is Cluster
         end
       end
 
-      _update_boundaries(layout_initializer where recovering = true)
+      _update_boundaries(layout_initializer
+        where checkpoint_target = checkpoint_target)
 
       @printf[I32]((_worker_name +
         ": Interconnections with other workers created.\n").cstring())
@@ -690,25 +652,29 @@ actor Connections is Cluster
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
-    let outgoing_boundary = boundary_builder(_step_id_gen(), target_name)
+    let outgoing_boundary = boundary_builder(_routing_id_gen(), target_name)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
 
-  be create_data_connection_to_joining_worker(target_name: String,
-    host: String, service: String, li: LayoutInitializer)
+  be create_data_connection_to_joining_worker(target_name: WorkerName,
+    host: String, service: String, new_boundary_id: RoutingId,
+    state_routing_ids: Map[StateName, RoutingId] val,
+    lti: LocalTopologyInitializer)
   =>
     _data_addrs(target_name) = (host, service)
+    let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
-      _spike_config)
+      consume reporter, host, service, _spike_config)
     let outgoing_boundary =
-      boundary_builder.build_and_initialize(_step_id_gen(), target_name, li)
+      boundary_builder.build_and_initialize(new_boundary_id, target_name, lti)
     _data_conn_builders(target_name) = boundary_builder
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
+    lti.add_boundary_to_joining_worker(target_name, outgoing_boundary,
+      boundary_builder, state_routing_ids)
 
-  be update_boundary_ids(boundary_ids: Map[String, U128] val) =>
+  be update_boundary_ids(boundary_ids: Map[String, RoutingId] val) =>
     for (worker, boundary) in _data_conns.pairs() do
       try
         boundary.register_step_id(boundary_ids(worker)?)
@@ -719,11 +685,12 @@ actor Connections is Cluster
     end
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
-    local_topology: LocalTopology,
+    local_topology: LocalTopology, checkpoint_id: CheckpointId,
+    rollback_id: RollbackId, primary_checkpoint_worker: String,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
-    omr_blueprint: OmniRouterBlueprint)
+    tidr_blueprints: Map[String, TargetIdRouterBlueprint] val)
   =>
     _register_disposable(conn)
     if not _control_addrs.contains(worker) then
@@ -741,10 +708,12 @@ actor Connections is Cluster
 
       try
         let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
-          _app_name, local_topology.for_new_worker(worker)?, _metrics_host,
-          _metrics_service, consume c_addrs, consume d_addrs,
-          local_topology.worker_names, partition_blueprints,
-          stateless_partition_blueprints, omr_blueprint, _auth)?
+          _app_name, local_topology.for_new_worker(worker)?,
+          checkpoint_id, rollback_id, _metrics_host, _metrics_service,
+          consume c_addrs, consume d_addrs,
+          local_topology.worker_names, primary_checkpoint_worker,
+          partition_blueprints, stateless_partition_blueprints,
+          tidr_blueprints, _auth)?
         conn.writev(inform_msg)
         @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
           "necessary information.***\n").cstring(), worker.cstring())
@@ -763,7 +732,9 @@ actor Connections is Cluster
       end
     end
 
-  be inform_contacted_worker_of_initialization(contacted_worker: String) =>
+  be inform_contacted_worker_of_initialization(contacted_worker: String,
+    state_routing_ids: Map[StateName, RoutingId] val)
+  =>
     try
       if not _has_registered_my_addrs() then
         @printf[I32](("Cannot inform contacted worker of join: my addresses " +
@@ -775,7 +746,7 @@ actor Connections is Cluster
         "I have completed initialization\n").cstring(),
         contacted_worker.cstring())
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
-        _my_control_addr, _my_data_addr, _auth)?
+        _my_control_addr, _my_data_addr, state_routing_ids, _auth)?
       _send_control(contacted_worker, msg)
     else
       Fail()
@@ -865,3 +836,21 @@ actor Connections is Cluster
       @printf[I32]("WARNING: LogRotation requested, but log_rotation is off!\n"
         .cstring())
     end
+
+  be update_worker_data_service(worker: WorkerName,
+    host: String, service: String)
+  =>
+    @printf[I32]("SLF: Connections.update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    if not _data_addrs.contains(worker) then
+      Fail()
+    end
+    _data_addrs(worker) = (host, service)
+    try
+      let old_bb = _data_conn_builders(worker)?
+      _data_conn_builders(worker) = old_bb.clone_with_new_service(host, service)
+    else
+      Fail()
+    end
+
+    @printf[I32]("SLF: TODO Connections.update_worker_data_service: anything with _data_conns iteration & update?\n".cstring())
+    // TODO ^^^^

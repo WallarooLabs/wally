@@ -67,7 +67,10 @@ primitive _BaseLocalTopologyGenerator
   =>
     LocalTopology("test", "w1", dag, _StepMapGenerator(),
       _BaseStateBuildersGenerator(rb, pf), psd, _ProxyIdsGenerator(),
-      _BaseWorkerNamesGenerator(), recover val SetIs[String] end)
+      recover val Map[StateName, Array[RoutingId] val] end,
+      _BaseWorkerNamesGenerator(), recover val SetIs[String] end,
+      recover val Map[StateName, Map[WorkerName, RoutingId] val] end,
+      0)
 
 primitive _TargetLocalTopologyGenerator
   fun apply(dag: Dag[StepInitializer] val,
@@ -77,7 +80,10 @@ primitive _TargetLocalTopologyGenerator
   =>
     LocalTopology("test", "w1", dag, _StepMapGenerator(),
       _TargetStateBuildersGenerator(rb, pf), psd, _ProxyIdsGenerator(),
-      _TargetWorkerNamesGenerator(), recover val SetIs[String] end)
+      recover val Map[StateName, Array[RoutingId] val] end,
+      _TargetWorkerNamesGenerator(), recover val SetIs[String] end,
+      recover val Map[StateName, Map[WorkerName, RoutingId] val] end,
+      0)
 
 primitive _DagGenerator
   fun apply(): Dag[StepInitializer] val =>
@@ -96,7 +102,7 @@ primitive _BaseStateBuildersGenerator
     Map[String, StateSubpartitions] val
   =>
     let m = recover trn Map[String, StateSubpartitions] end
-    m("state") = _BaseStateSubpartitionsGenerator(rb, pf)
+    m("state") = _BaseStateSubpartitionsGenerator(rb)
     consume m
 
 primitive _TargetStateBuildersGenerator
@@ -104,24 +110,24 @@ primitive _TargetStateBuildersGenerator
     Map[String, StateSubpartitions] val
   =>
     let m = recover trn Map[String, StateSubpartitions] end
-    m("state") = _TargetStateSubpartitionsGenerator(rb, pf)
+    m("state") = _TargetStateSubpartitionsGenerator(rb)
     consume m
 
 primitive _BaseStateSubpartitionsGenerator
-  fun apply(rb: RunnerBuilder, pf: PartitionFunction[String] val):
+  fun apply(rb: RunnerBuilder):
     StateSubpartitions
   =>
-    KeyedStateSubpartitions[String, EmptyState]("s",
+    KeyedStateSubpartitions[EmptyState]("s", 1,
       _BaseKeyDistributionGenerator(), _IdMapGenerator(),
-      rb, pf, "pipeline")
+      rb, "pipeline")
 
 primitive _TargetStateSubpartitionsGenerator
-  fun apply(rb: RunnerBuilder, pf: PartitionFunction[String] val):
+  fun apply(rb: RunnerBuilder):
     StateSubpartitions
   =>
-    KeyedStateSubpartitions[String, EmptyState]("s",
+    KeyedStateSubpartitions[EmptyState]("s", 1,
       _TargetKeyDistributionGenerator(), _IdMapGenerator(),
-      rb, pf, "pipeline")
+      rb, "pipeline")
 
 primitive _HashPartitionsAndWorkersToKeys
   fun apply(workers: Array[String] val, keys: Array[String] val)
@@ -200,12 +206,11 @@ primitive _PreStateDataArrayGenerator
 
 primitive _PreStateDataGenerator
   fun apply(rb: RunnerBuilder): PreStateData =>
-    PreStateData(rb, recover Array[StepId] end)
+    PreStateData(rb, recover Array[RoutingId] end)
 
 primitive _RunnerBuilderGenerator
   fun apply(): RunnerBuilder =>
-    ComputationRunnerBuilder[U8, U8](_ComputationBuilderGenerator(),
-      BoundaryOnlyRouteBuilder)
+    ComputationRunnerBuilder[U8, U8](_ComputationBuilderGenerator())
 
 primitive _ComputationBuilderGenerator
   fun apply(): ComputationBuilder[U8, U8] val =>

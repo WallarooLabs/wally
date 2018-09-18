@@ -103,11 +103,20 @@ actor Main
           symbols_file_path = arg
         end
       end
-      let symbol_data_partition = if symbols_file_path is None then
-          Partitions[Symboly val](
+      let order_data_partition = if symbols_file_path is None then
+          Partitions[FixOrderMessage val](
             SymbolPartitionFunction, LegalSymbols.symbols)
         else
-          Partitions[Symboly val](
+          Partitions[FixOrderMessage val](
+            SymbolPartitionFunction,
+            PartitionsFileReader(symbols_file_path as String,
+              env.root as AmbientAuth))
+        end
+      let nbbo_data_partition = if symbols_file_path is None then
+          Partitions[FixNbboMessage val](
+            SymbolPartitionFunction, LegalSymbols.symbols)
+        else
+          Partitions[FixNbboMessage val](
             SymbolPartitionFunction,
             PartitionsFileReader(symbols_file_path as String,
               env.root as AmbientAuth))
@@ -128,10 +137,9 @@ actor Main
             TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
-            .to_state_partition[Symboly val,
-              (OrderResult val | None), SymbolData](CheckOrder,
-              SymbolDataBuilder, "symbol-data", symbol_data_partition
-              where multi_worker = true)
+            .to_state_partition[(OrderResult val | None), SymbolData](
+              CheckOrder, SymbolDataBuilder, "symbol-data",
+              order_data_partition where multi_worker = true)
             //!! TODO: Update to use command line for host/service
             .to_sink(TCPSinkConfig[OrderResult val].from_options(OrderResultEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?))
@@ -139,9 +147,9 @@ actor Main
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(1)?))
-            .to_state_partition[Symboly val, None,
-               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
-               symbol_data_partition where multi_worker = true)
+            .to_state_partition[None, SymbolData](UpdateNbbo,
+              SymbolDataBuilder, "symbol-data",
+              nbbo_data_partition where multi_worker = true)
             .done()
       end
       Startup(env, application, "market-spread")

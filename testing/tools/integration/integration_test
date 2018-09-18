@@ -309,6 +309,7 @@ class SinkAwaitAction(argparse.Action):
 
 
 LOG_LEVELS = {'none': 0,
+              '1': 1,
               'debug': 10,
               'info': 20,
               'warn': 30,
@@ -465,7 +466,7 @@ def CLI():
     log_group.add_argument('--log-file', help=("Save integration test output"
                            " to file."), action=SetLogFile)
     log_group.add_argument('--log-level', help=("Set the logging level."),
-                           choices=['none', 'debug', 'info', 'warning',
+                           choices=['none', '1', 'debug', 'info', 'warning',
                                     'error', 'critical'],
                            default='info')
 
@@ -539,7 +540,7 @@ def CLI():
             logging.error("Application outputs:\n{}".format(outputs))
             logging.error("Validation command '%s' failed with the output:\n"
                           "--\n%s\nThe application output is shown above.\n",
-                          ' '.join(res.command), res.output)
+                          res.command, res.output)
 
         if logging.root.level > logging.ERROR:
             # If failed, and logging level means we didn't log error, include it

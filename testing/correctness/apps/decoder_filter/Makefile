@@ -56,10 +56,6 @@ testing_decoder_filter_test:
 		--workers 1 \
 		--sink-expect 500
 
-clean-testing-correctnes-apps-decoder_filter: decoder_filter_clean
-
-decoder_filter_clean:
-	$(QUIET)rm -fr $(TESTING_DECODER_FILTER_PATH)/decoder_filter*
 
 # end of prevent rules from being evaluated/included multiple times
 endif

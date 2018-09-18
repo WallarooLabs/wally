@@ -35,16 +35,16 @@ interface FramedSourceHandler[In: Any val]
   fun decode(data: Array[U8] val): In ?
 
 interface SourceNotify
-  fun ref routes(): Array[Consumer] val
+  fun ref routes(): Map[RoutingId, Consumer] val
 
   fun ref update_router(router: Router)
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
 
 interface val SourceNotifyBuilder[In: Any val, SH: SourceHandler[In] val]
-  fun apply(source_id: StepId, pipeline_name: String, env: Env,
+  fun apply(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SH, runner_builder: RunnerBuilder,
     router: Router, metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
-    pre_state_target_ids: Array[StepId] val = recover Array[StepId] end):
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end):
     SourceNotify iso^

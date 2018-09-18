@@ -28,16 +28,20 @@ use "wallaroo_labs/mort"
 use "wallaroo_labs/options"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common/"
+use "wallaroo/core/initialization"
+use "wallaroo/core/messages"
+use "wallaroo/core/metrics"
+use "wallaroo/core/topology"
+use "wallaroo/ent/autoscale"
+use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/cluster_manager"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
+use "wallaroo/ent/checkpoint"
 use "wallaroo/ent/spike"
-use "wallaroo/core/initialization"
-use "wallaroo/core/messages"
-use "wallaroo/core/metrics"
-use "wallaroo/core/topology"
+
 
 actor Startup
   let _env: Env
@@ -48,12 +52,12 @@ actor Startup
 
   var _external_host: String = ""
   var _external_service: String = ""
-  var _is_multi_worker: Bool = true
   var _cluster_initializer: (ClusterInitializer | None) = None
   var _application_distributor: (ApplicationDistributor | None) = None
   var _swarm_manager_addr: String = ""
   var _event_log: (EventLog | None) = None
   var _joining_listener: (TCPListener | None) = None
+  var _recovery_listener: (TCPListener | None) = None
 
   // RECOVERY FILES
   var _event_log_file: String = ""
@@ -61,15 +65,18 @@ actor Startup
   var _event_log_file_basename: String = ""
   var _event_log_file_suffix: String = ""
   var _local_topology_file: String = ""
+  var _local_keys_file: String = ""
   var _data_channel_file: String = ""
   var _control_channel_file: String = ""
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
+  var _checkpoint_ids_file: String = ""
 
   var _connections: (Connections | None) = None
 
-  let _join_disposables: SetIs[DisposableActor] = _join_disposables.create()
+  let _disposables: SetIs[DisposableActor] = _disposables.create()
   var _is_joining: Bool = false
+  var _is_recovering: Bool = false
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -103,7 +110,15 @@ actor Startup
     try
       let auth = _env.root as AmbientAuth
       _startup_options = WallarooConfig.wallaroo_args(_env.args)?
-      _is_joining = _startup_options.is_joining
+      _set_recovery_file_names(auth)
+      _is_recovering = is_recovering(auth)
+      _is_joining = (not _is_recovering) and _startup_options.is_joining
+
+      if _is_joining then
+        @printf[I32]("New worker preparing to join cluster\n".cstring())
+      elseif _is_recovering then
+        @printf[I32]("Attempting to recover...\n".cstring())
+      end
 
       (_external_host, _external_service) =
         match _startup_options.x_arg
@@ -133,25 +148,6 @@ actor Startup
       end
 
       if _is_joining then
-        @printf[I32]("New worker preparing to join cluster\n".cstring())
-      else
-        match _startup_options.worker_count
-        | let wc: USize =>
-          if wc == 1 then
-            @printf[I32]("Single worker topology\n".cstring())
-            _is_multi_worker = false
-          else
-            @printf[I32]((_startup_options.worker_count.string() +
-              " worker topology\n").cstring())
-          end
-        else
-          if _startup_options.is_initializer then
-            Unreachable()
-          end
-        end
-      end
-
-      if _is_joining then
         if _startup_options.worker_name == "" then
           @printf[I32](("You must specify a name for the worker " +
             "via the -n parameter.\n").cstring())
@@ -163,29 +159,42 @@ actor Startup
             _startup_options.worker_name, _startup_options.worker_count, this)
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0)?, j_addr(1)?)
-        _join_disposables.set(control_conn)
-        @printf[I32]("Attempting to join cluster...\n".cstring())
+        _disposables.set(control_conn)
         // This only exists to keep joining worker alive while it waits for
         // cluster information.
         // TODO: Eliminate the need for this.
         let joining_listener = TCPListener(auth, JoiningListenNotifier)
         _joining_listener = joining_listener
-        _join_disposables.set(joining_listener)
+        _disposables.set(joining_listener)
+      elseif _is_recovering then
+        (let checkpoint_id, let rollback_id) =
+          LatestCheckpointId.read(auth, _checkpoint_ids_file)
+        _initialize(checkpoint_id)
       else
-        initialize()
+        _initialize()
       end
     else
       StartupHelp()
     end
 
-  be initialize() =>
+  be recover_and_initialize(checkpoint_id: CheckpointId) =>
+    match _recovery_listener
+    | let l: TCPListener =>
+      l.dispose()
+    end
+    _initialize(checkpoint_id)
+
+  fun ref _initialize(checkpoint_id: (CheckpointId | None) = None) =>
     try
       if _is_joining then
         Fail()
       end
 
+      // TODO: Replace this with the name of this worker, whatever it
+      // happens to be.
+      let initializer_name = "initializer"
+
       let auth = _env.root as AmbientAuth
-      _set_recovery_file_names(auth)
 
       let m_addr = _startup_options.m_arg as Array[String]
 
@@ -200,103 +209,56 @@ actor Startup
       let metrics_conn = ReconnectingMetricsSink(m_addr(0)?,
           m_addr(1)?, _application.name(), _startup_options.worker_name)
 
-      var is_recovering: Bool = false
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
 
-      // check to see if we can recover
-      // Use Set to make the logic explicit and clear
-      let existing_files: Set[String] = Set[String]
-
       let event_log_filepath = try
-        let elf: FilePath = LastLogFilePath(_event_log_file_basename,
+        LastLogFilePath(_event_log_file_basename,
           _event_log_file_suffix, event_log_dir_filepath)?
-        existing_files.set(elf.path)
-        elf
       else
-        let elf = FilePath(event_log_dir_filepath,
+        FilePath(event_log_dir_filepath,
           _event_log_file_basename + _event_log_file_suffix)?
-        if elf.exists() then
-          existing_files.set(elf.path)
-        end
-        elf
       end
 
       let local_topology_filepath: FilePath = FilePath(auth,
         _local_topology_file)?
-      if local_topology_filepath.exists() then
-        existing_files.set(local_topology_filepath.path)
-      end
+
+      let local_keys_filepath: FilePath = FilePath(auth, _local_keys_file)?
 
       let data_channel_filepath: FilePath = FilePath(auth,
         _data_channel_file)?
-      if data_channel_filepath.exists() then
-        existing_files.set(data_channel_filepath.path)
-      end
 
       let control_channel_filepath: FilePath = FilePath(auth,
         _control_channel_file)?
-      if control_channel_filepath.exists() then
-        existing_files.set(control_channel_filepath.path)
-      end
 
       let worker_names_filepath: FilePath = FilePath(auth,
         _worker_names_file)?
-      if worker_names_filepath.exists() then
-        existing_files.set(worker_names_filepath.path)
-      end
 
       let connection_addresses_filepath: FilePath = FilePath(auth,
         _connection_addresses_file)?
-      if connection_addresses_filepath.exists() then
-        existing_files.set(connection_addresses_filepath.path)
-      end
 
-      let required_files: Set[String] = Set[String]
-      ifdef "resilience" then
-        required_files.set(event_log_filepath.path)
-      end
-      required_files.set(local_topology_filepath.path)
-      required_files.set(control_channel_filepath.path)
-      required_files.set(worker_names_filepath.path)
-      if not _startup_options.is_initializer then
-        required_files.set(data_channel_filepath.path)
-        required_files.set(connection_addresses_filepath.path)
-      end
-
-      // Only validate _all_ files exist if _any_ files exist.
-      if existing_files.size() > 0 then
-        // If any recovery file exists, but not all, then fail
-        if (required_files.op_and(existing_files)) != required_files then
-          @printf[I32](("Some resilience/recovery files are missing! "
-            + "Cannot continue!\n").cstring())
-            let files_missing = required_files.without(existing_files)
-            let files_missing_str: String val = "\n    "
-              .join(files_missing.values())
-            @printf[I32]("The missing files are:\n    %s\n".cstring(),
-              files_missing_str.cstring())
-          Fail()
-        else
-          @printf[I32]("Recovering from recovery files!\n".cstring())
-          // we are recovering because all files exist
-          is_recovering = true
-        end
-      end
+      let checkpoint_ids_filepath: FilePath = FilePath(auth,
+        _checkpoint_ids_file)?
 
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(auth, _startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
             where backend_file_length' =
               _startup_options.event_log_file_length,
-            suffix' = _event_log_file_suffix, log_rotation' = true))
+            suffix' = _event_log_file_suffix, log_rotation' = true,
+            is_recovering' = _is_recovering))
         else
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(auth, _startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
-              _startup_options.event_log_file_length))
+              _startup_options.event_log_file_length,
+              is_recovering' = _is_recovering))
         end
       else
-        EventLog()
+        EventLog(auth, _startup_options.worker_name,
+          EventLogConfig(where is_recovering' = _is_recovering))
       end
       let event_log = _event_log as EventLog
 
@@ -311,35 +273,66 @@ actor Startup
       _connections = connections
       connections.register_disposable(this)
 
+      let barrier_initiator = BarrierInitiator(auth,
+        _startup_options.worker_name, connections, initializer_name,
+        _is_recovering)
+      connections.register_disposable(barrier_initiator)
+      event_log.set_barrier_initiator(barrier_initiator)
+
+      // TODO: We currently set the primary checkpoint initiator worker to the
+      // initializer.
+      let checkpoint_initiator = CheckpointInitiator(auth,
+        _startup_options.worker_name, initializer_name, connections,
+        _startup_options.time_between_checkpoints, event_log,
+        barrier_initiator, _checkpoint_ids_file,
+        _startup_options.checkpoints_enabled
+        where is_recovering = _is_recovering)
+      checkpoint_initiator.initialize_checkpoint_id()
+      connections.register_disposable(checkpoint_initiator)
+
+      let autoscale_initiator = AutoscaleInitiator(
+        _startup_options.worker_name, barrier_initiator)
+      connections.register_disposable(autoscale_initiator)
+
       _setup_shutdown_handler(connections, this, auth)
 
-      let state_step_creator = StateStepCreator(auth, _app_name,
-        _startup_options.worker_name, metrics_conn, event_log)
-
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name, state_step_creator, is_recovering)
+        _startup_options.worker_name, _is_recovering)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
-        connections, state_step_creator, this,
-        _startup_options.stop_the_world_pause, _is_joining)
+        connections, this,
+        _startup_options.stop_the_world_pause, _is_joining, initializer_name,
+        barrier_initiator, checkpoint_initiator, autoscale_initiator,
+        initializer_name)
       router_registry.set_event_log(event_log)
-      event_log.set_router_registry(router_registry)
 
-      let recovery_replayer = RecoveryReplayer(auth,
-        _startup_options.worker_name, data_receivers, router_registry,
-        connections, is_recovering)
+      (let control_host, let control_service, let data_service) =
+        if _startup_options.is_initializer then
+          (_startup_options.c_host, _startup_options.c_service,
+            _startup_options.d_service)
+        else
+          (_startup_options.my_c_host, _startup_options.my_c_service,
+            _startup_options.my_d_service)
+        end
+
+      let recovery_reconnecter = RecoveryReconnecter(auth,
+        _startup_options.worker_name, data_service,
+        data_receivers, router_registry,
+        connections, _is_recovering)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        event_log, recovery_replayer, connections)
+        event_log, recovery_reconnecter, checkpoint_initiator, connections,
+        router_registry, data_receivers)
 
       let local_topology_initializer =
         LocalTopologyInitializer(
           _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers, event_log, recovery,
-          recovery_replayer, _local_topology_file, _data_channel_file,
-          _worker_names_file, state_step_creator)
+          recovery_reconnecter, checkpoint_initiator, barrier_initiator,
+          _local_topology_file, _data_channel_file, _worker_names_file,
+          local_keys_filepath)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -356,6 +349,7 @@ actor Startup
         @printf[I32]("Running as Initializer...\n".cstring())
         _application_distributor = ApplicationDistributor(auth, _application,
           local_topology_initializer)
+
         match _application_distributor
         | let ad: ApplicationDistributor =>
           match _startup_options.worker_count
@@ -363,7 +357,7 @@ actor Startup
             _cluster_initializer = ClusterInitializer(auth,
               _startup_options.worker_name, wc, connections, ad,
               local_topology_initializer, _startup_options.d_addr,
-              metrics_conn, is_recovering)
+              metrics_conn, _is_recovering, initializer_name)
           else
             Unreachable()
           end
@@ -374,16 +368,22 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
-          recovery_replayer, router_registry,
-          control_channel_filepath, _startup_options.my_d_host,
-          _startup_options.my_d_service, event_log, this)
+          recovery_reconnecter, router_registry, barrier_initiator,
+          checkpoint_initiator, control_channel_filepath,
+          _startup_options.my_d_host, _startup_options.my_d_service, event_log,
+          this)
 
       // We need to recover connections before creating our control
       // channel listener, since it's at that point that we notify
       // the cluster of our control address. If the cluster connection
       // addresses were not yet recovered, we'd only notify the initializer.
-      if is_recovering then
-        connections.recover_connections(local_topology_initializer)
+      if _is_recovering then
+        match checkpoint_id
+        | let s_id: CheckpointId =>
+          connections.recover_connections(local_topology_initializer, s_id)
+        else
+          Fail()
+        end
       end
 
       if _startup_options.is_initializer then
@@ -396,20 +396,22 @@ actor Startup
           _startup_options.my_c_host, _startup_options.my_c_service)
       end
 
-      if is_recovering then
+      if _is_recovering then
         // need to do this before recreating the data connection as at
         // that point replay starts
         let recovered_workers = _recover_worker_names(
           worker_names_filepath)
-        if _is_multi_worker then
+        if recovered_workers.size() > 1 then
           local_topology_initializer.recover_and_initialize(
-            recovered_workers, _cluster_initializer)
+            recovered_workers, checkpoint_id as CheckpointId,
+            _cluster_initializer)
         else
-          local_topology_initializer.initialize(where recovering = true)
+          local_topology_initializer.initialize(
+            where checkpoint_target = checkpoint_id)
         end
       end
 
-      if not is_recovering then
+      if not _is_recovering then
         match _cluster_initializer
         | let ci: ClusterInitializer =>
           // TODO: Pass in initializer name once we've refactored
@@ -424,7 +426,13 @@ actor Startup
   be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg) =>
     try
       let auth = _env.root as AmbientAuth
-      _set_recovery_file_names(auth)
+
+      let local_keys_filepath: FilePath = FilePath(auth,
+        _local_keys_file)?
+
+      // TODO: Replace this with the name of this worker, whatever it
+      // happens to be.
+      let initializer_name = "initializer"
 
       let metrics_conn = ReconnectingMetricsSink(m.metrics_host,
         m.metrics_service, _application.name(), _startup_options.worker_name)
@@ -445,22 +453,33 @@ actor Startup
           m.data_addrs("initializer")?
         end
 
+      // Generate state routing ids
+      let new_state_routing_ids_iso = recover iso Map[StateName, RoutingId] end
+      let routing_id_gen = RoutingIdGenerator
+      for state_name in m.partition_router_blueprints.keys() do
+        let next_id = routing_id_gen()
+        new_state_routing_ids_iso(state_name) = next_id
+      end
+      let new_state_routing_ids = consume val new_state_routing_ids_iso
+
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _event_log = ifdef "resilience" then
         if _startup_options.log_rotation then
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(auth, _startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename
             where backend_file_length' =
               _startup_options.event_log_file_length,
             suffix' = _event_log_file_suffix, log_rotation' = true))
         else
-          EventLog(EventLogConfig(event_log_dir_filepath,
+          EventLog(auth, _startup_options.worker_name,
+            EventLogConfig(event_log_dir_filepath,
             _event_log_file_basename + _event_log_file_suffix
             where backend_file_length' =
               _startup_options.event_log_file_length))
         end
       else
-        EventLog()
+        EventLog(auth, _startup_options.worker_name)
       end
       let event_log = _event_log as EventLog
 
@@ -475,37 +494,52 @@ actor Startup
       _connections = connections
       connections.register_disposable(this)
 
+      let barrier_initiator = BarrierInitiator(auth,
+        _startup_options.worker_name, connections, initializer_name)
+      event_log.set_barrier_initiator(barrier_initiator)
+
+      let checkpoint_initiator = CheckpointInitiator(auth,
+        _startup_options.worker_name, m.primary_checkpoint_worker, connections,
+        _startup_options.time_between_checkpoints, event_log,
+        barrier_initiator, _checkpoint_ids_file,
+        _startup_options.checkpoints_enabled)
+      checkpoint_initiator.initialize_checkpoint_id(
+        (m.checkpoint_id, m.rollback_id))
+
+      let autoscale_initiator = AutoscaleInitiator(
+        _startup_options.worker_name, barrier_initiator)
+
       _setup_shutdown_handler(connections, this, auth)
 
-      let state_step_creator = StateStepCreator(auth, _app_name,
-        _startup_options.worker_name, metrics_conn, event_log)
-
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name, state_step_creator)
+        _startup_options.worker_name)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
-        connections, state_step_creator, this,
-        _startup_options.stop_the_world_pause, _is_joining, m.sender_name)
+        connections, this,
+        _startup_options.stop_the_world_pause, _is_joining, initializer_name,
+        barrier_initiator, checkpoint_initiator, autoscale_initiator,
+        m.sender_name where joining_state_routing_ids = new_state_routing_ids)
       router_registry.set_event_log(event_log)
-      event_log.set_router_registry(router_registry)
 
-      let recovery_replayer = RecoveryReplayer(auth,
-        _startup_options.worker_name,
+      let recovery_reconnecter = RecoveryReconnecter(auth,
+        _startup_options.worker_name, _startup_options.my_d_service,
         data_receivers, router_registry, connections)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        event_log, recovery_replayer, connections)
+        event_log, recovery_reconnecter, checkpoint_initiator, connections,
+        router_registry, data_receivers)
 
       let local_topology_initializer =
         LocalTopologyInitializer(
           _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
-          event_log, recovery, recovery_replayer,
-          _local_topology_file, _data_channel_file, _worker_names_file,
-          state_step_creator
-          where is_joining = true)
+          event_log, recovery, recovery_reconnecter, checkpoint_initiator,
+          barrier_initiator, _local_topology_file, _data_channel_file,
+          _worker_names_file, local_keys_filepath
+          where is_joining = true,
+          joining_state_routing_ids = new_state_routing_ids)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -518,10 +552,20 @@ actor Startup
           _external_host.cstring(), _external_service.cstring())
       end
 
-      router_registry.set_data_router(
-        DataRouter(recover Map[StepId, Consumer] end,
-          recover LocalStatePartitions end, recover LocalStatePartitionIds end))
-      local_topology_initializer.update_topology(m.local_topology)
+      let dr_state_routing_ids = recover iso Map[RoutingId, StateName] end
+      for (s_name, r_id) in new_state_routing_ids.pairs() do
+        dr_state_routing_ids(r_id) = s_name
+      end
+
+      let data_router = DataRouter(_startup_options.worker_name,
+        recover Map[RoutingId, Consumer] end,
+        recover Map[StateName, Array[Step] val] end,
+        consume dr_state_routing_ids)
+
+      router_registry.set_data_router(data_router)
+      let updated_topology = m.local_topology.add_state_routing_ids(
+        _startup_options.worker_name, new_state_routing_ids)
+      local_topology_initializer.update_topology(updated_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)
 
@@ -551,7 +595,8 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
-          recovery_replayer, router_registry, control_channel_filepath,
+          recovery_reconnecter, router_registry, barrier_initiator,
+          checkpoint_initiator, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service,
           event_log, this)
 
@@ -567,7 +612,7 @@ actor Startup
       local_topology_initializer.quick_initialize_data_connections()
       local_topology_initializer.set_partition_router_blueprints(
         m.partition_router_blueprints,
-        m.stateless_partition_router_blueprints, m.omni_router_blueprint)
+        m.stateless_partition_router_blueprints, m.target_id_router_blueprints)
 
       // Dispose of temporary listener
       match _joining_listener
@@ -579,22 +624,6 @@ actor Startup
     else
       Fail()
     end
-
-  be recover_not_join() =>
-    """
-    Called when the cluster informs us we should be recovering instead of
-    joining (i.e. we've already joined, so we must be coming back up).
-    """
-    // Dispose of temporary listener
-    match _joining_listener
-    | let tcp_l: TCPListener =>
-      tcp_l.dispose()
-    else
-      Fail()
-    end
-    _is_joining = false
-
-    initialize()
 
   fun ref _set_recovery_file_names(auth: AmbientAuth) =>
     try
@@ -608,6 +637,8 @@ actor Startup
       _startup_options.worker_name + ".evlog"
     _local_topology_file = _startup_options.resilience_dir + "/" + _app_name +
       "-" + _startup_options.worker_name + ".local-topology"
+    _local_keys_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".local-keys"
     _data_channel_file = _startup_options.resilience_dir + "/" + _app_name +
       "-" + _startup_options.worker_name + ".tcp-data"
     _control_channel_file = _startup_options.resilience_dir + "/" + _app_name +
@@ -616,15 +647,121 @@ actor Startup
       "-" + _startup_options.worker_name + ".workers"
     _connection_addresses_file = _startup_options.resilience_dir + "/" +
       _app_name + "-" + _startup_options.worker_name + ".connection-addresses"
+    _checkpoint_ids_file = _startup_options.resilience_dir + "/" + _app_name +
+      "-" + _startup_options.worker_name + ".checkpoint_ids"
+
+  fun is_recovering(auth: AmbientAuth): Bool =>
+    // check to see if we can recover
+    // Use Set to make the logic explicit and clear
+    let existing_files: Set[String] = Set[String]
+
+    try
+      let event_log_dir_filepath = _event_log_dir_filepath as FilePath
+
+      let event_log_filepath = try
+        let elf: FilePath = LastLogFilePath(_event_log_file_basename,
+          _event_log_file_suffix, event_log_dir_filepath)?
+        existing_files.set(elf.path)
+        elf
+      else
+        let elf = FilePath(event_log_dir_filepath,
+          _event_log_file_basename + _event_log_file_suffix)?
+        if elf.exists() then
+          existing_files.set(elf.path)
+        end
+        elf
+      end
+
+      let local_topology_filepath: FilePath = FilePath(auth,
+        _local_topology_file)?
+      if local_topology_filepath.exists() then
+        existing_files.set(local_topology_filepath.path)
+      end
+
+      let local_keys_filepath: FilePath = FilePath(auth,
+        _local_keys_file)?
+      if local_keys_filepath.exists() then
+        existing_files.set(local_keys_filepath.path)
+      end
+
+      let data_channel_filepath: FilePath = FilePath(auth,
+        _data_channel_file)?
+      if data_channel_filepath.exists() then
+        existing_files.set(data_channel_filepath.path)
+      end
+
+      let control_channel_filepath: FilePath = FilePath(auth,
+        _control_channel_file)?
+      if control_channel_filepath.exists() then
+        existing_files.set(control_channel_filepath.path)
+      end
+
+      let worker_names_filepath: FilePath = FilePath(auth,
+        _worker_names_file)?
+      if worker_names_filepath.exists() then
+        existing_files.set(worker_names_filepath.path)
+      end
+
+      let connection_addresses_filepath: FilePath = FilePath(auth,
+        _connection_addresses_file)?
+      if connection_addresses_filepath.exists() then
+        existing_files.set(connection_addresses_filepath.path)
+      end
+
+      let checkpoint_ids_filepath: FilePath = FilePath(auth,
+        _checkpoint_ids_file)?
+      if checkpoint_ids_filepath.exists() then
+        existing_files.set(checkpoint_ids_filepath.path)
+      end
+
+      let required_files: Set[String] = Set[String]
+      ifdef "resilience" then
+        required_files.set(event_log_filepath.path)
+      end
+      required_files.set(local_topology_filepath.path)
+      required_files.set(control_channel_filepath.path)
+      required_files.set(worker_names_filepath.path)
+      if not _startup_options.is_initializer then
+        required_files.set(data_channel_filepath.path)
+        required_files.set(connection_addresses_filepath.path)
+      end
+
+      // Only validate _all_ files exist if _any_ files exist.
+      if existing_files.size() > 0 then
+        // If any recovery file exists, but not all, then fail
+        if (required_files.op_and(existing_files)) != required_files then
+          @printf[I32](("Some resilience/recovery files are missing! "
+            + "Cannot continue!\n").cstring())
+            let files_missing = required_files.without(existing_files)
+            let files_missing_str: String val = "\n    "
+              .join(files_missing.values())
+            @printf[I32]("The missing files are:\n    %s\n".cstring(),
+              files_missing_str.cstring())
+          Fail()
+          false
+        else
+          @printf[I32]("Recovering from recovery files!\n".cstring())
+          // we are recovering because all files exist
+          true
+        end
+      else
+        false
+      end
+    else
+      Fail()
+      false
+    end
 
   be clean_recovery_files() =>
     @printf[I32]("Removing recovery files\n".cstring())
     _remove_file(_event_log_file)
     _remove_file(_local_topology_file)
+    _remove_file(_local_keys_file)
     _remove_file(_data_channel_file)
     _remove_file(_control_channel_file)
     _remove_file(_worker_names_file)
     _remove_file(_connection_addresses_file)
+    _remove_file(_checkpoint_ids_file)
 
     try
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
@@ -650,7 +787,7 @@ actor Startup
 
   be dispose() =>
     @printf[I32]("Shutting down Startup...\n".cstring())
-    for d in _join_disposables.values() do
+    for d in _disposables.values() do
       d.dispose()
     end
 

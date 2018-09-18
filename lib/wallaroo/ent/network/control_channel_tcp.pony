@@ -12,19 +12,22 @@ the License. You may obtain a copy of the License at
 
 use "net"
 use "collections"
-use "time"
 use "files"
-use "wallaroo_labs/bytes"
-use "wallaroo_labs/hub"
+use "promises"
+use "time"
 use "wallaroo"
 use "wallaroo/core/common"
-use "wallaroo/ent/recovery"
-use "wallaroo/ent/router_registry"
-use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/recovery"
+use "wallaroo/ent/router_registry"
+use "wallaroo/ent/checkpoint"
+use "wallaroo_labs/bytes"
+use "wallaroo_labs/hub"
+use "wallaroo_labs/mort"
 
 class ControlChannelListenNotifier is TCPListenNotify
   let _auth: AmbientAuth
@@ -38,8 +41,10 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _layout_initializer: LayoutInitializer
   let _connections: Connections
   let _recovery: Recovery
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
+  let _barrier_initiator: BarrierInitiator
+  let _checkpoint_initiator: CheckpointInitiator
   let _recovery_file: FilePath
   let _event_log: EventLog
   let _recovery_file_cleaner: RecoveryFileCleaner
@@ -48,7 +53,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     connections: Connections, is_initializer: Bool,
     initializer: (ClusterInitializer | None) = None,
     layout_initializer: LayoutInitializer, recovery: Recovery,
-    recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
+    recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
+    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
     recovery_file: FilePath, data_host: String, data_service: String,
     event_log: EventLog, recovery_file_cleaner: RecoveryFileCleaner)
   =>
@@ -63,6 +69,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _barrier_initiator = barrier_initiator
+    _checkpoint_initiator = checkpoint_initiator
     _recovery_file = recovery_file
     _event_log = event_log
     _recovery_file_cleaner = recovery_file_cleaner
@@ -107,8 +115,8 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_worker_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
-      _router_registry, _d_host, _d_service, _event_log,
-      _recovery_file_cleaner)
+      _router_registry, _barrier_initiator, _checkpoint_initiator,
+      _d_host, _d_service, _event_log, _recovery_file_cleaner)
 
   fun ref closed(listen: TCPListener ref) =>
     @printf[I32]((_worker_name + " control: listener closed\n").cstring())
@@ -120,8 +128,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _initializer: (ClusterInitializer | None)
   let _layout_initializer: LayoutInitializer
   let _recovery: Recovery
-  let _recovery_replayer: RecoveryReplayer
+  let _recovery_replayer: RecoveryReconnecter
   let _router_registry: RouterRegistry
+  let _barrier_initiator: BarrierInitiator
+  let _checkpoint_initiator: CheckpointInitiator
   let _d_host: String
   let _d_service: String
   let _event_log: EventLog
@@ -131,7 +141,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   new iso create(worker_name: String, auth: AmbientAuth,
     connections: Connections, initializer: (ClusterInitializer | None),
     layout_initializer: LayoutInitializer, recovery: Recovery,
-    recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
+    recovery_replayer: RecoveryReconnecter, router_registry: RouterRegistry,
+    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
     data_host: String, data_service: String, event_log: EventLog,
     recovery_file_cleaner: RecoveryFileCleaner)
   =>
@@ -143,6 +154,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _barrier_initiator = barrier_initiator
+    _checkpoint_initiator = checkpoint_initiator
     _d_host = data_host
     _d_service = data_service
     _event_log = event_log
@@ -211,8 +224,12 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("Received ReconnectDataPortMsg on Control Channel\n"
             .cstring())
         end
-        _connections.reconnect_data_connection(m.worker_name)
-        _router_registry.reconnect_source_boundaries(m.worker_name)
+        try
+          (let host, _) = conn.remote_address().name()?
+          _router_registry.update_worker_data_service(m.worker_name,
+            host, m.service)
+          _router_registry.reconnect_source_boundaries(m.worker_name)
+        end
       | let m: ReplayBoundaryCountMsg =>
         ifdef "trace" then
           @printf[I32]("Received ReplayBoundaryCountMsg on Control Channel\n"
@@ -270,6 +287,12 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
         _layout_initializer.create_data_channel_listener(m.workers,
           _d_host, _d_service)
+      | let m: RequestRecoveryInfoMsg =>
+        ifdef "trace" then
+          @printf[I32]("Received RequestRecoveryInfoMsg on Control Channel\n"
+            .cstring())
+        end
+        _checkpoint_initiator.inform_recovering_worker(m.sender, conn)
       | let m: JoinClusterMsg =>
         ifdef "trace" then
           @printf[I32]("Received JoinClusterMsg on Control Channel\n"
@@ -299,9 +322,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             let host = m.control_addrs(w)?._1
             let control_addr = m.control_addrs(w)?
             let data_addr = m.data_addrs(w)?
+            let new_state_routing_ids = m.new_state_routing_ids(w)?
             match _layout_initializer
             | let lti: LocalTopologyInitializer =>
-              lti.add_joining_worker(w, host, control_addr, data_addr)
+              lti.add_joining_worker(w, host, control_addr, data_addr,
+                new_state_routing_ids)
             else
               Fail()
             end
@@ -313,7 +338,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
           lti.connect_to_joining_workers(m.sender, m.control_addrs,
-            m.data_addrs)
+            m.data_addrs, m.new_state_routing_ids)
         else
           Fail()
         end
@@ -322,12 +347,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           m.hash_partitions)
       | let m: ConnectedToJoiningWorkersMsg =>
         _router_registry.report_connected_to_joining_worker(m.sender)
-      | let m: AnnounceNewStatefulStepMsg =>
-        m.update_registry(_router_registry)
       | let m: AnnounceNewSourceMsg =>
         _router_registry.register_remote_source(m.sender, m.source_id)
-      | let m: StepMigrationCompleteMsg =>
-        _router_registry.step_migration_complete(m.step_id)
+      | let m: KeyMigrationCompleteMsg =>
+        _router_registry.key_migration_complete(m.key)
       | let m: JoiningWorkerInitializedMsg =>
         ifdef debug then
           @printf[I32](("Rcvd JoiningWorkerInitializedMsg on Control " +
@@ -338,7 +361,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
             lti.add_joining_worker(m.worker_name, joining_host, m.control_addr,
-              m.data_addr)
+              m.data_addr, m.state_routing_ids)
           else
             Fail()
           end
@@ -347,12 +370,22 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
       | let m: InitiateStopTheWorldForJoinMigrationMsg =>
         _router_registry.remote_stop_the_world_for_join_migration_request(
-          m.new_workers)
+          m.sender, m.new_workers)
       | let m: InitiateJoinMigrationMsg =>
-        _router_registry.remote_join_migration_request(m.new_workers)
+        _router_registry.remote_join_migration_request(m.new_workers,
+          m.checkpoint_id)
       | let m: AutoscaleCompleteMsg =>
         _router_registry.autoscale_complete()
+      | let m: InitiateStopTheWorldForShrinkMigrationMsg =>
+        _router_registry.remote_stop_the_world_for_shrink_migration_request(
+          m.sender, m.remaining_workers, m.leaving_workers)
       | let m: LeavingMigrationAckRequestMsg =>
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          lti.remove_worker_connection_info(m.sender)
+        else
+          Fail()
+        end
         try
           // We're acking immediately here, but in the future we may need
           // to take other steps first, plugging this directly into the
@@ -377,7 +410,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32](("Received BeginLeavingMigrationMsg on Control " +
             "Channel\n").cstring())
         end
-        _router_registry.begin_leaving_migration(m.remaining_workers,
+        _router_registry.prepare_leaving_migration(m.remaining_workers,
           m.leaving_workers)
       | let m: InitiateShrinkMsg =>
         match _layout_initializer
@@ -392,6 +425,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32](("Received PrepareShrinkMsg on Control " +
             "Channel\n").cstring())
         end
+        @printf[I32]("!@ Got PrepareShrinkMsg\n".cstring())
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
           lti.prepare_shrink(m.remaining_workers, m.leaving_workers)
@@ -406,31 +440,151 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Control Ch: Received Unmute Request from %s\n".cstring(),
           m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
-      | let m: RequestInFlightAckMsg =>
-        _router_registry.remote_request_in_flight_ack(m.sender,
-          m.request_id, m.requester_id)
-      | let m: RequestInFlightResumeAckMsg =>
-        _router_registry.remote_request_in_flight_resume_ack(m.sender,
-          m.in_flight_resume_ack_id, m.request_id, m.requester_id,
-          m.leaving_workers)
-      | let m: InFlightAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received InFlightAckMsg from %s\n".cstring(),
-            m.sender.cstring())
-        end
-        _router_registry.receive_in_flight_ack(m.request_id)
-      | let m: FinishedCompleteAckMsg =>
-        ifdef "trace" then
-          @printf[I32]("Received FinishedCompleteAckMsg from %s\n".cstring(),
-            m.sender.cstring())
-        end
-        _router_registry.receive_in_flight_resume_ack(m.request_id)
-      | let m: ResumeTheWorldMsg =>
+      | let m: ForwardInjectBarrierMsg =>
+        let promise = Promise[BarrierToken]
+        promise.next[None]({(t: BarrierToken) =>
+          try
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_complete(t,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _barrier_initiator.inject_barrier(m.token, promise)
+      | let m: ForwardInjectBlockingBarrierMsg =>
+        let promise = Promise[BarrierToken]
+        promise.next[None]({(t: BarrierToken) =>
+          try
+            let msg = ChannelMsgEncoder.forwarded_inject_barrier_complete(t,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _barrier_initiator.inject_blocking_barrier(m.token, promise,
+          m.wait_for_token)
+      | let m: ForwardedInjectBarrierCompleteMsg =>
+        _barrier_initiator.forwarded_inject_barrier_complete(m.token)
+      | let m: RemoteInitiateBarrierMsg =>
+        _barrier_initiator.remote_initiate_barrier(m.sender, m.token)
+      | let m: WorkerAckBarrierStartMsg =>
+        _barrier_initiator.worker_ack_barrier_start(m.sender, m.token)
+      | let m: WorkerAckBarrierMsg =>
+        _barrier_initiator.worker_ack_barrier(m.sender, m.token)
+      | let m: BarrierCompleteMsg =>
+        _barrier_initiator.remote_barrier_complete(m.token)
+      | let m: EventLogInitiateCheckpointMsg =>
+        let promise = Promise[CheckpointId]
+        promise.next[None]({(s_id: CheckpointId) =>
+          try
+            let msg = ChannelMsgEncoder.event_log_ack_checkpoint(s_id,
+              _worker_name, _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _event_log.initiate_checkpoint(m.checkpoint_id, promise)
+      | let m: EventLogWriteCheckpointIdMsg =>
+        let promise = Promise[CheckpointId]
+        promise.next[None]({(s_id: CheckpointId) =>
+          try
+            let msg = ChannelMsgEncoder.event_log_ack_checkpoint_id_written(
+              s_id, _worker_name, _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _event_log.write_checkpoint_id(m.checkpoint_id, promise)
+      | let m: EventLogAckCheckpointMsg =>
+        @printf[I32]("!@ Rcvd EventLogAckCheckpointMsg!!!\n".cstring())
+        _checkpoint_initiator.event_log_checkpoint_complete(m.sender,
+          m.checkpoint_id)
+      | let m: EventLogAckCheckpointIdWrittenMsg =>
+        @printf[I32]("!@ Rcvd EventLogAckCheckpointIdWrittenMsg!!!\n".cstring())
+        _checkpoint_initiator.event_log_id_written(m.sender,
+          m.checkpoint_id)
+      | let m: CommitCheckpointIdMsg =>
+        _checkpoint_initiator.commit_checkpoint_id(m.checkpoint_id, m.rollback_id,
+          m.sender)
+      | let m: RecoveryInitiatedMsg =>
+        _recovery.recovery_initiated_at_worker(m.sender, m.token)
+      | let m: AckRecoveryInitiatedMsg =>
+        _recovery.ack_recovery_initiated(m.sender, m.token)
+      | let m: InitiateRollbackBarrierMsg =>
+        let promise = Promise[CheckpointRollbackBarrierToken]
+        promise.next[None]({(t: CheckpointRollbackBarrierToken) =>
+          try
+            let msg = ChannelMsgEncoder.rollback_barrier_complete(t,
+              _worker_name, _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _checkpoint_initiator.initiate_rollback(promise, m.sender)
+      | let m: PrepareForRollbackMsg =>
+        // !@ TODO: This promise can be used for acking. Right now it's a
+        // placeholder.
+        let promise = Promise[None]
+        _event_log.prepare_for_rollback(promise, _checkpoint_initiator)
+      | let m: RollbackLocalKeysMsg =>
+        @printf[I32]("!@ Rcvd RollbackLocalKeysMsg\n".cstring())
+        let promise = Promise[None]
+        promise.next[None]({(n: None) =>
+          try
+            let msg = ChannelMsgEncoder.ack_rollback_local_keys( _worker_name, m.checkpoint_id, _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _layout_initializer.rollback_local_keys(m.checkpoint_id,
+          promise)
+      | let m: AckRollbackLocalKeysMsg =>
+        _recovery.worker_ack_local_keys_rollback(m.sender, m.checkpoint_id)
+      | let m: RegisterProducersMsg =>
+        let promise = Promise[None]
+        promise.next[None]({(n: None) =>
+          try
+            let msg = ChannelMsgEncoder.ack_register_producers( _worker_name,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _router_registry.producers_register_downstream(promise)
+      | let m: AckRegisterProducersMsg =>
+        _recovery.worker_ack_register_producers(m.sender)
+      | let m: RollbackBarrierCompleteMsg =>
+        _recovery.rollback_barrier_complete(m.token)
+      | let m: EventLogInitiateRollbackMsg =>
+        let promise = Promise[CheckpointRollbackBarrierToken]
+        promise.next[None]({(t: CheckpointRollbackBarrierToken) =>
+          try
+            let msg = ChannelMsgEncoder.event_log_ack_rollback(t, _worker_name,
+              _auth)?
+            _connections.send_control(m.sender, msg)
+          else
+            Fail()
+          end
+        })
+        _event_log.initiate_rollback(m.token, promise)
+      | let m: EventLogAckRollbackMsg =>
+        _recovery.rollback_complete(m.sender, m.token)
+      | let m: ResumeCheckpointMsg =>
+        @printf[I32]("!@ Rcvd ResumeCheckpointMsg!!\n".cstring())
+        _checkpoint_initiator.resume_checkpoint()
+      | let m: ResumeProcessingMsg =>
         ifdef "trace" then
           @printf[I32]("Received ResumeTheWorldMsg from %s\n".cstring(),
             m.sender.cstring())
         end
-        _router_registry.resume_the_world(m.sender)
+        _router_registry.resume_processing(m.sender)
       | let m: RotateLogFilesMsg =>
         @printf[I32]("Control Ch: Received Rotate Log Files request\n"
           .cstring())
@@ -519,9 +673,6 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
       | let m: InformJoinErrorMsg =>
         @printf[I32]("Join Error: %s\n".cstring(), m.message.cstring())
         FatalUserError("Join Error: " + m.message)
-      | let m: InformRecoverNotJoinMsg =>
-        @printf[I32]("Informed that we should recover.\n".cstring())
-        _startup.recover_not_join()
       | let m: CleanShutdownMsg =>
         @printf[I32]("Shutting down early: %s\n".cstring(), m.msg.cstring())
         _startup.dispose()

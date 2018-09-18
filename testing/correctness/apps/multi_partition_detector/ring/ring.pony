@@ -102,7 +102,7 @@ class Ring[A: Any val]
     """
     Create a ring with zero elements but space for len elements.
     """
-    _buf = Array[A](len)
+    _buf = Array[A]
     _size = len
 
   new from_array(a: Array[A] iso, size': USize, count': USize) =>

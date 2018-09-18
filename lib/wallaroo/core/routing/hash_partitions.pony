@@ -1,6 +1,32 @@
+/*
+
+Copyright 2018 The Wallaroo Authors.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ implied. See the License for the specific language governing
+ permissions and limitations under the License.
+
+*/
+
 use "collections"
 use "crypto"
 use "wallaroo_labs/mort"
+
+primitive HashKey
+  fun apply(key: ByteSeq): U128 =>
+    var hashed_key: U128 = 0
+    for v in MD5(key).values() do
+      hashed_key = (hashed_key << 8) + v.u128()
+    end
+    hashed_key
 
 class val HashPartitions is (Equatable[HashPartitions] & Stringable)
   let _lower_bounds: Array[U128] = _lower_bounds.create()
@@ -257,11 +283,7 @@ fun ref create2(sizes: Array[(String, U128)] val) =>
     ""
 
   fun get_claimant_by_key(key: ByteSeq): String ? =>
-    var hashed_key: U128 = 0
-    for v in MD5(key).values() do
-      hashed_key = (hashed_key << 8) + v.u128()
-    end
-    get_claimant(hashed_key)?
+    get_claimant(HashKey(key))?
 
   fun claimants(): Iterator[String] ref =>
     _lb_to_c.values()
