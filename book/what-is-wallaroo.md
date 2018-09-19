@@ -6,7 +6,7 @@ When we set out to build Wallaroo, we had a few goals in mind. We wanted to impr
 
 - Take you through what Wallaroo is
 - Describe the problems Wallaroo is solving
-- Discuss some of the key features including integrated state management and exactly-once processing
+- Discuss some of the key features including integrated state management and resilience
 
 ## Wallaroo by example: Market Spread
 
@@ -23,7 +23,7 @@ When we break the application down into its key components we get:
 
 For the proof of concept, our client was looking to handle hundreds of thousands of messages a second with median latencies measured in microseconds. Further, they needed flat, predictable tail latencies that were measured in single-digit milliseconds. While the proof of concept was only run on a single machine, the goal was to have an application that would be able to respond to ever-increasing rates of data and seamlessly scale to run on multiple machines while handling millions of messages a second.
 
-Distributed data processing applications are hard. We know; over the course of our careers, we’ve been involved in building a lot of them. Here’s a quick checklist of things we’d need to worry about for an application like Market Spread if we were to start from scratch:
+Distributed data processing applications are hard. We know. Over the course of our careers, we’ve been involved in building a lot of them. Here’s a quick checklist of things we’d need to worry about for an application like Market Spread if we were to start from scratch:
 
 - Creating a robust communication layer between communicating processes
 - Ensuring message replay occurs when a message fails to process.
@@ -82,13 +82,3 @@ During a recent performance testing run using 16 cores on an AWS m4 class machin
 | <= | 66µs | 0.5ms | 0.5ms | 0.5ms | 1 ms |
 
 Even with the application caveats that we laid out, we think that is some pretty impressive performance. Performance that we are committed to maintaining as we continue to add functionality to Wallaroo.
-
-## Exactly-once processing
-
-We mentioned earlier that our goal is to “provide correct results quickly." The "correct" part of that statement is the most important part. Processing millions of events a second is only great if the results are accurate. We guarantee accurate results, even in the face of failure, by providing integrated managed state and exactly-once processing.
-
-"Exactly-once" is a bit of a holy grail in distributed systems. As such, it's a heated topic and one that causes confusion. What do we mean when we say that Wallaroo provides "exactly-once processing"? In the face of failure, when messages have to be replayed to ensure that no data is lost, we won't process a message more than once. Note that this is very different from saying a message will only be delivered once. If you are a bit lost, don't worry. Hopefully, this example will help.
-
-Imagine a counting application. It takes in numbers and adds their value to its internal state. If we send in the values 5, 10, 15 and it runs without error, we would expect the final value to be 30. Errors do, however, happen. Imagine that we sent in 5 and 10 and then an error occurs. Further, we have only acknowledged that 5 was received and processed. What do we do? If we resend 10 and it was already processed, then our final value will be 40 instead of 30. If we don’t resend and it wasn’t processed, then our final value will be 20 instead of 30.
-
-What we want to do is ensure that each message has been delivered at least once while also ensuring that it is processed only once. In distributed system lingo this is "at-least-once message delivery" + "idempotence". By combining the two, we can guarantee that results in Wallaroo are correct even in the face of failures.

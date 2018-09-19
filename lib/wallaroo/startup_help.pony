@@ -51,8 +51,10 @@ primitive StartupHelp
         --join/-j [When a new worker is joining a running cluster, pass the
           control channel address of any worker as the value for this
           parameter]
-        --stop-world/-u [Sets pause before state migration after stop the
+        --stop-pause/-u [Sets pause before state migration after stop the
           world]
+        --time-between-checkpoints [Sets the interval between checkpoints for
+          resilience (in nanoseconds)]
 
       -------------------------------------------------------------------------
       To set Wallaroo modes, compile with the following -D flags:
