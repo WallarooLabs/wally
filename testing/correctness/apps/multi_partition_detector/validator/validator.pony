@@ -33,6 +33,7 @@ use "collections"
 use "files"
 use "wallaroo_labs/bytes"
 use "wallaroo_labs/options"
+use "wallaroo_labs/mort"
 use "../building_blocks"
 use "../inline_validation"
 use "../window_codecs"
@@ -41,7 +42,7 @@ actor Main
   new create(env: Env) =>
     let options = Options(env.args)
     var input_file_path = "received.txt"
-    var expected: U64 = 1000
+    var expected: U64 = 0
     var at_least_once: Bool = false
     var keys: Array[String] val = recover Array[String] end
 
@@ -64,12 +65,13 @@ actor Main
             PARAMETERS:
             -----------------------------------------------------------------------------------
             --input/-i [Sets file to read from (default: received.txt)]
-            --expected/-e [Sets the expected number of messages to validate (default: 1000)]
+            --expected/-e [Sets the expected number of messages to validate
+              (default: 0, does not check expected value)]
             --at-least-once/-a [Sets at-least-once mode (default: exactly-once)]
             --keys/-k [Optional: list of keys to verify. (default: assume all
                        keys are valid)]
             -----------------------------------------------------------------------------------
-            """
+            """.cstring()
           )
           return
         end
@@ -111,7 +113,7 @@ class OutputValidator
     - compare all the final values in each sequence validator
     - validate all required keys are present
   """
-  let _keys: Set[String] val 
+  let _keys: Set[String] val
   let _seen: Array[String] ref = recover Array[String] end
   let _expected: U64
   let _at_least_once: Bool
@@ -134,10 +136,10 @@ class OutputValidator
       // validate k is in whitelisted keys set _keys
       Fact(_keys.contains(k), "Encountered a non-whitelisted key: " + k)?
     end
-    let sv = 
+    let sv =
       try
         _sequence_validators(k)?
-      else 
+      else
         _sequence_validators.insert(k, SequenceValidator(k, _at_least_once))?
       end
     sv(m)?
@@ -149,15 +151,20 @@ class OutputValidator
     - validate all required keys are present
     """
     // Validate keys
-    if _keys.size() > 1 then 
+    if _keys.size() > 1 then
       let observed_keys: Set[String] = recover Set[String] end
       observed_keys.union(_sequence_validators.keys())
       Fact(_keys == observed_keys, "Expected keys do not match observed keys")?
     end
 
     // Validate final values in each sequence validator
-    for sv in _sequence_validators.values() do
-      sv.test_expected_value(_expected)?
+    if _expected > 0 then
+      for sv in _sequence_validators.values() do
+        sv.test_expected_value(_expected)?
+      end
+    else
+      @printf[I32](("Final expected value validation not run. To validte" +
+        " final values, use the `--expect/-e` parameter.\n").cstring())
     end
 
 class SequenceValidator
@@ -232,8 +239,7 @@ class ReceiverFileDataSource is Iterator[Array[U8] val]
     let h = _file.read(4)
     try
       let expect: USize = Bytes.to_u32(h(0)?, h(1)?, h(2)?, h(3)?).usize()
-      h.append(_file.read(expect))
-      h
+      _file.read(expect)
     else
       ifdef debug then
         @printf[I32]("Failed to convert message header!\n".cstring())

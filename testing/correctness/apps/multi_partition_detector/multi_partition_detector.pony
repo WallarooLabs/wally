@@ -33,6 +33,7 @@ use "buffered"
 use "collections"
 use "options"
 use "serialise"
+use "time"
 
 // wallaroo/lib
 use "wallaroo_labs/bytes"
@@ -41,6 +42,7 @@ use "wallaroo/core/common"
 use "wallaroo_labs/mort"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
+use "wallaroo/core/source/gen_source"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
 use "wallaroo/core/topology"
@@ -49,16 +51,23 @@ actor Main
   new create(env: Env) =>
 
     try
-      // Add "--depth" option
+      // Add options:
+      //  "--depth": Int
+      //  "--internal-source": flag
       var depth: USize = 1
+      var internal_source: Bool = false
+
       let options = Options(env.args, false)
 
       options.add("depth", "", I64Argument)
+      options.add("internal-source", "", None)
 
       for option in options do
         match option
         | ("depth", let arg: I64) =>
           depth = arg.usize()
+        | ("internal-source", None) =>
+          internal_source = true
         end
       end
 
@@ -67,9 +76,14 @@ actor Main
 
       let application = recover val
         let a = Application("Multi Partition Detector")
-        let p = a.new_pipeline[t.Message, String]("Detector",
-          TCPSourceConfig[t.Message].from_options(PartitionedU64FramedHandler,
-            TCPSourceConfigCLIParser(env.args)?(0)?))
+        let p = if internal_source then
+          a.new_pipeline[t.Message, String]("Detector",
+            GenSourceConfig[t.Message](MultiPartitionGenerator(40)))
+        else
+          a.new_pipeline[t.Message, String]("Detector",
+            TCPSourceConfig[t.Message].from_options(PartitionedU64FramedHandler,
+              TCPSourceConfigCLIParser(env.args)?(0)?))
+        end
         // Add as many layers of depth as specified in the `--depth` option
         for x in Range[USize](1, depth + 1) do
           env.out.print("Adding level " + x.string())
@@ -86,6 +100,46 @@ actor Main
       Startup(env, application, "multi_partition_detector")
     else
       env.out.print("Couldn't build topology!")
+    end
+
+// TODO: (optional) refactor this out of the detector code and add unit tests
+// Use this with the internal source
+class val MultiPartitionGenerator
+  let _partitions: USize
+
+  new val create(partitions: USize) =>
+    _partitions = partitions
+
+  fun initial_value(): t.Message =>
+    t.Message("0", 1)
+
+  fun apply(v: t.Message): t.Message =>
+    try
+      let last_key = v.key().usize()?
+      let last_value = v.value()
+      let next_value =
+        if (last_key + 1) == _partitions then
+          last_value + 1
+        else
+          last_value
+        end
+      let next_key = (last_key + 1) % _partitions
+
+      let m = t.Message(next_key.string(), next_value)
+
+      // Print a timestamp
+      ifdef debug then
+          (let sec', let ns') = Time.now()
+          let us' = ns' / 1000
+          let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'.string())
+        @printf[I32]("%s Source decoded: %s\n".cstring(), ts'.cstring(),
+          m.string().cstring())
+      end
+
+      consume m
+    else
+      Fail()
+      t.Message("0", 1)
     end
 
 class val WindowStateBuilder

@@ -150,10 +150,11 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         runner_data = persistent_data.get('runner_data', [])
         # save worker data to files
         for rd in runner_data:
-            worker_log_name = '{name}_{code}_{time}.error.log'.format(
+            worker_log_name = '{name}.{pid}.{code}.{time}.error.log'.format(
                 name=rd.name,
                 code=rd.returncode,
-                time=rd.start_time.strftime('%Y%m%d_%H%M%S'))
+                pid=rd.pid,
+                time=rd.start_time.strftime('%Y%m%d_%H%M%S.%f'))
             with open(os.path.join(base_dir, worker_log_name), 'wb') as f:
                 f.write('{identifier} ->\n\n{stdout}\n\n{identifier} <-'
                     .format(identifier="--- {name} (pid: {pid}, rc: {rc})"
@@ -165,7 +166,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         for sd in sender_data:
             sender_log_name = 'sender_{address}_{time}.error.dat'.format(
                 address=sd.address.replace(':', '.'),
-                time=sd.start_time.strftime('%Y%m%d_%H%M%S'))
+                time=sd.start_time.strftime('%Y%m%d_%H%M%S.%f'))
             with open(os.path.join(base_dir, sender_log_name), 'wb') as f:
                 f.write(''.join(sd.data))
         # save sinks data to files
@@ -173,7 +174,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         for sk in sink_data:
             sink_log_name = 'sink_{address}_{time}.error.dat'.format(
                 address=sk.address.replace(':', '.'),
-                time=sk.start_time.strftime('%Y%m%d_%H%M%S'))
+                time=sk.start_time.strftime('%Y%m%d_%H%M%S.%f'))
             with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
                 f.write(''.join(sk.data))
         logging.warn("Error logs saved to {}".format(base_dir))
