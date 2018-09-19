@@ -68,4 +68,3 @@ def encode_conversion(data):
 @wallaroo.experimental.stream_message_decoder
 def decode_conversion(data):
     return data.decode('utf-8')
-
