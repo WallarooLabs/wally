@@ -32,8 +32,10 @@ When running a Wallaroo application, we use some of the following command line p
   --join/j [When a new worker is joining a running cluster, pass the
     control channel address of any worker as the value for this
     parameter]
-  --stop-world/u [Sets pause before state migration after the stop the
+  --stop-pause/u [Sets pause before state migration after the stop the
     world]
+  --time-between-checkpoints [Sets the interval between checkpoints for
+    resilience (in nanoseconds)]
 ```
 
 Wallaroo currently supports one source per pipeline, which is setup by the application code. Each pipeline may have one or more sinks, each of which is also set up by the application code.

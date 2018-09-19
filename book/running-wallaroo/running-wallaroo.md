@@ -14,7 +14,7 @@ If you are starting up a Wallaroo cluster with only one worker, then that worker
 
 If your application uses a TCP source, then you must specify a TCP input address via `--in`. Likewise, if your application uses a TCP sink, then you must specify a TCP output address via `--out`. In what follows, we'll be using the Celsius Converter example app which uses a TCP source and sink (there are versions of this app written in [Go](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/go/celsius) and [Python](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/celsius)).
 
-If you are using the Go or Pony APIs, then you will run a binary called `celsius` in order to run the Celsius Converter app. If you are using the Python API, then you will run [Machida](book/python/intro.md), passing in the application name via `--application-module`. And since Machida is single-threaded, you must pass in `--ponythreads 1` (otherwise Machida will refuse to start).
+If you are using the Go or Pony APIs, then you will run a binary called `celsius` in order to run the Celsius Converter app. If you are using the Python API, then you will run [Machida](/book/python/intro.md), passing in the application name via `--application-module`. And since Machida is single-threaded, you must pass in `--ponythreads 1` (otherwise Machida will refuse to start).
 
 Putting this all together, to run the Celsius Converter app, you would run the following command:
 
