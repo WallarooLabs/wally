@@ -1,0 +1,72 @@
+#!/usr/bin/env python
+import argparse
+import os
+import signal
+import struct
+import socket
+import SocketServer
+import subprocess
+import threading
+import time
+
+
+class UDPHandler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        data = self.request[0].strip()
+        print(data)
+
+def send_feed():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    value = 0.0
+    while value < 100:
+        packet = struct.pack(">f", value)
+        sock.sendto(packet, ('127.0.0.1', 8801))
+        value += 1
+        time.sleep(1)
+
+def recv_conv():
+    server = server = SocketServer.UDPServer(('127.0.0.1', 8901), UDPHandler)
+    server.serve_forever()
+
+threading.Thread(target = recv_conv).start()
+
+source = subprocess.Popen([
+    "../../../connectors/udp_source",
+    "--application-module", "celsius",
+    "--connector", "celsius_feed",
+    "--celsius_feed-host", "127.0.0.1",
+    "--celsius_feed-port", "8801"])
+
+sink = subprocess.Popen([
+    "../../../connectors/udp_sink",
+    "--application-module", "celsius",
+    "--connector", "fahrenheit_conversion",
+    "--fahrenheit_conversion-host", "127.0.0.1",
+    "--fahrenheit_conversion-port", "8901"])
+
+wallaroo = subprocess.Popen([
+    # "sleep", "10"])
+    "../../../machida/build/machida",
+    "--application-module", "celsius",
+    "--metrics", "127.0.0.1:5001",
+    "--control", "127.0.0.1:6000",
+    "--data", "127.0.0.1:6001",
+    "--name", "worker-name",
+    "--external", "127.0.0.1:5050",
+    "--cluster-initializer",
+    "--ponythreads=1", "--ponynoblock"])
+
+def terminate(_signal=None, _frame=None):
+    print("terminating source")
+    source.terminate()
+    print("terminating sink")
+    sink.terminate()
+    print("terminating wallaroo")
+    wallaroo.terminate()
+    os._exit(-1)
+
+signal.signal(signal.SIGINT, terminate)
+signal.signal(signal.SIGTERM, terminate)
+
+send_feed()
+terminate()

@@ -12,5 +12,5 @@ producer = KafkaProducer(bootstrap_servers=bootstrap_brokers)
 topic = connector.params.topic
 
 while True:
-    key, value = extension.read()
+    key, value = connector.read()
     producer.send(topic, key=str(key), value=str(value))

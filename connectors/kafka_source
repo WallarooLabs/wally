@@ -10,4 +10,4 @@ consumer_group = connector.params.consumer_group or 'wallaroo'
 consumer = KafkaConsumer(connector.params.topics, bootstrap_servers=bootstrap_brokers, group_id=consumer_group)
 
 for message in consumer:
-    extension.write(message.value)
+    connector.write(message.value)

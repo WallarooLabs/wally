@@ -40,10 +40,10 @@ class SourceConnector(object):
         self._conn = None
 
     def connect(self, host=None, port=None):
-        conn = socket.socket()
         while True:
             try:
-                conn.connect((host or self._host, port or self_port))
+                conn = socket.socket()
+                conn.connect( (host or self._host, int(port or self._port)) )
                 self._conn = conn
                 return
             except socket.error as err:
@@ -73,7 +73,7 @@ class SinkConnector(object):
                 action for action in actions
                 if action[0] == "sink_connector" and action[1] == params.connector_name)
         except:
-            print("Unable to find a source connector with the name " + params.connector_name)
+            print("Unable to find a sink connector with the name " + params.connector_name)
             exit(-1)
         self.params = params
         self._decoder = decoder
@@ -86,7 +86,7 @@ class SinkConnector(object):
 
     def listen(self, host=None, port=None, backlog=0):
         acceptor = socket.socket()
-        acceptor.bind((host or self._host, port or self._port))
+        acceptor.bind((host or self._host, int(port or self._port)))
         acceptor.listen(backlog)
         self._acceptor = acceptor
         self._connections.append(acceptor)
