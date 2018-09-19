@@ -17,21 +17,24 @@ export START_SENDER_CMD2='env PYTHONPATH="./testing/tools/integration" \
 
 echo To stop everything, run: env WALLAROO_BIN="./testing/correctness/apps/multi_partition_detector/multi_partition_detector" ./99-stop-everything.sh
 
+echo Start 3 worker cluster
 ./21-start-3worker-cluster.sh
 if [ $? -ne 0 ]; then
     echo STOP with non-zero status
 fi
 
+echo Send 1st half of messages
 . ./SEND-1k.sh
 echo Sleep 4 before restarting worker2; sleep 4
 
 echo Kill worker2
 ./40-kill-worker.sh 2
 
-echo Move worker2 journal files, restart worker2 on server 3
-./50-copy-worker-resilience.sh 2 2 3
-./60-restart-worker.sh 2 3
+echo Move worker2 journal files, restart worker2 on server 4
+./50-copy-worker-resilience.sh 2 2 4
+./60-restart-worker.sh 2 4
 
+echo Send 2nd half of messages
 env START_SENDER_CMD="$START_SENDER_CMD2" START_SENDER_BG=n \
   ./30-start-sender.sh
 ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 2000 20"
