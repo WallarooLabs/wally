@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import re
+import shutil
 import struct
 
 from cluster import runner_data_format
@@ -20,7 +21,6 @@ from logger import (add_in_memory_log_stream,
                     INFO2,
                     set_logging)
 
-set_logging(name='integration', level=logging.DEBUG)
 
 """
 Run an integration test as a CLI
@@ -318,10 +318,9 @@ LOG_LEVELS = {'none': 0,
               'warn': 30,
               'error': 40,
               'critical': 50}
-def set_log_level(value):
-    """Set the effective log level"""
-    level = LOG_LEVELS.get(value, 20)
-    logging.root.setLevel(level)
+def get_log_level(value):
+    """Get the effective log level"""
+    return LOG_LEVELS.get(value, 10)
 
 
 class SetLogFile(argparse.Action):
@@ -448,6 +447,9 @@ def CLI():
     expect = stopper.add_argument_group('Sink Expect')
     expect.add_argument('--sink-expect', type=int, action='append',
                         help=("How many messages to expect at each sink."))
+    stopper.add_argument('--sink-expect-allow-more', action='store_true',
+                         help=("Allow sink to receive more than the expected"
+                               " number of values"))
     stopper.add_argument('--sink-await', nargs='+', action=SinkAwaitAction,
                          metavar=('value', 'header'),
                          help=("Stop after receiving all await values in the"
@@ -480,7 +482,8 @@ def CLI():
                                   "error."))
 
     args = parser.parse_args()
-    set_log_level(args.log_level)
+    log_level = get_log_level(args.log_level)
+    set_logging(name='integration', level=log_level)
 
     # If --validation-cmp, make sure expected_val is not None
     if args.validation_cmp:
@@ -499,8 +502,12 @@ def CLI():
 
 
     t0 = datetime.datetime.now()
-    base_dir = 'errors/{}'.format(t0.strftime('%Y%m%d_%H%M%S'))
-    log_stream = add_in_memory_log_stream()
+    log_stream = add_in_memory_log_stream(level=logging.DEBUG)
+    cwd = os.getcwd()
+    trunc_head = cwd.find('/wallaroo/') + len('/wallaroo/')
+    base_dir = '/tmp/wallaroo_test_errors/{}/{}'.format(
+        cwd[trunc_head:],
+        t0.strftime('%Y%m%d_%H%M%S'))
     persistent_data = {}
 
     logging.debug("Running integration test with the following options:")
@@ -519,6 +526,7 @@ def CLI():
             mode = args.sink_mode,
             batch_size = args.batch_size,
             sink_expect = args.sink_expect,
+            sink_expect_allow_more = args.sink_expect_allow_more,
             sink_stop_timeout = args.sink_stop_timeout,
             sink_await = args.sink_await,
             delay = args.delay,
@@ -535,6 +543,18 @@ def CLI():
                       % args.command)
         # Save logs to file in case of error
         save_logs_to_file(base_dir, log_stream, persistent_data)
+        # get core file names
+        try:
+            rex = re.compile('core.*')
+            cores = filter(lambda s: rex.match(s), os.listdir(os.getcwd()))
+            if cores:
+                logging.warn("Core files detected: {}".format(cores))
+            for core in cores:
+                logging.info("Moving core {} to {}".format(core, base_dir))
+                shutil.move(core, os.path.join(base_dir, core))
+        except Exception as err_inner:
+            logging.exception(err_inner)
+            logging.warn("Failed to move core files {}".format(base_dir))
         parser.exit(1)
 
     if validation_cmd:
@@ -551,7 +571,7 @@ def CLI():
             outputs = runner_data_format(persistent_data.get('runner_data', []))
             logging.error("Application outputs:\n{}".format(outputs))
             logging.error("Validation command '%s' failed with the output:\n"
-                          "--\n%s\nThe application output is shown above.\n",
+                          "--\n%s",
                           res.command, res.output)
             # Save logs to file in case of error
             save_logs_to_file(base_dir, log_stream, persistent_data)
