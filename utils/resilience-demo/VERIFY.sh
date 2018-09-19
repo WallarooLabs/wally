@@ -23,34 +23,19 @@ if [ $? -ne 0 ]; then
 fi
 
 . ./SEND-1k.sh
-echo BONUS SLEEP 4; sleep 4
+echo Sleep 4 before restarting worker2; sleep 4
 
 echo Kill worker2
 ./40-kill-worker.sh 2
 
-#### What we'd do to move worker2 from server 2 to server 3
-##./50-copy-worker-resilience.sh 2 2 3
-##./60-restart-worker.sh 2 3
-
-#### What we'd do to restart worker2 on server 2 but with a different TCP port.
-##echo Kludge TCP files on server 2 for worker2
-##env TARGET=$SERVER2 TARGET_EXT=$SERVER2_EXT SOURCE_WORKER=2 \
-##  ./KLUDGE-TCP-FILES.sh
-##ssh -n $USER@$SERVER2_EXT "mkdir -p /tmp/run-dir/OLD ; mv -v /tmp/run-dir/m* /tmp/run-dir/OLD"
-##echo Restart worker2 on server 2
-##./60-restart-worker.sh 2 2
-
-## What we'd do to restart worker2 on server 2 with same TCP ports
-echo Restart worker2 on server 2 with same TCP ports
-ssh -n $USER@$SERVER2_EXT "mkdir -p /tmp/run-dir/OLD ; mv -v /tmp/run-dir/m* /tmp/run-dir/OLD"
-./62-restart-worker-no-port-change.sh 2 2
-if [ $? -ne 0 ]; then
-    exit 1
-fi
+echo Move worker2 journal files, restart worker2 on server 3
+./50-copy-worker-resilience.sh 2 2 3
+./60-restart-worker.sh 2 3
 
 env START_SENDER_CMD="$START_SENDER_CMD2" START_SENDER_BG=n \
   ./30-start-sender.sh
-S=3; echo Second sender has finished, sleep $S; sleep $S
+ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/resilience-demo/received-wait-for.sh ./received.txt 11 2000 20"
+if [ $? -ne 0 ]; then echo status check failed; exit 7; fi;
 
 echo Run validator to check for sequence validity.
 ssh -n $USER@$SERVER1_EXT "cd wallaroo; ./testing/correctness/apps/multi_partition_detector/validator/validator -e 2000  -i -k key_0,key_1,key_2,key_3,key_4,key_5,key_6,key_7,key_8,key_9,key_10"
