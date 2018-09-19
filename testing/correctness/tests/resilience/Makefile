@@ -50,7 +50,7 @@ resilience_tests:
 	cd $(RESILIENCE_PATH) && \
 	python2 -m pytest -c $(integration_path)/pytest.ini resilience_tests.py $(pytest_exp)
 else
-recovery_concurrent_tests:
+resilience_tests:
 	$(QUIET)printf "reseilience tests not run.\nRun make with 'resilience=on' to run this test.\n"
 endif
 
