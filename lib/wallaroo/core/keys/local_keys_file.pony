@@ -1,3 +1,4 @@
+
 /*
 
 Copyright 2018 The Wallaroo Authors.
@@ -37,7 +38,6 @@ class LocalKeysFile
   //   x - StateName
   //   4 - Key entry length y
   //   y - Key
-  //   16 - RoutingId <--- only for add() (TODO still valid?)
   let _file: AsyncJournalledFile iso
   let _filepath: FilePath
   let _writer: Writer

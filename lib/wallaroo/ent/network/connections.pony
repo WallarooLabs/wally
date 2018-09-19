@@ -25,7 +25,6 @@ use "wallaroo/core/initialization"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/source"
-////// delme?? use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
@@ -65,8 +64,6 @@ actor Connections is Cluster
   let _the_journal: SimpleJournal
   let _do_local_file_io: Bool
   let _log_rotation: Bool
-  let _source_listeners: SetIs[SourceListener] =
-    _source_listeners.create()
 
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
