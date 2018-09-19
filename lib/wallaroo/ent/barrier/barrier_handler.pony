@@ -248,7 +248,7 @@ class InProgressSecondaryBarrierHandler is BarrierHandler
     if not _sinks.contains(s) then Fail() end
 
     _acked_sinks.set(s)
-    @printf[I32]("!@ InProgressSecondaryBarrierHandler: Ack received.")
+    @printf[I32]("!@ InProgressSecondaryBarrierHandler: Ack received.".cstring())
 
     check_for_completion()
 
