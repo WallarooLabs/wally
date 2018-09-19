@@ -688,18 +688,6 @@ actor Startup
     // Use Set to make the logic explicit and clear
     let existing_files: Set[String] = Set[String]
 
-    try (_event_log as EventLog).dispose() end
-    // This is a kludge: we don't want to dispose of _the_journal
-    // until after the _remove_file() async commands have been
-    // processed by _the_journal.  Wheeee!
-    let ts: Timers = Timers
-    let later = _DoLater(recover {(): Bool =>
-      try (_the_journal as SimpleJournal).dispose_journal() end
-      false
-    } end)
-    let t = Timer(consume later, 500_000_000)
-    ts(consume t)
-
     try
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
 
@@ -835,6 +823,17 @@ actor Startup
     for d in _disposables.values() do
       d.dispose()
     end
+    try (_event_log as EventLog).dispose() end
+    // This is a kludge: we don't want to dispose of _the_journal
+    // until after the _remove_file() async commands have been
+    // processed by _the_journal.
+    let ts: Timers = Timers
+    let later = _DoLater(recover {(): Bool =>
+      try (_the_journal as SimpleJournal).dispose_journal() end
+      false
+    } end)
+    let t = Timer(consume later, 500_000_000)
+    ts(consume t)
 
   fun ref _remove_file(filename: String) =>
     @printf[I32]("...Removing %s...\n".cstring(), filename.cstring())
