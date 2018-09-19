@@ -35,6 +35,9 @@ class WallarooParameterError(Exception):
 
 class ApplicationBuilder(object):
     def __init__(self, name):
+        self._connectors = {}
+        self._next_source_connector_port = 7100
+        self._next_sink_connector_port = 7200
         self._actions = [("name", name)]
 
     def source_connector(self, name, encoder, decoder, port=None):

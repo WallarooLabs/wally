@@ -11,5 +11,5 @@ bucket_name = connector.params.bucket
 s3.create_bucket(Bucket=bucket_name)
 
 while True:
-    key, body = extension.read()
+    key, body = connector.read()
     s3.put_object(Bucket=bucket_name, Body=body, Key=key, ACL='authenticated-read')

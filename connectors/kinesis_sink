@@ -10,5 +10,5 @@ stream = connector.params.stream
 producer = boto3.client('kinesis')
 
 while True:
-    key, value = extension.read()
+    key, value = connector.read()
     producer.put_record(StreamName=stream, PartitionKey=key, Data=value)
