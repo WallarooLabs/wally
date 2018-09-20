@@ -101,7 +101,7 @@ Build the Market Spread application and Wallaroo tools:
 
 ```bash
 cd ~/wallaroo
-make build-testing-performance-apps-market-spread build-giles-all build-utils-cluster_shutdown
+make build-testing-performance-apps-market-spread build-giles-all build-utils-cluster_shutdown build-testing-tools-fixed_length_message_blaster
 ```
 
 `scp` Wallaroo to other workers on the cluster:
