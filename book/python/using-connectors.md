@@ -99,6 +99,8 @@ We have a number of [prebuild connectors](https://github.com/WallarooLabs/wallar
 
 This connector provides Kafka source and sink support. This uses the [kafka library](https://pypi.org/project/kafka/). Consumer group based sources are supported to allow easier management of your source's progress through a topic.
 
+While Wallaroo already has built-in Kafka support, using the connector allows you to support the use of consumer groups and reuse any logic you might already have around offset management and consumer lifecycles. We're looking for feedback, so if your Kafka usecase doesn't seem to fit either option, please let us know.
+
 ### Kinesis
 
 AWS Kinesis is supported via the [boto3 library](https://pypi.org/project/boto3/). This script will expect AWS credentials to be setup as described in their documentation.
