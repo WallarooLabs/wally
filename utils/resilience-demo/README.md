@@ -125,11 +125,24 @@ move `worker2`'s state over to `$SERVER4` then restart `worker2` on
         ./40-kill-worker.sh 4 && sleep 1 && ./60-restart-worker.sh 2 4; \
     done
 
-# Demo: move worker2 from $SERVER2 -> $SERVER4 -> $SERVER2
+# Demo: 2-worker cluster: move worker2 from $SERVER2 -> $SERVER4 -> $SERVER2 -> $SERVER3
 
     ./20-start-2worker-cluster.sh && \
         ./30-start-sender.sh && sleep 3 && \
         ./40-kill-worker.sh 2 && ./50-copy-worker-resilience.sh 2 2 4 && \
         ./60-restart-worker.sh 2 4 && sleep 3 && \
         ./40-kill-worker.sh 4 && ./50-copy-worker-resilience.sh 2 4 2 && \
-        ./60-restart-worker.sh 2 2
+        ./60-restart-worker.sh 2 2 && sleep 3 && \
+        ./40-kill-worker.sh 2 && ./50-copy-worker-resilience.sh 2 2 3 && \
+        ./60-restart-worker.sh 2 3
+
+# Demo: 3-worker cluster: move worker2 from $SERVER2 -> $SERVER4 -> $SERVER2 -> $SERVER4
+
+    ./21-start-3worker-cluster.sh && \
+        ./30-start-sender.sh && sleep 3 && \
+        ./40-kill-worker.sh 2 && ./50-copy-worker-resilience.sh 2 2 4 && \
+        ./60-restart-worker.sh 2 4 && sleep 3 && \
+        ./40-kill-worker.sh 4 && ./50-copy-worker-resilience.sh 2 4 2 && \
+        ./60-restart-worker.sh 2 2 && sleep 3 && \
+        ./40-kill-worker.sh 2 && ./50-copy-worker-resilience.sh 2 2 4 && \
+        ./60-restart-worker.sh 2 4
