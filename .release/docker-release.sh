@@ -154,6 +154,57 @@ push_docker_images() {
   fi
 }
 
+push_release_latest_docker_images() {
+  ## Only push for release branch
+  if [[ $BRANCH == "release" ]]
+  then
+    ## Conditional check for whether the Wallaroo latest Docker path has been set, does not
+    ## upload image if it hasn't. Otherwise uploads to Bintray.
+    if [ -n "$wallaroo_docker_image_latest_path"]
+    then
+      # push the image
+      if docker push "$wallaroo_docker_image_latest_path"
+      then
+        echo "Pushed image $wallaroo_docker_image_latest_path successfully."
+      else
+        echo "Failed to push image: $wallaroo_docker_image_latest_path"
+        exit 1
+      fi
+    fi
+    ## Conditional check for whether the Metrics UI latest Docker path has been set, does not
+    ## upload image if it hasn't. Otherwise uploads to Bintray.
+    if [ -n "$metrics_ui_docker_image_latest_path" ]
+    then
+      if docker push "$metrics_ui_docker_image_latest_path"
+      then
+        echo "Pushed image $metrics_ui_docker_image_latest_path successfully."
+      else
+        echo "Failed to push image $metrics_ui_docker_image_latest_path"
+        exit 1
+      fi
+    fi
+
+
+  else
+    echo "Not on release branch, skipping push of latest tag..."
+  fi
+}
+
+tag_release_latest_docker_images() {
+  ## Only tag for release branch
+  if [[ $BRANCH == "release" ]]
+  then
+    # tagging Wallaroo image as latest
+    $wallaroo_docker_image_latest_path = $wallaroo_docker_repo_host/$wallaroo_docker_image_repo/wallaroo:latest
+    docker tag "$wallaroo_docker_image_path" "$wallaroo_docker_image_latest_path"
+    # tagging Metrics UI image as latest
+    metrics_ui_docker_image_latest_path=$wallaroo_docker_repo_host/$wallaroo_docker_image_repo/metrics_ui:latest
+    docker tag "$metrics_ui_docker_image_path" "metrics_ui_docker_image_latest_path"
+  else
+    echo "Not on release branch, skipping tag of Wallaroo and Metrics UI Docker images to latest..."
+  fi
+}
+
 git_reset() {
   git clean -df
   git reset --hard HEAD
@@ -179,4 +230,6 @@ set_docker_image_names
 build_metrics_ui_image
 build_wallaroo_image
 push_docker_images
+tag_release_latest_docker_images
+push_release_latest_docker_images
 git_reset
