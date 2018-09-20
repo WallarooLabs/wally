@@ -36,14 +36,13 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 RESILIENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 resilience_tests : CUSTOM_PATH = $(MULTI_PARTITION_DETECTOR_PATH):$(MULTI_PART_VALIDATOR_PATH):$(CLUSTER_SHRINKER_PATH)
 
-build-testing-correctness-tests-resilience: build-testing-correctness-apps-multi_partition_detector
-build-testing-correctness-tests-resilience: build-utils-cluster_shrinker
-build-testing-correctness-tests-resilience: build-testing-tools-external_sender
-integration-tests-testing-correctness-tests-resilience: build-testing-correctness-tests-resilience
-integration-tests-testing-correctness-tests-resilience: resilience_tests
-
 # standard rules generation makefile
 include $(rules_mk_path)
+
+build-testing-correctness-tests-resilience: build-testing-correctness-apps-multi_partition_detector
+build-testing-correctness-tests-resilience: build-utils-cluster_shrinker
+integration-tests-testing-correctness-tests-resilience: build-testing-correctness-tests-resilience
+integration-tests-testing-correctness-tests-resilience: resilience_tests
 
 ifeq ($(resilience),on)
 resilience_tests:

@@ -38,14 +38,14 @@ autoscale_tests : CUSTOM_PATH = :$(EXTERNAL_SENDER_PATH):$(TESTING_ALPHABET_PATH
 autoscale_tests : CUSTOM_PYTHONPATH = :$(TESTING_ALPHABET_PYTHON_PATH):$(TESTING_ALPHABET_PYTHON27_PATH)
 
 build-testing-correctness-tests-autoscale_tests: build-testing-correctness-apps-alphabet
+# standard rules generation makefile
+include $(rules_mk_path)
+
 build-testing-correctness-tests-autoscale_tests: build-machida
 build-testing-correctness-tests-autoscale_tests: build-testing-tools-external_sender
 build-testing-correctness-tests-autoscale_tests: build-utils-cluster_shrinker
 # integration-tests-testing-correctness-tests-autoscale_tests: build-testing-correctness-tests-autoscale_tests
 # integration-tests-testing-correctness-tests-autoscale_tests: autoscale_tests
-
-# standard rules generation makefile
-include $(rules_mk_path)
 
 ifeq ($(autoscale),on)
 autoscale_tests:
