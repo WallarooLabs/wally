@@ -37,16 +37,17 @@ RESTART_WITHOUT_RESILIENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST)))
 restart_without_resilience_tests : CUSTOM_PATH = $(SEQUENCE_WINDOW_PATH):$(VALIDATOR_PATH):$(EXTERNAL_SENDER_PATH)
 restart_without_resilience_tests : CUSTOM_PYTHONPATH = $(SEQUENCE_WINDOW_PYTHON_PATH)
 
+# standard rules generation makefile
+include $(rules_mk_path)
+
+ifeq ($(resilience),on)
+
 build-testing-correctness-tests-restart_without_resilience: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests-restart_without_resilience: build-testing-tools-external_sender
 build-testing-correctness-tests-restart_without_resilience: build-machida
 integration-tests-testing-correctness-tests-restart_without_resilience: build-testing-correctness-tests-restart_without_resilience
 integration-tests-testing-correctness-tests-restart_without_resilience: restart_without_resilience_tests
 
-# standard rules generation makefile
-include $(rules_mk_path)
-
-ifeq ($(resilience),on)
 restart_without_resilience_tests:
 	$(QUIET)printf "restart_without_resilience_tests not run.\nRun make with 'resilience=off' to run this test.\n"
 else
