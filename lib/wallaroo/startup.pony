@@ -325,17 +325,8 @@ actor Startup
         initializer_name)
       router_registry.set_event_log(event_log)
 
-      (let control_host, let control_service, let data_service) =
-        if _startup_options.is_initializer then
-          (_startup_options.c_host, _startup_options.c_service,
-            _startup_options.d_service)
-        else
-          (_startup_options.my_c_host, _startup_options.my_c_service,
-            _startup_options.my_d_service)
-        end
-
       let recovery_reconnecter = RecoveryReconnecter(auth,
-        _startup_options.worker_name, data_service,
+        _startup_options.worker_name, _startup_options.my_d_service,
         data_receivers, router_registry,
         connections, _is_recovering)
 
@@ -383,7 +374,6 @@ actor Startup
         end
       end
 
-      @printf[I32]("SLF: control_host = %s, control_service = %s\n".cstring(), control_host.cstring(), control_service.cstring())
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
@@ -392,7 +382,8 @@ actor Startup
           checkpoint_initiator, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service, event_log,
           this, _the_journal as SimpleJournal,
-          _startup_options.do_local_file_io, control_host, control_service)
+          _startup_options.do_local_file_io,
+          _startup_options.my_c_host, _startup_options.my_c_service)
 
       // We need to recover connections before creating our control
       // channel listener, since it's at that point that we notify
@@ -407,9 +398,15 @@ actor Startup
         end
       end
 
-      connections.make_and_register_recoverable_listener(
-        auth, consume control_notifier, control_channel_filepath,
-        control_host, control_service)
+      if _startup_options.is_initializer then
+        connections.make_and_register_recoverable_listener(
+          auth, consume control_notifier, control_channel_filepath,
+          _startup_options.c_host, _startup_options.c_service)
+      else
+        connections.make_and_register_recoverable_listener(
+          auth, consume control_notifier, control_channel_filepath,
+          _startup_options.my_c_host, _startup_options.my_c_service)
+      end
 
       if _is_recovering then
         // need to do this before recreating the data connection as at
