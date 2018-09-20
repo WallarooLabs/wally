@@ -77,7 +77,7 @@ These are self-contained python scripts. Some of them may expect a related pytho
 
 If we run one of these scripts we'll see there are some required arguments listed. The first one should be familiar. `--application-module` is the same as the one seen when running a Wallaroo worker (if you need a review of those command line parameters check the [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md) section). Providing this argument allows the script to autodetect most of your settings by reading the same application description that your wallaroo app runs with.
 
-The application module is not quite enough for the script to know what settings to use when connecting to wallaroo. Since your application may have more than one connector, the `--conncetor` argument is required for disambiguating which connector in your application setup this script is running as. Once you pass this in, we can autodetect the most common settings.
+The application module is not quite enough for the script to know what settings to use when connecting to wallaroo. Since your application may have more than one connector, the `--connector` argument is required for disambiguating which connector in your application setup this script is running as. Once you pass this in, we can autodetect the most common settings.
 
 Many connector scripts will have their own additional arguments, some may be required and others may be optional. In this case we have two, the host and port. These argument names prefix the connector name to ensure that conflicting argument names do not cause problems (should be able to pass all your wallaroo arguments in without conflict for example).
 
@@ -93,7 +93,7 @@ Since the included connector scripts are self-contained, feel free to copy it ov
 
 ## Starting With Prebuilt Connectors
 
-We have a number of [prebuild connectors](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/). Here is a short description of each one.
+We have a number of [prebuild connectors](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/). Here is a short description of each one. These are all written so they can be copied and customized in your application source tree. You're still welcome to run them in place as well.
 
 ### Kafka
 
