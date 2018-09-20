@@ -63,6 +63,13 @@ def terminate(_signal=None, _frame=None):
     sink.terminate()
     print("terminating wallaroo")
     wallaroo.terminate()
+    try:
+        # machida occasionally leaves the
+        # tty in a non-echoing state. This
+        # will fix the shell after it exits.
+        subprocess.call(['stty', 'sane'])
+    except:
+        pass
     os._exit(-1)
 
 signal.signal(signal.SIGINT, terminate)
