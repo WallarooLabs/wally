@@ -341,15 +341,11 @@ actor DataReceiver is Producer
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
-<<<<<<< HEAD
     ifdef "checkpoint_trace" then
       @printf[I32]("DataReceiver: forward_barrier to %s -> seq id %s, last_seen: %s\n".cstring(),
         target_step_id.string().cstring(), seq_id.string().cstring(),
         _last_id_seen.string().cstring())
     end
-=======
-    @printf[I32]("!@ DataReceiver (%s): forward_barrier to %s -> seq id %s, last_seen: %s\n".cstring(), _sender_name.cstring(), target_step_id.string().cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
->>>>>>> 26062047... Fix boundary message ordering bug
     if seq_id > _last_id_seen then
       match barrier_token
       //!@ This isn't good enough. We need to ensure that we've been overriden
