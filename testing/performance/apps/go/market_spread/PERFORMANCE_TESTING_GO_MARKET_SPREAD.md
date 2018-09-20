@@ -195,29 +195,29 @@ sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/
 #### NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 60 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 60 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 4,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 4,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 60 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
 ```
 
 #### Orders Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 100 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 60 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 600 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 60 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 11,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 600 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 11,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 60 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
 ```
 
 ### Market Spread Cluster Shutdown
@@ -348,29 +348,29 @@ sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/sender/
 ##### NBBO Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 20 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 3,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 20 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 4,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 4,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7001 -m 10000000000 -s 20 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w --ponynoblock
 ```
 
 ##### Orders Sender
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 20 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 20 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
 ```
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 11,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 50 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
+sudo cset proc -s user -e numactl -- -C 11,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 20 -i 2_500_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w --ponynoblock
 ```
 
 #### Market Spread Cluster Shutdown
