@@ -1,6 +1,6 @@
 # Using Connectors As Sources & Sinks
 
-Wallaroo's connectors are an experimental feature that allows full customization of sources and sinks. These streams can be integrated into Wallaroo using libraries you're already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they're all available for easy customization.
+This is a preview release of Wallaroo's connectors feature that allows full customization of sources and sinks. These streams can be integrated into Wallaroo using libraries you're already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they're all available for easy customization.
 
 Care has been taken to keep the API simple and the runtime assumtions unobtrusive so it's easy to hook up the library to existing code. Read down below for more information on how this works.
 
@@ -49,7 +49,7 @@ def decode_feed(data):
 
 Here we've defined two functions and use `wallaroo.experimental.stream_message_encoder` and `wallaroo.experimental.stream_message_decoder` as decorators. These decorators will handle framing and delivery of your data, so all you need to ensure is that the bytes represent the single message you want to deliver.
 
-A good observer will note that we're just returning the data in this example's `encode_feed` function. In this case we're receiving data that's already a packed floating point number so there is no need to reencode it. This allows you to pass along data as-is when it's already in the correct format.
+You might want to ask why we're just returning the data in this example's `encode_feed` function. In this case we're receiving data that's already a packed floating point number so there is no need to reencode it. This allows you to pass along data as-is when it's already in the correct format.
 
 Returning to the application setup code, we should look at the pipeline defintion to understand how all of this comes together. First is the `new_pipeline` call:
 
@@ -57,7 +57,7 @@ Returning to the application setup code, we should look at the pipeline defintio
 ab.new_pipeline("Celsius Conversion", "celsius_feed")
 ```
 
-Instead of the traditional `TCPSourceConfig` instance that we might have used before for a basic TCP stream, we now use the name of the connector. This must match the type of connector; in this case, new_pipeline expects a source, so we should declare `"celsius_feed"` using `source_connector`.
+Instead of using something like the `wallaroo.TCPSourceConfig` instance that we might have used before (if not you can we explain about how this works in [details](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/python/api.html#tcpsource)) for a basic TCP stream, we now use the name of the connector. This must match the type of connector; in this case, new_pipeline expects a source, so we should declare `"celsius_feed"` using `source_connector`.
 
 Likewise, our sink has adopted a named connector:
 
@@ -71,9 +71,9 @@ Notice how we don't couple the specifics of the medium used by the connector and
 
 ## Running Connector Scripts
 
-To run an application that makes use of these connectors we'll need to understand how the connector scripts work. You can find a number of the included connectors [here](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/). We'll look at `udp_source` and `udp_sink` as used in the example introduced above.
+To run an application that makes use of these connectors we'll need to understand how the connector scripts work. Wallaroo includes a [library of connectors](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/) to help get you started. We'll look at `udp_source` and `udp_sink` as used in the example introduced above.
 
-These are self-contained python scripts. Some of them may expect a related python library to be installed and available for import but our example uses the UDP facilities provider for by Python's standard library. Be sure that your python path is set up to include the wallaroo library.
+These included connectors are self-contained Python scripts. Some of them may expect a related Python library to be installed and available for import but our example uses the UDP facilities provider for by Python's standard library. Be sure that your Python path is set up to include the Wallaroo library.
 
 If we run one of these scripts we'll see there are some required arguments listed. The first one should be familiar. `--application-module` is the same as the one seen when running a Wallaroo worker (if you need a review of those command line parameters check the [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md) section). Providing this argument allows the script to autodetect most of your settings by reading the same application description that your wallaroo app runs with.
 
@@ -139,7 +139,7 @@ While we offer prebuilt connectors and they can be modified, sometimes you might
 
 ### Custom Source Connector
 
-To build a new source, you need to import `wallaroo.experimental` along with any other runtime requirements you have. Because this is a vanilla python runtime, you're welcome to organize your code however you like.
+To build a new source, you need to import `wallaroo.experimental` along with any other runtime requirements you have. Because this is a vanilla Python runtime, you're welcome to organize your code however you like.
 
 When your script starts running, you need to create the proper
 connector instance type. In this case we'd like to build a source connector so we'll use this:
