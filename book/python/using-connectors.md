@@ -4,7 +4,7 @@ Wallaroo's connectors are an experimental feature that allows full customization
 
 Care has been taken to keep the API simple and the runtime assumtions unobtrusive so it's easy to hook up the library to existing code. Read down below for more information on how this works.
 
-Connectors themselves are composed to two parts. First is the entry in your application builder which explains how encoding and decoding of the content works as well as giving each connector instance a name and direction of flow (source or sink). Second is the script which is a local process which runs side-by-side with Wallaroo. We'll look at each part in turn in the sections below.
+Connectors themselves are composed of to two parts. First is the entry in your application builder which explains how encoding and decoding of the content works as well as giving each connector instance a name and direction of flow (source or sink). Second is the script which is a local process which runs side-by-side with Wallaroo. We'll look at each part in turn in the sections below.
 
 ## Using A Connector In Your Application
 
@@ -33,7 +33,7 @@ def application_setup(args):
 
 You can follow along in this example by going to [github](https://github.com/Wallaroo/wallaroo/tree/{{book.wallaroo_version}}/examples/python/celsius_connectors/).
 
-We have introduced two new application builder methods for declaring connectors `source_connector` and `sink_connector`. These allow you to describe both ends of the connection so the connector script can encode or decode data in a way that's compatible with your application. Keeping these in one place helps ensure that it's easy to keep these in sync.
+We have introduced two new application builder methods for declaring connectors: `source_connector` and `sink_connector`. These allow you to describe both ends of the connection so the connector script can encode or decode data in a way that's compatible with your application. Keeping these in one place helps ensure that it's easy to keep these in sync.
 
 In our example we can look at the celsius feed's encoder and decoder functions:
 
@@ -49,15 +49,15 @@ def decode_feed(data):
 
 Here we've defined two functions and use `wallaroo.experimental.stream_message_encoder` and `wallaroo.experimental.stream_message_decoder` as decorators. These decorators will handle framing and delivery of your data, so all you need to ensure is that the bytes represent the single message you want to deliver.
 
-A good observer will note that we're just returning th data in this example's `encode_feed` function. In this case we're receiving data that's already a packed floating point number so there is no need to reencode it. This allows you to pass along data as-is when it's already in the correct format.
+A good observer will note that we're just returning the data in this example's `encode_feed` function. In this case we're receiving data that's already a packed floating point number so there is no need to reencode it. This allows you to pass along data as-is when it's already in the correct format.
 
-Returning to the application setup code, we should look at the pipeline defintion to understand how we all of this comes together. First is the `new_pipeline` call:
+Returning to the application setup code, we should look at the pipeline defintion to understand how all of this comes together. First is the `new_pipeline` call:
 
 ```python
 ab.new_pipeline("Celsius Conversion", "celsius_feed")
 ```
 
-Instead of the traditional `TCPSourceConfig` instance that we might have used before for a basic TCP stream, we now use the name of the connector. This must match the type of connector, in this case, new_pipeline expects a source, so we should declare `"celsius_feed"` using `source_connector`.
+Instead of the traditional `TCPSourceConfig` instance that we might have used before for a basic TCP stream, we now use the name of the connector. This must match the type of connector; in this case, new_pipeline expects a source, so we should declare `"celsius_feed"` using `source_connector`.
 
 Likewise, our sink has adopted a named connector:
 
@@ -87,7 +87,7 @@ To illustrate this, let's look at what the `udp_source` command line parameters 
 ./wallaroo/connectors/udp_source --application-module celsius --connector celsius_feed --celsius_feed-host 127.0.0.1 --celsius_feed-port 6789
 ```
 
-In this example, we are running a UDP source for our application whic listens to a UDP socket on 127.0.0.1 port 6789 and forwards the data in each packet to wallaroo as a message.
+In this example, we are running a UDP source for our application which listens to a UDP socket on 127.0.0.1 port 6789 and forwards the data in each packet to wallaroo as a message.
 
 Since the included connector scripts are self-contained, feel free to copy it over to your application tree to use them directly and make path management a little easier.
 
@@ -109,11 +109,11 @@ Redis has many ways to be used as a source and a sink. We've provided two starti
 
 For the source, we show an example using the subscription support offered by Redis pubsub and it's a natural fit for many stream processing applications. Check out `redis_subscriber_source` for [details](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/redis_subscriber_source).
 
-For the sink, we show that not everything needs to look exactly like a stream to be used with Wallaroo. We use a give hash in redis and set key, value pairs on that hash for each tuple passed to the sink. This is very handy for those cases that want to keep track of the latest value. See `redis_hash_sink` for [details](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/redis_hash_sink).
+For the sink, we show that not everything needs to look exactly like a stream to be used with Wallaroo. We use a give hash in redis and set key-value pairs on the target hash for each tuple passed to the sink. This is very handy for those cases that want to keep track of the latest value. See `redis_hash_sink` for [details](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/redis_hash_sink).
 
 ### RabbitMQ
 
-Our RabbitMQ source uses the [pika library](https://pypi.org/project/pika/). We support autmatic provisioning of missing queues in our setup code but it's advised that users ensure they provision their broker's exchange with the appropriate type before hand.
+Our RabbitMQ source uses the [pika library](https://pypi.org/project/pika/). We support autmatic provisioning of missing queues in our setup code but it's advised that users ensure they provision their broker's exchange with the appropriate type beforehand.
 
 ### UDP
 
@@ -125,22 +125,22 @@ This sink is powered by the [boto3 library](https://pypi.org/project/boto3/) and
 
 ### Postgres
 
-We do offer a some starting templates for postgres integration. These depend on your database schema and so we've left them in the [connectors/templates directory](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/templates).
+We do offer some starting templates for postgres integration. These depend on your database schema and so we've left them in the [connectors/templates directory](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/templates).
 
-As a source we have a very interesting example of how notifiers can turn a regular table into a stream. If you're struggling with finding a efficient way to stream relational data, this might be a good place to start.
+As a source we have a very interesting example of how notifiers can turn a regular table into a stream. If you're struggling with finding an efficient way to stream relational data, this might be a good place to start.
 
 On the sink side, we support inserting new records for each sink output. This should be easy to modify to allow more complex database interactions.
 
 ## Building Your Own Connectors
 
-While we offer prebuild connectors and they can be modified, somethins you might find yourself needing to build a connector from scratch. We'll walk through a source and sink example.
+While we offer prebuilt connectors and they can be modified, sometimes you might find yourself needing to build a connector from scratch. We'll walk through a source and sink example.
 
 ### Custom Source Connector
 
 To build a new source, you need to import `wallaroo.experimental` along with any other runtime requirements you have. Because this is a vanilla python runtime, you're welcome to organize your code however you like.
 
 When your script starts running, you need to create the proper
-connector instance type. In this case we'd like to build a source connctor so we'll use this:
+connector instance type. In this case we'd like to build a source connector so we'll use this:
 
 ```python
 connector = wallaroo.experimental.SourceConnector(required_params=[], optional_params=[])
