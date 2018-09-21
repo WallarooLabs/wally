@@ -48,14 +48,16 @@ class _WaitingCheckpointInitiatorPhase is _CheckpointInitiatorPhase
 class _CheckpointingPhase is _CheckpointInitiatorPhase
   let _token: CheckpointBarrierToken
   let _c_initiator: CheckpointInitiator ref
+  let _repeating: Bool
   var _barrier_complete: Bool = false
   var _event_log_checkpoints_complete: Bool = false
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
-  new create(token: CheckpointBarrierToken,
+  new create(token: CheckpointBarrierToken, repeating: Bool,
     c_initiator: CheckpointInitiator ref)
   =>
     _token = token
+    _repeating = repeating
     _c_initiator = c_initiator
 
   fun name(): String => "_CheckpointingPhase"
@@ -84,18 +86,21 @@ class _CheckpointingPhase is _CheckpointInitiatorPhase
 
   fun ref _check_completion() =>
     if _barrier_complete and _event_log_checkpoints_complete then
-      _c_initiator.event_log_write_checkpoint_id(_token.id, _token)
+      _c_initiator.event_log_write_checkpoint_id(_token.id, _token,
+        _repeating)
     end
 
 class _WaitingForEventLogIdWrittenPhase is _CheckpointInitiatorPhase
   let _token: CheckpointBarrierToken
   let _c_initiator: CheckpointInitiator ref
+  let _repeating: Bool
   let _acked_workers: SetIs[WorkerName] = _acked_workers.create()
 
-  new create(token: CheckpointBarrierToken,
+  new create(token: CheckpointBarrierToken, repeating: Bool,
     c_initiator: CheckpointInitiator ref)
   =>
     _token = token
+    _repeating = repeating
     _c_initiator = c_initiator
 
   fun name(): String => "_WaitingForEventLogIdWrittenPhase"
@@ -111,5 +116,5 @@ class _WaitingForEventLogIdWrittenPhase is _CheckpointInitiatorPhase
     _acked_workers.set(worker)
     @printf[I32]("!@ _WaitingForEventLogIdWrittenPhase: acked_workers: %s, workers: %s\n".cstring(), _acked_workers.size().string().cstring(), _c_initiator.workers().size().string().cstring())
     if (_acked_workers.size() == _c_initiator.workers().size()) then
-      _c_initiator.checkpoint_complete(_token)
+      _c_initiator.checkpoint_complete(_token, _repeating)
     end
