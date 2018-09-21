@@ -92,15 +92,12 @@ actor Startup
       end
     ifdef "resilience" then
       @printf[I32]("****RESILIENCE MODE is active****\n".cstring())
-      _print_link_to_community_license()
     end
     ifdef "clustering" then
       @printf[I32]("****CLUSTERING MODE is active****\n".cstring())
-      _print_link_to_community_license()
     end
     ifdef "autoscale" then
       @printf[I32]("****AUTOSCALE MODE is active****\n".cstring())
-      _print_link_to_community_license()
     end
     ifdef "trace" then
       @printf[I32]("****TRACE is active****\n".cstring())
@@ -860,13 +857,6 @@ actor Startup
     end
 
     ws
-
-  fun ref _print_link_to_community_license() =>
-    @printf[I32](("****This is an enterprise feature. You may need to " +
-      "obtain a paid usage agreement to use this feature in production. See " +
-      "the Wallaroo Community License at https://github.com/WallarooLabs/" +
-      "wallaroo/blob/master/LICENSE.md for details, and also please visit " +
-      "the page at http://www.wallaroolabs.com/pricing****\n").cstring())
 
   fun ref _setup_shutdown_handler(c: Connections, r: RecoveryFileCleaner,
     a: AmbientAuth)

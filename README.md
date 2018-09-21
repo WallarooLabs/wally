@@ -3,7 +3,7 @@
 
 ---
 [![CircleCI](https://circleci.com/gh/WallarooLabs/wallaroo.svg?style=shield)](https://circleci.com/gh/WallarooLabs/wallaroo)
-[![GitHub license](https://img.shields.io/badge/license-apache%202-blue.svg)][wallaroo-community-license-readme]
+[![GitHub license](https://img.shields.io/badge/license-apache%202-blue.svg)][wallaroo-license-readme]
 [![GitHub version](https://badge.fury.io/gh/WallarooLabs%2Fwallaroo.svg)](http://badge.fury.io/gh/WallarooLabs%2Fwallaroo)
 [![IRC][irc-badge]][irc-link]
 [![Groups.io][group-badge]][group-link]
@@ -93,13 +93,7 @@ We welcome contributions. Please see our [Contribution Guide][contribution-guide
 
 ## License
 
-The [Wallaroo Community License][wallaroo-community-license] is based on [Apache version 2][apache-2-license]. However, you should read it for yourself. Here we provide a summary of the main points of the [Wallaroo Community License Agreement][wallaroo-community-license].
-
-- You can **run** all Wallaroo code in a non-production environment without restriction.
-- You can **run** all Wallaroo code in a production environment for free on up to 3 server or 24 cpus.
-- If you want to **run** Wallaroo Enterprise version features in production above 3 servers or 24 cpus, you have to obtain a license.
-- You can **modify** and **redistribute** any Wallaroo code
-- Anyone who uses your **modified** or **redistributed** code is bound by the same license and needs to obtain a Wallaroo Enterprise license to run on more than 3 servers or 24 cpus in a production environment.
+Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 
 [apache-2-license]: https://www.apache.org/licenses/LICENSE-2.0
 [application-structure-link]: MONOREPO.md
@@ -123,6 +117,5 @@ The [Wallaroo Community License][wallaroo-community-license] is based on [Apache
 [reverse]: examples/python/reverse/
 [source-install-instructions]: https://docs.wallaroolabs.com/book/getting-started/linux-setup.html
 [survey-link]: https://wallaroolabs.typeform.com/to/HS6azY?source=wallaroo_readme
-[wallaroo-community-license-readme]: #license
-[wallaroo-community-license]: LICENSE.md
+[wallaroo-license-readme]: #license
 [faq]: FAQ.md
