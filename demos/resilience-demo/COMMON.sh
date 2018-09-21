@@ -45,19 +45,7 @@ USER=ubuntu
 REPO_URL=https://github.com/slfritchie/wallaroo.git
 
 # Source branch name to test with
-####REPO_BRANCH=slf-file-io-journal6
-#REPO_BRANCH=s-res-test-f+slf-worker-migration+issue-2370
-#REPO_BRANCH=res-merge-1
-#REPO_BRANCH=res-merge-1+dos
-#REPO_BRANCH=resilience-project+dos
-#REPO_BRANCH=resilience-project+dos2
-#REPO_BRANCH=static-key-graph+dos3
-#REPO_BRANCH=resilience-project+dos4
-#REPO_BRANCH=resilience-project+dos5
-#REPO_BRANCH=static-key-graph+dos5b
-#REPO_BRANCH=46e8558d # resilience-project end of Sunday 2018-09-16, mostly good
-#REPO_BRANCH=resilience-project+dos6
-REPO_BRANCH=sept-2018-prerelease+dos8
+REPO_BRANCH=master
 
 # If the environment variable WALLAROO_BIN is set, then use it
 # for the path to our Wallaroo executable.

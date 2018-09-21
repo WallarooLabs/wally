@@ -16,7 +16,6 @@ STOP=`expr $NOW + $TIMEOUT`
 while [ 1 ]; do
     C=`strings $RECEIVED | egrep ",${SEQ_NUM}\\]" | sort -u | wc -l`
     if [ $C -eq $NUM_KEYS ]; then
-        echo DONE
         exit 0
     fi
     if [ `date +%s` -gt $STOP ]; then
