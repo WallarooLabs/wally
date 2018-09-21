@@ -122,7 +122,9 @@ actor CheckpointInitiator is Initializable
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     ifdef "resilience" then
       if _is_active and (_worker_name == _primary_worker) then
-        _initiate_checkpoint(_checkpoint_group)
+        let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
+          1_000_000_000)
+        _timers(consume t)
       end
     end
     _is_recovering = false
@@ -159,6 +161,7 @@ actor CheckpointInitiator is Initializable
   =>
     if not _ignoring_checkpoints and (checkpoint_group == _checkpoint_group)
     then
+      _clear_pending_checkpoints()
       _current_checkpoint_id = _current_checkpoint_id + 1
 
       //!@
@@ -193,6 +196,7 @@ actor CheckpointInitiator is Initializable
   be resume_checkpoint() =>
     @printf[I32]("!@ CheckpointInitiator: resume_checkpoint()\n".cstring())
     if _is_active and (_worker_name == _primary_worker) then
+      _clear_pending_checkpoints()
       let promise = Promise[BarrierToken]
       promise.next[None]({(t: BarrierToken) =>
         _self.initiate_checkpoint(_checkpoint_group)})
