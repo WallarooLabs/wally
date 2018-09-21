@@ -36,7 +36,7 @@ Wallaroo can either be installed via [Docker, Vagrant][docker-link] or (on Linux
 As easy as:
 
 ```sh
-docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:0.5.2
+docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:latest
 ```
 
 ## Usage
