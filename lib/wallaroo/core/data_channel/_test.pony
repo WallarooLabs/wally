@@ -95,7 +95,8 @@ class _TestDataChannel is DataChannelListenNotify
       let b_initiator = BarrierInitiator(auth, worker_name, conns, "init")
       let s_initiator = CheckpointInitiator(auth, "", "", conns, 0, event_log,
         b_initiator, "", SimpleJournalNoop, false)
-      let a_initiator = AutoscaleInitiator(worker_name, b_initiator)
+      let a_initiator = AutoscaleInitiator(worker_name, b_initiator,
+        s_initiator)
       let rr = RouterRegistry(auth, worker_name, dr, conns,
         _DummyRecoveryFileCleaner, 1, false, "",
         b_initiator, s_initiator, a_initiator)

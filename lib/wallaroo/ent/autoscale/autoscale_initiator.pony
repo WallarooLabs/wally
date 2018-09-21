@@ -13,21 +13,37 @@ the License. You may obtain a copy of the License at
 use "promises"
 use "wallaroo/core/common"
 use "wallaroo/ent/barrier"
+use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 
 actor AutoscaleInitiator
+  let _self: AutoscaleInitiator tag = this
   let _worker_name: WorkerName
   let _barrier_initiator: BarrierInitiator
+  let _checkpoint_initiator: CheckpointInitiator
   var _current_autoscale_tokens: AutoscaleTokens
   var _autoscale_token_in_progress: Bool = false
 
-  new create(w_name: WorkerName, barrier_initiator: BarrierInitiator) =>
+  new create(w_name: WorkerName, barrier_initiator: BarrierInitiator,
+    checkpoint_initiator: CheckpointInitiator)
+  =>
     _worker_name = w_name
     _current_autoscale_tokens = AutoscaleTokens(_worker_name, 0)
     _barrier_initiator = barrier_initiator
+    _checkpoint_initiator = checkpoint_initiator
 
   be initiate_autoscale(autoscale_initiate_promise: AutoscaleResultPromise)
+  =>
+    let promise = Promise[None]
+    promise
+      .next[None]({(_: None) => _self.inject_autoscale_barrier(
+        autoscale_initiate_promise)})
+
+    _checkpoint_initiator.pause_checkpoints(promise)
+
+  be inject_autoscale_barrier(
+    autoscale_initiate_promise: AutoscaleResultPromise)
   =>
     @printf[I32]("Checking there are no in flight messages.\n".cstring())
     if _autoscale_token_in_progress then Fail() end
@@ -65,6 +81,7 @@ actor AutoscaleInitiator
   be autoscale_resume_complete(barrier_token: BarrierToken) =>
     if barrier_token != _current_autoscale_tokens.resume_token then Fail() end
     _autoscale_token_in_progress = false
+    _checkpoint_initiator.restart_repeating_checkpoints()
 
   be dispose() =>
     @printf[I32]("Shutting down AutoscaleInitiator\n".cstring())

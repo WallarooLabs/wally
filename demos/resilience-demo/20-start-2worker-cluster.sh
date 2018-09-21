@@ -34,13 +34,20 @@ ssh -n $USER@$SERVER2_EXT "cd wallaroo ; $WALLAROO_BIN -i ${SERVER1}:${ORDERS_PO
 
 for i in $SERVER1_EXT $SERVER2_EXT; do
     /bin/echo -n "Check Wallaroo worker on ${i}: "
-    while [ 1 ]; do 
+    LIM=30
+    C=0
+    while [ $C -lt $LIM ]; do
         /bin/echo -n .
         ssh -n $USER@$i "grep III /tmp/run-dir/${WALLAROO_NAME}*out"
         if [ $? -eq 0 ]; then
             break
         fi
+        C=`expr $C + 1`
     done
+    if [ $C -ge $LIM ]; then
+        echo TIMEOUT
+        exit 1
+    fi
 done
 
 exit 0

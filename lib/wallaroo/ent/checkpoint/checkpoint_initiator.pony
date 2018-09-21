@@ -38,6 +38,10 @@ actor CheckpointInitiator is Initializable
   var _time_between_checkpoints: U64
   let _event_log: EventLog
   let _barrier_initiator: BarrierInitiator
+
+  // Used as a way to identify outdated timer-based initiate_checkpoint calls
+  var _checkpoint_group: USize = 0
+
   var _current_checkpoint_id: CheckpointId = 0
   var _last_complete_checkpoint_id: CheckpointId = 0
   var _last_rollback_id: RollbackId = 0
@@ -118,7 +122,7 @@ actor CheckpointInitiator is Initializable
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     ifdef "resilience" then
       if _is_active and (_worker_name == _primary_worker) then
-        _initiate_checkpoint()
+        _initiate_checkpoint(_checkpoint_group)
       end
     end
     _is_recovering = false
@@ -139,11 +143,22 @@ actor CheckpointInitiator is Initializable
   be lookup_checkpoint_id(p: Promise[(CheckpointId, RollbackId)]) =>
     p((_last_complete_checkpoint_id, _last_rollback_id))
 
-  be initiate_checkpoint() =>
-    _initiate_checkpoint()
+  be initiate_checkpoint(checkpoint_group: USize) =>
+    _initiate_checkpoint(checkpoint_group)
 
-  fun ref _initiate_checkpoint() =>
-    if not _checkpoints_paused then
+  be pause_checkpoints(promise: Promise[None]) =>
+    _clear_timers()
+    _checkpoint_group = _checkpoint_group + 1
+    promise(None)
+
+  be restart_repeating_checkpoints() =>
+    _clear_timers()
+    _initiate_checkpoint(_checkpoint_group)
+
+  fun ref _initiate_checkpoint(checkpoint_group: USize,
+    repeating: Bool = true)
+  =>
+    if not _checkpoints_paused and (checkpoint_group == _checkpoint_group) then
       _current_checkpoint_id = _current_checkpoint_id + 1
 
       //!@
@@ -172,14 +187,15 @@ actor CheckpointInitiator is Initializable
         recover this~checkpoint_barrier_complete() end)
       _barrier_initiator.inject_barrier(token, barrier_promise)
 
-      _phase = _CheckpointingPhase(token, this)
+      _phase = _CheckpointingPhase(token, repeating, this)
     end
 
   be resume_checkpoint() =>
     @printf[I32]("!@ CheckpointInitiator: resume_checkpoint()\n".cstring())
     if _is_active and (_worker_name == _primary_worker) then
       let promise = Promise[BarrierToken]
-      promise.next[None]({(t: BarrierToken) => _self.initiate_checkpoint()})
+      promise.next[None]({(t: BarrierToken) =>
+        _self.initiate_checkpoint(_checkpoint_group)})
       _barrier_initiator.inject_barrier(
         CheckpointRollbackResumeBarrierToken(_last_rollback_id,
           _last_complete_checkpoint_id), promise)
@@ -228,7 +244,7 @@ actor CheckpointInitiator is Initializable
     end
 
   fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
-    token: CheckpointBarrierToken)
+    token: CheckpointBarrierToken, repeating: Bool)
   =>
     @printf[I32]("!@ CheckpointInitiator: event_log_write_checkpoint_id()\n".cstring())
     let promise = Promise[CheckpointId]
@@ -248,9 +264,9 @@ actor CheckpointInitiator is Initializable
       Fail()
     end
 
-    _phase = _WaitingForEventLogIdWrittenPhase(token, this)
+    _phase = _WaitingForEventLogIdWrittenPhase(token, repeating, this)
 
-  fun ref checkpoint_complete(token: BarrierToken) =>
+  fun ref checkpoint_complete(token: BarrierToken, repeating: Bool) =>
     if not _checkpoints_paused then
       ifdef "resilience" then
         match token
@@ -269,9 +285,11 @@ actor CheckpointInitiator is Initializable
           end
 
           // Prepare for next checkpoint
-          if _is_active and (_worker_name == _primary_worker) then
+          if repeating and _is_active and (_worker_name == _primary_worker)
+          then
             @printf[I32]("!@ Creating _InitiateCheckpoint timer for future checkpoint %s\n".cstring(), (_current_checkpoint_id + 1).string().cstring())
-            let t = Timer(_InitiateCheckpoint(this), _time_between_checkpoints)
+            let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
+              _time_between_checkpoints)
             _timers(consume t)
           end
         else
@@ -431,12 +449,14 @@ primitive LatestCheckpointId
 
 class _InitiateCheckpoint is TimerNotify
   let _si: CheckpointInitiator
+  let _checkpoint_group: USize
 
-  new iso create(si: CheckpointInitiator) =>
+  new iso create(si: CheckpointInitiator, checkpoint_group: USize) =>
     _si = si
+    _checkpoint_group = checkpoint_group
 
   fun ref apply(timer: Timer, count: U64): Bool =>
-    _si.initiate_checkpoint()
+    _si.initiate_checkpoint(_checkpoint_group)
     false
 
 /////////////////////////////////////////////////////////////////////////////

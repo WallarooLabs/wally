@@ -3,7 +3,7 @@
 set -o errexit
 set -o nounset
 
-export WALLAROO_VERSION="0.5.2"
+export WALLAROO_VERSION="release-0.5.3"
 
 wallaroo_up() {
   cd /tmp
