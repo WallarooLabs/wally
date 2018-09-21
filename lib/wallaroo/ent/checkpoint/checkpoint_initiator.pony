@@ -147,12 +147,11 @@ actor CheckpointInitiator is Initializable
     _initiate_checkpoint(checkpoint_group)
 
   be pause_checkpoints(promise: Promise[None]) =>
-    _clear_timers()
-    _checkpoint_group = _checkpoint_group + 1
+    _clear_pending_checkpoints()
     promise(None)
 
   be restart_repeating_checkpoints() =>
-    _clear_timers()
+    _clear_pending_checkpoints()
     _initiate_checkpoint(_checkpoint_group)
 
   fun ref _initiate_checkpoint(checkpoint_group: USize,
@@ -305,9 +304,10 @@ actor CheckpointInitiator is Initializable
     if _is_active and (_worker_name == _primary_worker) then
       _checkpoints_paused = true
     end
-    _clear_timers()
+    _clear_pending_checkpoints()
 
-  fun ref _clear_timers() =>
+  fun ref _clear_pending_checkpoints() =>
+    _checkpoint_group = _checkpoint_group + 1
     _timers.dispose()
     _timers = Timers
 
@@ -321,8 +321,7 @@ actor CheckpointInitiator is Initializable
         Fail()
       end
 
-      // Clear any pending checkpoint
-      _clear_timers()
+      _clear_pending_checkpoints()
 
       let rollback_id = _last_rollback_id + 1
       _last_rollback_id = rollback_id
