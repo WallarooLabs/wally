@@ -307,7 +307,7 @@ actor Startup
       connections.register_disposable(checkpoint_initiator)
 
       let autoscale_initiator = AutoscaleInitiator(
-        _startup_options.worker_name, barrier_initiator)
+        _startup_options.worker_name, barrier_initiator, checkpoint_initiator)
       connections.register_disposable(autoscale_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
@@ -534,7 +534,7 @@ actor Startup
         (m.checkpoint_id, m.rollback_id))
 
       let autoscale_initiator = AutoscaleInitiator(
-        _startup_options.worker_name, barrier_initiator)
+        _startup_options.worker_name, barrier_initiator, checkpoint_initiator)
 
       _setup_shutdown_handler(connections, this, auth)
 
