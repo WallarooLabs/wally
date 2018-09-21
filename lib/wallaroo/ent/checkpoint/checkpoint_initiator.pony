@@ -55,7 +55,7 @@ actor CheckpointInitiator is Initializable
   let _do_local_file_io: Bool
 
   var _is_recovering: Bool
-  var _checkpoints_paused: Bool = false
+  var _ignoring_checkpoints: Bool = false
 
   var _phase: _CheckpointInitiatorPhase = _WaitingCheckpointInitiatorPhase
 
@@ -146,7 +146,7 @@ actor CheckpointInitiator is Initializable
   be initiate_checkpoint(checkpoint_group: USize) =>
     _initiate_checkpoint(checkpoint_group)
 
-  be pause_checkpoints(promise: Promise[None]) =>
+  be clear_pending_checkpoints(promise: Promise[None]) =>
     _clear_pending_checkpoints()
     promise(None)
 
@@ -157,7 +157,8 @@ actor CheckpointInitiator is Initializable
   fun ref _initiate_checkpoint(checkpoint_group: USize,
     repeating: Bool = true)
   =>
-    if not _checkpoints_paused and (checkpoint_group == _checkpoint_group) then
+    if not _ignoring_checkpoints and (checkpoint_group == _checkpoint_group)
+    then
       _current_checkpoint_id = _current_checkpoint_id + 1
 
       //!@
@@ -198,19 +199,19 @@ actor CheckpointInitiator is Initializable
       _barrier_initiator.inject_barrier(
         CheckpointRollbackResumeBarrierToken(_last_rollback_id,
           _last_complete_checkpoint_id), promise)
-      _checkpoints_paused = false
+      _ignoring_checkpoints = false
     else
       try
         let msg = ChannelMsgEncoder.resume_checkpoint(_worker_name, _auth)?
         _connections.send_control(_primary_worker, msg)
-        _checkpoints_paused = false
+        _ignoring_checkpoints = false
       else
         Fail()
       end
     end
 
   be checkpoint_barrier_complete(token: BarrierToken) =>
-    if not _checkpoints_paused then
+    if not _ignoring_checkpoints then
       ifdef debug then
         @printf[I32]("Checkpoint_Initiator: Checkpoint Barrier %s Complete\n"
           .cstring(), token.string().cstring())
@@ -266,7 +267,7 @@ actor CheckpointInitiator is Initializable
     _phase = _WaitingForEventLogIdWrittenPhase(token, repeating, this)
 
   fun ref checkpoint_complete(token: BarrierToken, repeating: Bool) =>
-    if not _checkpoints_paused then
+    if not _ignoring_checkpoints then
       ifdef "resilience" then
         match token
         | let st: CheckpointBarrierToken =>
@@ -302,7 +303,7 @@ actor CheckpointInitiator is Initializable
 
   be prepare_for_rollback() =>
     if _is_active and (_worker_name == _primary_worker) then
-      _checkpoints_paused = true
+      _ignoring_checkpoints = true
     end
     _clear_pending_checkpoints()
 

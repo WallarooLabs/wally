@@ -40,7 +40,7 @@ actor AutoscaleInitiator
       .next[None]({(_: None) => _self.inject_autoscale_barrier(
         autoscale_initiate_promise)})
 
-    _checkpoint_initiator.pause_checkpoints(promise)
+    _checkpoint_initiator.clear_pending_checkpoints(promise)
 
   be inject_autoscale_barrier(
     autoscale_initiate_promise: AutoscaleResultPromise)
