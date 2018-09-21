@@ -76,35 +76,37 @@ On your laptop, run the following two commands:
     ./00-setup-dev-env.sh
     ./10-setup-slf-repo.r=on.sh
 
-# Demo: Verify that a worker restart does not disrupt sequence window verification
+## Demo scripts and chain-them-together examples
+
+### Demo: a worker restart does not violate message ordering invariants
 
     ./VERIFY.2worker.simple-restart.sh
 
-# Demo: Verify that a worker migration in a 2-worker cluster does not disrupt sequence window verification
+### Demo: a worker migration in a 2-worker cluster does not violate message ordering invariants
 
     ./VERIFY.2worker.sh
 
-# Demo: Verify that a worker migration in a 3-worker cluster does not disrupt sequence window verification
+### Demo: a worker migration in a 3-worker cluster does not violate message ordering invariants
 
     ./VERIFY.3worker.sh
 
-# Demo: Start market-spread on a 2-worker cluster
+### Demo: Start market-spread on a 2-worker cluster
 
     ./20-start-2worker-cluster.sh
 
 The Wallaroo metrics UI agent will be available at `http://$SERVER1:4000`
 
-# Demo: Start market-spread on a 2-worker cluster
+### Demo: Start market-spread on a 2-worker cluster
 
     ./21-start-3worker-cluster.sh
 
 The Wallaroo metrics UI agent will be available at `http://$SERVER1:4000`
 
-# Demo: Start a pair of Orders + NBBO data stream senders
+### Demo: Start a pair of Orders + NBBO data stream senders
 
     ./30-start-sender.sh
 
-# Demo: Crash a worker, then migrate the worker's state to a new machine then restart
+### Demo: Crash a worker, then migrate the worker's state to a new machine then restart
 
 We will crash the `worker2` Wallaroo process on `$SERVER2` and then
 move `worker2`'s state over to `$SERVER4` then restart `worker2` on
@@ -114,7 +116,7 @@ move `worker2`'s state over to `$SERVER4` then restart `worker2` on
         ./50-copy-worker-resilience.sh 2 2 4 && \
         ./60-restart-worker.sh 2 4
 
-# Demo: move worker2 from $SERVER2 -> $SERVER4  then restart several times
+### Demo: move worker2 from $SERVER2 -> $SERVER4  then restart several times
 
     ./20-start-2worker-cluster.sh && \
         ./30-start-sender.sh && sleep 3 && \
@@ -125,7 +127,7 @@ move `worker2`'s state over to `$SERVER4` then restart `worker2` on
         ./40-kill-worker.sh 4 && sleep 1 && ./60-restart-worker.sh 2 4; \
     done
 
-# Demo: 2-worker cluster: move worker2 from $SERVER2 -> $SERVER4 -> $SERVER2 -> $SERVER3
+### Demo: 2-worker cluster: move worker2 from $SERVER2 -> $SERVER4 -> $SERVER2 -> $SERVER3
 
     ./20-start-2worker-cluster.sh && \
         ./30-start-sender.sh && sleep 3 && \
@@ -136,7 +138,7 @@ move `worker2`'s state over to `$SERVER4` then restart `worker2` on
         ./40-kill-worker.sh 2 && ./50-copy-worker-resilience.sh 2 2 3 && \
         ./60-restart-worker.sh 2 3
 
-# Demo: 3-worker cluster: move worker2 from $SERVER2 -> $SERVER4 -> $SERVER2 -> $SERVER4
+### Demo: 3-worker cluster: move worker2 from $SERVER2 -> $SERVER4 -> $SERVER2 -> $SERVER4
 
     ./21-start-3worker-cluster.sh && \
         ./30-start-sender.sh && sleep 3 && \
