@@ -253,7 +253,7 @@ parse_and_run() {
           # process failed; if not metrics ui, stop running this example and move on to next one
           if [[ "$LAST_CMD" != "metrics_reporter_ui start" ]]; then
             log "Error! Script for shell${d} failed with ${RET_CODE}!"
-            if [[ "$VERBOSE_ERROR" == "true" ]]; then
+            if [[ "${VERBOSE_ERROR:-}" == "true" ]]; then
               cat "$SHELL_LOG_FILE"
             fi
             return
@@ -261,7 +261,7 @@ parse_and_run() {
           # process failed; if metrics ui, retry a few times just in case of a transient issue (port conflict, etc)
           if [[ $j -gt 3 ]]; then
             log "Error! Script for shell${d} failed with ${RET_CODE}! Tried multiple times (because it is the metrics_ui) with no success!"
-            if [[ "$VERBOSE_ERROR" == "true" ]]; then
+            if [[ "${VERBOSE_ERROR:-}" == "true" ]]; then
               cat "$SHELL_LOG_FILE"
             fi
             return
@@ -288,7 +288,7 @@ parse_and_run() {
             else
               # if no, this means the example failed
               log "Error! Script for shell${d} finished successfully without expected output in log!"
-              if [[ "$VERBOSE_ERROR" == "true" ]]; then
+              if [[ "${VERBOSE_ERROR:-}" == "true" ]]; then
                 cat "$SHELL_LOG_FILE"
               fi
               return
@@ -332,7 +332,7 @@ parse_and_run() {
           # if error and tried too many times, the example failed
           if [[ $j -gt 3 ]]; then
             log "Error! Script for shell${d} failed with ${RET_CODE}! Tried multiple times (because it is the metrics_ui) with no success!"
-            if [[ "$VERBOSE_ERROR" == "true" ]]; then
+            if [[ "${VERBOSE_ERROR:-}" == "true" ]]; then
               cat "$SHELL_LOG_FILE"
             fi
             return
@@ -353,7 +353,7 @@ parse_and_run() {
           # if timed out and tried too many times, the example failed
           if [[ $j -gt 3 ]]; then
             log "Error! Metrics reporter taking too long to start! Tried multiple times (because it is the metrics_ui) with no success!"
-            if [[ "$VERBOSE_ERROR" == "true" ]]; then
+            if [[ "${VERBOSE_ERROR:-}" == "true" ]]; then
               cat "$SHELL_LOG_FILE"
             fi
             return
@@ -380,7 +380,7 @@ parse_and_run() {
       wait ${last_pid} || RET_CODE=$?
       if [[ "${RET_CODE}" != "0" ]]; then
         log "Error! Script for shell${d} failed with ${RET_CODE}!"
-        if [[ "$VERBOSE_ERROR" == "true" ]]; then
+        if [[ "${VERBOSE_ERROR:-}" == "true" ]]; then
           cat "$SHELL_LOG_FILE"
         fi
         return
@@ -395,7 +395,7 @@ parse_and_run() {
       wait ${last_pid} || RET_CODE=$?
       if [[ "${RET_CODE}" != "0" ]]; then
         log "Error! Script for shell${d} failed with ${RET_CODE}!"
-        if [[ "$VERBOSE_ERROR" == "true" ]]; then
+        if [[ "${VERBOSE_ERROR:-}" == "true" ]]; then
           cat "$SHELL_LOG_FILE"
         fi
         return
@@ -467,6 +467,11 @@ print_results() {
 # iterate through all examples and run them
 # shellcheck disable=SC2231
 for file in "$(readlink -e "${WALLAROO_DIR}/examples")"/${LANG_TO_TEST}/${EXAMPLE_TO_TEST}/README.md; do
+  # if it's the connectors example skip it
+  if [[ "${file}" == *connectors* ]]; then
+    continue
+  fi
+
   # call cleanup to kill any dangling processes started by this script to ensure a clean slate
   cleanup
   parse_and_run "$file"
