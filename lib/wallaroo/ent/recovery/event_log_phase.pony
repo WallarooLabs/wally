@@ -317,6 +317,46 @@ class _RollbackEventLogPhase is _EventLogPhase
     _promise(_token)
     _event_log.rollback_complete(_token.checkpoint_id)
 
+class _DisposedEventLogPhase is _EventLogPhase
+  fun name(): String => "_DisposedRollbackEventLogPhase"
+
+  fun ref initiate_checkpoint(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId], event_log: EventLog ref)
+  =>
+    None
+
+  fun ref checkpoint_state(resilient_id: RoutingId,
+    checkpoint_id: CheckpointId, payload: Array[ByteSeq] val)
+  =>
+    None
+
+  fun ref state_checkpointed(resilient_id: RoutingId) =>
+    None
+
+  fun ref write_initial_checkpoint_id(checkpoint_id: CheckpointId) =>
+    None
+
+  fun ref write_checkpoint_id(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId])
+  =>
+    None
+
+  fun ref checkpoint_id_written(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId])
+  =>
+    None
+
+  fun ref expect_rollback_count(count: USize) =>
+    None
+
+  fun ref ack_rollback(resilient_id: RoutingId) =>
+    None
+
+  fun ref complete_early() =>
+    None
+
+  fun ref check_completion() =>
+    None
 
 class _QueuedCheckpointState
   let resilient_id: RoutingId

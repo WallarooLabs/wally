@@ -32,7 +32,7 @@ use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 
-actor DataReceiver is (Producer)
+actor DataReceiver is Producer
   let _id: RoutingId
   let _auth: AmbientAuth
   let _worker_name: String
@@ -122,18 +122,8 @@ actor DataReceiver is (Producer)
       end
     end
 
-    let resend = _phase.flush()
     _phase = _NormalDataReceiverPhase(this)
-    for m in resend.values() do
-      match m
-      | let qdm: _QueuedDeliveryMessage =>
-        qdm.process_message(this)
-      | let qrdm: _QueuedReplayableDeliveryMessage =>
-        qrdm.replay_process_message(this)
-      | let pb: _QueuedBarrier =>
-        _forward_barrier(pb._1, pb._2, pb._3, pb._4)
-      end
-    end
+
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     // DataReceiver doesn't have its own routes
     None
@@ -165,35 +155,42 @@ actor DataReceiver is (Producer)
   /////////////////////////////////////////////////////////////////////////////
   // MESSAGES
   /////////////////////////////////////////////////////////////////////////////
-  be received(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    process_message(d, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
-
-  fun ref process_message(d: DeliveryMsg, pipeline_time_spent: U64,
+  be received(d: DeliveryMsg, producer_id: RoutingId, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _phase.deliver(d, pipeline_time_spent, seq_id, latest_ts, metrics_id,
-      worker_ingress_ts)
+    @printf[I32]("!@ DataReceiver (%s): received seq id %s\n".cstring(), _sender_name.cstring(), seq_id.string().cstring())
+    process_message(d, producer_id, pipeline_time_spent, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
 
-  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun ref process_message(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
+  =>
+    _phase.deliver(d, producer_id, pipeline_time_spent, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
+
+  fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd pipeline msg at DataReceiver\n".cstring())
     end
     if seq_id > _last_id_seen then
+      ifdef debug then
+        Invariant((seq_id - _last_id_seen) == 1)
+      end
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
-      _router.route(d, pipeline_time_spent, _id, this, seq_id, latest_ts,
-        metrics_id, worker_ingress_ts)
+      _router.route(d, pipeline_time_spent, producer_id, this, seq_id,
+        latest_ts, metrics_id, worker_ingress_ts)
       _maybe_ack()
     end
 
   be replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    @printf[I32]("!@ DataReceiver (%s): replay_received seq id %s\n".cstring(), _sender_name.cstring(), seq_id.string().cstring())
     if seq_id > _last_id_seen then
       replay_process_message(r, pipeline_time_spent, seq_id, latest_ts,
         metrics_id, worker_ingress_ts)
@@ -210,6 +207,9 @@ actor DataReceiver is (Producer)
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if seq_id > _last_id_seen then
+      ifdef debug then
+        Invariant((seq_id - _last_id_seen) == 1)
+      end
       _last_id_seen = seq_id
       _router.replay_route(r, pipeline_time_spent, _id, this, seq_id,
         latest_ts, metrics_id, worker_ingress_ts)
@@ -269,14 +269,19 @@ actor DataReceiver is (Producer)
     if highest_seq_id < _last_id_seen then
       _last_id_seen = highest_seq_id
     end
-    if highest_seq_id < _last_id_acked then
-      _last_id_acked = highest_seq_id
-    end
 
     _phase.data_connect(highest_seq_id)
 
-  fun ref _update_last_id_seen(seq_id: SeqId) =>
-    _last_id_seen = seq_id
+  fun ref _update_last_id_seen(seq_id: SeqId, on_increase: Bool = false) =>
+    if on_increase then
+      if seq_id > _last_id_seen then
+        @printf[I32]("!@ DataReceiver (%s): _update_last_id_seen on increase to %s\n".cstring(), _sender_name.cstring(), seq_id.string().cstring())
+        _last_id_seen = seq_id
+      end
+    else
+      @printf[I32]("!@ DataReceiver (%s): _update_last_id_seen update to new value to %s\n".cstring(), _sender_name.cstring(), seq_id.string().cstring())
+      _last_id_seen = seq_id
+    end
 
   fun _inform_boundary_to_send_normal_messages() =>
     try
@@ -347,7 +352,7 @@ actor DataReceiver is (Producer)
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
-    @printf[I32]("!@ DataReceiver: forward_barrier to %s -> seq id %s, last_seen: %s\n".cstring(), target_step_id.string().cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
+    @printf[I32]("!@ DataReceiver (%s): forward_barrier to %s -> seq id %s, last_seen: %s\n".cstring(), _sender_name.cstring(), target_step_id.string().cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
     if seq_id > _last_id_seen then
       // @printf[I32]("!@ DataReceiver: received token %s from %s at DataReceiver %s\n".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring(), _id.string().cstring())
       match barrier_token
@@ -375,6 +380,10 @@ actor DataReceiver is (Producer)
   =>
     // @printf[I32]("!@ DataReceiver: send_barrier %s -> seq id %s, last_seen: %s\n".cstring(), barrier_token.string().cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
     if seq_id > _last_id_seen then
+      //!@
+      // ifdef debug then
+      //   Invariant((seq_id - _last_id_seen) == 1)
+      // end
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
       match barrier_token
