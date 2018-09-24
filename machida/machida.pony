@@ -577,9 +577,7 @@ primitive Machida
       let action_p = @get_application_setup_action(item)
       let action = String.copy_cstring(action_p)
       match action
-      | "source_connector" =>
-        None
-      | "sink_connector" =>
+      | "connector_definitions" =>
         None
       | "new_pipeline" =>
         let name = recover val
@@ -938,7 +936,7 @@ primitive _SourceConfig
       end
 
       KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
-    | "connector" =>
+    | "source_connector" =>
       let host = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
       end
@@ -1038,7 +1036,7 @@ primitive _SinkConfig
       end
 
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
-    | "connector" =>
+    | "sink_connector" =>
       let host = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 1)))
       end

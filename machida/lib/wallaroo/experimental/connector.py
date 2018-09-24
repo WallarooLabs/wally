@@ -19,6 +19,7 @@ import struct
 import sys
 import time
 import wallaroo
+import wallaroo.experimental
 
 
 class SourceConnector(object):
@@ -27,16 +28,18 @@ class SourceConnector(object):
         wallaroo_app = __import__(params.application)
         actions = wallaroo_app.application_setup(args or sys.argv)
         try:
-            (_command, _name, port, encoder, _decoder) = next(
-                action for action in actions
-                if action[0] == "source_connector" and action[1] == params.connector_name)
+            connectors = next(action[1] for action in actions if action[0] == "connector_definitions")
+            connector = connectors[params.connector_name]
+            if isinstance(connector, wallaroo.experimental.SinkConnectorConfig):
+                print("Unable to use a sink connector as a source for " + params.connector_name)
+                exit(-1)
         except:
             print("Unable to find a source connector with the name " + params.connector_name)
             exit(-1)
         self.params = params
-        self._encoder = encoder
-        self._host = '127.0.0.1'
-        self._port = port
+        self._encoder = connector._encoder
+        self._host = connector._host
+        self._port = connector._port
         self._conn = None
 
     def connect(self, host=None, port=None):
@@ -69,16 +72,18 @@ class SinkConnector(object):
         wallaroo_app = __import__(params.application)
         actions = wallaroo_app.application_setup(args or sys.argv)
         try:
-            (_command, _name, port, _encoder, decoder) = next(
-                action for action in actions
-                if action[0] == "sink_connector" and action[1] == params.connector_name)
+            (_, connectors) = next(action for action in actions if action[0] == "connector_definitions")
+            connector = connectors[params.connector_name]
+            if isinstance(connector, wallaroo.experimental.SourceConnectorConfig):
+                print("Unable to use a source connector as a sink for " + params.connector_name)
+                exit(-1)
         except:
             print("Unable to find a sink connector with the name " + params.connector_name)
             exit(-1)
         self.params = params
-        self._decoder = decoder
-        self._host = '127.0.0.1'
-        self._port = port
+        self._decoder = connector._decoder
+        self._host = connector._host
+        self._port = connector._port
         self._acceptor = None
         self._connections = []
         self._buffers = {}

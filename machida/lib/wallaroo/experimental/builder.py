@@ -18,24 +18,42 @@ import struct
 from functools import wraps
 
 
-class SourceConfig(object):
-    def __init__(self, host, port, decoder):
-        self._host = host
-        self._port = port
-        self._decoder = decoder
-
-    def to_tuple(self):
-        return ("connector", self._host, str(self._port), self._decoder)
-
-
-class SinkConfig(object):
-    def __init__(self, host, port, encoder):
-        self._host = host
-        self._port = port
+class SourceConnectorConfig(object):
+    def __init__(self, name, encoder, decoder, host='127.0.0.1', port=None):
+        self._name = name
         self._encoder = encoder
+        self._decoder = decoder
+        self._host = host
+        self._port = port
 
     def to_tuple(self):
-        return ("connector", self._host, str(self._port), self._encoder)
+        return ("source_connector", self._host, str(self._port), self._decoder)
+
+    def _assign(self, host, port):
+        self._host = host
+        self._port = port
+
+    def _is_unassigned(self):
+        return self._port == None
+
+
+class SinkConnectorConfig(object):
+    def __init__(self, name, encoder, decoder, host='127.0.0.1', port=None):
+        self._name = name
+        self._encoder = encoder
+        self._decoder = decoder
+        self._host = host
+        self._port = port
+
+    def to_tuple(self):
+        return ("sink_connector", self._host, str(self._port), self._encoder)
+
+    def _assign(self, host, port):
+        self._host = host
+        self._port = port
+
+    def _is_unassigned(self):
+        return self._port == None
 
 
 def parse_input_addrs(args):

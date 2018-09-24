@@ -19,8 +19,8 @@ from .stream import (
 )
 
 from .builder import (
-    SourceConfig as SourceConnectorConfig,
-    SinkConfig as SinkConnectorConfig
+    SourceConnectorConfig,
+    SinkConnectorConfig
 )
 
 from .connector import SourceConnector, SinkConnector

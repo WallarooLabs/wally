@@ -26,17 +26,19 @@ import wallaroo.experimental
 def application_setup(args):
     ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit")
 
-    ab.source_connector("celsius_feed",
+    celsius_feed = wallaroo.experimental.SourceConnectorConfig(
+        "celsius_feed",
         encoder=encode_feed,
         decoder=decode_feed)
-    ab.sink_connector("fahrenheit_conversion",
+    fahrenheit_conversion = wallaroo.experimental.SinkConnectorConfig(
+        "fahrenheit_conversion",
         encoder=encode_conversion,
         decoder=decode_conversion)
 
-    ab.new_pipeline("Celsius Conversion", "celsius_feed")
+    ab.new_pipeline("Celsius Conversion", celsius_feed)
     ab.to(multiply)
     ab.to(add)
-    ab.to_sink("fahrenheit_conversion")
+    ab.to_sink(fahrenheit_conversion)
     return ab.build()
 
 

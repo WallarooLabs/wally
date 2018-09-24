@@ -40,31 +40,13 @@ class ApplicationBuilder(object):
         self._next_sink_connector_port = 7200
         self._actions = [("name", name)]
 
-    def source_connector(self, name, encoder, decoder, port=None):
-        port_num = port or self._next_source_connector_port
-        # for lookup in the connector script
-        self._actions.append(("source_connector", name, port_num, encoder, decoder))
-        # for lookup in the pipeline builder
-        self._connectors[name] = (port_num, decoder)
-        self._next_source_connector_port += 1
-        return self
-
-    def sink_connector(self, name, encoder, decoder, port=None):
-        port_num = port or self._next_sink_connector_port
-        # for lookup in the connector script
-        self._actions.append(("sink_connector", name, port_num, encoder, decoder))
-        # for lookup in the pipeline builder
-        self._connectors[name] = (port_num, encoder)
-        self._next_sink_connector_port += 1
-        return self
-
     def new_pipeline(self, name, source_config):
-        if isinstance(source_config, str):
-            (port, decoder) = self._connectors[source_config]
-            connector = wallaroo.experimental.SourceConnectorConfig(host='localhost', port=port, decoder=decoder)
-            self._actions.append(("new_pipeline", name, connector.to_tuple()))
-        else:
-            self._actions.append(("new_pipeline", name, source_config.to_tuple()))
+        if isinstance(source_config, wallaroo.experimental.SourceConnectorConfig):
+            self._connectors[source_config._name] = source_config
+            if source_config._is_unassigned():
+                source_config._assign('127.0.0.1', self._next_source_connector_port)
+                self._next_source_connector_port += 1
+        self._actions.append(("new_pipeline", name, source_config.to_tuple()))
         return self
 
 
@@ -90,23 +72,23 @@ class ApplicationBuilder(object):
         return self
 
     def to_sink(self, sink_config):
-        if isinstance(sink_config, str):
-            (port, encoder) = self._connectors[sink_config]
-            connector = wallaroo.experimental.SinkConnectorConfig(host='localhost', port=port, encoder=encoder)
-            self._actions.append(("to_sink", connector.to_tuple()))
-        else:
-            self._actions.append(("to_sink", sink_config.to_tuple()))
+        if isinstance(sink_config, wallaroo.experimental.SinkConnectorConfig):
+                self._connectors[sink_config._name] = sink_config
+                if sink_config._is_unassigned():
+                    sink_config._assign('127.0.0.1', self._next_sink_connector_port)
+                    self._next_sink_connector_port += 1
+        self._actions.append(("to_sink", sink_config.to_tuple()))
         return self
 
     def to_sinks(self, sink_configs):
         sinks = []
         for sc in sink_configs:
-            if isinstance(sc, str):
-                (port, encoder) = self._connectors[sc]
-                connector = wallaroo.experimental.SinkConnectorConfig(host='localhost', port=port, encoder=encoder)
-                sinks.append(connector.to_tuple())
-            else:
-                sinks.append(sc.to_tuple())
+            if isinstance(sc, wallaroo.experimental.SinkConnectorConfig):
+                self._connectors[sc._name] = sc
+                if sc._is_unassigned():
+                    sc._assign('127.0.0.1', self._next_sink_connector_port)
+                    self._next_sink_connector_port += 1
+            sinks.append(sc.to_tuple())
         self._actions.append(("to_sinks", sinks))
         return self
 
@@ -115,6 +97,8 @@ class ApplicationBuilder(object):
         return self
 
     def build(self):
+        if self._connectors:
+            self._actions.append(("connector_definitions", self._connectors))
         self._validate_actions()
         return self._actions
 
