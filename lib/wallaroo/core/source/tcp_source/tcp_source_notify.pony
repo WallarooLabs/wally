@@ -93,7 +93,6 @@ trait TCPSourceNotify
     """
     qty
 
-
   fun ref closed(conn: TCPSource ref) =>
     """
     Called when the connection is closed.

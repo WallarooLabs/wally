@@ -111,6 +111,9 @@ actor ConnectorSourceListener is SourceListener
       + host + ":" + service + "\n").cstring())
     _notify_listening()
 
+  be recovery_protocol_complete() =>
+    None
+
   be update_router(router: Router) =>
     _source_builder = _source_builder.update_router(router)
     _router = router

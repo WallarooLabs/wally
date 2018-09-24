@@ -83,8 +83,10 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun ref received(source: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
+      @printf[I32]("!@ <><><> Header (size: %s)\n".cstring(), data.size().string().cstring())
       try
         let payload_size: USize = _handler.payload_length(consume data)?
+        @printf[I32]("!@ <><><> -- payload_size: %s\n".cstring(), payload_size.string().cstring())
 
         source.expect(payload_size)
         _header = false
@@ -93,6 +95,8 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
       end
       true
     else
+      @printf[I32]("!@ <><><> Payload (size: %s)\n".cstring(), data.size().string().cstring())
+
       _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
       let ingest_ts = Time.nanos()
       let pipeline_time_spent: U64 = 0
@@ -182,10 +186,10 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun ref accepted(source: TCPSource ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
+    _header = true
     source.expect(_header_size)
 
   fun ref closed(source: TCPSource ref) =>
     @printf[I32]("TCPSource connection closed\n".cstring())
-    source._dispose()
 
   // TODO: implement connect_failed

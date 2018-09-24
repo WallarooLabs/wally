@@ -187,6 +187,9 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
       None
     end
 
+  be recovery_protocol_complete() =>
+    None
+
   be kafka_client_error(client: KafkaClient, error_report: KafkaErrorReport) =>
     @printf[I32](("ERROR: Kafka client encountered an unrecoverable error! " +
       error_report.string() + "\n").cstring())

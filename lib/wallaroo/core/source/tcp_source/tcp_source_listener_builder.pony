@@ -40,6 +40,7 @@ class val TCPSourceListenerBuilder
   let _host: String
   let _service: String
   let _metrics_reporter: MetricsReporter
+  let _parallelism: USize
 
   new val create(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry,
@@ -47,7 +48,7 @@ class val TCPSourceListenerBuilder
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    target_router: Router = EmptyRouter,
+    target_router: Router = EmptyRouter, parallelism: USize,
     host: String = "", service: String = "0")
   =>
     _source_builder = source_builder
@@ -62,20 +63,23 @@ class val TCPSourceListenerBuilder
     _host = host
     _service = service
     _metrics_reporter = consume metrics_reporter
+    _parallelism = parallelism
 
   fun apply(env: Env): SourceListener =>
     TCPSourceListener(env, _source_builder, _router, _router_registry,
       _outgoing_boundary_builders, _event_log, _auth,
       _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      _target_router, _host, _service)
+      _target_router, _parallelism, _host, _service)
 
 class val TCPSourceListenerBuilderBuilder
   let _host: String
   let _service: String
+  let _parallelism: USize
 
-  new val create(host: String, service: String) =>
+  new val create(host: String, service: String, parallelism: USize) =>
     _host = host
     _service = service
+    _parallelism = parallelism
 
   fun apply(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry,
@@ -88,4 +92,4 @@ class val TCPSourceListenerBuilderBuilder
     TCPSourceListenerBuilder(source_builder, router, router_registry,
       outgoing_boundary_builders, event_log, auth, pipeline_name,
       layout_initializer, consume metrics_reporter,
-      target_router, _host, _service)
+      target_router, _parallelism, _host, _service)

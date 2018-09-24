@@ -66,6 +66,7 @@ actor GenSourceListener is SourceListener
   var _source_builder: SourceBuilder
   let _event_log: EventLog
   let _target_router: Router
+  let _sources: Array[Source] = _sources.create()
 
   new create(env: Env, source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry,
@@ -115,6 +116,7 @@ actor GenSourceListener is SourceListener
         _outgoing_boundary_builders)
       match s
       | let source: (Source & RouterUpdatable) =>
+        source.mute(this)
         _router_registry.register_source(source, source_id)
         match _router
         | let pr: PartitionRouter =>
@@ -124,11 +126,17 @@ actor GenSourceListener is SourceListener
           _router_registry.register_stateless_partition_router_subscriber(
             spr.partition_id(), source)
         end
+        _sources.push(source)
       else
         Fail()
       end
     else
       Fail()
+    end
+
+  be recovery_protocol_complete() =>
+    for s in _sources.values() do
+      s.unmute(this)
     end
 
   be update_router(router: Router) =>

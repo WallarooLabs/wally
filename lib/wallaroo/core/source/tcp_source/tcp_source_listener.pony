@@ -36,6 +36,7 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
+use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
@@ -66,14 +67,17 @@ actor TCPSourceListener is SourceListener
   let _event_log: EventLog
   let _target_router: Router
 
+  let _connected_sources: SetIs[TCPSource] = _connected_sources.create()
+  let _available_sources: Array[TCPSource] = _available_sources.create()
+
   new create(env: Env, source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    target_router: Router = EmptyRouter,
-    host: String = "", service: String = "0", limit: USize = 0,
+    target_router: Router = EmptyRouter, parallelism: USize = 10,
+    host: String = "", service: String = "0",
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -88,7 +92,7 @@ actor TCPSourceListener is SourceListener
     _layout_initializer = layout_initializer
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
-    _limit = limit
+    _limit = parallelism
     _metrics_reporter = consume metrics_reporter
     _source_builder = source_builder
     _event_log = event_log
@@ -110,6 +114,46 @@ actor TCPSourceListener is SourceListener
     @printf[I32]((source_builder.name() + " source attempting to listen on "
       + host + ":" + service + "\n").cstring())
     _notify_listening()
+
+    for i in Range(0, _limit) do
+      try
+        let source_id = _routing_id_gen()
+        let source = TCPSource(source_id, _auth, this,
+          _notify_connected(source_id)?, _event_log, _router,
+          _outgoing_boundary_builders, _layout_initializer,
+          _metrics_reporter.clone(), _router_registry)
+        source.mute(this)
+
+        _router_registry.register_source(source, source_id)
+        match _router
+        | let pr: PartitionRouter =>
+          _router_registry.register_partition_router_subscriber(
+            pr.state_name(), source)
+        | let spr: StatelessPartitionRouter =>
+          _router_registry.register_stateless_partition_router_subscriber(
+            spr.partition_id(), source)
+        end
+
+        _available_sources.push(source)
+      else
+        Fail()
+      end
+    end
+
+  be recovery_protocol_complete() =>
+    """
+    Called when Recovery is finished. If we're not recovering, that's right
+    away. At that point, we can tell sources that from our perspective it's
+    safe to unmute.
+    """
+    @printf[I32]("!@ TCPSourceListener: recovery_protocol_complete()\n"
+      .cstring())
+    for s in _available_sources.values() do
+      s.unmute(this)
+    end
+    for s in _connected_sources.values() do
+      s.unmute(this)
+    end
 
   be update_router(router: Router) =>
     _source_builder = _source_builder.update_router(router)
@@ -172,12 +216,22 @@ actor TCPSourceListener is SourceListener
       _event = AsioEvent.none()
     end
 
-  be _conn_closed() =>
+  be _conn_closed(s: TCPSource) =>
     """
     An accepted connection has closed. If we have dropped below the limit, try
     to accept new connections.
     """
+    if _connected_sources.contains(s) then
+      _connected_sources.unset(s)
+      _available_sources.push(s)
+    else
+      Fail()
+    end
     _count = _count - 1
+    ifdef debug then
+      Invariant(_count == _connected_sources.size())
+      Invariant(_available_sources.size() == (_limit - _count))
+    end
 
     if _count < _limit then
       _accept()
@@ -189,9 +243,13 @@ actor TCPSourceListener is SourceListener
     """
     if _closed then
       return
+    elseif _count >= _limit then
+      @printf[I32]("TCPSourceListener: Already reached connection limit\n"
+        .cstring())
+      return
     end
 
-    while (_limit == 0) or (_count < _limit) do
+    while _count < _limit do
       var fd = @pony_os_accept[U32](_event)
 
       match fd
@@ -211,26 +269,13 @@ actor TCPSourceListener is SourceListener
     Spawn a new connection.
     """
     try
-      let source_id = _routing_id_gen()
-      let source = TCPSource._accept(source_id, _auth, this,
-        _notify_connected(source_id)?, _event_log, _router,
-        _outgoing_boundary_builders, _layout_initializer,
-        ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry)
-
-      // TODO: We need to figure out how to unregister this when the
-      // connection dies
-      _router_registry.register_source(source, source_id)
-      match _router
-      | let pr: PartitionRouter =>
-        _router_registry.register_partition_router_subscriber(pr.state_name(),
-          source)
-      | let spr: StatelessPartitionRouter =>
-        _router_registry.register_stateless_partition_router_subscriber(
-          spr.partition_id(), source)
-      end
+      let source = _available_sources.pop()?
+      source.accept(ns, _init_size, _max_size)
+      _connected_sources.set(source)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)
+      Fail()
     end
 
   fun ref _notify_listening() =>
