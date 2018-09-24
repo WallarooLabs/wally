@@ -9,6 +9,14 @@ import subprocess
 import threading
 import time
 
+# This is imported to test that wallaroo's python library is reachable.
+try:
+    import wallaroo
+except:
+    print("Unable to find wallaroo python library. Has the wallaroo "
+          "environment been activated? "
+          "See https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html")
+
 
 class UDPHandler(SocketServer.BaseRequestHandler):
     def handle(self):
@@ -44,17 +52,21 @@ sink = subprocess.Popen([
     "--fahrenheit_conversion-host", "127.0.0.1",
     "--fahrenheit_conversion-port", "8901"])
 
-wallaroo = subprocess.Popen([
-    # "sleep", "10"])
-    "../../../machida/build/machida",
-    "--application-module", "celsius",
-    "--metrics", "127.0.0.1:5001",
-    "--control", "127.0.0.1:6000",
-    "--data", "127.0.0.1:6001",
-    "--name", "worker-name",
-    "--external", "127.0.0.1:5050",
-    "--cluster-initializer",
-    "--ponythreads=1", "--ponynoblock"])
+try:
+    wallaroo = subprocess.Popen([
+        "machida",
+        "--application-module", "celsius",
+        "--metrics", "127.0.0.1:5001",
+        "--control", "127.0.0.1:6000",
+        "--data", "127.0.0.1:6001",
+        "--name", "worker-name",
+        "--external", "127.0.0.1:5050",
+        "--cluster-initializer",
+        "--ponythreads=1", "--ponynoblock"])
+except:
+    print("Unable to run machida. Has the wallaroo environment "
+          " been activated? "
+          "See https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html")
 
 def terminate(_signal=None, _frame=None):
     print("terminating source")
