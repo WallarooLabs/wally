@@ -918,7 +918,6 @@ class Cluster(object):
         for s in self.senders:
             s.stop()
         self.metrics.stop()
-        # clean_resilience_path(self.res_dir)
         self.persistent_data['runner_data'] = [
             RunnerData(r.name, r.command, r.pid, r.returncode(),
                        r.get_output(), r.start_time)
@@ -927,6 +926,7 @@ class Cluster(object):
             SenderData(s.name, s.address, s.start_time, s.data) for s in self.senders]
         self.persistent_data['sink_data'] = [
             SinkData(s.name, s.address, s.start_time, s.data) for s in self.sinks]
+        clean_resilience_path(self.res_dir)
         self._finalized = True
 
 
