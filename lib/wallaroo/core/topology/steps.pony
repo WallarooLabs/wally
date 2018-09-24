@@ -347,6 +347,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
+    @printf[I32]("!@ Step %s process_message from %s\n".cstring(), _id.string().cstring(), i_producer_id.string().cstring())
     _seq_id_generator.new_incoming_message()
 
     let my_latest_ts = ifdef "detailed-metrics" then
@@ -540,7 +541,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   be receive_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ Step %s received barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
+    @printf[I32]("!@ Step %s received barrier %s from %s\n".cstring(), _id.string().cstring(), barrier_token.string().cstring(), step_id.string().cstring())
     process_barrier(step_id, producer, barrier_token)
 
   fun ref process_barrier(step_id: RoutingId, producer: Producer,
@@ -588,7 +589,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
-    // @printf[I32]("!@ Barrier complete at Step %s\n".cstring(), _id.string().cstring())
+    @printf[I32]("!@ Barrier complete at Step %s\n".cstring(), _id.string().cstring())
     ifdef debug then
       Invariant(_step_message_processor.barrier_in_progress())
     end

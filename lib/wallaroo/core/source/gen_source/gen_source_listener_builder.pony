@@ -27,7 +27,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-class val TCPSourceListenerBuilder
+class val GenSourceListenerBuilder
   let _source_builder: SourceBuilder
   let _pipeline_name: String
   let _router: Router
@@ -37,10 +37,7 @@ class val TCPSourceListenerBuilder
   let _event_log: EventLog
   let _auth: AmbientAuth
   let _target_router: Router
-  let _host: String
-  let _service: String
   let _metrics_reporter: MetricsReporter
-  let _parallelism: USize
 
   new val create(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry,
@@ -48,8 +45,7 @@ class val TCPSourceListenerBuilder
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    target_router: Router = EmptyRouter, parallelism: USize,
-    host: String = "", service: String = "0")
+    target_router: Router = EmptyRouter)
   =>
     _source_builder = source_builder
     _pipeline_name = pipeline_name
@@ -60,36 +56,24 @@ class val TCPSourceListenerBuilder
     _event_log = event_log
     _auth = auth
     _target_router = target_router
-    _host = host
-    _service = service
     _metrics_reporter = consume metrics_reporter
-    _parallelism = parallelism
 
   fun apply(env: Env): SourceListener =>
-    TCPSourceListener(env, _source_builder, _router, _router_registry,
+    GenSourceListener(env, _source_builder, _router, _router_registry,
       _outgoing_boundary_builders, _event_log, _auth,
       _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      _target_router, _parallelism, _host, _service)
+      _target_router)
 
-class val TCPSourceListenerBuilderBuilder
-  let _host: String
-  let _service: String
-  let _parallelism: USize
-
-  new val create(host: String, service: String, parallelism: USize) =>
-    _host = host
-    _service = service
-    _parallelism = parallelism
-
+primitive GenSourceListenerBuilderBuilder
   fun apply(source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso, recovering: Bool,
-    target_router: Router = EmptyRouter): TCPSourceListenerBuilder
+    target_router: Router = EmptyRouter): GenSourceListenerBuilder
   =>
-    TCPSourceListenerBuilder(source_builder, router, router_registry,
+    GenSourceListenerBuilder(source_builder, router, router_registry,
       outgoing_boundary_builders, event_log, auth, pipeline_name,
       layout_initializer, consume metrics_reporter,
-      target_router, _parallelism, _host, _service)
+      target_router)

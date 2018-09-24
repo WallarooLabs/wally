@@ -310,7 +310,7 @@ class _DataReceiver is _DataReceiverWrapper
       _metrics_reporter.step_metric(data_msg.metric_name,
         "Before receive on data channel (network time)", data_msg.metrics_id,
         data_msg.latest_ts, ingest_ts)
-      _data_receiver.received(data_msg.delivery_msg,
+      _data_receiver.received(data_msg.delivery_msg, data_msg.producer_id,
           data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
           data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
           my_latest_ts)

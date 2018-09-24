@@ -28,7 +28,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+use "buffered"
 use "collections"
+use "crypto"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/ent/data_receiver"
@@ -36,16 +38,21 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
-use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-actor TCPSourceListener is SourceListener
+interface _Sourcey
+  fun ref source(layout_initializer: LayoutInitializer,
+    router_registry: RouterRegistry,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val):
+    Source
+
+actor GenSourceListener is SourceListener
   """
-  # TCPSourceListener
+  # GenSourceListener
   """
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
@@ -55,20 +62,11 @@ actor TCPSourceListener is SourceListener
   let _router_registry: RouterRegistry
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
   let _layout_initializer: LayoutInitializer
-  var _fd: U32
-  var _event: AsioEventID = AsioEvent.none()
-  let _limit: USize
-  var _count: USize = 0
-  var _closed: Bool = false
-  var _init_size: USize
-  var _max_size: USize
   let _metrics_reporter: MetricsReporter
   var _source_builder: SourceBuilder
   let _event_log: EventLog
   let _target_router: Router
-
-  let _connected_sources: SetIs[TCPSource] = _connected_sources.create()
-  let _available_sources: Array[TCPSource] = _available_sources.create()
+  let _sources: Array[Source] = _sources.create()
 
   new create(env: Env, source_builder: SourceBuilder, router: Router,
     router_registry: RouterRegistry,
@@ -76,13 +74,8 @@ actor TCPSourceListener is SourceListener
     event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
-    target_router: Router = EmptyRouter, parallelism: USize = 10,
-    host: String = "", service: String = "0",
-    init_size: USize = 64, max_size: USize = 16384)
+    target_router: Router = EmptyRouter)
   =>
-    """
-    Listens for both IPv4 and IPv6 connections.
-    """
     _env = env
     _auth = auth
     _pipeline_name = pipeline_name
@@ -90,17 +83,10 @@ actor TCPSourceListener is SourceListener
     _router_registry = router_registry
     _outgoing_boundary_builders = outgoing_boundary_builders
     _layout_initializer = layout_initializer
-    _event = @pony_os_listen_tcp[AsioEventID](this,
-      host.cstring(), service.cstring())
-    _limit = parallelism
     _metrics_reporter = consume metrics_reporter
     _source_builder = source_builder
     _event_log = event_log
     _target_router = target_router
-
-    _init_size = init_size
-    _max_size = max_size
-    _fd = @pony_asio_event_fd(_event)
 
     match router
     | let pr: PartitionRouter =>
@@ -111,19 +97,26 @@ actor TCPSourceListener is SourceListener
         spr.partition_id(), this)
     end
 
-    @printf[I32]((source_builder.name() + " source attempting to listen on "
-      + host + ":" + service + "\n").cstring())
-    _notify_listening()
+    _create_source()
 
-    for i in Range(0, _limit) do
-      try
-        let source_id = _routing_id_gen()
-        let source = TCPSource(source_id, _auth, this,
-          _notify_connected(source_id)?, _event_log, _router,
-          _outgoing_boundary_builders, _layout_initializer,
-          _metrics_reporter.clone(), _router_registry)
+  fun ref _create_source() =>
+    let name = _pipeline_name + " source"
+    let temp_id = MD5(name)
+    let rb = Reader
+    rb.append(temp_id)
+
+    let source_id = try rb.u128_le()? else Fail(); 0 end
+
+    let notify = _source_builder(source_id, _event_log, _auth,
+      _target_router, _env)
+
+    match consume notify
+    | let gsn: _Sourcey =>
+      let s = gsn.source(_layout_initializer, _router_registry,
+        _outgoing_boundary_builders)
+      match s
+      | let source: (Source & RouterUpdatable) =>
         source.mute(this)
-
         _router_registry.register_source(source, source_id)
         match _router
         | let pr: PartitionRouter =>
@@ -133,25 +126,16 @@ actor TCPSourceListener is SourceListener
           _router_registry.register_stateless_partition_router_subscriber(
             spr.partition_id(), source)
         end
-
-        _available_sources.push(source)
+        _sources.push(source)
       else
         Fail()
       end
+    else
+      Fail()
     end
 
   be recovery_protocol_complete() =>
-    """
-    Called when Recovery is finished. If we're not recovering, that's right
-    away. At that point, we can tell sources that from our perspective it's
-    safe to unmute.
-    """
-    @printf[I32]("!@ TCPSourceListener: recovery_protocol_complete()\n"
-      .cstring())
-    for s in _available_sources.values() do
-      s.unmute(this)
-    end
-    for s in _connected_sources.values() do
+    for s in _sources.values() do
       s.unmute(this)
     end
 
@@ -196,130 +180,4 @@ actor TCPSourceListener is SourceListener
     _outgoing_boundary_builders = consume new_boundary_builders
 
   be dispose() =>
-    @printf[I32]("Shutting down TCPSourceListener\n".cstring())
-    _close()
-
-  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
-    """
-    When we are readable, we accept new connections until none remain.
-    """
-    if event isnt _event then
-      return
-    end
-
-    if AsioEvent.readable(flags) then
-      _accept(arg)
-    end
-
-    if AsioEvent.disposable(flags) then
-      @pony_asio_event_destroy(_event)
-      _event = AsioEvent.none()
-    end
-
-  be _conn_closed(s: TCPSource) =>
-    """
-    An accepted connection has closed. If we have dropped below the limit, try
-    to accept new connections.
-    """
-    if _connected_sources.contains(s) then
-      _connected_sources.unset(s)
-      _available_sources.push(s)
-    else
-      Fail()
-    end
-    _count = _count - 1
-    ifdef debug then
-      Invariant(_count == _connected_sources.size())
-      Invariant(_available_sources.size() == (_limit - _count))
-    end
-
-    if _count < _limit then
-      _accept()
-    end
-
-  fun ref _accept(ns: U32 = 0) =>
-    """
-    Accept connections as long as we have spawned fewer than our limit.
-    """
-    if _closed then
-      return
-    elseif _count >= _limit then
-      @printf[I32]("TCPSourceListener: Already reached connection limit\n"
-        .cstring())
-      return
-    end
-
-    while _count < _limit do
-      var fd = @pony_os_accept[U32](_event)
-
-      match fd
-      | -1 =>
-        // Something other than EWOULDBLOCK, try again.
-        None
-      | 0 =>
-        // EWOULDBLOCK, don't try again.
-        return
-      else
-        _spawn(fd)
-      end
-    end
-
-  fun ref _spawn(ns: U32) =>
-    """
-    Spawn a new connection.
-    """
-    try
-      let source = _available_sources.pop()?
-      source.accept(ns, _init_size, _max_size)
-      _connected_sources.set(source)
-      _count = _count + 1
-    else
-      @pony_os_socket_close[None](ns)
-      Fail()
-    end
-
-  fun ref _notify_listening() =>
-    """
-    Inform the notifier that we're listening.
-    """
-    if not _event.is_null() then
-      @printf[I32]((_source_builder.name() + " source is listening\n")
-        .cstring())
-    else
-      _closed = true
-      @printf[I32]((_source_builder.name() +
-        " source is unable to listen\n").cstring())
-      Fail()
-    end
-
-  fun ref _notify_connected(source_id: RoutingId): TCPSourceNotify iso^ ? =>
-    try
-      _source_builder(source_id, _event_log, _auth, _target_router, _env)
-        as TCPSourceNotify iso^
-    else
-      @printf[I32](
-        (_source_builder.name() + " could not create a TCPSourceNotify\n")
-        .cstring())
-      Fail()
-      error
-    end
-
-  fun ref _close() =>
-    """
-    Dispose of resources.
-    """
-    if _closed then
-      return
-    end
-
-    _closed = true
-
-    if not _event.is_null() then
-      // When not on windows, the unsubscribe is done immediately.
-      ifdef not windows then
-        @pony_asio_event_unsubscribe(_event)
-      end
-
-      @pony_os_socket_close[None](_fd)
-      _fd = -1
-    end
+    @printf[I32]("Shutting down GenSourceListener\n".cstring())

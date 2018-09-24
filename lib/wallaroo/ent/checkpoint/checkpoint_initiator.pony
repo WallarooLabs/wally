@@ -62,6 +62,7 @@ actor CheckpointInitiator is Initializable
 
   var _is_recovering: Bool
   var _ignoring_checkpoints: Bool = false
+  var _disposed: Bool = false
 
   var _phase: _CheckpointInitiatorPhase = _WaitingCheckpointInitiatorPhase
 
@@ -277,7 +278,7 @@ actor CheckpointInitiator is Initializable
     _phase = _WaitingForEventLogIdWrittenPhase(token, repeating, this)
 
   fun ref checkpoint_complete(token: BarrierToken, repeating: Bool) =>
-    if not _ignoring_checkpoints then
+    if not _ignoring_checkpoints and not _disposed then
       ifdef "resilience" then
         match token
         | let st: CheckpointBarrierToken =>
@@ -424,7 +425,8 @@ actor CheckpointInitiator is Initializable
 
   be dispose() =>
     @printf[I32]("Shutting down CheckpointInitiator\n".cstring())
-    _timers.dispose()
+    _clear_pending_checkpoints()
+    _disposed = true
 
 primitive LatestCheckpointId
   fun read(auth: AmbientAuth, checkpoint_id_file: String):

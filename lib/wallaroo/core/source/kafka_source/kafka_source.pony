@@ -73,7 +73,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   var _muted: Bool = true
   var _disposed: Bool = false
-  let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
+  let _muted_by: SetIs[Any tag] = _muted_by.create()
 
   let _router_registry: RouterRegistry
 
@@ -480,24 +480,24 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _muted = false
 
   fun ref _mute_local() =>
-    _muted_downstream.set(this)
+    _muted_by.set(this)
     _mute()
 
   fun ref _unmute_local() =>
-    _muted_downstream.unset(this)
+    _muted_by.unset(this)
 
-    if _muted_downstream.size() == 0 then
+    if _muted_by.size() == 0 then
       _unmute()
     end
 
-  be mute(c: Consumer) =>
-    _muted_downstream.set(c)
+  be mute(a: Any tag) =>
+    _muted_by.set(a)
     _mute()
 
-  be unmute(c: Consumer) =>
-    _muted_downstream.unset(c)
+  be unmute(a: Any tag) =>
+    _muted_by.unset(a)
 
-    if _muted_downstream.size() == 0 then
+    if _muted_by.size() == 0 then
       _unmute()
     end
 

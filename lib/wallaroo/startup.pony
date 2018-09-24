@@ -336,7 +336,7 @@ actor Startup
 
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_reconnecter, checkpoint_initiator, connections,
-        router_registry, data_receivers)
+        router_registry, data_receivers, _is_recovering)
 
       let local_topology_initializer =
         LocalTopologyInitializer(
@@ -552,7 +552,7 @@ actor Startup
 
       let recovery = Recovery(auth, _startup_options.worker_name,
         event_log, recovery_reconnecter, checkpoint_initiator, connections,
-        router_registry, data_receivers)
+        router_registry, data_receivers, _is_recovering)
 
       let local_topology_initializer =
         LocalTopologyInitializer(

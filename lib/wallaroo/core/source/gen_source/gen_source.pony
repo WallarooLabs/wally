@@ -31,6 +31,7 @@ use "buffered"
 use "collections"
 use "net"
 use "promises"
+use "serialise"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
@@ -55,17 +56,23 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is Source
-  """
-  # TCPSource
+interface val GenSourceGenerator[V: Any val]
+  fun initial_value(): V
+  fun apply(v: V): V
 
-  ## Future work
-  * Switch to requesting credits via promise
+actor GenSource[V: Any val] is Source
   """
+  # GenSource
+  """
+  var _cur_value: V
+  let _generator: GenSourceGenerator[V]
+
   let _source_id: RoutingId
   let _auth: AmbientAuth
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   var _router: Router
+  let _target_id_router: TargetIdRouter = EmptyTargetIdRouter
+
   let _routes: MapIs[Consumer, Route] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
@@ -80,28 +87,9 @@ actor TCPSource is Source
 
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
-  // TCP
-  let _listen: TCPSourceListener
-  let _notify: TCPSourceNotify
-  var _next_size: USize = 0
-  var _max_size: USize = 0
-  var _connect_count: U32 = 0
-  var _fd: U32 = -1
-  var _expect: USize = 0
-  var _connected: Bool = false
-  var _closed: Bool = false
-  var _event: AsioEventID = AsioEvent.none()
-  var _read_buf: Array[U8] iso = recover Array[U8] end
-  var _read_buf_offset: USize = 0
-  var _shutdown_peer: Bool = false
-  var _readable: Bool = false
-  var _reading: Bool = false
-  var _shutdown: Bool = false
   // Start muted. Wait for unmute to begin processing
   var _muted: Bool = true
   var _disposed: Bool = false
-  var _expect_read_buf: Reader = Reader
-  var _max_received_count: U8 = 50
   let _muted_by: SetIs[Any tag] = _muted_by.create()
 
   var _is_pending: Bool = true
@@ -116,22 +104,37 @@ actor TCPSource is Source
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
 
-  new create(source_id: RoutingId, auth: AmbientAuth,
-    listen: TCPSourceListener, notify: TCPSourceNotify iso,
-    event_log: EventLog, router': Router,
+  let _pipeline_name: String
+  let _source_name: String
+  let _runner: Runner
+  let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
+
+  new create(source_id: RoutingId, auth: AmbientAuth, pipeline_name: String,
+    runner_builder: RunnerBuilder, router': Router, target_router: Router,
+    generator: GenSourceGenerator[V], event_log: EventLog,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
   =>
-    @printf[I32]("!@ Spinning up TCPSource %s\n".cstring(), source_id.string().cstring())
+    @printf[I32]("!@ Spinning up GenSource %s\n".cstring(), source_id.string().cstring())
+    _pipeline_name = pipeline_name
+    _source_name = pipeline_name + " source"
+
+    _cur_value = generator.initial_value()
+    _generator = generator
+
     _source_id = source_id
     _auth = auth
     _event_log = event_log
     _metrics_reporter = consume metrics_reporter
-    _listen = listen
-    _notify = consume notify
+
     _layout_initializer = layout_initializer
     _router_registry = router_registry
+
+    _runner = runner_builder(event_log, auth, None,
+      target_router, pre_state_target_ids)
+    _router = _runner.clone_router_and_set_input_type(router')
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -146,8 +149,6 @@ actor TCPSource is Source
     _router = router'
     _update_router(router')
 
-    _notify.update_boundaries(_outgoing_boundaries)
-
     for r in _routes.values() do
       // TODO: this is a hack, we shouldn't be calling application events
       // directly. route lifecycle needs to be broken out better from
@@ -156,7 +157,7 @@ actor TCPSource is Source
     end
 
     for r in _routes.values() do
-      r.application_initialized("TCPSource")
+      r.application_initialized("GenSource")
     end
 
     // register resilient with event log
@@ -167,40 +168,57 @@ actor TCPSource is Source
       _mute_local()
     end
 
-  be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
-    """
-    A new connection accepted on a server.
-    """
-    if not _disposed then
-      @printf[I32]("!@ TCPSource %s _accept()\n".cstring(), _source_id.string().cstring())
-
-      _notify.accepted(this)
-
-      _connect_count = 0
-      _fd = fd
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true)
-      _connected = true
-      _read_buf = recover Array[U8].>undefined(init_size) end
-      _read_buf_offset = 0
-      _next_size = init_size
-      _max_size = max_size
-
-      _readable = true
-      _closed = false
-      _shutdown = false
-      _shutdown_peer = false
-
-      _pending_reads()
+  be next_message() =>
+    if not _muted and not _disposed then
+      process_message()
     end
 
-  //!@
+  fun ref process_message() =>
+    _metrics_reporter.pipeline_ingest(_pipeline_name, _source_name)
+    let ingest_ts = Time.nanos()
+    let pipeline_time_spent: U64 = 0
+    var latest_metrics_id: U16 = 1
+
+    ifdef "trace" then
+      @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
+    end
+
+    let decode_end_ts = Time.nanos()
+    _metrics_reporter.step_metric(_pipeline_name,
+      "Decode Time in TCP Source", latest_metrics_id, ingest_ts,
+      decode_end_ts)
+    latest_metrics_id = latest_metrics_id + 1
+
+    let next = _cur_value
+    _cur_value = _generator(next)
+    (let is_finished, let last_ts) =
+      _runner.run[V](_pipeline_name, pipeline_time_spent, next,
+        _source_id, this, _router, _target_id_router, _msg_id_gen(),
+        None, decode_end_ts, latest_metrics_id, ingest_ts,
+        _metrics_reporter)
+
+    if is_finished then
+      let end_ts = Time.nanos()
+      let time_spent = end_ts - ingest_ts
+
+      ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(_pipeline_name,
+          "Before end at TCP Source", 9999,
+          last_ts, end_ts)
+      end
+
+      _metrics_reporter.pipeline_metric(_pipeline_name, time_spent +
+        pipeline_time_spent)
+      _metrics_reporter.worker_metric(_pipeline_name, time_spent)
+    end
+    // !@ USE TIMER
+    next_message()
+
   be first_checkpoint_complete() =>
     """
     In case we pop into existence midway through a checkpoint, we need to
     wait until this is called to start processing.
     """
-    @printf[I32]("!@ TCPSource: first_checkpoint_complete()\n".cstring())
     _unmute_local()
     _is_pending = false
     for (id, c) in _outputs.pairs() do
@@ -238,8 +256,6 @@ actor TCPSource is Source
     for (c_id, consumer) in _router.routes().pairs() do
       _register_output(c_id, consumer)
     end
-
-    _notify.update_router(_router)
 
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
     if _outputs.contains(id) then
@@ -337,7 +353,7 @@ actor TCPSource is Source
   =>
     """
     Build a new boundary for each builder that corresponds to a worker we
-    don't yet have a boundary to. Each TCPSource has its own
+    don't yet have a boundary to. Each GenSource has its own
     OutgoingBoundary to each worker to allow for higher throughput.
     """
     for (target_worker_name, builder) in boundary_builders.pairs() do
@@ -351,7 +367,6 @@ actor TCPSource is Source
         _routes(boundary) = new_route
       end
     end
-    _notify.update_boundaries(_outgoing_boundaries)
 
   be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     //!@ Should we fail here?
@@ -376,7 +391,7 @@ actor TCPSource is Source
       _outgoing_boundaries.remove(worker)?
     else
       ifdef debug then
-        @printf[I32]("TCPSource couldn't find boundary to %s to disconnect\n"
+        @printf[I32]("GenSource couldn't find boundary to %s to disconnect\n"
           .cstring(), worker.cstring())
       end
     end
@@ -391,7 +406,7 @@ actor TCPSource is Source
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
     ifdef "trace" then
       @printf[I32](("initializing sequence id on recovery: " + seq_id.string() +
-        " in TCPSource\n").cstring())
+        " in GenSource\n").cstring())
     end
     // update to use correct seq_id for recovery
     _seq_id = seq_id
@@ -420,13 +435,10 @@ actor TCPSource is Source
       _router_registry.unregister_source(this, _source_id)
       _event_log.unregister_resilient(_source_id, this)
       _unregister_all_outputs()
-      @printf[I32]("Shutting down TCPSource\n".cstring())
+      @printf[I32]("Shutting down GenSource\n".cstring())
       for b in _outgoing_boundaries.values() do
         b.dispose()
       end
-      close()
-      _dispose_routes()
-      _muted = true
       _disposed = true
     end
 
@@ -452,7 +464,7 @@ actor TCPSource is Source
         | let br: BoundaryRoute => b_count = b_count + 1
         end
       end
-      @printf[I32]("TCPSource %s has %s boundaries.\n".cstring(),
+      @printf[I32]("GenSource %s has %s boundaries.\n".cstring(),
         _source_id.string().cstring(), b_count.string().cstring())
     end
     for route in _routes.values() do
@@ -462,7 +474,7 @@ actor TCPSource is Source
   be update_worker_data_service(worker: WorkerName,
     host: String, service: String)
   =>
-    @printf[I32]("SLF: TCPSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
+    @printf[I32]("SLF: GenSource: update_worker_data_service: %s -> %s %s\n".cstring(), worker.cstring(), host.cstring(), service.cstring())
     try
       let b = _outgoing_boundaries(worker)?
       b.update_worker_data_service(worker, host, service)
@@ -474,13 +486,13 @@ actor TCPSource is Source
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    @printf[I32]("!@ TCPSource received initiate_barrier %s\n".cstring(), token.string().cstring())
-    if not _is_pending and not _disposed then
+    @printf[I32]("!@ GenSource received initiate_barrier %s\n".cstring(), token.string().cstring())
+    if not _is_pending then
       _initiate_barrier(token)
     end
 
   fun ref _initiate_barrier(token: BarrierToken) =>
-    if not _disposed and not _shutdown then
+    if not _disposed then
       match token
       | let srt: CheckpointRollbackBarrierToken =>
         _prepare_for_rollback()
@@ -501,9 +513,7 @@ actor TCPSource is Source
     end
 
   be barrier_complete(token: BarrierToken) =>
-    // @printf[I32]("!@ barrier_complete at TCPSource %s\n".cstring(), _source_id.string().cstring())
-    // !@ Here's where we could ack finished messages up to checkpoint point.
-    // We should also match for rollback token.
+    // @printf[I32]("!@ barrier_complete at GenSource %s\n".cstring(), _source_id.string().cstring())
     None
 
   //////////////
@@ -511,11 +521,21 @@ actor TCPSource is Source
   //////////////
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
     """
-    TCPSources don't currently write out any data as part of the checkpoint.
+    GenSources don't currently write out any data as part of the checkpoint.
     """
     _next_checkpoint_id = checkpoint_id + 1
-    _event_log.checkpoint_state(_source_id, checkpoint_id,
-      recover val Array[ByteSeq] end)
+    _event_log.checkpoint_state(_source_id, checkpoint_id, _serialize())
+
+  fun ref _serialize(): Array[ByteSeq] val =>
+    let res = recover iso Array[ByteSeq] end
+    try
+      let bytes = Serialised(SerialiseAuth(_auth), _cur_value)?
+        .output(OutputSerialisedAuth(_auth))
+      res.push(bytes)
+    else
+      Fail()
+    end
+    consume res
 
   be prepare_for_rollback() =>
     _prepare_for_rollback()
@@ -527,292 +547,47 @@ actor TCPSource is Source
     checkpoint_id: CheckpointId)
   =>
     """
-    There is nothing for a TCPSource to rollback to.
+    There is nothing for a GenSource to rollback to.
     """
     _next_checkpoint_id = checkpoint_id + 1
+
+    try
+      _cur_value = _deserialize(payload)?
+    else
+      Fail()
+    end
+
     event_log.ack_rollback(_source_id)
 
-  /////////
-  // TCP
-  /////////
-  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
-    """
-    Handle socket events.
-    """
-    if event isnt _event then
-      if AsioEvent.writeable(flags) then
-        // A connection has completed.
-        var fd = @pony_asio_event_fd(event)
-        _connect_count = _connect_count - 1
-
-        if not _connected and not _closed then
-          // We don't have a connection yet.
-          if @pony_os_connected[Bool](fd) then
-            // The connection was successful, make it ours.
-            _fd = fd
-            _event = event
-            _connected = true
-            _readable = true
-
-            _notify.connected(this)
-
-            _pending_reads()
-          else
-            // The connection failed, unsubscribe the event and close.
-            @pony_asio_event_unsubscribe(event)
-            @pony_os_socket_close[None](fd)
-            _notify_connecting()
-          end
-        else
-          // We're already connected, unsubscribe the event and close.
-          @pony_asio_event_unsubscribe(event)
-          @pony_os_socket_close[None](fd)
-        end
-      else
-        // It's not our event.
-        if AsioEvent.disposable(flags) then
-          // It's disposable, so dispose of it.
-          @pony_asio_event_destroy(event)
-        end
-      end
-    else
-      if _connected and not _shutdown_peer then
-        if AsioEvent.readable(flags) then
-          _readable = true
-          _pending_reads()
-        end
-      end
-
-      if AsioEvent.disposable(flags) then
-        @pony_asio_event_destroy(event)
-        _event = AsioEvent.none()
-      end
-
-      _try_shutdown()
-    end
-
-  fun ref _notify_connecting() =>
-    """
-    Inform the notifier that we're connecting.
-    """
-    if _connect_count > 0 then
-      _notify.connecting(this, _connect_count)
-    else
-      _notify.connect_failed(this)
-      _hard_close()
-    end
-
-  fun ref close() =>
-    """
-    Shut our connection down immediately. Stop reading data from the incoming
-    source.
-    """
-    _hard_close()
-
-  fun ref _try_shutdown() =>
-    """
-    If we have closed and we have no remaining writes or pending connections,
-    then shutdown.
-    """
-    if not _closed then
-      return
-    end
-
-    if
-      not _shutdown and
-      (_connect_count == 0)
-    then
-      _shutdown = true
-
-      if _connected then
-        @pony_os_socket_shutdown[None](_fd)
-      else
-        _shutdown_peer = true
-      end
-    end
-
-    if _connected and _shutdown and _shutdown_peer then
-      _hard_close()
-    end
-
-  fun ref _hard_close() =>
-    """
-    When an error happens, do a non-graceful close.
-    """
-    if not _connected then
-      return
-    end
-
-    _connected = false
-    _closed = true
-    _shutdown = true
-    _shutdown_peer = true
-
-    // Unsubscribe immediately and drop all pending writes.
-    @pony_asio_event_unsubscribe(_event)
-    _readable = false
-    @pony_asio_event_set_readable[None](_event, false)
-
-    @pony_os_socket_close[None](_fd)
-    _fd = -1
-
-    _event = AsioEvent.none()
-    _expect_read_buf.clear()
-    _expect = 0
-
-    _notify.closed(this)
-
-    _listen._conn_closed(this)
-
-  fun ref _dispose_routes() =>
-    if not _unregistered then
-      for r in _routes.values() do
-        r.dispose()
-      end
-      _unregistered = true
-    end
-
-  fun ref _pending_reads() =>
-    """
-    Unless this connection is currently muted, read while data is available,
-    guessing the next packet length as we go. If we read 5 kb of data, send
-    ourself a resume message and stop reading, to avoid starving other actors.
-    Currently we can handle a varying value of _expect (greater than 0) and
-    constant _expect of 0 but we cannot handle switching between these two
-    cases.
-    """
+  fun _deserialize(data: ByteSeq val): V ? =>
     try
-      var sum: USize = 0
-      var received_count: U8 = 0
-      _reading = true
-
-      while _readable and not _shutdown_peer do
-        if _muted then
-          _reading = false
-          return
-        end
-
-        if (_read_buf_offset >= _expect) and (_read_buf_offset != 0) then
-          if (_expect == 0) and (_read_buf_offset > 0) then
-            let data = _read_buf = recover Array[U8] end
-            data.truncate(_read_buf_offset)
-            _read_buf_offset = 0
-
-            received_count = received_count + 1
-            if not _notify.received(this, consume data) then
-              _read_buf_size()
-              _read_again()
-              _reading = false
-              return
-            else
-              _read_buf_size()
-            end
-            if received_count >= _max_received_count then
-              _read_again()
-              _reading = false
-              return
-            end
-          else
-            while _read_buf_offset >= _expect do
-              let x = _read_buf = recover Array[U8] end
-              (let data, _read_buf) = (consume x).chop(_expect)
-              _read_buf_offset = _read_buf_offset - _expect
-
-              // increment max reads
-              received_count = received_count + 1
-              if not _notify.received(this, consume data) then
-                _read_buf_size()
-                _read_again()
-                _reading = false
-                return
-              end
-
-              if received_count >= _max_received_count then
-                _read_buf_size()
-                _read_again()
-                _reading = false
-                return
-              end
-            end
-
-            _read_buf_size()
-          end
-
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            // _read_buf_size()
-            _read_again()
-            _reading = false
-            return
-          end
-        else
-          if _read_buf.size() > _read_buf_offset then
-          // Read as much data as possible.
-            let len = @pony_os_recv[USize](
-              _event,
-              _read_buf.cpointer(_read_buf_offset),
-              _read_buf.size() - _read_buf_offset) ?
-
-            match len
-            | 0 =>
-              // Would block, try again later.
-              // this is safe because asio thread isn't currently subscribed
-              // for a read event so will not be writing to the readable flag
-              @pony_asio_event_set_readable[None](_event, false)
-              _readable = false
-              @pony_asio_event_resubscribe_read(_event)
-              _reading = false
-              return
-            | (_read_buf.size() - _read_buf_offset) =>
-              // Increase the read buffer size.
-              _next_size = _max_size.min(_next_size * 2)
-            end
-
-            _read_buf_offset = _read_buf_offset + len
-            sum = sum + len
-          else
-            _read_buf_size()
-            _read_again()
-          end
-        end
+      match Serialised.input(InputSerialisedAuth(_auth),
+        data as Array[U8] val)(DeserialiseAuth(_auth))?
+      | let v: V => v
+      else
+        error
       end
     else
-      // The socket has been closed from the other side.
-      _shutdown_peer = true
-      _hard_close()
+      error
     end
 
-    _reading = false
-
-  be _read_again() =>
-    """
-    Resume reading.
-    """
-    _pending_reads()
-
-  fun ref _read_buf_size() =>
-    """
-    Resize the read buffer.
-    """
-    if _expect != 0 then
-      _read_buf.undefined(_expect.next_pow2().max(_next_size))
-    else
-      _read_buf.undefined(_next_size)
-    end
-
+  //////////
+  // MUTING
+  //////////
   fun ref _mute() =>
     ifdef debug then
-      @printf[I32]("Muting TCPSource\n".cstring())
+      @printf[I32]("Muting GenSource\n".cstring())
     end
     _muted = true
 
   fun ref _unmute() =>
     ifdef debug then
-      @printf[I32]("Unmuting TCPSource\n".cstring())
+      @printf[I32]("Unmuting GenSource\n".cstring())
     end
+    let was_muted = _muted
     _muted = false
-    if not _reading then
-      _pending_reads()
+    if was_muted then
+      next_message()
     end
 
   fun ref _mute_local() =>
@@ -831,7 +606,6 @@ actor TCPSource is Source
     _mute()
 
   be unmute(a: Any tag) =>
-    @printf[I32]("!@ TCPSource %s: Somebody called unmute() with %s left\n".cstring(), _source_id.string().cstring(), _muted_by.size().string().cstring())
     _muted_by.unset(a)
 
     if _muted_by.size() == 0 then
@@ -840,12 +614,3 @@ actor TCPSource is Source
 
   fun ref is_muted(): Bool =>
     _muted
-
-  fun ref expect(qty: USize = 0) =>
-    """
-    A `received` call on the notifier must contain exactly `qty` bytes. If
-    `qty` is zero, the call can contain any amount of data.
-    """
-    // TODO: verify that removal of "in_sent" check is harmless
-    _expect = _notify.expect(this, qty)
-    @printf[I32]("!@ TCPSource: set expect to %s\n".cstring(), _expect.string().cstring())
