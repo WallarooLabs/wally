@@ -807,7 +807,6 @@ actor RouterRegistry
       Fail()
     end
     _stop_the_world_for_grow_migration(new_workers)
-    @printf[I32]("!@ setting up migration action\n".cstring())
 
     let promise = Promise[None]
     promise.next[None]({(_: None) =>
@@ -857,9 +856,6 @@ actor RouterRegistry
     remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    """
-    !@
-    """
     _stop_the_world_for_shrink_migration()
 
   fun ref _stop_the_world_for_shrink_migration() =>
@@ -872,22 +868,13 @@ actor RouterRegistry
     _stop_the_world()
 
   fun ref _try_resume_the_world() =>
-    @printf[I32]("!@ _try_resume_the_world\n".cstring())
     if _initiated_stop_the_world then
-      //!@ Do we need this here? We don't know the state name anymore.
-      // Since we don't need all steps to be up to date on the TargetIdRouter
-      // during migrations, we wait on the worker that initiated stop the
-      // world to distribute it until here to avoid unnecessary messaging.
-      // _distribute_target_id_router()
-
       let promise = Promise[None]
       promise.next[None]({(_: None) => _self.initiate_autoscale_complete()})
       _autoscale_initiator.initiate_autoscale_resume_acks(promise)
 
       // We are done with this round of leaving workers
       _leaving_workers = recover Array[WorkerName] end
-    else
-      @printf[I32]("!@ but I didn't initiate\n".cstring())
     end
 
   fun ref _resume_the_world(initiator: WorkerName) =>
@@ -913,7 +900,6 @@ actor RouterRegistry
     _unmute_request(originating_worker)
 
   fun ref _unmute_request(originating_worker: WorkerName) =>
-    @printf[I32]("!@ RouterRegistry: _unmute_request from %s with %s in there\n".cstring(), originating_worker.cstring(), _stopped_worker_waiting_list.size().string().cstring())
     if _stopped_worker_waiting_list.size() > 0 then
       _stopped_worker_waiting_list.unset(originating_worker)
       if (_stopped_worker_waiting_list.size() == 0) then
@@ -1138,7 +1124,6 @@ actor RouterRegistry
     telling them to it's time to stop the world. This behavior is called when
     that message is received.
     """
-    @printf[I32]("!@ REMOTE STOP THE WORLD\n".cstring())
     try
       (_autoscale as Autoscale).stop_the_world_for_join_migration_initiated(
         coordinator, joining_workers)
@@ -1184,8 +1169,6 @@ actor RouterRegistry
     end
 
   be prepare_join_migration(target_workers: Array[WorkerName] val) =>
-    @printf[I32]("!@ prepare_join_migration\n".cstring())
-
     let lookup_next_checkpoint_id = Promise[CheckpointId]
     lookup_next_checkpoint_id.next[None](
       _self~initiate_join_migration(target_workers))
@@ -1194,8 +1177,6 @@ actor RouterRegistry
   be initiate_join_migration(target_workers: Array[WorkerName] val,
     next_checkpoint_id: CheckpointId)
   =>
-    @printf[I32]("!@ initiate_join_migration\n".cstring())
-
     // Update BarrierInitiator about new workers
     for w in target_workers.values() do
       _barrier_initiator.add_worker(w)
@@ -1224,7 +1205,6 @@ actor RouterRegistry
         "to migrate.\n").cstring())
       _resume_the_world(_worker_name)
     end
-    @printf[I32]("!@ begin_join_migration to %s workers\n".cstring(), target_workers.size().string().cstring())
     for w in target_workers.values() do
       @printf[I32]("Migrating partitions to %s\n".cstring(), w.cstring())
     end
@@ -1415,10 +1395,6 @@ actor RouterRegistry
     coordinator: WorkerName, remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    """
-    !@
-    """
-    @printf[I32]("!@ REMOTE SHRINK STOP THE WORLD\n".cstring())
     try
       (_autoscale as Autoscale).stop_the_world_for_shrink_migration_initiated(
         coordinator, remaining_workers, leaving_workers)
@@ -1457,9 +1433,6 @@ actor RouterRegistry
       for w in leaving_workers.values() do
         @printf[I32]("-- -- %s\n".cstring(), w.cstring())
       end
-      //!@
-      // _initiated_stop_the_world = true
-      // _stop_the_world_for_shrink_migration()
       try
         let msg = ChannelMsgEncoder.prepare_shrink(remaining_workers,
           leaving_workers, _auth)?
@@ -1484,23 +1457,11 @@ actor RouterRegistry
     shrink. This behavior is called in response to receiving that message
     from the contacted worker.
     """
-    //!@
-    // try
-    //   (_autoscale as Autoscale).prepare_shrink(remaining_workers,
-    //     leaving_workers)
-    // else
-    //   Fail()
-    // end
     _prepare_shrink(remaining_workers, leaving_workers)
 
   fun ref _prepare_shrink(remaining_workers: Array[WorkerName] val,
     leaving_workers: Array[WorkerName] val)
   =>
-    //!@
-    // if not _stop_the_world_in_process then
-    //   _stop_the_world_for_shrink_migration()
-    // end
-
     for (p_id, router) in _stateless_partition_routers.pairs() do
       let new_router = router.calculate_shrink(remaining_workers)
       _distribute_stateless_partition_router(new_router)

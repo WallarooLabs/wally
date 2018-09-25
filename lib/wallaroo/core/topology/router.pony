@@ -1459,29 +1459,7 @@ class val LocalPartitionRouter[S: State ref] is PartitionRouter
       a.push(id.string())
     end
     digest(_worker_name) = consume a
-
-    // Now the other workers
-    //!@ Others needs to be filled in another way. We don't know about
-    // ProxyRouters anymore.  We need this distribution digest for partition
-    // queries, which are used in autoscale tests.
     let others = Map[WorkerName, Array[String]]
-    // try
-    //   for target in _local_routes.values() do
-    //     match target
-    //     | let pr: ProxyRouter =>
-    //       let pa = pr.proxy_address()
-    //       if others.contains(pa.worker) then
-    //         others(pa.worker)?.push(pa.routing_id.string())
-    //       else
-    //         let next = Array[String]
-    //         next.push(pa.routing_id.string())
-    //         others(pa.worker) = next
-    //       end
-    //     end
-    //   end
-    // else
-    //   Fail()
-    // end
     for (k, v) in others.pairs() do
       let next = recover iso Array[String] end
       for id in v.values() do

@@ -250,7 +250,10 @@ actor BarrierSource is Source
     None
 
   be initiate_barrier(token: BarrierToken) =>
-    @printf[I32]("!@ BarrierSource initiate_barrier. Forwarding to %s outputs\n".cstring(), _outputs.size().string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("BarrierSource initiate_barrier. Forwarding to %s outputs\n"
+        .cstring(), _outputs.size().string().cstring())
+    end
     match token
     | let sbt: CheckpointBarrierToken =>
       checkpoint_state(sbt.id)
@@ -258,7 +261,6 @@ actor BarrierSource is Source
     for (o_id, o) in _outputs.pairs() do
       match o
       | let ob: OutgoingBoundary =>
-        // @printf[I32]("!@ BarrierSource: barrier over boundary to %s!\n".cstring(), o_id.string().cstring())
         ob.forward_barrier(o_id, _source_id, token)
       else
         o.receive_barrier(_source_id, this, token)
@@ -266,7 +268,9 @@ actor BarrierSource is Source
     end
 
   be barrier_complete(token: BarrierToken) =>
-    @printf[I32]("!@ barrier_complete at BarrierSource %s\n".cstring(), _source_id.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("barrier_complete at BarrierSource %s\n".cstring(), _source_id.string().cstring())
+    end
     None
 
   be update_worker_data_service(worker_name: String,

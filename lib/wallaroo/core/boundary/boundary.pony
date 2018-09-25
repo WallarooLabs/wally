@@ -268,7 +268,6 @@ actor OutgoingBoundary is Consumer
 
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
       + "\n").cstring())
-    @printf[I32]("!@ reconnect() RE-Connecting OutgoingBoundary %s to %s:%s on %s\n".cstring(), _step_id.string().cstring(), _host.cstring(), _service.cstring(), _target_worker.cstring())
 
   be migrate_key(step_id: RoutingId, state_name: String, key: Key,
     checkpoint_id: CheckpointId, state: ByteSeq val)
@@ -450,8 +449,6 @@ actor OutgoingBoundary is Consumer
     None
 
   be register_producer(id: RoutingId, producer: Producer) =>
-    // @printf[I32]("!@ Registered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
-
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
     end
@@ -459,8 +456,6 @@ actor OutgoingBoundary is Consumer
     _upstreams.set(producer)
 
   be unregister_producer(id: RoutingId, producer: Producer) =>
-    // @printf[I32]("!@ Unregistered producer %s at boundary %s. Total %s upstreams.\n".cstring(), id.string().cstring(), (digestof this).string().cstring(), _upstreams.size().string().cstring())
-
     // TODO: Determine if we need this Invariant.
     // ifdef debug then
     //   Invariant(_upstreams.contains(producer))
@@ -476,7 +471,6 @@ actor OutgoingBoundary is Consumer
   fun ref _forward_register_producer(source_id: RoutingId,
     target_id: RoutingId, producer: Producer)
   =>
-    // @printf[I32]("!@ Forward Registered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
     _registered_producers.register_producer(source_id, producer, target_id)
     try
       let msg = ChannelMsgEncoder.register_producer(_worker_name,
@@ -490,8 +484,6 @@ actor OutgoingBoundary is Consumer
   be forward_unregister_producer(source_id: RoutingId, target_id: RoutingId,
     producer: Producer)
   =>
-    // @printf[I32]("!@ Forward UNRegistered producer at boundary %s. sourceid: %s, target_id: %s\n".cstring(), (digestof this).string().cstring(), source_id.string().cstring(), target_id.string().cstring())
-
     _registered_producers.unregister_producer(source_id, producer, target_id)
     try
       let msg = ChannelMsgEncoder.unregister_producer(_worker_name,
@@ -730,7 +722,6 @@ actor OutgoingBoundary is Consumer
     if (_host != "") and (_service != "") and not _no_more_reconnect then
       @printf[I32]("RE-Connecting OutgoingBoundary to %s:%s\n".cstring(),
         _host.cstring(), _service.cstring())
-        @printf[I32]("!@ _schedule_reconnect() RE-Connecting OutgoingBoundary %s to %s:%s on %s\n".cstring(), _step_id.string().cstring(), _host.cstring(), _service.cstring(), _target_worker.cstring())
       let timer = Timer(_PauseBeforeReconnect(this), _reconnect_pause)
       _timers(consume timer)
     end

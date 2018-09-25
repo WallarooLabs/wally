@@ -319,7 +319,6 @@ actor Connections is Cluster
 
   be notify_cluster_of_new_key(key: Key, state_name: String) =>
     try
-      @printf[I32]("!@ Notify cluster about key %s\n".cstring(), key.cstring())
       let migration_complete_msg =
         ChannelMsgEncoder.key_migration_complete(key, _auth)?
       _send_control_to_cluster(migration_complete_msg)
@@ -366,27 +365,6 @@ actor Connections is Cluster
     else
       Fail()
     end
-
-//!@
-  // be create_boundary_to_joining_worker(target: String, boundary_id: U128,
-  //   state_routing_ids: Map[StateName, RoutingId] val,
-  //   local_topology_initializer: LocalTopologyInitializer)
-  // =>
-  //   try
-  //     (let host, let service) = _data_addrs(target)?
-  //     let reporter = MetricsReporter(_app_name,
-  //       _worker_name, _metrics_conn)
-  //     let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-  //       consume reporter, host, service, _spike_config)
-  //     let boundary = builder.build_and_initialize(boundary_id, target,
-  //       local_topology_initializer)
-  //     _register_disposable(boundary)
-  //     local_topology_initializer.add_boundary_to_joining_worker(target,
-  //       boundary, builder, state_routing_ids)
-  //   else
-  //     @printf[I32]("Can't find data address for worker\n".cstring())
-  //     Fail()
-  //   end
 
   // TODO: Passing in checkpoint target here is a hack because we currently
   // do recovery initialization at the point boundary updates are complete.
@@ -512,11 +490,6 @@ actor Connections is Cluster
     let data_map = recover trn Map[WorkerName, (String, String)] end
     for (key, value) in data_addrs.pairs() do
       data_map(key) = value
-    end
-
-    //!@
-    for (w, a) in control_map.pairs() do
-      @printf[I32]("!@ CONN TO WORKER WWW %s\n".cstring(), w.cstring())
     end
 
     map("control") = consume control_map

@@ -82,19 +82,16 @@ actor DataReceivers
     is the first time that OutgoingBoundary has connected to this worker,
     then we create a new DataReceiver here.
     """
-    // @printf[I32]("!@ IDENTIFYING BOUNDARY %s from %s\n".cstring(), sender_boundary_id.string().cstring(), sender_name.cstring())
     let boundary_id = BoundaryId(sender_name, sender_boundary_id)
     let dr =
       try
         _data_receivers(boundary_id)?
       else
-        // !@ this should be recoverable
+        // !@ TODO: This should be recoverable
         let id = RoutingIdGenerator()
 
         let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
           _data_router, _initialized, _is_recovering)
-        //!@
-        // new_dr.update_router(_data_router)
         match _router_registry
         | let rr: RouterRegistry =>
           rr.register_data_receiver(sender_name, new_dr)
@@ -103,19 +100,14 @@ actor DataReceivers
         end
         _data_receivers(boundary_id) = new_dr
         _connections.register_disposable(new_dr)
-        // @printf[I32]("!@ -- CREATED New DR for it\n".cstring())
         new_dr
       end
     conn.identify_data_receiver(dr, sender_boundary_id, highest_seq_id)
     _inform_subscribers(boundary_id, dr)
 
-    //!@
+    //!@ TODO: Remove
   be start_replay_processing() =>
     None
-    //!@
-    // for dr in _data_receivers.values() do
-    //   dr.start_replay_processing()
-    // end
 
   be start_normal_message_processing() =>
     _initialized = true

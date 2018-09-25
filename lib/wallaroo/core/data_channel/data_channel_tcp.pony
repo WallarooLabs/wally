@@ -182,10 +182,7 @@ class DataChannelConnectNotifier is DataChannelNotify
       _layout_initializer, _data_receivers, _recovery_replayer,
       _router_registry, this, dr)
     dr.data_connect(sender_boundary_id, highest_seq_id, conn)
-    //!@
-    if _queue.size() > 0 then @printf[I32]("!@ DataChannel: playing queued msgs:\n".cstring()) end
     for msg in _queue.values() do
-      @printf[I32]("!@ -- Playing msg size %s\n".cstring(), msg.size().string().cstring())
       _receiver.decode_and_process(conn, msg)
     end
     _queue.clear()

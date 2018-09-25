@@ -33,6 +33,7 @@ class BarrierStepForwarder
 
   // !@ Perhaps we need to add invariant wherever inputs and outputs can be
   // updated in the encapsulating actor to check if barrier is in progress.
+  // <--- This shouldn't matter with a static graph.
   new create(step_id: RoutingId, step: Step ref) =>
     _step_id = step_id
     _step = step
@@ -52,7 +53,6 @@ class BarrierStepForwarder
   fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ StepForwarder: receive_new_barrier\n".cstring())
     _barrier_token = barrier_token
     receive_barrier(step_id, producer, barrier_token)
 
@@ -62,7 +62,6 @@ class BarrierStepForwarder
     // If this new token is a higher priority token, then the forwarder should
     // have already been cleared to make way for it.
     ifdef debug then
-      //!@
       if barrier_token > _barrier_token then
         @printf[I32]("Invariant violation: received barrier %s is greater than current barrier %s \n".cstring(), barrier_token.string().cstring(), _barrier_token.string().cstring())
       end
@@ -70,7 +69,6 @@ class BarrierStepForwarder
       Invariant(not (barrier_token > _barrier_token))
     end
 
-    // @printf[I32]("!@ receive_barrier at Forwarder from %s!\n".cstring(), step_id.string().cstring())
     // If we're processing a rollback token which is higher priority than
     // this new one, then we need to drop this new one.
     if _barrier_token > barrier_token then
@@ -78,8 +76,9 @@ class BarrierStepForwarder
     end
 
     if barrier_token != _barrier_token then
-      @printf[I32]("!@ Received %s when still processing %s at step %s\n".cstring(),
-        _barrier_token.string().cstring(), barrier_token.string().cstring(), _step_id.string().cstring())
+      @printf[I32]("Received %s when still processing %s at step %s\n"
+        .cstring(), _barrier_token.string().cstring(),
+        barrier_token.string().cstring(), _step_id.string().cstring())
       Fail()
     end
 
@@ -89,7 +88,7 @@ class BarrierStepForwarder
       check_completion(inputs)
     else
       if not _removed_inputs.contains(step_id) then
-        @printf[I32]("!@ %s: Forwarder at %s doesn't know about %s\n".cstring(), barrier_token.string().cstring(), _step_id.string().cstring(), step_id.string().cstring())
+        @printf[I32]("%s: Forwarder at %s doesn't know about %s\n".cstring(), barrier_token.string().cstring(), _step_id.string().cstring(), step_id.string().cstring())
         Fail()
       end
     end
@@ -116,12 +115,9 @@ class BarrierStepForwarder
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
     if (inputs.size() == (_inputs_blocking.size() + _removed_inputs.size()))
     then
-      // @printf[I32]("!@ That was last barrier at Forwarder.  FORWARDING!\n".cstring())
       for (o_id, o) in _step.outputs().pairs() do
         match o
         | let ob: OutgoingBoundary =>
-          // @printf[I32]("!@ FORWARDING TO BOUNDARY\n".cstring())
-          @printf[I32]("!@ BarrierStepForwarder: sending over OutgoingBoundary to %s\n".cstring(), o_id.string().cstring())
           ob.forward_barrier(o_id, _step_id,
             _barrier_token)
         else
@@ -132,16 +128,6 @@ class BarrierStepForwarder
       let b_token = _barrier_token
       clear()
       _step.barrier_complete(b_token)
-    //!@
-    else
-      //!@
-      None
-      // @printf[I32]("!@ Not last barrier at Forwarder. inputs: %s, inputs_blocking: %s, removed_inputs: %s\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring(), _removed_inputs.size().string().cstring())
-      // @printf[I32]("!@ Inputs:\n".cstring())
-      //!@
-      // for i in inputs.keys() do
-        // @printf[I32]("!@ -- %s\n".cstring(), i.string().cstring())
-      // end
     end
 
   fun ref clear() =>

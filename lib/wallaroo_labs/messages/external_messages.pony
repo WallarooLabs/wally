@@ -165,14 +165,6 @@ primitive ExternalMsgEncoder
     local_keys: Map[StateName, SetIs[Key]],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
-    @printf[I32]("!@ Creating StateEntityQueryResponse with local keys\n".cstring())
-    //!@
-    for (k, v) in local_keys.pairs() do
-      for key in v.values() do
-        @printf[I32]("!@ -- %s\n".cstring(), key.cstring())
-      end
-    end
-
     let digest_map = _state_entity_digest(local_keys)
     let seqr = StateEntityQueryEncoder.state_entity_keys(digest_map)
     _encode(_StateEntityQueryResponse(), seqr, wb)

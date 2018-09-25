@@ -385,15 +385,12 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     end
 
   be barrier_complete(token: BarrierToken) =>
-    // !@ Here's where we could ack finished messages up to checkpoint point.
-    // We should also match for rollback token.
     None
 
   //////////////
   // CHECKPOINTS
   //////////////
   fun ref checkpoint_state(checkpoint_id: CheckpointId) =>
-    //!@ We probably need to checkpoint info about last seq id for checkpoint.
     ifdef "trace" then
       @printf[I32]("checkpoint_state in %s\n".cstring(), _name.cstring())
     end
@@ -411,7 +408,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)
   =>
-    //!@ Rollback!
     _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_source_id)
 

@@ -202,10 +202,16 @@ class _BlockingBarrierInitiatorPhase is _BarrierInitiatorPhase
     if (barrier_token == _initial_token) or
       (barrier_token == _wait_for_token)
     then
-      @printf[I32]("!@ BlockPhase: Initiating barrier %s!\n".cstring(), barrier_token.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("BlockPhase: Initiating barrier %s!\n".cstring(),
+          barrier_token.string().cstring())
+      end
       _initiator.initiate_barrier(barrier_token, result_promise)
     else
-      @printf[I32]("!@ BlockPhase: Queuing barrier %s!\n".cstring(), barrier_token.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("BlockPhase: Queuing barrier %s!\n".cstring(),
+          barrier_token.string().cstring())
+      end
       // !@ We need to ensure that we don't queue checkpoints when we're
       // rolling back. This is a crude way to test that.
       if not (_wait_for_token > barrier_token) then

@@ -172,7 +172,6 @@ actor Recovery
         let checkpoint_id = _checkpoint_id as CheckpointId
         _recovery_phase = _RollbackLocalKeys(this, checkpoint_id, _workers)
 
-        //!@ Tell someone to start rolling back topology
         let promise = Promise[None]
         promise.next[None]({(n: None) =>
           _self.worker_ack_local_keys_rollback(_worker_name, checkpoint_id)

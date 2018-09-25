@@ -128,7 +128,6 @@ actor ConnectorSource is Source
     """
     A new connection accepted on a server.
     """
-    @printf[I32]("!@ Spinning up ConnectorSource %s\n".cstring(), source_id.string().cstring())
     _source_id = source_id
     _auth = auth
     _event_log = event_log
@@ -464,7 +463,10 @@ actor ConnectorSource is Source
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    @printf[I32]("!@ ConnectorSource received initiate_barrier %s\n".cstring(), token.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("ConnectorSource received initiate_barrier %s\n".cstring(),
+        token.string().cstring())
+    end
     if not _is_pending then
       _initiate_barrier(token)
     end
@@ -491,9 +493,10 @@ actor ConnectorSource is Source
     end
 
   be barrier_complete(token: BarrierToken) =>
-    // @printf[I32]("!@ barrier_complete at ConnectorSource %s\n".cstring(), _source_id.string().cstring())
-    // !@ Here's where we could ack finished messages up to checkpoint point.
-    // We should also match for rollback token.
+    ifdef "checkpoint_trace" then
+      @printf[I32]("barrier_complete at ConnectorSource %s\n".cstring(),
+        _source_id.string().cstring())
+    end
     None
 
   //////////////

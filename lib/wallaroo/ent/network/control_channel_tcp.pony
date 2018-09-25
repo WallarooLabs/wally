@@ -440,7 +440,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32](("Received PrepareShrinkMsg on Control " +
             "Channel\n").cstring())
         end
-        @printf[I32]("!@ Got PrepareShrinkMsg\n".cstring())
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
           lti.prepare_shrink(m.remaining_workers, m.leaving_workers)
@@ -515,11 +514,15 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         })
         _event_log.write_checkpoint_id(m.checkpoint_id, promise)
       | let m: EventLogAckCheckpointMsg =>
-        @printf[I32]("!@ Rcvd EventLogAckCheckpointMsg!!!\n".cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("Rcvd EventLogAckCheckpointMsg!\n".cstring())
+        end
         _checkpoint_initiator.event_log_checkpoint_complete(m.sender,
           m.checkpoint_id)
       | let m: EventLogAckCheckpointIdWrittenMsg =>
-        @printf[I32]("!@ Rcvd EventLogAckCheckpointIdWrittenMsg!!!\n".cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("Rcvd EventLogAckCheckpointIdWrittenMsg!\n".cstring())
+        end
         _checkpoint_initiator.event_log_id_written(m.sender,
           m.checkpoint_id)
       | let m: CommitCheckpointIdMsg =>
@@ -547,7 +550,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         let promise = Promise[None]
         _event_log.prepare_for_rollback(promise, _checkpoint_initiator)
       | let m: RollbackLocalKeysMsg =>
-        @printf[I32]("!@ Rcvd RollbackLocalKeysMsg\n".cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("Rcvd RollbackLocalKeysMsg\n".cstring())
+        end
         let promise = Promise[None]
         promise.next[None]({(n: None) =>
           try
@@ -592,7 +597,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: EventLogAckRollbackMsg =>
         _recovery.rollback_complete(m.sender, m.token)
       | let m: ResumeCheckpointMsg =>
-        @printf[I32]("!@ Rcvd ResumeCheckpointMsg!!\n".cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("Rcvd ResumeCheckpointMsg!!\n".cstring())
+        end
         _checkpoint_initiator.resume_checkpoint()
       | let m: ResumeProcessingMsg =>
         ifdef "trace" then
