@@ -181,7 +181,7 @@ Machida is the program that runs Wallaroo Python applications. Change to the Wal
 cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
 make build-machida-all
 cp machida/build/machida bin
-cp machida/wallaroo.py bin
+cp -r machida/lib/ bin/pylib
 ```
 
 ## Compiling Giles Sender, Data Receiver, Cluster Shutdown, and Cluster Shrinker tools
