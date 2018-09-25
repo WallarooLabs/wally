@@ -92,32 +92,23 @@ class LocalKeysFile
           /////
           //// QQQ r.append(_file.read(1))
           let qqq = _file.read(1)
-          @printf[I32]("@! read result size = %d\n".cstring(), qqq.size())
           r.append(consume qqq)
-          @printf[I32]("!@cmd\n".cstring())
           let cmd: U8 = r.u8()?
-          @printf[I32]("!@next_cpoint_id\n".cstring())
           r.append(_file.read(8))
           let next_cpoint_id = r.u64_be()?
-          @printf[I32]("!@payload_size\n".cstring())
           r.append(_file.read(4))
           let payload_size = r.u32_be()?
           if next_cpoint_id > checkpoint_id then
             // Skip this entry
-             @printf[I32]("!@ next_cpoint_id %d > checkpoint_id %d, payload_size = %d\n".cstring(), next_cpoint_id, checkpoint_id, payload_size)
             _file.seek(payload_size.isize())
           else
             r.append(_file.read(4))
-            @printf[I32]("!@s_name_size\n".cstring())
             let s_name_size = r.u32_be()?.usize()
             r.append(_file.read(s_name_size))
-            @printf[I32]("!@s_name\n".cstring())
             let s_name: StateName = String.from_array(r.block(s_name_size)?)
             r.append(_file.read(4))
-            @printf[I32]("!@k_size\n".cstring())
             let k_size = r.u32_be()?.usize()
             r.append(_file.read(k_size))
-            @printf[I32]("!@key\n".cstring())
             let key: Key = String.from_array(r.block(k_size)?)
 
             match cmd
@@ -126,7 +117,6 @@ class LocalKeysFile
             | LocalKeysFileCommand.remove() =>
               if lks.contains(s_name) then
                 try
-                  @printf[I32]("!@lks(s_name)?\n".cstring())
                   let keys = lks(s_name)?
                   if keys.contains(key) then
                     keys.unset(key)
@@ -143,20 +133,12 @@ class LocalKeysFile
           @printf[I32]("Error reading local keys file!\n".cstring())
           Fail()
         end
-        @printf[I32]("!@bottom of loop: _file.size() %d vs _file.position() %d\n".cstring(), _file.size(), _file.position())
         if _file.size() == _file.position() then
           end_of_checkpoint = true
-        //!@
-        elseif _file.size() < _file.position() then
-          @printf[I32]("!@ BAD: overshot end of local keys file by %s\n".cstring(), (_file.position().isize() - _file.size().isize()).string().cstring())
         end
       end
     end
-    @printf[I32]("!@ Finished reading local keys\n".cstring())
-
-    // Truncate rest of file since we are rolling back to an earlier
-    // checkpoint.
-    // _file.set_length(_file.position())
+    @printf[I32]("Finished reading local keys\n".cstring())
 
     let lks_iso = recover iso Map[StateName, SetIs[Key] val] end
     for (s, keys) in lks.pairs() do

@@ -78,13 +78,20 @@ class _CheckpointingPhase is _CheckpointInitiatorPhase
   fun ref event_log_checkpoint_complete(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    @printf[I32]("!@ _CheckpointingPhase: event_log_checkpoints_complete from %s for %s\n".cstring(), worker.cstring(), checkpoint_id.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("_CheckpointingPhase: event_log_checkpoints_complete from %s for %s\n".cstring(),
+        worker.cstring(), checkpoint_id.string().cstring())
+    end
     ifdef debug then
       Invariant(checkpoint_id == _token.id)
       Invariant(_c_initiator.workers().contains(worker))
     end
     _acked_workers.set(worker)
-    @printf[I32]("!@ _CheckpointingPhase: acked_workers: %s, workers: %s\n".cstring(), _acked_workers.size().string().cstring(), _c_initiator.workers().size().string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("_CheckpointingPhase: acked_workers: %s, workers: %s\n"
+        .cstring(), _acked_workers.size().string().cstring(),
+        _c_initiator.workers().size().string().cstring())
+    end
     if (_acked_workers.size() == _c_initiator.workers().size()) then
       _event_log_checkpoints_complete = true
       _check_completion()
@@ -114,13 +121,20 @@ class _WaitingForEventLogIdWrittenPhase is _CheckpointInitiatorPhase
   fun ref event_log_id_written(worker: WorkerName,
     checkpoint_id: CheckpointId)
   =>
-    @printf[I32]("!@ _WaitingForEventLogIdWrittenPhase: event_log_id_written from %s for %s\n".cstring(), worker.cstring(), checkpoint_id.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("_WaitingForEventLogIdWrittenPhase: event_log_id_written from %s for %s\n".cstring(),
+        worker.cstring(), checkpoint_id.string().cstring())
+    end
     ifdef debug then
       Invariant(checkpoint_id == _token.id)
       Invariant(_c_initiator.workers().contains(worker))
     end
     _acked_workers.set(worker)
-    @printf[I32]("!@ _WaitingForEventLogIdWrittenPhase: acked_workers: %s, workers: %s\n".cstring(), _acked_workers.size().string().cstring(), _c_initiator.workers().size().string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("_WaitingForEventLogIdWrittenPhase: acked_workers: %s, workers: %s\n".cstring(),
+        _acked_workers.size().string().cstring(),
+        _c_initiator.workers().size().string().cstring())
+    end
     if (_acked_workers.size() == _c_initiator.workers().size()) then
       _c_initiator.checkpoint_complete(_token, _repeating)
     end

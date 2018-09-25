@@ -108,12 +108,6 @@ actor RecoveryReconnecter
   be start_recovery_reconnect(workers: Array[WorkerName] val,
     recovery: Recovery)
   =>
-    @printf[I32]("!@ RecoveryReconnecter start_recovery_reconnect with workers\n".cstring())
-    //!@
-    for w in workers.values() do
-      @printf[I32]("!@ -- %s\n".cstring(), w.cstring())
-    end
-
     if single_worker(workers) then
       @printf[I32]("|~~ -- Skipping Reconnect: Only One Worker -- ~~|\n"
         .cstring())
@@ -127,7 +121,6 @@ actor RecoveryReconnecter
     let expected_workers: SetIs[WorkerName] = expected_workers.create()
     for w in workers.values() do
       if w != _worker_name then
-        @printf[I32]("!@ RecoveryReconnecter: SETTING expected worker %s\n".cstring(), w.cstring())
         expected_workers.set(w)
       end
     end
@@ -258,9 +251,6 @@ class _ReadyForNormalProcessing is _ReconnectPhase
   =>
     //!@ Do we need this anymore?
     None
-    // If we experience a reconnect outside recovery, then we can immediately
-    // clear deduplication lists when it's complete
-    // _reconnecter._clear_deduplication_lists()
 
 class _WaitingForBoundaryCounts is _ReconnectPhase
   let _expected_workers: SetIs[WorkerName]
@@ -280,7 +270,6 @@ class _WaitingForBoundaryCounts is _ReconnectPhase
   fun name(): String => "Waiting for Boundary Counts Phase"
 
   fun ref add_expected_boundary_count(worker: WorkerName, count: USize) =>
-    @printf[I32]("!@ add_expected_boundary_count: w: %s, c: %s\n".cstring(), worker.cstring(), count.string().cstring())
     ifdef debug then
       // This should only be called once per worker
       Invariant(not _expected_boundaries.contains(worker))

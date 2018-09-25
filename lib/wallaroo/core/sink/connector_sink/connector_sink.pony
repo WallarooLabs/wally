@@ -285,7 +285,6 @@ actor ConnectorSink is Sink
     _inputs
 
   be register_producer(id: RoutingId, producer: Producer) =>
-    // @printf[I32]("!@ Registered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
     // If we have at least one input, then we are involved in checkpointing.
     if _inputs.size() == 0 then
       _barrier_initiator.register_sink(this)
@@ -296,8 +295,6 @@ actor ConnectorSink is Sink
     _upstreams.set(producer)
 
   be unregister_producer(id: RoutingId, producer: Producer) =>
-    // @printf[I32]("!@ Unregistered producer %s at sink %s. Total %s upstreams.\n".cstring(), id.string().cstring(), _sink_id.string().cstring(), _upstreams.size().string().cstring())
-
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
@@ -333,7 +330,9 @@ actor ConnectorSink is Sink
   be receive_barrier(input_id: RoutingId, producer: Producer,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ Receive barrier %s at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Receive barrier %s at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    end
     process_barrier(input_id, producer, barrier_token)
 
   fun ref process_barrier(input_id: RoutingId, producer: Producer,
@@ -371,7 +370,9 @@ actor ConnectorSink is Sink
     end
 
   fun ref barrier_complete(barrier_token: BarrierToken) =>
-    @printf[I32]("!@ Barrier %s complete at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Barrier %s complete at ConnectorSink %s\n".cstring(), barrier_token.string().cstring(), _sink_id.string().cstring())
+    end
     ifdef debug then
       Invariant(_message_processor.barrier_in_progress())
     end

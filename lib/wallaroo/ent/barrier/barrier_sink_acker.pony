@@ -30,7 +30,8 @@ class BarrierSinkAcker
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
 
   // !@ Perhaps to add invariant wherever inputs can be updated in
-  // the encapsulating actor to check if barrier is in progress.
+  // the encapsulating actor to check if barrier is in progress. <-- This
+  // shouldn't matter with a static graph.
   new create(sink_id: RoutingId, sink: Sink ref,
     barrier_initiator: BarrierInitiator)
   =>
@@ -39,7 +40,6 @@ class BarrierSinkAcker
     _barrier_initiator = barrier_initiator
 
   fun ref higher_priority(token: BarrierToken): Bool =>
-    // @printf[I32]("!@ SINKACKER: Comparing %s to %s. higher_priority: %s\n".cstring(), token.string().cstring(), _barrier_token.string().cstring(), (token > _barrier_token).string().cstring())
     token > _barrier_token
 
   fun ref lower_priority(token: BarrierToken): Bool =>
@@ -67,7 +67,7 @@ class BarrierSinkAcker
       _inputs_blocking(step_id) = producer
       _check_completion(inputs)
     else
-      @printf[I32]("!@ Failed to find step_id %s in inputs at Sink %s\n".cstring(), step_id.string().cstring(), _sink_id.string().cstring())
+      @printf[I32]("Failed to find step_id %s in inputs at Sink %s\n".cstring(), step_id.string().cstring(), _sink_id.string().cstring())
       Fail()
     end
 
@@ -87,7 +87,6 @@ class BarrierSinkAcker
     _check_completion(_sink.inputs())
 
   fun ref _check_completion(inputs: Map[RoutingId, Producer] box) =>
-    // @printf[I32]("!@ receive_barrier at TCPSink: %s inputs, %s received\n".cstring(), inputs.size().string().cstring(), _inputs_blocking.size().string().cstring())
     if inputs.size() == _inputs_blocking.size() then
       _barrier_initiator.ack_barrier(_sink, _barrier_token)
       let b_token = _barrier_token

@@ -167,7 +167,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     initializer.report_event_log_ready_to_work()
 
   be register_resilient(id: RoutingId, resilient: Resilient) =>
-    // @printf[I32]("!@ EventLog register_resilient %s\n".cstring(), id.string().cstring())
     ifdef debug then
       match resilient
       | let s: Source =>
@@ -192,7 +191,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     end
 
   be unregister_resilient(id: RoutingId, resilient: Resilient) =>
-    // @printf[I32]("!@ EventLog unregister_resilient %s\n".cstring(), id.string().cstring())
     try
       _resilients.remove(id)?
       _phase.unregister_resilient(id, resilient)
@@ -213,7 +211,9 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
   be initiate_checkpoint(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId])
   =>
-    @printf[I32]("!@ EventLog: initiate_checkpoint\n".cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("EventLog: initiate_checkpoint\n".cstring())
+    end
     _phase.initiate_checkpoint(checkpoint_id, promise, this)
 
   be checkpoint_state(resilient_id: RoutingId, checkpoint_id: CheckpointId,
@@ -229,7 +229,10 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     _phase = _CheckpointEventLogPhase(this, checkpoint_id, promise,
       _resilients)
     for p in pending_checkpoint_states.values() do
-      @printf[I32]("!@ EventLog: Process pending checkpoint_state for resilient %s for checkpoint %s\n".cstring(), p.resilient_id.string().cstring(), checkpoint_id.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("EventLog: Process pending checkpoint_state for resilient %s for checkpoint %s\n".cstring(),
+          p.resilient_id.string().cstring(), checkpoint_id.string().cstring())
+      end
       _phase.checkpoint_state(p.resilient_id, checkpoint_id, p.payload)
     end
 
@@ -279,7 +282,10 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
   fun ref _write_checkpoint_id(checkpoint_id: CheckpointId,
     promise: Promise[CheckpointId])
   =>
-    @printf[I32]("!@ EventLog: write_checkpoint_id !!!!!!!!!!!\n".cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("EventLog: write_checkpoint_id %s!!\n".cstring(),
+        checkpoint_id.string().cstring())
+    end
     _backend.encode_checkpoint_id(checkpoint_id)
     for (r_id, s) in _pending_sources.values() do
       s.first_checkpoint_complete()
@@ -288,16 +294,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     _pending_sources.clear()
     _phase.checkpoint_id_written(checkpoint_id, promise)
 
-//!@
-  // fun ref update_normal_event_log_checkpoint_id(checkpoint_id: CheckpointId)
-  // =>
-  //   // We need to update the next checkpoint id we're expecting.
-  //   //!@ This should go through a phase
-  //   _phase = _WaitingForCheckpointInitiationEventLogPhase(
-  //  checkpoint_id + 1, this)
-
   fun ref checkpoint_id_written(checkpoint_id: CheckpointId) =>
-    // @printf[I32]("!@ EventLog: checkpoint_complete()\n".cstring())
     write_log()
     _phase = _WaitingForCheckpointInitiationEventLogPhase(checkpoint_id + 1,
       this)
@@ -346,9 +343,8 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     try
       _resilients(resilient_id)?.rollback(payload, this, checkpoint_id)
     else
-      //!@ Update message
-      @printf[I32](("Can't find resilient for rollback data\n").cstring())
-      @printf[I32](("!@ Can't find resilient %s for rollback data\n").cstring(), resilient_id.string().cstring())
+      @printf[I32](("Can't find resilient %s for rollback data\n").cstring(),
+        resilient_id.string().cstring())
       Fail()
     end
 
@@ -364,56 +360,22 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
 
   //!@
   /////////////
-  // STUFF
+  // STUFF TO REMOVE
   ////////////
-    //!@
-  // be start_log_replay(recovery: Recovery) =>
-  //   _recovery = recovery
-  //   _backend.start_log_replay()
-
+  //!@
   be log_replay_finished() =>
-    //!@
     None
-    //!@
-    // for r in _resilients.values() do
-    //   r.log_replay_finished()
-    // end
-
-    // match _recovery
-    // | let r: Recovery =>
-    //   r.log_replay_finished()
-    // else
-    //   Fail()
-    // end
-
+  //!@
   be replay_log_entry(resilient_id: RoutingId,
     uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq val)
   =>
     None
-    //!@
-    // try
-    //   _resilients(resilient_id)?.replay_log_entry(uid, frac_ids,
-    //     statechange_id, payload)
-    // else
-    //   @printf[I32](("FATAL: Unable to replay event log, because a replay " +
-    //     "buffer has disappeared").cstring())
-    //   Fail()
-    // end
-
+  //!@
   be initialize_seq_ids(seq_ids: Map[RoutingId, SeqId] val) =>
-    //!@
     None
-    // for (resilient_id, seq_id) in seq_ids.pairs() do
-    //   try
-    //     _resilients(resilient_id)?.initialize_seq_id_on_recovery(seq_id)
-    //   else
-    //     @printf[I32](("Could not initialize seq id " + seq_id.string() +
-    //       ". Resilient " + resilient_id.string() + " does not exist\n")
-    //       .cstring())
-    //     Fail()
-    //   end
-    // end
+
+
 
 
 

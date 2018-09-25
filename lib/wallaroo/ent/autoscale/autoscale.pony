@@ -221,7 +221,6 @@ class Autoscale
   fun ref begin_join_migration(joining_workers: Array[WorkerName] val,
     checkpoint_id: CheckpointId)
   =>
-    @printf[I32]("!@ ---> begin_join_migration\n".cstring())
     _phase = _WaitingForJoinMigration(this, _auth, joining_workers
       where is_coordinator = false)
     _router_registry.begin_join_migration(joining_workers,
@@ -230,7 +229,6 @@ class Autoscale
   fun ref prepare_grow_migration(
     joining_workers: Array[WorkerName] val)
   =>
-    @printf[I32]("!@ ---> initiate_stop_the_world_for_join_migration\n".cstring())
     _phase = _WaitingForJoinMigration(this, _auth, joining_workers
       where is_coordinator = true)
     // TODO: For now, we're handing control of the join protocol over to
@@ -254,7 +252,6 @@ class Autoscale
   fun ref send_migration_batch_complete(joining_workers: Array[WorkerName] val,
     is_coordinator: Bool)
   =>
-    @printf[I32]("!@ ---> send_migration_batch_complete\n".cstring())
     _phase = _WaitingForJoinMigrationAcks(this, _auth, joining_workers,
       is_coordinator)
     for target in joining_workers.values() do
@@ -307,12 +304,6 @@ class Autoscale
     _phase = _InitiatingShrink(this, remaining_workers, leaving_workers)
     _router_registry.initiate_shrink(remaining_workers, leaving_workers)
 
-    //!@
-  // fun ref prepare_shrink(remaining_workers: Array[WorkerName] val,
-  //   leaving_workers: Array[WorkerName] val)
-  // =>
-  //   _phase = _ShrinkInProgress(this, remaining_workers, leaving_workers)
-
   fun ref begin_leaving_migration(remaining_workers: Array[WorkerName] val) =>
     _phase = _WaitingForLeavingMigration(this, remaining_workers)
 
@@ -322,7 +313,6 @@ class Autoscale
   fun ref all_leaving_workers_finished(leaving_workers: Array[WorkerName] val,
     is_coordinator: Bool = false)
   =>
-    @printf[I32]("!@ Autoscale: all_leaving_workers_finished\n".cstring())
     _phase = _WaitingForResumeTheWorld(this, _auth, is_coordinator)
     _router_registry.all_leaving_workers_finished(leaving_workers)
 
@@ -696,7 +686,6 @@ class _WaitingForConnections is _AutoscalePhase
     @printf[I32](("AUTOSCALE: Waiting for %s current workers to connect " +
       "to joining workers.\n").cstring(),
       _connecting_worker_count.string().cstring())
-    @printf[I32]("!@ -- current_worker_count: %s\n".cstring(), current_worker_count.string().cstring())
 
   fun name(): String => "WaitingForConnections"
 
@@ -704,7 +693,6 @@ class _WaitingForConnections is _AutoscalePhase
     """
     Indicates that another worker has connected to joining workers.
     """
-    @printf[I32]("!@ worker_connected_to_joining_workers from %s\n".cstring(), worker.cstring())
     _connected_workers.set(worker)
     if _connected_workers.size() == _connecting_worker_count then
       _autoscale.prepare_grow_migration(_new_workers)
@@ -946,7 +934,6 @@ class _ShrinkInProgress is _AutoscalePhase
   fun name(): String => "ShrinkInProgress"
 
   fun ref leaving_worker_finished_migration(worker: WorkerName) =>
-    @printf[I32]("!@ autoscale: leaving_worker_finished_migration from %s\n".cstring(), worker.cstring())
     ifdef debug then
       Invariant(_leaving_workers_waiting_list.size() > 0)
     end
@@ -976,7 +963,6 @@ class _WaitingForLeavingMigration is _AutoscalePhase
     None
 
   fun ref all_key_migration_complete() =>
-    @printf[I32]("!@ AUTOSCALENOTES: Leaving worker all_key_migration_complete\n".cstring())
     _autoscale.wait_for_leaving_migration_acks(_remaining_workers)
 
 class _WaitingForLeavingMigrationAcks is _AutoscalePhase
@@ -1034,7 +1020,6 @@ class _WaitingForResumeTheWorld is _AutoscalePhase
 
   fun ref autoscale_complete() =>
     if _is_coordinator then
-      @printf[I32]("!@ _WaitingForResumeTheWorld AUTOSCALE: sending out autoscale complete messages\n".cstring())
       try
         let msg = ChannelMsgEncoder.autoscale_complete(_auth)?
         _autoscale.send_control_to_cluster(msg)

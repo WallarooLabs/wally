@@ -161,7 +161,10 @@ class _RollbackLocalKeys is _RecoveryPhase
 
   fun ref worker_ack_local_keys_rollback(w: WorkerName, checkpoint_id: CheckpointId)
   =>
-    @printf[I32]("!@ _RollbackLocalKeys rcvd ack from %s\n".cstring(), w.cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("_RollbackLocalKeys rcvd ack from %s\n".cstring(),
+        w.cstring())
+    end
     //!@ Should we just ignore misses here (which indicate an overlapping
     // recovery)?
     if checkpoint_id == _checkpoint_id then
@@ -177,9 +180,12 @@ class _RollbackLocalKeys is _RecoveryPhase
   fun ref _check_completion() =>
     if _workers.size() == _acked_workers.size() then
       _recovery._local_keys_rollback_complete()
-    //!@
     else
-      @printf[I32]("!@ _RollbackTopology: %s acked out of %s\n".cstring(), _acked_workers.size().string().cstring(), _workers.size().string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("_RollbackTopology: %s acked out of %s\n".cstring(),
+          _acked_workers.size().string().cstring(),
+          _workers.size().string().cstring())
+      end
     end
 
 class _RollbackBarrier is _RecoveryPhase

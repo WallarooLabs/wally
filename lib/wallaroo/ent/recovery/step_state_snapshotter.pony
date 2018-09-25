@@ -26,18 +26,25 @@ primitive StepStateCheckpointer
   fun apply(runner: Runner, id: RoutingId, checkpoint_id: CheckpointId,
     event_log: EventLog, wb: Writer = Writer)
   =>
-    @printf[I32]("!@ StepStateCheckpointer apply()\n".cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("StepStateCheckpointer apply()\n".cstring())
+    end
     match runner
     | let r: SerializableStateRunner =>
       let serialized: ByteSeq val = r.serialize_state()
-      @printf[I32]("!@ -- Got %s serialized bytes\n".cstring(), serialized.size().string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("-- Got %s serialized bytes\n".cstring(),
+          serialized.size().string().cstring())
+      end
       wb.write(serialized)
       let payload = wb.done()
-      // @printf[I32]("!@ State Step %s calling EventLog.checkpoint_state()\n".cstring(), id.string().cstring())
       event_log.checkpoint_state(id, checkpoint_id, consume payload)
     else
       // Currently, non-state steps don't have anything to checkpoint.
-      @printf[I32]("!@ Stateless Step %s calling EventLog.checkpoint_state()\n".cstring(), id.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("Stateless Step %s calling EventLog.checkpoint_state()\n"
+          .cstring(), id.string().cstring())
+      end
       event_log.checkpoint_state(id, checkpoint_id,
         recover val Array[ByteSeq] end)
     end

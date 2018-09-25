@@ -27,7 +27,10 @@ class ActiveBarriers
 
   fun ref add_barrier(barrier_token: BarrierToken, handler: BarrierHandler) ?
   =>
-    @printf[I32]("!@ ACTIVE_BARRIERS: Adding barrier %s\n".cstring(), barrier_token.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("ACTIVE_BARRIERS: Adding barrier %s\n".cstring(),
+        barrier_token.string().cstring())
+    end
     if _barriers.contains(barrier_token) then
       try
         let old_handler = _barriers(barrier_token)?
@@ -44,7 +47,10 @@ class ActiveBarriers
   fun ref remove_barrier(barrier_token: BarrierToken) ? =>
     if _barriers.contains(barrier_token) then
       try
-        @printf[I32]("!@ ACTIVE_BARRIERS: Removing barrier %s\n".cstring(), barrier_token.string().cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("ACTIVE_BARRIERS: Removing barrier %s\n".cstring(),
+            barrier_token.string().cstring())
+        end
         _barriers.remove(barrier_token)?
       else
         Fail()
@@ -107,5 +113,7 @@ class ActiveBarriers
     end
 
   fun ref clear() =>
-    @printf[I32]("!@ ACTIVE_BARRIERS: Clearing!!\n".cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("ACTIVE_BARRIERS: Clearing!!\n".cstring())
+    end
     _barriers.clear()

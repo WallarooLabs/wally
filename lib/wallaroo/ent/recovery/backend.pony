@@ -231,10 +231,6 @@ class FileBackend is Backend
       Fail()
     end
 
-    @printf[I32](("!@ Backend: Found end of entries for checkpoint %s" +
-      " between offset %d and %d.\n").cstring(),
-      current_checkpoint_id.string().cstring(), target_checkpoint_offset_start,
-      target_checkpoint_offset_end)
     _file.seek_start(target_checkpoint_offset_start)
 
     while _file.position() < target_checkpoint_offset_end do
@@ -255,7 +251,7 @@ class FileBackend is Backend
         // put entry into temporary recovered buffer
         replay_buffer.push((resilient_id, payload))
       | _LogCheckpointIdEntry =>
-        break      
+        break
       | _LogRestartEntry =>
         replay_buffer.clear()
         _file.seek(_restart_len.isize() - 1)
@@ -580,7 +576,7 @@ class AsyncJournalledFile
       _file.dispose()
     end
 
-  fun ref errno(): (FileOK val | FileError val | FileEOF val | 
+  fun ref errno(): (FileOK val | FileError val | FileEOF val |
     FileBadFileNumber val | FileExists val | FilePermissionDenied val)
   =>
     // TODO journal!  Perhaps fake a File* error if journal write failed?

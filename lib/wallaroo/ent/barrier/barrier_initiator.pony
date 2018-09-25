@@ -85,7 +85,6 @@ actor BarrierInitiator is Initializable
     end
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("!@ application_begin_reporting BarrierInitiator\n".cstring())
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
@@ -110,7 +109,6 @@ actor BarrierInitiator is Initializable
     _sources(source_id) = source
 
   be unregister_source(source: Source, source_id: RoutingId) =>
-    @printf[I32]("!@ BarrierInitiator: Unregistering source\n".cstring())
     try
       _sources.remove(source_id)?
     else
@@ -118,7 +116,9 @@ actor BarrierInitiator is Initializable
     end
 
   be add_worker(w: String) =>
-    @printf[I32]("!@ BarrierInitiator: add_worker %s\n".cstring(), w.cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("BarrierInitiator: add_worker %s\n".cstring(), w.cstring())
+    end
     if _active_barriers.barrier_in_progress() then
       @printf[I32]("add_worker called while barrier is in progress\n"
         .cstring())
@@ -127,7 +127,10 @@ actor BarrierInitiator is Initializable
     _workers.set(w)
 
   be remove_worker(w: String) =>
-    @printf[I32]("!@ BarrierInitiator: remove_worker %s\n".cstring(), w.cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("BarrierInitiator: remove_worker %s\n".cstring(),
+        w.cstring())
+    end
     if _active_barriers.barrier_in_progress() then
       @printf[I32]("remove_worker called while barrier is in progress\n"
         .cstring())
@@ -167,7 +170,10 @@ actor BarrierInitiator is Initializable
     """
     Called to begin the barrier protocol for a new barrier token.
     """
-    @printf[I32]("!@ Injecting barrier %s\n".cstring(), barrier_token.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Injecting barrier %s\n".cstring(),
+        barrier_token.string().cstring())
+    end
     if _primary_worker == _worker_name then
       // We handle rollback barrier token as a special case. That's because
       // in the presence of a rollback token, we need to cancel all other
@@ -214,7 +220,10 @@ actor BarrierInitiator is Initializable
     this one is complete or, if `wait_for_token` is specified, once
     the specified token is received.
     """
-    @printf[I32]("!@ Injecting blocking barrier %s\n".cstring(), barrier_token.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Injecting blocking barrier %s\n".cstring(),
+        barrier_token.string().cstring())
+    end
     if _primary_worker == _worker_name then
       // We handle rollback barrier token as a special case. That's because
       // in the presence of a rollback token, we need to cancel all other
@@ -278,21 +287,15 @@ actor BarrierInitiator is Initializable
 
     try
       if _workers.size() > 1 then
-        // @printf[I32]("!@ Sending remote initiate barrier for %s\n".cstring(), barrier_token.string().cstring())
         let msg = ChannelMsgEncoder.remote_initiate_barrier(_worker_name,
           barrier_token, _auth)?
         for w in _workers.values() do
           if w != _worker_name then _connections.send_control(w, msg) end
         end
-      else
-        //!@
-        None
-        // @printf[I32]("!@ Not sending remote initiate barrier because there's only one worker!\n".cstring())
       end
     else
       Fail()
     end
-    // @printf[I32]("!@ About to call worker_ack_barrier_start on handler for %s\n".cstring(), barrier_token.string().cstring())
     _active_barriers.worker_ack_barrier_start(_worker_name, barrier_token)
 
   fun ref _clear_barriers() =>
@@ -320,8 +323,6 @@ actor BarrierInitiator is Initializable
   be remote_initiate_barrier(primary_worker: String,
     barrier_token: BarrierToken)
   =>
-    // @printf[I32]("!@ remote_initiate_barrier called for %s\n".cstring(), barrier_token.string().cstring())
-
     // If we're in recovery mode, we might need to collect some rollback
     // acks before we receive a remote_initiate_barrier.
     var pending_acks: (PendingRollbackBarrierAcks | None) = None
@@ -339,7 +340,10 @@ actor BarrierInitiator is Initializable
       if _phase.higher_priority(srt) then
         _clear_barriers()
         pending_acks = _phase.pending_rollback_barrier_acks()
-        @printf[I32]("!@ Switching to _RollbackBarrierInitiatorPhase for %s\n".cstring(), srt.string().cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("Switching to _RollbackBarrierInitiatorPhase for %s\n"
+            .cstring(), srt.string().cstring())
+        end
         _phase = _RollbackBarrierInitiatorPhase(this, srt)
       end
     | let srrt: CheckpointRollbackResumeBarrierToken =>
@@ -363,7 +367,9 @@ actor BarrierInitiator is Initializable
 
     match pending_acks
     | let pa: PendingRollbackBarrierAcks =>
-      @printf[I32]("!@ Flushing PendingRollbackBarrierAcks\n".cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("Flushing PendingRollbackBarrierAcks\n".cstring())
+      end
       pa.flush(barrier_token, _active_barriers)
     end
 
@@ -380,7 +386,6 @@ actor BarrierInitiator is Initializable
     end
 
   be worker_ack_barrier_start(w: String, token: BarrierToken) =>
-    // @printf[I32]("!@ _worker_ack_barrier_start called for %s\n".cstring(), w.cstring())
     _phase.worker_ack_barrier_start(w, token, _active_barriers)
 
   fun confirm_start_barrier(barrier_token: BarrierToken) =>
@@ -405,7 +410,9 @@ actor BarrierInitiator is Initializable
         InProgressPrimaryBarrierHandler(_worker_name, this, barrier_token,
           acked_sinks, acked_ws, _sinks, _workers, result_promise)
       else
-        @printf[I32]("!@ Phase transition to SecondaryBarrierHandler for token %s with primary worker being %s\n".cstring(), barrier_token.string().cstring(), primary_worker.cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("Phase transition to SecondaryBarrierHandler for token %s with primary worker being %s\n".cstring(), barrier_token.string().cstring(), primary_worker.cstring())
+        end
         InProgressSecondaryBarrierHandler(this, barrier_token, acked_sinks,
           _sinks, primary_worker)
       end
@@ -415,12 +422,18 @@ actor BarrierInitiator is Initializable
       Fail()
     end
 
-    @printf[I32]("!@ calling initiate_barrier at %s BarrierSources\n".cstring(), _barrier_sources.size().string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Calling initiate_barrier at %s BarrierSources\n".cstring(),
+        _barrier_sources.size().string().cstring())
+    end
     for b_source in _barrier_sources.values() do
       b_source.initiate_barrier(barrier_token)
     end
 
-    @printf[I32]("!@ calling initiate_barrier at %s sources\n".cstring(), _sources.size().string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("Calling initiate_barrier at %s sources\n".cstring(),
+        _sources.size().string().cstring())
+    end
     for s in _sources.values() do
       s.initiate_barrier(barrier_token)
     end
@@ -433,11 +446,13 @@ actor BarrierInitiator is Initializable
     Called by sinks when they have received barrier barriers on all
     their inputs.
     """
-    @printf[I32]("!@ BarrierInitiator: ack_barrier on %s\n".cstring(), _phase.name().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("BarrierInitiator: ack_barrier on %s\n".cstring(),
+        _phase.name().cstring())
+    end
     _phase.ack_barrier(s, barrier_token, _active_barriers)
 
   be worker_ack_barrier(w: String, barrier_token: BarrierToken) =>
-    // @printf[I32]("!@ Rcvd worker_ack_barrier from %s\n".cstring(), w.cstring())
     _phase.worker_ack_barrier(w, barrier_token, _active_barriers)
 
   fun ref all_primary_sinks_acked(barrier_token: BarrierToken,
@@ -465,7 +480,10 @@ actor BarrierInitiator is Initializable
     the primary worker that started this barrier in the first place.
     We are finished processing that barrier.
     """
-    @printf[I32]("!@ all_secondary_sinks_acked for %s\n".cstring(), barrier_token.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("all_secondary_sinks_acked for %s\n".cstring(),
+        barrier_token.string().cstring())
+    end
     try
       let msg = ChannelMsgEncoder.worker_ack_barrier(_worker_name,
         barrier_token, _auth)?
@@ -475,8 +493,6 @@ actor BarrierInitiator is Initializable
       else
         Fail()
       end
-      //!@ WHA!?
-      // check()
     else
       Fail()
     end
@@ -488,7 +504,6 @@ actor BarrierInitiator is Initializable
     All in flight acks have been received. Revert to waiting state
     and trigger the BarrierResultPromise.
     """
-    // @printf[I32]("!@ all_workers_acked\n".cstring())
     try
       _active_barriers.remove_barrier(barrier_token)?
     else
@@ -519,7 +534,6 @@ actor BarrierInitiator is Initializable
     _phase.barrier_complete(barrier_token)
 
   fun ref next_token() =>
-    // @printf[I32]("!@ next_token(): _pending %s\n".cstring(), _pending.size().string().cstring())
     _phase = _NormalBarrierInitiatorPhase(this)
     if _pending.size() > 0 then
       try
@@ -556,12 +570,6 @@ actor BarrierInitiator is Initializable
   be dispose() =>
     @printf[I32]("Shutting down BarrierInitiator\n".cstring())
     None
-
-  //!@
-  // be check() =>
-  //   //!@ What sort of bug is this!?
-  //   _barrier_handler = WaitingBarrierHandler
-  //   @printf[I32]("!@ --- STILL? Switched to %s\n".cstring(), _barrier_handler.name().cstring())
 
 /////////////////////////////////////////////////////////////////////////////
 // TODO: Replace using this with the badly named SetIs once we address a bug

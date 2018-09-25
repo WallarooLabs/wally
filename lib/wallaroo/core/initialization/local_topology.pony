@@ -918,8 +918,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             end
           end
 
-        //!@ This needs to take account of keys
-        if t.is_empty() then
+        if t.is_empty() and (local_keys.size() == 0) then
           @printf[I32]("----This worker has no steps----\n".cstring())
         end
 

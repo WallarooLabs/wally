@@ -84,7 +84,6 @@ actor CheckpointInitiator is Initializable
     _the_journal = the_journal
     _do_local_file_io = do_local_file_io
     _is_recovering = is_recovering
-    @printf[I32]("!@ CheckpointInitiator: is_recovering: %s\n".cstring(), _is_recovering.string().cstring())
     _event_log.set_checkpoint_initiator(this)
 
   be initialize_checkpoint_id(
@@ -96,10 +95,16 @@ actor CheckpointInitiator is Initializable
     """
     match ids
     | (let cid: CheckpointId, let rid: RollbackId) =>
-      @printf[I32]("!@ CheckpointInitiator: initializing cid/rid to %s/%s\n".cstring(), cid.string().cstring(), rid.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("CheckpointInitiator: initializing cid/rid to %s/%s\n"
+          .cstring(), cid.string().cstring(), rid.string().cstring())
+      end
       ifdef "resilience" then
         _commit_checkpoint_id(cid, rid)
-        @printf[I32]("!@ -- Writing cid %s to event log\n".cstring(), _current_checkpoint_id.string().cstring())
+        ifdef "checkpoint_trace" then
+          @printf[I32]("-- Writing cid %s to event log\n".cstring(),
+            _current_checkpoint_id.string().cstring())
+        end
         _event_log.write_initial_checkpoint_id(_current_checkpoint_id)
       end
     else
@@ -116,7 +121,6 @@ actor CheckpointInitiator is Initializable
     end
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
-    @printf[I32]("!@ application_begin_reporting CheckpointInitiator\n".cstring())
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
@@ -138,11 +142,17 @@ actor CheckpointInitiator is Initializable
   fun workers(): _StringSet box => _workers
 
   be add_worker(w: String) =>
-    @printf[I32]("!@ CheckpointInitiator: add_worker %s\n".cstring(), w.cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("CheckpointInitiator: add_worker %s\n".cstring(),
+        w.cstring())
+    end
     _workers.set(w)
 
   be remove_worker(w: String) =>
-    @printf[I32]("!@ CheckpointInitiator: remove_worker %s\n".cstring(), w.cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("CheckpointInitiator: remove_worker %s\n".cstring(),
+        w.cstring())
+    end
     _workers.unset(w)
 
   be lookup_next_checkpoint_id(p: Promise[CheckpointId]) =>
@@ -170,11 +180,13 @@ actor CheckpointInitiator is Initializable
       _clear_pending_checkpoints()
       _current_checkpoint_id = _current_checkpoint_id + 1
 
-      //!@
-      (let s, let ns) = Time.now()
-      let us = ns / 1000
-      let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
-      @printf[I32]("!@ Initiating checkpoint %s at %s\n".cstring(), _current_checkpoint_id.string().cstring(), ts.string().cstring())
+      ifdef "checkpoint_trace" then
+        (let s, let ns) = Time.now()
+        let us = ns / 1000
+        let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
+        @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
+          _current_checkpoint_id.string().cstring(), ts.string().cstring())
+      end
 
       let event_log_promise = Promise[CheckpointId]
       event_log_promise.next[None](
@@ -200,7 +212,9 @@ actor CheckpointInitiator is Initializable
     end
 
   be resume_checkpoint() =>
-    @printf[I32]("!@ CheckpointInitiator: resume_checkpoint()\n".cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("CheckpointInitiator: resume_checkpoint()\n".cstring())
+    end
     if _is_active and (_worker_name == _primary_worker) then
       _clear_pending_checkpoints()
       let promise = Promise[BarrierToken]
@@ -256,7 +270,10 @@ actor CheckpointInitiator is Initializable
   fun ref event_log_write_checkpoint_id(checkpoint_id: CheckpointId,
     token: CheckpointBarrierToken, repeating: Bool)
   =>
-    @printf[I32]("!@ CheckpointInitiator: event_log_write_checkpoint_id()\n".cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("CheckpointInitiator: event_log_write_checkpoint_id()\n"
+        .cstring())
+    end
     let promise = Promise[CheckpointId]
     promise.next[None](
       recover this~event_log_id_written(_worker_name) end)
@@ -282,7 +299,10 @@ actor CheckpointInitiator is Initializable
         match token
         | let st: CheckpointBarrierToken =>
           if st.id != _current_checkpoint_id then Fail() end
-          @printf[I32]("!@ CheckpointInitiator: Checkpoint %s is complete!\n".cstring(), st.id.string().cstring())
+          ifdef "checkpoint_trace" then
+            @printf[I32]("CheckpointInitiator: Checkpoint %s is complete!\n".
+              cstring(), st.id.string().cstring())
+          end
           _save_checkpoint_id(st.id, _last_rollback_id)
           _last_complete_checkpoint_id = st.id
 
@@ -297,7 +317,10 @@ actor CheckpointInitiator is Initializable
           // Prepare for next checkpoint
           if repeating and _is_active and (_worker_name == _primary_worker)
           then
-            @printf[I32]("!@ Creating _InitiateCheckpoint timer for future checkpoint %s\n".cstring(), (_current_checkpoint_id + 1).string().cstring())
+            ifdef "checkpoint_trace" then
+              @printf[I32]("Creating _InitiateCheckpoint timer for future checkpoint %s\n".cstring(),
+                (_current_checkpoint_id + 1).string().cstring())
+            end
             let t = Timer(_InitiateCheckpoint(this, _checkpoint_group),
               _time_between_checkpoints)
             _timers(consume t)
@@ -337,7 +360,9 @@ actor CheckpointInitiator is Initializable
       let rollback_id = _last_rollback_id + 1
       _last_rollback_id = rollback_id
 
-      @printf[I32]("!@ !!!!CheckpointInitiator: initiate_rollback %s on behalf of %s!!!!\n".cstring(), rollback_id.string().cstring(), worker.cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("CheckpointInitiator: initiate_rollback %s on behalf of %s\n".cstring(), rollback_id.string().cstring(), worker.cstring())
+      end
 
       let token = CheckpointRollbackBarrierToken(rollback_id,
         _last_complete_checkpoint_id)
@@ -394,7 +419,10 @@ actor CheckpointInitiator is Initializable
     rollback_id: RollbackId)
   =>
     try
-      @printf[I32]("!@ Saving CheckpointId %s and RollbackId %s\n".cstring(), checkpoint_id.string().cstring(), rollback_id.string().cstring())
+      ifdef "checkpoint_trace" then
+        @printf[I32]("Saving CheckpointId %s and RollbackId %s\n".cstring(),
+          checkpoint_id.string().cstring(), rollback_id.string().cstring())
+      end
       let filepath = FilePath(_auth, _checkpoint_id_file)?
       // TODO: We'll need to rotate this file since it will grow.
       // !@ Hold onto this in a field so we don't open it every time.
@@ -415,7 +443,6 @@ actor CheckpointInitiator is Initializable
     end
 
   fun ref _load_latest_checkpoint_id() =>
-    @printf[I32]("!@ Loading _load_latest_checkpoint_id\n".cstring())
     (let checkpoint_id, let rollback_id) =
       LatestCheckpointId.read(_auth, _checkpoint_id_file)
     _current_checkpoint_id = checkpoint_id
@@ -438,11 +465,8 @@ primitive LatestCheckpointId
         file.seek(-16)
         let r = Reader
         r.append(file.read(16))
-        //!@
         let checkpoint_id = r.u64_be()?
-        @printf[I32]("!@ Loaded CheckpointId: %s\n".cstring(), checkpoint_id.string().cstring())
         let rollback_id = r.u64_be()?
-        @printf[I32]("!@ Loaded RollbackId: %s\n".cstring(), rollback_id.string().cstring())
         (checkpoint_id, rollback_id)
       else
         @printf[I32]("No latest checkpoint id in recovery file.\n".cstring())

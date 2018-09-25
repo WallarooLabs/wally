@@ -239,17 +239,6 @@ actor DataReceiver is (Producer)
   /////////////////////////////////////////////////////////////////////////////
   // CONNECTION
   /////////////////////////////////////////////////////////////////////////////
-
-    //!@ Don't think we need this anymore
-  // be start_replay_processing() =>
-    //!@
-    // _processing_phase = _DataReceiverAcceptingReplaysPhase(this)
-    // If we've already received a DataConnect, then send ack
-    // match _latest_conn
-    // | let conn: DataChannel =>
-    //   _ack_data_connect()
-    // end
-
   be start_normal_message_processing() =>
     _phase = _NormalDataReceiverPhase(this)
     _inform_boundary_to_send_normal_messages()
@@ -347,9 +336,12 @@ actor DataReceiver is (Producer)
   be forward_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
-    @printf[I32]("!@ DataReceiver: forward_barrier to %s -> seq id %s, last_seen: %s\n".cstring(), target_step_id.string().cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("DataReceiver: forward_barrier to %s -> seq id %s, last_seen: %s\n".cstring(),
+        target_step_id.string().cstring(), seq_id.string().cstring(),
+        _last_id_seen.string().cstring())
+    end
     if seq_id > _last_id_seen then
-      // @printf[I32]("!@ DataReceiver: received token %s from %s at DataReceiver %s\n".cstring(), barrier_token.string().cstring(), origin_step_id.string().cstring(), _id.string().cstring())
       match barrier_token
       //!@ This isn't good enough. We need to ensure that we've been overriden
       // to make this change back from recovery phase. As it stands, this
@@ -360,9 +352,6 @@ actor DataReceiver is (Producer)
       end
 
       _forward_barrier(target_step_id, origin_step_id, barrier_token, seq_id)
-    //!@
-    // else
-      // @printf[I32]("!@ Dropping barrier because seq_id is %s and last_seen is %s\n".cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
     end
 
   fun ref _forward_barrier(target_step_id: RoutingId,
@@ -373,7 +362,6 @@ actor DataReceiver is (Producer)
   fun ref send_barrier(target_step_id: RoutingId, origin_step_id: RoutingId,
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
-    // @printf[I32]("!@ DataReceiver: send_barrier %s -> seq id %s, last_seen: %s\n".cstring(), barrier_token.string().cstring(), seq_id.string().cstring(), _last_id_seen.string().cstring())
     if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
