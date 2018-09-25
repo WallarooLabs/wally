@@ -82,13 +82,13 @@ declare -a DISTROS_TO_TEST=(
 "ubuntu:xenial,ubuntu/xenial64"
 "ubuntu:bionic,ubuntu/bionic64"
 "ubuntu:artful,ubuntu/artful64"
-"centos:7,centos-7"
+"centos:7,centos/7"
 "fedora:26,fedora/26-cloud-base"
 "fedora:27,fedora/27-cloud-base"
 "fedora:28,fedora/28-cloud-base"
 "amazonlinux:2,gbailey/amzn2"
 "oraclelinux:7,generic/oracle7"
-"debian:buster,debian/testing64"
+"debian:buster,fujimakishouten/debian-buster64"
 )
 
 # set some linux/mac specific stuff
@@ -201,12 +201,23 @@ run_vagrant() {
   fi
 
   # edit vagrant file to add wallaroo synced folder and memory needed
-  sed "${SED_ARGS}" -e "s@^end@  config.vm.synced_folder '${WALLAROO_DIR}', '${WALLAROO_DIR}';  config.vm.provider 'virtualbox' do |vb|    vb.memory = 4084  end  end@" Vagrantfile
+  if [[ "$vagrant_distro" == "generic/oracle7" ]]; then
+    sed "${SED_ARGS}" -e "s@^end@  config.vbguest.auto_update = false;  config.vm.synced_folder '${WALLAROO_DIR}', '${WALLAROO_DIR}';  config.vm.provider 'virtualbox' do |vb|    vb.memory = 4084  end  end@" Vagrantfile
+  else
+    sed "${SED_ARGS}" -e "s@^end@  config.vm.synced_folder '${WALLAROO_DIR}', '${WALLAROO_DIR}';  config.vm.provider 'virtualbox' do |vb|    vb.memory = 4084  end  end@" Vagrantfile
+  fi
 
   # start vagrant box; destroy it if it doesn't start successfully
   if ! vagrant up 2>&1 | tee -a "$LOG_FILE"; then
-    vagrant destroy -f 2>&1 | tee -a "$LOG_FILE"
-    return
+    if ! vagrant halt 2>&1 | tee -a "$LOG_FILE"; then
+      vagrant destroy -f 2>&1 | tee -a "$LOG_FILE"
+      return
+    fi
+
+    if ! vagrant up 2>&1 | tee -a "$LOG_FILE"; then
+      vagrant destroy -f 2>&1 | tee -a "$LOG_FILE"
+      return
+    fi
   fi
 
   # ssh into vagrant and run the command to test everything; destroy the vagrant box if there's an error
@@ -298,9 +309,28 @@ done
 
 print_results
 
-# TODO: Add ability to test parts of the wallaroo book (install from source, vagrant, run an application, etc) where possible.
-# TODO: add ability to test wallaroo vagrant box
-# TODO: add ability to test wallaroo docker container
+# TODO: Add ability to test parts of the wallaroo book (install from source, vagrant, run an application, etc) where possible. (NOTE: this requires doing a search/replace of the book variables first to get good/working instructions from the md files)
+# TODO: add ability to test wallaroo-up (both go and python)(for all distributions supported?)
+## simulate steps from wallaroo-up-setup then run an application then run example tester then kill vagrant box to clean up
+# TODO: add ability to test wallaroo vagrant box (both go and python)
+## install prereqs for env (vagrant/virtualbox) then simulate steps from vagrant-setup then run an application then run example tester then kill vagrant box to clean up
+# TODO: add ability to test wallaroo install from source (both go and python and all ubuntu versions officially supported)
+## simulate steps from install from source then run an application then run example tester then delete any temp files to clean up
+## this could potentially allow for adding in instructions for other distros if we want since they can be tested via automation
+# TODO: add ability to test wallaroo docker container (both go and python)
+## install prereqs for env (docker) then simulate steps from docker-setup then run an application then run example tester then delete any temp files to clean up
+# TODO: add ability to test wallaroo vagrant/docker in windows environments? (both go and python) (Vagrant?? or AWS?? or both??)
+## install prereqs for env (vagrant/virtualbox) then simulate steps from vagrant-setup then run an application then run example tester then kill vagrant box to clean up
+## install prereqs for env (docker) then simulate steps from docker-setup then run an application then run example tester then delete any temp files to clean up
+# TODO: add support for "data science"/similar type linux distros in wally up and here
+# TODO: AWS based testing
+## with RHEL 7 instance in addition to all the others (will require support in wally up)
+## ideally with parallelism (for quicker turnaround)
+# TODO: rename "release-tester" to "wallaroo-up-tester"
+# TODO: create script of shared functions to source from other scripts to avoid copy/paste (NOTE: wallaroo-up must remain fully self contained)
+# TODO: create "book-tester" (purpose: automate following instructions from book to ensure they work)
+## replace variables in book
+## run various installation types for different environments + run an application for that environment + example tester + cleanup (see earlier TODOs)
 # TODO: goal: single command to run wallaroo up and all examples (and possibly automated testing of other things also) (for docker, vagrant, wallaroo vagrant, wallaroo docker) with either custom files or normal released files (for release testing). This should run through everything and save all logs (wallaroo-up, example test logs, etc) and produce a report at the end of results of what passed/failed (optionally allow for exit on first failure). ideal case, someone can start and then go sleep and wake up to results to review for everything. should work on at least mac osx and linux. even better if it can work in a virtualized environment (probably wouldn't be able to run vagrant due to lack of nested virtualization but can try and record it didn't work for summary).
 ## after this, the release testing process would be:
 ### run this automated thing and confirm everything successful
