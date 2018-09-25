@@ -2,6 +2,8 @@
 
 set -eEuo pipefail
 
+export PATH=$PATH:/sbin
+
 # check if command exists
 have_cmd() {
   command -v "$1" > /dev/null 2>&1
@@ -60,9 +62,32 @@ if ! have_cmd docker; then
     rm docker-${DOCKERVERSION}.tgz
     DOCKER_PREFIX="bash -c "
   else
-    # if in vagrant, do a full docker install
-    curl -fsSL get.docker.com -o /tmp/get-docker.sh
-    sh /tmp/get-docker.sh
+    dist="$(. /etc/os-release && echo "$ID")"
+    case "$dist" in
+      ol)
+        sudo yum-config-manager --enable ol7_addons
+        sudo yum install -y docker
+      ;;
+      amzn)
+        sudo yum install -y docker
+      ;;
+
+      *)
+        # if in vagrant, do a full docker install
+        curl -fsSL get.docker.com -o /tmp/get-docker.sh
+        export CHANNEL=stable
+        sh /tmp/get-docker.sh
+    esac
+
+    # start docker for RPM based distros
+    if have_cmd yum; then
+      sudo systemctl start docker
+    fi
+  fi
+fi
+
+if [ ! -f /.dockerenv ]; then
+  if ! groups | grep -F "docker" > /dev/null 2>&1; then
     sudo groupadd -f docker
     sudo usermod -aG docker "$USER"
 
@@ -70,6 +95,8 @@ if ! have_cmd docker; then
     DOCKER_PREFIX="sg docker -c "
   fi
 fi
+
+echo "DOCKER_PREFIX is '${DOCKER_PREFIX}'"
 
 # get all pids that are children of current shell
 pidtree() (
@@ -95,14 +122,22 @@ pidtree() (
 function cleanup {
   set +e
   while true; do
-    pkill run_erl > /dev/null 2>&1
-    pkill epmd > /dev/null 2>&1
-    pkill sender > /dev/null 2>&1
-    pkill data_receiver > /dev/null 2>&1
+    pkill -9 run_erl > /dev/null 2>&1
+    pkill -9 epmd > /dev/null 2>&1
+    pkill -9 erl_child_setup > /dev/null 2>&1
+    pkill -9 beam.smp > /dev/null 2>&1
+    pkill -9 sender > /dev/null 2>&1
+    pkill -9 data_receiver > /dev/null 2>&1
     PIDS_TO_KILL="$(pidtree $$)"
     # shellcheck disable=SC2086
     PIDS_TO_KILL="$(ps -o pid= ${PIDS_TO_KILL})"
     if [[ "$PIDS_TO_KILL" == "" ]]; then
+      pkill -9 run_erl > /dev/null 2>&1
+      pkill -9 epmd > /dev/null 2>&1
+      pkill -9 erl_child_setup > /dev/null 2>&1
+      pkill -9 beam.smp > /dev/null 2>&1
+      pkill -9 sender > /dev/null 2>&1
+      pkill -9 data_receiver > /dev/null 2>&1
       break
     fi
     # shellcheck disable=SC2086

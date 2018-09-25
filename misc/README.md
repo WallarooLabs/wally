@@ -28,7 +28,11 @@ NOTE: This has only been tested on Linux. It may or may not work on OSX/other en
 
 The release tester is a script to automate running Wallaroo Up and all example applications for every distribution supported by Wallaroo Up. It does so by looping through a list of supported distributions and then using either Vagrant or Docker to start the appropriate environment for running Wallaroo Up and the Wallaroo example tester.
 
-The release tester requires an environment with Docker and/or Vagrant/Virtualbox installed and available with Docker set up to be run without `sudo`.
+The release tester requires an environment with Docker and/or Vagrant/Virtualbox installed and available with Docker set up to be run without `sudo`. Vagrant also requires the `vagrant-vbguest` plugin to be install. It can be installed via the following command:
+
+```
+vagrant plugin install vagrant-vbguest
+```
 
 You can run the release tester on any Wallaroo source tree via the following command:
 
