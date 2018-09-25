@@ -41,9 +41,6 @@ RUN apt-get install -y \
     mkdir /wallaroo-bin && \
     cp docker/env-setup /wallaroo-bin && \
     make clean && \
-    make target_cpu=x86-64 build-machida-all resilience=on && \
-    cp machida/build/machida bin/machida-resilience && \
-    make clean && \
     mkdir /src && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get -y autoremove --purge && \

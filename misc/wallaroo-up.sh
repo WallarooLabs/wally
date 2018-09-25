@@ -681,7 +681,11 @@ configure_wallaroo() {
       log "Compiling Machida for running Python Wallaroo Applications..."
     fi
 
+    run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all resilience=on $REDIRECT"
+    run_cmd "mv machida/build/machida bin/machida-resilience $REDIRECT"
     run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all $REDIRECT"
+    run_cmd "cp machida/build/machida bin $REDIRECT"
+    run_cmd "cp -r machida/lib bin/pylib $REDIRECT"
   fi
 
   # copy binaries to the bin directory
@@ -690,11 +694,6 @@ configure_wallaroo() {
   run_cmd "cp utils/cluster_shrinker/cluster_shrinker bin $REDIRECT"
   run_cmd "cp giles/sender/sender bin $REDIRECT"
   run_cmd "ln -s metrics_ui/AppRun bin/metrics_reporter_ui $REDIRECT"
-
-  if [ "$PYTHON_INSTALL" == "true" ]; then
-    run_cmd "cp machida/build/machida bin $REDIRECT"
-    run_cmd "cp -r machida/lib bin/pylib $REDIRECT"
-  fi
 
   # clean up built artifacts
   run_cmd "make clean $REDIRECT $REDIRECT"
