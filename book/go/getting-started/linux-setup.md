@@ -81,6 +81,12 @@ gcc --version
 To upgrade to GCC 5 if you don't have at least GCC 4.7:
 
 ```bash
+sudo apt-get install software-properties-common
+```
+
+then
+
+```bash
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
 ```
 
