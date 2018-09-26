@@ -2,11 +2,9 @@
 
 To get you up and running quickly with Wallaroo, we have provided a Vagrantfile which includes Wallaroo and related tools needed to run and modify a few example applications. We should warn that this Vagrantfile was created with the intent of getting users started quickly with Wallaroo and is not intended to be suitable for production. Wallaroo in Vagrant runs on Ubuntu Linux Xenial.
 
-**Note:** For Windows users, this section of the guide assumes you are using Powershell.
-
 ## Set up Environment for the Wallaroo Tutorial
 
-### Linux Ubuntu, MacOS, and Windows via Powershell
+### Linux Ubuntu and MacOS
 
 If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
 
@@ -24,6 +22,28 @@ mkdir wallaroo-{{ book.wallaroo_version }}
 tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
 rm wallaroo-{{ book.wallaroo_version }}.tar.gz
 cd wallaroo-{{ book.wallaroo_version }}
+```
+
+### Windows via Powershell
+
+**Note:** This section of the guide assumes you are using Powershell.
+
+Download and install git from [Git for Windows](https://gitforwindows.org/) and install it.
+
+If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
+
+```bash
+cd ~/
+mkdir ~/wallaroo-tutorial
+cd ~/wallaroo-tutorial
+```
+
+This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
+
+```bash
+git clone https://github.com/WallarooLabs/wallaroo wallaroo-{{ book.wallaroo_version }}
+cd wallaroo-{{ book.wallaroo_version }}
+git checkout {{ book.wallaroo_version }}
 ```
 
 ## Installing VirtualBox
