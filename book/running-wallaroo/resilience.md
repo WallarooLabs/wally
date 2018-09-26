@@ -4,7 +4,7 @@ Wallaroo is designed with built-in resilience. However, since the operations inv
 
 ## How Does Wallaroo Implement Resilience
 
-Wallaroo's resilience is based on the Chandy-Lamport snapshotting algorithm that minimizes the impact of checkpointing on processing in-flight messages. Each worker maintains a resilience file, where it periodically saves a snapshot of its latest state. A checkpoint represents a consistent recovery line—a specific generation of individual worker snapshots. This means that when a failed worker recover, we can roll back the states in the cluster to the last checkpoint and begin processing again with the guarantee that all state in the system reflects a causally consistent history. The interval between checkpoints is configurable with the `--time-between-checkpoints` command line parameter (in nanoseconds).
+Wallaroo's resilience is based on the Chandy-Lamport snapshotting algorithm that minimizes the impact of checkpointing on processing in-flight messages. Each worker maintains a resilience file, where it periodically saves a snapshot of its latest state. A checkpoint represents a consistent recovery line—a specific generation of individual worker snapshots. This means that when a failed worker recovers, we can roll back the states in the cluster to the last checkpoint and begin processing again with the guarantee that all state in the system reflects a causally consistent history. The interval between checkpoints is configurable with the `--time-between-checkpoints` command line parameter (in nanoseconds).
 
 Since recovery involves a rollback to the last successful checkpoint, any data that was processed _after_ that checkpoint will have to be resent by the sources.
 
