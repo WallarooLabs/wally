@@ -110,7 +110,12 @@ actor Startup
       let auth = _env.root as AmbientAuth
       _startup_options = WallarooConfig.wallaroo_args(_env.args)?
       _set_recovery_file_names(auth)
-      _is_recovering = is_recovering(auth)
+      _is_recovering =
+        ifdef "resilience" then
+          is_recovering(auth)
+        else
+          false
+        end
       _is_joining = (not _is_recovering) and _startup_options.is_joining
 
       if _is_joining then
