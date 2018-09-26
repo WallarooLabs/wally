@@ -25,10 +25,10 @@ RUN apt-get install -y \
     python-pip \
     python3-dev \
     python3-pip && \
-    pip2 install virtualenv virtualenvwrapper && \
-    pip2 install --upgrade pip && \
     pip3 install virtualenv virtualenvwrapper && \
     pip3 install --upgrade pip && \
+    pip2 install virtualenv virtualenvwrapper && \
+    pip2 install --upgrade pip && \
     cd /tmp && \
     curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/${WALLAROO_VERSION}/misc/wallaroo-up.sh -o wallaroo-up.sh -J -L && \
     chmod +x wallaroo-up.sh && \
