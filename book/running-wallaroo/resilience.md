@@ -16,15 +16,7 @@ For example, if we were running the bundled Python example [word_count_with_dyna
 
 ### Running the resilience example
 
-In order to run the example you will need Machida with resilience enabled, Giles Sender, Data Receiver, and the Cluster Shutdown tool. If you're using our Docker or Vagrant installation, these should already be set up.
-
-If you built Wallaroo from source, please run the following commands:
-
-    cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
-    make build-machida-all resilience=on
-    cp machida/build/machida bin/machida-resilience
-
-If you haven't yet set up wallaroo, please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to get started.
+In order to run the example you will need Machida with resilience enabled, Giles Sender, Data Receiver, and the Cluster Shutdown tool. If you haven't yet set up wallaroo, please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to get started.
 
 ### Running the example
 

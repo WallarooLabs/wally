@@ -179,6 +179,9 @@ Machida is the program that runs Wallaroo Python applications. Change to the Wal
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
+make build-machida-all resilience=on
+cp machida/build/machida bin/machida-resilience
+make clean-machida-all
 make build-machida-all
 cp machida/build/machida bin
 cp machida/wallaroo.py bin
