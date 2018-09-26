@@ -1,5 +1,9 @@
 #!/bin/bash
 
+HERE=$(dirname "$(readlink -e "${0}")")
+WALLAROO_DIR="$(readlink -e "${HERE}/..")"
+. "$(readlink -e "${WALLAROO_DIR}/bin/activate")"
+
 set -eEuo pipefail
 
 export PATH=$PATH:/sbin
@@ -169,8 +173,6 @@ log() {
 LANG_TO_TEST=${1:-*}
 EXAMPLE_TO_TEST=${2:-*}
 
-HERE=$(dirname "$(readlink -e "${0}")")
-WALLAROO_DIR="$(readlink -e "${HERE}/..")"
 SOURCE_ACTIVATE="source $(readlink -e "${WALLAROO_DIR}/bin/activate")"
 BASH_HEADER="#!/bin/bash -ex"
 
@@ -357,7 +359,7 @@ parse_and_run() {
       sleep 1
       i=1
       # look for erlang prompt in log file to confirm metrics UI is running successfully since the command forks and returns prior to the UI being up and functional
-      while [[ "$(tail -n 1 "${WALLAROO_DIR}/tmp/log/erlang.log.1")" != "iex(metrics_reporter_ui@127.0.0.1)1> " ]]; do
+      while [[ "$(tail -n 1 "${RELEASE_MUTABLE_DIR:-${WALLAROO_DIR}/tmp}/log/erlang.log.1")" != "iex(metrics_reporter_ui@127.0.0.1)1> " ]]; do
         sleep 1
         (( i=i+1 ))
         RET_CODE=0
