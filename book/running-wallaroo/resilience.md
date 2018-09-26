@@ -29,18 +29,18 @@ If you haven't yet set up wallaroo, please visit our [setup](https://docs.wallar
 ### Running the example
 
 The rest of the example should be run in the `examples/python/word_count_with_dynamic_keys` directory in the Wallaroo repository.
-You will need 4 terminals to run this example.
+You will need 4 shells to run this example.
 
 1. Create the path where the workers will save their resilience snapshots.
 
         mkdir -p /tmp/resilience-dir
 
-2. Terminal 1: Start a data receiver
+2. Shell 1: Start a data receiver
 
         cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/word_count_with_dynamic_keys
         data_receiver --listen 127.0.0.1 7002 | tee received.txt
 
-3. Terminal 2: Start initializer
+3. Shell 2: Start initializer
 
         cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/word_count_with_dynamic_keys
         machida-resilience --application-module word_count_with_dynamic_keys \
@@ -52,7 +52,7 @@ You will need 4 terminals to run this example.
           --ponythreads=1 --ponynoblock \
           | tee initializer.log
 
-4. Terminal 3: Start worker
+4. Shell 3: Start worker
 
         cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/word_count_with_dynamic_keys
         machida-resilience --application-module word_count_with_dynamic_keys \
@@ -65,7 +65,7 @@ You will need 4 terminals to run this example.
           --ponythreads=1 --ponynoblock \
           | tee worker1.log
 
-5. Terminal 4: Start sender
+5. Shell 4: Start sender
 
         cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/word_count_with_dynamic_keys
         sender --host 127.0.0.1:7010 --file count_this.txt --batch-size 5 \
@@ -73,16 +73,16 @@ You will need 4 terminals to run this example.
           --ponynoblock --repeat --no-write
 
 6. Wait a few seconds for the internal states to update and for some checkpoints to complete
-7. Terminal 4: Stop the sender (`Ctrl-C`)
-8. Terminal 4: Kill the worker to simulate a crash (using SIGKILL)
+7. Shell 4: Stop the sender (`Ctrl-C`)
+8. Shell 4: Kill the worker to simulate a crash (using SIGKILL)
 
         pkill -f -KILL machida.*worker1
 
-9. Terminal 4: Send some data directly to our data receiver to mark in the sink where the crash occurred (for demonstration purposes)
+9. Shell 4: Send some data directly to our data receiver to mark in the sink where the crash occurred (for demonstration purposes)
 
         echo '<<CRASH-and-RECOVER>>' | nc -q1 127.0.0.1 7002
 
-10. Terminal 3: Restart worker1 with the same command we used above, but save its log output to a new file
+10. Shell 3: Restart worker1 with the same command we used above, but save its log output to a new file
 
         machida-resilience --application-module word_count_with_dynamic_keys \
           --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
@@ -94,13 +94,13 @@ You will need 4 terminals to run this example.
           --ponythreads=1 --ponynoblock \
           | tee worker1.recovered.log
 
-11. Terminal 4: Restart the sender
+11. Shell 4: Restart the sender
 
         sender --host 127.0.0.1:7010 --file count_this.txt --batch-size 5 \
           --interval 1_000_000_000 --messages 10000000 --ponythreads=1 \
           --ponynoblock --repeat --no-write
 
-12. Terminal 4: Let things run for a few more seconds before shutting down the sender (`Ctrl-C`), and then shut down the cluster with the `cluster_shutdown` tool.
+12. Shell 4: Let things run for a few more seconds before shutting down the sender (`Ctrl-C`), and then shut down the cluster with the `cluster_shutdown` tool.
 
         cluster_shutdown 127.0.0.1:5050
 
