@@ -9,6 +9,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Added
 
+- Added support for Fedora 26/27, Amazon Linux 2, Oracle Linux, Ubuntu Artful, and Debian Jessie/Buster Linux distributions via Wallaroo Up
 
 ### Changed
 
