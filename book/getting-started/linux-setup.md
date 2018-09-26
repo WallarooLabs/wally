@@ -190,7 +190,7 @@ cp machida/build/machida bin/machida-resilience
 make clean-machida-all
 make build-machida-all
 cp machida/build/machida bin
-cp machida/wallaroo.py bin
+cp -r machida/lib/ bin/pylib
 ```
 
 ## Compiling Giles Sender, Data Receiver, Cluster Shutdown, and Cluster Shrinker tools
