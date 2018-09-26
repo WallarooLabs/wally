@@ -40,6 +40,7 @@
   * [Writing Your Own Partitioned Stateful Application](book/python/writing-your-own-partitioned-stateful-application.md).
   * [Word Count](book/python/word-count.md)
   * [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)
+  * [Using Connectors](book/python/using-connectors.md)
   * [Wallaroo Python API](book/python/api.md)
 
 * Debugging Python Wallaroo Applications
