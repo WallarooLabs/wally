@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import argparse
-import os
 import signal
 import struct
 import socket
 import SocketServer
 import subprocess
+import sys
 import threading
 import time
 
@@ -36,7 +36,33 @@ def recv_conv():
     server = server = SocketServer.UDPServer(('127.0.0.1', 8901), UDPHandler)
     server.serve_forever()
 
-threading.Thread(target = recv_conv).start()
+def terminate(_signal=None, _frame=None):
+    print("terminating source")
+    source.terminate()
+    print("terminating sink")
+    sink.terminate()
+    if wallaroo:
+        print("terminating wallaroo")
+        wallaroo.terminate()
+        try:
+            # machida occasionally leaves the
+            # tty in a non-echoing state. This
+            # will fix the shell after it exits.
+            subprocess.call(['stty', 'sane'])
+        except:
+            pass
+    time.sleep(1)
+    source.poll()
+    if source.returncode is not None:
+        source.kill()
+    sink.poll()
+    if sink.returncode is not None:
+        sink.kill()
+    if wallaroo:
+        wallaroo.poll()
+        if wallaroo.returncode is not None:
+            wallaroo.kill()
+    sys.exit(-1)
 
 source = subprocess.Popen([
     "../../../connectors/udp_source",
@@ -51,6 +77,17 @@ sink = subprocess.Popen([
     "--connector", "fahrenheit_conversion",
     "--fahrenheit_conversion-host", "127.0.0.1",
     "--fahrenheit_conversion-port", "8901"])
+
+print("Ensuring connectors are initialized")
+time.sleep(1)
+source.poll()
+sink.poll()
+if source.returncode or sink.returncode:
+    terminate()
+
+thread = threading.Thread(target = recv_conv)
+thread.daemon = True
+thread.start()
 
 try:
     wallaroo = subprocess.Popen([
@@ -67,22 +104,6 @@ except:
     print("Unable to run machida. Has the wallaroo environment "
           " been activated? "
           "See https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html")
-
-def terminate(_signal=None, _frame=None):
-    print("terminating source")
-    source.terminate()
-    print("terminating sink")
-    sink.terminate()
-    print("terminating wallaroo")
-    wallaroo.terminate()
-    try:
-        # machida occasionally leaves the
-        # tty in a non-echoing state. This
-        # will fix the shell after it exits.
-        subprocess.call(['stty', 'sane'])
-    except:
-        pass
-    os._exit(-1)
 
 signal.signal(signal.SIGINT, terminate)
 signal.signal(signal.SIGTERM, terminate)
