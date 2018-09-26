@@ -38,7 +38,7 @@ You will need 4 shells to run this example.
 2. Shell 1: Start a data receiver
 
         cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/word_count_with_dynamic_keys
-        data_receiver --listen 127.0.0.1 7002 | tee received.txt
+        data_receiver --listen 127.0.0.1:7002 | tee received.txt
 
 3. Shell 2: Start initializer
 
