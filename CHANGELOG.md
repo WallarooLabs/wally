@@ -6,13 +6,17 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Python's argparse and other libraries which require properly intialized python arguments should no longer fail in certain cases in machida
 
 ### Added
 
 - Added support for Fedora 26/27, Amazon Linux 2, Oracle Linux, Ubuntu Artful, and Debian Jessie/Buster Linux distributions via Wallaroo Up
-- Checkpointing protocol for regular checkpointing of application state.
-- Support for rollback to most recent checkpoint on recovery.
-- Support for replicated recovery data.
+- Checkpointing protocol for regular checkpointing of application state
+- Support for rollback to most recent checkpoint on recovery
+- Support for replicated recovery data
+- Added preview release of the Python Connectors API
+- Added connector scripts for Kafka, Kinesis, RabbitMQ, Redis, S3, and UDP
+- Added a template for a Postgres connector script
 
 ### Changed
 
