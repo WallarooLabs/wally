@@ -136,6 +136,8 @@ As a source we have a very interesting example of how notifiers can turn a regul
 
 On the sink side, we support inserting new records for each sink output. This should be easy to modify to allow more complex database interactions.
 
+If you have a use-case with Postgres and don't feel like our template addresses it. Please let us know at [hello@wallaroolabs.com](mailto:hello@wallaroolabs.com).
+
 ## Building Your Own Connectors
 
 While we offer prebuilt connectors and they can be modified, sometimes you might find yourself needing to build a connector from scratch. We'll walk through a source and sink example.
