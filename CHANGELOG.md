@@ -6,7 +6,7 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
-- Argument parsers in machida no longer require a program name to be passed
+- Python's argparse and other libraries which require properly intialized python arguments should no longer fail in certain cases in machida
 
 ### Added
 
