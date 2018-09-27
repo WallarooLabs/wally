@@ -181,7 +181,7 @@ ln -s metrics_ui/AppRun bin/metrics_reporter_ui
 
 ## Compiling Machida
 
-Machida is the program that runs Wallaroo Python applications. Change to the Wallaroo directory:
+Machida is the program that runs Wallaroo Python applications. Machida supports resiliency, but it comes with a performance hit. If you don't need resiliency then we recommend to build Machida without the flag. Here we build Machida once with resiliency and once without resiliency. Change to the Wallaroo directory:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
