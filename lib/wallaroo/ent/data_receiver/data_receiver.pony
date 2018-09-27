@@ -158,7 +158,6 @@ actor DataReceiver is Producer
   be received(d: DeliveryMsg, producer_id: RoutingId, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    @printf[I32]("!@ DataReceiver (%s): received seq id %s\n".cstring(), _sender_name.cstring(), seq_id.string().cstring())
     process_message(d, producer_id, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
@@ -190,7 +189,6 @@ actor DataReceiver is Producer
   be replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    @printf[I32]("!@ DataReceiver (%s): replay_received seq id %s\n".cstring(), _sender_name.cstring(), seq_id.string().cstring())
     if seq_id > _last_id_seen then
       replay_process_message(r, pipeline_time_spent, seq_id, latest_ts,
         metrics_id, worker_ingress_ts)
@@ -264,11 +262,9 @@ actor DataReceiver is Producer
   fun ref _update_last_id_seen(seq_id: SeqId, on_increase: Bool = false) =>
     if on_increase then
       if seq_id > _last_id_seen then
-        @printf[I32]("!@ DataReceiver (%s): _update_last_id_seen on increase to %s\n".cstring(), _sender_name.cstring(), seq_id.string().cstring())
         _last_id_seen = seq_id
       end
     else
-      @printf[I32]("!@ DataReceiver (%s): _update_last_id_seen update to new value to %s\n".cstring(), _sender_name.cstring(), seq_id.string().cstring())
       _last_id_seen = seq_id
     end
 

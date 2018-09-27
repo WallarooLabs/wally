@@ -16,15 +16,10 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "options"
-use "wallaroo"
-use "wallaroo/core/source"
+interface SourceHandler[In: Any val]
+  fun decode(data: Array[U8] val): In ?
 
-class val GenSourceConfig[In: Any val]
-  let _gen: GenSourceGenerator[In]
-
-  new val create(gen: GenSourceGenerator[In]) =>
-    _gen = gen
-
-  fun source_listener_builder_builder(): GenSourceListenerBuilderBuilder[In] =>
-    GenSourceListenerBuilderBuilder[In](_gen)
+interface FramedSourceHandler[In: Any val]
+  fun header_length(): USize
+  fun payload_length(data: Array[U8] iso): USize ?
+  fun decode(data: Array[U8] val): In ?

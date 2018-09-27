@@ -36,24 +36,38 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo_labs/mort"
 use "wallaroo/core/initialization"
+use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-actor ConnectorSourceListener is SourceListener
+actor ConnectorSourceListener[In: Any val] is SourceListener
   """
   # ConnectorSourceListener
   """
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   let _env: Env
-  let _auth: AmbientAuth
+  let _worker_name: WorkerName
   let _pipeline_name: String
+  let _runner_builder: RunnerBuilder
   var _router: Router
+  let _metrics_conn: MetricsSink
+  let _metrics_reporter: MetricsReporter
   let _router_registry: RouterRegistry
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
+  let _event_log: EventLog
+  let _auth: AmbientAuth
   let _layout_initializer: LayoutInitializer
+  let _recovering: Bool
+  let _pre_state_target_ids: Array[RoutingId] val
+  let _target_router: Router
+  let _parallelism: USize
+  let _handler: FramedSourceHandler[In] val
+  let _host: String
+  let _service: String
+
   var _fd: U32
   var _event: AsioEventID = AsioEvent.none()
   let _limit: USize
@@ -61,39 +75,48 @@ actor ConnectorSourceListener is SourceListener
   var _closed: Bool = false
   var _init_size: USize
   var _max_size: USize
-  let _metrics_reporter: MetricsReporter
-  var _source_builder: SourceBuilder
-  let _event_log: EventLog
-  let _target_router: Router
 
-  new create(env: Env, source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry,
+  let _connected_sources: SetIs[ConnectorSource[In]] = _connected_sources.create()
+  let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
+
+  new create(env: Env, worker_name: WorkerName, pipeline_name: String,
+    runner_builder: RunnerBuilder, router: Router, metrics_conn: MetricsSink,
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso,
-    target_router: Router = EmptyRouter,
-    host: String = "", service: String = "0", limit: USize = 0,
+    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
+    target_router: Router = EmptyRouter, parallelism: USize,
+    handler: FramedSourceHandler[In] val,
+    host: String = "", service: String = "0",
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     Listens for both IPv4 and IPv6 connections.
     """
     _env = env
-    _auth = auth
+    _worker_name = worker_name
     _pipeline_name = pipeline_name
+    _runner_builder = runner_builder
     _router = router
+    _metrics_conn = metrics_conn
+    _metrics_reporter = consume metrics_reporter
     _router_registry = router_registry
     _outgoing_boundary_builders = outgoing_boundary_builders
+    _event_log = event_log
+    _auth = auth
     _layout_initializer = layout_initializer
+    _recovering = recovering
+    _pre_state_target_ids = pre_state_target_ids
+    _target_router = target_router
+    _parallelism = parallelism
+    _handler = handler
+    _host = host
+    _service = service
+
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
-    _limit = limit
-    _metrics_reporter = consume metrics_reporter
-    _source_builder = source_builder
-    _event_log = event_log
-    _target_router = target_router
-
+    _limit = parallelism
     _init_size = init_size
     _max_size = max_size
     _fd = @pony_asio_event_fd(_event)
@@ -107,15 +130,49 @@ actor ConnectorSourceListener is SourceListener
         spr.partition_id(), this)
     end
 
-    @printf[I32]((source_builder.name() + " source attempting to listen on "
+    @printf[I32]((pipeline_name + " source attempting to listen on "
       + host + ":" + service + "\n").cstring())
     _notify_listening()
 
+    for i in Range(0, _limit) do
+      let source_id = _routing_id_gen()
+      let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
+        _env, _auth, _handler, _runner_builder, _router,
+        _metrics_reporter.clone(), _event_log, _target_router,
+        _pre_state_target_ids)
+      let source = ConnectorSource[In](source_id, _auth, this,
+        consume notify, _event_log, _router,
+        _outgoing_boundary_builders, _layout_initializer,
+        _metrics_reporter.clone(), _router_registry)
+      source.mute(this)
+
+      _router_registry.register_source(source, source_id)
+      match _router
+      | let pr: PartitionRouter =>
+        _router_registry.register_partition_router_subscriber(
+          pr.state_name(), source)
+      | let spr: StatelessPartitionRouter =>
+        _router_registry.register_stateless_partition_router_subscriber(
+          spr.partition_id(), source)
+      end
+
+      _available_sources.push(source)
+    end
+
   be recovery_protocol_complete() =>
-    None
+    """
+    Called when Recovery is finished. If we're not recovering, that's right
+    away. At that point, we can tell sources that from our perspective it's
+    safe to unmute.
+    """
+    for s in _available_sources.values() do
+      s.unmute(this)
+    end
+    for s in _connected_sources.values() do
+      s.unmute(this)
+    end
 
   be update_router(router: Router) =>
-    _source_builder = _source_builder.update_router(router)
     _router = router
 
   be remove_route_for(moving_step: Consumer) =>
@@ -175,12 +232,22 @@ actor ConnectorSourceListener is SourceListener
       _event = AsioEvent.none()
     end
 
-  be _conn_closed() =>
+  be _conn_closed(s: ConnectorSource[In]) =>
     """
     An accepted connection has closed. If we have dropped below the limit, try
     to accept new connections.
     """
+    if _connected_sources.contains(s) then
+      _connected_sources.unset(s)
+      _available_sources.push(s)
+    else
+      Fail()
+    end
     _count = _count - 1
+    ifdef debug then
+      Invariant(_count == _connected_sources.size())
+      Invariant(_available_sources.size() == (_limit - _count))
+    end
 
     if _count < _limit then
       _accept()
@@ -192,9 +259,13 @@ actor ConnectorSourceListener is SourceListener
     """
     if _closed then
       return
+    elseif _count >= _limit then
+      @printf[I32]("ConnectorSourceListener: Already reached connection limit\n"
+        .cstring())
+      return
     end
 
-    while (_limit == 0) or (_count < _limit) do
+    while _count < _limit do
       var fd = @pony_os_accept[U32](_event)
 
       match fd
@@ -214,26 +285,13 @@ actor ConnectorSourceListener is SourceListener
     Spawn a new connection.
     """
     try
-      let source_id = _routing_id_gen()
-      let source = ConnectorSource._accept(source_id, _auth, this,
-        _notify_connected(source_id)?, _event_log, _router,
-        _outgoing_boundary_builders, _layout_initializer,
-        ns, _init_size, _max_size, _metrics_reporter.clone(), _router_registry)
-
-      // TODO: We need to figure out how to unregister this when the
-      // connection dies
-      _router_registry.register_source(source, source_id)
-      match _router
-      | let pr: PartitionRouter =>
-        _router_registry.register_partition_router_subscriber(pr.state_name(),
-          source)
-      | let spr: StatelessPartitionRouter =>
-        _router_registry.register_stateless_partition_router_subscriber(
-          spr.partition_id(), source)
-      end
+      let source = _available_sources.pop()?
+      source.accept(ns, _init_size, _max_size)
+      _connected_sources.set(source)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)
+      Fail()
     end
 
   fun ref _notify_listening() =>
@@ -241,25 +299,13 @@ actor ConnectorSourceListener is SourceListener
     Inform the notifier that we're listening.
     """
     if not _event.is_null() then
-      @printf[I32]((_source_builder.name() + " source is listening\n")
+      @printf[I32]((_pipeline_name + " source is listening\n")
         .cstring())
     else
       _closed = true
-      @printf[I32]((_source_builder.name() +
+      @printf[I32]((_pipeline_name +
         " source is unable to listen\n").cstring())
       Fail()
-    end
-
-  fun ref _notify_connected(source_id: RoutingId): ConnectorSourceNotify iso^ ? =>
-    try
-      _source_builder(source_id, _event_log, _auth, _target_router, _env)
-        as ConnectorSourceNotify iso^
-    else
-      @printf[I32](
-        (_source_builder.name() + " could not create a ConnectorSourceNotify\n")
-        .cstring())
-      Fail()
-      error
     end
 
   fun ref _close() =>

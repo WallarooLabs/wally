@@ -347,7 +347,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
-    @printf[I32]("!@ Step %s process_message from %s\n".cstring(), _id.string().cstring(), i_producer_id.string().cstring())
     _seq_id_generator.new_incoming_message()
 
     let my_latest_ts = ifdef "detailed-metrics" then

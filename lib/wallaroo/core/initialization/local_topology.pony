@@ -1548,14 +1548,10 @@ actor LocalTopologyInitializer is LayoutInitializer
 
               // Set up SourceListener builders
               sl_builders.push(source_data.source_listener_builder_builder()(
-                source_data.builder()(source_data.runner_builder(),
-                  out_router, _metrics_conn,
-                  source_data.pre_state_target_ids(), t.worker_name(),
-                  source_reporter.clone()),
-                out_router, _router_registry,
-                _outgoing_boundary_builders,
-                _event_log, _auth, pipeline_name,
-                this,  consume source_reporter, _recovering))
+                t.worker_name(), pipeline_name, source_data.runner_builder(),
+                out_router, _metrics_conn, consume source_reporter,
+                _router_registry, _outgoing_boundary_builders, _event_log,
+                _auth, this, _recovering, source_data.pre_state_target_ids()))
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one

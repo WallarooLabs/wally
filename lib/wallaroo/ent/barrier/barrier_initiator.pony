@@ -304,7 +304,6 @@ actor BarrierInitiator is Initializable
 
       try
         if _workers.size() > 1 then
-          // @printf[I32]("!@ Sending remote initiate barrier for %s\n".cstring(), barrier_token.string().cstring())
           let msg = ChannelMsgEncoder.remote_initiate_barrier(_worker_name,
             barrier_token, _auth)?
           for w in _workers.values() do
@@ -313,12 +312,10 @@ actor BarrierInitiator is Initializable
         else
           //!@
           None
-          // @printf[I32]("!@ Not sending remote initiate barrier because there's only one worker!\n".cstring())
         end
       else
         Fail()
       end
-      // @printf[I32]("!@ About to call worker_ack_barrier_start on handler for %s\n".cstring(), barrier_token.string().cstring())
       _active_barriers.worker_ack_barrier_start(_worker_name, barrier_token)
     end
 
@@ -348,8 +345,6 @@ actor BarrierInitiator is Initializable
     barrier_token: BarrierToken)
   =>
     if not _disposed then
-      // @printf[I32]("!@ remote_initiate_barrier called for %s\n".cstring(), barrier_token.string().cstring())
-
       // If we're in recovery mode, we might need to collect some rollback
       // acks before we receive a remote_initiate_barrier.
       var pending_acks: (PendingRollbackBarrierAcks | None) = None

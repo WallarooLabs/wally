@@ -55,7 +55,7 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is Source
+actor TCPSource[In: Any val] is Source
   """
   # TCPSource
 
@@ -81,8 +81,8 @@ actor TCPSource is Source
   let _pending_barriers: Array[BarrierToken] = _pending_barriers.create()
 
   // TCP
-  let _listen: TCPSourceListener
-  let _notify: TCPSourceNotify
+  let _listen: TCPSourceListener[In]
+  let _notify: TCPSourceNotify[In]
   var _next_size: USize = 0
   var _max_size: USize = 0
   var _connect_count: U32 = 0
@@ -117,7 +117,7 @@ actor TCPSource is Source
   var _next_checkpoint_id: CheckpointId = 1
 
   new create(source_id: RoutingId, auth: AmbientAuth,
-    listen: TCPSourceListener, notify: TCPSourceNotify iso,
+    listen: TCPSourceListener[In], notify: TCPSourceNotify[In] iso,
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
@@ -174,8 +174,6 @@ actor TCPSource is Source
     A new connection accepted on a server.
     """
     if not _disposed then
-      @printf[I32]("!@ TCPSource %s _accept()\n".cstring(), _source_id.string().cstring())
-
       _notify.accepted(this)
 
       _connect_count = 0
@@ -202,7 +200,6 @@ actor TCPSource is Source
     In case we pop into existence midway through a checkpoint, we need to
     wait until this is called to start processing.
     """
-    @printf[I32]("!@ TCPSource: first_checkpoint_complete()\n".cstring())
     _unmute_local()
     _is_pending = false
     for (id, c) in _outputs.pairs() do
@@ -837,7 +834,6 @@ actor TCPSource is Source
     _mute()
 
   be unmute(a: Any tag) =>
-    @printf[I32]("!@ TCPSource %s: Somebody called unmute() with %s left\n".cstring(), _source_id.string().cstring(), _muted_by.size().string().cstring())
     _muted_by.unset(a)
 
     if _muted_by.size() == 0 then
@@ -854,4 +850,3 @@ actor TCPSource is Source
     """
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
-    @printf[I32]("!@ TCPSource: set expect to %s\n".cstring(), _expect.string().cstring())

@@ -81,10 +81,6 @@ class val TCPSourceConfig[In: Any val]
     _service = opts.service
     _parallelism = parallelism'
 
-  fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder =>
-    TCPSourceListenerBuilderBuilder(_host, _service, _parallelism)
-
-  fun source_builder(app_name: String, name: String):
-    TypedTCPSourceBuilderBuilder[In]
-  =>
-    TypedTCPSourceBuilderBuilder[In](app_name, name, _handler, _host, _service)
+  fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder[In] =>
+    TCPSourceListenerBuilderBuilder[In](_host, _service, _parallelism,
+      _handler)

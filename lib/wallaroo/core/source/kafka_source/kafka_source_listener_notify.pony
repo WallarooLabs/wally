@@ -24,57 +24,35 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
 class KafkaSourceListenerNotify[In: Any val]
-  var _source_builder: SourceBuilder
+  let _pipeline_name: String
+  let _auth: AmbientAuth
+  let _handler: SourceHandler[In] val
+  let _runner_builder: RunnerBuilder
+  let _router: Router
+  let _metrics_reporter: MetricsReporter
   let _event_log: EventLog
   let _target_router: Router
-  let _auth: AmbientAuth
+  let _pre_state_target_ids: Array[RoutingId] val
 
-  new iso create(builder: SourceBuilder, event_log: EventLog,
-    auth: AmbientAuth, target_router: Router) =>
-    _source_builder = builder
+  new iso create(pipeline_name: String, auth: AmbientAuth,
+    handler: SourceHandler[In] val, runner_builder: RunnerBuilder,
+    router': Router, metrics_reporter: MetricsReporter iso,
+    event_log: EventLog, target_router: Router,
+    pre_state_target_ids: Array[RoutingId] val)
+  =>
+    _pipeline_name = pipeline_name
+    _auth = auth
+    _handler = handler
+    _runner_builder = runner_builder
+    _router = router'
+    _metrics_reporter = consume metrics_reporter
     _event_log = event_log
     _target_router = target_router
-    _auth = auth
+    _pre_state_target_ids = pre_state_target_ids
 
   fun ref build_source(source_id: RoutingId, env: Env):
-    KafkaSourceNotify[In] iso^ ?
+    KafkaSourceNotify[In] iso^
   =>
-    try
-      _source_builder(source_id, _event_log, _auth, _target_router, env) as
-        KafkaSourceNotify[In] iso^
-    else
-      @printf[I32](
-        (_source_builder.name()
-          + " could not create a KafkaSourceNotify\n").cstring())
-      Fail()
-      error
-    end
-
-  fun ref update_router(router: Router) =>
-    _source_builder = _source_builder.update_router(router)
-
-class val KafkaSourceBuilderBuilder[In: Any val]
-  let _app_name: String
-  let _name: String
-  let _handler: SourceHandler[In] val
-
-  new val create(app_name: String, name': String,
-    handler: SourceHandler[In] val)
-  =>
-    _app_name = app_name
-    _name = name'
-    _handler = handler
-
-  fun name(): String => _name
-
-  fun apply(runner_builder: RunnerBuilder, router: Router,
-    metrics_conn: MetricsSink,
-    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end,
-    worker_name: String, metrics_reporter: MetricsReporter iso):
-      SourceBuilder
-  =>
-    BasicSourceBuilder[In, SourceHandler[In] val](_app_name, worker_name,
-      _name, runner_builder, _handler, router,
-      metrics_conn, pre_state_target_ids, consume metrics_reporter,
-      KafkaSourceNotifyBuilder[In])
-
+    KafkaSourceNotify[In](source_id, _pipeline_name, env, _auth,
+      _handler, _runner_builder, _router, _metrics_reporter.clone(),
+      _event_log, _target_router, _pre_state_target_ids)

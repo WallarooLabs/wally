@@ -90,8 +90,6 @@ class BarrierStepForwarder
       if not _removed_inputs.contains(step_id) then
         @printf[I32]("%s: Forwarder at %s doesn't know about %s\n".cstring(), barrier_token.string().cstring(), _step_id.string().cstring(), step_id.string().cstring())
         Fail()
-      else
-        @printf[I32]("!@ %s: Forwarder at %s doesn't know about %s but it's in removed_inputs so we're ignoring\n".cstring(), barrier_token.string().cstring(), _step_id.string().cstring(), step_id.string().cstring())
       end
     end
 
@@ -123,7 +121,6 @@ class BarrierStepForwarder
           ob.forward_barrier(o_id, _step_id,
             _barrier_token)
         else
-          // @printf[I32]("!@ FORWARDING TO NON BOUNDARY\n".cstring())
           o.receive_barrier(_step_id, _step, _barrier_token)
         end
       end
