@@ -27,10 +27,9 @@ trait _DataReceiverPhase
   fun has_pending(): Bool =>
     false
 
-  fun ref flush(): Array[_Queued]
-
-  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     _invalid_call()
     Fail()
@@ -64,9 +63,6 @@ class _DataReceiverNotProcessingPhase is _DataReceiverPhase
     @printf[I32](("DataReceiver: data_connect received, but still waiting " +
       "for DataReceivers to initialize.\n").cstring())
 
-  fun ref flush(): Array[_Queued] =>
-    Array[_Queued]
-
 class _RecoveringDataReceiverPhase is _DataReceiverPhase
   let _data_receiver: DataReceiver ref
 
@@ -79,15 +75,16 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
   fun has_pending(): Bool =>
     false
 
-  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     // Drop non-barriers
     ifdef debug then
       @printf[I32]("Recovering DataReceiver dropping non-rollback-barrier\n"
         .cstring())
     end
-    None
+    _data_receiver._update_last_id_seen(seq_id, true)
 
   fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -97,7 +94,7 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
       @printf[I32]("Recovering DataReceiver dropping non-rollback-barrier\n"
         .cstring())
     end
-    None
+    _data_receiver._update_last_id_seen(seq_id, true)
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)
@@ -113,6 +110,7 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
         @printf[I32]("Recovering DataReceiver dropping non-rollback barrier\n"
           .cstring())
       end
+      _data_receiver._update_last_id_seen(seq_id, true)
     end
 
   fun ref data_connect(highest_seq_id: SeqId) =>
@@ -120,9 +118,6 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
     // boundaries, which will be cleared as part of rollback.
     _data_receiver._update_last_id_seen(highest_seq_id)
     _data_receiver._inform_boundary_to_send_normal_messages()
-
-  fun ref flush(): Array[_Queued] =>
-    Array[_Queued]
 
 class _NormalDataReceiverPhase is _DataReceiverPhase
   let _data_receiver: DataReceiver ref
@@ -136,11 +131,12 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
   fun has_pending(): Bool =>
     false
 
-  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
-    _data_receiver.deliver(d, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+    _data_receiver.deliver(d, producer_id, pipeline_time_spent, seq_id,
+      latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -155,6 +151,7 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
 
   fun ref data_connect(highest_seq_id: SeqId) =>
     _data_receiver._inform_boundary_to_send_normal_messages()
+<<<<<<< HEAD
 
   fun ref flush(): Array[_Queued] =>
     Array[_Queued]
@@ -250,3 +247,5 @@ class _QueuedReplayableDeliveryMessage
   fun replay_process_message(dr: DataReceiver ref) =>
     dr.replay_process_message(msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
+=======
+>>>>>>> 26062047... Fix boundary message ordering bug
