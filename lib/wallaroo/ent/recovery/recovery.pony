@@ -66,7 +66,8 @@ actor Recovery
   new create(auth: AmbientAuth, worker_name: WorkerName, event_log: EventLog,
     recovery_reconnecter: RecoveryReconnecter,
     checkpoint_initiator: CheckpointInitiator, connections: Connections,
-    router_registry: RouterRegistry, data_receivers: DataReceivers)
+    router_registry: RouterRegistry, data_receivers: DataReceivers,
+    is_recovering: Bool)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -76,6 +77,9 @@ actor Recovery
     _connections = connections
     _router_registry = router_registry
     _data_receivers = data_receivers
+    if not is_recovering then
+      _router_registry.recovery_protocol_complete()
+    end
 
   be update_initializer(initializer: LocalTopologyInitializer) =>
     _initializer = initializer
@@ -263,6 +267,7 @@ actor Recovery
     end
     _router_registry.resume_the_world(_worker_name)
     _data_receivers.recovery_complete(this)
+    _router_registry.recovery_protocol_complete()
     _recovery_phase = _FinishedRecovering
     match _initializer
     | let lti: LocalTopologyInitializer =>
@@ -297,4 +302,5 @@ actor Recovery
     else
       Fail()
     end
+    _router_registry.recovery_protocol_complete()
     _recovery_phase = _RecoveryOverrideAccepted

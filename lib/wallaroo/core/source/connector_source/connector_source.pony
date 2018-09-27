@@ -826,12 +826,12 @@ actor ConnectorSource is Source
       _unmute()
     end
 
-  be mute(c: Consumer) =>
-    _muted_downstream.set(c)
+  be mute(a: Any tag) =>
+    _muted_downstream.set(a)
     _mute()
 
-  be unmute(c: Consumer) =>
-    _muted_downstream.unset(c)
+  be unmute(a: Any tag) =>
+    _muted_downstream.unset(a)
 
     if _muted_downstream.size() == 0 then
       _unmute()

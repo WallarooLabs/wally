@@ -83,27 +83,26 @@ actor TCPSource is Source
   // TCP
   let _listen: TCPSourceListener
   let _notify: TCPSourceNotify
-  var _next_size: USize
-  let _max_size: USize
-  var _connect_count: U32
+  var _next_size: USize = 0
+  var _max_size: USize = 0
+  var _connect_count: U32 = 0
   var _fd: U32 = -1
   var _expect: USize = 0
   var _connected: Bool = false
   var _closed: Bool = false
   var _event: AsioEventID = AsioEvent.none()
-  var _read_buf: Array[U8] iso
+  var _read_buf: Array[U8] iso = recover Array[U8] end
   var _read_buf_offset: USize = 0
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
-  var _read_len: USize = 0
   var _reading: Bool = false
   var _shutdown: Bool = false
   // Start muted. Wait for unmute to begin processing
   var _muted: Bool = true
   var _disposed: Bool = false
   var _expect_read_buf: Reader = Reader
-  let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
-  let _max_received_count: U8 = 50
+  var _max_received_count: U8 = 50
+  let _muted_by: SetIs[Any tag] = _muted_by.create()
 
   var _is_pending: Bool = true
 
@@ -117,12 +116,11 @@ actor TCPSource is Source
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
 
-  new _accept(source_id: RoutingId, auth: AmbientAuth,
+  new create(source_id: RoutingId, auth: AmbientAuth,
     listen: TCPSourceListener, notify: TCPSourceNotify iso,
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    fd: U32, init_size: USize = 64, max_size: USize = 16384,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
   =>
     """
@@ -134,15 +132,6 @@ actor TCPSource is Source
     _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
-    _connect_count = 0
-    _fd = fd
-    _event = @pony_asio_event_create(this, fd,
-      AsioEvent.read_write_oneshot(), 0, true)
-    _connected = true
-    _read_buf = recover Array[U8].>undefined(init_size) end
-    _next_size = init_size
-    _max_size = max_size
-
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
@@ -156,15 +145,8 @@ actor TCPSource is Source
       end
     end
 
-    _readable = true
-
     _router = router'
     _update_router(router')
-
-    _pending_reads()
-    //TODO: either only accept when we are done recovering or don't start
-    //listening until we are done recovering
-    _notify.accepted(this)
 
     _notify.update_boundaries(_outgoing_boundaries)
 
@@ -187,11 +169,40 @@ actor TCPSource is Source
       _mute_local()
     end
 
+  be accept(fd: U32, init_size: USize = 64, max_size: USize = 16384) =>
+    """
+    A new connection accepted on a server.
+    """
+    if not _disposed then
+      @printf[I32]("!@ TCPSource %s _accept()\n".cstring(), _source_id.string().cstring())
+
+      _notify.accepted(this)
+
+      _connect_count = 0
+      _fd = fd
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write_oneshot(), 0, true)
+      _connected = true
+      _read_buf = recover Array[U8].>undefined(init_size) end
+      _read_buf_offset = 0
+      _next_size = init_size
+      _max_size = max_size
+
+      _readable = true
+      _closed = false
+      _shutdown = false
+      _shutdown_peer = false
+
+      _pending_reads()
+    end
+
+  //!@
   be first_checkpoint_complete() =>
     """
     In case we pop into existence midway through a checkpoint, we need to
     wait until this is called to start processing.
     """
+    @printf[I32]("!@ TCPSource: first_checkpoint_complete()\n".cstring())
     _unmute_local()
     _is_pending = false
     for (id, c) in _outputs.pairs() do
@@ -416,6 +427,8 @@ actor TCPSource is Source
         b.dispose()
       end
       close()
+      _dispose_routes()
+      _muted = true
       _disposed = true
     end
 
@@ -467,7 +480,7 @@ actor TCPSource is Source
       @printf[I32]("TCPSource received initiate_barrier %s\n".cstring(),
         token.string().cstring())
     end
-    if not _is_pending then
+    if not _is_pending and not _disposed then
       _initiate_barrier(token)
     end
 
@@ -600,9 +613,7 @@ actor TCPSource is Source
     Shut our connection down immediately. Stop reading data from the incoming
     source.
     """
-
     _hard_close()
-
 
   fun ref _try_shutdown() =>
     """
@@ -628,10 +639,6 @@ actor TCPSource is Source
 
     if _connected and _shutdown and _shutdown_peer then
       _hard_close()
-    else
-      if not _unregistered then
-        _dispose_routes()
-      end
     end
 
   fun ref _hard_close() =>
@@ -652,16 +659,16 @@ actor TCPSource is Source
     _readable = false
     @pony_asio_event_set_readable[None](_event, false)
 
-
     @pony_os_socket_close[None](_fd)
     _fd = -1
 
+    _event = AsioEvent.none()
+    _expect_read_buf.clear()
+    _expect = 0
+
     _notify.closed(this)
 
-    _listen._conn_closed()
-    if not _unregistered then
-      _dispose_routes()
-    end
+    _listen._conn_closed(this)
 
   fun ref _dispose_routes() =>
     if not _unregistered then
@@ -670,7 +677,6 @@ actor TCPSource is Source
       end
       _unregistered = true
     end
-    _muted = true
 
   fun ref _pending_reads() =>
     """
@@ -816,24 +822,25 @@ actor TCPSource is Source
     end
 
   fun ref _mute_local() =>
-    _muted_downstream.set(this)
+    _muted_by.set(this)
     _mute()
 
   fun ref _unmute_local() =>
-    _muted_downstream.unset(this)
+    _muted_by.unset(this)
 
-    if _muted_downstream.size() == 0 then
+    if _muted_by.size() == 0 then
       _unmute()
     end
 
-  be mute(c: Consumer) =>
-    _muted_downstream.set(c)
+  be mute(a: Any tag) =>
+    _muted_by.set(a)
     _mute()
 
-  be unmute(c: Consumer) =>
-    _muted_downstream.unset(c)
+  be unmute(a: Any tag) =>
+    @printf[I32]("!@ TCPSource %s: Somebody called unmute() with %s left\n".cstring(), _source_id.string().cstring(), _muted_by.size().string().cstring())
+    _muted_by.unset(a)
 
-    if _muted_downstream.size() == 0 then
+    if _muted_by.size() == 0 then
       _unmute()
     end
 
@@ -847,3 +854,4 @@ actor TCPSource is Source
     """
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
+    @printf[I32]("!@ TCPSource: set expect to %s\n".cstring(), _expect.string().cstring())

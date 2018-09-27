@@ -104,8 +104,8 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   be reconnect_boundary(target_worker_name: WorkerName)
   be disconnect_boundary(worker: WorkerName)
-  be mute(c: Consumer)
-  be unmute(c: Consumer)
+  be mute(a: Any tag)
+  be unmute(a: Any tag)
   be initiate_barrier(token: BarrierToken)
   be barrier_complete(token: BarrierToken)
   be update_worker_data_service(worker_name: String,
@@ -115,6 +115,7 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   be first_checkpoint_complete()
 
 interface tag SourceListener is (DisposableActor & BoundaryUpdatable)
+  be recovery_protocol_complete()
   be update_router(router: PartitionRouter)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)

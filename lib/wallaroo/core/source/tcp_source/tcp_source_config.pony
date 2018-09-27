@@ -63,19 +63,26 @@ class val TCPSourceConfig[In: Any val]
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
+  let _parallelism: USize
 
-  new val create(handler': FramedSourceHandler[In] val, host': String, service': String) =>
+  new val create(handler': FramedSourceHandler[In] val, host': String,
+    service': String, parallelism': USize = 10)
+  =>
     _handler = handler'
     _host = host'
     _service = service'
+    _parallelism = parallelism'
 
-  new val from_options(handler': FramedSourceHandler[In] val, opts: TCPSourceConfigOptions) =>
+  new val from_options(handler': FramedSourceHandler[In] val,
+    opts: TCPSourceConfigOptions, parallelism': USize = 10)
+  =>
     _handler = handler'
     _host = opts.host
     _service = opts.service
+    _parallelism = parallelism'
 
   fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder =>
-    TCPSourceListenerBuilderBuilder(_host, _service)
+    TCPSourceListenerBuilderBuilder(_host, _service, _parallelism)
 
   fun source_builder(app_name: String, name: String):
     TypedTCPSourceBuilderBuilder[In]
