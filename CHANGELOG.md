@@ -15,7 +15,7 @@ All notable changes to Wallaroo will be documented in this file.
 - Support for rollback to most recent checkpoint on recovery
 - Support for replicated recovery data
 - Added preview release of the Python Connectors API
-- Added conncetor scripts for Kafka, Kinesis, RabbitMQ, Redis, S3, and UDP
+- Added connector scripts for Kafka, Kinesis, RabbitMQ, Redis, S3, and UDP
 - Added a template for a Postgres connector script
 
 ### Changed
