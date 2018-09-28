@@ -195,7 +195,7 @@ tag_release_latest_docker_images() {
   if [[ $BRANCH == "release" ]]
   then
     # tagging Wallaroo image as latest
-    $wallaroo_docker_image_latest_path = $wallaroo_docker_repo_host/$wallaroo_docker_image_repo/wallaroo:latest
+    wallaroo_docker_image_latest_path=$wallaroo_docker_repo_host/$wallaroo_docker_image_repo/wallaroo:latest
     docker tag "$wallaroo_docker_image_path" "$wallaroo_docker_image_latest_path"
     # tagging Metrics UI image as latest
     metrics_ui_docker_image_latest_path=$wallaroo_docker_repo_host/$wallaroo_docker_image_repo/metrics_ui:latest
