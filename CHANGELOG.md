@@ -2,7 +2,7 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [unreleased] - unreleased
+## [0.5.3] - 2018-09-28
 
 ### Fixed
 
@@ -17,9 +17,6 @@ All notable changes to Wallaroo will be documented in this file.
 - Added preview release of the Python Connectors API
 - Added connector scripts for Kafka, Kinesis, RabbitMQ, Redis, S3, and UDP
 - Added a template for a Postgres connector script
-
-### Changed
-
 
 ## [0.5.2] - 2018-08-24
 
