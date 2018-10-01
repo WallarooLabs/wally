@@ -12,7 +12,7 @@ To start an AWS cluster first change directories from within the main `wallaroo`
 cd orchestration/terraform
 ```
 
-You will have to replace `<YOUR-CLUSTER-NAME>` with the name you want to give your cluster in the command below. We will be starting a 3 machine cluster `wallaroo-leader-1` for the initial Market Spread Wallaroo worker, `wallaroo-follower-1` for the NBBO/Orders senders, and `wallaroo-follower-2` for Giles Receiver and the Metrics UI. You can increase the number provided to `num_followers` for each additional Wallaroo worker you plan to test if testing more than a single worker.
+You will have to replace `<YOUR-CLUSTER-NAME>` with the name you want to give your cluster in the command below. We will be starting a 3 machine cluster `wallaroo-leader-1` for the initial Market Spread Wallaroo worker, `wallaroo-follower-1` for the NBBO/Orders senders, and `wallaroo-follower-2` for Data Receiver and the Metrics UI. You can increase the number provided to `num_followers` for each additional Wallaroo worker you plan to test if testing more than a single worker.
 
 The following command will spin up the cluster:
 
@@ -154,14 +154,14 @@ docker restart mui
 
 ### Running Single Worker Python Market Spread
 
-#### Start Giles Receiver
+#### Start Data Receiver
 
 SSH into `wallaroo-follower-2`
 
-Start Giles Receiver with the following command:
+Start Data Receiver with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555
 ```
 
 ### Start the Python Market Spread Application
@@ -279,14 +279,14 @@ If you need to restart the Metrics UI, run the following command on the machine 
 docker restart mui
 ```
 
-#### Start Giles Receiver
+#### Start Data Receiver
 
 SSH into `wallaroo-follower-2`
 
-Start Giles Receiver with the following command:
+Start Data Receiver with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555
 ```
 
 #### Start the Python Market Spread Application

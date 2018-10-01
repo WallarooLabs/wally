@@ -13,13 +13,13 @@ e.g. if in the control run, we observed the sequence of outputs `[10,11,12,13], 
 
 ### Setting Up for the Test:
 
-1. build Giles receiver and sender
+1. build Data Receiver and Giles Sender
 1. build `testing/correctness/apps/sequence_window` with `-D resilience` (and optionally `-d` for debug messages)
 1. create a `res-data` directory in the `testing/correctness/apps/sequence_window` directory
 
 ### Running the Test:
 
-1. start giles-receiver:  `../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555`
+1. start data-receiver:  `../../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555`
 1. start initializer-worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t`
 1. start second worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -r res-data -n worker2`
 1. start giles-sender and send the first 10000 integers: `../../../../giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 -u --ponythreads=1 -y -g 12 -w -m 10000`
@@ -44,7 +44,7 @@ This test is similar to testing state recovery, except we run giles sender with 
 
 ### Running the Test:
 
-1. start giles receiver, worker 1, and worker 2 as in the previous test
+1. start data receiver, worker 1, and worker 2 as in the previous test
 1. run giles with: `../../../../giles/sender/sender -h 127.0.0.1:7000 -s 1 -i 2_000_000_000 -u --ponythreads=1 -y -g 12 -w -m 10000`
 1. wait for a few lines to go through
 1. terminate worker2
@@ -70,4 +70,3 @@ TODO: fill this up
 
 ### Analysing the Test Results:
 TODO: fill this up
-

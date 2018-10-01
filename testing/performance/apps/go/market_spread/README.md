@@ -15,7 +15,7 @@ make
 Run a listener.
 
 ```bash
-../../../giles/receiver/receiver --ponythreads=1 --listen 127.0.0.1:7002
+../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --listen 127.0.0.1:7002
 ```
 
 ### Shell 2
@@ -67,7 +67,7 @@ Send the order data.
 Run a listener.
 
 ```bash
-../../../giles/receiver/receiver --ponythreads=1 --listen 127.0.0.1:7002
+../../../utils/data_receiver/data_receiver --ponythreads=1 --listen 127.0.0.1:7002
 ```
 
 ### Shell 2
