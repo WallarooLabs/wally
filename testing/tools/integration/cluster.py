@@ -851,7 +851,7 @@ class Cluster(object):
     def stop_background_threads(self, error=None):
         logging.log(1, "stop_background_threads({})".format(error))
         for s in self._stoppables:
-            s.stop()
+            s.stop(error)
         self._stoppables.clear()
 
     def raise_from_error(self, error):

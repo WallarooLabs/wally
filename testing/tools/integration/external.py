@@ -16,6 +16,7 @@
 from collections import namedtuple
 import logging
 import os
+import re
 import shlex
 import shutil
 import socket
@@ -148,6 +149,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
             with open(os.path.join(base_dir, 'test.error.log'), 'wb') as f:
                 f.write(log_stream.getvalue())
         runner_data = persistent_data.get('runner_data', [])
+
         # save worker data to files
         for rd in runner_data:
             worker_log_name = '{name}.{pid}.{code}.{time}.error.log'.format(
@@ -161,6 +163,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
                         .format(name=rd.name, pid=rd.pid,
                                 rc=rd.returncode),
                             stdout=rd.stdout))
+
         # save sender data to files
         sender_data = persistent_data.get('sender_data', [])
         for sd in sender_data:
@@ -169,6 +172,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
                 time=sd.start_time.strftime('%Y%m%d_%H%M%S.%f'))
             with open(os.path.join(base_dir, sender_log_name), 'wb') as f:
                 f.write(''.join(sd.data))
+
         # save sinks data to files
         sink_data = persistent_data.get('sink_data', [])
         for sk in sink_data:
@@ -178,6 +182,15 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
             with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
                 f.write(''.join(sk.data))
         logging.warn("Error logs saved to {}".format(base_dir))
+
+        # save core files if they exist
+        rex = re.compile('core.*')
+        cores = filter(lambda s: rex.match(s), os.listdir(os.getcwd()))
+        if cores:
+            logging.warn("Core files detected: {}".format(cores))
+        for core in cores:
+            logging.info("Moving core {} to {}".format(core, base_dir))
+            shutil.move(core, os.path.join(base_dir, core))
     except Exception as err:
         logging.error("Failed to write failure log files.")
         logging.exception(err)

@@ -195,7 +195,6 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
             ############
             # Validation
             ############
-            logging.debug('Begin validation phase...')
             if validate_file:
                 validation_files = validate_file.split(',')
                 for sink, fp in zip(cluster.sinks, validation_files):
@@ -203,6 +202,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 # let the code after 'finally' return our data
 
             else:  # compare expected to processed
+                logging.debug('Begin validation phase...')
                 # Decode captured output from sink
                 if decoder:
                     if not isinstance(decoder, (list, tuple)):

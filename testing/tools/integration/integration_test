@@ -6,16 +6,17 @@ import datetime
 import logging
 import os
 import random
-import re
 import shutil
 import struct
+import time
 
 from cluster import runner_data_format
-from external import (run_shell_cmd,
-                      save_logs_to_file)
 from end_points import (files_generator,
                         iter_generator,
                         sequence_generator)
+from errors import RunnerHasntStartedError
+from external import (run_shell_cmd,
+                      save_logs_to_file)
 from integration import pipeline_test
 from logger import (add_in_memory_log_stream,
                     INFO2,
@@ -510,51 +511,70 @@ def CLI():
         t0.strftime('%Y%m%d_%H%M%S'))
     persistent_data = {}
 
-    logging.debug("Running integration test with the following options:")
-    for k, v in args._get_kwargs():
-        logging.debug('%s: %r' % (k, v))
 
     # Run the test!
+    attempt = 0
     try:
-        pipeline_test(
-            generator = args.generators,
-            expected = args.expected_val,
-            command = args.command,
-            workers = args.workers,
-            sources = args.sources,
-            sinks = args.sinks,
-            mode = args.sink_mode,
-            batch_size = args.batch_size,
-            sink_expect = args.sink_expect,
-            sink_expect_allow_more = args.sink_expect_allow_more,
-            sink_stop_timeout = args.sink_stop_timeout,
-            sink_await = args.sink_await,
-            delay = args.delay,
-            validate_file = (args.output if args.validation_cmd else
-                             False),
-            giles_mode = 'giles' if args.giles_mode else None,
-            host=args.host,
-            runner_join_timeout=args.runner_join_timeout,
-            resilience_dir=args.resilience_dir,
-            spikes=args.spike,
-            persistent_data = persistent_data)
+        while True:
+            attempt += 1
+            try:
+                # clean up data collection before each attempt
+                persistent_data.clear()
+                log_stream.reset()
+                log_stream.truncate()
+
+                # start test attempt
+                logging.info("Integration test attempt {}".format(attempt))
+                logging.debug("Running integration test with the following"
+                              " options:")
+                for k, v in args._get_kwargs():
+                    logging.debug('%s: %r' % (k, v))
+                pipeline_test(
+                    generator = args.generators,
+                    expected = args.expected_val,
+                    command = args.command,
+                    workers = args.workers,
+                    sources = args.sources,
+                    sinks = args.sinks,
+                    mode = args.sink_mode,
+                    batch_size = args.batch_size,
+                    sink_expect = args.sink_expect,
+                    sink_expect_allow_more = args.sink_expect_allow_more,
+                    sink_stop_timeout = args.sink_stop_timeout,
+                    sink_await = args.sink_await,
+                    delay = args.delay,
+                    validate_file = (args.output if args.validation_cmd else
+                                     False),
+                    giles_mode = 'giles' if args.giles_mode else None,
+                    host=args.host,
+                    runner_join_timeout=args.runner_join_timeout,
+                    resilience_dir=args.resilience_dir,
+                    spikes=args.spike,
+                    persistent_data = persistent_data)
+                # Test run was successful, break out of loop and proceed to
+                # validation
+                logging.info("Run phase complete. Proceeding to validation.")
+                break
+            except RunnerHasntStartedError:
+                logging.warn("Runner failed to start properly.")
+                if attempt < args.max_retries:
+                    logging.info("Restarting the test!")
+                    time.sleep(0.5)
+                    continue
+                else:
+                    logging.error("Max retry attempts reached.")
+                    raise
+            except:
+                raise
     except Exception as err:
-        logging.exception("Encountered an error while running the test for %r\n===\n"
-                      % args.command)
+        logging.exception("Encountered an error while running the test for"
+                          " %r\n===\n" % args.command)
         # Save logs to file in case of error
-        save_logs_to_file(base_dir, log_stream, persistent_data)
-        # get core file names
         try:
-            rex = re.compile('core.*')
-            cores = filter(lambda s: rex.match(s), os.listdir(os.getcwd()))
-            if cores:
-                logging.warn("Core files detected: {}".format(cores))
-            for core in cores:
-                logging.info("Moving core {} to {}".format(core, base_dir))
-                shutil.move(core, os.path.join(base_dir, core))
-        except Exception as err_inner:
-            logging.exception(err_inner)
-            logging.warn("Failed to move core files {}".format(base_dir))
+            save_logs_to_file(base_dir, log_stream, persistent_data)
+        except Exception as err:
+            logging.warn("failed to save logs to file")
+            logging.exception(err)
         parser.exit(1)
 
     if validation_cmd:

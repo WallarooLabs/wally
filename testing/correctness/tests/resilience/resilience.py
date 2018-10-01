@@ -342,23 +342,17 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                 raise
     except Exception as err:
         # save log stream to file
-        base_dir = ('/tmp/wallaroo_test_errors/testing/correctness/'
-            'tests/resilience/{ops}/{time}'.format(
-                time=t0.strftime('%Y%m%d_%H%M%S'),
-                ops='_'.join((o.name().replace(':','') for o in ops*cycles))))
-        save_logs_to_file(base_dir, log_stream, persistent_data)
-        # get core file names
         try:
-            rex = re.compile('core.*')
-            cores = filter(lambda s: rex.match(s), os.listdir(os.getcwd()))
-            if cores:
-                logging.warn("Core files detected: {}".format(cores))
-            for core in cores:
-                logging.info("Moving core {} to {}".format(core, base_dir))
-                shutil.move(core, os.path.join(base_dir, core))
+            base_dir = ('/tmp/wallaroo_test_errors/testing/correctness/'
+                'tests/resilience/{ops}/{time}'.format(
+                    time=t0.strftime('%Y%m%d_%H%M%S'),
+                    ops='_'.join((o.name().replace(':','')
+                                  for o in ops*cycles))))
+            save_logs_to_file(base_dir, log_stream, persistent_data)
         except Exception as err_inner:
             logging.exception(err_inner)
-            logging.warn("Failed to move core files {}".format(base_dir))
+            logging.warn("Encountered an error when saving logs files to {}"
+                         .format(base_dir))
         logging.exception(err)
         raise
 
