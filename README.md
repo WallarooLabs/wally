@@ -10,8 +10,6 @@
 
 A fast, stream-processing framework. Wallaroo makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
 
-Answer our [30-second survey][survey-link], and be entered to win a Wallaroo T-Shirt.
-
 ## What is Wallaroo?
 
 When we set out to build Wallaroo, we had several high-level goals in mind:
