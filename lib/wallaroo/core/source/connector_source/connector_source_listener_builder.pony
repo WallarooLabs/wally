@@ -27,65 +27,88 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-class val ConnectorSourceListenerBuilder
-  let _source_builder: SourceBuilder
+class val ConnectorSourceListenerBuilder[In: Any val]
+  let _worker_name: WorkerName
   let _pipeline_name: String
+  let _runner_builder: RunnerBuilder
   let _router: Router
+  let _metrics_conn: MetricsSink
+  let _metrics_reporter: MetricsReporter
   let _router_registry: RouterRegistry
   let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val
-  let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
   let _auth: AmbientAuth
+  let _layout_initializer: LayoutInitializer
+  let _recovering: Bool
+  let _pre_state_target_ids: Array[RoutingId] val
   let _target_router: Router
+  let _parallelism: USize
+  let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
-  let _metrics_reporter: MetricsReporter
 
-  new val create(source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry,
+  new val create(worker_name: WorkerName, pipeline_name: String,
+    runner_builder: RunnerBuilder, router: Router, metrics_conn: MetricsSink,
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso,
-    target_router: Router = EmptyRouter,
+    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
+    target_router: Router = EmptyRouter, parallelism: USize,
+    handler: FramedSourceHandler[In] val,
     host: String = "", service: String = "0")
   =>
-    _source_builder = source_builder
+    _worker_name = worker_name
     _pipeline_name = pipeline_name
+    _runner_builder = runner_builder
     _router = router
+    _metrics_conn = metrics_conn
+    _metrics_reporter = consume metrics_reporter
     _router_registry = router_registry
     _outgoing_boundary_builders = outgoing_boundary_builders
-    _layout_initializer = layout_initializer
     _event_log = event_log
     _auth = auth
+    _layout_initializer = layout_initializer
+    _recovering = recovering
+    _pre_state_target_ids = pre_state_target_ids
     _target_router = target_router
+    _parallelism = parallelism
+    _handler = handler
     _host = host
     _service = service
-    _metrics_reporter = consume metrics_reporter
 
   fun apply(env: Env): SourceListener =>
-    ConnectorSourceListener(env, _source_builder, _router, _router_registry,
-      _outgoing_boundary_builders, _event_log, _auth,
-      _pipeline_name, _layout_initializer, _metrics_reporter.clone(),
-      _target_router, _host, _service)
+    ConnectorSourceListener[In](env, _worker_name, _pipeline_name, _runner_builder,
+      _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
+      _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
+      _recovering, _pre_state_target_ids, _target_router, _parallelism,
+      _handler, _host, _service)
 
-class val ConnectorSourceListenerBuilderBuilder
+class val ConnectorSourceListenerBuilderBuilder[In: Any val]
   let _host: String
   let _service: String
+  let _parallelism: USize
+  let _handler: FramedSourceHandler[In] val
 
-  new val create(host: String, service: String) =>
+  new val create(host: String, service: String, parallelism: USize,
+    handler: FramedSourceHandler[In] val)
+  =>
     _host = host
     _service = service
+    _parallelism = parallelism
+    _handler = handler
 
-  fun apply(source_builder: SourceBuilder, router: Router,
-    router_registry: RouterRegistry,
+  fun apply(worker_name: WorkerName, pipeline_name: String,
+    runner_builder: RunnerBuilder, router: Router, metrics_conn: MetricsSink,
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
-    event_log: EventLog, auth: AmbientAuth, pipeline_name: String,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso, recovering: Bool,
-    target_router: Router = EmptyRouter): ConnectorSourceListenerBuilder
+    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
+    target_router: Router = EmptyRouter): ConnectorSourceListenerBuilder[In]
   =>
-    ConnectorSourceListenerBuilder(source_builder, router, router_registry,
-      outgoing_boundary_builders, event_log, auth, pipeline_name,
-      layout_initializer, consume metrics_reporter,
-      target_router, _host, _service)
+    ConnectorSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
+      router, metrics_conn, consume metrics_reporter, router_registry,
+      outgoing_boundary_builders, event_log, auth,
+      layout_initializer, recovering, pre_state_target_ids,
+      target_router, _parallelism, _handler, _host, _service)

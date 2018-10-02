@@ -20,14 +20,22 @@ jobs:
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: make integration-tests debug=true
+      - run: |
+          ulimit -c unlimited
+          make integration-tests debug=true
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
   integration-tests-with-resilience:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.08.13.1
     steps:
       - checkout
       - run: .circleci/clone_tracker.sh
-      - run: make integration-tests-testing-correctness-tests-all resilience=on debug=true
+      - run: |
+          ulimit -c unlimited
+          make integration-tests-testing-correctness-tests-all resilience=on debug=true
+      - store_artifacts:
+          path: /tmp/wallaroo_test_errors
   unit-tests:
     docker:
       - image: wallaroolabs/wallaroo-ci:2018.08.13.1

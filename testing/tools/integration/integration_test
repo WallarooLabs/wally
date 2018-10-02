@@ -6,21 +6,22 @@ import datetime
 import logging
 import os
 import random
-import re
+import shutil
 import struct
+import time
 
 from cluster import runner_data_format
-from external import (run_shell_cmd,
-                      save_logs_to_file)
 from end_points import (files_generator,
                         iter_generator,
                         sequence_generator)
+from errors import RunnerHasntStartedError
+from external import (run_shell_cmd,
+                      save_logs_to_file)
 from integration import pipeline_test
 from logger import (add_in_memory_log_stream,
                     INFO2,
                     set_logging)
 
-set_logging(name='integration', level=logging.DEBUG)
 
 """
 Run an integration test as a CLI
@@ -318,10 +319,9 @@ LOG_LEVELS = {'none': 0,
               'warn': 30,
               'error': 40,
               'critical': 50}
-def set_log_level(value):
-    """Set the effective log level"""
-    level = LOG_LEVELS.get(value, 20)
-    logging.root.setLevel(level)
+def get_log_level(value):
+    """Get the effective log level"""
+    return LOG_LEVELS.get(value, 10)
 
 
 class SetLogFile(argparse.Action):
@@ -448,6 +448,9 @@ def CLI():
     expect = stopper.add_argument_group('Sink Expect')
     expect.add_argument('--sink-expect', type=int, action='append',
                         help=("How many messages to expect at each sink."))
+    stopper.add_argument('--sink-expect-allow-more', action='store_true',
+                         help=("Allow sink to receive more than the expected"
+                               " number of values"))
     stopper.add_argument('--sink-await', nargs='+', action=SinkAwaitAction,
                          metavar=('value', 'header'),
                          help=("Stop after receiving all await values in the"
@@ -480,7 +483,8 @@ def CLI():
                                   "error."))
 
     args = parser.parse_args()
-    set_log_level(args.log_level)
+    log_level = get_log_level(args.log_level)
+    set_logging(name='integration', level=log_level)
 
     # If --validation-cmp, make sure expected_val is not None
     if args.validation_cmp:
@@ -499,42 +503,78 @@ def CLI():
 
 
     t0 = datetime.datetime.now()
-    base_dir = 'errors/{}'.format(t0.strftime('%Y%m%d_%H%M%S'))
-    log_stream = add_in_memory_log_stream()
+    log_stream = add_in_memory_log_stream(level=logging.DEBUG)
+    cwd = os.getcwd()
+    trunc_head = cwd.find('/wallaroo/') + len('/wallaroo/')
+    base_dir = '/tmp/wallaroo_test_errors/{}/{}'.format(
+        cwd[trunc_head:],
+        t0.strftime('%Y%m%d_%H%M%S'))
     persistent_data = {}
 
-    logging.debug("Running integration test with the following options:")
-    for k, v in args._get_kwargs():
-        logging.debug('%s: %r' % (k, v))
 
     # Run the test!
+    attempt = 0
     try:
-        pipeline_test(
-            generator = args.generators,
-            expected = args.expected_val,
-            command = args.command,
-            workers = args.workers,
-            sources = args.sources,
-            sinks = args.sinks,
-            mode = args.sink_mode,
-            batch_size = args.batch_size,
-            sink_expect = args.sink_expect,
-            sink_stop_timeout = args.sink_stop_timeout,
-            sink_await = args.sink_await,
-            delay = args.delay,
-            validate_file = (args.output if args.validation_cmd else
-                             False),
-            giles_mode = 'giles' if args.giles_mode else None,
-            host=args.host,
-            runner_join_timeout=args.runner_join_timeout,
-            resilience_dir=args.resilience_dir,
-            spikes=args.spike,
-            persistent_data = persistent_data)
+        while True:
+            attempt += 1
+            try:
+                # clean up data collection before each attempt
+                persistent_data.clear()
+                log_stream.reset()
+                log_stream.truncate()
+
+                # start test attempt
+                logging.info("Integration test attempt {}".format(attempt))
+                logging.debug("Running integration test with the following"
+                              " options:")
+                for k, v in args._get_kwargs():
+                    logging.debug('%s: %r' % (k, v))
+                pipeline_test(
+                    generator = args.generators,
+                    expected = args.expected_val,
+                    command = args.command,
+                    workers = args.workers,
+                    sources = args.sources,
+                    sinks = args.sinks,
+                    mode = args.sink_mode,
+                    batch_size = args.batch_size,
+                    sink_expect = args.sink_expect,
+                    sink_expect_allow_more = args.sink_expect_allow_more,
+                    sink_stop_timeout = args.sink_stop_timeout,
+                    sink_await = args.sink_await,
+                    delay = args.delay,
+                    validate_file = (args.output if args.validation_cmd else
+                                     False),
+                    giles_mode = 'giles' if args.giles_mode else None,
+                    host=args.host,
+                    runner_join_timeout=args.runner_join_timeout,
+                    resilience_dir=args.resilience_dir,
+                    spikes=args.spike,
+                    persistent_data = persistent_data)
+                # Test run was successful, break out of loop and proceed to
+                # validation
+                logging.info("Run phase complete. Proceeding to validation.")
+                break
+            except RunnerHasntStartedError:
+                logging.warn("Runner failed to start properly.")
+                if attempt < args.max_retries:
+                    logging.info("Restarting the test!")
+                    time.sleep(0.5)
+                    continue
+                else:
+                    logging.error("Max retry attempts reached.")
+                    raise
+            except:
+                raise
     except Exception as err:
-        logging.exception("Encountered an error while running the test for %r\n===\n"
-                      % args.command)
+        logging.exception("Encountered an error while running the test for"
+                          " %r\n===\n" % args.command)
         # Save logs to file in case of error
-        save_logs_to_file(base_dir, log_stream, persistent_data)
+        try:
+            save_logs_to_file(base_dir, log_stream, persistent_data)
+        except Exception as err:
+            logging.warn("failed to save logs to file")
+            logging.exception(err)
         parser.exit(1)
 
     if validation_cmd:
@@ -551,7 +591,7 @@ def CLI():
             outputs = runner_data_format(persistent_data.get('runner_data', []))
             logging.error("Application outputs:\n{}".format(outputs))
             logging.error("Validation command '%s' failed with the output:\n"
-                          "--\n%s\nThe application output is shown above.\n",
+                          "--\n%s",
                           res.command, res.output)
             # Save logs to file in case of error
             save_logs_to_file(base_dir, log_stream, persistent_data)

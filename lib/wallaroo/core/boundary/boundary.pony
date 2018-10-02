@@ -152,7 +152,11 @@ actor OutgoingBoundary is Consumer
   var _host: String
   var _service: String
   let _from: String
+  // Queuing all messages in case we need to resend them
   let _queue: Array[Array[ByteSeq] val] = _queue.create()
+  // Queuing messages we haven't sent yet (these will also be queued in _queue,
+  // so _unsent is a subset of _queue).
+  let _unsent: Array[Array[ByteSeq] val] = _unsent.create()
   var _lowest_queue_id: SeqId = 0
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
@@ -319,6 +323,7 @@ actor OutgoingBoundary is Consumer
 
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+    i_producer_id: RoutingId,
     i_producer: Producer, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -348,6 +353,7 @@ actor OutgoingBoundary is Consumer
       _seq_id = _seq_id + 1
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
+        i_producer_id,
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         _seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)?
@@ -355,6 +361,8 @@ actor OutgoingBoundary is Consumer
 
       if _connection_initialized then
         _writev(outgoing_msg)
+      else
+        _unsent.push(outgoing_msg)
       end
 
       let end_ts = Time.nanos()
@@ -405,6 +413,10 @@ actor OutgoingBoundary is Consumer
     end
     _connection_initialized = true
     _replaying = false
+    for msg in _unsent.values() do
+      _writev(msg)
+    end
+    _unsent.clear()
     _maybe_mute_or_unmute_upstreams()
 
   fun ref _replay_from(idx: SeqId) =>
@@ -420,7 +432,9 @@ actor OutgoingBoundary is Consumer
         end
         cur_id = cur_id + 1
       end
-      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _step_id, _auth)?)
+      _unsent.clear()
+      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _step_id,
+        _auth)?)
     else
       Fail()
     end
@@ -517,6 +531,7 @@ actor OutgoingBoundary is Consumer
     match barrier_token
     | let srt: CheckpointRollbackBarrierToken =>
       _queue.clear()
+      _unsent.clear()
     end
 
     try
@@ -528,6 +543,8 @@ actor OutgoingBoundary is Consumer
         origin_step_id, barrier_token, _seq_id, _auth)?
       if _connection_initialized then
         _writev(msg)
+      else
+        _unsent.push(msg)
       end
       _add_to_upstream_backup(msg)
     else
@@ -558,6 +575,7 @@ actor OutgoingBoundary is Consumer
   be prepare_for_rollback() =>
     _lowest_queue_id = _lowest_queue_id + _queue.size().u64()
     _queue.clear()
+    _unsent.clear()
 
   be rollback(payload: ByteSeq val, event_log: EventLog,
     checkpoint_id: CheckpointId)

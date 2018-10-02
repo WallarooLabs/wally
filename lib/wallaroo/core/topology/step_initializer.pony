@@ -91,26 +91,23 @@ class val SourceData
   let _pipeline_name: String
   let _name: String
   let _state_name: String
-  let _builder: SourceBuilderBuilder
   let _runner_builder: RunnerBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
   let _pre_state_target_ids: Array[RoutingId] val
 
-  new val create(id': RoutingId, b: SourceBuilderBuilder, r: RunnerBuilder,
+  new val create(id': RoutingId, p_name: String, r: RunnerBuilder,
     s: SourceListenerBuilderBuilder,
     pre_state_target_ids': Array[RoutingId] val = recover Array[RoutingId] end)
   =>
     _id = id'
-    _pipeline_name = b.name()
+    _pipeline_name = p_name
     _name = "| " + _pipeline_name + " source | " + r.name() + "|"
-    _builder = b
     _runner_builder = r
     _state_name = _runner_builder.state_name()
     _source_listener_builder_builder = s
 
     _pre_state_target_ids = pre_state_target_ids'
 
-  fun builder(): SourceBuilderBuilder => _builder
   fun runner_builder(): RunnerBuilder => _runner_builder
 
   fun name(): String => _name

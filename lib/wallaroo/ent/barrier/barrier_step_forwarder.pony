@@ -121,7 +121,6 @@ class BarrierStepForwarder
           ob.forward_barrier(o_id, _step_id,
             _barrier_token)
         else
-          // @printf[I32]("!@ FORWARDING TO NON BOUNDARY\n".cstring())
           o.receive_barrier(_step_id, _step, _barrier_token)
         end
       end

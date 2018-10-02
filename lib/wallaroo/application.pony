@@ -89,7 +89,6 @@ class Application
 trait BasicPipeline
   fun name(): String
   fun source_id(): USize
-  fun source_builder(): SourceBuilderBuilder ?
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
   fun val sink_builders(): Array[SinkBuilder] val
   fun val sink_ids(): Array[RoutingId] val
@@ -102,7 +101,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _name: String
   let _app_name: String
   let _runner_builders: Array[RunnerBuilder]
-  var _source_builder: (SourceBuilderBuilder | None) = None
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
   var _sink_builders: Array[SinkBuilder] = Array[SinkBuilder]
 
@@ -118,7 +116,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _app_name = app_name
     _is_coalesced = coalescing
     _source_listener_builder_builder = sc.source_listener_builder_builder()
-    _source_builder = sc.source_builder(_app_name, _name)
 
   fun ref add_runner_builder(p: RunnerBuilder) =>
     _runner_builders.push(p)
@@ -130,9 +127,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _add_sink_id()
 
   fun source_id(): USize => _pipeline_id
-
-  fun source_builder(): SourceBuilderBuilder ? =>
-    _source_builder as SourceBuilderBuilder
 
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder
