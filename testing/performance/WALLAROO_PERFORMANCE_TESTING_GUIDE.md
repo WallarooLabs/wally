@@ -126,7 +126,7 @@ Starting Data Receiver on `wallaroo-follower-2`:
 ```bash
 sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 \
   ~/wallaroo/utils/data_receiver/data_receiver --framed -w -l wallaroo-follower-2:5555 \
-  --ponythreads=1 --ponynoblock --ponypinasio
+  --ponythreads=1 --ponynoblock --ponypinasio > received.txt
 ```
 
 - `numactl -- -C 1,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `1` is used in this case because it is the first free CPU available of this instance. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`.

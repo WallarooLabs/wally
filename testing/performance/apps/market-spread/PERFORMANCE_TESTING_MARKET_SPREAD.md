@@ -163,7 +163,7 @@ SSH into `wallaroo-follower-2`
 Start Data Receiver with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555 > received.txt
 ```
 
 #### Start the Market Spread Application
@@ -341,7 +341,7 @@ SSH into `wallaroo-follower-2`
 Start Data Receiver with the following command:
 
 ```bash
-sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555
+sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 ~/wallaroo/utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l wallaroo-follower-2:5555 > received.txt
 ```
 
 #### Start the Market Spread Application

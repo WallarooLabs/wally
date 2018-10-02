@@ -15,7 +15,7 @@ make
 Run a listener.
 
 ```bash
-../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --listen 127.0.0.1:7002
+../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --listen 127.0.0.1:7002 > received.txt
 ```
 
 ### Shell 2

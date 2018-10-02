@@ -32,7 +32,7 @@ To run, use the following commands:
 1. Data Receiver:
 ```bash
 ../../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock \
---ponypinasio -l 127.0.0.1:5555
+--ponypinasio -l 127.0.0.1:5555 > received.txt
 ```
 2. Initializer worker
 ```bash

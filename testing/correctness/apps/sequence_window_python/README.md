@@ -31,7 +31,7 @@ In another shell, run Data Receiver to listen for messages:
 
 ```bash
 ../../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock \
-  --listen 127.0.0.1:7002
+  --listen 127.0.0.1:7002 > received.txt
 ```
 
 In two other shells, export the current directories and machida directories to paths, then run the application main (initializer) worker and second worker:
