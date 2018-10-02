@@ -18,6 +18,7 @@ import logging
 from numbers import Number
 import os
 import re
+import shutil
 import time
 
 
@@ -60,6 +61,9 @@ def parse_sink_value(s):
 # TODO: refactor and move to control.py
 def pause_senders_and_sink_await(cluster, timeout=10):
     logging.debug("pause_senders_and_sink_await")
+    if not cluster.senders:
+        logging.debug("No senders to pause. Continuing.")
+        return
     cluster.pause_senders()
     time.sleep(5)
     for s in cluster.senders:
@@ -269,7 +273,7 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
     `validate_output` - whether or not to validate the output
     """
     t0 = datetime.datetime.now()
-    log_stream = add_in_memory_log_stream()
+    log_stream = add_in_memory_log_stream(level=logging.DEBUG)
     persistent_data = {}
     res_ops = []
     try:
@@ -316,8 +320,7 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                             FROM_TAIL,
                             runner_data_format(
                                 persistent_data.get('runner_data'),
-                                from_tail=FROM_TAIL,
-                                filter_fn=lambda r: True)))
+                                from_tail=FROM_TAIL)))
                 raise
             except TimeoutError:
                 if persistent_data.get('runner_data'):
@@ -326,8 +329,7 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                             FROM_TAIL,
                             runner_data_format(
                                 persistent_data.get('runner_data'),
-                                from_tail=FROM_TAIL,
-                                filter_fn=lambda r: True)))
+                                from_tail=FROM_TAIL)))
                 raise
             except:
                 if persistent_data.get('runner_data'):
@@ -336,16 +338,22 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                         .format(FROM_TAIL,
                             runner_data_format(
                                 persistent_data.get('runner_data'),
-                                from_tail=FROM_TAIL,
-                                filter_fn=lambda r: True)))
+                                from_tail=FROM_TAIL)))
                 raise
     except Exception as err:
-        logging.exception(err)
         # save log stream to file
-        base_dir = 'error/{ops}/{time}'.format(
-            time=t0.strftime('%Y%m%d_%H%M%S'),
-            ops='_'.join((o.name().replace(':','') for o in ops*cycles)))
-        save_logs_to_file(base_dir, log_stream, persistent_data)
+        try:
+            base_dir = ('/tmp/wallaroo_test_errors/testing/correctness/'
+                'tests/resilience/{ops}/{time}'.format(
+                    time=t0.strftime('%Y%m%d_%H%M%S'),
+                    ops='_'.join((o.name().replace(':','')
+                                  for o in ops*cycles))))
+            save_logs_to_file(base_dir, log_stream, persistent_data)
+        except Exception as err_inner:
+            logging.exception(err_inner)
+            logging.warn("Encountered an error when saving logs files to {}"
+                         .format(base_dir))
+        logging.exception(err)
         raise
 
 
@@ -413,7 +421,6 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
 
         # loop over ops, keeping the result and passing it to the next op
         res = None
-        sender_paused = False
         assert(not cluster.get_crashed_workers())
         for op in ops:
             res_ops.append(op)
@@ -424,37 +431,38 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
         # Wait a full second for things to calm down
         time.sleep(1)
 
-        # Tell the multi-sequence-sender to stop
-        msg.stop()
+        # If using external senders, wait for them to stop cleanly
+        if cluster.senders:
+            # Tell the multi-sequence-sender to stop
+            msg.stop()
 
-        # wait for senders to reach the end of their readers and stop
-        for s in cluster.senders:
-            cluster.wait_for_sender(s)
+            # wait for senders to reach the end of their readers and stop
+            for s in cluster.senders:
+                cluster.wait_for_sender(s)
 
-        # Validate all sender values caught up
-        stop_value = max(msg.seqs)
-        t0 = time.time()
-        while True:
-            try:
-                assert(len(msg.seqs) == msg.seqs.count(stop_value))
-                break
-            except:
-                if time.time() - t0 > 2:
-                    logging.error("msg.seqs aren't all equal: {}"
-                        .format(msg.seqs))
-                    raise
-            time.sleep(0.1)
+            # Validate all sender values caught up
+            stop_value = max(msg.seqs)
+            t0 = time.time()
+            while True:
+                try:
+                    assert(len(msg.seqs) == msg.seqs.count(stop_value))
+                    break
+                except:
+                    if time.time() - t0 > 2:
+                        logging.error("msg.seqs aren't all equal: {}"
+                            .format(msg.seqs))
+                        raise
+                time.sleep(0.1)
 
-        # Create await_values for the sink based on the stop values from the
-        # multi sequence generator
+            # Create await_values for the sink based on the stop values from
+            # the multi sequence generator
+            await_values = []
+            for part, val in enumerate(msg.seqs):
+                key = '{:07d}'.format(part)
+                data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)])
+                await_values.append((key, data))
+            cluster.sink_await(values=await_values, func=parse_sink_value)
 
-        await_values = []
-        for part, val in enumerate(msg.seqs):
-            key = '{:07d}'.format(part)
-            data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)])
-            await_values.append((key, data))
-
-        cluster.sink_await(values=await_values, func=parse_sink_value)
         logging.info("Completion condition achieved. Shutting down cluster.")
 
         # Use validator to validate the data in at-least-once mode
@@ -466,9 +474,14 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
 
             # Validate captured output
             logging.info("Validating output")
-            cmd_validate = ('validator -i {out_file} -e {expect} -a'
-                            .format(out_file = out_file,
-                                    expect = stop_value))
+            # if senders == 0, using internal source
+            if cluster.senders:
+                cmd_validate = ('validator -i {out_file} -e {expect} -a'
+                                .format(out_file = out_file,
+                                        expect = stop_value))
+            else:
+                cmd_validate = ('validator -i {out_file} -a'
+                                .format(out_file = out_file))
             res = run_shell_cmd(cmd_validate)
             try:
                 assert(res.success)

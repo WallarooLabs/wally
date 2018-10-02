@@ -45,6 +45,9 @@ build-testing-correctness-apps-multi_partition_detector: build-testing-correctne
 integration-tests-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector
 integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test
 integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test_10_worker
+integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test_internal_source
+integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test_internal_source_10_worker
+
 
 multi_partition_detector_test:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
@@ -58,6 +61,19 @@ multi_partition_detector_test:
 		--batch-size 10 \
 		--workers 2 \
 		--sink-expect 200
+
+multi_partition_detector_test_internal_source:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --log-level error \
+		--command './multi_partition_detector --internal-source' \
+		--sources 0 \
+		--validation-cmd './validator/validator -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 2 \
+		--sink-expect 200 \
+		--sink-expect-allow-more
 
 multi_partition_detector_test_10_worker:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
@@ -78,7 +94,20 @@ multi_partition_detector_test_10_worker:
 		--output 'received.txt' \
 		--batch-size 10 \
 		--workers 10 \
-		--sink-expect 10000 
+		--sink-expect 10000
+
+multi_partition_detector_test_internal_source_10_worker:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --log-level error \
+		--command './multi_partition_detector --internal-source' \
+		--sources 0 \
+		--validation-cmd './validator/validator -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 10 \
+		--sink-expect 10000 \
+		--sink-expect-allow-more
 
 # end of prevent rules from being evaluated/included multiple times
 endif

@@ -252,7 +252,7 @@ class val ProxyRouter is Router
         _target_proxy_address,
         i_msg_uid, frac_ids)
 
-      r.forward(delivery_msg, pipeline_time_spent, producer,
+      r.forward(delivery_msg, pipeline_time_spent, producer_id, producer,
         latest_ts, metrics_id, metric_name, worker_ingress_ts)
 
       (false, latest_ts)
@@ -535,7 +535,7 @@ class val StateStepRouter is TargetIdRouter
                 _worker_name, data, metric_name,
                 pa, msg_uid, frac_ids)
 
-              r.forward(delivery_msg, pipeline_time_spent,
+              r.forward(delivery_msg, pipeline_time_spent, producer_id,
                 producer, latest_ts, metrics_id,
                 metric_name, worker_ingress_ts)
               (false, latest_ts)
@@ -1897,7 +1897,7 @@ class val HashedProxyRouter is Router
 
       match data
       | let m: ReplayableDeliveryMsg =>
-        r.forward(m, pipeline_time_spent, producer,
+        r.forward(m, pipeline_time_spent, producer_id, producer,
           latest_ts, metrics_id, metric_name, worker_ingress_ts)
       else
         Fail()

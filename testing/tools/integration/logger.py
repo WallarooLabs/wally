@@ -26,7 +26,7 @@ DEFAULT_LOG_FMT_NAME = '%(asctime)s %(name)s %(levelname)-8s [%(filename)s:%(lin
 
 def set_logging(name='', level=logging.INFO, fmt=None):
     logging.root.name = name
-    logging.root.setLevel(level)
+    logging.root.setLevel(0)
     if not fmt:
         if name:
             fmt = DEFAULT_LOG_FMT_NAME
@@ -34,11 +34,13 @@ def set_logging(name='', level=logging.INFO, fmt=None):
             fmt = DEFAULT_LOG_FMT
     logging.root.formatter = logging.Formatter(fmt)
     stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(level)
     stream_handler.setFormatter(logging.root.formatter)
     logging.root.addHandler(stream_handler)
 
 
 def add_in_memory_log_stream(name='', level=None, fmt=None):
+    logging.root.setLevel(0)
     log_stream = StringIO()
     if not fmt:
         if name:
@@ -49,8 +51,6 @@ def add_in_memory_log_stream(name='', level=None, fmt=None):
     sh = logging.StreamHandler(log_stream)
     if level:
         sh.setLevel(level)
-    else:
-        sh.setLevel(logging.root.level)
     sh.setFormatter(formatter)
     logging.root.addHandler(sh)
     return log_stream

@@ -203,6 +203,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     @printf[I32]("EventLog: dispose\n".cstring())
     _backend.dispose()
     _disposed = true
+    _phase = _DisposedEventLogPhase
     @printf[I32]("EventLog: dispose 2\n".cstring())
 
   /////////////////

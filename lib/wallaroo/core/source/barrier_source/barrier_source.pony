@@ -243,10 +243,10 @@ actor BarrierSource is Source
   be disconnect_boundary(worker: WorkerName) =>
     None
 
-  be mute(c: Consumer) =>
+  be mute(a: Any tag) =>
     None
 
-  be unmute(c: Consumer) =>
+  be unmute(a: Any tag) =>
     None
 
   be initiate_barrier(token: BarrierToken) =>

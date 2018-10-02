@@ -42,9 +42,4 @@ class val KafkaSourceConfig[In: Any val] is SourceConfig[In]
 
   fun source_listener_builder_builder(): KafkaSourceListenerBuilderBuilder[In]
   =>
-    KafkaSourceListenerBuilderBuilder[In](_ksco, _auth)
-
-  fun source_builder(app_name: String, name: String):
-    KafkaSourceBuilderBuilder[In]
-  =>
-    KafkaSourceBuilderBuilder[In](app_name, name, _handler)
+    KafkaSourceListenerBuilderBuilder[In](_ksco, _handler, _auth)

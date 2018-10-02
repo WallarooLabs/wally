@@ -164,6 +164,8 @@ actor RouterRegistry
 
   var _initiated_stop_the_world: Bool = false
 
+  var _recovery_protocol_complete: Bool = false
+
   // If this is a worker that joined during an autoscale event, then there
   // is one worker we contacted to join.
   let _contacted_worker: (WorkerName | None)
@@ -207,6 +209,16 @@ actor RouterRegistry
 
   be application_ready_to_work() =>
     _application_ready_to_work = true
+
+  be recovery_protocol_complete() =>
+    """
+    Called when Recovery is finished. If we're not recovering, that's right
+    away.
+    """
+    _recovery_protocol_complete = true
+    for sl in _source_listeners.values() do
+      sl.recovery_protocol_complete()
+    end
 
   be data_receivers_initialized() =>
     _data_receivers_initialized = true
@@ -301,6 +313,9 @@ actor RouterRegistry
   be register_source_listener(source_listener: SourceListener) =>
     _source_listeners.set(source_listener)
     _connections.register_disposable(source_listener)
+    if _recovery_protocol_complete then
+      source_listener.recovery_protocol_complete()
+    end
 
   be register_data_channel_listener(dchl: DataChannelListener) =>
     _data_channel_listeners.set(dchl)

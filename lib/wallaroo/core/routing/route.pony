@@ -37,9 +37,9 @@ trait Route
     worker_ingress_ts: U64)
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
-    pipeline_time_spent: U64, cfp: Producer ref,
-    latest_ts: U64, metrics_id: U16,
-    metric_name: String, worker_ingress_ts: U64)
+    pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
+    latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64)
 
   fun register_producer(target_id: RoutingId)
   fun unregister_producer(target_id: RoutingId)
@@ -108,9 +108,9 @@ class EmptyRoute is Route
     true
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
-    pipeline_time_spent: U64, cfp: Producer ref,
-    latest_ts: U64, metrics_id: U16,
-    metric_name: String, worker_ingress_ts: U64)
+    pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
+    latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64)
   =>
     Fail()
     true

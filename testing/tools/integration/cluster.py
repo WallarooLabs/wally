@@ -209,8 +209,8 @@ class Runner(threading.Thread):
 
 
 BASE_COMMAND = r'''{command} \
-    --in {inputs} \
-    --out {outputs} \
+    {in_block} \
+    {out_block} \
     --metrics {metrics_addr} \
     --resilience-dir {res_dir} \
     --name {{name}} \
@@ -222,6 +222,8 @@ BASE_COMMAND = r'''{command} \
     --ponythreads=1 \
     --ponypinasio \
     --ponynoblock'''
+IN_BLOCK = r'''--in {inputs}'''
+OUT_BLOCK = r'''--out {outputs}'''
 INITIALIZER_CMD = r'''{worker_count} \
     --data {data_addr} \
     --external {external_addr} \
@@ -247,8 +249,14 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
                   res_dir, workers, worker_addrs=[], alt_block=None,
                   alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
-                                   inputs=','.join(source_addrs),
-                                   outputs=','.join(sink_addrs),
+                                   in_block=(
+                                       IN_BLOCK.format(inputs=','.join(
+                                           source_addrs))
+                                       if source_addrs else ''),
+                                   out_block=(
+                                       OUT_BLOCK.format(outputs=','.join(
+                                           sink_addrs))
+                                       if sink_addrs else ''),
                                    metrics_addr=metrics_addr,
                                    res_dir=res_dir)
 
@@ -336,8 +344,14 @@ def add_runner(worker_id, runners, command, source_addrs, sink_addrs, metrics_ad
                my_control_addr, my_data_addr, my_external_addr,
                alt_block=None, alt_func=lambda x: False, spikes={}):
     cmd_stub = BASE_COMMAND.format(command=command,
-                                   inputs=','.join(source_addrs),
-                                   outputs=','.join(sink_addrs),
+                                   in_block=(
+                                       IN_BLOCK.format(inputs=','.join(
+                                           source_addrs))
+                                       if source_addrs else ''),
+                                   out_block=(
+                                       OUT_BLOCK.format(outputs=','.join(
+                                           sink_addrs))
+                                       if sink_addrs else ''),
                                    metrics_addr=metrics_addr,
                                    res_dir=res_dir)
 
@@ -718,14 +732,14 @@ class Cluster(object):
             raise t.error
         return sink
 
-    def sink_expect(self, expected, timeout=30, sink=-1):
+    def sink_expect(self, expected, timeout=30, sink=-1, allow_more=False):
         logging.log(1, "sink_expect(expected={}, timeout={}, sink={})".format(
             expected, timeout, sink))
         if isinstance(sink, Sink):
             pass
         else:
             sink = self.sinks[sink]
-        t = SinkExpect(sink, expected, timeout)
+        t = SinkExpect(sink, expected, timeout, allow_more=allow_more)
         self._stoppables.add(t)
         t.start()
         t.join()
@@ -837,7 +851,7 @@ class Cluster(object):
     def stop_background_threads(self, error=None):
         logging.log(1, "stop_background_threads({})".format(error))
         for s in self._stoppables:
-            s.stop()
+            s.stop(error)
         self._stoppables.clear()
 
     def raise_from_error(self, error):
