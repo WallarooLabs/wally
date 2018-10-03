@@ -87,8 +87,8 @@ class ReceiverFileDataSource is Iterator[Array[U8] val]
     end
 
   fun ref next(): Array[U8] val =>
-    // 4 bytes LENGTH HEADER + 8 byte U64 giles receiver timestamp
-    let h = _file.read(12)
+    // 4 bytes LENGTH HEADER
+    let h = _file.read(4)
     try
       let expect: USize = Bytes.to_u32(h(0)?, h(1)?, h(2)?, h(3)?).usize()
       h.append(_file.read(expect))

@@ -53,7 +53,7 @@ Run worker 3.
 In a shell, set up a listener:
 
 ```bash
-../../giles/receiver/receiver --ponythreads=1 --listen 127.0.0.1:7002
+../../utils/data_receiver/data_receiver --framed --ponythreads=1 --listen 127.0.0.1:7002
 ```
 In another shell, export the current directory and `wallaroo.py` directories to `PYTHONPATH`:
 

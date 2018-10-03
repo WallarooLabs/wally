@@ -25,7 +25,7 @@ make cluster cluster_name=<YOUR-CLUSTER-NAME> num_followers=2 \
 
 - `cluster_name`: the name you'd want to use for your cluster, this should be a unique identifier that you can remember.
 
-- `num_followers`: The number of additional instance types to bring up besides the default single instance `wallaroo-leader-1` brought up via the `make cluster` command. If running multi-worker tests, this should be adjusted to include an additional instance per worker. The Metrics UI, Giles Receiver(s) and Sender(s) should also be running on a separate instance type where no other Wallaroo worker is running.
+- `num_followers`: The number of additional instance types to bring up besides the default single instance `wallaroo-leader-1` brought up via the `make cluster` command. If running multi-worker tests, this should be adjusted to include an additional instance per worker. The Metrics UI, Data Receiver(s) and Sender(s) should also be running on a separate instance type where no other Wallaroo worker is running.
 
 - `force_instance`: The instance type you want to use for performance testing. Standard performance testing is done on `c4.8xlarge` instance types. Change this to a different instance type if doing testing that requires a different instance.
 
@@ -80,7 +80,7 @@ sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
 
 - `-c wallaroo-leader-1:12500 -d wallaroo-leader-1:12501 -e wallaroo-leader-1:5050`: Assuming we're running this command on `wallaroo-leader-1`, this is used in place of the IP that the AWS instance is running on without having to update the command each time it is run on a different AWS cluster.
 
-- `-o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001`: Assuming we're running the Metrics UI and Giles Receiver on  `wallaroo-follower-2`, this is used in place of the IP that the AWS instance is running on without having to update the command each time it is run on a different AWS cluster.
+- `-o wallaroo-follower-2:5555 -m wallaroo-follower-2:5001`: Assuming we're running the Metrics UI and Data Receiver on  `wallaroo-follower-2`, this is used in place of the IP that the AWS instance is running on without having to update the command each time it is run on a different AWS cluster.
 
 - `--ponythreads=16`: For the current processing rate we currently test Walalroo with, we've determined that 16 threads works best. This should be adjusted to fit the instance type you choose if 16 threads are not avialable.
 
@@ -119,14 +119,14 @@ sudo cset proc -s user -e numactl -- -C 1-16,17 chrt -f 80 \
 
 ### Wallaroo Data Receiver Command
 
-In this section we'll break down the command used to start up Giles Receiver to receive data from Wallaroo. It assumes you have basic knowledge of the arguments used to start a receiver.
+In this section we'll break down the command used to start up Data Receiver to receive data from Wallaroo. It assumes you have basic knowledge of the arguments used to start a receiver.
 
-Starting Giles Receiver on `wallaroo-follower-2`:
+Starting Data Receiver on `wallaroo-follower-2`:
 
 ```bash
 sudo cset proc -s user -e numactl -- -C 1,17 chrt -f 80 \
-  ~/wallaroo/giles/receiver/receiver -w -l wallaroo-follower-2:5555 \
-  --ponythreads=1 --ponynoblock --ponypinasio
+  ~/wallaroo/utils/data_receiver/data_receiver --framed -w -l wallaroo-follower-2:5555 \
+  --ponythreads=1 --ponynoblock --ponypinasio > received.txt
 ```
 
 - `numactl -- -C 1,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `1` is used in this case because it is the first free CPU available of this instance. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`.
@@ -149,7 +149,7 @@ sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 \
   --ponythreads=1 --ponynoblock --ponypinasio
 ```
 
-- `numactl -- -C 2,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `2` is used in this case because we want to use 1 ponythread and we're assuming Giles Receiver is on `1`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`.
+- `numactl -- -C 2,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `2` is used in this case because we want to use 1 ponythread and we're assuming Data Receiver is on `1`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`.
 
 - `-h wallaroo-leader-1:7001`: Assuming the initial Wallaroo worker is running on `wallaroo-leader-1` and expecting NBBO data on port `7001`. This should be updated if the worker is running on a different host or is listening on a different port.
 
@@ -164,7 +164,7 @@ sudo cset proc -s user -e numactl -- -C 2,17 chrt -f 80 \
   -f ~/wallaroo/testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg \
   --ponythreads=1 --ponypinasio --ponynoblock
 ```
-- `numactl -- -C 2,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `2` is used in this case because we want to use 1 ponythread and we're assuming Giles Receiver is on `1`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`. The initial number provided to `numactl` should not clash with a running process started using `numactl`.
+- `numactl -- -C 2,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `2` is used in this case because we want to use 1 ponythread and we're assuming Data Receiver is on `1`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`. The initial number provided to `numactl` should not clash with a running process started using `numactl`.
 
 `-m 10000000000`: We send in a large amount of total messages to avoid the senders dying on us before testing is complete.
 
@@ -185,7 +185,7 @@ Starting a repeating Orders sender on `wallaroo-follower-2`:
 sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/wallaroo/giles/sender/sender -h wallaroo-leader-1:7000 -m 5000000000 -s 900 -i 5_000_000 -f ~/wallaroo/testing/data/market_spread/orders/350-symbols_orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
 ```
 
-- `numactl -- -C 9,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `9` is used in this case because we want to use 1 ponythread and we're assuming Giles Receiver is on `1` and NBBO senders are on `2-8`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`. The initial number provided to `numactl` should not clash with a running process started using `numactl`.
+- `numactl -- -C 9,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `9` is used in this case because we want to use 1 ponythread and we're assuming Data Receiver is on `1` and NBBO senders are on `2-8`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`. The initial number provided to `numactl` should not clash with a running process started using `numactl`.
 
 `-m 5000000000`: We send in a large amount of total messages to avoid the senders dying on us before testing is complete.
 
@@ -207,7 +207,7 @@ sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 \
 
 - `wallaroo-leader-1:5050`: We're assuming the initalizer is running on `wallaroo-leader-1` and is using port `5050` for it's external data channel. Update the hostname and/or the port if a different argument is used to start the initial Wallaroo worker.
 
-- `numactl -- -C 16,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `16` is used in this case because we want to use 1 ponythread and we're assuming Giles Receiver is on `1` and Giles senders are on `2-15`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`.
+- `numactl -- -C 16,17`: this command tells `numactl` to execute the following command only on the CPUs provided to `-C`. `16` is used in this case because we want to use 1 ponythread and we're assuming Data Receiver is on `1` and Giles senders are on `2-15`. `,17` is used for the Pony ASIO thread because we're using `--ponypinasio`.
 
 ## Information to Record
 
@@ -215,7 +215,7 @@ When running performance tests for Wallaroo, there's certain information we want
 
 - **Cluster Create Command**: Allows for reproduction if neccessary.
 
-- **Wallaroo Commands**: Commands used to start Wallaroo workers, Giles Receiver, Giles Sender(s), and the Metrics UI.
+- **Wallaroo Commands**: Commands used to start Wallaroo workers, Data Receiver, Giles Sender(s), and the Metrics UI.
 
 - **Walalroo Version**: Commit or version used for testing.
 
