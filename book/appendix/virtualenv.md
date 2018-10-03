@@ -96,18 +96,19 @@ $HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/build/machi
   --ponynoblock
 ```
 
-Please be aware that you'll still need to setup a source and sink as well. We include a toolkit named Giles to assist in this. To learn more you can look at [Giles Receiver](/book/wallaroo-tools/giles-receiver.md) and [Giles Sender](/book/wallaroo-tools/giles-sender.md) for more detailed instructions on building and running Giles.
+Please be aware that you'll still need to setup a source and sink as well. To learn more you can look at [Giles Sender](/book/wallaroo-tools/giles-sender.md) for more detailed instructions on building and running Giles.
 
-To run a sink for our example with Giles, run
+To run a sink for our example with Data Receiver, run
 
 ```bash
-$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/giles/receiver/receiver --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock
+$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/utils/data_receiver/data_receiver --framed --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock
 ```
 
-or if you prefer to log the output into a file, you may use the netcat utility like so
+or if you prefer to log the output into a file:
 
 ```bash
-nc -l 127.0.0.1 5555 > output
+$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/utils/data_receiver/data_receiver \
+--framed --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock > output
 ```
 
 The contents of your pipeline's decoder will be added to a file named output in the directory from which this is run.

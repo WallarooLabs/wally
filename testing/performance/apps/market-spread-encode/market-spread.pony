@@ -28,7 +28,7 @@ nc -l 127.0.0.1 5001 >> /dev/null
 
 or
 
-giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 127.0.0.1:5555
+utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock -w -l 127.0.0.1:5555 > received.txt
 
 350 Symbols
 

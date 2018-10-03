@@ -34,16 +34,16 @@ The `Decoder`'s `decode(...)` method creates a `Votes` object with the letter be
 
 ## Running Alphabet Partitioned
 
-In order to run the application you will need Machida, Giles Sender, Giles Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [MacOS](/book/getting-started/macos-setup.md) setup instructions.
+In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. To build them, please see the [Linux](/book/getting-started/linux-setup.md) or [MacOS](/book/getting-started/macos-setup.md) setup instructions.
 
 You will need four separate shells to run this application. Open each shell and go to the `examples/python/alphabet_partitioned` directory.
 
 ### Shell 1
 
-Run Giles Receiver to listen for TCP output on `127.0.0.1` port `7002`:
+Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 
 ```bash
-../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
+../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock \
   --listen 127.0.0.1:7002 --no-write
 ```
 
@@ -101,4 +101,4 @@ You can shut down the cluster with this command at any time:
 ../../../utils/cluster_shutdown/cluster_shutdown 127.0.0.1:6002
 ```
 
-You can shut down Giles Sender and Giles Receiver by pressing `Ctrl-c` from their respective shells.
+You can shut down Giles Sender and Data Receiver by pressing `Ctrl-c` from their respective shells.
