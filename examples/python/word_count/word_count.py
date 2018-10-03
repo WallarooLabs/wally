@@ -52,6 +52,7 @@ def split(data):
             clean_word = word.strip(punctuation)
             words.append(clean_word)
 
+    print("split, return: {}".format(repr(words)))
     return words
 
 
@@ -86,9 +87,11 @@ class WordCount(object):
 def partition(data):
     print("NH: partition({})".format(repr(data)))
     if data[0] >= "a" and data[0] <= "z":
-        return data[0]
+        r = data[0]
     else:
-        return "!"
+        r = "!"
+    print("NH: partition return: {}".format(repr(r)))
+    return r
 
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
