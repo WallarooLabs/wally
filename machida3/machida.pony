@@ -186,7 +186,7 @@ class PyPartitionFunction
         Fail()
       end
 
-      let py_string_p = @PyBytes_AsString(ps)
+      let py_string_p = @PyUnicode_AsUTF8(ps)
       let py_string_size = @PyBytes_Size(ps)
 
       let ret = String.copy_cpointer(py_string_p, py_string_size)
@@ -606,7 +606,7 @@ primitive Machida
         let partition = Partitions[PyData val](partition_function,
           partition_values)
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.to_state_partition[PyData val, PyData val, PyState](
+        latest = pb.to_state_partition[PyData val, PyState](
           state_computation, state_builder, state_name, partition)
       | "to_sink" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
@@ -734,7 +734,7 @@ primitive Machida
     for i in Range(0, size) do
       let ps = @PyList_GetItem(py_array, i)
       arr.push(recover
-        String.copy_cstring(@PyBytes_AsString(ps))
+        String.copy_cstring(@PyUnicode_AsUTF8(ps))
       end)
     end
 
