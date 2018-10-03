@@ -48,7 +48,10 @@ MACHIDA3_BUILD = $(MACHIDA3_PATH)/build
 MACHIDA3_CPP = $(MACHIDA3_PATH)/cpp
 WALLAROO_LIB =  $(wallaroo_path)/lib
 
-PYTHON3_INCLUDES = $(shell python3-config --includes)
+PYTHON3 = python3
+#PYTHON3 = python3-dbg
+PYTHON3_INCLUDES = $(shell $(PYTHON3)-config --includes)
+PYTHON3_LIBS = $(shell $(PYTHON3)-config --libs)
 
 # Our top level Makefile has 3 rules that would have been generated for us if
 # we hadn't turned them off at the top of the Makefile. Here we recreate them
@@ -66,7 +69,7 @@ machida3_clean:
 machida3_build: $(MACHIDA3_BUILD)/machida3
 
 -include $(MACHIDA3_PATH)/machida.d
-$(MACHIDA3_BUILD)/machida3: EXTRA_PONYCFLAGS= --output=$(MACHIDA3_BUILD) --path=$(MACHIDA3_BUILD) --linker '$(CC) $(shell python3-config --libs)'
+$(MACHIDA3_BUILD)/machida3: EXTRA_PONYCFLAGS= --output=$(MACHIDA3_BUILD) --path=$(MACHIDA3_BUILD) --linker '$(CC) $(PYTHON3_LIBS)'
 $(MACHIDA3_BUILD)/machida3: $(MACHIDA3_BUILD)/libpython-wallaroo.a
 	$(call PONYC,$(abspath $(MACHIDA3_PATH:%/=%)))
 
