@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="0207c72f302701b79161c5219b10dfe8  -"
+MD5="9ed08a26f9ff0625495bab93504450ec  -"
 
 set -eEuo pipefail
 
