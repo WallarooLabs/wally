@@ -90,6 +90,7 @@ use @PyErr_print[None]()
 use @PyTuple_GetItem[Pointer[U8] val](t: Pointer[U8] val, idx: USize)
 use @PyBytes_Size[USize](str: Pointer[U8] box)
 use @PyBytes_AsString[Pointer[U8]](str: Pointer[U8] box)
+use @PyUnicode_GetLength[USize](str: Pointer[U8] box)
 use @PyUnicode_AsUTF8[Pointer[U8]](str: Pointer[U8] box)
 use @PyUnicode_FromStringAndSize[Pointer[U8]](str: Pointer[U8] tag, size: USize)
 use @PyList_New[Pointer[U8] val](size: USize)
@@ -187,7 +188,7 @@ class PyPartitionFunction
       end
 
       let py_string_p = @PyUnicode_AsUTF8(ps)
-      let py_string_size = @PyBytes_Size(ps)
+      let py_string_size = @PyUnicode_GetLength(ps)
 
       let ret = String.copy_cpointer(py_string_p, py_string_size)
 
