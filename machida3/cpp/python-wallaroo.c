@@ -230,21 +230,6 @@ extern PyObject *partition_function_partition(PyObject *partition_function, PyOb
   return pValue;
 }
 
-extern long partition_function_partition_u64(PyObject *partition_function, PyObject *data)
-{
-  PyObject *pFunc, *pValue;
-
-  pFunc = PyObject_GetAttrString(partition_function, "partition");
-  pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
-  Py_DECREF(pFunc);
-
-  long rtn = PyLong_AsLong(pValue);
-  if (pValue != NULL) {
-    Py_DECREF(pValue);
-  }
-  return rtn;
-}
-
 extern void set_user_serialization_fns(PyObject *module)
 {
   if (PyObject_HasAttrString(module, "deserialize") && PyObject_HasAttrString(module, "serialize"))
@@ -330,4 +315,34 @@ extern int is_py_none(PyObject *o)
 extern int py_list_check(PyObject *l)
 {
   return PyList_Check(l);
+}
+
+extern int py_unicode_check(PyObject *o)
+{
+  return PyUnicode_Check(o);
+}
+
+extern int py_bytes_check(PyObject *o)
+{
+  return PyBytes_Check(o);
+}
+
+extern size_t py_bytes_or_unicode_size(PyObject *o)
+{
+  if (PyBytes_Check(o)) {
+    return PyBytes_Size(o);
+  } else if (PyUnicode_Check(o)) {
+    return PyUnicode_GetLength(o);
+  }
+}
+
+extern char *py_bytes_or_unicode_as_char(PyObject *o)
+{
+  if (PyBytes_Check(o)) {
+    return PyBytes_AsString(o);
+  } else if (PyUnicode_Check(o)) {
+    return PyUnicode_AsUTF8(o);
+  } else{
+    return NULL;
+  }
 }
