@@ -347,7 +347,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
-    _seq_id_generator.new_incoming_message()
+    _seq_id_generator.new_id()
 
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()
@@ -401,7 +401,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _seq_id_generator.new_id()
 
   fun ref current_sequence_id(): SeqId =>
-    _seq_id_generator.latest_for_run()
+    _seq_id_generator.current_seq_id()
 
   ///////////
   // RECOVERY
@@ -424,7 +424,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         @printf[I32]("Filtering a dupe in replay\n".cstring())
       end
 
-      _seq_id_generator.new_incoming_message()
+      _seq_id_generator.new_id()
     end
 
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
