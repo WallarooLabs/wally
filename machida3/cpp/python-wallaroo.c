@@ -155,21 +155,10 @@ extern PyObject *computation_compute(PyObject *computation, PyObject *data,
 
 extern PyObject *sink_encoder_encode(PyObject *sink_encoder, PyObject *data)
 {
-  PyObject *pFunc, *pArgs, *pValueIn, *pValue;
+  PyObject *pFunc, *pValue;
 
   pFunc = PyObject_GetAttrString(sink_encoder, "encode");
-  pValueIn = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
-
-  if (PyBytes_Check(pValueIn)) {
-    pValue = pValueIn;
-  } else if (PyUnicode_Check(pValueIn)) {
-    pValue = PyUnicode_AsUTF8String(pValueIn);
-    Py_DECREF(pValueIn);
-  } else {
-    pValue = NULL;
-    PyErr_SetString(PyExc_ValueError,
-                    "The encoder must return a unicode or bytes object");
-  }
+  pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
 
   Py_DECREF(pFunc);
   return pValue;
