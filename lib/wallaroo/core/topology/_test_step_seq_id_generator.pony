@@ -26,9 +26,10 @@ actor _TestStepSeqIdGenerator is TestList
 
   fun tag tests(test: PonyTest) =>
     test(_TestNewIncrementsByOne)
-    test(_TestLatestAfterNew)
-    test(_TestLatestWithNew)
-    test(_TestLatestWithoutNew)
+    test(_TestCurrentAfterNew)
+    test(_TestCurrentWithoutNew)
+    test(_TestCurrentWithNew)
+    test(_TestCurrentDoesNotIncrement)
 
 class iso _TestNewIncrementsByOne is UnitTest
   """
@@ -39,66 +40,81 @@ class iso _TestNewIncrementsByOne is UnitTest
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
-
-    gen.new_incoming_message()
     let x = gen.new_id()
     let y = gen.new_id()
 
     h.assert_ne[SeqId](0, x)
     h.assert_eq[SeqId]((x + 1), y)
 
-class iso _TestLatestAfterNew is UnitTest
+class iso _TestCurrentAfterNew is UnitTest
   """
-  Verify calling `latest_for_run` after `new_id` results in the same id.
+  Verify calling `current_seq_id` after `new_id` results in the same id.
   """
   fun name(): String =>
-    "step_seq_id_generator/latest_after_new"
+    "step_seq_id_generator/current_after_new"
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
 
-    gen.new_incoming_message()
     let x = gen.new_id()
-    let y = gen.latest_for_run()
+    let y = gen.current_seq_id()
 
     h.assert_ne[SeqId](0, x)
     h.assert_eq[SeqId](x, y)
 
-class iso _TestLatestWithNew is UnitTest
+class iso _TestCurrentDoesNotIncrement is UnitTest
   """
-  Verify calling `latest_for_run` returns a new id when used in conjunction
-  with a call to new. We do this by doing more than one "run" and verify that
-  the ids are different.
+  `current_seq_id()` will not increment the id value, even
+  if the generator has never had `new_id()` called on it before.
   """
   fun name(): String =>
-    "step_seq_id_generator/latest_without_new"
+    "step_seq_id_generator/current_doesnt_increment"
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
 
-    gen.new_incoming_message()
-    let x = gen.latest_for_run()
-    gen.new_incoming_message()
-    let y = gen.latest_for_run()
+    h.assert_eq[SeqId](0,gen.current_seq_id())
+    h.assert_eq[SeqId](0,gen.current_seq_id())
 
-    h.assert_ne[SeqId](0, x)
-    h.assert_true(x < y)
 
-class iso _TestLatestWithoutNew is UnitTest
+class iso _TestCurrentWithoutNew is UnitTest
   """
-  Verify calling `latest_for_run` doesn't return a new id when not used
+  Verify calling `current_seq_id()` doesn't return a new id when not used
   in conjunction with a call to new. We do this by doing more than one
   "run" and verify that the ids are the same.
   """
   fun name(): String =>
-    "step_seq_id_generator/latest_without_new"
+    "step_seq_id_generator/current_without_new"
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
 
-    gen.new_incoming_message()
-    let x = gen.latest_for_run()
-    let y = gen.latest_for_run()
+    let x = gen.current_seq_id()
+    let y = gen.current_seq_id()
 
-    h.assert_ne[SeqId](0, x)
     h.assert_eq[SeqId](x, y)
+
+
+class iso _TestCurrentWithNew is UnitTest
+  """
+  Verify calling `current_seq_id()` returns the freshest id generated with
+  `new_id`.
+  """
+  fun name(): String =>
+    "step_seq_id_generator/current_with_new"
+
+  fun ref apply(h: TestHelper) =>
+    let gen = StepSeqIdGenerator
+
+    let x = gen.new_id()
+    let x_current = gen.current_seq_id()
+
+    let y = gen.new_id()
+    let y_current = gen.current_seq_id()
+
+    h.assert_ne[SeqId](x, 0)
+    h.assert_ne[SeqId](y, 0)
+    h.assert_ne[SeqId](x, y)
+
+    h.assert_eq[SeqId](x, x_current)
+    h.assert_eq[SeqId](y, y_current)

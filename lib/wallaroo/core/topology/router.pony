@@ -1585,7 +1585,6 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       @printf[I32]("Rcvd msg at StatelessPartitionRouter\n".cstring())
     end
     let stateless_partition_id = producer.current_sequence_id() % size().u64()
-
     try
       match _partition_routes(stateless_partition_id)?
       | let s: Step =>
@@ -1600,7 +1599,8 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
             worker_ingress_ts)
           (false, latest_ts)
         else
-          // TODO: What do we do if we get None?
+          @printf[I32]("Rcvd msg at StatelessPartitionRouter\n".cstring())
+          Fail()
           (true, latest_ts)
         end
       | let p: ProxyRouter =>
@@ -1609,7 +1609,8 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
           worker_ingress_ts)
       end
     else
-      // Can't find route
+      @printf[I32]("Can't find route!\n".cstring())
+      Fail()
       (true, latest_ts)
     end
 
