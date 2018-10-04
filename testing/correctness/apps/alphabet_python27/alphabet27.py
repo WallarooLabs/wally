@@ -37,7 +37,7 @@ def application_setup(args):
 
 @wallaroo.partition
 def partition(data):
-    return data.letter[0]
+    return data.letter[0:1]
 
 
 class TotalVotes(object):
