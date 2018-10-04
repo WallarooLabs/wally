@@ -45,4 +45,4 @@ def reverse(data):
 @wallaroo.encoder
 def encoder(data):
     # data is a string
-    return data + "\n"
+    return (data + "\n").encode()
