@@ -84,4 +84,4 @@ def add_votes(data, state):
 @wallaroo.encoder
 def encoder(data):
     # data is a Votes
-    return "%s => %d\n" % (data.letter, data.votes)
+    return ("%s => %d\n" % (data.letter, data.votes)).encode()
