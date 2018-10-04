@@ -40,8 +40,6 @@ class iso _TestNewIncrementsByOne is UnitTest
 
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
-
-    gen.new_incoming_message()
     let x = gen.new_id()
     let y = gen.new_id()
 
@@ -58,7 +56,6 @@ class iso _TestCurrentAfterNew is UnitTest
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
 
-    gen.new_incoming_message()
     let x = gen.new_id()
     let y = gen.current_seq_id()
 
@@ -76,7 +73,7 @@ class iso _TestCurrentDoesNotIncrement is UnitTest
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
 
-    gen.new_incoming_message()
+    h.assert_eq[SeqId](0,gen.current_seq_id())
     h.assert_eq[SeqId](0,gen.current_seq_id())
 
 
@@ -92,7 +89,6 @@ class iso _TestCurrentWithoutNew is UnitTest
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
 
-    gen.new_incoming_message()
     let x = gen.current_seq_id()
     let y = gen.current_seq_id()
 
@@ -110,7 +106,6 @@ class iso _TestCurrentWithNew is UnitTest
   fun ref apply(h: TestHelper) =>
     let gen = StepSeqIdGenerator
 
-    gen.new_incoming_message()
     let x = gen.new_id()
     let x_current = gen.current_seq_id()
 
