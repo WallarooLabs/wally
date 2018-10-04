@@ -131,6 +131,20 @@ def makedirs_if_not_exists(dirpath):
             raise
 
 
+def strftime(date, fmt):
+    """
+    Apply strftime to `date` object with `fmt` prameter.
+    Returns '' if either is non truthy
+    """
+    try:
+        if not date or not fmt:
+            return ''
+        return date.strftime(fmt)
+    except:
+        return ''
+
+
+STRFTIME_FMT = '%Y%m%d_%H%M%S.%f'
 def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
     """
     Save logs to individual files.
@@ -156,9 +170,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
                 name=rd.name,
                 code=rd.returncode,
                 pid=rd.pid,
-                time=(rd.start_time.strftime('%Y%m%d_%H%M%S.%f')
-                      if rd.start_time is not None
-                      else ''))
+                time=strftime(rd.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, worker_log_name), 'wb') as f:
                 f.write('{identifier} ->\n\n{stdout}\n\n{identifier} <-'
                     .format(identifier="--- {name} (pid: {pid}, rc: {rc})"
@@ -171,9 +183,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         for sd in sender_data:
             sender_log_name = 'sender_{address}_{time}.error.dat'.format(
                 address=sd.address.replace(':', '.'),
-                time=(sd.start_time.strftime('%Y%m%d_%H%M%S.%f')
-                      if st.start_time is not None
-                      else ''))
+                time=strftime(sd.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sender_log_name), 'wb') as f:
                 f.write(''.join(sd.data))
 
@@ -182,9 +192,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         for sk in sink_data:
             sink_log_name = 'sink_{address}_{time}.error.dat'.format(
                 address=sk.address.replace(':', '.'),
-                time=(sk.start_time.strftime('%Y%m%d_%H%M%S.%f')
-                      if sk.start_time is not None
-                      else ''))
+                time=strftime(sk.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
                 f.write(''.join(sk.data))
         logging.warn("Error logs saved to {}".format(base_dir))
