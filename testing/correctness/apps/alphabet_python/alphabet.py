@@ -75,7 +75,7 @@ def double_vote(data):
 
 @wallaroo.computation(name="half vote")
 def half_vote(data):
-    return Votes(data.letter, data.votes/2)
+    return Votes(data.letter, data.votes//2)
 
 
 @wallaroo.state_computation(name="add votes")
