@@ -40,18 +40,8 @@ class ref StepSeqIdGenerator
   new create(initial_seq_id: SeqId = 0) =>
     _seq_id = initial_seq_id
 
-  fun ref latest_for_run(): SeqId =>
-    """
-    Gets the most recent id for a given step run.
-
-    If no id, has been generated yet, then we want to generate a
-    new one, otherwise, use the most recent for this run.
-    """
-    if _generate_new then
-      new_id()
-    else
-      _seq_id
-    end
+  fun ref current_seq_id(): SeqId =>
+    _seq_id
 
   fun ref new_id(): SeqId =>
     """
@@ -67,6 +57,3 @@ class ref StepSeqIdGenerator
     `latest_for_run` usage.
     """
     _generate_new = true
-
-  fun last_id(): SeqId =>
-    _seq_id

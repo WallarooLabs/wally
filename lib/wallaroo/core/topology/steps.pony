@@ -401,7 +401,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _seq_id_generator.new_id()
 
   fun ref current_sequence_id(): SeqId =>
-    _seq_id_generator.latest_for_run()
+    _seq_id_generator.current_seq_id()
 
   ///////////
   // RECOVERY
