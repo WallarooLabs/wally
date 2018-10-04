@@ -82,7 +82,7 @@ word_count_py3_test:
 	cd $(WORD_COUNT_PY_PATH) && \
 	integration_test --newline-file-sender count_this.txt \
 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
-		--log-level debug \
+		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
 		--command 'machida3 --application-module word_count' \
