@@ -48,8 +48,8 @@ MACHIDA3_BUILD = $(MACHIDA3_PATH)/build
 MACHIDA3_CPP = $(MACHIDA3_PATH)/cpp
 WALLAROO_LIB =  $(wallaroo_path)/lib
 
-#PYTHON3 = python3
-PYTHON3 = python3-dbg
+PYTHON3 = python3
+#PYTHON3 = python3-dbg
 PYTHON3_INCLUDES = $(shell $(PYTHON3)-config --includes)
 PYTHON3_LIBS = $(shell $(PYTHON3)-config --libs)
 
