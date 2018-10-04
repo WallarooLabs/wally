@@ -52,4 +52,4 @@ def add(data):
 
 @wallaroo.encoder
 def encoder(data):
-    return "%.6f\n" % (data)
+    return ("%.6f\n" % (data)).encode()
