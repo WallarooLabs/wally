@@ -1,0 +1,58 @@
+{
+  "variables": {
+    "aws_access_key_id": "{{env `AWS_ACCESS_KEY_ID`}}",
+    "aws_secret_access_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
+    "wallaroo_version": null,
+    "ami_regions": null
+  },
+
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "access_key": "{{user `aws_access_key_id`}}",
+      "secret_key": "{{user `aws_secret_access_key`}}",
+      "instance_type": "m5.large",
+      "region": "us-west-2",
+      "ssh_username": "ubuntu",
+      "ami_name": "Wallaroo {{ user `wallaroo_version`}}",
+      "ami_regions": "{{ user `ami_regions` }}",
+      "ami_groups": "all",
+      "tags": {
+	"Platform": "Ubuntu",
+	"Name": "Wallaroo {{ user `wallaroo_version` }}",
+	"Release": "{{ user `wallaroo_version` }}",
+	"Description": "AMI for running Wallaroo Python apps, based on Ubuntu 16.04",
+	"Base_AMI_Name": "{{ .SourceAMIName }}"
+      },
+      "source_ami_filter": {
+        "filters": {
+          "name": "*ubuntu-xenial-16.04-amd64-server-*",
+          "root-device-type": "ebs",
+          "virtualization-type": "hvm"
+        },
+        "most_recent": true,
+        "owners": [
+          "099720109477"
+        ]
+      }
+    }
+  ],
+
+  "provisioners": [
+    {"type": "file",
+     "source": "wallaroo_bin.zip", "destination": "/tmp/"},
+    {"type": "file",
+     "source": "metrics_ui.zip", "destination": "/tmp/"},
+    {"type": "file",
+     "source": "../machida/lib/wallaroo", "destination": "/tmp/"},
+    {"type":"shell",
+     "script":"ami/initial_system_setup.sh"},
+    {"type": "shell",
+     "inline": [
+       "sudo mv /tmp/wallaroo /usr/lib/python2.7/",
+       "sudo unzip -j /tmp/wallaroo_bin.zip -d /usr/bin/"]},
+    {"type": "shell",
+     "inline": [
+       "sudo unzip /tmp/metrics_ui.zip -d /usr/bin/"]}
+  ]
+}

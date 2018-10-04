@@ -149,7 +149,7 @@ install_changelog_tool() {
 
 install_other() {
   echo "** Installing other required tooling..."
-  sudo apt-get install -y jq
+  sudo apt-get install -y jq zip unzip
 }
 
 
@@ -171,6 +171,16 @@ clone_and_report() {
   echo "** Wallaroo repo cloned"
 }
 
+install_packer() {
+  VER=1.2.5
+  echo "** Installing packer for building AMIs..."
+  (cd $(mktemp -d) && \
+       curl -sO "https://releases.hashicorp.com/packer/${VER}/packer_${VER}_linux_amd64.zip" && \
+       unzip "packer_${VER}_linux_amd64.zip" && \
+       sudo mv packer /usr/bin/packer)
+    echo "** Installed packer ${VER} in /usr/bin"
+}
+
 echo "----- Installing dependencies"
 
 install_ponyc
@@ -184,6 +194,7 @@ install_docker
 install_go
 install_other
 install_changelog_tool
+install_packer
 
 echo "----- Dependencies installed"
 
