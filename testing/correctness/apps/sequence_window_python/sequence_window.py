@@ -93,5 +93,6 @@ def observe_new_value(data, state):
 @wallaroo.encoder
 def encoder(data):
     # data is a list of integers
-    s = "[{}]".format(",".join(str(v) for v in data))
+    s = ("[{}]".format(",".join(str(v) for v in data))).encode()
     return struct.pack(">L{}s".format(len(s)), len(s), s)
+
