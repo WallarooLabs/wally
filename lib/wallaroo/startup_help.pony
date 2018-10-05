@@ -39,7 +39,7 @@ primitive StartupHelp
           initializing process (that status is meaningless after init is done)]
         --resilience-dir/-r [Sets directory to write resilience files to,
           e.g. -r /tmp/data (no trailing slash)]
-        --resilience-dos-server [Sets the hostname+port of the remote DOS server]
+        --resilience-dos-server [Comma-separated list of hostname:port of the remote DOS server(s)]
         --resilience-enable-io-journal [Enables the write-ahead logging
           of all file I/O (regardless of resilience build type)]
         --resilience-no-local-file-io [Disables local file I/O; writes to I/O

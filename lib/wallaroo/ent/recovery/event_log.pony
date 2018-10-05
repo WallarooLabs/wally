@@ -46,8 +46,7 @@ class val EventLogConfig
   let is_recovering: Bool
   let do_local_file_io: Bool
   let worker_name: String
-  let dos_host: String
-  let dos_service: String
+  let dos_servers: Array[(String,String)] val
 
   new val create(log_dir': (FilePath | AmbientAuth | None) = None,
     filename': (String val | None) = None,
@@ -58,8 +57,7 @@ class val EventLogConfig
     is_recovering': Bool = false,
     do_local_file_io': Bool = true,
     worker_name': String = "unknown-worker-name",
-    dos_host': String = "localhost",
-    dos_service': String = "9999")
+    dos_servers': Array[(String,String)] val = recover val [] end)
   =>
     filename = filename'
     log_dir = log_dir'
@@ -70,8 +68,7 @@ class val EventLogConfig
     is_recovering = is_recovering'
     do_local_file_io = do_local_file_io'
     worker_name = worker_name'
-    dos_host = dos_host'
-    dos_service = dos_service'
+    dos_servers = dos_servers'
 
 actor EventLog is SimpleJournalAsyncResponseReceiver
   let _auth: AmbientAuth
@@ -118,7 +115,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
               RotatingFileBackend(ld, f, _config.suffix, this,
                 _config.backend_file_length, _the_journal, _auth,
                 _config.worker_name, _config.do_local_file_io,
-                _config.dos_host, _config.dos_service
+                _config.dos_servers
                 where rotation_enabled = true)?
             else
               Fail()
@@ -130,13 +127,13 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
               RotatingFileBackend(ld, f, "", this,
                 _config.backend_file_length, _the_journal, _auth,
                 _config.worker_name, _config.do_local_file_io,
-                _config.dos_host, _config.dos_service
+                _config.dos_servers
                 where rotation_enabled = false)?
             | let ld: AmbientAuth =>
               RotatingFileBackend(FilePath(ld, f)?, f, "", this,
                 _config.backend_file_length, _the_journal, _auth,
                 _config.worker_name, _config.do_local_file_io,
-                _config.dos_host, _config.dos_service
+                _config.dos_servers
                 where rotation_enabled = false)?
             else
               Fail()
