@@ -93,7 +93,9 @@ Run `machida` with `--application-module alphabet_partitioned` as a worker:
 ```bash
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --name worker-2 --external 127.0.0.1:6010 --ponythreads=1 --ponynoblock
+  --name worker-2 --external 127.0.0.1:6010 \
+  --my-control 127.0.0.1:6002 --my-data 127.0.0.1:6003 \
+  --ponythreads=1 --ponynoblock
 ```
 
 ### Shell 5: Sender
