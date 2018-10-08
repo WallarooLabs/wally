@@ -9,13 +9,11 @@ output_file = open(sys.argv[3])
 
 decoded = filter(lambda x: x!='',
                  "".join(output_file.readlines()).split("\x00"))
-ids_pids = map(lambda x: x.split(":"), decoded)
-n_output_ids = len(map(lambda x: x[0], ids_pids))
-pids = map(lambda x: x[1], ids_pids)
+ids_pids = [ item.split(":") for item in decoded ]
+n_output_ids = len([ id_pid[0] for id_pid in ids_pids ])
+n_worker_pids = len(set([ id_pid[1] for id_pid in ids_pids ]))
 
-unique_pids = len(set(pids))
-
-if (n_input_items == n_output_ids) and (unique_pids == n_workers):
+if (n_input_items == n_output_ids) and (n_worker_pids == n_workers):
     sys.exit(0)
 else:
     print "Expected {} pids, {} items".format(n_workers, n_input_items)
