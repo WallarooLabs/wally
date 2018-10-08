@@ -45,7 +45,7 @@ integration-tests-examples-python-parallel_classifier: build-examples-python-par
 integration-tests-examples-python-parallel_classifier: parallel_classifier_py_test
 clean-examples-python-alphabet: parallel_classifier_py_clean
 
-INPUT_ITEMS:=15
+INPUT_ITEMS:=2500
 .PHONY: generate_inputs
 generate_inputs:
 	seq 1 $(INPUT_ITEMS) > inputs.txt
@@ -56,7 +56,7 @@ parallel_classifier_py_test: generate_inputs
 	 	--validation-cmd 'validate.py 1 $(INPUT_ITEMS)' \
 	 	--output 'received.txt' \
 	 	--batch-size 100 \
-	 	--log-level debug \
+	 	--log-level error \
 	 	--command 'machida --application-module parallel_classifier' \
 	 	--sink-mode framed \
 	 	--sink-stop-timeout 10 \
@@ -65,7 +65,7 @@ parallel_classifier_py_test: generate_inputs
 	integration_test --newline-file-sender inputs.txt \
 		--validation-cmd './validate.py 2 $(INPUT_ITEMS)' \
 		--output 'received.txt' \
-		--log-level debug \
+		--log-level error \
 		--batch-size 100 \
 		--command 'machida --application-module parallel_classifier' \
 		--sink-mode framed \
@@ -74,15 +74,15 @@ parallel_classifier_py_test: generate_inputs
 		--workers 2
 	cd $(PARALLEL_CLASSIFIER_PY_PATH) && \
 	integration_test --newline-file-sender inputs.txt \
-		--validation-cmd './validate.py 5 $(INPUT_ITEMS)' \
+		--validation-cmd './validate.py 15 $(INPUT_ITEMS)' \
 		--output 'received.txt' \
-		--log-level debug \
+		--log-level error \
 		--batch-size 100 \
 		--command 'machida --application-module parallel_classifier' \
 		--sink-mode framed \
 		--sink-expect $(INPUT_ITEMS) \
 		--sink-stop-timeout 20 \
-		--workers 5
+		--workers 15
 
 parallel_classifier_py_clean:
 	$(QUIET)rm -f $(PARALLEL_CLASSIFIER_PY_PATH)/received.txt

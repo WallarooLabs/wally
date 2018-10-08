@@ -1585,11 +1585,6 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
       @printf[I32]("Rcvd msg at StatelessPartitionRouter\n".cstring())
     end
     let stateless_partition_id = producer.current_sequence_id() % size().u64()
-    @printf[I32](("@@ stateless_part_id: "+stateless_partition_id.string())
-      .cstring())
-    @printf[I32](("@@ producers sq_id: "+producer.current_sequence_id().string())
-      .cstring())
-    @printf[I32](("@@ size: "+size().string()).cstring())
     try
       match _partition_routes(stateless_partition_id)?
       | let s: Step =>
