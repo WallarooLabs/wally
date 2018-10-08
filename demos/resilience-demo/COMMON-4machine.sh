@@ -73,8 +73,10 @@ ORDERS_PORT=7000
 # DOS server-related flags: if USE_DOS_SERVER=n then following two
 # variables will be ignored.
 USE_DOS_SERVER=y
-DOS_SERVER_EXT=$SERVER1_EXT
-DOS_SERVER=$SERVER1
+DOS_SERVER1_EXT=$SERVER1_EXT
+DOS_SERVER1=$SERVER1
+DOS_SERVER2_EXT=$SERVER2_EXT
+DOS_SERVER2=$SERVER2
 
 # Choice for data copy step from former/dead worker -> new worker:
 # if "n", then rsync all /tmp/market-spread-worker2* files;
