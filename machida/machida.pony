@@ -30,6 +30,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/source/connector_source"
 use "wallaroo/core/source/kafka_source"
 use "wallaroo/core/source/tcp_source"
+use "wallaroo/core/source/simple_file_source"
 use "wallaroo/core/topology"
 use "wallaroo/core/state"
 
@@ -913,6 +914,16 @@ primitive _SourceConfig
       end
 
       TCPSourceConfig[(PyData val | None)](decoder, host, port)
+    | "simple-file" =>
+      let filename = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
+      end
+
+      let is_repeating = recover val
+        Machida.bool_check(@PyTuple_GetItem(source_config_tuple, 2))
+      end
+
+      SimpleFileSourceConfig(filename, is_repeating)
     | "kafka-internal" =>
       let kafka_source_name = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
