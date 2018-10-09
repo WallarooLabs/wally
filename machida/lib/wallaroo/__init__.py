@@ -293,7 +293,10 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
     elif base_cls is Partition:
         class C(base_cls):
             def partition(self, data):
-                return func(data)
+                res = func(data)
+                if isinstance(res, int):
+                    return chr(res)
+                return res
 
     # Case 3: Encoder
     elif base_cls is Encoder:
