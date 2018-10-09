@@ -38,6 +38,11 @@ def test_restart_machida():
     _test_restart(command)
 
 
+def test_restart_machida():
+    command = 'machida3 --application-module sequence_window'
+    _test_restart(command)
+
+
 def _test_restart(command):
 
     host = '127.0.0.1'
