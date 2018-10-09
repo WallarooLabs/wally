@@ -41,8 +41,10 @@ TESTING_MULTICRASHDEDUPE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-testing-correctness-topology_layouts-apps-single_stream-filtering-python_multi_crash_dedupe: build-machida
+build-testing-correctness-topology_layouts-apps-single_stream-filtering-python_multi_crash_dedupe: build-machida3
 integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering-python_multi_crash_dedupe: build-testing-correctness-topology_layouts-apps-single_stream-filtering-python_multi_crash_dedupe
 integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering-python_multi_crash_dedupe: multi_crash_dedupe_py_test
+integration-tests-testing-correctness-topology_layouts-apps-single_stream-filtering-python_multi_crash_dedupe: multi_crash_dedupe_py3_test
 
 multi_crash_dedupe_py_test:
 	cd $(TESTING_MULTICRASHDEDUPE_PATH) && \
@@ -52,6 +54,16 @@ multi_crash_dedupe_py_test:
 		--log-level error \
 		--batch-size 1 \
 		--command 'machida --application-module multi_crash_dedupe' \
+		--sink-mode newlines \
+		--sink-expect 8
+multi_crash_dedupe_py3_test:
+	cd $(TESTING_MULTICRASHDEDUPE_PATH) && \
+	integration_test --sequence-sender '[0,10]' \
+		--validation-cmp \
+		--expected-csv '0,1,2,3,7,8,9,10' \
+		--log-level error \
+		--batch-size 1 \
+		--command 'machida3 --application-module multi_crash_dedupe' \
 		--sink-mode newlines \
 		--sink-expect 8
 
