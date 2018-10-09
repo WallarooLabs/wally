@@ -41,7 +41,7 @@ FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 
 def pipeline_test(generator, expected, command, workers=1, sources=1,
                   mode='framed', sinks=1, decoder=None, pre_processor=None,
-                  batch_size=1, sink_expect=None,
+                  batch_size=1, sink_expect=None, sink_expect_allow_more=False,
                   sink_stop_timeout=DEFAULT_SINK_STOP_TIMEOUT,
                   sink_await=None, delay=30,
                   validate_file=None, giles_mode=False,
@@ -83,6 +83,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
     - `sink_expect`: the number of messages to expect at the sink. This allows
         directly relying on received output for timing control. Default: None
         Should be a list of `len(sinks)`.
+    - `sink_expect_allow_more`: Bool (default False): allow more messages in sink
+        after `sink_expect` values have been received.
     - `sink_await`: a list of (binary) strings to await for at the sink.
         Once all of the await values have been seen at the sink, the test may
         be stopped.
@@ -140,46 +142,47 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                      persistent_data=persistent_data) as cluster:
 
             # Create senders
-            senders = []
-            if not isinstance(generator, list):
-                generator = [(generator, 0)]
-            for gen, idx in generator:
-                reader = Reader(gen)
-                sender = Sender(cluster.source_addrs[idx], reader,
-                                batch_size=batch_size)
-                cluster.add_sender(sender)
+            if generator:
+                if not isinstance(generator, list):
+                    generator = [(generator, 0)]
+                for gen, idx in generator:
+                    reader = Reader(gen)
+                    sender = Sender(cluster.source_addrs[idx], reader,
+                                    batch_size=batch_size)
+                    cluster.add_sender(sender)
 
-            # start each sender and await its completion before startin the next
-            for sender in cluster.senders:
-                sender.start()
-                sender.join()
-                try:
-                    assert(sender.error is None)
-                except Exception as err:
-                    logging.error("Sender exited with an error")
-                    raise sender.error
-            logging.debug('All senders completed sending.')
+            # start each sender and await its completion before starting the next
+            if cluster.senders:
+                for sender in cluster.senders:
+                    sender.start()
+                    sender.join()
+                    try:
+                        assert(sender.error is None)
+                    except Exception as err:
+                        logging.error("Sender exited with an error")
+                        raise sender.error
+                logging.debug('All senders completed sending.')
+            else:
+                logging.debug("No external senders were given for the cluster.")
             # Use sink, metrics, or a timer to determine when to stop the
             # runners and sinks and begin validation
-            stoppers = []
             if sink_expect:
                 logging.debug('Waiting for {} messages at the sinks with a timeout'
                               ' of {} seconds'.format(sink_expect,
                                                       sink_stop_timeout))
                 for sink, sink_expect_val in zip(cluster.sinks, sink_expect):
-                    stopper = SinkExpect(sink, sink_expect_val, sink_stop_timeout)
-                    stopper.start()
-                    stoppers.append(stopper)
+                    cluster.sink_expect(expected=sink_expect_val,
+                                        timeout=sink_stop_timeout,
+                                        sink=sink,
+                                        allow_more=sink_expect_allow_more)
             elif sink_await:
                 logging.debug('Awaiting {} values at the sinks with a timeout of '
                               '{} seconds'.format(sum(map(len, sink_await)),
                                                   sink_stop_timeout))
-                stoppers = []
                 for sink, sink_await_vals in zip(cluster.sinks, sink_await):
-                    stopper = SinkAwaitValue(sink, sink_await_vals,
-                                             sink_stop_timeout)
-                    stopper.start()
-                    stoppers.append(stopper)
+                    cluster.sink_await(values=sink_await_vals,
+                                       timeout=sink_stop_timeout,
+                                       sink=sink)
             else:
                 logging.debug('Waiting {} seconds before shutting down '
                               'cluster.'
@@ -187,23 +190,11 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 time.sleep(delay)
 
             # join stoppers and check for errors
-            for stopper in stoppers:
-                stopper.join()
-                if stopper.error:
-                    print(cluster.sinks)
-                    for s in cluster.sinks:
-                        print
-                        print(len(s.data))
-                        print()
-                    raise stopper.error
-            logging.debug('Shutting down cluster.')
-
             cluster.stop_cluster()
 
             ############
             # Validation
             ############
-            logging.debug('Begin validation phase...')
             if validate_file:
                 validation_files = validate_file.split(',')
                 for sink, fp in zip(cluster.sinks, validation_files):
@@ -211,6 +202,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 # let the code after 'finally' return our data
 
             else:  # compare expected to processed
+                logging.debug('Begin validation phase...')
                 # Decode captured output from sink
                 if decoder:
                     if not isinstance(decoder, (list, tuple)):

@@ -46,11 +46,12 @@ primitive ChannelMsgEncoder
     wb.done()
 
   fun data_channel(delivery_msg: ReplayableDeliveryMsg,
-    pipeline_time_spent: U64, seq_id: SeqId, wb: Writer, auth: AmbientAuth,
+    producer_id: RoutingId, pipeline_time_spent: U64, seq_id: SeqId,
+    wb: Writer, auth: AmbientAuth,
     latest_ts: U64, metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
   =>
-    _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, metric_name), auth, wb)?
+    _encode(DataMsg(delivery_msg, producer_id, pipeline_time_spent, seq_id,
+      latest_ts, metrics_id, metric_name), auth, wb)?
 
   fun migrate_key(state_name: String, key: Key, checkpoint_id: CheckpointId,
     state: ByteSeq val, worker: String, auth: AmbientAuth):
@@ -832,22 +833,24 @@ class val AckDataReceivedMsg is ChannelMsg
 
 class val DataMsg is ChannelMsg
   let pipeline_time_spent: U64
+  let producer_id: RoutingId
   let seq_id: SeqId
   let delivery_msg: ReplayableDeliveryMsg
   let latest_ts: U64
   let metrics_id: U16
   let metric_name: String
 
-  new val create(msg: ReplayableDeliveryMsg, pipeline_time_spent': U64,
-    seq_id': SeqId, latest_ts': U64, metrics_id': U16, metric_name': String)
+  new val create(msg: ReplayableDeliveryMsg, producer_id': RoutingId,
+    pipeline_time_spent': U64, seq_id': SeqId, latest_ts': U64,
+    metrics_id': U16, metric_name': String)
   =>
+    producer_id = producer_id'
     seq_id = seq_id'
     pipeline_time_spent = pipeline_time_spent'
     delivery_msg = msg
     latest_ts = latest_ts'
     metrics_id = metrics_id'
     metric_name = metric_name'
-
 
 class val ReplayMsg is ChannelMsg
   let data_bytes: Array[ByteSeq] val

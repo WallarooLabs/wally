@@ -27,11 +27,11 @@ In a shell, start up the Metrics UI if you don't already have it running:
 docker start mui
 ```
 
-In another shell, run Giles Receiver to listen for messages:
+In another shell, run Data Receiver to listen for messages:
 
 ```bash
-../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
-  --listen 127.0.0.1:7002
+../../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock \
+  --listen 127.0.0.1:7002 > received.txt
 ```
 
 In two other shells, export the current directories and machida directories to paths, then run the application main (initializer) worker and second worker:

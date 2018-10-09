@@ -72,22 +72,24 @@ class BoundaryRoute is Route
     Fail()
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
-    pipeline_time_spent: U64, cfp: Producer ref,
-    latest_ts: U64, metrics_id: U16,
-    metric_name: String, worker_ingress_ts: U64)
+    pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
+    latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64)
   =>
-    ifdef debug then
-      match _step
-      | let source: (TCPSource ref | ConnectorSource ref) =>
-        Invariant(not source.is_muted())
-      end
-    end
+    //!@ TODO: Do we need this?
+    // ifdef debug then
+    //   match _step
+    //   | let source: (TCPSource ref | ConnectorSource ref) =>
+    //     Invariant(not source.is_muted())
+    //   end
+    // end
     ifdef "trace" then
       @printf[I32]("Rcvd msg at BoundaryRoute (%s)\n".cstring(),
         _step_type.cstring())
     end
     _send_message_on_route(delivery_msg,
       pipeline_time_spent,
+      producer_id,
       cfp,
       latest_ts,
       metrics_id,
@@ -101,7 +103,7 @@ class BoundaryRoute is Route
     _consumer.forward_unregister_producer(_step_id, target_id, _step)
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg,
-    pipeline_time_spent: U64, cfp: Producer ref,
+    pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)
   =>
@@ -109,6 +111,7 @@ class BoundaryRoute is Route
 
     _consumer.forward(delivery_msg,
       pipeline_time_spent,
+      producer_id,
       cfp,
       o_seq_id,
       _route_id,

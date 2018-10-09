@@ -31,20 +31,7 @@ use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
 
-primitive ConnectorFramedSourceNotifyBuilder[In: Any val]
-  fun apply(source_id: RoutingId, pipeline_name: String, env: Env,
-    auth: AmbientAuth, handler: FramedSourceHandler[In] val,
-    runner_builder: RunnerBuilder, router: Router,
-    metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router,
-    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end):
-    SourceNotify iso^
-  =>
-    ConnectorFramedSourceNotify[In](source_id, pipeline_name, env, auth, handler,
-      runner_builder, router, consume metrics_reporter, event_log,
-      target_router, pre_state_target_ids)
-
-class ConnectorFramedSourceNotify[In: Any val] is ConnectorSourceNotify
+class ConnectorSourceNotify[In: Any val]
   let _source_id: RoutingId
   let _env: Env
   let _auth: AmbientAuth
@@ -81,7 +68,7 @@ class ConnectorFramedSourceNotify[In: Any val] is ConnectorSourceNotify
   fun routes(): Map[RoutingId, Consumer] val =>
     _router.routes()
 
-  fun ref received(source: ConnectorSource ref, data: Array[U8] iso): Bool =>
+  fun ref received(source: ConnectorSource[In] ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         let payload_size: USize = _handler.payload_length(consume data)?
@@ -180,12 +167,40 @@ class ConnectorFramedSourceNotify[In: Any val] is ConnectorSourceNotify
       end
     end
 
-  fun ref accepted(source: ConnectorSource ref) =>
+  fun ref accepted(source: ConnectorSource[In] ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())
+    _header = true
     source.expect(_header_size)
 
-  fun ref closed(source: ConnectorSource ref) =>
+  fun ref closed(source: ConnectorSource[In] ref) =>
     @printf[I32]("ConnectorSource connection closed\n".cstring())
-    source._dispose()
 
-  // TODO: implement connect_failed
+  fun ref connecting(conn: ConnectorSource[In] ref, count: U32) =>
+    """
+    Called if name resolution succeeded for a ConnectorSource and we are now
+    waiting for a connection to the server to succeed. The count is the number
+    of connections we're trying. The notifier will be informed each time the
+    count changes, until a connection is made or connect_failed() is called.
+    """
+    None
+
+  fun ref connected(conn: ConnectorSource[In] ref) =>
+    """
+    Called when we have successfully connected to the server.
+    """
+    None
+
+  fun ref connect_failed(conn: ConnectorSource[In] ref) =>
+    """
+    Called when we have failed to connect to all possible addresses for the
+    server. At this point, the connection will never be established.
+    """
+    None
+
+  fun ref expect(conn: ConnectorSource[In] ref, qty: USize): USize =>
+    """
+    Called when the connection has been told to expect a certain quantity of
+    bytes. This allows nested notifiers to change the expected quantity, which
+    allows a lower level protocol to handle any framing (e.g. SSL).
+    """
+    qty

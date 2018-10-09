@@ -27,10 +27,9 @@ trait _DataReceiverPhase
   fun has_pending(): Bool =>
     false
 
-  fun ref flush(): Array[_Queued]
-
-  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     _invalid_call()
     Fail()
@@ -64,9 +63,6 @@ class _DataReceiverNotProcessingPhase is _DataReceiverPhase
     @printf[I32](("DataReceiver: data_connect received, but still waiting " +
       "for DataReceivers to initialize.\n").cstring())
 
-  fun ref flush(): Array[_Queued] =>
-    Array[_Queued]
-
 class _RecoveringDataReceiverPhase is _DataReceiverPhase
   let _data_receiver: DataReceiver ref
 
@@ -79,15 +75,16 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
   fun has_pending(): Bool =>
     false
 
-  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     // Drop non-barriers
     ifdef debug then
       @printf[I32]("Recovering DataReceiver dropping non-rollback-barrier\n"
         .cstring())
     end
-    None
+    _data_receiver._update_last_id_seen(seq_id, true)
 
   fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -97,7 +94,7 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
       @printf[I32]("Recovering DataReceiver dropping non-rollback-barrier\n"
         .cstring())
     end
-    None
+    _data_receiver._update_last_id_seen(seq_id, true)
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)
@@ -113,6 +110,7 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
         @printf[I32]("Recovering DataReceiver dropping non-rollback barrier\n"
           .cstring())
       end
+      _data_receiver._update_last_id_seen(seq_id, true)
     end
 
   fun ref data_connect(highest_seq_id: SeqId) =>
@@ -120,9 +118,6 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
     // boundaries, which will be cleared as part of rollback.
     _data_receiver._update_last_id_seen(highest_seq_id)
     _data_receiver._inform_boundary_to_send_normal_messages()
-
-  fun ref flush(): Array[_Queued] =>
-    Array[_Queued]
 
 class _NormalDataReceiverPhase is _DataReceiverPhase
   let _data_receiver: DataReceiver ref
@@ -136,11 +131,12 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
   fun has_pending(): Bool =>
     false
 
-  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
-    _data_receiver.deliver(d, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+    _data_receiver.deliver(d, producer_id, pipeline_time_spent, seq_id,
+      latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -155,98 +151,3 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
 
   fun ref data_connect(highest_seq_id: SeqId) =>
     _data_receiver._inform_boundary_to_send_normal_messages()
-
-  fun ref flush(): Array[_Queued] =>
-    Array[_Queued]
-
-class _QueuingDataReceiverPhase is _DataReceiverPhase
-  let _data_receiver: DataReceiver ref
-  var _queued: Array[_Queued] = _queued.create()
-
-  new create(dr: DataReceiver ref) =>
-    _data_receiver = dr
-
-  fun name(): String =>
-    "_QueuingDataReceiverPhase"
-
-  fun has_pending(): Bool =>
-    _queued.size() == 0
-
-  fun ref deliver(d: DeliveryMsg, pipeline_time_spent: U64, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    let qdm = _QueuedDeliveryMessage(d, pipeline_time_spent, seq_id,
-      latest_ts, metrics_id, worker_ingress_ts)
-    _queued.push(qdm)
-
-  fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    let qrdm = _QueuedReplayableDeliveryMessage(r, pipeline_time_spent, seq_id,
-      latest_ts, metrics_id, worker_ingress_ts)
-    _queued.push(qrdm)
-
-  fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
-    token: BarrierToken, seq_id: SeqId)
-  =>
-    ifdef "checkpoint_trace" then
-      @printf[I32]("DataReceiver: Queuing barrier to %s\n".cstring(),
-        output_id.string().cstring())
-    end
-    _queued.push((input_id, output_id, token, seq_id))
-
-  fun ref data_connect(highest_seq_id: SeqId) =>
-    _data_receiver._inform_boundary_to_send_normal_messages()
-
-  fun ref flush(): Array[_Queued] =>
-    // Return and clear
-    _queued = Array[_Queued]
-
-type _Queued is (_QueuedBarrier | _QueuedDeliveryMessage |
-  _QueuedReplayableDeliveryMessage)
-
-type _QueuedBarrier is (RoutingId, RoutingId, BarrierToken, SeqId)
-
-class _QueuedDeliveryMessage
-  let msg: DeliveryMsg
-  let pipeline_time_spent: U64
-  let seq_id: SeqId
-  let latest_ts: U64
-  let metrics_id: U16
-  let worker_ingress_ts: U64
-
-  new create(msg': DeliveryMsg, pipeline_time_spent': U64, seq_id': SeqId,
-    latest_ts': U64, metrics_id': U16, worker_ingress_ts': U64)
-  =>
-    msg = msg'
-    pipeline_time_spent = pipeline_time_spent'
-    seq_id = seq_id'
-    latest_ts = latest_ts'
-    metrics_id = metrics_id'
-    worker_ingress_ts = worker_ingress_ts'
-
-  fun process_message(dr: DataReceiver ref) =>
-    dr.process_message(msg, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
-
-class _QueuedReplayableDeliveryMessage
-  let msg: ReplayableDeliveryMsg
-  let pipeline_time_spent: U64
-  let seq_id: SeqId
-  let latest_ts: U64
-  let metrics_id: U16
-  let worker_ingress_ts: U64
-
-  new create(msg': ReplayableDeliveryMsg, pipeline_time_spent': U64,
-    seq_id': SeqId, latest_ts': U64, metrics_id': U16, worker_ingress_ts': U64)
-  =>
-    msg = msg'
-    pipeline_time_spent = pipeline_time_spent'
-    seq_id = seq_id'
-    latest_ts = latest_ts'
-    metrics_id = metrics_id'
-    worker_ingress_ts = worker_ingress_ts'
-
-  fun replay_process_message(dr: DataReceiver ref) =>
-    dr.replay_process_message(msg, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)

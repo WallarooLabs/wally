@@ -16,6 +16,7 @@
 from collections import namedtuple
 import logging
 import os
+import re
 import shlex
 import shutil
 import socket
@@ -130,6 +131,20 @@ def makedirs_if_not_exists(dirpath):
             raise
 
 
+def strftime(date, fmt):
+    """
+    Apply strftime to `date` object with `fmt` prameter.
+    Returns '' if either is non truthy
+    """
+    try:
+        if not date or not fmt:
+            return ''
+        return date.strftime(fmt)
+    except:
+        return ''
+
+
+STRFTIME_FMT = '%Y%m%d_%H%M%S.%f'
 def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
     """
     Save logs to individual files.
@@ -148,35 +163,48 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
             with open(os.path.join(base_dir, 'test.error.log'), 'wb') as f:
                 f.write(log_stream.getvalue())
         runner_data = persistent_data.get('runner_data', [])
+
         # save worker data to files
         for rd in runner_data:
-            worker_log_name = '{name}_{code}_{time}.error.log'.format(
+            worker_log_name = '{name}.{pid}.{code}.{time}.error.log'.format(
                 name=rd.name,
                 code=rd.returncode,
-                time=rd.start_time.strftime('%Y%m%d_%H%M%S'))
+                pid=rd.pid,
+                time=strftime(rd.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, worker_log_name), 'wb') as f:
                 f.write('{identifier} ->\n\n{stdout}\n\n{identifier} <-'
                     .format(identifier="--- {name} (pid: {pid}, rc: {rc})"
                         .format(name=rd.name, pid=rd.pid,
                                 rc=rd.returncode),
                             stdout=rd.stdout))
+
         # save sender data to files
         sender_data = persistent_data.get('sender_data', [])
         for sd in sender_data:
             sender_log_name = 'sender_{address}_{time}.error.dat'.format(
                 address=sd.address.replace(':', '.'),
-                time=sd.start_time.strftime('%Y%m%d_%H%M%S'))
+                time=strftime(sd.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sender_log_name), 'wb') as f:
                 f.write(''.join(sd.data))
+
         # save sinks data to files
         sink_data = persistent_data.get('sink_data', [])
         for sk in sink_data:
             sink_log_name = 'sink_{address}_{time}.error.dat'.format(
                 address=sk.address.replace(':', '.'),
-                time=sk.start_time.strftime('%Y%m%d_%H%M%S'))
+                time=strftime(sk.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
                 f.write(''.join(sk.data))
         logging.warn("Error logs saved to {}".format(base_dir))
+
+        # save core files if they exist
+        rex = re.compile('core.*')
+        cores = filter(lambda s: rex.match(s), os.listdir(os.getcwd()))
+        if cores:
+            logging.warn("Core files detected: {}".format(cores))
+        for core in cores:
+            logging.info("Moving core {} to {}".format(core, base_dir))
+            shutil.move(core, os.path.join(base_dir, core))
     except Exception as err:
         logging.error("Failed to write failure log files.")
         logging.exception(err)

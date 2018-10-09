@@ -34,7 +34,20 @@ git pull
 
 ### Releasing the updated artifacts
 
-From within the Wallaroo Vagrant box run the following:
+From within the Wallaroo Vagrant box run the following for a Release Candidate:
+
+```bash
+cd ~/wallaroo
+bash .release/update-release-artifacts.sh release-RELEASE_VERSION RELEASE_COMMIT
+```
+
+So, for example, if you are releasing the RC for `0.4.0` from commit `8a8ee28` then your command would be:
+
+```bash
+bash .release/update-release-artifacts.sh release-0.4.0 8a8ee28
+```
+
+From within the Wallaroo Vagrant box run the following for a final release:
 
 ```bash
 cd ~/wallaroo

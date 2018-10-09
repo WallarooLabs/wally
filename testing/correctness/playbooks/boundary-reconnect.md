@@ -3,7 +3,7 @@
 ## Description
 
 Wallaroo can run a single application topology across several hosts. In order to properly test this behaviour, it is important to understand how it is implemented.
-Since Wallaroo topologies are DAGs, they are implemented as a collection of steps strung together by a lookup map. At the end of each step, a router is used to determine where the next step in the DAG resides. If it is local, the step is executed with the output of the current step. If, however, the next step is on another host, we have to move the output of the current step over to the correct step on the correct host. This flow looks like: 
+Since Wallaroo topologies are DAGs, they are implemented as a collection of steps strung together by a lookup map. At the end of each step, a router is used to determine where the next step in the DAG resides. If it is local, the step is executed with the output of the current step. If, however, the next step is on another host, we have to move the output of the current step over to the correct step on the correct host. This flow looks like:
 
 ```
 [HOST_A: step -> router -> proxy router (if on another host) -> specific boundary] -> data_channel ->
@@ -24,12 +24,12 @@ The gist of the test is simple: We run `sequence_window` with `Spike` on the `in
 
 ### Setting Up for the Test:
 
-1. build Giles receiver and sender
+1. build Data Receiver and Giles Sender
 2. build `testing/correctness/apps/sequence_window` with `-D spike` (and optionally `-d` for debug messages)
 
 ### Running the Test:
 
-1. start giles-receiver:  `../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555`
+1. start data receiver:  `../../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555 > received.txt`
 2. start initializer-worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t --spike-drop --spike-prob 0.001 --spike-margin 1000`
 3. start second worker: `./sequence_window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -r res-data -n worker2`
 4. start giles-sender and send 10000 integers: `../../../../giles/sender/sender -h 127.0.0.1:7000 -s 10 -i 5_000_000 -u --ponythreads=1 -y -g 12 -w -m 10000`

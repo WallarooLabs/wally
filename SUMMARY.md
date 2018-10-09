@@ -84,9 +84,7 @@
 * [Wallaroo and Virtualenv](book/appendix/virtualenv.md)
 * [TCP Decoders and Encoders](book/appendix/tcp-decoders-and-encoders.md)
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
-* [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
 * [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
-* [Decoding Giles Receiver Output](book/appendix/decoding-giles-receiver-output.md)
 * [Wallaroo and Long-Running Data Processing and Other Workflows](book/appendix/wallaroo-and-long-running-data-processing-and-other-workflows.md)
 * [Tips for using Wallaroo in Docker](book/appendix/wallaroo-in-docker-tips.md)
 

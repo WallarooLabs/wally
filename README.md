@@ -10,8 +10,6 @@
 
 A fast, stream-processing framework. Wallaroo makes it easy to react to data in real-time. By eliminating infrastructure complexity, going from prototype to production has never been simpler.
 
-Answer our [30-second survey][survey-link], and be entered to win a Wallaroo T-Shirt.
-
 ## What is Wallaroo?
 
 When we set out to build Wallaroo, we had several high-level goals in mind:
@@ -83,7 +81,7 @@ Trying to figure out how to get started?
  - Drop us a line:
     - [IRC][irc-link]
     - [Mailing List][group-link]
-    - [Commercial Support][contact-us-email]
+    - [Commercial Support][commercial-support-email]
 
 ## Contributing
 
@@ -99,7 +97,7 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [application-structure-link]: MONOREPO.md
 [blog-link]: https://blog.wallaroolabs.com/
 [cla]: https://gist.github.com/WallarooLabsTeam/e06d4fed709e0e7035fdaa7249bf88fb
-[contact-us-email]: mailto:hello@wallaroolabs.com
+[commercial-support-email]: mailto:sales@wallaroolabs.com
 [contribution-guide]: CONTRIBUTING.md
 [docker-link]: https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html
 [documentation]: https://docs.wallaroolabs.com/

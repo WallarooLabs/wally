@@ -29,10 +29,10 @@ and the output is the encoded string of the array, in the format
 "[a, b, c, d]\n"
 
 To run, use the following commands:
-1. Giles receiver:
+1. Data Receiver:
 ```bash
-../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
---ponypinasio -l 127.0.0.1:5555
+../../../../utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock \
+--ponypinasio -l 127.0.0.1:5555 > received.txt
 ```
 2. Initializer worker
 ```bash

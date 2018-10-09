@@ -105,6 +105,7 @@ class BarrierStepMessageProcessor is StepMessageProcessor
         i_route_id, latest_ts, metrics_id, worker_ingress_ts)
       _queued.push(msg)
     else
+      @printf[I32]("!@ Input not blocking so processing waiting for barrier\n".cstring())
       step.process_message[D](metric_name, pipeline_time_spent, data,
         i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts)

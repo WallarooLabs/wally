@@ -35,7 +35,7 @@ primitive KafkaSourceNotifyBuilder[In: Any val]
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router,
     pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end):
-    SourceNotify iso^
+    KafkaSourceNotify[In] iso^
   =>
     KafkaSourceNotify[In](source_id, pipeline_name, env, auth, handler,
       runner_builder, router, consume metrics_reporter, event_log,

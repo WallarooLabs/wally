@@ -16,12 +16,15 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-use "ponytest"
+use "options"
+use "wallaroo"
+use "wallaroo/core/source"
 
-actor TestMain is TestList
-  new create(env: Env) => PonyTest(env, this)
+class val GenSourceConfig[In: Any val]
+  let _gen: GenSourceGenerator[In]
 
-  new make() => None
+  new val create(gen: GenSourceGenerator[In]) =>
+    _gen = gen
 
-  fun tag tests(test: PonyTest) =>
-    None
+  fun source_listener_builder_builder(): GenSourceListenerBuilderBuilder[In] =>
+    GenSourceListenerBuilderBuilder[In](_gen)

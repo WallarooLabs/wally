@@ -78,24 +78,26 @@ class SinkExpect(StoppableThread):
     """
     __base_name__ = 'SinkExpect'
 
-    def __init__(self, sink, expected, timeout=30):
+    def __init__(self, sink, expected, timeout=30, allow_more=False):
         super(SinkExpect, self).__init__()
         self.sink = sink
         self.expected = expected
         self.timeout = timeout
         self.name = self.__base_name__
         self.error = None
+        self.allow_more = allow_more
 
     def run(self):
         started = time.time()
         while not self.stopped():
             msgs = len(self.sink.data)
             if msgs > self.expected:
-                self.error = ExpectationError('{}: has received too many '
-                                              'messages. Expected {} but got '
-                                              '{}.'.format(self.name,
-                                                           self.expected,
-                                                           msgs))
+                if not self.allow_more:
+                    self.error = ExpectationError('{}: has received too many '
+                                                  'messages. Expected {} but got '
+                                                  '{}.'.format(self.name,
+                                                               self.expected,
+                                                               msgs))
                 self.stop()
                 break
             if msgs == self.expected:
