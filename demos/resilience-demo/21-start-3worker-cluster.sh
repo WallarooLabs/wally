@@ -12,7 +12,7 @@ wait
 . ./START-DOS-SERVER.sh
 
 echo Start MUI
-ssh -n $USER@$SERVER1_EXT "/home/ubuntu/wallaroo-tutorial/wallaroo-0.5.2/bin/metrics_ui/AppRun start" &
+ssh -n $USER@$SERVER1_EXT "$HOME/wallaroo-tutorial/wallaroo-0.5.2/bin/metrics_ui/AppRun start" &
 sleep 1
 
 if [ ! -z "$START_RECEIVER_CMD" ]; then
@@ -47,6 +47,7 @@ for i in $SERVER1_EXT $SERVER2_EXT $SERVER3_EXT; do
             break
         fi
         C=`expr $C + 1`
+        sleep 0.2
     done
     if [ $C -ge $LIM ]; then
         echo TIMEOUT

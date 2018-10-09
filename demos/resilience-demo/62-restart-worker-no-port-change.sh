@@ -32,6 +32,7 @@ for i in $SERVER1_EXT $TARGET_EXT; do
         if [ $? -eq 0 ]; then
             break
         fi
+        sleep 0.2
         C=`expr $C + 1`
     done
     if [ $C -ge $LIM ]; then

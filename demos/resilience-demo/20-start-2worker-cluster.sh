@@ -11,7 +11,7 @@ wait
 . ./START-DOS-SERVER.sh
 
 echo Start MUI
-ssh -n $USER@$SERVER1_EXT "/home/ubuntu/wallaroo-tutorial/wallaroo-0.5.2/bin/metrics_ui/AppRun start" &
+ssh -n $USER@$SERVER1_EXT "$HOME/wallaroo-tutorial/wallaroo-0.5.2/bin/metrics_ui/AppRun start" &
 sleep 1
 
 if [ ! -z "$START_RECEIVER_CMD" ]; then
@@ -21,7 +21,7 @@ if [ ! -z "$START_RECEIVER_CMD" ]; then
     ssh -n $USER@$SERVER1_EXT "cd wallaroo ; $CMD > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
 else
     echo Start receiver
-    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -w -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
+    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./utils/data_receiver/data_receiver --framed --ponythreads=1 --ponynoblock --ponypinasio -l ${SERVER1}:5555 > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
     sleep 2
 fi    
 
@@ -43,6 +43,7 @@ for i in $SERVER1_EXT $SERVER2_EXT; do
             break
         fi
         C=`expr $C + 1`
+        sleep 0.2
     done
     if [ $C -ge $LIM ]; then
         echo TIMEOUT
