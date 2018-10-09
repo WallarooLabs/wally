@@ -118,8 +118,8 @@ actor SimpleFileSource[In: Any val] is Source
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
   =>
-    @printf[I32]("!@ Spinning up SimpleFileSource %s\n".cstring(),
-      source_id.string().cstring())
+    @printf[I32]("!@ Spinning up SimpleFileSource %s. Repeating: %s\n"
+      .cstring(), source_id.string().cstring(), is_repeating.string().cstring())
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
 

@@ -415,12 +415,16 @@ class TCPSinkConfig(object):
         return ("tcp", self._host, self._port, self._encoder)
 
 class SimpleFileSourceConfig(object):
-    def __init__(self, filename, is_repeating):
+    def __init__(self, filename, decoder, is_repeating):
         self._filename = filename
-        self._is_repeating = is_repeating
+        self._decoder = decoder
+        if is_repeating:
+            self._is_repeating = 1
+        else:
+            self._is_repeating = 0
 
     def to_tuple(self):
-        return ("simple-file", self._filename, self._is_repeating)
+        return ("simple-file", self._filename, self._decoder, self._is_repeating)
 
 class CustomKafkaSourceCLIParser(object):
     def __init__(self, args, decoder):
