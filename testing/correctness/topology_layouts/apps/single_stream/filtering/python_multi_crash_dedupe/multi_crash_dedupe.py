@@ -90,4 +90,4 @@ def dedupe(data, state):
 @wallaroo.encoder
 def encoder(data):
     print("> Encoder got: {}".format(data))
-    return '{}\n'.format(data)
+    return ('{}\n'.format(data)).encode()
