@@ -482,7 +482,7 @@ actor TCPSource[In: Any val] is Source
     end
 
   fun ref _initiate_barrier(token: BarrierToken) =>
-    if not _disposed and not _shutdown then
+    if not _disposed then
       match token
       | let srt: CheckpointRollbackBarrierToken =>
         _prepare_for_rollback()
