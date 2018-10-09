@@ -953,7 +953,11 @@ primitive _SourceConfig
       end
 
       let is_repeating = recover val
-        Machida.bool_check(@PyTuple_GetItem(source_config_tuple, 3))
+        if @PyInt_AsLong(@PyTuple_GetItem(source_config_tuple, 3)) == 0 then
+          false
+        else
+          true
+        end
       end
 
       SimpleFileSourceConfig[(PyData val | None)](filename, decoder,
