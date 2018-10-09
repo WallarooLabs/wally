@@ -51,11 +51,12 @@ interface _Sourcey
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val):
     Source
 
-actor SimpleFileSourceListener is SourceListener
+actor SimpleFileSourceListener[In: Any val] is SourceListener
   """
   # SimpleFileSourceListener
   """
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
+  let _decoder: Decoder[In]
   let _is_repeating: Bool
 
   let _env: Env
@@ -74,7 +75,7 @@ actor SimpleFileSourceListener is SourceListener
   let _pre_state_target_ids: Array[RoutingId] val
   let _target_router: Router
 
-  let _sources: Array[SimpleFileSource] = _sources.create()
+  let _sources: Array[SimpleFileSource[In]] = _sources.create()
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, router: Router, metrics_conn: MetricsSink,
@@ -83,7 +84,8 @@ actor SimpleFileSourceListener is SourceListener
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
-    target_router: Router, filename: String, is_repeating: Bool)
+    target_router: Router, filename: String, decoder: Decoder[In],
+    is_repeating: Bool)
   =>
     _env = env
 
@@ -101,6 +103,7 @@ actor SimpleFileSourceListener is SourceListener
     _recovering = recovering
     _pre_state_target_ids = pre_state_target_ids
     _target_router = target_router
+    _decoder = decoder
     _is_repeating = is_repeating
 
     match router
@@ -124,10 +127,11 @@ actor SimpleFileSourceListener is SourceListener
 
     try
       let filepath = FilePath(_auth, filename)?
-      let source = SimpleFileSource(source_id, _auth, _pipeline_name,
-        _runner_builder, _router, _target_router, filepath, _is_repeating,
-        _event_log, _outgoing_boundary_builders, _layout_initializer,
-        _metrics_reporter.clone(), _router_registry, _pre_state_target_ids)
+      let source = SimpleFileSource[In](source_id, _auth, _pipeline_name,
+        _runner_builder, _router, _target_router, filepath, _decoder,
+        _is_repeating, _event_log, _outgoing_boundary_builders,
+        _layout_initializer, _metrics_reporter.clone(), _router_registry,
+        _pre_state_target_ids)
 
       source.mute(this)
       _router_registry.register_source(source, source_id)

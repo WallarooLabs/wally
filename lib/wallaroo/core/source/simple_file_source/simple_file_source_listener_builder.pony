@@ -27,7 +27,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-class val SimpleFileSourceListenerBuilder
+class val SimpleFileSourceListenerBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -43,6 +43,7 @@ class val SimpleFileSourceListenerBuilder
   let _pre_state_target_ids: Array[RoutingId] val
   let _target_router: Router
   let _filename: String
+  let _decoder: Decoder[In]
   let _is_repeating: Bool
 
   new val create(worker_name: WorkerName, pipeline_name: String,
@@ -52,7 +53,8 @@ class val SimpleFileSourceListenerBuilder
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
-    target_router: Router, filename: String, is_repeating: Bool)
+    target_router: Router, filename: String, decoder: Decoder[In],
+    is_repeating: Bool)
   =>
     _worker_name = worker_name
     _pipeline_name = pipeline_name
@@ -69,21 +71,25 @@ class val SimpleFileSourceListenerBuilder
     _pre_state_target_ids = pre_state_target_ids
     _target_router = target_router
     _filename = filename
+    _decoder = decoder
     _is_repeating = is_repeating
 
   fun apply(env: Env): SourceListener =>
-    SimpleFileSourceListener(env, _worker_name, _pipeline_name,
+    SimpleFileSourceListener[In](env, _worker_name, _pipeline_name,
       _runner_builder, _router, _metrics_conn, _metrics_reporter.clone(),
       _router_registry, _outgoing_boundary_builders, _event_log, _auth,
       _layout_initializer, _recovering, _pre_state_target_ids,
-      _target_router, _filename, _is_repeating)
+      _target_router, _filename, _decoder, _is_repeating)
 
-class val SimpleFileSourceListenerBuilderBuilder
+class val SimpleFileSourceListenerBuilderBuilder[In: Any val]
   let _filename: String
+  let _decoder: Decoder[In]
   let _is_repeating: Bool
 
-  new val create(filename: String, is_repeating: Bool) =>
+  new val create(filename: String, decoder: Decoder[In], is_repeating: Bool)
+  =>
     _filename = filename
+    _decoder = decoder
     _is_repeating = is_repeating
 
   fun apply(worker_name: WorkerName, pipeline_name: String,
@@ -93,10 +99,10 @@ class val SimpleFileSourceListenerBuilderBuilder
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
-    target_router: Router = EmptyRouter): SimpleFileSourceListenerBuilder
+    target_router: Router = EmptyRouter): SimpleFileSourceListenerBuilder[In]
   =>
-    SimpleFileSourceListenerBuilder(worker_name, pipeline_name,
+    SimpleFileSourceListenerBuilder[In](worker_name, pipeline_name,
       runner_builder, router, metrics_conn, consume metrics_reporter,
       router_registry, outgoing_boundary_builders, event_log, auth,
       layout_initializer, recovering, pre_state_target_ids,
-      target_router, _filename, _is_repeating)
+      target_router, _filename, _decoder, _is_repeating)

@@ -58,13 +58,14 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
-actor SimpleFileSource is Source
+actor SimpleFileSource[In: Any val] is Source
   """
   # SimpleFileSource
   """
   var _cur_position: USize = 0
   let _file: File
   let _is_repeating: Bool
+  let _decoder: Decoder[In]
 
   let _source_id: RoutingId
   let _auth: AmbientAuth
@@ -110,7 +111,8 @@ actor SimpleFileSource is Source
 
   new create(source_id: RoutingId, auth: AmbientAuth, pipeline_name: String,
     runner_builder: RunnerBuilder, router': Router, target_router: Router,
-    filepath: FilePath, is_repeating: Bool, event_log: EventLog,
+    filepath: FilePath, decoder: Decoder[In], is_repeating: Bool,
+    event_log: EventLog,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
@@ -123,6 +125,7 @@ actor SimpleFileSource is Source
 
     _file = File(filepath)
     _is_repeating = is_repeating
+    _decoder = decoder
 
     _source_id = source_id
     _auth = auth
@@ -199,10 +202,11 @@ actor SimpleFileSource is Source
     latest_metrics_id = latest_metrics_id + 1
 
     try
-      let next = _file.line()?
+      let line = _file.line()?
+      let next = _decoder.decode((consume line).array())?
       _cur_position = _file.position()
       (let is_finished, let last_ts) =
-        _runner.run[String](_pipeline_name, pipeline_time_spent, consume next,
+        _runner.run[In](_pipeline_name, pipeline_time_spent, consume next,
           _source_id, this, _router, _target_id_router, _msg_id_gen(),
           None, decode_end_ts, latest_metrics_id, ingest_ts,
           _metrics_reporter)

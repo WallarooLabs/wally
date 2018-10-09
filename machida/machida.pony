@@ -283,6 +283,33 @@ class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
   fun _final() =>
     Machida.dec_ref(_source_decoder)
 
+class PyDecoder is Decoder[(PyData val | None)]
+  var _source_decoder: Pointer[U8] val
+
+  new create(source_decoder: Pointer[U8] val) =>
+    _source_decoder = source_decoder
+
+  fun decode(data: Array[U8] val): (PyData val | None) =>
+    let r = Machida.source_decoder_decode(_source_decoder, data.cpointer(),
+        data.size())
+    if not Machida.is_py_none(r) then
+      recover PyData(r) end
+    else
+      None
+    end
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_source_decoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_source_decoder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _source_decoder = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_source_decoder)
+
 class PyComputationBuilder
   var _computation: PyComputation val
 
@@ -919,11 +946,18 @@ primitive _SourceConfig
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
       end
 
-      let is_repeating = recover val
-        Machida.bool_check(@PyTuple_GetItem(source_config_tuple, 2))
+      let decoder = recover val
+        let d = @PyTuple_GetItem(source_config_tuple, 2)
+        Machida.inc_ref(d)
+        PyDecoder(d)
       end
 
-      SimpleFileSourceConfig(filename, is_repeating)
+      let is_repeating = recover val
+        Machida.bool_check(@PyTuple_GetItem(source_config_tuple, 3))
+      end
+
+      SimpleFileSourceConfig[(PyData val | None)](filename, decoder,
+        is_repeating)
     | "kafka-internal" =>
       let kafka_source_name = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))

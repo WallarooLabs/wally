@@ -20,15 +20,19 @@ use "options"
 use "wallaroo"
 use "wallaroo/core/source"
 
-class val SimpleFileSourceConfig
+class val SimpleFileSourceConfig[In: Any val]
   let _filename: String
+  let _decoder: Decoder[In]
   let _is_repeating: Bool
 
-  new val create(filename: String, is_repeating: Bool) =>
+  new val create(filename: String, decoder: Decoder[In], is_repeating: Bool)
+  =>
     _filename = filename
+    _decoder = decoder
     _is_repeating = is_repeating
 
   fun source_listener_builder_builder():
-    SimpleFileSourceListenerBuilderBuilder
+    SimpleFileSourceListenerBuilderBuilder[In]
   =>
-    SimpleFileSourceListenerBuilderBuilder(_filename, _is_repeating)
+    SimpleFileSourceListenerBuilderBuilder[In](_filename, _decoder,
+      _is_repeating)
