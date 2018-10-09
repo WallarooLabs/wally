@@ -31,7 +31,7 @@ def application_setup(args):
     return ab.build()
 ```
 
-You can follow along in this example by going to [github](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/examples/python/celsius_connectors/).
+You can follow along in this example by going to [github](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/celsius_connectors/).
 
 We have introduced two new application builder methods for declaring connectors: `source_connector` and `sink_connector`. These allow you to describe both ends of the connection so the connector script can encode or decode data in a way that's compatible with your application's worker code. Keeping these in one place helps ensure that it's easy to keep them in sync.
 
@@ -71,7 +71,7 @@ Notice how we don't couple the specifics of the medium used by the connector and
 
 ## Running Connector Scripts
 
-To run an application that makes use of these connectors we'll need to understand how the connector scripts work. Wallaroo includes a [library of connectors](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/) to help get you started. We'll look at `udp_source` and `udp_sink` as used in the example introduced above.
+To run an application that makes use of these connectors we'll need to understand how the connector scripts work. Wallaroo includes a [library of connectors](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/connectors/) to help get you started. We'll look at `udp_source` and `udp_sink` as used in the example introduced above.
 
 These included connectors are self-contained Python scripts. Some of them may expect a related Python library to be installed and available for import but our example uses the UDP facilities provided for by Python's standard library. Be sure that the Python path is set up to include the Wallaroo library.
 
@@ -96,7 +96,7 @@ Since the included connector scripts are self-contained, feel free to copy it ov
 
 ## Starting with Prebuilt Connectors
 
-We have a number of [prebuilt connectors](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/). Here is a short description of each one. These are all written so they can be copied and customized in your application source tree. You're still welcome to run them in place as well.
+We have a number of [prebuilt connectors](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/connectors/). Here is a short description of each one. These are all written so they can be copied and customized in your application source tree. You're still welcome to run them in place as well.
 
 ### Kafka
 
@@ -112,9 +112,9 @@ AWS Kinesis is supported via the [boto3 library](https://pypi.org/project/boto3/
 
 Redis has many ways to be used as a source and a sink. We've provided two starting points to show how a source and sink can work. The script is very easy to modify and uses the well maintained [redis library](https://pypi.org/project/redis/).
 
-For the source, we show an example using the subscription support offered by Redis pubsub and it's a natural fit for many stream processing applications. Check out `redis_subscriber_source` for [details](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/redis_subscriber_source).
+For the source, we show an example using the subscription support offered by Redis pubsub and it's a natural fit for many stream processing applications. Check out `redis_subscriber_source` for [details](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/connectors/redis_subscriber_source).
 
-For the sink, we show that not everything needs to look exactly like a stream to be used with Wallaroo. We use the given hash key in redis and set key-value pairs on that target hash for each key-value pair passed to the sink. This is very handy for those cases that want to keep track of the latest value. See `redis_hash_sink` for [details](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/redis_hash_sink).
+For the sink, we show that not everything needs to look exactly like a stream to be used with Wallaroo. We use the given hash key in redis and set key-value pairs on that target hash for each key-value pair passed to the sink. This is very handy for those cases that want to keep track of the latest value. See `redis_hash_sink` for [details](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/connectors/redis_hash_sink).
 
 ### RabbitMQ
 
@@ -122,7 +122,7 @@ Our RabbitMQ source uses the [pika library](https://pypi.org/project/pika/). We 
 
 ### UDP
 
-Our UDP support uses the Python standard library. To see an example of it in action, check out the [celsius_connectors example](https://github.com/Wallaroo/wallaroo/tree/{{book.wallaroo_version}}/examples/python/celsius_connectors/).
+Our UDP support uses the Python standard library. To see an example of it in action, check out the [celsius_connectors example](https://github.com/Wallaroo/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/celsius_connectors/).
 
 ### AWS S3
 
@@ -130,7 +130,7 @@ This sink is powered by the [boto3 library](https://pypi.org/project/boto3/) and
 
 ### Postgres
 
-We offer some starting templates for Postgres integration. These depend on your database schema and so we've left them in the [connectors/templates directory](https://github.com/WallarooLabs/wallaroo/tree/{{book.wallaroo_version}}/connectors/templates).
+We offer some starting templates for Postgres integration. These depend on your database schema and so we've left them in the [connectors/templates directory](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/connectors/templates).
 
 As a source we have a very interesting example of how notifiers can turn a regular table into a stream. If you're struggling with finding an efficient way to stream relational data, this might be a good place to start.
 
