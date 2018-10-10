@@ -26,7 +26,7 @@ fi
 echo Sleep 4 before restarting worker2; sleep 4
 
 echo Kill worker2
-./40-kill-worker.sh 2
+./40-kill-worker.sh 2 2
 
 ## What we'd do to restart worker2 on server 2 with same TCP ports
 echo Restart worker2 on server 2 with same TCP ports

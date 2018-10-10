@@ -2,7 +2,7 @@
 
 . ./COMMON.sh
 
-if [ -z "$1" -o -z "$2" ]; then
+if [ -z "$1" -o -z "$2" -o -z "$3" ]; then
     echo "usage: $0 worker-number source-machine-number target-machine-number ... where number = 2-4"
     exit 1
 else
