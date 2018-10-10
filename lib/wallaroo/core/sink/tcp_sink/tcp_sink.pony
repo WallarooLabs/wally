@@ -940,12 +940,16 @@ actor TCPSink is Sink
     end
 
   fun ref _mute_upstreams() =>
+    @printf[I32]("Muting sink %s\n".cstring(),
+                 _sink_id.string().cstring())
     for u in _upstreams.values() do
       u.mute(this)
     end
     _mute_outstanding = true
 
   fun ref _unmute_upstreams() =>
+    @printf[I32]("Unmuting sink %s\n".cstring(),
+                 _sink_id.string().cstring())
     for u in _upstreams.values() do
       u.unmute(this)
     end

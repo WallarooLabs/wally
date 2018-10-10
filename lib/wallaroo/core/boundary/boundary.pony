@@ -384,6 +384,9 @@ actor OutgoingBoundary is Consumer
     _writev(data)
 
   fun ref receive_ack(seq_id: SeqId) =>
+    @printf[I32](
+    "OutgoingBoundary: got ack from downstream worker %s\n".cstring(), 
+       seq_id.string().cstring())
     ifdef debug then
       Invariant(seq_id > _lowest_queue_id)
     end
@@ -603,6 +606,14 @@ actor OutgoingBoundary is Consumer
     """
     Handle socket events.
     """
+
+    @printf[I32]("_readable %s\n".cstring(), _readable.string().cstring())
+    @printf[I32]("_writeable %s\n".cstring(), _writeable.string().cstring())
+
+    @printf[I32]("event readable %s\n".cstring(), AsioEvent.readable(flags).string().cstring())
+    @printf[I32]("event writeable %s\n".cstring(), AsioEvent.writeable(flags).string().cstring())
+    @printf[I32]("event disposable %s\n".cstring(), AsioEvent.disposable(flags).string().cstring())
+
     if event isnt _event then
       if AsioEvent.writeable(flags) then
         // A connection has completed.
@@ -631,6 +642,7 @@ actor OutgoingBoundary is Consumer
             end
           else
             // The connection failed, unsubscribe the event and close.
+            @printf[I32]("unsubscribing 1\n".cstring())
             @pony_asio_event_unsubscribe(event)
             @pony_os_socket_close[None](fd)
             _notify_connecting()
@@ -681,12 +693,14 @@ actor OutgoingBoundary is Consumer
             _maybe_mute_or_unmute_upstreams()
           else
             // The connection failed, unsubscribe the event and close.
+            @printf[I32]("Unsubscribe 2 \n".cstring())
             @pony_asio_event_unsubscribe(event)
             @pony_os_socket_close[None](fd)
             _notify_connecting()
           end
         else
           // We're already connected, unsubscribe the event and close.
+          @printf[I32]("Unsubscribe 3 \n".cstring())
           @pony_asio_event_unsubscribe(event)
           @pony_os_socket_close[None](fd)
         end
@@ -698,6 +712,7 @@ actor OutgoingBoundary is Consumer
         end
       end
     else
+      
       // At this point, it's our event.
       if _connected and not _shutdown_peer then
         if AsioEvent.writeable(flags) then
@@ -721,6 +736,8 @@ actor OutgoingBoundary is Consumer
         _event = AsioEvent.none()
       end
 
+      @printf[I32]("_readable end %s\n".cstring(), _readable.string().cstring())
+      @printf[I32]("_writeable end %s\n".cstring(), _writeable.string().cstring())
       _try_shutdown()
     end
 
@@ -835,10 +852,12 @@ actor OutgoingBoundary is Consumer
     _shutdown_peer = true
 
     // Unsubscribe immediately and drop all pending writes.
+    @printf[I32]("Unsubscribe 4 \n".cstring())
     @pony_asio_event_unsubscribe(_event)
     _pending_writev.clear()
     _pending.clear()
     _pending_writev_total = 0
+    @printf[I32]("hard close\n".cstring())
     _readable = false
     _writeable = false
     @pony_asio_event_set_readable[None](_event, false)
@@ -861,6 +880,7 @@ actor OutgoingBoundary is Consumer
       var received_called: USize = 0
 
       while _readable and not _shutdown_peer do
+        @printf[I32]("Pending reads called 1\n".cstring())
         if _muted then
           return
         end
@@ -877,6 +897,7 @@ actor OutgoingBoundary is Consumer
           // this is safe because asio thread isn't currently subscribed
           // for a read event so will not be writing to the readable flag
           @pony_asio_event_set_readable[None](_event, false)
+          @printf[I32]("pending reads: readable=false\n".cstring())
           _readable = false
           @pony_asio_event_resubscribe_read(_event)
           return
@@ -1057,7 +1078,7 @@ actor OutgoingBoundary is Consumer
     _maybe_mute_or_unmute_upstreams()
 
   fun ref _release_backpressure() =>
-    if _throttled then
+    if _throttled and not _backup_queue_is_overflowing() then
       _throttled = false
       _notify.unthrottled(this)
       _maybe_mute_or_unmute_upstreams()
@@ -1075,12 +1096,14 @@ actor OutgoingBoundary is Consumer
     end
 
   fun ref _mute_upstreams() =>
+    ifdef debug then @printf[I32]("Boundary muted upstreams \n".cstring()) end
     for u in _upstreams.values() do
       u.mute(this)
     end
     _mute_outstanding = true
 
   fun ref _unmute_upstreams() =>
+    ifdef debug then @printf[I32]("Boundary unmuted upstreams \n".cstring()) end
     for u in _upstreams.values() do
       u.unmute(this)
     end
@@ -1115,6 +1138,10 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
     times: USize): Bool
   =>
+    @printf[I32]("BoundaryNotify received called, header:%s digest:%s\n".cstring(),
+       _header.string().cstring(),
+       (digestof _outgoing_boundary).string().cstring())
+
     if _header then
       try
         let e = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
@@ -1129,13 +1156,19 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
       end
       match ChannelMsgDecoder(consume data, _auth)
       | let ac: AckDataConnectMsg =>
+        @printf[I32]("Received AckDataConnectMsg at Boundary %s\n".cstring(),
+          (digestof _outgoing_boundary).string().cstring())
         ifdef "trace" then
           @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
         end
         conn.receive_connect_ack(ac.last_id_seen)
       | let dd: DataDisconnectMsg =>
+        @printf[I32]("Received DataDisconnectMsg at Boundary %s\n".cstring(),
+          (digestof _outgoing_boundary).string().cstring())
         _outgoing_boundary.dispose()
       | let sn: StartNormalDataSendingMsg =>
+        @printf[I32]("Received StartNormalDataSendingMsg at Boundary %s\n".cstring(),
+          (digestof _outgoing_boundary).string().cstring())
         ifdef "trace" then
           @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"
             .cstring())
@@ -1143,6 +1176,8 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         conn.receive_connect_ack(sn.last_id_seen)
         conn.start_normal_sending()
       | let aw: AckDataReceivedMsg =>
+        @printf[I32]("Received AckDataReceivedMsg at Boundary %s\n".cstring(),
+           aw.seq_id.string().cstring())
         ifdef "trace" then
           @printf[I32]("Received AckDataReceivedMsg at Boundary\n".cstring())
         end

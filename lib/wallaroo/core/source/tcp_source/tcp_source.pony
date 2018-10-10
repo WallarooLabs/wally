@@ -819,23 +819,25 @@ actor TCPSource[In: Any val] is Source
     end
 
   fun ref _mute_local() =>
+    ifdef debug then @printf[I32]("tcpsrc muted local \n".cstring()) end
     _muted_by.set(this)
     _mute()
 
   fun ref _unmute_local() =>
+    ifdef debug then @printf[I32]("tcpsrc unmuted local \n".cstring()) end
     _muted_by.unset(this)
-
     if _muted_by.size() == 0 then
       _unmute()
     end
 
   be mute(a: Any tag) =>
+    ifdef debug then @printf[I32]("tcpsrc muted w Consumer \n".cstring()) end
     _muted_by.set(a)
     _mute()
 
   be unmute(a: Any tag) =>
+    ifdef debug then @printf[I32]("tcpsrc unmuted w Consumer \n".cstring()) end
     _muted_by.unset(a)
-
     if _muted_by.size() == 0 then
       _unmute()
     end

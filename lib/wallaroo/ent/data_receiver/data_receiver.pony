@@ -228,7 +228,9 @@ actor DataReceiver is Producer
         _last_id_acked = _last_id_seen
         let ack_msg = ChannelMsgEncoder.ack_data_received(_worker_name,
           _sender_step_id, _last_id_seen, _auth)?
-        _write_on_conn(ack_msg)
+        @printf[I32]("DataReceiver acking seq_id %s\n".cstring(),
+           _last_id_seen.string().cstring())
+         _write_on_conn(ack_msg)
       end
     else
       @printf[I32]("Error creating ack data received message\n".cstring())
@@ -286,12 +288,14 @@ actor DataReceiver is Producer
     end
 
   be mute(c: Consumer) =>
+    ifdef debug then @printf[I32]("datarecvr muted local \n".cstring()) end
     match _latest_conn
     | let conn: DataChannel =>
       conn.mute(c)
     end
 
   be unmute(c: Consumer) =>
+    ifdef debug then @printf[I32]("datarecvr unmuted local \n".cstring()) end
     match _latest_conn
     | let conn: DataChannel =>
       conn.unmute(c)
