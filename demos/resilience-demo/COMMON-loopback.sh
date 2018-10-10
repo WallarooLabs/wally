@@ -2,9 +2,6 @@
 # workers all listening to different IP addresses on the loopback interface.
 # For OS X/macOS, prepare by using these commands:
 #
-#    sudo ifconfig lo0 alias 127.0.0.2 netmask 255.0.0.0
-#    sudo ifconfig lo0 alias 127.0.0.3 netmask 255.0.0.0
-#    sudo ifconfig lo0 alias 127.0.0.4 netmask 255.0.0.0
 #    ln -s /path/to/your/wallaroo/source/repo $HOME/wallaroo
 #    rm -f $HOME/wallaroo/demos/resilience-demo/COMMON.sh
 #    ln -s ./COMMON-loopback.sh $HOME/wallaroo/demos/resilience-demo/COMMON.sh
