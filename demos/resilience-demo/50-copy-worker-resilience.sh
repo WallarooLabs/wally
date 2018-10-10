@@ -15,7 +15,7 @@ fi
 
 if [ $RESTORE_VIA_JOURNAL_DUMP = y ]; then
     echo Rsync journal file from DOS server $DOS_SERVER to $TARGET
-    ssh -n $USER@$TARGET_EXT "rm -vf /tmp/${WALLAROO_NAME}*"
+    ssh -n $USER@$TARGET_EXT "rm -vf /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}*"
     ssh -A -n $USER@$TARGET_EXT "rsync -raH -v -e 'ssh -o \"StrictHostKeyChecking no\"' ${DOS_SERVER}:/tmp/dos-data/worker${SOURCE_WORKER}/\* /tmp"
 
     echo Extract journalled I/O ops from the journal file
