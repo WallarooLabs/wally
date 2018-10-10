@@ -485,11 +485,15 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   be mute(c: Consumer) =>
+    @printf[I32]("Step %s muting.\n".cstring(),
+                 _id.string().cstring())
     for u in _upstreams.values() do
       u.mute(c)
     end
 
   be unmute(c: Consumer) =>
+    @printf[I32]("Step %s unmuting.\n".cstring(),
+                 _id.string().cstring())
     for u in _upstreams.values() do
       u.unmute(c)
     end

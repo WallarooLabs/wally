@@ -820,6 +820,7 @@ actor DataChannel
     try (_listen as DataChannelListener)._conn_closed() end
 
   fun ref _apply_backpressure() =>
+    @printf[I32]("datachannel apply backpressure\n".cstring())
     if not _throttled then
       _throttled = true
       _notify.throttled(this)
@@ -832,8 +833,8 @@ actor DataChannel
       @pony_asio_event_resubscribe_write(_event)
     end
 
-
   fun ref _release_backpressure() =>
+    @printf[I32]("datachannel release backpressure\n".cstring())
     if _throttled then
       _throttled = false
       _notify.unthrottled(this)
