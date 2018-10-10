@@ -314,22 +314,10 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
                     logging.error("Max retry attempts reached.")
                     raise
             except SinkAwaitTimeoutError:
-                if persistent_data.get('runner_data'):
-                    logging.error("SinkAWaitTimeoutError encountered. The "
-                        "last {} lines of each worker were:\n\n{}".format(
-                            FROM_TAIL,
-                            runner_data_format(
-                                persistent_data.get('runner_data'),
-                                from_tail=FROM_TAIL)))
+                logging.error("SinkAWaitTimeoutError encountered.")
                 raise
             except TimeoutError:
-                if persistent_data.get('runner_data'):
-                    logging.error("TimeoutError encountered. The last {} lines"
-                        " of each worker were:\n\n{}".format(
-                            FROM_TAIL,
-                            runner_data_format(
-                                persistent_data.get('runner_data'),
-                                from_tail=FROM_TAIL)))
+                logging.error("TimeoutError encountered.")
                 raise
             except:
                 if persistent_data.get('runner_data'):

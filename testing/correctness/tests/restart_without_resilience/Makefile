@@ -40,7 +40,6 @@ restart_without_resilience_tests : CUSTOM_PYTHONPATH = $(SEQUENCE_WINDOW_PYTHON_
 # standard rules generation makefile
 include $(rules_mk_path)
 
-ifeq ($(resilience),on)
 
 build-testing-correctness-tests-restart_without_resilience: build-testing-correctness-apps-sequence_window
 build-testing-correctness-tests-restart_without_resilience: build-testing-tools-external_sender
@@ -48,12 +47,13 @@ build-testing-correctness-tests-restart_without_resilience: build-machida
 integration-tests-testing-correctness-tests-restart_without_resilience: build-testing-correctness-tests-restart_without_resilience
 integration-tests-testing-correctness-tests-restart_without_resilience: restart_without_resilience_tests
 
+ifeq ($(resilience),on)
 restart_without_resilience_tests:
 	$(QUIET)printf "restart_without_resilience_tests not run.\nRun make with 'resilience=off' to run this test.\n"
 else
 restart_without_resilience_tests:
 	cd $(RESTART_WITHOUT_RESILIENCE_PATH) && \
-	python2 -m pytest --color=yes --tb=native --verbose --exitfirst restart_without_resilience.py $(pytest_exp)
+	python2 -m pytest -c $(integration_path)/pytest.ini restart_without_resilience.py $(pytest_exp)
 endif
 
 endif
