@@ -12,7 +12,7 @@ wait
 . ./START-DOS-SERVER.sh
 
 echo Start MUI
-ssh -n $USER@$SERVER1_EXT "$HOME/wallaroo-tutorial/wallaroo-0.5.2/bin/metrics_ui/AppRun start" &
+ssh -n $USER@$SERVER1_EXT "~$USER/wallaroo-tutorial/wallaroo-0.5.2/bin/metrics_ui/AppRun start" &
 sleep 1
 
 if [ ! -z "$START_RECEIVER_CMD" ]; then
