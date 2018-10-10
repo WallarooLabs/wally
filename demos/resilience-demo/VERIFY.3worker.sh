@@ -21,6 +21,7 @@ echo Start 3 worker cluster
 ./21-start-3worker-cluster.sh
 if [ $? -ne 0 ]; then
     echo STOP with non-zero status
+    exit 7
 fi
 
 echo Send 1st half of messages
