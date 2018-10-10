@@ -10,7 +10,7 @@ if [ "$SKIP_CLEAN" = "" ]; then
 fi
 
 if [ "$SKIP_MAKE" = "" ]; then
-    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; make PONYCFLAGS='--verbose=1 -d' $RESILIENCE_FLAG build-testing-performance-apps-market-spread build-giles-all build-utils-cluster_shutdown build-utils-data_receiver build-testing-correctness-apps-multi_partition_detector-all"
+    ssh -n $USER@$SERVER1_EXT "cd wallaroo ; make PONYCFLAGS='--verbose=1 -d' $RESILIENCE_FLAG build-testing-performance-apps-market-spread build-utils-cluster_shutdown build-utils-data_receiver build-testing-correctness-apps-multi_partition_detector build-testing-correctness-apps-multi_partition_detector-validator"
 fi
 
 for i in $SERVER2 $SERVER3 $SERVER4; do
