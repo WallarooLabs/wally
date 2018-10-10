@@ -16,16 +16,24 @@
 # import requisite components for integration test
 from integration import (Cluster,
                          Reader,
+                         runner_data_format,
                          Sender,
                          sequence_generator)
-from integration.logger import set_logging
+from integration.external import save_logs_to_file
+from integration.errors import (RunnerHasntStartedError,
+                                SinkAwaitTimeoutError,
+                                TimeoutError)
+from integration.logger import add_in_memory_log_stream
 
+import datetime
 import logging
+import os
 import re
 import struct
 import time
 
-set_logging(level=logging.ERROR)
+
+FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 
 
 def test_restart_pony():
@@ -39,7 +47,49 @@ def test_restart_machida():
 
 
 def _test_restart(command):
+    t0 = datetime.datetime.now()
+    log_stream = add_in_memory_log_stream(level=logging.DEBUG)
+    persistent_data = {}
+    try:
+        try:
+            _run(command, persistent_data)
+        except:
+            logging.error("Restart_without_resilience test encountered an "
+                          "error.")
+            # Do this ugly thing to use proper exception handling here
+            try:
+                raise
+            except SinkAwaitTimeoutError:
+                logging.error("SinkAWaitTimeoutError encountered.")
+                raise
+            except TimeoutError:
+                logging.error("TimeoutError encountered.")
+                raise
+            except:
+                if persistent_data.get('runner_data'):
+                    logging.error("Some workers exited badly. The last {} lines of "
+                        "each were:\n\n{}"
+                        .format(FROM_TAIL,
+                            runner_data_format(
+                                persistent_data.get('runner_data'),
+                                from_tail=FROM_TAIL)))
+                raise
+    except Exception as err:
+        # save log stream to file
+        try:
+            base_dir = ('/tmp/wallaroo_test_errors/testing/correctness/'
+                'tests/restart_without_resilience/{time}'.format(
+                    time=t0.strftime('%Y%m%d_%H%M%S')))
+            save_logs_to_file(base_dir, log_stream, persistent_data)
+        except Exception as err_inner:
+            logging.exception(err_inner)
+            logging.warn("Encountered an error when saving logs files to {}"
+                         .format(base_dir))
+        logging.exception(err)
+        raise
 
+
+def _run(command, persistent_data):
     host = '127.0.0.1'
     sources = 1
     sinks = 1
@@ -52,8 +102,6 @@ def _test_restart(command):
                    struct.pack('>I', len(last_value_1)) + last_value_1)
 
 
-
-    persistent_data = {}
     # Start cluster
     with Cluster(command=command, host=host, sources=sources,
                  workers=workers, sinks=sinks, sink_mode=sink_mode,
