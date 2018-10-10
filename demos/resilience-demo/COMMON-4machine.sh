@@ -49,7 +49,7 @@ USER=ubuntu
 # the scripts if the repo already exists.  It's up to the user to manage
 # the repo with Git "fetch" & "pull" commands as appropriate, if you're
 # doing active code development or debugging.
-REPO_URL=https://github.com/slfritchie/wallaroo.git
+REPO_URL=https://github.com/WallarooLabs/wallaroo.git
 
 # Source branch name to test with
 REPO_BRANCH=master
