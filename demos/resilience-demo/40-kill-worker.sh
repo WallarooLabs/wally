@@ -9,4 +9,4 @@ else
     eval 'TARGET_EXT=$SERVER'$1'_EXT'
 fi
 
-ssh -n $USER@$TARGET_EXT "killall -9 -v $WALLAROO_NAME"
+ssh -n $USER@$TARGET_EXT 'PID=`ps axww | grep worker'$1' | egrep -v "cd wallaroo|grep" | awk '\''{print $1}'\''`; echo Pid is $PID; kill -9 $PID'
