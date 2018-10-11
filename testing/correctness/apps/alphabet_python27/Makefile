@@ -40,8 +40,8 @@ TESTING_ALPHABET_PYTHON27_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-testing-correctness-apps-alphabet27_python: build-machida
-build-testing-correctness-apps-alphabet27_python: build-machida3
+build-testing-correctness-apps-alphabet_python27: build-machida
+build-testing-correctness-apps-alphabet_python27: build-machida3
 integration-tests-testing-correctness-apps-alphabet_python27: build-testing-correctness-apps-alphabet_python27
 integration-tests-testing-correctness-apps-alphabet_python27: testing_alphabet_python27_test
 integration-tests-testing-correctness-apps-alphabet_python27: testing_alphabet_python27_python3_test
