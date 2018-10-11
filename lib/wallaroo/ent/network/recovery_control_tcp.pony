@@ -54,8 +54,13 @@ class RecoveryControlSenderConnectNotifier is TCPConnectionNotify
     if _header then
       try
         let expect = Bytes.to_u32(data(0)?, data(1)?, data(2)?, data(3)?).usize()
-        conn.expect(expect)
-        _header = false
+        if expect > 0 then
+          conn.expect(expect)
+          _header = false
+        else
+          conn.expect(4)
+          _header = true
+        end
       else
         @printf[I32]("Error reading header on control channel\n".cstring())
       end
