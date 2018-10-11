@@ -68,7 +68,7 @@ sessions to all other target machines.
     $SERVER2=$SERVER2_EXT
     $SERVER3=$SERVER3_EXT
     $SERVER4=$SERVER4_EXT
-    
+
 ### Prerequisite: Set up the runtime environment on all target machines/VMs
 
 On your laptop, run the following two commands:
