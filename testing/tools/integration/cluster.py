@@ -451,6 +451,7 @@ class Cluster(object):
         # Run a continuous crash in a background thread
         self._stoppables = set()
         self.crash_checker = CrashChecker(self)
+        self.crash_checker.start()
 
         # Try to start everything... clean up on exception
         try:
@@ -493,7 +494,6 @@ class Cluster(object):
                                      self.runners[0].external,
                                      tests=[(worker_count_matches, [workers])])
             # start the crash checker
-            self.crash_checker.start()
         except Exception as err:
             logging.error("Encountered and error when starting up the cluster")
             logging.exception(err)
