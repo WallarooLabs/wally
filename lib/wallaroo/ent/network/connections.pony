@@ -132,7 +132,8 @@ actor Connections is Cluster
         let host' = file_lines.next()?
         let port' = file_lines.next()?
 
-        @printf[I32]("Restarting a listener ...\n\n".cstring())
+        @printf[I32]("Restarting a listener at %s:%s\n\n".cstring(),
+          host'.cstring(), port'.cstring())
 
         let listener = TCPListener(auth, consume notifier, consume host',
             consume port')
