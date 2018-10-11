@@ -2,7 +2,7 @@
 
 . ./COMMON.sh
 
-if [ -z "$1" -o -z "$2" ]; then
+if [ -z "$1" -o -z "$2" -o -z "$3" ]; then
     echo "usage: $0 worker-number source-machine-number target-machine-number ... where number = 2-4"
     exit 1
 else
@@ -15,7 +15,7 @@ fi
 
 if [ $RESTORE_VIA_JOURNAL_DUMP = y ]; then
     echo Rsync journal file from DOS server $DOS_SERVER to $TARGET
-    ssh -n $USER@$TARGET_EXT "rm -vf /tmp/${WALLAROO_NAME}*"
+    ssh -n $USER@$TARGET_EXT "rm -vf /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}*"
     ssh -A -n $USER@$TARGET_EXT "rsync -raH -v -e 'ssh -o \"StrictHostKeyChecking no\"' ${DOS_SERVER}:/tmp/dos-data/worker${SOURCE_WORKER}/\* /tmp"
 
     echo Extract journalled I/O ops from the journal file

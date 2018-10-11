@@ -1,3 +1,5 @@
+# Copy/symlink this file to COMMON.sh before use.
+
 # Common variables for controlling the other scripts in this directory.
 # I have been testing these scripts using AWS EC2 instances of type
 # t3.medium + AMI: Ubuntu Server 16.04 LTS (HVM), SSD Volume Type,
@@ -14,10 +16,15 @@
 #    b). SSH used by rsync from one cluster member directly to another
 #        via internal network addresses.
 #
-# 3. Each machine is running Ubuntu Linux or something similar,
-#    supported by Wallaroo Up.
+# 3. The Wallaroo source repo exists on $SERVER1 in the directory
+#    $HOME/wallaroo.  All other servers will have $HOME/wallaroo
+#    created by rsync from $SERVER1 -> target.
 #
-# 4. For on/off variables defined here, valid values are only "y" and "n".
+# 4. Each machine is running Ubuntu Linux or something similar,
+#    supported by Wallaroo Up.  (Wallaroo Up files are assumed to be
+#    in the $HOME/wallaroo-tutorial directory.)
+#
+# 5. For on/off variables defined here, valid values are only "y" and "n".
 
 # External IP addresses for each of the 4 machines in this cluster.
 # Must be routable by the machine that executes these scripts.
@@ -42,7 +49,7 @@ USER=ubuntu
 # the scripts if the repo already exists.  It's up to the user to manage
 # the repo with Git "fetch" & "pull" commands as appropriate, if you're
 # doing active code development or debugging.
-REPO_URL=https://github.com/slfritchie/wallaroo.git
+REPO_URL=https://github.com/WallarooLabs/wallaroo.git
 
 # Source branch name to test with
 REPO_BRANCH=master

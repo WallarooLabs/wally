@@ -21,6 +21,7 @@ echo Start 3 worker cluster
 ./21-start-3worker-cluster.sh
 if [ $? -ne 0 ]; then
     echo STOP with non-zero status
+    exit 7
 fi
 
 echo Send 1st half of messages
@@ -28,7 +29,7 @@ echo Send 1st half of messages
 echo Sleep 4 before restarting worker2; sleep 4
 
 echo Kill worker2
-./40-kill-worker.sh 2
+./40-kill-worker.sh 2 2
 
 echo Move worker2 journal files, restart worker2 on server 4
 ./50-copy-worker-resilience.sh 2 2 4
