@@ -14,7 +14,7 @@ Generally, in order to build a Wallaroo Python application, the following steps 
 * `import wallaroo` in the Python application's `.py` file
 * Create classes that provide the correct Wallaroo Python interfaces (more on this later)
 * Define an `application_setup` function that uses the `ApplicationBuilder` from the `wallaroo` module to construct the application topology.
-* Run `machida` with the application module as the `--application-module` argument
+* Run `machida` or `machida3` with the application module as the `--application-module` argument
 
 Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate topology, and enters a `ready` state where it awaits incoming data to process.
 
@@ -32,10 +32,16 @@ If you are working your way through the tutorial you might find it easier to set
 export PYTHONPATH="$PYTHONPATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:."
 ```
 
-If you chose to do this while working through the tutorial, you might also find it useful to add the path to the `machida` executable to your `PATH`, which can be done like this:
+If you chose to do this while working through the tutorial, you might also find it useful to add the path to the `machida` or `machida3` executable to your `PATH`, which can be done like this:
 
 ```bash
 export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/build"
+```
+
+or
+
+```bash
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida3/build"
 ```
 
 ## Next Steps

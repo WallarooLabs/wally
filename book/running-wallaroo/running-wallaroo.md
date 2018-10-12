@@ -1,16 +1,18 @@
 # Running Wallaroo
 
-A Wallaroo application is distributed over one or more Wallaroo processes, which we call "workers". Any Wallaroo cluster will have one worker designated as the "cluster initializer", a temporary role played during cluster initialization. 
+A Wallaroo application is distributed over one or more Wallaroo processes, which we call "workers". Any Wallaroo cluster will have one worker designated as the "cluster initializer", a temporary role played during cluster initialization.
 
-Workers communicate with each other over two channels: a control channel and a data channel. They send metrics data over TCP to an external metrics address. And they optionally listen for messages from external systems over an external channel.  
+Workers communicate with each other over two channels: a control channel and a data channel. They send metrics data over TCP to an external metrics address. And they optionally listen for messages from external systems over an external channel.
 
 Depending on the type of sources and sinks used in your application, you might need to provide more configuration information.  For example, a TCP source requires a network address so that it can listen for incoming data.  And a TCP sink requires a target address where it can send output data.
 
 In this document, we'll discuss most of the command line arguments that can be passed to a Wallaroo binary.  For a complete list, see [Wallaroo Command Line Options](/book/running-wallaroo/wallaroo-command-line-options.md).
 
+Remember to use the `machida3` executable instead of `machida` if you are using Python 3.X.
+
 ## Single Worker Setup
 
-If you are starting up a Wallaroo cluster with only one worker, then that worker must be configured as the "cluster initializer" by passing the `--cluster-initializer` flag. You must also specify a target address for metrics data using the `--metrics` parameter. And you must specify its control and data addresses via the `--control` and `--data` command line parameters (these will be used if more workers are added to the cluster later). 
+If you are starting up a Wallaroo cluster with only one worker, then that worker must be configured as the "cluster initializer" by passing the `--cluster-initializer` flag. You must also specify a target address for metrics data using the `--metrics` parameter. And you must specify its control and data addresses via the `--control` and `--data` command line parameters (these will be used if more workers are added to the cluster later).
 
 If your application uses a TCP source, then you must specify a TCP input address via `--in`. Likewise, if your application uses a TCP sink, then you must specify a TCP output address via `--out`. In what follows, we'll be using the Celsius Converter example app which uses a TCP source and sink (there are versions of this app written in [Go](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/go/celsius) and [Python](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/celsius)).
 

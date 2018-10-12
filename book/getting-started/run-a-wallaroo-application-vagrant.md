@@ -70,7 +70,7 @@ First, we will need to set up the `PYTHONPATH` environment variable. Machida nee
 export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius:$PYTHONPATH"
 ```
 
-Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
+Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command (remember to use the `machida3` executable instead of `machida` if you are using Python 3.X):
 
 ```bash
 machida --application-module celsius --in 127.0.0.1:7000 \
