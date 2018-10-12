@@ -38,7 +38,7 @@ u'\ua000abcd\u07b4'
 
 ## Debugging Using PDB
 
- If you need a more robust tool to do debugging, the Python standard library provides `pdb`. `pdb` is an interactive debugger which gives you the option to set breakpoints, inspect the stack frames, and other features expected from an interactive debugger. A quick example of using `pdb` in your application would be importing the `pdb` module and then calling its `set_trace()` function. The `import pdb` command goes in the module you pass to `--application-module` when running `machida`. Usage example:
+ If you need a more robust tool to do debugging, the Python standard library provides `pdb`. `pdb` is an interactive debugger which gives you the option to set breakpoints, inspect the stack frames, and other features expected from an interactive debugger. A quick example of using `pdb` in your application would be importing the `pdb` module and then calling its `set_trace()` function. The `import pdb` command goes in the module you pass to `--application-module` when running `machida` or `machida3`. Usage example:
 
 ```python
 import pdb
