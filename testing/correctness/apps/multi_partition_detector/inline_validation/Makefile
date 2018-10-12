@@ -34,9 +34,16 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := true
 # (and by recursion every makefile in the tree that is referenced)
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := true
 
+MULTI_PARTITION_DETECTOR_INLINE_VALIDATION_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # standard rules generation makefile
 include $(rules_mk_path)
+
+unit-tests-testing-correctness-apps-multi_partition_detector-inline_validation: inline_validation_unit_tests
+
+inline_validation_unit_tests:
+	cd $(MULTI_PARTITION_DETECTOR_INLINE_VALIDATION_PATH) && \
+		python2 -m pytest --color=yes --tb=native test.py
 
 # end of prevent rules from being evaluated/included multiple times
 endif
