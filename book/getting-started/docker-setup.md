@@ -44,7 +44,7 @@ docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }
 
 * **Wallaroo Source Code**: full Wallaroo source code is provided, including Python example applications.
 
-* **Machida with Resilience**: runs Wallaroo Python applications and writes state to disk for recovery. This version of Machida can be used via the `machida-resilience` binary. See the [Interworker Serialization and Resilience](/book/python/interworker-serialization-and-resilience.md) documentation for general information and the [Resilience](/book/running-wallaroo/wallaroo-command-line-options.md#resilience) section of our [Command Line Options](/book/running-wallaroo/wallaroo-command-line-options.md) documentation for information on its usage.
+* **Machida with Resilience**: runs Wallaroo Python applications and writes state to disk for recovery. This version of Machida can be used via the `machida-resilience` and `machida3-resilience` binaries. See the [Interworker Serialization and Resilience](/book/python/interworker-serialization-and-resilience.md) documentation for general information and the [Resilience](/book/running-wallaroo/wallaroo-command-line-options.md#resilience) section of our [Command Line Options](/book/running-wallaroo/wallaroo-command-line-options.md) documentation for information on its usage.
 
 ## Additional Windows Setup
 
