@@ -35,12 +35,15 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 RESILIENCE_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 resilience_tests : CUSTOM_PATH = $(MULTI_PARTITION_DETECTOR_PATH):$(MULTI_PART_VALIDATOR_PATH):$(CLUSTER_SHRINKER_PATH)
+resilience_tests : CUSTOM_PYTHONPATH = $(MULTI_PARTITION_DETECTOR_PATH)
 
 # standard rules generation makefile
 include $(rules_mk_path)
 
 build-testing-correctness-tests-resilience: build-testing-correctness-apps-multi_partition_detector
 build-testing-correctness-tests-resilience: build-utils-cluster_shrinker
+build-testing-correctness-tests-resilience: build-machida
+#build-testing-correctness-tests-resilience: build-machida3
 integration-tests-testing-correctness-tests-resilience: build-testing-correctness-tests-resilience
 integration-tests-testing-correctness-tests-resilience: resilience_tests
 

@@ -501,7 +501,5 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
                     assert(re.search(pattern, stdout) is not None)
                     logging.info("{} recovered successfully".format(r.name))
                 except AssertionError:
-                    raise AssertionError('Worker does not appear to have performed '
-                                         'recovery as expected. Worker output is '
-                                         'included below.\nSTDOUT\n---\n%s'
-                                         % stdout)
+                    raise AssertionError('Worker {} does not appear to have performed '
+                                         'recovery as expected.'.format(r.name))
