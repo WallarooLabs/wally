@@ -54,20 +54,25 @@ actor Main
       // Add options:
       //  "--depth": Int
       //  "--internal-source": flag
+      //  "--partitions": Int
       var depth: USize = 1
-      var internal_source: Bool = false
+      var gen_source: Bool = false
+      var partition_count: USize = 40
 
       let options = Options(env.args, false)
 
       options.add("depth", "", I64Argument)
-      options.add("internal-source", "", None)
+      options.add("gen-source", "", None)
+      options.add("partitions", "", I64Argument)
 
       for option in options do
         match option
         | ("depth", let arg: I64) =>
           depth = arg.usize()
-        | ("internal-source", None) =>
-          internal_source = true
+        | ("gen-source", None) =>
+          gen_source = true
+        | ("partitions", let arg: I64) =>
+          partition_count = arg.usize()
         end
       end
 
@@ -76,9 +81,9 @@ actor Main
 
       let application = recover val
         let a = Application("Multi Partition Detector")
-        let p = if internal_source then
+        let p = if gen_source then
           a.new_pipeline[t.Message, String]("Detector",
-            GenSourceConfig[t.Message](MultiPartitionGenerator(40)))
+            GenSourceConfig[t.Message](MultiPartitionGenerator(partition_count)))
         else
           a.new_pipeline[t.Message, String]("Detector",
             TCPSourceConfig[t.Message].from_options(PartitionedU64FramedHandler,

@@ -41,15 +41,160 @@ MULTI_PARTITION_DETECTOR_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 
+build-testing-correctness-apps-multi_partition_detector: build-machida
+#build-testing-correctness-apps-multi_partition_detector: build-machida3
 build-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector-validator
 integration-tests-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector
-integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test
-integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test_10_worker
-integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test_internal_source
-integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_test_internal_source_10_worker
+integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_pony
+integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_python
+#integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_python3
+
+# group the tests by target API (Pony, Python, Python3)
+# Pony
+multi_partition_detector_tests_pony: multi_partition_detector_test_pony
+multi_partition_detector_tests_pony: multi_partition_detector_test_pony_gen_source
+multi_partition_detector_tests_pony: multi_partition_detector_test_pony_10_worker
+multi_partition_detector_tests_pony: multi_partition_detector_test_pony_gen_source_10_worker
+
+# Python
+multi_partition_detector_tests_python: multi_partition_detector_test_python
+multi_partition_detector_tests_python: multi_partition_detector_test_python_gen_source
+multi_partition_detector_tests_python: multi_partition_detector_test_python_10_worker
+multi_partition_detector_tests_python: multi_partition_detector_test_python_gen_source_10_worker
+
+# Python3
+multi_partition_detector_tests_python3: multi_partition_detector_test_python3
+multi_partition_detector_tests_python3: multi_partition_detector_test_python3_gen_source
+multi_partition_detector_tests_python3: multi_partition_detector_test_python3_10_worker
+multi_partition_detector_tests_python3: multi_partition_detector_test_python3_gen_source_10_worker
 
 
-multi_partition_detector_test:
+# Individual test definitions below
+#
+# Python tests
+multi_partition_detector_test_python:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --sequence-sender '(0,100]' 0 '>I' key_0 \
+	  --sequence-sender '(0,100]' 0 '>I' key_1 \
+	  --log-level error \
+		--command 'machida --application-module multi_partition_detector' \
+		--validation-cmd './validator/validator -e 100 -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 2 \
+		--sink-expect 200
+
+multi_partition_detector_test_python_gen_source:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --log-level error \
+		--sources 0 \
+		--command 'machida --application-module multi_partition_detector --gen-source' \
+		--validation-cmd './validator/validator -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 10 \
+		--sink-expect 200 \
+		--sink-expect-allow-more
+
+multi_partition_detector_test_python_10_worker:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --sequence-sender '(0,1000]' 0 '>I' key_0 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_1 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_2 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_3 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_4 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_5 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_6 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_7 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_8 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_9 \
+	  --log-level error \
+		--command 'machida --application-module multi_partition_detector' \
+		--validation-cmd './validator/validator -e 1000 -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 10 \
+		--sink-expect 10000
+
+multi_partition_detector_test_python_gen_source_10_worker:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --log-level error \
+		--sources 0 \
+		--command 'machida --application-module multi_partition_detector --gen-source' \
+		--validation-cmd './validator/validator -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 10 \
+		--sink-expect 10000 \
+		--sink-expect-allow-more
+
+# Python3 tests
+multi_partition_detector_test_python3:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --sequence-sender '(0,100]' 0 '>I' key_0 \
+	  --sequence-sender '(0,100]' 0 '>I' key_1 \
+	  --log-level error \
+		--command 'machida3 --application-module multi_partition_detector' \
+		--validation-cmd './validator/validator -e 100 -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 2 \
+		--sink-expect 200
+
+multi_partition_detector_test_python3_gen_source:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --log-level error \
+		--sources 0 \
+		--command 'machida3 --application-module multi_partition_detector --gen-source' \
+		--validation-cmd './validator/validator -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 10 \
+		--sink-expect 200 \
+		--sink-expect-allow-more
+
+multi_partition_detector_test_python3_10_worker:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --sequence-sender '(0,1000]' 0 '>I' key_0 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_1 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_2 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_3 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_4 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_5 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_6 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_7 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_8 \
+	  --sequence-sender '(0,1000]' 0 '>I' key_9 \
+	  --log-level error \
+		--command 'machida3 --application-module multi_partition_detector' \
+		--validation-cmd './validator/validator -e 1000 -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 10 \
+		--sink-expect 10000
+
+multi_partition_detector_test_python3_gen_source_10_worker:
+	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
+	integration_test \
+	  --log-level error \
+		--sources 0 \
+		--command 'machida3 --application-module multi_partition_detector --gen-source' \
+		--validation-cmd './validator/validator -a -i' \
+		--output 'received.txt' \
+		--batch-size 10 \
+		--workers 10 \
+		--sink-expect 10000 \
+		--sink-expect-allow-more
+
+# Pony tests
+multi_partition_detector_test_pony:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
 	  --sequence-sender '(0,100]' 0 '>I' key_0 \
@@ -62,11 +207,11 @@ multi_partition_detector_test:
 		--workers 2 \
 		--sink-expect 200
 
-multi_partition_detector_test_internal_source:
+multi_partition_detector_test_pony_gen_source:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
 	  --log-level error \
-		--command './multi_partition_detector --internal-source' \
+		--command './multi_partition_detector --gen-source' \
 		--sources 0 \
 		--validation-cmd './validator/validator -a -i' \
 		--output 'received.txt' \
@@ -75,7 +220,7 @@ multi_partition_detector_test_internal_source:
 		--sink-expect 200 \
 		--sink-expect-allow-more
 
-multi_partition_detector_test_10_worker:
+multi_partition_detector_test_pony_10_worker:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
 	  --sequence-sender '(0,1000]' 0 '>I' key_0 \
@@ -96,11 +241,11 @@ multi_partition_detector_test_10_worker:
 		--workers 10 \
 		--sink-expect 10000
 
-multi_partition_detector_test_internal_source_10_worker:
+multi_partition_detector_test_pony_gen_source_10_worker:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
 	  --log-level error \
-		--command './multi_partition_detector --internal-source' \
+		--command './multi_partition_detector --gen-source' \
 		--sources 0 \
 		--validation-cmd './validator/validator -a -i' \
 		--output 'received.txt' \
