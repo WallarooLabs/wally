@@ -117,7 +117,7 @@ First, we'll need to get to the python Celsius example directory with the follow
 cd /src/wallaroo/examples/python/celsius
 ```
 
-Now that we are in the proper directory, and the Metrics UI and Data receiver are up and running, we can run the application itself by executing the following command:
+Now that we are in the proper directory, and the Metrics UI and Data receiver are up and running, we can run the application itself by executing the following command (remember to use the `machida3` executable instead of `machida` if you are using Python 3.X):
 
 ```bash
 machida --application-module celsius --in 127.0.0.1:7000 \
