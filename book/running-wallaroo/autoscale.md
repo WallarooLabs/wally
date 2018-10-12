@@ -4,7 +4,9 @@ Wallaroo is designed to support scale-independent development. It can adapt to c
 
 With autoscale enabled, you can add or remove workers from a running cluster. We call these “grow to fit” and “shrink to fit”, respectively (referring to the fact that the cluster grows or shrinks to fit your current resource requirements). To enable autoscale, you must build a Wallaroo binary using the `-D autoscale` command line argument. Autoscale is set by default when running `make` for building Machida or the example Wallaroo applications.
 
-## Grow to Fit   
+Remember to use the `machida3` executable instead of `machida` if you are using Python 3.X.
+
+## Grow to Fit
 
 While a Wallaroo cluster is running, new workers can join the cluster.  To add workers to a running cluster, you must know the control channel address of one of the workers in the running cluster.  Let’s assume it’s `127.0.0.1:12500`.  The following command would allow us to add one worker to a running cluster for the `alphabet` example app:
 
@@ -46,8 +48,8 @@ alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
 
 ## Shrink to Fit
 
-It is also possible to remove one or more workers from a running cluster. 
-There are two ways to specify that workers should be removed from the cluster.  You can either specify the worker names or the total count of workers to be removed.  You must know the external channel address of one worker in the running cluster. 
+It is also possible to remove one or more workers from a running cluster.
+There are two ways to specify that workers should be removed from the cluster.  You can either specify the worker names or the total count of workers to be removed.  You must know the external channel address of one worker in the running cluster.
 
 You can use the `cluster_shrinker` tool to send a shrink message to this channel. For example, if the external address is `127.0.0.1:5050` and we want to remove 2 workers from the cluster, we can run the following, using the `count` argument to specify the worker count to remove:
 
@@ -75,4 +77,3 @@ You can query a running cluster to get a list of workers eligible for shutdown. 
 ```
 cluster_shrinker --external 127.0.0.1:5050 --query
 ```
-
