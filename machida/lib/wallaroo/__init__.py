@@ -405,6 +405,14 @@ class TCPSourceConfig(object):
         return ("tcp", self._host, self._port, self._decoder)
 
 
+class GenSourceConfig(object):
+    def __init__(self, gen_instance):
+        self._gen = gen_instance
+
+    def to_tuple(self):
+        return ("gen", self._gen)
+
+
 class TCPSinkConfig(object):
     def __init__(self, host, port, encoder):
         self._host = host
