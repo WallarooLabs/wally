@@ -29,6 +29,7 @@ use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
 use "wallaroo/core/source/connector_source"
 use "wallaroo/core/source/kafka_source"
+use "wallaroo/core/source/gen_source"
 use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/topology"
 use "wallaroo/core/state"
@@ -69,6 +70,10 @@ use @source_decoder_payload_length[USize](source_decoder: Pointer[U8] val,
   data: Pointer[U8] tag, size: USize)
 use @source_decoder_decode[Pointer[U8] val](source_decoder: Pointer[U8] val,
   data: Pointer[U8] tag, size: USize)
+use @source_generator_initial_value[Pointer[U8] val](
+  source_generator: Pointer[U8] val)
+use @source_generator_apply[Pointer[U8] val](source_generator: Pointer[U8] val,
+  data: Pointer[U8] tag)
 
 use @sink_encoder_encode[Pointer[U8] val](sink_encoder: Pointer[U8] val,
   data: Pointer[U8] val)
@@ -281,6 +286,40 @@ class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
 
   fun _final() =>
     Machida.dec_ref(_source_decoder)
+
+class PyGenSourceHandler is GenSourceGenerator[PyData val]
+  var _source_generator: Pointer[U8] val
+
+  new create(source_generator: Pointer[U8] val) =>
+    _source_generator = source_generator
+
+  fun initial_value(): (PyData val | None) =>
+    let r = Machida.source_generator_initial_value(_source_generator)
+    if not Machida.is_py_none(r) then
+      recover PyData(r) end
+    else
+      None
+    end
+
+  fun apply(data: PyData val): (PyData val | None) =>
+    let r = Machida.source_generator_apply(_source_generator, data.obj())
+    if not Machida.is_py_none(r) then
+      recover PyData(r) end
+    else
+      None
+    end
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_source_generator)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_source_generator, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _source_generator = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_source_generator)
 
 class PyComputationBuilder
   var _computation: PyComputation val
@@ -716,6 +755,22 @@ primitive Machida
     if r.is_null() then Fail() end
     r
 
+  fun source_generator_initial_value(source_decoder: Pointer[U8] val):
+    Pointer[U8] val
+  =>
+    let r = @source_generator_initial_value(source_decoder)
+    print_errors()
+    if r.is_null() then Fail() end
+    r
+
+  fun source_generator_apply(source_decoder: Pointer[U8] val,
+    data: Pointer[U8] val): Pointer[U8] val
+  =>
+    let r = @source_generator_apply(source_decoder, data)
+    print_errors()
+    if r.is_null() then Fail() end
+    r
+
   fun sink_encoder_encode(sink_encoder: Pointer[U8] val, data: Pointer[U8] val):
     Pointer[U8] val
   =>
@@ -897,6 +952,13 @@ primitive _SourceConfig
     end
 
     match name
+    | "gen" =>
+      let gen = recover val
+        let g = @PyTuple_GetItem(source_config_tuple, 1)
+        Machida.inc_ref(g)
+        PyGenSourceHandler(g)
+      end
+      GenSourceConfig[PyData val](gen)
     | "tcp" =>
       let host = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))

@@ -57,14 +57,14 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 interface val GenSourceGenerator[V: Any val]
-  fun initial_value(): V
-  fun apply(v: V): V
+  fun initial_value(): (V | None)
+  fun apply(v: V): (V | None)
 
 actor GenSource[V: Any val] is Source
   """
   # GenSource
   """
-  var _cur_value: V
+  var _cur_value: (V | None)
   let _generator: GenSourceGenerator[V]
 
   let _source_id: RoutingId
@@ -190,29 +190,34 @@ actor GenSource[V: Any val] is Source
     latest_metrics_id = latest_metrics_id + 1
 
     let next = _cur_value
-    _cur_value = _generator(next)
-    (let is_finished, let last_ts) =
-      _runner.run[V](_pipeline_name, pipeline_time_spent, next,
-        _source_id, this, _router, _target_id_router, _msg_id_gen(),
-        None, decode_end_ts, latest_metrics_id, ingest_ts,
-        _metrics_reporter)
+    match next
+    | (let next': V) =>
+      _cur_value = _generator(next')
+      (let is_finished, let last_ts) =
+        _runner.run[V](_pipeline_name, pipeline_time_spent, next',
+          _source_id, this, _router, _target_id_router, _msg_id_gen(),
+          None, decode_end_ts, latest_metrics_id, ingest_ts,
+          _metrics_reporter)
 
-    if is_finished then
-      let end_ts = Time.nanos()
-      let time_spent = end_ts - ingest_ts
+      if is_finished then
+        let end_ts = Time.nanos()
+        let time_spent = end_ts - ingest_ts
 
-      ifdef "detailed-metrics" then
-        _metrics_reporter.step_metric(_pipeline_name,
-          "Before end at TCP Source", 9999,
-          last_ts, end_ts)
+        ifdef "detailed-metrics" then
+          _metrics_reporter.step_metric(_pipeline_name,
+            "Before end at TCP Source", 9999,
+            last_ts, end_ts)
+        end
+
+        _metrics_reporter.pipeline_metric(_pipeline_name, time_spent +
+          pipeline_time_spent)
+        _metrics_reporter.worker_metric(_pipeline_name, time_spent)
       end
-
-      _metrics_reporter.pipeline_metric(_pipeline_name, time_spent +
-        pipeline_time_spent)
-      _metrics_reporter.worker_metric(_pipeline_name, time_spent)
-    end
     // !@ USE TIMER
-    next_message()
+      next_message()
+    else
+      @printf[I32]("GenSource produced a None. Stopping GenSource.\n".cstring())
+    end
 
   be first_checkpoint_complete() =>
     """
