@@ -176,7 +176,7 @@ set_commands_to_run() {
 export CUSTOM_WALLAROO_SOURCE_TGZ_URL=${CUSTOM_WALLAROO_SOURCE_TGZ_URL:-} && \
 export CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL=${CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL:-} && \
 cd '${tmp_for_run}' && \
-(echo y | ${HERE}/wallaroo-up.sh -t all || exit) && \
+(echo y | ${HERE}/wallaroo-up.sh -t python || exit) && \
 export TMPDIR='${tmp_for_run}' && \
 (~/wallaroo-tutorial/wallaroo*/misc/example-tester.bash || exit) && \
 echo SUCCESS > ${tmp_for_run}/result
