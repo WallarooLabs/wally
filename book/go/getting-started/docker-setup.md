@@ -63,7 +63,7 @@ We'll need to create a directory for the Wallaroo source code.
 To create the Wallaroo source code directory run the following command in Powershell or Command Prompt:
 
 ```bash
-mkdir c:\wallaroo-docker\wallaroo-src
+mkdir c:\wallaroo-docker\wallaroo-{{ book.wallaroo_version }}\wallaroo-src
 ```
 
 Your Windows machine is now all set to continue!

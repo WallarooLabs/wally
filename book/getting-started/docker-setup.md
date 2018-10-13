@@ -65,12 +65,12 @@ We'll need to create two directories, one for the Wallaroo source code and one f
 To create the Wallaroo source code directory run the following command in Powershell or Command Prompt:
 
 ```bash
-mkdir c:\wallaroo-docker\wallaroo-src
+mkdir c:\wallaroo-docker\wallaroo-{{ book.wallaroo_version }}\wallaroo-src
 ```
 To create the Wallaroo Python virtual environment directory run the following command in Powershell or Command Prompt:
 
 ```bash
-mkdir c:\wallaroo-docker\python-virtualenv
+mkdir c:\wallaroo-docker\wallaroo-{{ book.wallaroo_version }}\python-virtualenv
 ```
 
 Your Windows machine is now all set to continue!
