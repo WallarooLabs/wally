@@ -24,20 +24,20 @@ It takes two optional positional arguments. Arg1 is which language's examples to
 
 NOTE: This has only been tested on Linux. It may or may not work on OSX/other environments.
 
-## Wallaroo release tester
+## Wallaroo Up tester
 
-The release tester is a script to automate running Wallaroo Up and all example applications for every distribution supported by Wallaroo Up. It does so by looping through a list of supported distributions and then using either Vagrant or Docker to start the appropriate environment for running Wallaroo Up and the Wallaroo example tester.
+The Wallaroo Up tester is a script to automate running Wallaroo Up and all example applications for every distribution supported by Wallaroo Up. It does so by looping through a list of supported distributions and then using either Vagrant or Docker to start the appropriate environment for running Wallaroo Up and the Wallaroo example tester.
 
-The release tester requires an environment with Docker and/or Vagrant/Virtualbox installed and available with Docker set up to be run without `sudo`. Vagrant also requires the `vagrant-vbguest` plugin to be install. It can be installed via the following command:
+The Wallaroo Up tester requires an environment with Docker and/or Vagrant/Virtualbox installed and available with Docker set up to be run without `sudo`. Vagrant also requires the `vagrant-vbguest` plugin to be install. It can be installed via the following command:
 
 ```
 vagrant plugin install vagrant-vbguest
 ```
 
-You can run the release tester on any Wallaroo source tree via the following command:
+You can run the Wallaroo Up tester on any Wallaroo source tree via the following command:
 
 ```
-./release-tester.bash
+./wallaroo-up-tester.bash
 ```
 
 It takes three optional positional arguments. Arg1 is whether to test a `custom` or the latest `released` set of artifacts. If custom, it will use the current source tree to generate the appropriate artifacts to use. Arg2 is which environment to test in (docker/vagrant/all). Arg3 is which distribution to test (xenial/etc). By default, it will run Wallaroo Up and the example tester for all distributions in all environments with the latest released artifacts.

@@ -170,7 +170,7 @@ log() {
   eval "$tmp_cmd"
 }
 
-LANG_TO_TEST=${1:-*}
+LANG_TO_TEST=${1:-python}
 EXAMPLE_TO_TEST=${2:-*}
 
 SOURCE_ACTIVATE="source $(readlink -e "${WALLAROO_DIR}/bin/activate")"
