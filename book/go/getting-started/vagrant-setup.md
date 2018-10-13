@@ -14,21 +14,20 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
+This will be our base directory in what follows. Create a directory for the current Wallaroo version and download the Wallaroo Vagrantfile:
 
 ```bash
-curl -L -o wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/wallaroo-{{ book.wallaroo_version }}.tar.gz'
 mkdir wallaroo-{{ book.wallaroo_version }}
-tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
-rm wallaroo-{{ book.wallaroo_version }}.tar.gz
 cd wallaroo-{{ book.wallaroo_version }}
+mkdir vagrant
+cd vagrant
+curl -o Vagrantfile -J -L \
+  https://raw.githubusercontent.com/WallarooLabs/wallaroo/{{ book.wallaroo_version }}/vagrant/Vagrantfile
 ```
 
 ### Windows via Powershell
 
 **Note:** This section of the guide assumes you are using Powershell.
-
-Download and install git from [Git for Windows](https://gitforwindows.org/) and install it.
 
 If you haven't already done so, create a directory called `~/wallaroo-tutorial` and navigate there by running:
 
@@ -38,12 +37,15 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. If you haven't already cloned the Wallaroo repo, do so now (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
+This will be our base directory in what follows. Create a directory for the current Wallaroo version and download the Wallaroo Vagrantfile:
 
 ```bash
-git clone https://github.com/WallarooLabs/wallaroo wallaroo-{{ book.wallaroo_version }}
+mkdir wallaroo-{{ book.wallaroo_version }}
 cd wallaroo-{{ book.wallaroo_version }}
-git checkout {{ book.wallaroo_version }}
+mkdir vagrant
+cd vagrant
+Invoke-WebRequest -OutFile Vagrantfile `
+  https://raw.githubusercontent.com/WallarooLabs/wallaroo/{{ book.wallaroo_version }}/vagrant/Vagrantfile
 ```
 
 ## Installing VirtualBox

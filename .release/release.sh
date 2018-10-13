@@ -61,7 +61,7 @@ update_version() {
   echo "$for_version" > VERSION
   echo "VERSION set to $for_version"
   echo "Replacing Wallaroo version in Vagrant bootstrap.sh with $for_version"
-  find vagrant -name "bootstrap.sh" -exec sed -i -- "/WALLAROO_VERSION/ s/=\"[^\"][^\"]*\"/=\"$for_version\"/" {} \;
+  find vagrant -name "Vagrantfile" -exec sed -i -- "/WALLAROO_VERSION/ s/=\"[^\"][^\"]*\"/=\"$for_version\"/" {} \;
   echo "Updating Dockerfile for $for_version"
   sed -i "s/^ENV WALLAROO_VERSION .*/ENV WALLAROO_VERSION ${for_version}/" Dockerfile
   echo "Updating wallaroo-up.sh for $for_version"
@@ -88,7 +88,7 @@ commit_version_update() {
   echo "Committing version change..."
   # commit VERSION update
   git add VERSION
-  git add vagrant/bootstrap.sh
+  git add vagrant/Vagrantfile
   git add misc/wallaroo-up.sh
   git add misc/activate
   git add Dockerfile

@@ -1,6 +1,37 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+$script = <<-SCRIPT
+#! /bin/bash
+
+set -o errexit
+set -o nounset
+
+export WALLAROO_VERSION="0.5.3"
+
+wallaroo_up() {
+  cd /tmp
+  curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/${WALLAROO_VERSION}/misc/wallaroo-up.sh -o wallaroo-up.sh -J -L
+  chmod +x wallaroo-up.sh
+  export WALLAROO_UP_SOURCE=vagrant
+  echo y | ./wallaroo-up.sh -t all
+}
+
+add_activate_to_bashrc() {
+  echo "source /home/vagrant/wallaroo-tutorial/wallaroo-${WALLAROO_VERSION}/bin/activate" >> /home/vagrant/.bashrc
+}
+
+## clone and build Wallaroo
+wallaroo_up
+
+## add Metrics UI to PATH
+add_activate_to_bashrc
+
+## allow vagrant user access to everything
+pushd /home/vagrant
+chown -R vagrant:vagrant wallaroo-tutorial
+SCRIPT
+
 # All Vagrant configuration is done below. The "2" in Vagrant.configure
 # configures the configuration version (we support older styles for
 # backwards compatibility). Please don't change it unless you know what
@@ -15,7 +46,7 @@ Vagrant.configure("2") do |config|
   # boxes at https://atlas.hashicorp.com/search.
   config.vm.box = "ubuntu/xenial64"
   config.vm.box_version = "20180504.0.0"
-  config.vm.provision :shell, privileged: false, path: "bootstrap.sh"
+  config.vm.provision "setup-wallaroo", type: "shell", privileged: false, inline: $script
 
   config.vm.provider "virtualbox" do |v|
     v.memory = 4084
