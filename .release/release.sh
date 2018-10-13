@@ -75,8 +75,6 @@ update_version() {
   sed -i "s/WALLAROO_PONYC_MAP=\"/WALLAROO_PONYC_MAP=\"\nW${for_version}=${PONYC_VERSION}/" misc/wallaroo-up.sh
   # remove old release candidate versions from wallaroo-up.sh map
   sed -i "/Wrelease-/d" misc/wallaroo-up.sh
-  # update activate script for latest release
-  sed -i "s@^WALLAROO_ROOT=.*@WALLAROO_ROOT=\"\${HOME}/wallaroo-tutorial/wallaroo-${for_version}\"@" misc/activate
   # update activate script for golang version
   sed -i "s@^export GOROOT=.*@export GOROOT=\$WALLAROO_ROOT/bin/go${GO_VERSION}@" misc/activate
   # update checksum in wallaroo-up.sh
