@@ -37,7 +37,6 @@ RUN apt-get install -y \
     echo y | ./wallaroo-up.sh -t all && \
     ln -s ~/wallaroo-tutorial/wallaroo-${WALLAROO_VERSION} /wallaroo-src && \
     cd /wallaroo-src && \
-    sed -i "s@^WALLAROO_ROOT=.*@WALLAROO_ROOT=\"/src/wallaroo\"@" bin/activate && \
     sed -i "s@^export RELEASE_MUTABLE_DIR=.*@export RELEASE_MUTABLE_DIR=\"/tmp/metrics_ui\"@" bin/activate && \
     mkdir /wallaroo-bin && \
     cp docker/env-setup /wallaroo-bin && \

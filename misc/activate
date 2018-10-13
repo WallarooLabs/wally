@@ -3,7 +3,7 @@
 WALLAROO_ACTIVATE="${BASH_SOURCE[0]}"
 HERE=$(dirname "$(readlink -e "${WALLAROO_ACTIVATE}")")
 
-WALLAROO_ROOT="${HOME}/wallaroo-tutorial/wallaroo-0.5.3"
+WALLAROO_ROOT="${HERE}/.."
 export WALLAROO_ROOT
 
 export GOROOT=$WALLAROO_ROOT/bin/go1.9.4
