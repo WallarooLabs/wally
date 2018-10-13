@@ -38,7 +38,7 @@ export CUSTOM_WALLAROO_METRICS_UI_APPIMAGE_URL=${CUSTOM_WALLAROO_METRICS_UI_APPI
 mkdir -p "${TESTING_TMP}"
 cd "${TESTING_TMP}"
 echo "Running Wallaroo Up..."
-echo y | ${WALLAROO_DIR}/misc/wallaroo-up.sh -t all || (cat /home/travis/build/WallarooLabs/wallaroo/travis/logs/wallaroo-release-tester/wallaroo-up.log && exit 1)
+echo y | ${WALLAROO_DIR}/misc/wallaroo-up.sh -t python || (cat /home/travis/build/WallarooLabs/wallaroo/travis/logs/wallaroo-release-tester/wallaroo-up.log && exit 1)
 export TMPDIR="${TESTING_TMP}"
 echo "Running example tester..."
 export VERBOSE_ERROR=true

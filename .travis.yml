@@ -19,7 +19,3 @@ jobs:
     - stage: tests
       script: bash travis/wallaroo-up-example-tester.bash python
       name: "Python Examples"
-    - script: bash travis/wallaroo-up-example-tester.bash go
-      name: "Go Examples"
-    - script: bash travis/wallaroo-up-example-tester.bash pony
-      name: "Pony Examples"
