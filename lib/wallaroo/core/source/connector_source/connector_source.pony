@@ -628,94 +628,79 @@ actor ConnectorSource[In: Any val] is Source
       _reading = true
 
       while _readable and not _shutdown_peer do
+        // exit if muted
         if _muted then
           _reading = false
           return
         end
 
-        if (_read_buf_offset >= _expect) and (_read_buf_offset != 0) then
-          if (_expect == 0) and (_read_buf_offset > 0) then
-            let data = _read_buf = recover Array[U8] end
-            data.truncate(_read_buf_offset)
-            _read_buf_offset = 0
-
-            received_count = received_count + 1
-            if not _notify.received(this, consume data) then
-              _read_buf_size()
-              _read_again()
-              _reading = false
-              return
+        // distribute and data we've already read that is in the `read_buf`
+        // and able to be distributed
+        while (_read_buf_offset >= _expect) and (_read_buf_offset > 0) do
+          // get data to be distributed and update `_read_buf_offset`
+          let data =
+            if _expect == 0 then
+              let data' = _read_buf = recover Array[U8] end
+              data'.truncate(_read_buf_offset)
+              _read_buf_offset = 0
+              consume data'
             else
-              _read_buf_size()
-            end
-            if received_count >= _max_received_count then
-              _read_again()
-              _reading = false
-              return
-            end
-          else
-            while _read_buf_offset >= _expect do
               let x = _read_buf = recover Array[U8] end
-              (let data, _read_buf) = (consume x).chop(_expect)
+              (let data', _read_buf) = (consume x).chop(_expect)
               _read_buf_offset = _read_buf_offset - _expect
-
-              // increment max reads
-              received_count = received_count + 1
-              if not _notify.received(this, consume data) then
-                _read_buf_size()
-                _read_again()
-                _reading = false
-                return
-              end
-
-              if received_count >= _max_received_count then
-                _read_buf_size()
-                _read_again()
-                _reading = false
-                return
-              end
+              consume data'
             end
 
-            _read_buf_size()
-          end
+          // increment max reads
+          received_count = received_count + 1
 
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            // _read_buf_size()
+          // check if we should yield to let another actor run
+          if (not _notify.received(this, consume data))
+            or (received_count >= _max_received_count)
+          then
+            _read_buf_size()
             _read_again()
             _reading = false
             return
           end
-        else
-          if _read_buf.size() > _read_buf_offset then
-          // Read as much data as possible.
-            let len = @pony_os_recv[USize](
-              _event,
-              _read_buf.cpointer(_read_buf_offset),
-              _read_buf.size() - _read_buf_offset) ?
-
-            match len
-            | 0 =>
-              // Would block, try again later.
-              // this is safe because asio thread isn't currently subscribed
-              // for a read event so will not be writing to the readable flag
-              @pony_asio_event_set_readable[None](_event, false)
-              _readable = false
-              @pony_asio_event_resubscribe_read(_event)
-              _reading = false
-              return
-            | (_read_buf.size() - _read_buf_offset) =>
-              // Increase the read buffer size.
-              _next_size = _max_size.min(_next_size * 2)
-            end
-
-            _read_buf_offset = _read_buf_offset + len
-            sum = sum + len
-          else
-            _read_buf_size()
-            _read_again()
-          end
         end
+
+        if sum >= _max_size then
+          // If we've read _max_size, yield and read again later.
+          _read_buf_size()
+          _read_again()
+          _reading = false
+          return
+        end
+
+        // make sure we have enough space to read enough data for _expect
+        if _read_buf.size() <= _read_buf_offset then
+          _read_buf_size()
+        end
+
+        // Read as much data as possible.
+        let len = @pony_os_recv[USize](
+          _event,
+          _read_buf.cpointer(_read_buf_offset),
+          _read_buf.size() - _read_buf_offset) ?
+
+        match len
+        | 0 =>
+          // Would block, try again later.
+          // this is safe because asio thread isn't currently subscribed
+          // for a read event so will not be writing to the readable flag
+          @pony_asio_event_set_readable[None](_event, false)
+          _readable = false
+          _reading = false
+          @pony_asio_event_resubscribe_read(_event)
+          return
+        | (_read_buf.size() - _read_buf_offset) =>
+          // Increase the read buffer size.
+          _next_size = _max_size.min(_next_size * 2)
+        end
+
+        _read_buf_offset = _read_buf_offset + len
+        sum = sum + len
       end
     else
       // The socket has been closed from the other side.
