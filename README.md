@@ -37,6 +37,8 @@ As easy as:
 docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/release/wallaroo:latest
 ```
 
+Check out our [installation options][installation-options] page to learn more.
+
 ## Usage
 
 Once you've installed Wallaroo, Take a look at some of our examples. A great place to start are our [reverse][reverse] or [market spread][market-spread] examples in either [Python](python-examples) or [Go](go-examples).
@@ -106,6 +108,7 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [group-link]: https://groups.io/g/wallaroo
 [hello-wallaroo-post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/
 [home-page]: https://www.wallaroolabs.com/
+[installation-options]: https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html
 [irc-badge]: https://img.shields.io/badge/IRC-join%20chat%20%E2%86%92-blue.svg
 [irc-link]: https://webchat.freenode.net/?channels=#wallaroo
 [kafka-link]: https://kafka.apache.org/
