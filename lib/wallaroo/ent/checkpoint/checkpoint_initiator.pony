@@ -116,8 +116,9 @@ actor CheckpointInitiator is Initializable
       else
         ifdef "resilience" then
           _event_log.write_initial_checkpoint_id(_current_checkpoint_id)
+          _commit_checkpoint_id(_last_complete_checkpoint_id,
+            _last_rollback_id)
         end
-        _commit_checkpoint_id(_last_complete_checkpoint_id, _last_rollback_id)
       end
     end
 
@@ -176,40 +177,43 @@ actor CheckpointInitiator is Initializable
   fun ref _initiate_checkpoint(checkpoint_group: USize,
     repeating: Bool = true)
   =>
-    if not _ignoring_checkpoints and (checkpoint_group == _checkpoint_group)
-    then
-      _clear_pending_checkpoints()
-      _current_checkpoint_id = _current_checkpoint_id + 1
+    ifdef "resilience" then
+      if not _ignoring_checkpoints and (checkpoint_group == _checkpoint_group)
+      then
+        _clear_pending_checkpoints()
+        _current_checkpoint_id = _current_checkpoint_id + 1
 
-      ifdef "checkpoint_trace" then
-        (let s, let ns) = Time.now()
-        let us = ns / 1000
-        let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
-        @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
-          _current_checkpoint_id.string().cstring(), ts.string().cstring())
+        ifdef "checkpoint_trace" then
+          (let s, let ns) = Time.now()
+          let us = ns / 1000
+          let ts = PosixDate(s, ns).format("%Y-%m-%d %H:%M:%S." + us.string())
+          @printf[I32]("Initiating checkpoint %s at %s\n".cstring(),
+            _current_checkpoint_id.string().cstring(), ts.string().cstring())
+        end
+
+        let event_log_promise = Promise[CheckpointId]
+        event_log_promise.next[None](
+          recover this~event_log_checkpoint_complete(_worker_name) end)
+        _event_log.initiate_checkpoint(_current_checkpoint_id,
+          event_log_promise)
+
+        try
+          let msg = ChannelMsgEncoder.event_log_initiate_checkpoint(
+            _current_checkpoint_id, _worker_name, _auth)?
+          _connections.send_control_to_cluster(msg)
+        else
+          Fail()
+        end
+
+        let token = CheckpointBarrierToken(_current_checkpoint_id)
+
+        let barrier_promise = Promise[BarrierToken]
+        barrier_promise.next[None](
+          recover this~checkpoint_barrier_complete() end)
+        _barrier_initiator.inject_barrier(token, barrier_promise)
+
+        _phase = _CheckpointingPhase(token, repeating, this)
       end
-
-      let event_log_promise = Promise[CheckpointId]
-      event_log_promise.next[None](
-        recover this~event_log_checkpoint_complete(_worker_name) end)
-      _event_log.initiate_checkpoint(_current_checkpoint_id, event_log_promise)
-
-      try
-        let msg = ChannelMsgEncoder.event_log_initiate_checkpoint(
-          _current_checkpoint_id, _worker_name, _auth)?
-        _connections.send_control_to_cluster(msg)
-      else
-        Fail()
-      end
-
-      let token = CheckpointBarrierToken(_current_checkpoint_id)
-
-      let barrier_promise = Promise[BarrierToken]
-      barrier_promise.next[None](
-        recover this~checkpoint_barrier_complete() end)
-      _barrier_initiator.inject_barrier(token, barrier_promise)
-
-      _phase = _CheckpointingPhase(token, repeating, this)
     end
 
   be resume_checkpoint() =>
@@ -218,18 +222,22 @@ actor CheckpointInitiator is Initializable
     end
     if _is_active and (_worker_name == _primary_worker) then
       _clear_pending_checkpoints()
-      let promise = Promise[BarrierToken]
-      promise.next[None]({(t: BarrierToken) =>
-        _self.initiate_checkpoint(_checkpoint_group)})
-      _barrier_initiator.inject_barrier(
-        CheckpointRollbackResumeBarrierToken(_last_rollback_id,
-          _last_complete_checkpoint_id), promise)
-      _ignoring_checkpoints = false
+      ifdef "resilience" then
+        let promise = Promise[BarrierToken]
+        promise.next[None]({(t: BarrierToken) =>
+          _self.initiate_checkpoint(_checkpoint_group)})
+        _barrier_initiator.inject_barrier(
+          CheckpointRollbackResumeBarrierToken(_last_rollback_id,
+            _last_complete_checkpoint_id), promise)
+        _ignoring_checkpoints = false
+      end
     else
       try
-        let msg = ChannelMsgEncoder.resume_checkpoint(_worker_name, _auth)?
-        _connections.send_control(_primary_worker, msg)
-        _ignoring_checkpoints = false
+        ifdef "resilience" then
+          let msg = ChannelMsgEncoder.resume_checkpoint(_worker_name, _auth)?
+          _connections.send_control(_primary_worker, msg)
+          _ignoring_checkpoints = false
+        end
       else
         Fail()
       end
@@ -248,9 +256,9 @@ actor CheckpointInitiator is Initializable
     checkpoint_id: CheckpointId)
   =>
     ifdef debug then
-      @printf[I32](("Checkpoint_Initiator: Event Log CheckpointId %s complete " +
-        "for worker %s\n").cstring(), checkpoint_id.string().cstring(),
-        worker.cstring())
+      @printf[I32](("Checkpoint_Initiator: Event Log CheckpointId %s " +
+        "complete for worker %s\n").cstring(), checkpoint_id.string()
+        .cstring(), worker.cstring())
     end
     _phase.event_log_checkpoint_complete(worker, checkpoint_id)
 
@@ -275,21 +283,23 @@ actor CheckpointInitiator is Initializable
       @printf[I32]("CheckpointInitiator: event_log_write_checkpoint_id()\n"
         .cstring())
     end
-    let promise = Promise[CheckpointId]
-    promise.next[None](
-      recover this~event_log_id_written(_worker_name) end)
-    _event_log.write_checkpoint_id(checkpoint_id, promise)
+    ifdef "resilience" then
+      let promise = Promise[CheckpointId]
+      promise.next[None](
+        recover this~event_log_id_written(_worker_name) end)
+      _event_log.write_checkpoint_id(checkpoint_id, promise)
 
-    try
-      let msg = ChannelMsgEncoder.event_log_write_checkpoint_id(
-        checkpoint_id, _worker_name, _auth)?
-      for w in _workers.values() do
-        if w != _worker_name then
-          _connections.send_control(w, msg)
+      try
+        let msg = ChannelMsgEncoder.event_log_write_checkpoint_id(
+          checkpoint_id, _worker_name, _auth)?
+        for w in _workers.values() do
+          if w != _worker_name then
+            _connections.send_control(w, msg)
+          end
         end
+      else
+        Fail()
       end
-    else
-      Fail()
     end
 
     _phase = _WaitingForEventLogIdWrittenPhase(token, repeating, this)
@@ -350,53 +360,59 @@ actor CheckpointInitiator is Initializable
     recovery_promise: Promise[CheckpointRollbackBarrierToken],
     worker: WorkerName)
   =>
-    if (_primary_worker == _worker_name) then
-      if _current_checkpoint_id == 0 then
-        @printf[I32]("No checkpoints were taken!\n".cstring())
-        Fail()
-      end
+    ifdef "resilience" then
+      if (_primary_worker == _worker_name) then
+        if _current_checkpoint_id == 0 then
+          @printf[I32]("No checkpoints were taken!\n".cstring())
+          Fail()
+        end
 
-      _clear_pending_checkpoints()
+        _clear_pending_checkpoints()
 
-      let rollback_id = _last_rollback_id + 1
-      _last_rollback_id = rollback_id
+        let rollback_id = _last_rollback_id + 1
+        _last_rollback_id = rollback_id
 
-      ifdef "checkpoint_trace" then
-        @printf[I32]("CheckpointInitiator: initiate_rollback %s on behalf of %s\n".cstring(), rollback_id.string().cstring(), worker.cstring())
-      end
+        ifdef "checkpoint_trace" then
+          @printf[I32](("CheckpointInitiator: initiate_rollback %s on " +
+            " behalf of %s\n").cstring(), rollback_id.string().cstring(),
+            worker.cstring())
+        end
 
-      let token = CheckpointRollbackBarrierToken(rollback_id,
-        _last_complete_checkpoint_id)
-      if _current_checkpoint_id < _last_complete_checkpoint_id then
-        _current_checkpoint_id = _last_complete_checkpoint_id
-      end
-      let barrier_promise = Promise[BarrierToken]
-      barrier_promise.next[None]({(t: BarrierToken) =>
-        match t
-        | let srbt: CheckpointRollbackBarrierToken =>
-          recovery_promise(srbt)
-          _self.rollback_complete(srbt.rollback_id)
+        let token = CheckpointRollbackBarrierToken(rollback_id,
+          _last_complete_checkpoint_id)
+        if _current_checkpoint_id < _last_complete_checkpoint_id then
+          _current_checkpoint_id = _last_complete_checkpoint_id
+        end
+        let barrier_promise = Promise[BarrierToken]
+        barrier_promise.next[None]({(t: BarrierToken) =>
+          match t
+          | let srbt: CheckpointRollbackBarrierToken =>
+            recovery_promise(srbt)
+            _self.rollback_complete(srbt.rollback_id)
+          else
+            Fail()
+          end
+        })
+        let resume_token = CheckpointRollbackResumeBarrierToken(rollback_id,
+          _last_complete_checkpoint_id)
+        _barrier_initiator.inject_blocking_barrier(token, barrier_promise,
+          resume_token)
+      else
+        try
+          let msg = ChannelMsgEncoder.initiate_rollback_barrier(_worker_name,
+            _auth)?
+          _connections.send_control(_primary_worker, msg)
         else
           Fail()
         end
-      })
-      let resume_token = CheckpointRollbackResumeBarrierToken(rollback_id,
-        _last_complete_checkpoint_id)
-      _barrier_initiator.inject_blocking_barrier(token, barrier_promise,
-        resume_token)
-    else
-      try
-        let msg = ChannelMsgEncoder.initiate_rollback_barrier(_worker_name,
-          _auth)?
-        _connections.send_control(_primary_worker, msg)
-      else
-        Fail()
       end
     end
 
   be rollback_complete(rollback_id: RollbackId) =>
-    _last_rollback_id = rollback_id
-    _save_checkpoint_id(_last_complete_checkpoint_id, rollback_id)
+    ifdef "resilience" then
+      _last_rollback_id = rollback_id
+      _save_checkpoint_id(_last_complete_checkpoint_id, rollback_id)
+    end
 
   be commit_checkpoint_id(checkpoint_id: CheckpointId, rollback_id: RollbackId,
     sender: WorkerName)
@@ -411,10 +427,12 @@ actor CheckpointInitiator is Initializable
   fun ref _commit_checkpoint_id(checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
-    _current_checkpoint_id = checkpoint_id
-    _last_complete_checkpoint_id = checkpoint_id
-    _last_rollback_id = rollback_id
-    _save_checkpoint_id(checkpoint_id, rollback_id)
+    ifdef "resilience" then
+      _current_checkpoint_id = checkpoint_id
+      _last_complete_checkpoint_id = checkpoint_id
+      _last_rollback_id = rollback_id
+      _save_checkpoint_id(checkpoint_id, rollback_id)
+    end
 
   fun ref _save_checkpoint_id(checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
@@ -444,11 +462,13 @@ actor CheckpointInitiator is Initializable
     end
 
   fun ref _load_latest_checkpoint_id() =>
-    (let checkpoint_id, let rollback_id) =
-      LatestCheckpointId.read(_auth, _checkpoint_id_file)
-    _current_checkpoint_id = checkpoint_id
-    _last_complete_checkpoint_id = checkpoint_id
-    _last_rollback_id = rollback_id
+    ifdef "resilience" then
+      (let checkpoint_id, let rollback_id) =
+        LatestCheckpointId.read(_auth, _checkpoint_id_file)
+      _current_checkpoint_id = checkpoint_id
+      _last_complete_checkpoint_id = checkpoint_id
+      _last_rollback_id = rollback_id
+    end
 
   be dispose() =>
     @printf[I32]("Shutting down CheckpointInitiator\n".cstring())
