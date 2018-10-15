@@ -416,8 +416,9 @@ RunnerData = namedtuple('RunnerData',
                          'stdout',
                          'start_time'])
 SenderData = namedtuple('SenderData',
-                        ['name', 'address', 'start_time', 'data'])
-SinkData = namedtuple('SinkData', ['name', 'address', 'start_time', 'data'])
+                        ['name', 'host', 'port', 'start_time', 'data'])
+SinkData = namedtuple('SinkData',
+                         ['name', 'host', 'port', 'start_time', 'data'])
 
 
 class Cluster(object):
@@ -937,9 +938,11 @@ class Cluster(object):
                        r.get_output(), r.start_time)
             for r in self.runners]
         self.persistent_data['sender_data'] = [
-            SenderData(s.name, s.address, s.start_time, s.data) for s in self.senders]
+            SenderData(s.name, s.host, s.port, s.start_time, s.data)
+            for s in self.senders]
         self.persistent_data['sink_data'] = [
-            SinkData(s.name, s.address, s.start_time, s.data) for s in self.sinks]
+            SinkData(s.name, s.host, s.port, s.start_time, s.data)
+            for s in self.sinks]
         clean_resilience_path(self.res_dir)
         self._finalized = True
 

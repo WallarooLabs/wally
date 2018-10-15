@@ -181,8 +181,9 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         # save sender data to files
         sender_data = persistent_data.get('sender_data', [])
         for sd in sender_data:
-            sender_log_name = 'sender_{address}_{time}.error.dat'.format(
-                address=sd.address.replace(':', '.'),
+            sender_log_name = 'sender_{host}!{port}_{time}.error.dat'.format(
+                host=sd.host,
+                port=sd.port,
                 time=strftime(sd.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sender_log_name), 'wb') as f:
                 f.write(''.join(sd.data))
