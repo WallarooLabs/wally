@@ -27,6 +27,7 @@ class Creator(object):
                                                        for o in ops*cycles)))
         def f():
             _test_resilience(cmd, ops=ops, cycles=cycles, initial=initial,
-                             validate_output=validate_output, sources=sources)
+                             validate_output=validate_output, sources=sources,
+                             api=api)
         f.func_name = test_name
         setattr(self.module, test_name, f)
