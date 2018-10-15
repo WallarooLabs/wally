@@ -190,8 +190,9 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         # save sinks data to files
         sink_data = persistent_data.get('sink_data', [])
         for sk in sink_data:
-            sink_log_name = 'sink_{address}_{time}.error.dat'.format(
-                address=sk.address.replace(':', '.'),
+            sink_log_name = 'sink_{host}!{port}_{time}.error.dat'.format(
+                host=sk.host,
+                port=sk.port,
                 time=strftime(sk.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
                 f.write(''.join(sk.data))
