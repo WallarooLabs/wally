@@ -129,6 +129,14 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         if sink_expect is not None:
             if not isinstance(sink_expect, (list, tuple)):
                 sink_expect = [sink_expect for x in range(sinks)]
+            elif len(sink_expect) != sinks:  # list/tuple, but wrong length
+                if len(sink_expect) == 1:
+                    sink_expect = sink_expect * sinks
+                else: # throw error, we don't know how to handle this
+                    raise ValueError("sink_expect must be either an integer "
+                        "or a list of integers whose length is the same as "
+                        "the number of sinks. Got {}."
+                        .format(sink_expect))
         elif sink_await is not None:
             if len(sink_await) != sinks:
                 sink_await = [sink_await[:] for x in range(sinks)]
@@ -171,6 +179,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                               ' of {} seconds'.format(sink_expect,
                                                       sink_stop_timeout))
                 for sink, sink_expect_val in zip(cluster.sinks, sink_expect):
+                    logging.debug("SinkExpect on {} for {} msgs".format(sink, sink_expect_val))
                     cluster.sink_expect(expected=sink_expect_val,
                                         timeout=sink_stop_timeout,
                                         sink=sink,
