@@ -35,7 +35,7 @@ use "wallaroo_labs/mort"
 use "wallaroo_labs/time"
 
 
-interface Runner
+trait Runner
   // Return a Bool indicating whether the message is finished processing
   // and a U64 indicating the last timestamp for calculating the duration of
   // the computation
@@ -45,12 +45,8 @@ interface Runner
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
   fun name(): String
-  fun state_name(): StateName
-  // TODO: We no longer need to set the input type, so this and related code
-  // can be simplified.
-  fun clone_router_and_set_input_type(r: Router): Router
 
-interface SerializableStateRunner
+trait SerializableStateRunner
   fun ref import_key_state(step: Step ref, s_name: StateName, key: Key,
     s: ByteSeq val)
   fun ref export_key_state(step: Step ref, key: Key): ByteSeq val
@@ -68,27 +64,24 @@ trait val RunnerBuilder
     grouper: (Shuffle | GroupByKey | None) = None): Runner iso^
 
   fun name(): String
-  fun state_name(): StateName => ""
+  fun routing_group(): (StateName | RoutingId)
   fun parallelism(): USize
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool
   fun is_multi(): Bool => false
-  fun clone_router_and_set_input_type(r: Router): Router
-  =>
-    r
 
 class val RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder] val
-  var _state_name: String
+  let _routing_group: (StateName | RoutingId)
   let _parallelism: USize
 
   new val create(bs: Array[RunnerBuilder] val, parallelism': USize) =>
     _runner_builders = bs
-    _state_name =
+    _routing_group =
       try
-        _runner_builders(_runner_builders.size() - 1)?.state_name()
+        _runner_builders(0)?.routing_group()
       else
-        ""
+        0
       end
     _parallelism = parallelism'
 
@@ -122,7 +115,8 @@ class val RunnerSequenceBuilder is RunnerBuilder
     end
     n + "|"
 
-  fun state_name(): StateName => _state_name
+  fun routing_group(): (StateName | RoutingId) =>
+    _routing_group
   fun parallelism(): USize => _parallelism
   fun is_prestate(): Bool =>
     try
@@ -137,23 +131,17 @@ class val RunnerSequenceBuilder is RunnerBuilder
     else
       false
     end
-  fun clone_router_and_set_input_type(r: Router): Router
-  =>
-    try
-      _runner_builders(_runner_builders.size() - 1)?
-        .clone_router_and_set_input_type(r)
-    else
-      r
-    end
 
 class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   let _comp_builder: ComputationBuilder[In, Out]
+  let _routing_group: RoutingId
   let _parallelism: USize
 
   new val create(comp_builder: ComputationBuilder[In, Out],
-    parallelism': USize)
+    routing_group': RoutingId, parallelism': USize)
   =>
     _comp_builder = comp_builder
+    _routing_group = routing_group'
     _parallelism = parallelism'
 
   fun apply(event_log: EventLog,
@@ -170,7 +158,7 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     end
 
   fun name(): String => _comp_builder().name()
-  fun state_name(): StateName => ""
+  fun routing_group(): (StateName | RoutingId) => _routing_group
   fun parallelism(): USize => _parallelism
   fun is_stateful(): Bool => false
 
@@ -208,108 +196,11 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
     end
 
   fun name(): String => _state_name + " StateRunnerBuilder"
-  fun state_name(): StateName => _state_name
+  fun routing_group(): (StateName | RoutingId) => _state_name
   fun parallelism(): USize => _parallelism
   fun is_stateful(): Bool => true
 
-// !@ TODO: This probably shouldn't be separate anymore
-trait val PartitionsBuilder
-  // These two methods need to be deterministic at the moment since they
-  // are called at different times
-  fun state_subpartition(workers: (String | Array[String] val)):
-    StateSubpartitions
-  fun key_distribution(workers: (String | Array[String] val)):
-    KeyDistribution
-  fun state_name(): StateName
-  fun per_worker_parallelism(): USize
-  fun is_multi(): Bool
-
-//!@ This probably shouldn't be separate anymore
-// class val PartitionedStateRunnerBuilder[In: Any val, S: State ref] is
-//   (PartitionsBuilder & RunnerBuilder)
-//   let _state_id: RoutingId
-//   let _pipeline_name: String
-//   let _state_name: String
-//   let _state_runner_builder: StateRunnerBuilder[S] val
-//   let _step_id_map: Map[Key, RoutingId] val
-//   let _partition: Partitions[In] val
-//   let _per_worker_parallelism: USize
-//   let _multi_worker: Bool
-
-//   new val create(pipeline_name: String, state_name': String,
-//     step_id_map': Map[Key, RoutingId] val, partition: Partitions[In] val,
-//     state_runner_builder: StateRunnerBuilder[S] val,
-//     per_worker_parallelism': USize, multi_worker: Bool = false)
-//   =>
-//     _state_id = RoutingIdGenerator()
-//     _state_name = state_name'
-//     _pipeline_name = pipeline_name
-//     _state_runner_builder = state_runner_builder
-//     _step_id_map = step_id_map'
-//     _partition = partition
-//     _per_worker_parallelism = per_worker_parallelism'
-//     _multi_worker = multi_worker
-
-//   fun apply(event_log: EventLog, auth: AmbientAuth,
-//     next_runner: (Runner iso | None) = None,
-//     router: (Router | None) = None): Runner iso^
-//   =>
-//     _state_runner_builder(event_log, auth, consume next_runner, router)
-
-//   fun name(): String => _state_name
-//   fun state_name(): StateName => _state_name
-//   fun parallelism(): USize => _per_worker_parallelism
-//   fun is_stateful(): Bool => true
-//   fun id(): RoutingId => _state_id
-//   fun step_id_map(): Map[Key, U128] val => _step_id_map
-//   fun per_worker_parallelism(): USize => _per_worker_parallelism
-//   fun is_multi(): Bool => _multi_worker
-
-//   fun state_subpartition(workers: (String | Array[String] val)):
-//     StateSubpartitions
-//   =>
-//     KeyedStateSubpartitions[S](_state_name, _per_worker_parallelism,
-//       key_distribution(workers), _step_id_map, _state_runner_builder,
-//       _pipeline_name)
-
-//   fun key_distribution(workers: (String | Array[String] val)):
-//     KeyDistribution
-//   =>
-//     let wtk = Map[String, Array[Key]]
-
-//     let hash_partitions = HashPartitions(match workers
-//       | let w: String =>
-//         wtk(w) = Array[Key]
-//         recover val [w] end
-//       | let ws: Array[String] val =>
-//         for w in ws.values() do
-//           wtk(w) = Array[Key]
-//         end
-//         ws
-//       end)
-//     let workers_to_keys = recover trn Map[String, Array[Key] val] end
-
-//     try
-//       for key in _partition.keys().values() do
-//         let w = hash_partitions.get_claimant_by_key(key)?
-//         wtk.upsert(w, recover trn [key] end,
-//           {(x, y) => x.>append(y)})?
-//       end
-
-//       for (w, ks') in wtk.pairs() do
-//         let a = recover trn Array[Key] end
-//         for k in ks'.values() do
-//           a.push(k)
-//         end
-//         workers_to_keys(w) = consume a
-//       end
-//     else
-//       Unreachable()
-//     end
-
-//     KeyDistribution(hash_partitions, consume workers_to_keys)
-
-class ComputationRunner[In: Any val, Out: Any val]
+class ComputationRunner[In: Any val, Out: Any val] is Runner
   let _next: Runner
   let _computation: Computation[In, Out] val
   let _computation_name: String
@@ -368,53 +259,6 @@ class ComputationRunner[In: Any val, Out: Any val]
         latest_metrics_id, computation_start, computation_end)
 
       (is_finished, last_ts)
-
-        // match result
-        // | None => (true, computation_end)
-        // | let output: Out =>
-        //   _next.run[Out](metric_name, pipeline_time_spent, output, key,
-        //     producer_id, producer, router, target_id_router,
-        //     i_msg_uid, frac_ids,
-        //     computation_end, new_metrics_id, worker_ingress_ts,
-        //     metrics_reporter)
-        // | let outputs: Array[Out] val =>
-        //   var this_is_finished = true
-        //   var this_last_ts = computation_end
-
-        //   for (frac_id, output) in outputs.pairs() do
-        //     let o_frac_ids = match frac_ids
-        //     | None =>
-        //       recover val
-        //         Array[U32].init(frac_id.u32(), 1)
-        //       end
-        //     | let x: Array[U32 val] val =>
-        //       recover val
-        //         let z = Array[U32](x.size() + 1)
-        //         for xi in x.values() do
-        //           z.push(xi)
-        //         end
-        //         z.push(frac_id.u32())
-        //         z
-        //       end
-        //     end
-
-        //     (let f, let ts) = _next.run[Out](metric_name,
-        //       pipeline_time_spent, output, key, producer_id, producer,
-        //       router, target_id_router,
-        //       i_msg_uid, o_frac_ids,
-        //       computation_end, new_metrics_id, worker_ingress_ts,
-        //       metrics_reporter)
-
-        //     // we are sending multiple messages, only mark this message as
-        //     // finished if all are finished
-        //     if (f == false) then
-        //       this_is_finished = false
-        //     end
-
-        //     this_last_ts = ts
-        //   end
-        //   (this_is_finished, this_last_ts)
-        // end
     else
       @printf[I32]("ComputationRunner: Input was not correct type!\n"
         .cstring())
@@ -422,12 +266,7 @@ class ComputationRunner[In: Any val, Out: Any val]
       (true, latest_ts)
     end
 
-
   fun name(): String => _computation.name()
-  fun state_name(): StateName => ""
-  fun clone_router_and_set_input_type(r: Router): Router
-  =>
-    _next.clone_router_and_set_input_type(r)
 
 class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   RollbackableRunner & SerializableStateRunner)
@@ -525,53 +364,6 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         latest_metrics_id, computation_start, computation_end)
 
       (is_finished, last_ts)
-
-        // match result
-        // | None => (true, computation_end)
-        // | let output: Out =>
-        //   _next.run[Out](metric_name, pipeline_time_spent, output, key,
-        //     producer_id, producer, router, target_id_router,
-        //     i_msg_uid, frac_ids,
-        //     computation_end, new_metrics_id, worker_ingress_ts,
-        //     metrics_reporter)
-        // | let outputs: Array[Out] val =>
-        //   var this_is_finished = true
-        //   var this_last_ts = computation_end
-
-        //   for (frac_id, output) in outputs.pairs() do
-        //     let o_frac_ids = match frac_ids
-        //     | None =>
-        //       recover val
-        //         Array[U32].init(frac_id.u32(), 1)
-        //       end
-        //     | let x: Array[U32 val] val =>
-        //       recover val
-        //         let z = Array[U32](x.size() + 1)
-        //         for xi in x.values() do
-        //           z.push(xi)
-        //         end
-        //         z.push(frac_id.u32())
-        //         z
-        //       end
-        //     end
-
-        //     (let f, let ts) = _next.run[Out](metric_name,
-        //       pipeline_time_spent, output, key, producer_id, producer,
-        //       router, target_id_router,
-        //       i_msg_uid, o_frac_ids,
-        //       computation_end, new_metrics_id, worker_ingress_ts,
-        //       metrics_reporter)
-
-        //     // we are sending multiple messages, only mark this message as
-        //     // finished if all are finished
-        //     if (f == false) then
-        //       this_is_finished = false
-        //     end
-
-        //     this_last_ts = ts
-        //   end
-        //   (this_is_finished, this_last_ts)
-        // end
     else
       @printf[I32]("StateComputationRunner: Input was not correct type!\n"
         .cstring())
@@ -584,10 +376,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     //rotate
     None
 
-  fun name(): String => "State runner"
-  fun state_name(): StateName => _state_name
-  fun clone_router_and_set_input_type(r: Router): Router =>
-    r
+  fun name(): String => _state_comp.name()
 
   fun ref import_key_state(step: Step ref, s_name: StateName, key: Key,
     s: ByteSeq val)
@@ -726,7 +515,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
 interface Stringablike
   fun string(): String
 
-class iso RouterRunner
+class iso RouterRunner is Runner
   let _grouper: Grouper
 
   new iso create(g: (Shuffle | GroupByKey | None)) =>
@@ -749,6 +538,3 @@ class iso RouterRunner
       worker_ingress_ts)
 
   fun name(): String => "Router runner"
-  fun state_name(): StateName => ""
-  fun clone_router_and_set_input_type(r: Router): Router =>
-    r

@@ -61,7 +61,7 @@ actor RouterRegistry
   let _autoscale_initiator: AutoscaleInitiator
   var _data_router: DataRouter
   var _local_keys: Map[StateName, SetIs[Key]] = _local_keys.create()
-  let _partition_routers: Map[StateName, PartitionRouter] =
+  let _partition_routers: Map[StateName, StatePartitionRouter] =
     _partition_routers.create()
   let _stateless_partition_routers: Map[U128, StatelessPartitionRouter] =
     _stateless_partition_routers.create()
@@ -82,7 +82,7 @@ actor RouterRegistry
 
   ////////////////
   // Subscribers
-  // All steps that have a PartitionRouter, registered by partition
+  // All steps that have a StatePartitionRouter, registered by partition
   // state name
   let _partition_router_subs: Map[StateName, SetIs[_RouterSub]] =
     _partition_router_subs.create()
@@ -102,7 +102,7 @@ actor RouterRegistry
   //
   ////////////////
 
-  let _producers: Map[RoutingId, Producer] = _producers.create()
+  let _producers: SetIs[Producer] = _producers.create()
   let _sources: Map[RoutingId, Source] = _sources.create()
   let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
   // Map from Source digestof value to source id
@@ -238,7 +238,9 @@ actor RouterRegistry
     _data_router = dr
     _distribute_data_router()
 
-  be set_partition_router(state_name: StateName, pr: PartitionRouter) =>
+  be set_state_partition_router(state_name: StateName,
+    pr: StatePartitionRouter)
+  =>
     _partition_routers(state_name) = pr
     if not _local_keys.contains(state_name) then
       _local_keys(state_name) = SetIs[Key]
@@ -262,7 +264,7 @@ actor RouterRegistry
     _connections.register_disposable(d)
 
   be register_source(source: Source, source_id: RoutingId) =>
-    _producers(source_id) = source
+    _producers.set(source)
     _sources(source_id) = source
     _source_ids(digestof source) = source_id
     _barrier_initiator.register_source(source, source_id)
@@ -275,7 +277,7 @@ actor RouterRegistry
 
   be unregister_source(source: Source, source_id: RoutingId) =>
     try
-      _unregister_producer(source_id)
+      _unregister_producer(source)
       _sources.remove(source_id)?
       _source_ids.remove(digestof source)?
       _barrier_initiator.unregister_source(source, source_id)
@@ -496,26 +498,20 @@ actor RouterRegistry
       Fail()
     end
 
-  be register_producer(id: RoutingId, p: Producer) =>
-    _producers(id) = p
+  be register_producer(p: Producer) =>
+    _producers.set(p)
 
-  be unregister_producer(id: RoutingId) =>
-    _unregister_producer(id)
+  be unregister_producer(p: Producer) =>
+    _unregister_producer(p)
 
-  fun ref _unregister_producer(id: RoutingId) =>
-    try
-      _producers.remove(id)?
-    else
-      ifdef debug then
-        @printf[I32]("RouterRegistry: Trying to remove unknown producer.\n"
-          .cstring())
-      end
-    end
+  fun ref _unregister_producer(p: Producer) =>
+    _producers.unset(p)
 
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
 
-  fun ref _distribute_partition_router(partition_router: PartitionRouter) =>
+  fun ref _distribute_partition_router(partition_router: StatePartitionRouter)
+  =>
     let state_name = partition_router.state_name()
 
     try
@@ -531,7 +527,7 @@ actor RouterRegistry
   fun ref _distribute_stateless_partition_router(
     partition_router: StatelessPartitionRouter)
   =>
-    let partition_id = partition_router.partition_id()
+    let partition_id = partition_router.partition_routing_id()
 
     try
       if not _stateless_partition_router_subs.contains(partition_id) then
@@ -603,7 +599,7 @@ actor RouterRegistry
   be create_partition_routers_from_blueprints(workers: Array[WorkerName] val,
     state_steps: Map[StateName, Array[Step] val] val,
     state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
-    partition_blueprints: Map[StateName, PartitionRouterBlueprint] val)
+    partition_blueprints: Map[StateName, StatePartitionRouterBlueprint] val)
   =>
     let obs_trn = recover trn Map[WorkerName, OutgoingBoundary] end
     for (w, ob) in _outgoing_boundaries.pairs() do
@@ -973,7 +969,7 @@ actor RouterRegistry
     rollback_id: RollbackId)
   =>
     let state_blueprints =
-      recover iso Map[StateName, PartitionRouterBlueprint] end
+      recover iso Map[StateName, StatePartitionRouterBlueprint] end
     for (w, r) in _partition_routers.pairs() do
       state_blueprints(w) = r.blueprint()
     end
@@ -1537,19 +1533,21 @@ actor RouterRegistry
   /////////////////////////////////////////////////////////////////////////////
   // Key moved onto this worker
   /////////////////////////////////////////////////////////////////////////////
-  be receive_immigrant_key(subpartition: StateSubpartitions,
-    runner_builder: RunnerBuilder, reporter: MetricsReporter iso,
-    recovery_replayer: RecoveryReconnecter, msg: KeyMigrationMsg)
-  =>
-    try
-      _register_key(msg.state_name(), msg.key(), msg.checkpoint_id())
 
-      _partition_routers(msg.state_name())?
-        .receive_key_state(msg.key(), msg.state())
-      _connections.notify_cluster_of_new_key(msg.key(), msg.state_name())
-    else
-      Fail()
-    end
+  //!@ What should happen here?
+  // be receive_immigrant_key(subpartition: StateSubpartitions,
+  //   runner_builder: RunnerBuilder, reporter: MetricsReporter iso,
+  //   recovery_replayer: RecoveryReconnecter, msg: KeyMigrationMsg)
+  // =>
+  //   try
+  //     _register_key(msg.state_name(), msg.key(), msg.checkpoint_id())
+
+  //     _partition_routers(msg.state_name())?
+  //       .receive_key_state(msg.key(), msg.state())
+  //     _connections.notify_cluster_of_new_key(msg.key(), msg.state_name())
+  //   else
+  //     Fail()
+  //   end
 
   /////////////////////////////////////////////////////////////////////////////
   // EXTERNAL QUERIES

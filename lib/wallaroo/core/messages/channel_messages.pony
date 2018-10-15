@@ -264,7 +264,7 @@ primitive ChannelMsgEncoder
     control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
     worker_names: Array[String] val, primary_checkpoint_worker: String,
-    partition_blueprints: Map[String, PartitionRouterBlueprint] val,
+    partition_blueprints: Map[String, StatePartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -380,7 +380,7 @@ primitive ChannelMsgEncoder
     Once migration is complete, the coordinator of a grow autoscale event
     informs all joining workers of all hash partitions. We include the joining
     workers list to make it more straightforward for the recipients to update
-    the HashProxyRouters in their PartitionRouters.
+    the HashProxyRouters in their StatePartitionRouters.
     """
     _encode(AnnounceHashPartitionsGrowMsg(sender, joining_workers,
       hash_partitions), auth)?
@@ -1195,7 +1195,8 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let worker_names: Array[WorkerName] val
   // The worker currently in control of checkpoints
   let primary_checkpoint_worker: WorkerName
-  let partition_router_blueprints: Map[StateName, PartitionRouterBlueprint] val
+  let partition_router_blueprints:
+    Map[StateName, StatePartitionRouterBlueprint] val
   let stateless_partition_router_blueprints:
     Map[U128, StatelessPartitionRouterBlueprint] val
 
@@ -1206,7 +1207,7 @@ class val InformJoiningWorkerMsg is ChannelMsg
     d_addrs: Map[WorkerName, (String, String)] val,
     w_names: Array[String] val,
     p_checkpoint_worker: WorkerName,
-    p_blueprints: Map[StateName, PartitionRouterBlueprint] val,
+    p_blueprints: Map[StateName, StatePartitionRouterBlueprint] val,
     stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
   =>
     sender_name = sender

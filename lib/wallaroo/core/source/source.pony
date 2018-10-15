@@ -37,7 +37,7 @@ interface val TypedSourceConfig[In: Any val] is SourceConfig
 trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   StatusReporter)
   be register_downstreams(promise: Promise[Source])
-  be update_router(router: PartitionRouter)
+  be update_router(router: StatePartitionRouter)
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
@@ -53,9 +53,9 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   // is complete.
   be first_checkpoint_complete()
 
-interface tag SourceListener is (DisposableActor & BoundaryUpdatable)
+trait tag SourceListener is (DisposableActor & BoundaryUpdatable)
   be recovery_protocol_complete()
-  be update_router(router: PartitionRouter)
+  be update_router(router: StatePartitionRouter)
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   be update_boundary_builders(

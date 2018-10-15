@@ -98,7 +98,7 @@ primitive ExternalMsgEncoder
     """
     _encode(_PartitionQuery(), "", wb)
 
-  fun partition_query_response(state_routers: Map[String, PartitionRouter],
+  fun partition_query_response(state_routers: Map[String, StatePartitionRouter],
     stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
@@ -135,7 +135,7 @@ primitive ExternalMsgEncoder
     _encode(_PartitionCountQuery(), "", wb)
 
   fun partition_count_query_response(state_routers: Map[String,
-    PartitionRouter], stateless_routers: Map[U128, StatelessPartitionRouter],
+    StatePartitionRouter], stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
     let digest_map = _partition_digest(state_routers, stateless_routers)
@@ -215,7 +215,7 @@ primitive ExternalMsgEncoder
       StatelessPartitionCountQueryEncoder.stateless_partition_count(digest_map)
     _encode(_StatelessPartitionCountQueryResponse(), spcqr, wb)
 
-  fun _partition_digest(state_routers: Map[StateName, PartitionRouter],
+  fun _partition_digest(state_routers: Map[StateName, StatePartitionRouter],
     stateless_routers: Map[U128, StatelessPartitionRouter]):
     Map[String, Map[String, Map[String, Array[String] val] val] val] val
   =>

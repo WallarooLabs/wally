@@ -27,7 +27,7 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
-class val TCPSourceListenerBuilder[In: Any val]
+class val TCPSourceListenerBuilder[In: Any val] is SourceListenerBuilder
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
@@ -80,7 +80,8 @@ class val TCPSourceListenerBuilder[In: Any val]
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
       _recovering, _target_router, _parallelism, _handler, _host, _service)
 
-class val TCPSourceListenerBuilderBuilder[In: Any val]
+class val TCPSourceListenerBuilderBuilder[In: Any val] is
+  SourceListenerBuilderBuilder
   let _host: String
   let _service: String
   let _parallelism: USize

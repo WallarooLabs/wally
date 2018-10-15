@@ -528,7 +528,7 @@ actor Connections is Cluster
     end
 
   be create_routers_from_blueprints(workers: Array[WorkerName] val,
-    pr_blueprints: Map[StateName, PartitionRouterBlueprint] val,
+    pr_blueprints: Map[StateName, StatePartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
     local_sinks: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
@@ -674,7 +674,7 @@ actor Connections is Cluster
   be inform_joining_worker(conn: TCPConnection, worker: String,
     local_topology: LocalTopology, checkpoint_id: CheckpointId,
     rollback_id: RollbackId, primary_checkpoint_worker: String,
-    partition_blueprints: Map[String, PartitionRouterBlueprint] val,
+    partition_blueprints: Map[String, StatePartitionRouterBlueprint] val,
     stateless_partition_blueprints:
       Map[U128, StatelessPartitionRouterBlueprint] val)
   =>

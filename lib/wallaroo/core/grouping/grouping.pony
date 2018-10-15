@@ -47,27 +47,27 @@ trait val GroupByKey
   fun apply(): KeyGrouper
 
 class val TypedGroupByKey[In: Any val] is GroupByKey
-  let partition_function: PartitionFunction[In]
+  let key_extractor: KeyExtractor[In]
 
-  new val create(pf: PartitionFunction[In]) =>
-    partition_function = pf
+  new val create(ke: KeyExtractor[In]) =>
+    key_extractor = ke
 
   fun apply(): KeyGrouper =>
-    TypedKeyGrouper[In](partition_function)
+    TypedKeyGrouper[In](key_extractor)
 
 trait KeyGrouper is Grouper
   fun ref apply[D: Any val](d: D): Key
 
 class TypedKeyGrouper[In: Any val] is KeyGrouper
-  let partition_function: PartitionFunction[In]
+  let key_extractor: KeyExtractor[In]
 
-  new create(pf: PartitionFunction[In]) =>
-    partition_function = pf
+  new create(ke: KeyExtractor[In]) =>
+    key_extractor = ke
 
   fun ref apply[D: Any val](d: D): Key =>
     match d
     | let i: In =>
-      partition_function(i)
+      key_extractor(i)
     else
       Fail()
       ""

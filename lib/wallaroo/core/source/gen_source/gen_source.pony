@@ -131,7 +131,7 @@ actor GenSource[V: Any val] is Source
     _router_registry = router_registry
 
     _runner = runner_builder(event_log, auth, None, target_router)
-    _router = _runner.clone_router_and_set_input_type(router')
+    _router = router'
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
@@ -238,7 +238,7 @@ actor GenSource[V: Any val] is Source
   fun ref _update_router(router': Router) =>
     let new_router =
       match router'
-      | let pr: PartitionRouter =>
+      | let pr: StatePartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)

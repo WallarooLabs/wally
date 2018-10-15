@@ -115,7 +115,6 @@ class EmptyRoute is Route
     Fail()
     true
 
-
   fun register_producer(target_id: RoutingId) =>
     Fail()
 

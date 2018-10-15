@@ -27,6 +27,16 @@ use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
 
+
+//!@
+use "promises"
+use "time"
+use "wallaroo/ent/barrier"
+use "wallaroo/ent/checkpoint"
+use "wallaroo/core/invariant"
+use "wallaroo_labs/mort"
+
+
 class val GenSourceListenerBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String

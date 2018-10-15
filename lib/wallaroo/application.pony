@@ -131,9 +131,10 @@ class Pipeline[Out: Any val] is BasicPipeline
   fun ref to[Next: Any val](comp_builder: ComputationBuilder[Out, Next],
     parallelization: USize = 1): Pipeline[Next]
   =>
+    let routing_id_gen = RoutingIdGenerator
     if not _finished then
       let runner_builder = ComputationRunnerBuilder[Out, Next](comp_builder,
-        parallelization)
+        routing_id_gen(), parallelization)
       let node_id = _stages.add_node(runner_builder)
       try
         for sink_id in _dag_sink_ids.values() do
@@ -188,7 +189,7 @@ class Pipeline[Out: Any val] is BasicPipeline
       Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids)
     end
 
-  fun ref group_by_key(pf: PartitionFunction[Out]): Pipeline[Out] =>
+  fun ref group_by_key(pf: KeyExtractor[Out]): Pipeline[Out] =>
     if not _finished then
       let node_id = _stages.add_node(TypedGroupByKey[Out](pf))
       try
