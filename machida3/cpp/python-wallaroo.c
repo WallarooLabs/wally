@@ -123,6 +123,28 @@ extern PyObject *source_decoder_decode(PyObject *source_decoder, char *bytes, si
   return pValue;
 }
 
+extern PyObject *source_generator_initial_value(PyObject *source_generator)
+{
+  PyObject *pFunc, *pValue;
+
+  pFunc = PyObject_GetAttrString(source_generator, "initial_value");
+  pValue = PyObject_CallFunctionObjArgs(pFunc,  NULL);
+  Py_DECREF(pFunc);
+
+  return pValue;
+}
+
+extern PyObject *source_generator_apply(PyObject *source_generator, PyObject *data)
+{
+  PyObject *pFunc, *pValue;
+
+  pFunc = PyObject_GetAttrString(source_generator, "apply");
+  pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
+  Py_DECREF(pFunc);
+
+  return pValue;
+}
+
 extern PyObject *instantiate_python_class(PyObject *class)
 {
   return PyObject_CallFunctionObjArgs(class, NULL);
