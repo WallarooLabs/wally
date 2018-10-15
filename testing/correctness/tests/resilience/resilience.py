@@ -343,11 +343,13 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
     except Exception as err:
         # save log stream to file
         try:
-            base_dir = ('/tmp/wallaroo_test_errors/testing/correctness/'
-                'tests/resilience/{ops}/{time}'.format(
-                    time=t0.strftime('%Y%m%d_%H%M%S'),
-                    ops='_'.join((o.name().replace(':','')
-                                  for o in ops*cycles))))
+            cwd = os.getcwd()
+            trunc_head = cwd.find('/wallaroo/') + len('/wallaroo/')
+            base_dir = '/tmp/wallaroo_test_errors/{head}/{ops}/{time}'.format(
+                head=cwd[trunc_head:],
+                time=t0.strftime('%Y%m%d_%H%M%S'),
+                ops='_'.join((o.name().replace(':','')
+                              for o in ops*cycles)))
             save_logs_to_file(base_dir, log_stream, persistent_data)
         except Exception as err_inner:
             logging.exception(err_inner)
