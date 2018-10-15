@@ -29,7 +29,7 @@ Wallaroo is a little different than most stream processing tools. While most req
 
 ## Getting Started
 
-Wallaroo can either be installed via [Docker, Vagrant][docker-link] or (on Linux) compiled from [source][source-install-instructions].
+Wallaroo can either be installed via [Docker, Vagrant][docker-link] or (on Linux) via our handy [Wallaroo Up command][wally-up].
 
 As easy as:
 
@@ -116,4 +116,5 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [source-install-instructions]: https://docs.wallaroolabs.com/book/getting-started/linux-setup.html
 [survey-link]: https://wallaroolabs.typeform.com/to/HS6azY?source=wallaroo_readme
 [wallaroo-license-readme]: #license
+[wally-up]: https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html
 [faq]: FAQ.md
