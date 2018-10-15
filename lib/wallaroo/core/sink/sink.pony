@@ -34,5 +34,5 @@ interface val SinkConfig[Out: Any val]
 interface val SinkBuilder
   fun apply(sink_name: String, event_log: EventLog,
     reporter: MetricsReporter iso, env: Env,
-    barrier_initiator: BarrierInitiator, checkpoint_initiator: CheckpointInitiator,
-    recovering: Bool): Sink
+    barrier_initiator: BarrierInitiator,
+    checkpoint_initiator: CheckpointInitiator, recovering: Bool): Sink

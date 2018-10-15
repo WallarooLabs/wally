@@ -119,12 +119,12 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _fd = @pony_asio_event_fd(_event)
 
     match router
-    | let pr: PartitionRouter =>
+    | let pr: StatePartitionRouter =>
       _router_registry.register_partition_router_subscriber(pr.state_name(),
         this)
     | let spr: StatelessPartitionRouter =>
       _router_registry.register_stateless_partition_router_subscriber(
-        spr.partition_id(), this)
+        spr.partition_routing_id(), this)
     end
 
     @printf[I32]((pipeline_name + " source attempting to listen on "
@@ -144,12 +144,12 @@ actor TCPSourceListener[In: Any val] is SourceListener
 
       _router_registry.register_source(source, source_id)
       match _router
-      | let pr: PartitionRouter =>
+      | let pr: StatePartitionRouter =>
         _router_registry.register_partition_router_subscriber(
           pr.state_name(), source)
       | let spr: StatelessPartitionRouter =>
         _router_registry.register_stateless_partition_router_subscriber(
-          spr.partition_id(), source)
+          spr.partition_routing_id(), source)
       end
 
       _available_sources.push(source)

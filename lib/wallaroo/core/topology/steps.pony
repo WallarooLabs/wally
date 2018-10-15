@@ -109,8 +109,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
     _event_log.register_resilient(id, this)
 
-    let initial_router = _runner.clone_router_and_set_input_type(router')
-    _update_router(initial_router)
+    _update_router(router')
 
     for (c_id, consumer) in _router.routes().pairs() do
       _register_output(c_id, consumer)

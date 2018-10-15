@@ -170,7 +170,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   fun ref _update_router(router': Router) =>
     let new_router =
       match router'
-      | let pr: PartitionRouter =>
+      | let pr: StatePartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)

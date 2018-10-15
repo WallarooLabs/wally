@@ -78,7 +78,7 @@ actor BarrierSource is Source
     _source_id = source_id
     _router_registry = router_registry
     _event_log = event_log
-    _router_registry.register_producer(_source_id, this)
+    _router_registry.register_producer(this)
 
   be first_checkpoint_complete() =>
     None
@@ -101,12 +101,12 @@ actor BarrierSource is Source
 
     // Subscribe to the router if it can be updated over time.
     match router'
-    | let pr: PartitionRouter =>
+    | let pr: StatePartitionRouter =>
       _router_registry.register_partition_router_subscriber(pr.state_name(),
         this)
     | let spr: StatelessPartitionRouter =>
       _router_registry.register_stateless_partition_router_subscriber(
-        spr.partition_id(), this)
+        spr.partition_routing_id(), this)
     end
     _update_router(pipeline_name, router')
 
@@ -284,7 +284,7 @@ actor BarrierSource is Source
   be dispose() =>
     if not _disposed then
       _unregister_all_outputs()
-      _router_registry.unregister_producer(_source_id)
+      _router_registry.unregister_producer(this)
       @printf[I32]("Shutting down BarrierSource\n".cstring())
       _disposed = true
     end

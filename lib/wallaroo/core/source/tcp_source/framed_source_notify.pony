@@ -58,7 +58,7 @@ class TCPSourceNotify[In: Any val]
     _auth = auth
     _handler = handler
     _runner = runner_builder(event_log, auth, None, target_router)
-    _router = _runner.clone_router_and_set_input_type(router')
+    _router = router'
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
 
@@ -153,11 +153,11 @@ class TCPSourceNotify[In: Any val]
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
     match _router
-    | let p_router: PartitionRouter =>
+    | let p_router: StatePartitionRouter =>
       _router = p_router.update_boundaries(_auth, obs)
     else
       ifdef "trace" then
-        @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +
+        @printf[I32](("FramedSourceNotify doesn't have StatePartitionRouter." +
           " Updating boundaries is a noop for this kind of Source.\n")
           .cstring())
       end

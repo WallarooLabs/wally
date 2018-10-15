@@ -86,33 +86,10 @@ actor ApplicationDistributor is Distributor
       let stateless_partition_routing_ids =
         recover iso Map[RoutingId, Map[WorkerName, RoutingId] val] end
 
-      //!@
-      // Create StateSubpartitions
-      // let ssb_trn = recover trn Map[StateName, StateSubpartitions] end
-      // for (s_name, p_builder) in application.state_builders().pairs() do
-      //   let worker_routing_ids = recover iso Map[WorkerName, RoutingId] end
-      //   for w in all_workers.values() do
-      //     worker_routing_ids(w) = RoutingIdGenerator()
-      //   end
-      //   state_routing_ids(s_name) = consume worker_routing_ids
-      //   ssb_trn(s_name) = p_builder.state_subpartition(all_workers)
-      // end
-      // let state_subpartitions: Map[StateName, StateSubpartitions] val =
-      //   consume ssb_trn
-
-
       // Keep track of workers that cannot be removed during shrink to fit.
       // Currently only the initializer has sources, so we just add it here.
       let non_shrinkable = recover trn SetIs[WorkerName] end
       non_shrinkable.set(initializer_name)
-
-
-///////////////////////
-// !@ NEW CODE START
-///////////////////////
-//
-//
-//
 
       // ASSUMPTION: The only case where a node in the logical graph has more
       // than one output is when it points to multiple sinks.
@@ -167,8 +144,25 @@ actor ApplicationDistributor is Distributor
               None
             end
           let s_builder = StepBuilder(_app_name, _app_name, rb,
-            node.id, grouper, rb.is_stateful())
+            node.id, rb.routing_group(), grouper, rb.is_stateful())
           interm_graph.add_node(s_builder, node.id)
+
+          // If this is part of a step group, assign a special routing id
+          // for that group to each worker.
+          match s_builder.routing_group()
+          | let sn: StateName =>
+            let worker_map = recover iso Map[WorkerName, RoutingId] end
+            for w in all_workers.values() do
+              worker_map(w) = _routing_id_gen()
+            end
+            state_routing_ids(sn) = consume worker_map
+          | let ri: RoutingId =>
+            let worker_map = recover iso Map[WorkerName, RoutingId] end
+            for w in all_workers.values() do
+              worker_map(w) = _routing_id_gen()
+            end
+            stateless_partition_routing_ids(ri) = consume worker_map
+          end
 
           for i_node in node.ins() do
             // !@ We're parallelizing all computations
@@ -210,7 +204,7 @@ actor ApplicationDistributor is Distributor
           // !@ Using an empty runner sequence builder since I'm not yet
           // coalescing.
           let r_builder = RunnerSequenceBuilder(
-            recover Array[RunnerBuilder] end where parallelism' = 1)
+            recover Array[RunnerBuilder] end where parallelism' = 0)
           let source_data = SourceData(node.id, _app_name, r_builder,
             sc.source_listener_builder_builder(), grouper)
           interm_graph.add_node(source_data, node.id)
@@ -227,18 +221,6 @@ actor ApplicationDistributor is Distributor
           interm_graph.add_edge(origin, t)?
         end
       end
-
-
-
-////////////////
-//
-//
-// OLD CODE CUT
-//
-//
-///////////////
-
-
 
       let non_shrinkable_to_send = consume val non_shrinkable
 
@@ -259,19 +241,6 @@ actor ApplicationDistributor is Distributor
 
       for w in all_workers.values() do
         let barrier_source_id = _routing_id_gen()
-
-        //!@
-        // let worker_state_step_ids =
-        //   recover iso Map[StateName, Array[RoutingId] val] end
-        // for state_name in state_routing_ids_to_send.keys() do
-        //   let next_state_step_ids = recover iso Array[RoutingId] end
-        //   let parallelism =
-        //     _pipeline.per_worker_parallelism_for(state_name)?
-        //   for _ in Range(0, parallelism) do
-        //     next_state_step_ids.push(_routing_id_gen())
-        //   end
-        //   worker_state_step_ids(state_name) = consume next_state_step_ids
-        // end
 
         let graph_to_send =
           if w == initializer_name then
@@ -297,13 +266,6 @@ actor ApplicationDistributor is Distributor
           other_local_topologies(w) = local_topology
         end
       end
-
-//
-//
-//
-///////////////////////
-// !@ NEW CODE END
-///////////////////////
 
       // Distribute the LocalTopologies to the other (non-initializer) workers
       if worker_count > 1 then
