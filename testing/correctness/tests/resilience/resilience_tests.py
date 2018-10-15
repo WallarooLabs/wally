@@ -57,13 +57,13 @@ RESILIENCE_TEST_NAME_FMT = 'test_resilience_{api}_{ops}'
 RESILIENCE_SEQS = [
     # wait, grow1, wait, shrink1, wait, crash2, wait, recover
     [Wait(2), Grow(1), Wait(2), Shrink(1), Wait(2), Crash(2),
-     Wait(2), Recover(2), Wait(2)],
+     Wait(2), Recover(2), Wait(5)],
 
     # crash1, recover1
-    [Wait(2), Crash(1), Wait(2), Recover(1), Wait(2)],
+    [Wait(2), Crash(1), Wait(2), Recover(1), Wait(5)],
 
     # crash2, recover2
-    [Wait(2), Crash(2), Wait(2), Recover(2), Wait(2)]]
+    [Wait(2), Crash(2), Wait(2), Recover(2), Wait(5)]]
 
 # Generate resilience test functions for each api, for each of the op seqs
 for api, cmd in APIS.items():
