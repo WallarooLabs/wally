@@ -42,12 +42,12 @@ include $(rules_mk_path)
 
 
 build-testing-correctness-apps-multi_partition_detector: build-machida
-#build-testing-correctness-apps-multi_partition_detector: build-machida3
+build-testing-correctness-apps-multi_partition_detector: build-machida3
 build-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector-validator
 integration-tests-testing-correctness-apps-multi_partition_detector: build-testing-correctness-apps-multi_partition_detector
-integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_pony
-integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_python
-#integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_python3
+#integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_pony
+#integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_python
+integration-tests-testing-correctness-apps-multi_partition_detector: multi_partition_detector_tests_python3
 
 # group the tests by target API (Pony, Python, Python3)
 # Pony

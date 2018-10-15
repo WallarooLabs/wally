@@ -195,6 +195,7 @@ def trace_window(msg, state):
 def decoder(bs):
     # Expecting a 64-bit unsigned int in big endian followed by a string
     val, key = struct.unpack(">Q", bs[:8])[0], bs[8:]
+    key = key.decode("utf-8")  # python3 compat in downstream string concat
     return Message(key, val)
 
 

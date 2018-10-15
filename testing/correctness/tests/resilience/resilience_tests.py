@@ -40,8 +40,9 @@ TC = Creator(this)
 
 CMD_PONY = 'multi_partition_detector --depth 1 --gen-source'
 CMD_PYTHON = 'machida --application-module multi_partition_detector --depth 1 --gen-source'
+CMD_PYTHON3 = 'machida3 --application-module multi_partition_detector --depth 1 --gen-source'
 
-APIS = {'pony': CMD_PONY, 'python': CMD_PYTHON}
+APIS = {'pony': CMD_PONY, 'python': CMD_PYTHON, 'python3': CMD_PYTHON3}
 
 
 ##############
