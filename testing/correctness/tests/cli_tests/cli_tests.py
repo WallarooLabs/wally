@@ -15,7 +15,6 @@
 from integration import (Cluster,
                          iter_generator,
                          Reader,
-                         runner_data_format,
                          Sender)
 
 from integration.external import run_shell_cmd
