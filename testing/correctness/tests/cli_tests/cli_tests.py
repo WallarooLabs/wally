@@ -59,13 +59,13 @@ def test_cluster_status_query():
             u"worker_count": 2}
 
 def test_source_ids_query():
+    HARDCODED_NO_OF_SOURCE_IDS = 10
     with Cluster(command=CMD,sources=1) as cluster:
         given_data_sent(cluster)
         q = Query(cluster, "source-ids-query")
         got = q.result()
         assert got.keys() == ["source_ids"]
-        assert len(got["source_ids"]) == 1
-        assert int(got["source_ids"][0])
+        assert len(got["source_ids"]) == HARDCODED_NO_OF_SOURCE_IDS
 
 def test_state_entity_query():
     with Cluster(command=CMD,workers=2) as cluster:
@@ -125,6 +125,8 @@ class Query(object):
             try:
                 return json.loads(res.output)
             except:
-                raise Exception("Failed running parser on {!r}".format(res.output))
+                raise Exception("Failed running parser on {!r}".
+                                format(res.output))
         else:
-            raise Exception("Failed running cmd: {}".format(self._cmd))
+            raise Exception("Failed running cmd: {!r} with {!r}".
+                            format(self._cmd, res.output))
