@@ -34,14 +34,14 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_DOCKER_TARGET := false
 $(abspath $(lastword $(MAKEFILE_LIST)))_RECURSE_SUBMAKEFILES := false
 
 CLI_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-PYTHONPATH := :$(PYTHONPATH):$(DUMMY_PYTHON_PATH)
+cli_tests: CUSTOM_PYTHONPATH = $(CLI_PATH):$(DUMMY_PYTHON_PATH)
+
+# standard rules generation makefile
+include $(rules_mk_path)
 
 build-testing-correctness-tests-cli_tests: build-machida
 build-testing-correctness-tests-cli_tests: build-testing-tools-external_sender
 integration-tests-testing-correctness-tests-cli_tests: cli_tests
-
-# standard rules generation makefile
-include $(rules_mk_path)
 
 cli_tests:
 	cd $(CLI_PATH) && \
