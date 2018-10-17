@@ -36,7 +36,7 @@ actor Main is TestList
 class iso _TestMessageEncoder is UnitTest
   fun name(): String => "window_codecs/MessageEncoder"
 
-  fun apply(h: TestHelper) ? =>
+  fun apply(h: TestHelper) =>
     let w = Window(WindowSize())
     let k = "key"
     w.push(1)
@@ -45,17 +45,15 @@ class iso _TestMessageEncoder is UnitTest
     w.push(4)
     let msg = Message(k, w.clone())
     let byteseqs = MessageEncoder(msg)
-    h.log(byteseqs(0)?.size().string())
-    let encoded = match byteseqs(0)?
-    | let m: String val =>
-       h.fail("Unexpected string")
-       m
-    | let m: Array[U8] val =>
-       let tail : Array[U8] trn = recover trn Array[U8] end
-       for i in Range(4, m.size()) do tail.push(m(i)?) end
-       String.from_array(consume tail)
+
+    let payload = recover val
+      let flat : Array[U8] trn = recover trn Array[U8] end
+      for subarray in byteseqs.values() do flat.append(subarray) end
+      flat.slice(where from = 4)
     end
-    h.assert_eq[String](encoded, "(key,[1,2,3,4])")
+
+    let encoded : String = String.from_array(payload)
+    h.assert_eq[String]("(key,[1,2,3,4])", encoded)
 
 class iso _TestWindowDecoder is UnitTest
   fun name(): String => "window_codecs/WindowDecoder"

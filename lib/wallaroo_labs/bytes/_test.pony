@@ -60,20 +60,15 @@ class iso _TestLengthEncode is UnitTest
     let s0: String = ""
     let s1: String = "a"
     let s3: String = "aaa"
-    let a_max : Array[U8] trn =
-      recover trn Array[U8].init('a', 4_294_967_295) end
-    let s_max = String.from_array(consume a_max)
 
     let s0_enc: Array[ByteSeq] val = Bytes.length_encode(s0)
     let s1_enc: Array[ByteSeq] val = Bytes.length_encode(s1)
     let s3_enc: Array[ByteSeq] val = Bytes.length_encode(s3)
-    let s_max_enc: Array[ByteSeq] val = Bytes.length_encode(s_max)
 
     // Check outer size
     h.assert_eq[USize](0, s0_enc.size())
     h.assert_eq[USize](1, s1_enc.size())
     h.assert_eq[USize](1, s3_enc.size())
-    h.assert_eq[USize](2, s_max_enc.size())
 
     // Check contents
     h.assert_eq[U8](0, s1_enc(0)?(0)?)
