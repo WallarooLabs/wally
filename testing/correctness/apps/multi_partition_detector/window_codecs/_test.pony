@@ -45,11 +45,17 @@ class iso _TestMessageEncoder is UnitTest
     w.push(4)
     let msg = Message(k, w.clone())
     let byteseqs = MessageEncoder(msg)
-    let encoded = match byteseqs(1)?
-    | let m: String val => m
-    | let m: Array[U8] val => String.from_array(m)
+    h.log(byteseqs(0)?.size().string())
+    let encoded = match byteseqs(0)?
+    | let m: String val =>
+       h.fail("Unexpected string")
+       m
+    | let m: Array[U8] val =>
+       let tail : Array[U8] trn = recover trn Array[U8] end
+       for i in Range(4, m.size()) do tail.push(m(i)?) end
+       String.from_array(consume tail)
     end
-    h.assert_eq[String]("(key,[1,2,3,4])", encoded)
+    h.assert_eq[String](encoded, "(key,[1,2,3,4])")
 
 class iso _TestWindowDecoder is UnitTest
   fun name(): String => "window_codecs/WindowDecoder"
