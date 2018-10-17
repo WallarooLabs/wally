@@ -853,9 +853,9 @@ actor Startup
 
     let file = File(worker_names_filepath)
     for worker_name in file.lines() do
-      ws.push(worker_name)
-      @printf[I32]("recover_worker_names: %s\n".cstring(),
-        worker_name.cstring())
+      let w: String val = consume worker_name
+      ws.push(w)
+      @printf[I32]("recover_worker_names: %s\n".cstring(), w.cstring())
     end
 
     ws
