@@ -53,6 +53,7 @@ class StartupOptions
   var spike_config: (SpikeConfig | None) = None
   var dos_host: String = ""
   var dos_service: String = "9999"
+  var run_with_resilience: Bool = false
 
 primitive WallarooConfig
   fun application_args(args: Array[String] val): Array[String] val ? =>
@@ -99,6 +100,7 @@ primitive WallarooConfig
       .add("resilience-dos-server", "", StringArgument)
       .add("resilience-no-local-file-io", "", None)
       .add("resilience-enable-io-journal", "", None)
+      .add("run-with-resilience", "", None)
       .add("log-rotation", "", None)
       .add("event-log-file-size", "l", I64Argument)
       // pass in control address of any worker as the value of this parameter
@@ -177,6 +179,8 @@ primitive WallarooConfig
         so.do_local_file_io = false
       | ("resilience-enable-io-journal", let arg: None) =>
         so.use_io_journal = true
+      | ("run-with-resilience", let arg: None) =>
+        so.run_with_resilience = true
       | ("log-rotation", let arg: None) => so.log_rotation = true
       | ("event-log-file-size", let arg: I64) =>
         so.event_log_file_length = arg.usize()
@@ -230,7 +234,8 @@ primitive WallarooConfig
     else
       match so.worker_count
       | let wc: USize =>
-        FatalUserError("Only supply --worker-count to cluster initializer or to joining worker.")
+        FatalUserError("Only supply --worker-count to cluster initializer " +
+          "or to joining worker.")
       end
       if so.d_host != "" then
         FatalUserError("Only supply --data to cluster initializer.")
@@ -239,7 +244,21 @@ primitive WallarooConfig
 
     if (not so.is_initializer and (so.dos_host != "")) and
       ((so.my_d_host == "") or (so.my_c_host == "")) then
-        FatalUserError("Non-inititalizer nodes that use --resilience-dos-server must specify --my-control and --my-data flags")
+        FatalUserError("Non-initializer nodes that use " +
+          "--resilience-dos-server must specify --my-control and --my-data " +
+          "flags")
+    end
+
+    ifdef "resilience" then
+      if not so.run_with_resilience then
+        FatalUserError("You are running a resilience-enabled binary. " +
+          "You must pass in the command line flag `--run-with-resilience`.")
+      end
+    else
+      if so.run_with_resilience then
+        FatalUserError("You are running a resilience-disabled binary. " +
+          "You cannot run with the command line flag `--run-with-resilience`.")
+      end
     end
 
     ifdef "spike" then
