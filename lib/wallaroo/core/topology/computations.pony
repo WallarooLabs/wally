@@ -25,15 +25,16 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
 
-trait BasicComputation
+trait val BasicComputation
   fun name(): String
 
-interface Computation[In: Any val, Out: Any val] is BasicComputation
+trait val BasicStateComputation is BasicComputation
+
+interface val Computation[In: Any val, Out: Any val] is BasicComputation
   fun apply(input: In): (Out | Array[Out] val | None)
-  fun name(): String
 
-interface StateComputation[In: Any val, Out: Any val, S: State ref] is
-  BasicComputation
+interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
+  BasicStateComputation
   // Return a tuple containing the result of the computation (which is None
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).
@@ -41,13 +42,13 @@ interface StateComputation[In: Any val, Out: Any val, S: State ref] is
 
   fun initial_state(): S
 
-  fun name(): String
 
-interface val BasicComputationBuilder
-  fun apply(): BasicComputation val
+//!@
+// interface val BasicComputationBuilder
+//   fun apply(): BasicComputation val
 
-interface val ComputationBuilder[In: Any val, Out: Any val]
-  fun apply(): Computation[In, Out] val
+// interface val ComputationBuilder[In: Any val, Out: Any val]
+//   fun apply(): Computation[In, Out] val
 
-interface val StateBuilder[S: State ref]
-  fun apply(): S
+// interface val StateBuilder[S: State ref]
+//   fun apply(): S

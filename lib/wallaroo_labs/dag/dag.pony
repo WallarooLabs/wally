@@ -35,9 +35,6 @@ class Dag[V: Any val]
     _nodes.contains(id)
 
   fun get_node(id: U128): this->DagNode[V] ? =>
-    //!@
-    if not contains(id) then @printf[I32]("!@ Dag doesn't contain id! Can't get!\n".cstring()) end
-
     _nodes(id)?
 
   fun nodes(): Iterator[this->DagNode[V]] =>

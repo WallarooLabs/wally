@@ -128,12 +128,12 @@ class Pipeline[Out: Any val] is BasicPipeline
     end
     Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids)
 
-  fun ref to[Next: Any val](comp_builder: ComputationBuilder[Out, Next],
+  fun ref to[Next: Any val](comp: Computation[Out, Next],
     parallelization: USize = 1): Pipeline[Next]
   =>
     let routing_id_gen = RoutingIdGenerator
     if not _finished then
-      let runner_builder = ComputationRunnerBuilder[Out, Next](comp_builder,
+      let runner_builder = ComputationRunnerBuilder[Out, Next](comp,
         routing_id_gen(), parallelization)
       let node_id = _stages.add_node(runner_builder)
       try

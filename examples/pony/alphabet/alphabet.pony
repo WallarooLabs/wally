@@ -34,14 +34,14 @@ actor Main
   new create(env: Env) =>
     try
       let pipeline = recover val
-          let votes = Wallaroo.source[Votes val]("Alphabet Votes",
-                TCPSourceConfig[Votes val].from_options(VotesDecoder,
+          let votes = Wallaroo.source[Votes]("Alphabet Votes",
+                TCPSourceConfig[Votes].from_options(VotesDecoder,
                   TCPSourceConfigCLIParser(env.args)?(0)?))
 
           votes
             .group_by_key(ExtractFirstLetter)
-            .to_state[LetterTotal val, LetterState](AddVotes)
-            .to_sink(TCPSinkConfig[LetterTotal val].from_options(
+            .to_state[LetterTotal, LetterState](AddVotes)
+            .to_sink(TCPSinkConfig[LetterTotal].from_options(
               LetterTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
         end
 
@@ -57,34 +57,34 @@ class LetterState is State
   var letter: String = " "
   var count: U64 = 0
 
-primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
+primitive AddVotes is StateComputation[Votes, LetterTotal val, LetterState]
   fun name(): String => "Add Votes"
 
-  fun apply(votes: Votes val, state: LetterState): LetterTotal val =>
+  fun apply(votes: Votes, state: LetterState): LetterTotal val =>
     state.count = votes.count + state.count
     LetterTotal(votes.letter, state.count)
 
   fun initial_state(): LetterState =>
     LetterState
 
-primitive VotesDecoder is FramedSourceHandler[Votes val]
+primitive VotesDecoder is FramedSourceHandler[Votes]
   fun header_length(): USize =>
     4
 
   fun payload_length(data: Array[U8] iso): USize =>
     5
 
-  fun decode(data: Array[U8] val): Votes val ? =>
+  fun decode(data: Array[U8] val): Votes ? =>
     // Assumption: 1 byte for letter
     let letter = String.from_array(data.trim(0, 1))
     let count = Bytes.to_u32(data(1)?, data(2)?, data(3)?, data(4)?)
     Votes(letter, count.u64())
 
 primitive ExtractFirstLetter
-  fun apply(votes: Votes val): Key =>
+  fun apply(votes: Votes): Key =>
     votes.letter
 
-class Votes
+class val Votes
   let letter: String
   let count: U64
 
@@ -95,7 +95,7 @@ class Votes
   fun string(): String =>
     letter + ": " + count.string()
 
-class LetterTotal
+class val LetterTotal
   let letter: String
   let count: U64
 
