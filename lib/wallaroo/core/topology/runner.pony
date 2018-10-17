@@ -109,11 +109,15 @@ class val RunnerSequenceBuilder is RunnerBuilder
     consume latest_runner
 
   fun name(): String =>
-    var n = ""
-    for r in _runner_builders.values() do
-      n = n + "|" + r.name()
+    if _runner_builders.size() == 1 then
+      try _runner_builders(0)?.name() else Unreachable(); "" end
+    else
+      var n = ""
+      for r in _runner_builders.values() do
+        n = n + "|" + r.name()
+      end
+      n + "|"
     end
-    n + "|"
 
   fun routing_group(): (StateName | RoutingId) =>
     _routing_group
@@ -133,14 +137,14 @@ class val RunnerSequenceBuilder is RunnerBuilder
     end
 
 class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
-  let _comp_builder: ComputationBuilder[In, Out]
+  let _comp: Computation[In, Out]
   let _routing_group: RoutingId
   let _parallelism: USize
 
-  new val create(comp_builder: ComputationBuilder[In, Out],
-    routing_group': RoutingId, parallelism': USize)
+  new val create(comp: Computation[In, Out], routing_group': RoutingId,
+    parallelism': USize)
   =>
-    _comp_builder = comp_builder
+    _comp = comp
     _routing_group = routing_group'
     _parallelism = parallelism'
 
@@ -152,12 +156,12 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   =>
     match (consume next_runner)
     | let r: Runner iso =>
-      ComputationRunner[In, Out](_comp_builder(), consume r)
+      ComputationRunner[In, Out](_comp, consume r)
     else
-      ComputationRunner[In, Out](_comp_builder(), RouterRunner(grouper))
+      ComputationRunner[In, Out](_comp, RouterRunner(grouper))
     end
 
-  fun name(): String => _comp_builder().name()
+  fun name(): String => _comp.name()
   fun routing_group(): (StateName | RoutingId) => _routing_group
   fun parallelism(): USize => _parallelism
   fun is_stateful(): Bool => false
@@ -195,7 +199,7 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
         RouterRunner(grouper))
     end
 
-  fun name(): String => _state_name + " StateRunnerBuilder"
+  fun name(): String => _state_comp.name()
   fun routing_group(): (StateName | RoutingId) => _state_name
   fun parallelism(): USize => _parallelism
   fun is_stateful(): Bool => true

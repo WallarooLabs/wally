@@ -977,6 +977,8 @@ actor LocalTopologyInitializer is LayoutInitializer
               error
             end
 
+          @printf[I32]("!@ next_node.id %s\n".cstring(), next_node.id.string().cstring())
+
           if built_routers.contains(next_node.id) then
             @printf[I32](("We've already handled %s with id %s\n").cstring(),
               next_node.value.name().cstring(),

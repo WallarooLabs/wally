@@ -179,6 +179,14 @@ actor ApplicationDistributor is Distributor
               // its only output is to this node.
               Fail()
             end
+
+            // Set edge from this input to us if it's a computation or
+            // source
+            match i_node.value
+            | let input: (RunnerBuilder | SourceConfig) =>
+              edges.insert_if_absent(i_node.id, SetIs[U128])?
+                .set(node.id)
+            end
           end
         | let gbk: GroupByKey =>
           for i_node in node.ins() do
