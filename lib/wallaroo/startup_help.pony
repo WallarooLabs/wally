@@ -44,6 +44,8 @@ primitive StartupHelp
           of all file I/O (regardless of resilience build type)]
         --resilience-no-local-file-io [Disables local file I/O; writes to I/O
           journal are not affected by this flag]
+        --run-with-resilience [Enables resilience. Required (and only works)
+          if the Wallaroo binary was built in resilience mode.]
         --log-rotation [Enables log rotation. Default: off]
         --event-log-file-size/-l [Optionally sets rotation size for the event
           log file backend]
