@@ -736,6 +736,12 @@ actor ConnectorSink is Sink
       _schedule_reconnect()
     end
 
+  be _write_again() =>
+    """
+    Resume writing.
+    """
+    _pending_writes()
+
   fun ref _pending_writes(): Bool =>
     """
     Send pending data. If any data can't be sent, keep it and mark as not
@@ -754,6 +760,14 @@ actor ConnectorSink is Sink
     end
 
     while _writeable and not _shutdown_peer and (_pending_writev_total > 0) do
+      // yield if we sent max bytes
+      if bytes_sent > _max_size then
+        // do tracking finished stuff
+        _tracking_finished(bytes_sent)
+
+        _write_again()
+        return false
+      end
       try
         //determine number of bytes and buffers to send
         if (_pending_writev.size()/2) < writev_batch_size then
