@@ -8,8 +8,6 @@ The following files have a reference to a specific version of Ponyc and will nee
 
 - `.release/bootstrap.sh`: version referenced in the following variable declaration `export PONYC_VERSION=`
 
-- `.travis.yml`: version referenced following the `PONYC_VERSION` declaration under `env: global:`
-
 - `.ci-dockerfiles/ci-standard/Dockerfile`: version referenced following the `ENV` declaration of `PONYC_VERSION`
 
 ## Updating the Circle CI Docker Image
