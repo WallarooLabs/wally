@@ -373,16 +373,29 @@ actor Startup
         end
       end
 
+      (let c_host, let c_service, let d_host, let d_service) =
+        if _startup_options.is_initializer then
+          (_startup_options.c_host,
+            _startup_options.c_service,
+            _startup_options.d_host,
+            _startup_options.d_service)
+        else
+          (_startup_options.my_c_host,
+            _startup_options.my_c_service,
+            _startup_options.my_d_host,
+            _startup_options.my_d_service)
+        end
+
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
           recovery_reconnecter, router_registry, barrier_initiator,
           checkpoint_initiator, control_channel_filepath,
-          _startup_options.my_d_host, _startup_options.my_d_service, event_log,
+          d_host, d_service, event_log,
           this, _the_journal as SimpleJournal,
           _startup_options.do_local_file_io,
-          _startup_options.my_c_host, _startup_options.my_c_service)
+          c_host, c_service)
 
       // We need to recover connections before creating our control
       // channel listener, since it's at that point that we notify
