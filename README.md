@@ -120,4 +120,4 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [survey-link]: https://wallaroolabs.typeform.com/to/HS6azY?source=wallaroo_readme
 [wallaroo-license-readme]: #license
 [wally-up]: https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html
-[faq]: FAQ.md
+[faq]: https://www.wallaroolabs.com/faq
