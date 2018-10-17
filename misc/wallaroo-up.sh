@@ -46,6 +46,7 @@ GOLANG_DL_URL=https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz
 WALLAROO_PONYC_MAP="
 W0.5.3=0.24.4
 W0.5.2=0.24.4
+Wuse-ponyc-0.25=0.25.0
 Wmaster=
 "
 
