@@ -76,7 +76,7 @@ cd examples/python/word_count_with_dynamic_keys
       --data 127.0.0.1:6001 --external 127.0.0.1:5050 \
       --name initializer --cluster-initializer --worker-count 2 \
       --resilience-dir /tmp/resilience-dir \
-      --ponythreads=1 --ponynoblock \
+      --ponythreads=1 --ponynoblock --run-with-resilience \
       | tee initializer.log
     ```
 
@@ -90,7 +90,7 @@ cd examples/python/word_count_with_dynamic_keys
       --external 127.0.0.1:5051 \
       --name worker1 \
       --resilience-dir /tmp/resilience-dir \
-      --ponythreads=1 --ponynoblock \
+      --ponythreads=1 --ponynoblock --run-with-resilience \
       | tee worker1.log
     ```
 
@@ -126,7 +126,7 @@ cd examples/python/word_count_with_dynamic_keys
       --external 127.0.0.1:5051 \
       --name worker1 \
       --resilience-dir /tmp/resilience-dir \
-      --ponythreads=1 --ponynoblock \
+      --ponythreads=1 --ponynoblock --run-with-resilience \
       | tee worker1.recovered.log
     ```
 
