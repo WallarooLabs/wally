@@ -909,7 +909,6 @@ actor RouterRegistry
     //     Fail()
     //   end
     // end
-
     try
       (_autoscale as Autoscale).connect_to_joining_workers(ws, coordinator)
     else
