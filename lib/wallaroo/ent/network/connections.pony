@@ -128,9 +128,9 @@ actor Connections is Cluster
     if recovery_addr_file.exists() then
       try
         // TODO: We assume that all journal data is copied to local file system first
-        let file = File(recovery_addr_file)
-        let host' = file.line()?
-        let port' = file.line()?
+        let file_lines = File(recovery_addr_file).lines()
+        let host' = file_lines.next()?
+        let port' = file_lines.next()?
 
         @printf[I32]("Restarting a listener ...\n\n".cstring())
 
@@ -155,9 +155,9 @@ actor Connections is Cluster
     if recovery_addr_file.exists() then
       try
         // TODO: We assume that all journal data is copied to local file system first
-        let file = File(recovery_addr_file)
-        var host': String = file.line()?
-        let port': String = file.line()?
+        let file_lines = File(recovery_addr_file).lines()
+        var host': String = file_lines.next()?
+        let port': String = file_lines.next()?
 
         @printf[I32]("Restarting a data channel listener on %s:%s...\n\n"
           .cstring(), host'.cstring(), port'.cstring())
