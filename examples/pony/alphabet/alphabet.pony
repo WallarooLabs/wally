@@ -39,7 +39,7 @@ actor Main
                   TCPSourceConfigCLIParser(env.args)?(0)?))
 
           votes
-            .group_by_key(ExtractFirstLetter)
+            .key_by(ExtractFirstLetter)
             .to_state[LetterTotal, LetterState](AddVotes)
             .to_sink(TCPSinkConfig[LetterTotal].from_options(
               LetterTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
