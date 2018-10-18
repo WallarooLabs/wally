@@ -1021,12 +1021,13 @@ class val StatelessPartitionRouter is Router
       @printf[I32]("Rcvd msg at StatelessPartitionRouter\n".cstring())
     end
     try
-      let w_idx = producer.current_sequence_id().usize() % _workers.size()
+      let hashed_key = HashKey(key).usize()
+      // let w_idx = producer.current_sequence_id().usize() % _workers.size()
+      let w_idx = hashed_key % _workers.size()
       let target_worker = _workers(w_idx)?
-      let hashed_key = HashKey(key)
 
       if target_worker == _worker_name then
-        let s_idx = hashed_key.usize() % _local_partitions.size()
+        let s_idx = hashed_key % _local_partitions.size()
         let step = _local_partitions(s_idx)?
         let might_be_route = producer.route_to(step)
         match might_be_route
