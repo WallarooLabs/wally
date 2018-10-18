@@ -40,8 +40,6 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
-//!@
-use "wallaroo/core/source/gen_source"
 use "wallaroo/core/source/barrier_source"
 use "wallaroo/core/topology"
 use "wallaroo_labs/collection_helpers"
@@ -1022,6 +1020,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         _outgoing_boundaries, _router_registry)
 
       steps(r_id) = next_step
+      _connections.register_disposable(next_step)
 
       // If our outputs are going to be routed through a
       // StatePartitionRouter or StatelessPartitionRouter, then we

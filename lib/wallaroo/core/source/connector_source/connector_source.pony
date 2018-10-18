@@ -408,6 +408,10 @@ actor ConnectorSource[In: Any val] is Source
       _unregister_output(id, consumer)
     end
 
+  be dispose_for_shrink(promise: Promise[None]) =>
+    _dispose()
+    promise(None)
+
   be dispose() =>
     _dispose()
 

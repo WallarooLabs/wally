@@ -281,7 +281,14 @@ actor BarrierSource is Source
   be report_status(code: ReportStatusCode) =>
     None
 
+  be dispose_for_shrink(promise: Promise[None]) =>
+    _dispose()
+    promise(None)
+
   be dispose() =>
+    _dispose()
+
+  fun ref _dispose() =>
     if not _disposed then
       _unregister_all_outputs()
       _router_registry.unregister_producer(this)

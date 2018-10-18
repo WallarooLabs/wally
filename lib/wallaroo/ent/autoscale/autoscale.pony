@@ -91,7 +91,9 @@ class Autoscale
     1) _WaitingForLeavingMigration: RouterRegistry currently handles the
       details. We're waiting until all steps have been migrated off.
     2) _WaitingForLeavingMigrationAcks: Wait for remaining workers to ack
-    3) _ShuttingDown: All steps migrated off and acked, and we're ready to
+    3) _DisposeProducers: Wait for all producers to dispose (and unregister
+      downstream).
+    4) _ShuttingDown: All steps migrated off and acked, and we're ready to
       shut down.
   """
   let _auth: AmbientAuth
@@ -341,6 +343,13 @@ class Autoscale
     @printf[I32]("AUTOSCALE: Autoscale is complete.\n".cstring())
     _phase = _WaitingForAutoscale(this)
 
+  fun ref dispose_producers() =>
+    _phase = _DisposeProducers(this)
+    _router_registry.dispose_producers()
+
+  fun ref producers_disposed() =>
+    _phase.producers_disposed()
+
   fun ref clean_shutdown() =>
     _phase = _ShuttingDown
     _router_registry.clean_shutdown()
@@ -424,6 +433,10 @@ trait _AutoscalePhase
     Fail()
 
   fun ref receive_leaving_migration_ack(worker: WorkerName) =>
+    _invalid_call()
+    Fail()
+
+  fun ref producers_disposed() =>
     _invalid_call()
     Fail()
 
@@ -1035,8 +1048,30 @@ class _WaitingForLeavingMigrationAcks is _AutoscalePhase
     end
     _worker_waiting_list.unset(worker)
     if _worker_waiting_list.size() == 0 then
-      _autoscale.clean_shutdown()
+      _autoscale.dispose_producers()
     end
+
+class _DisposeProducers is _AutoscalePhase
+  let _autoscale: Autoscale ref
+
+  new create(autoscale: Autoscale ref) =>
+    @printf[I32]("AUTOSCALE: Disposing producers and unregistering.\n"
+      .cstring())
+    _autoscale = autoscale
+
+  fun name(): String => "DisposeProducers"
+
+  fun ref producers_disposed() =>
+    _autoscale.clean_shutdown()
+
+class _ShuttingDown is _AutoscalePhase
+  new create() =>
+    @printf[I32]("AUTOSCALE: Shutting down.\n".cstring())
+
+  fun name(): String => "ShuttingDown"
+
+  fun ref autoscale_complete() =>
+    None
 
 /////////////////////////////////////////////////
 // SHARED PHASES
@@ -1066,15 +1101,6 @@ class _WaitingForResumeTheWorld is _AutoscalePhase
       end
     end
     _autoscale.mark_autoscale_complete()
-
-class _ShuttingDown is _AutoscalePhase
-  new create() =>
-    @printf[I32]("AUTOSCALE: Shutting down.\n".cstring())
-
-  fun name(): String => "ShuttingDown"
-
-  fun ref autoscale_complete() =>
-    None
 
 
 /////////////////////////////////////////////////////////////////////////////

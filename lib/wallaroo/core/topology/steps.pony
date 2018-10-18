@@ -20,6 +20,7 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "promises"
 use "serialise"
 use "time"
 use "wallaroo_labs/guid"
@@ -426,7 +427,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _routes.contains(c)
 
   be register_producer(id: RoutingId, producer: Producer) =>
-    @printf[I32]("!@ Producer %s registered at Step %s\n".cstring(), id.string().cstring(), _id.string().cstring())
     _inputs(id) = producer
     _upstreams.set(producer)
 
@@ -476,7 +476,14 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       u.unmute(c)
     end
 
+  be dispose_for_shrink(promise: Promise[None]) =>
+    _dispose()
+    promise(None)
+
   be dispose() =>
+    _dispose()
+
+  fun ref _dispose() =>
     @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
     _event_log.unregister_resilient(_id, this)
     _unregister_all_outputs()

@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
@@ -74,4 +75,8 @@ actor DummyProducer is Producer
 
   be register_downstream() =>
     None
+
+  be dispose_for_shrink(promise: Promise[None]) =>
+    None
+
 
