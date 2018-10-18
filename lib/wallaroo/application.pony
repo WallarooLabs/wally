@@ -70,7 +70,7 @@ class Pipeline[Out: Any val] is BasicPipeline
   var _finished: Bool
 
   var _last_is_shuffle: Bool
-  var _last_is_group_by_key: Bool
+  var _last_is_key_by: Bool
 
   new from_source(p_id: USize, n: String,
     source_config: TypedSourceConfig[Out])
@@ -81,7 +81,7 @@ class Pipeline[Out: Any val] is BasicPipeline
     _dag_sink_ids = Array[RoutingId]
     _finished = false
     _last_is_shuffle = false
-    _last_is_group_by_key = false
+    _last_is_key_by = false
     let source_id' = _stages.add_node(source_config)
     _dag_sink_ids.push(source_id')
 
@@ -90,7 +90,7 @@ class Pipeline[Out: Any val] is BasicPipeline
     dag_sink_ids: Array[RoutingId] = Array[RoutingId],
     finished: Bool = false,
     last_is_shuffle: Bool = false,
-    last_is_group_by_key: Bool = false)
+    last_is_key_by: Bool = false)
   =>
     _pipeline_id = p_id
     _name = n
@@ -98,7 +98,7 @@ class Pipeline[Out: Any val] is BasicPipeline
     _dag_sink_ids = dag_sink_ids
     _finished = finished
     _last_is_shuffle = last_is_shuffle
-    _last_is_group_by_key = last_is_group_by_key
+    _last_is_key_by = last_is_key_by
 
   fun is_finished(): Bool => _finished
 
@@ -109,10 +109,10 @@ class Pipeline[Out: Any val] is BasicPipeline
       (not _last_is_shuffle and pipeline._last_is_shuffle)
     then
       _only_one_is_shuffle()
-    elseif (_last_is_group_by_key and not pipeline._last_is_group_by_key) or
-      (not _last_is_group_by_key and pipeline._last_is_group_by_key)
+    elseif (_last_is_key_by and not pipeline._last_is_key_by) or
+      (not _last_is_key_by and pipeline._last_is_key_by)
     then
-      _only_one_is_group_by_key()
+      _only_one_is_key_by()
     else
       // Successful merge
       try
@@ -124,7 +124,7 @@ class Pipeline[Out: Any val] is BasicPipeline
       _dag_sink_ids.append(pipeline._dag_sink_ids)
       return Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids
         where last_is_shuffle = _last_is_shuffle,
-        last_is_group_by_key = _last_is_group_by_key)
+        last_is_key_by = _last_is_key_by)
     end
     Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids)
 
@@ -189,7 +189,7 @@ class Pipeline[Out: Any val] is BasicPipeline
       Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids)
     end
 
-  fun ref group_by_key(pf: KeyExtractor[Out]): Pipeline[Out] =>
+  fun ref key_by(pf: KeyExtractor[Out]): Pipeline[Out] =>
     if not _finished then
       let node_id = _stages.add_node(TypedGroupByKey[Out](pf))
       try
@@ -200,7 +200,7 @@ class Pipeline[Out: Any val] is BasicPipeline
         Fail()
       end
       Pipeline[Out](_pipeline_id, _name, _stages, [node_id]
-        where last_is_group_by_key = true)
+        where last_is_key_by = true)
     else
       _try_add_to_finished_pipeline()
       Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids)
@@ -223,8 +223,8 @@ class Pipeline[Out: Any val] is BasicPipeline
   fun _only_one_is_shuffle() =>
     FatalUserError("A pipeline ending with shuffle can only be merged with another!")
 
-  fun _only_one_is_group_by_key() =>
-    FatalUserError("A pipeline ending with group_by_key can only be merged with another!")
+  fun _only_one_is_key_by() =>
+    FatalUserError("A pipeline ending with key_by can only be merged with another!")
 
 
 
