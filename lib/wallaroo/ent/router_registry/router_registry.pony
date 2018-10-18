@@ -590,52 +590,6 @@ actor RouterRegistry
       source_listener.update_boundary_builders(boundary_builders_to_send)
     end
 
-  //!@ remove
-  // be create_partition_routers_from_blueprints(workers: Array[WorkerName] val,
-  //   state_steps: Map[StateName, Array[Step] val] val,
-  //   state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
-  //   partition_blueprints: Map[StateName, StatePartitionRouterBlueprint] val)
-  // =>
-  //   let obs_trn = recover trn Map[WorkerName, OutgoingBoundary] end
-  //   for (w, ob) in _outgoing_boundaries.pairs() do
-  //     obs_trn(w) = ob
-  //   end
-  //   let obs = consume val obs_trn
-  //   for (state_name, b) in partition_blueprints.pairs() do
-  //     try
-  //       let local_state_steps = state_steps(state_name)?
-  //       let local_state_step_ids = state_step_ids(state_name)?
-  //       let next_router = b.build_router(_worker_name, workers,
-  //         local_state_steps, local_state_step_ids, obs, _auth)
-  //       _distribute_partition_router(next_router)
-  //       _partition_routers(state_name) = next_router
-
-  //       if not _local_keys.contains(state_name) then
-  //         _local_keys(state_name) = SetIs[Key]
-  //       end
-  //     else
-  //       Fail()
-  //     end
-  //   end
-
-  //!@ remove
-  // be create_stateless_partition_routers_from_blueprints(
-  //   partition_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
-  // =>
-  //   let obs_trn = recover trn Map[String, OutgoingBoundary] end
-  //   for (w, ob) in _outgoing_boundaries.pairs() do
-  //     obs_trn(w) = ob
-  //   end
-  //   let obs = consume val obs_trn
-  //   for (id, b) in partition_blueprints.pairs() do
-  //     None
-  //     //!@ TODO: Uncomment these lines once we've worked out how we create from
-  //     // blueprints.
-  //     // let next_router = b.build_router(_worker_name, obs, _auth)
-  //     // _distribute_stateless_partition_router(next_router)
-  //     // _stateless_partition_routers(id) = next_router
-  //   end
-
   be producers_register_downstream(promise: Promise[None]) =>
     for p in _producers.values() do
       p.register_downstream()
@@ -653,6 +607,23 @@ actor RouterRegistry
     end
     for boundary in _outgoing_boundaries.values() do
       boundary.report_status(code)
+    end
+
+  fun ref dispose_producers() =>
+    let ps = Array[Promise[None]]
+    for p in _producers.values() do
+      let promise = Promise[None]
+      ps.push(promise)
+      p.dispose_for_shrink(promise)
+    end
+    let promises = Promises[None].join(ps.values())
+    promises.next[None]({(_: None) => _self.producers_disposed()})
+
+  be producers_disposed() =>
+    try
+      (_autoscale as Autoscale).producers_disposed()
+    else
+      Fail()
     end
 
   fun ref clean_shutdown() =>
@@ -974,19 +945,6 @@ actor RouterRegistry
     local_topology: LocalTopology, checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
-    //!@ remove
-    // let state_blueprints =
-    //   recover iso Map[StateName, StatePartitionRouterBlueprint] end
-    // for (w, r) in _partition_routers.pairs() do
-    //   state_blueprints(w) = r.blueprint()
-    // end
-    //
-    // let stateless_blueprints =
-    //   recover iso Map[U128, StatelessPartitionRouterBlueprint] end
-    // for (id, r) in _stateless_partition_routers.pairs() do
-    //   stateless_blueprints(id) = r.blueprint()
-    // end
-
     _connections.inform_joining_worker(conn, worker, local_topology,
       checkpoint_id, rollback_id, _initializer_name)
 

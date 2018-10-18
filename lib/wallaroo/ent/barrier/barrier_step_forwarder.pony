@@ -113,7 +113,7 @@ class BarrierStepForwarder
     check_completion(_step.inputs())
 
   fun ref check_completion(inputs: Map[RoutingId, Producer] box) =>
-    if (inputs.size() == (_inputs_blocking.size() + _removed_inputs.size()))
+    if inputs.size() == _inputs_blocking.size()
     then
       for (o_id, o) in _step.outputs().pairs() do
         match o

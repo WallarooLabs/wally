@@ -21,7 +21,3 @@ type RoutingId is U128
 // TODO: Remove this with old watermarking algo.
 type RouteId is U64
 type RequestId is U64
-
-// We assign each stateless partition a sequential index so that we can route
-// messages in a round robin fashion modding over the incoming sequence ids.
-type SeqPartitionIndex is U64

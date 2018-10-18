@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"
@@ -36,6 +37,7 @@ trait tag Producer is (Muteable & Resilient)
   fun ref current_sequence_id(): SeqId
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
   be register_downstream()
+  be dispose_for_shrink(promise: Promise[None])
 
 interface tag RouterUpdatable
   be update_router(r: Router)

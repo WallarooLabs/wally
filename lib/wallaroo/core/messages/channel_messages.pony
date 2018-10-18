@@ -142,16 +142,6 @@ primitive ChannelMsgEncoder
   =>
     _encode(UnmuteRequestMsg(originating_worker), auth)?
 
-  //!@
-  // fun delivery[D: Any val](target_id: RoutingId,
-  //   from_worker_name: String, msg_data: D, key: Key,
-  //   metric_name: String, auth: AmbientAuth,
-  //   proxy_address: ProxyAddress, msg_uid: MsgId,
-  //   frac_ids: FractionalMessageId): Array[ByteSeq] val ?
-  // =>
-  //   _encode(ForwardMsg[D](target_id, from_worker_name,
-  //     msg_data, key, metric_name, proxy_address, msg_uid, frac_ids), auth)?
-
   fun identify_control_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -264,10 +254,6 @@ primitive ChannelMsgEncoder
     control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
     worker_names: Array[String] val, primary_checkpoint_worker: String,
-    //!@ remove
-    // partition_blueprints: Map[String, StatePartitionRouterBlueprint] val,
-    // stateless_partition_blueprints:
-    //   Map[U128, StatelessPartitionRouterBlueprint] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -291,9 +277,8 @@ primitive ChannelMsgEncoder
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
-    This message is sent after a joining worker uses partition blueprints and
-    other topology information to initialize its topology. It indicates that
-    it is ready to receive migrated steps.
+    This message is sent after a joining worker initializes its topology. It
+    indicates that it is ready to receive migrated steps.
     """
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr,
       state_routing_ids, stateless_partition_routing_ids), auth)?
@@ -1195,11 +1180,6 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let worker_names: Array[WorkerName] val
   // The worker currently in control of checkpoints
   let primary_checkpoint_worker: WorkerName
-  //!@ remove
-  // let partition_router_blueprints:
-  //   Map[StateName, StatePartitionRouterBlueprint] val
-  // let stateless_partition_router_blueprints:
-  //   Map[U128, StatelessPartitionRouterBlueprint] val
 
   new val create(sender: WorkerName, app: String, l_topology: LocalTopology,
     checkpoint_id': CheckpointId, rollback_id': RollbackId,
@@ -1208,9 +1188,6 @@ class val InformJoiningWorkerMsg is ChannelMsg
     d_addrs: Map[WorkerName, (String, String)] val,
     w_names: Array[String] val,
     p_checkpoint_worker: WorkerName)
-    //!@ remove
-    // p_blueprints: Map[StateName, StatePartitionRouterBlueprint] val,
-    // stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
   =>
     sender_name = sender
     local_topology = l_topology
@@ -1223,9 +1200,6 @@ class val InformJoiningWorkerMsg is ChannelMsg
     data_addrs = d_addrs
     worker_names = w_names
     primary_checkpoint_worker = p_checkpoint_worker
-    //!@ remove
-    // partition_router_blueprints = p_blueprints
-    // stateless_partition_router_blueprints = stateless_p_blueprints
 
 class val InformJoinErrorMsg is ChannelMsg
   let message: String

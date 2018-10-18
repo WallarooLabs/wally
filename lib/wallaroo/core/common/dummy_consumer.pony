@@ -17,6 +17,7 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/initialization"
 use "wallaroo/core/routing"

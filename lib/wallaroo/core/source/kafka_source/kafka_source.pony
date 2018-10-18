@@ -534,7 +534,14 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       _unregister_output(id, consumer)
     end
 
+  be dispose_for_shrink(promise: Promise[None]) =>
+    _dispose()
+    promise(None)
+
   be dispose() =>
+    _dispose()
+
+  fun ref _dispose() =>
     @printf[I32]("Shutting down %s\n".cstring(), _name.cstring())
 
     if not _disposed then

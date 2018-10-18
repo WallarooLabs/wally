@@ -99,41 +99,41 @@ actor GenSourceListener[In: Any val] is SourceListener
     _target_router = target_router
     _generator = generator
 
-  //   match router
-  //   | let pr: StatePartitionRouter =>
-  //     _router_registry.register_partition_router_subscriber(pr.state_name(),
-  //       this)
-  //   | let spr: StatelessPartitionRouter =>
-  //     _router_registry.register_stateless_partition_router_subscriber(
-  //       spr.partition_routing_id(), this)
-  //   end
+    match router
+    | let pr: StatePartitionRouter =>
+      _router_registry.register_partition_router_subscriber(pr.state_name(),
+        this)
+    | let spr: StatelessPartitionRouter =>
+      _router_registry.register_stateless_partition_router_subscriber(
+        spr.partition_routing_id(), this)
+    end
 
-  //   _create_source()
+    _create_source()
 
-  // fun ref _create_source() =>
-  //   let name = _pipeline_name + " source"
-  //   let temp_id = MD5(name)
-  //   let rb = Reader
-  //   rb.append(temp_id)
+  fun ref _create_source() =>
+    let name = _pipeline_name + " source"
+    let temp_id = MD5(name)
+    let rb = Reader
+    rb.append(temp_id)
 
-  //   let source_id = try rb.u128_le()? else Fail(); 0 end
+    let source_id = try rb.u128_le()? else Fail(); 0 end
 
-  //   let source = GenSource[In](source_id, _auth, _pipeline_name,
-  //     _runner_builder, _router, _target_router, _generator, _event_log,
-  //     _outgoing_boundary_builders, _layout_initializer,
-  //     _metrics_reporter.clone(), _router_registry)
+    let source = GenSource[In](source_id, _auth, _pipeline_name,
+      _runner_builder, _router, _target_router, _generator, _event_log,
+      _outgoing_boundary_builders, _layout_initializer,
+      _metrics_reporter.clone(), _router_registry)
 
-  //   source.mute(this)
-  //   _router_registry.register_source(source, source_id)
-  //   match _router
-  //   | let pr: StatePartitionRouter =>
-  //     _router_registry.register_partition_router_subscriber(
-  //       pr.state_name(), source)
-  //   | let spr: StatelessPartitionRouter =>
-  //     _router_registry.register_stateless_partition_router_subscriber(
-  //       spr.partition_routing_id(), source)
-  //   end
-  //   _sources.push(source)
+    source.mute(this)
+    _router_registry.register_source(source, source_id)
+    match _router
+    | let pr: StatePartitionRouter =>
+      _router_registry.register_partition_router_subscriber(
+        pr.state_name(), source)
+    | let spr: StatelessPartitionRouter =>
+      _router_registry.register_stateless_partition_router_subscriber(
+        spr.partition_routing_id(), source)
+    end
+    _sources.push(source)
 
   be recovery_protocol_complete() =>
     for s in _sources.values() do

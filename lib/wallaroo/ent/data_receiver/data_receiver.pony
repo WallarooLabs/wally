@@ -18,6 +18,7 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "net"
+use "promises"
 use "time"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
@@ -421,3 +422,6 @@ actor DataReceiver is Producer
 
   fun ref current_sequence_id(): SeqId =>
     0
+
+  be dispose_for_shrink(promise: Promise[None]) =>
+    None
