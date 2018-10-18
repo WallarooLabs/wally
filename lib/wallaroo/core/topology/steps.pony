@@ -487,6 +487,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
     _event_log.unregister_resilient(_id, this)
     _unregister_all_outputs()
+    _step_message_processor = DisposedStepMessageProcessor
 
   ///////////////
   // GROW-TO-FIT

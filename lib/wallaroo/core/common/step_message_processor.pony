@@ -138,3 +138,28 @@ class BarrierStepMessageProcessor is StepMessageProcessor
       qd.push(q)
     end
     qd
+
+class DisposedStepMessageProcessor is StepMessageProcessor
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
+  =>
+    None
+
+  fun barrier_in_progress(): Bool =>
+    false
+
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref queued(): Array[_Queued] =>
+    Array[_Queued]
