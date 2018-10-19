@@ -839,9 +839,7 @@ trait val DeliveryMsg is ChannelMsg
     data_routes: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
     stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val,
-    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
+    consumer_ids: MapIs[Consumer, RoutingId] val) ?
   fun metric_name(): String
   fun msg_uid(): U128
 
@@ -881,21 +879,16 @@ class val ForwardMsg[D: Any val] is DeliveryMsg
     data_routes: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
     stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val,
-    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
+    consumer_ids: MapIs[Consumer, RoutingId] val) ?
   =>
     let target_step = data_routes(_target_id)?
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
 
-    let route_id = target_ids_to_route_ids(_target_id)?
-
     target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
-    route_id
 
 class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
   let _target_state_name: String
@@ -930,30 +923,22 @@ class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
     data_routes: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
     stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val,
-    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
+    consumer_ids: MapIs[Consumer, RoutingId] val) ?
   =>
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
 
-    try
-      let local_state_steps = state_steps(_target_state_name)?
-      let idx =
-        (HashKey(_target_key) % local_state_steps.size().u128()).usize()
-      let target_step = local_state_steps(idx)?
+    let local_state_steps = state_steps(_target_state_name)?
+    let idx =
+      (HashKey(_target_key) % local_state_steps.size().u128()).usize()
+    let target_step = local_state_steps(idx)?
 
-      let target_id = consumer_ids(target_step)?
-      let route_id = target_ids_to_route_ids(target_id)?
+    let target_id = consumer_ids(target_step)?
 
-      target_step.run[D](_metric_name, pipeline_time_spent, _data, _target_key,
-        producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
-      route_id
-    else
-      error
-    end
+    target_step.run[D](_metric_name, pipeline_time_spent, _data, _target_key,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
 
 class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
   let _target_partition_id: RoutingId
@@ -988,33 +973,24 @@ class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
     data_routes: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
     stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val,
-    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
+    consumer_ids: MapIs[Consumer, RoutingId] val) ?
   =>
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
 
-    try
-      @printf[I32]("!@--1\n".cstring())
-      let partitions = stateless_partitions(_target_partition_id)?
-      let idx = HashKey(_key).usize() % partitions.size()
-      @printf[I32]("!@--2\n".cstring())
-      let target_step = partitions(idx)?
+    @printf[I32]("!@--1\n".cstring())
+    let partitions = stateless_partitions(_target_partition_id)?
+    let idx = HashKey(_key).usize() % partitions.size()
+    @printf[I32]("!@--2\n".cstring())
+    let target_step = partitions(idx)?
 
-      @printf[I32]("!@--3\n".cstring())
-      let target_id = consumer_ids(target_step)?
-      @printf[I32]("!@--4\n".cstring())
-      let route_id = target_ids_to_route_ids(target_id)?
+    @printf[I32]("!@--3\n".cstring())
+    let target_id = consumer_ids(target_step)?
 
-      target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
-        producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
-      route_id
-    else
-      error
-    end
+    target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
 
 class val RequestRecoveryInfoMsg is ChannelMsg
   """

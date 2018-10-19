@@ -171,9 +171,6 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   be update_router(router: Router) =>
     _router = router
 
-  be remove_route_for(moving_step: Consumer) =>
-    None
-
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
   =>

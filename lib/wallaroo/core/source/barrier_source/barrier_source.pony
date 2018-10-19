@@ -20,6 +20,7 @@ use "collections"
 use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
@@ -50,6 +51,8 @@ actor BarrierSource is Source
   let _router_registry: RouterRegistry
   let _event_log: EventLog
 
+  let _metrics_reporter: MetricsReporter
+
 ////////
   // Map from pipeline name to outputs for sources in that pipeline.
   let _pipeline_outputs: Map[String, Map[RoutingId, Consumer]] =
@@ -70,7 +73,7 @@ actor BarrierSource is Source
   ////////////////////
 
   new create(source_id: RoutingId, router_registry: RouterRegistry,
-    event_log: EventLog)
+    event_log: EventLog, metrics_reporter': MetricsReporter iso)
   =>
     """
     A new connection accepted on a server.
@@ -78,10 +81,19 @@ actor BarrierSource is Source
     _source_id = source_id
     _router_registry = router_registry
     _event_log = event_log
+    _metrics_reporter = consume metrics_reporter'
     _router_registry.register_producer(this)
 
   be first_checkpoint_complete() =>
     None
+
+  fun ref metrics_reporter(): MetricsReporter =>
+    _metrics_reporter
+
+  // We don't need to explicitly hold routes here because we only forward
+  // barriers.
+  fun ref has_route_to(c: Consumer): Bool =>
+    false
 
   be register_pipeline(pipeline_name: String, router': Router) =>
     """
@@ -324,8 +336,7 @@ actor BarrierSource is Source
   ///////////////////////
   // !@ STUFF TO BE REMOVED
   ///////////////////////
-  fun ref route_to(c: Consumer): (Route | None) =>
-    None
+
 
   fun ref next_sequence_id(): SeqId =>
     _seq_id = _seq_id + 1

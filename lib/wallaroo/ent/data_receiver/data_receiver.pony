@@ -24,6 +24,7 @@ use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
+use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
@@ -47,6 +48,8 @@ actor DataReceiver is Producer
   var _ack_counter: USize = 0
 
   var _last_request: USize = 0
+
+  let _metrics_reporter: MetricsReporter
 
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
@@ -76,6 +79,7 @@ actor DataReceiver is Producer
 
   new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
     sender_name: String, data_router: DataRouter,
+    metrics_reporter': MetricsReporter iso,
     initialized: Bool = false, is_recovering: Bool = false)
   =>
     _id = id
@@ -83,12 +87,16 @@ actor DataReceiver is Producer
     _worker_name = worker_name
     _sender_name = sender_name
     _router = data_router
+    _metrics_reporter = consume metrics_reporter'
     _state_routing_ids = _router.state_routing_ids()
     if is_recovering then
       _phase = _RecoveringDataReceiverPhase(this)
     else
       _phase = _NormalDataReceiverPhase(this)
     end
+
+  fun ref metrics_reporter(): MetricsReporter =>
+    _metrics_reporter
 
   be update_router(router': DataRouter) =>
     _router = router'
@@ -387,8 +395,8 @@ actor DataReceiver is Producer
   /////////////////////////////////////////////////////////////////////////////
   // PRODUCER
   /////////////////////////////////////////////////////////////////////////////
-  fun ref route_to(c: Consumer): (Route | None) =>
-    None
+  fun ref has_route_to(c: Consumer): Bool =>
+    false
 
   fun ref next_sequence_id(): SeqId =>
     0

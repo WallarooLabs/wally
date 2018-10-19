@@ -168,11 +168,6 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
 
 class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   RunnerBuilder
-  //!@
-  // This is the id for the entire state collection. It's used, for example,
-  // to route messages to a Key that exists on another worker where we don't
-  // know the specific routing ids of the state steps.
-
   let _state_comp: StateComputation[In, Out, S] val
   let _state_name: StateName
   let _parallelism: USize

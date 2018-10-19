@@ -18,6 +18,4 @@ Copyright 2017 The Wallaroo Authors.
 
 type SeqId is U64
 type RoutingId is U128
-// TODO: Remove this with old watermarking algo.
-type RouteId is U64
 type RequestId is U64

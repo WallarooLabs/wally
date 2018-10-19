@@ -27,8 +27,7 @@ trait SinkMessageProcessor
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
   fun barrier_in_progress(): Bool =>
     false
@@ -49,8 +48,7 @@ class EmptySinkMessageProcessor is SinkMessageProcessor
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
 
@@ -66,12 +64,11 @@ class NormalSinkMessageProcessor is SinkMessageProcessor
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     sink.process_message[D](metric_name, pipeline_time_spent, data, key,
-      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-      latest_ts, metrics_id, worker_ingress_ts)
+      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
 
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
@@ -90,18 +87,17 @@ class BarrierSinkMessageProcessor is SinkMessageProcessor
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if _barrier_acker.input_blocking(i_producer_id) then
       let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
         data, key, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
-        i_route_id, latest_ts, metrics_id, worker_ingress_ts)
+        latest_ts, metrics_id, worker_ingress_ts)
       _queued.push(msg)
     else
       sink.process_message[D](metric_name, pipeline_time_spent, data, key,
-        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
+        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, latest_ts,
+        metrics_id, worker_ingress_ts)
     end
 
   fun barrier_in_progress(): Bool =>
