@@ -244,3 +244,14 @@ def test_state():
         sp.update(m2)
     except Exception as err:
         assert(isinstance(err, AssertionError))
+
+
+def test_attach_to_module():
+    identifier = 'my_function'
+    def my_function():
+        return 'my function result'
+    assert(globals().get(identifier) is None)
+    assert(my_function.__name__ == identifier)
+    my_function = attach_to_module(my_function, identifier)
+    assert(globals().get(identifier) is not None)
+    assert(my_function.__name__ == identifier)
