@@ -38,9 +38,12 @@ class WaitForClusterToResumeProcessing(StoppableThread):
 
     def run(self):
         waiting = set()
-        for r in self.runners:
-            if not r.is_alive():
-                continue
+        # get live runners
+        live = [r for r in self.runners if r.is_alive()]
+        if not live:
+            self.stop(ClusterError("No live runners found. Cluster cannot "
+                                   "resume processing."))
+        for r in live:
             obs = ObservabilityNotifier(cluster_status_query,
                 r.external,
                 tests=is_processing, timeout=self.timeout)
