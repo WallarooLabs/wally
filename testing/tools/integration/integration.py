@@ -21,14 +21,14 @@ import os
 import re
 import time
 
-from cluster import (Cluster,
+from .cluster import (Cluster,
                      runner_data_format)
-from control import (SinkAwaitValue,
+from .control import (SinkAwaitValue,
                      SinkExpect)
-from end_points import (Sender,
+from .end_points import (Sender,
                         Reader)
-from errors import PipelineTestError
-from logger import INFO2
+from .errors import PipelineTestError
+from .logger import INFO2
 
 
 
