@@ -42,7 +42,7 @@ wallaroo_path := $(abs_wallaroo_dir)
 
 # Set global path variables
 integration_path := $(wallaroo_path)/testing/tools
-integration_bin_path := $(integration_path)/integration
+integration_bin_path := $(integration_path)
 wallaroo_lib :=  $(wallaroo_path)/lib
 wallaroo_python_path := $(wallaroo_path)/machida/lib
 machida_bin_path := $(wallaroo_path)/machida/build
