@@ -756,7 +756,7 @@ actor Connections is Cluster
     try
       let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)?
       _send_control_to_cluster(clean_shutdown_msg)
-      file_cleaner.clean_recovery_files()
+      file_cleaner.clean_shutdown()
     else
       Fail()
     end

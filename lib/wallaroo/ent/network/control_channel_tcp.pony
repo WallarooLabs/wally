@@ -616,7 +616,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           .cstring())
         _event_log.start_rotation()
       | let m: CleanShutdownMsg =>
-        _recovery_file_cleaner.clean_recovery_files()
+        _recovery_file_cleaner.clean_shutdown()
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else

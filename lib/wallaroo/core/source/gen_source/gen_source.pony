@@ -426,7 +426,7 @@ actor GenSource[V: Any val] is Source
       _unregister_output(id, consumer)
     end
 
-  be dispose_for_shrink(promise: Promise[None]) =>
+  be dispose_with_promise(promise: Promise[None]) =>
     _dispose()
     promise(None)
 

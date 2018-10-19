@@ -76,7 +76,7 @@ actor DummyProducer is Producer
   be register_downstream() =>
     None
 
-  be dispose_for_shrink(promise: Promise[None]) =>
+  be dispose_with_promise(promise: Promise[None]) =>
     None
 
 

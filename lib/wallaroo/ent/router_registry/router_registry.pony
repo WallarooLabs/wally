@@ -609,25 +609,21 @@ actor RouterRegistry
       boundary.report_status(code)
     end
 
-  fun ref dispose_producers() =>
+  be dispose_producers(promise: Promise[None]) =>
+    _dispose_producers(promise)
+
+  fun ref _dispose_producers(promise: Promise[None]) =>
     let ps = Array[Promise[None]]
-    for p in _producers.values() do
-      let promise = Promise[None]
-      ps.push(promise)
-      p.dispose_for_shrink(promise)
+    for producer in _producers.values() do
+      let p = Promise[None]
+      ps.push(p)
+      producer.dispose_with_promise(p)
     end
     let promises = Promises[None].join(ps.values())
-    promises.next[None]({(_: None) => _self.producers_disposed()})
-
-  be producers_disposed() =>
-    try
-      (_autoscale as Autoscale).producers_disposed()
-    else
-      Fail()
-    end
+    promises.next[None]({(_: None) => promise(None)})
 
   fun ref clean_shutdown() =>
-    _recovery_file_cleaner.clean_recovery_files()
+    _recovery_file_cleaner.clean_shutdown()
 
   // TODO: Move management of stop the world to another actor
   /////////////////////////////////////////////////////////////////////////////

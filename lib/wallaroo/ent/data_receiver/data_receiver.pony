@@ -396,5 +396,5 @@ actor DataReceiver is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  be dispose_for_shrink(promise: Promise[None]) =>
+  be dispose_with_promise(promise: Promise[None]) =>
     None
