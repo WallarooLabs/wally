@@ -323,8 +323,10 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
+      let reporter = MetricsReporter(_app_name, _startup_options.worker_name,
+        metrics_conn)
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name, _is_recovering)
+        _startup_options.worker_name, consume reporter, _is_recovering)
 
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
         data_receivers, connections, this,
@@ -552,8 +554,10 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
+      let reporter = MetricsReporter(_app_name, _startup_options.worker_name,
+        metrics_conn)
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name)
+        _startup_options.worker_name, consume reporter)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,

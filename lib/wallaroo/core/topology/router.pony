@@ -81,18 +81,17 @@ class val DirectRouter is Router
       @printf[I32]("Rcvd msg at DirectRouter\n".cstring())
     end
 
-    let might_be_route = producer.route_to(_target)
-    match might_be_route
-    | let r: Route =>
+    if producer.has_route_to(_target) then
       ifdef "trace" then
         @printf[I32]("DirectRouter found Route\n".cstring())
       end
-      r.run[D](metric_name, pipeline_time_spent, data, key,
+      Route.run[D](metric_name, pipeline_time_spent, data, key,
         // hand down producer so we can call _next_sequence_id()
         producer_id, producer,
         // incoming envelope
         i_msg_uid, frac_ids,
-        latest_ts, metrics_id, worker_ingress_ts)
+        latest_ts, metrics_id, worker_ingress_ts,
+        _target)
       (false, latest_ts)
     else
       // TODO: What do we do if we get None?
@@ -258,9 +257,7 @@ class val ProxyRouter is Router
       @printf[I32]("Rcvd msg at ProxyRouter\n".cstring())
     end
 
-    let might_be_route = producer.route_to(_target)
-    match might_be_route
-    | let r: Route =>
+    if producer.has_route_to(_target) then
       ifdef "trace" then
         @printf[I32]("ProxyRouter found Route\n".cstring())
       end
@@ -270,8 +267,8 @@ class val ProxyRouter is Router
         _target_proxy_address,
         i_msg_uid, frac_ids)
 
-      r.forward(delivery_msg, pipeline_time_spent, producer_id, producer,
-        latest_ts, metrics_id, metric_name, worker_ingress_ts)
+      Route.forward(delivery_msg, pipeline_time_spent, producer_id, producer,
+        latest_ts, metrics_id, metric_name, worker_ingress_ts, _target)
 
       (false, latest_ts)
     else
@@ -340,8 +337,6 @@ class val DataRouter is Equatable[DataRouter]
   let _state_steps: Map[StateName, Array[Step] val] val
   let _stateless_partitions: Map[RoutingId, Array[Step] val] val
   let _consumer_ids: MapIs[Consumer, RoutingId] val
-  let _target_ids_to_route_ids: Map[RoutingId, RouteId] val
-  let _route_ids_to_target_ids: Map[RouteId, RoutingId] val
 
   // Special RoutingIds that indicates that a barrier or register_producer
   // request needs to be forwarded to all known state steps on this workes.
@@ -363,11 +358,8 @@ class val DataRouter is Equatable[DataRouter]
     _state_routing_ids = state_routing_ids'
     _stateless_partition_routing_ids = stateless_partition_routing_ids'
 
-    var route_id: RouteId = 0
     let ids: Array[RoutingId] = ids.create()
     let cid_map = recover trn MapIs[Consumer, RoutingId] end
-    let tid_map = recover trn Map[RoutingId, RouteId] end
-    let rid_map = recover trn Map[RouteId, RoutingId] end
 
     for step_id in _data_routes.keys() do
       ids.push(step_id)
@@ -375,17 +367,7 @@ class val DataRouter is Equatable[DataRouter]
     for (r_id, c) in data_routes.pairs() do
       cid_map(c) = r_id
     end
-    for id in Sort[Array[RoutingId], RoutingId](ids).values() do
-      route_id = route_id + 1
-      tid_map(id) = route_id
-    end
-    for (t_id, r_id) in tid_map.pairs() do
-      rid_map(r_id) = t_id
-    end
-
-    _consumer_ids = consume cid_map
-    _target_ids_to_route_ids = consume tid_map
-    _route_ids_to_target_ids = consume rid_map
+     _consumer_ids = consume cid_map
 
   fun size(): USize =>
     _data_routes.size()
@@ -406,8 +388,7 @@ class val DataRouter is Equatable[DataRouter]
     try
       d_msg.deliver(pipeline_time_spent, producer_id, producer,
         seq_id, latest_ts, metrics_id, worker_ingress_ts,
-        _data_routes, _state_steps, _stateless_partitions, _consumer_ids,
-        _target_ids_to_route_ids, _route_ids_to_target_ids)?
+        _data_routes, _state_steps, _stateless_partitions, _consumer_ids)?
     else
       Fail()
     end
@@ -476,13 +457,6 @@ class val DataRouter is Equatable[DataRouter]
       producer.queue_unregister_producer(input_id, output_id)
     end
 
-  fun route_ids(): Array[RouteId] =>
-    let ids: Array[RouteId] = ids.create()
-    for id in _target_ids_to_route_ids.values() do
-      ids.push(id)
-    end
-    ids
-
   fun routes(): Map[RoutingId, Consumer] val =>
     let m = recover iso Map[RoutingId, Consumer] end
     for (r_id, c) in _data_routes.pairs() do
@@ -536,11 +510,7 @@ class val DataRouter is Equatable[DataRouter]
     end
 
   fun eq(that: box->DataRouter): Bool =>
-    MapTagEquality[U128, Consumer](_data_routes, that._data_routes) and
-      MapEquality[U128, RouteId](_target_ids_to_route_ids,
-        that._target_ids_to_route_ids) //and
-      // MapEquality[RouteId, U128](_route_ids_to_target_ids,
-      //   that._route_ids_to_target_ids)
+    MapTagEquality[U128, Consumer](_data_routes, that._data_routes)
 
   fun report_status(code: ReportStatusCode) =>
     for consumer in _data_routes.values() do
@@ -606,15 +576,13 @@ class val StatePartitionRouter is Router
       try
         let idx = (HashKey(key) % _state_steps.size().u128()).usize()
         let s = _state_steps(idx)?
-        let might_be_route = producer.route_to(s)
-        match might_be_route
-        | let r: Route =>
+        if producer.has_route_to(s) then
           ifdef "trace" then
             @printf[I32]("PartitionRouter found Route\n".cstring())
           end
-          r.run[D](metric_name, pipeline_time_spent,
+          Route.run[D](metric_name, pipeline_time_spent,
             data, key, producer_id, producer, i_msg_uid, frac_ids,
-            latest_ts, metrics_id, worker_ingress_ts)
+            latest_ts, metrics_id, worker_ingress_ts, s)
           (false, latest_ts)
         else
           // TODO: What do we do if we get None?
@@ -1016,15 +984,13 @@ class val StatelessPartitionRouter is Router
       if target_worker == _worker_name then
         let s_idx = hashed_key % _local_partitions.size()
         let step = _local_partitions(s_idx)?
-        let might_be_route = producer.route_to(step)
-        match might_be_route
-        | let r: Route =>
+        if producer.has_route_to(step) then
           ifdef "trace" then
             @printf[I32]("StatelessPartitionRouter found Route\n".cstring())
           end
-          r.run[D](metric_name, pipeline_time_spent, data, key,
+          Route.run[D](metric_name, pipeline_time_spent, data, key,
             producer_id, producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
-            worker_ingress_ts)
+            worker_ingress_ts, step)
           (false, latest_ts)
         else
           Fail()
@@ -1038,11 +1004,9 @@ class val StatelessPartitionRouter is Router
           data, key, metric_name, i_msg_uid, frac_ids)
         let proxy = _proxies(target_worker)?
         let ob = proxy.target_boundary()
-        let might_be_route = producer.route_to(ob)
-        match might_be_route
-        | let r: Route =>
-          r.forward(msg, pipeline_time_spent, producer_id, producer,
-            latest_ts, metrics_id, metric_name, worker_ingress_ts)
+        if producer.has_route_to(ob) then
+          Route.forward(msg, pipeline_time_spent, producer_id, producer,
+            latest_ts, metrics_id, metric_name, worker_ingress_ts, ob)
           (false, latest_ts)
         else
           Fail()
@@ -1220,17 +1184,15 @@ class val HashedProxyRouter is Router
       @printf[I32]("Rcvd msg at HashedProxyRouter\n".cstring())
     end
 
-    let might_be_route = producer.route_to(_target)
-    match might_be_route
-    | let r: Route =>
+    if producer.has_route_to(_target) then
       ifdef "trace" then
         @printf[I32]("HashedProxyRouter found Route\n".cstring())
       end
 
       match data
       | let m: DeliveryMsg =>
-        r.forward(m, pipeline_time_spent, producer_id, producer,
-          latest_ts, metrics_id, metric_name, worker_ingress_ts)
+        Route.forward(m, pipeline_time_spent, producer_id, producer,
+          latest_ts, metrics_id, metric_name, worker_ingress_ts, _target)
       else
         Fail()
       end

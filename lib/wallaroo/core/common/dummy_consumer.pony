@@ -40,16 +40,15 @@ actor DummyConsumer is Consumer
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64)
   =>
     None
 
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     None
 

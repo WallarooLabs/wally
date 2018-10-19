@@ -298,7 +298,7 @@ actor OutgoingBoundary is Consumer
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // run() should never be called on an OutgoingBoundary
@@ -307,8 +307,7 @@ actor OutgoingBoundary is Consumer
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // process_message() should never be called on an OutgoingBoundary
     Fail()
@@ -316,8 +315,7 @@ actor OutgoingBoundary is Consumer
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: DeliveryMsg, pipeline_time_spent: U64,
     i_producer_id: RoutingId, i_producer: Producer, i_seq_id: SeqId,
-    i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     let metric_name = delivery_msg.metric_name()
     // TODO: delete

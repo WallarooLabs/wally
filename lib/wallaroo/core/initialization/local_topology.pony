@@ -849,8 +849,10 @@ actor LocalTopologyInitializer is LayoutInitializer
               // If there is no BarrierSource, we need to create one, since
               // this worker has at least one Source on it.
               if barrier_source is None then
+                let b_reporter = MetricsReporter(t.name(), _worker_name,
+                  _metrics_conn)
                 let b_source = BarrierSource(t.barrier_source_id,
-                  _router_registry, _event_log)
+                  _router_registry, _event_log, consume b_reporter)
                 _barrier_initiator.register_barrier_source(b_source)
                 barrier_source = b_source
               end

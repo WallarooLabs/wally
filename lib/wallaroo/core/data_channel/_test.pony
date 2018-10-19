@@ -91,7 +91,8 @@ class _TestDataChannel is DataChannelListenNotify
         _NullMetricsSink, "127.0.0.1", "0",
         true, "/tmp/foo_connections.txt", false
         where event_log = event_log, the_journal = the_journal)
-      let dr = DataReceivers(auth, conns, worker_name)
+      let dr = DataReceivers(auth, conns, worker_name,
+        MetricsReporter(app_name, worker_name, metrics_sink))
       let b_initiator = BarrierInitiator(auth, worker_name, conns, "init")
       let s_initiator = CheckpointInitiator(auth, "", "", conns, 0, event_log,
         b_initiator, "", SimpleJournalNoop, false)

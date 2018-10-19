@@ -30,12 +30,6 @@ class RoutingIdGenerator
   fun ref apply(): RoutingId =>
     _guid.u128()
 
-class RouteIdGenerator
-  let _guid: GuidGenerator = GuidGenerator
-
-  fun ref apply(): RouteId =>
-    _guid.u64()
-
 class RequestIdGenerator
   let _guid: GuidGenerator = GuidGenerator
 

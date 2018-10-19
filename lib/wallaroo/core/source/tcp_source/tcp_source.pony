@@ -66,7 +66,7 @@ actor TCPSource[In: Any val] is Source
   let _auth: AmbientAuth
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   var _router: Router
-  let _routes: MapIs[Consumer, Route] = _routes.create()
+  let _routes: SetIs[Consumer] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -74,7 +74,6 @@ actor TCPSource[In: Any val] is Source
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _layout_initializer: LayoutInitializer
-  var _unregistered: Bool = false
 
   let _metrics_reporter: MetricsReporter
 
@@ -121,7 +120,7 @@ actor TCPSource[In: Any val] is Source
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
+    metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
   =>
     """
     A new connection accepted on a server.
@@ -129,7 +128,7 @@ actor TCPSource[In: Any val] is Source
     _source_id = source_id
     _auth = auth
     _event_log = event_log
-    _metrics_reporter = consume metrics_reporter
+    _metrics_reporter = consume metrics_reporter'
     _listen = listen
     _notify = consume notify
     _layout_initializer = layout_initializer
@@ -149,17 +148,6 @@ actor TCPSource[In: Any val] is Source
     _update_router(router')
 
     _notify.update_boundaries(_outgoing_boundaries)
-
-    for r in _routes.values() do
-      // TODO: this is a hack, we shouldn't be calling application events
-      // directly. route lifecycle needs to be broken out better from
-      // application lifecycle
-      r.application_created()
-    end
-
-    for r in _routes.values() do
-      r.application_initialized("TCPSource")
-    end
 
     // register resilient with event log
     _event_log.register_resilient_source(_source_id, this)
@@ -203,13 +191,11 @@ actor TCPSource[In: Any val] is Source
     _unmute_local()
     _is_pending = false
     for (id, c) in _outputs.pairs() do
-      try
-        let route = _routes(c)?
-        route.register_producer(id)
-      else
-        Fail()
-      end
+      Route.register_producer(_source_id, id, this, c)
     end
+
+  fun ref metrics_reporter(): MetricsReporter =>
+    _metrics_reporter
 
   be update_router(router': Router) =>
     _update_router(router')
@@ -265,20 +251,9 @@ actor TCPSource[In: Any val] is Source
       end
 
       _outputs(id) = c
-      if not _routes.contains(c) then
-        let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
-        _routes(c) = new_route
-        if not _is_pending then
-          new_route.register_producer(id)
-        end
-      else
-        try
-          if not _is_pending then
-            _routes(c)?.register_producer(id)
-          end
-        else
-          Unreachable()
-        end
+      _routes.set(c)
+      if not _is_pending then
+        Route.register_producer(_source_id, id, this, c)
       end
     end
 
@@ -307,9 +282,7 @@ actor TCPSource[In: Any val] is Source
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
-      if not _is_pending then
-        _routes(c)?.unregister_producer(id)
-      end
+      Route.unregister_producer(_source_id, id, this, c)
       _outputs.remove(id)?
       _remove_route_if_no_output(c)
     else
@@ -326,11 +299,7 @@ actor TCPSource[In: Any val] is Source
     end
 
   fun ref _remove_route(c: Consumer) =>
-    try
-      _routes.remove(c)?._2
-    else
-      Fail()
-    end
+    _routes.unset(c)
 
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
@@ -346,9 +315,7 @@ actor TCPSource[In: Any val] is Source
           target_worker_name, _layout_initializer)
         _router_registry.register_disposable(boundary)
         _outgoing_boundaries(target_worker_name) = boundary
-        let new_route = RouteBuilder(_source_id, this, boundary,
-          _metrics_reporter)
-        _routes(boundary) = new_route
+        _routes.set(boundary)
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)
@@ -380,21 +347,6 @@ actor TCPSource[In: Any val] is Source
           .cstring(), worker.cstring())
       end
     end
-
-  be remove_route_for(step: Consumer) =>
-    try
-      _routes.remove(step)?
-    else
-      Fail()
-    end
-
-  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32](("initializing sequence id on recovery: " + seq_id.string() +
-        " in TCPSource\n").cstring())
-    end
-    // update to use correct seq_id for recovery
-    _seq_id = seq_id
 
   fun ref _unregister_all_outputs() =>
     """
@@ -429,17 +381,12 @@ actor TCPSource[In: Any val] is Source
         b.dispose()
       end
       close()
-      _dispose_routes()
       _muted = true
       _disposed = true
     end
 
-  fun ref route_to(c: Consumer): (Route | None) =>
-    try
-      _routes(c)?
-    else
-      None
-    end
+  fun ref has_route_to(c: Consumer): Bool =>
+    _routes.contains(c)
 
   fun ref next_sequence_id(): SeqId =>
     _seq_id = _seq_id + 1
@@ -453,14 +400,11 @@ actor TCPSource[In: Any val] is Source
       var b_count: USize = 0
       for r in _routes.values() do
         match r
-        | let br: BoundaryRoute => b_count = b_count + 1
+        | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
       @printf[I32]("TCPSource %s has %s boundaries.\n".cstring(),
         _source_id.string().cstring(), b_count.string().cstring())
-    end
-    for route in _routes.values() do
-      route.report_status(code)
     end
 
   be update_worker_data_service(worker: WorkerName,
@@ -671,14 +615,6 @@ actor TCPSource[In: Any val] is Source
     _notify.closed(this)
 
     _listen._conn_closed(this)
-
-  fun ref _dispose_routes() =>
-    if not _unregistered then
-      for r in _routes.values() do
-        r.dispose()
-      end
-      _unregistered = true
-    end
 
   fun ref _pending_reads() =>
     """
