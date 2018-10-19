@@ -20,9 +20,9 @@ import time
 import socket
 import struct
 
-from errors import TimeoutError
-from logger import INFO2
-from stoppable_thread import StoppableThread
+from .errors import TimeoutError
+from .logger import INFO2
+from .stoppable_thread import StoppableThread
 
 
 class SingleSocketReceiver(StoppableThread):
