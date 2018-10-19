@@ -21,6 +21,7 @@ use "collections"
 use "files"
 use "itertools"
 use "net"
+use "promises"
 use "signals"
 use "time"
 use "wallaroo_labs/hub"
@@ -44,6 +45,7 @@ use "wallaroo/ent/spike"
 
 
 actor Startup
+  let _self: Startup tag = this
   let _env: Env
   var _startup_options: StartupOptions = StartupOptions
 
@@ -75,6 +77,7 @@ actor Startup
   var _checkpoint_ids_file: String = ""
 
   var _connections: (Connections | None) = None
+  var _router_registry: (RouterRegistry | None) = None
 
   let _disposables: SetIs[DisposableActor] = _disposables.create()
   var _is_joining: Bool = false
@@ -329,6 +332,7 @@ actor Startup
         barrier_initiator, checkpoint_initiator, autoscale_initiator,
         initializer_name)
       router_registry.set_event_log(event_log)
+      _router_registry = router_registry
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, _startup_options.my_d_service,
@@ -557,6 +561,7 @@ actor Startup
         initializer_name, barrier_initiator, checkpoint_initiator,
         autoscale_initiator, m.sender_name)
       router_registry.set_event_log(event_log)
+      _router_registry = router_registry
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, _startup_options.my_d_service,
@@ -776,6 +781,16 @@ actor Startup
     else
       Fail()
       false
+    end
+
+  be clean_shutdown() =>
+    let promise = Promise[None]
+    promise.next[None]({(n: None): None => _self.clean_recovery_files()})
+    match _router_registry
+    | let rr: RouterRegistry =>
+      rr.dispose_producers(promise)
+    else
+      Fail()
     end
 
   be clean_recovery_files() =>

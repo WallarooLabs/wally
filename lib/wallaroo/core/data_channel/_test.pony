@@ -568,5 +568,5 @@ actor _NullMetricsSink
     None
 
 actor _DummyRecoveryFileCleaner
-  be clean_recovery_files() =>
+  be clean_shutdown() =>
     None

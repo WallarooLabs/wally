@@ -281,7 +281,7 @@ actor BarrierSource is Source
   be report_status(code: ReportStatusCode) =>
     None
 
-  be dispose_for_shrink(promise: Promise[None]) =>
+  be dispose_with_promise(promise: Promise[None]) =>
     _dispose()
     promise(None)
 

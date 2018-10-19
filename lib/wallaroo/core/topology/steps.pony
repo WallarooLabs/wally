@@ -451,7 +451,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       u.unmute(c)
     end
 
-  be dispose_for_shrink(promise: Promise[None]) =>
+  be dispose_with_promise(promise: Promise[None]) =>
     _dispose()
     promise(None)
 
@@ -459,10 +459,15 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _dispose()
 
   fun ref _dispose() =>
-    @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
-    _event_log.unregister_resilient(_id, this)
-    _unregister_all_outputs()
-    _step_message_processor = DisposedStepMessageProcessor
+    match _step_message_processor
+    | let dsmp: DisposedStepMessageProcessor =>
+      None
+    else
+      @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
+      _event_log.unregister_resilient(_id, this)
+      _unregister_all_outputs()
+      _step_message_processor = DisposedStepMessageProcessor
+    end
 
   ///////////////
   // GROW-TO-FIT
