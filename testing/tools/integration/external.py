@@ -181,6 +181,9 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         # save sender data to files
         sender_data = persistent_data.get('sender_data', [])
         for sd in sender_data:
+            # skip empty data
+            if not sd.data:
+                continue
             sender_log_name = 'sender_{host}!{port}_{time}.error.dat'.format(
                 host=sd.host,
                 port=sd.port,
@@ -191,6 +194,9 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
         # save sinks data to files
         sink_data = persistent_data.get('sink_data', [])
         for sk in sink_data:
+            # skip empty data
+            if not sk.data:
+                continue
             sink_log_name = 'sink_{host}!{port}_{time}.error.dat'.format(
                 host=sk.host,
                 port=sk.port,
