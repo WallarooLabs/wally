@@ -23,17 +23,17 @@ import time
 import subprocess
 
 
-from control import (CrashChecker,
+from .control import (CrashChecker,
                      SinkExpect,
                      SinkAwaitValue,
                      TryUntilTimeout,
                      WaitForClusterToResumeProcessing)
 
-from end_points import (Metrics,
+from .end_points import (Metrics,
                         Sender,
                         Sink)
 
-from errors import (ClusterError,
+from .errors import (ClusterError,
                     CrashedWorkerError,
                     NotEmptyError,
                     RunnerHasntStartedError,
@@ -41,22 +41,22 @@ from errors import (ClusterError,
                     StopError,
                     TimeoutError)
 
-from external import (clean_resilience_path,
+from .external import (clean_resilience_path,
                       get_port_values,
                       send_shrink_command,
                       setup_resilience_path)
 
-from logger import INFO2
+from .logger import INFO2
 
-from observability import (cluster_status_query,
+from .observability import (cluster_status_query,
                            coalesce_partition_query_responses,
                            multi_states_query,
                            ObservabilityNotifier,
                            state_entity_query)
 
-from typed_list import TypedList
+from .typed_list import TypedList
 
-from validations import (validate_migration,
+from .validations import (validate_migration,
                          validate_sender_is_flushed,
                          worker_count_matches,
                          worker_has_state_entities)
