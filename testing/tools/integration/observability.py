@@ -24,11 +24,11 @@ import traceback
 import sys
 import time
 
-from errors import (DuplicateKeyError,
+from .errors import (DuplicateKeyError,
                     TimeoutError)
-from external import run_shell_cmd
-from logger import INFO2
-from stoppable_thread import StoppableThread
+from .external import run_shell_cmd
+from .logger import INFO2
+from .stoppable_thread import StoppableThread
 
 
 # Make string instance checking py2 and py3 compatible below

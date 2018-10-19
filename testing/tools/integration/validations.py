@@ -15,7 +15,7 @@
 from itertools import chain
 import logging
 
-from errors import (MigrationError,
+from .errors import (MigrationError,
                     NotEmptyError)
 
 

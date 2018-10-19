@@ -16,15 +16,15 @@ import logging
 from inspect import isfunction
 import time
 
-from errors import (ClusterError,
+from .errors import (ClusterError,
                     ExpectationError,
                     TimeoutError)
-from stoppable_thread import StoppableThread
-from observability import (cluster_status_query,
+from .stoppable_thread import StoppableThread
+from .observability import (cluster_status_query,
                            get_func_name,
                            ObservabilityNotifier)
 
-from validations import is_processing
+from .validations import is_processing
 
 
 class WaitForClusterToResumeProcessing(StoppableThread):
