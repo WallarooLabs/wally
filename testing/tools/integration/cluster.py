@@ -486,6 +486,9 @@ class Cluster(object):
             self.runners.extend(self.workers)
             self._worker_id_counter = len(self.workers)
 
+            # Give workers time to exit if they crashed on startup.
+            # This makes these errors show faster.
+            time.sleep(0.25)
             # Wait for all runners to report ready to process
             self.wait_to_resume_processing(self.is_ready_timeout)
             # make sure `workers` runners are active and listed in the
