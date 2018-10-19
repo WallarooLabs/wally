@@ -17,42 +17,11 @@
 
 import argparse
 from collections import Counter
-import logging
 import struct
-
-from integration.logger import (add_in_memory_log_stream,
-                                INFO2,
-                                set_logging)
 
 import wallaroo
 
 import components
-
-
-# TODO:
-# - [ ] build topology programmatically from args
-# - [ ] create validation logic from topology
-# - [ ] make this file the runnable validator
-#       - e.g. wallaroo runs application_setup(args)
-#              validation runs `python app_gen.py --topology ... --output received.txt`
-# - [ ] create topos for parity with pony tests. See new_tests.md for details
-
-
-######################
-# Logging functionality
-######################
-
-LOG_LEVELS = {'none': 0,
-              '1': 1,
-              'debug': 10,
-              'info': 20,
-              'warn': 30,
-              'error': 40,
-              'critical': 50}
-
-def get_log_level(value):
-    """Get the effective log level"""
-    return LOG_LEVELS.get(value, 10)
 
 
 #######################
@@ -68,10 +37,7 @@ def parser_add_args(parser):
                         const='to_stateful')
     parser.add_argument('--to-state-partition', dest='topology', action='append_const',
                         const='to_state_partition')
-    parser.add_argument('--log-level', help=("Set the logging level."),
-                           choices=['none', '1', 'debug', 'info', 'warning',
-                                    'error', 'critical'],
-                           default='info')
+
 
 def application_setup(args):
     # Parse user options
@@ -79,18 +45,12 @@ def application_setup(args):
     parser_add_args(parser)
     pargs, _ = parser.parse_known_args(args)
 
-    log_level = get_log_level(pargs.log_level)
-    set_logging(name='integration', level=log_level)
-
-    for k, v in pargs._get_kwargs():
-        logging.debug('%s: %r' % (k, v))
-
     app_name = "topology test"
     pipe_name = "topology test pipeline"
 
     ab = wallaroo.ApplicationBuilder(app_name)
 
-    logging.info("Using TCP Source")
+    print("Using TCP Source")
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
 
@@ -101,7 +61,7 @@ def application_setup(args):
     ab = topology.build(ab)
 
 
-    logging.info("Using TCP Sink")
+    print("Using TCP Sink")
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
     ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
     return ab.build()
@@ -109,7 +69,7 @@ def application_setup(args):
 
 class Topology(object):
     def __init__(self, topology):
-        logging.info("Topology({!r})".format(topology))
+        print("Topology({!r})".format(topology))
         c = Counter()
         self.steps = []
         for node in topology:
@@ -117,34 +77,34 @@ class Topology(object):
             if node == 'to':
                 # to
                 f = components.Tag('{}{}'.format(node, c[node]))
-                comp = wallaroo.computation(f.func_name)(f)
-                self.steps.append((node, comp, f.func_name))
+                comp = wallaroo.computation(f.__name__)(f)
+                self.steps.append((node, comp, f.__name__))
             elif node == 'to_stateful':
                 # to_stateful
                 f = components.TagState('{}{}'.format(node, c[node]))
-                comp = wallaroo.state_computation(f.func_name)(f)
-                self.steps.append((node, comp, f.func_name))
+                comp = wallaroo.state_computation(f.__name__)(f)
+                self.steps.append((node, comp, f.__name__))
             elif node == 'to_parallel':
 
                 # to_parallel
                 f = components.Tag('{}{}'.format(node, c[node]))
-                comp = wallaroo.computation(f.func_name)(f)
-                self.steps.append((node, comp, f.func_name))
+                comp = wallaroo.computation(f.__name__)(f)
+                self.steps.append((node, comp, f.__name__))
             elif node == 'to_state_partition':
                 # to_state_partition
                 f = components.TagState('{}{}'.format(node, c[node]))
-                comp = wallaroo.state_computation(f.func_name)(f)
-                self.steps.append((node, comp, f.func_name))
+                comp = wallaroo.state_computation(f.__name__)(f)
+                self.steps.append((node, comp, f.__name__))
             else:
                 raise ValueError("Unknown topology node type: {!r}. Please use "
                                  "'to', 'to_parallel', 'to_stateful', or "
                                  "'to_state_partition'".format(node))
 
     def build(self, ab):
-        logging.info("Building topology")
+        print("Building topology")
         partition = wallaroo.partition(components.partition)
         for node, comp, tag in self.steps:
-            logging.info("Adding step: ({!r}, {!r}, {!r})".format(
+            print("Adding step: ({!r}, {!r}, {!r})".format(
                 node, tag, comp))
             if node == 'to':
                 ab.to(comp)
@@ -160,13 +120,13 @@ class Topology(object):
 
     # onetomany
     #f = components.Tag(2, flow_mod=components.OneToN(3))
-    #comp = wallaroo.computation_multi(f.func_name)(f)
+    #comp = wallaroo.computation_multi(f.__name__)(f)
     #ab = ab.to(comp)
 
     # filter by (only keep key 1.0)
     #f = components.Tag(3, flow_mod=components.FilterBy('key1.0', by=(
     #    lambda data: data.key.endswith('.1') )))
-    #comp = wallaroo.computation(f.func_name)(f)
+    #comp = wallaroo.computation(f.__name__)(f)
     #ab = ab.to(comp)
 
 
@@ -194,11 +154,10 @@ def validate_api():
     parser_add_args(parser)
     pargs, _ = parser.parse_known_args()
 
-    log_level = get_log_level(pargs.log_level)
-    set_logging(name='integration', level=log_level)
-
-    for k, v in pargs._get_kwargs():
-        logging.debug('%s: %r' % (k, v))
+    if not (pargs.topology and pargs.output):
+        parser.print_help()
+        print('got args: {!r}'.format(sys.argv[1:]))
+        parser.exit(1)
 
     topology = Topology(pargs.topology)
     tags = [step[2] for step in topology.steps]
