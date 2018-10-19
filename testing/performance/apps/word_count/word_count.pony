@@ -45,8 +45,8 @@ actor Main
 
         lines
           .to[String](Split)
-          .key_by(ExtractFirstLetter)
-          .to_state[RunningTotal, WordTotals](AddCount)
+          .key_by(ExtractWord)
+          .to_state[RunningTotal, WordTotal](AddCount)
           .to_sink(TCPSinkConfig[RunningTotal].from_options(
             RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
       end
@@ -79,24 +79,21 @@ class val RunningTotal
     word = w
     count = c
 
-class val WordTotalsBuilder
-  fun apply(): WordTotals => WordTotals
-  fun name(): String => "Word Totals"
+class WordTotal is State
+  var count: U64
 
-class WordTotals is State
-  // Map from word to current count
-  var word_totals: Map[String, U64] = word_totals.create()
+  new create(c: U64) =>
+    count = c
 
-primitive AddCount is StateComputation[String, RunningTotal, WordTotals]
+primitive AddCount is StateComputation[String, RunningTotal, WordTotal]
   fun name(): String => "Add Count"
 
-  fun apply(word: String, state: WordTotals): RunningTotal =>
-    let new_count = try state.word_totals(word)? + 1 else 1 end
-    state.word_totals(word) = new_count
-    RunningTotal(word, new_count)
+  fun apply(word: String, state: WordTotal): RunningTotal =>
+    state.count = state.count + 1
+    RunningTotal(word, state.count)
 
-  fun initial_state(): WordTotals =>
-    WordTotals
+  fun initial_state(): WordTotal =>
+    WordTotal(0)
 
 primitive StringFrameHandler is FramedSourceHandler[String]
   fun header_length(): USize =>
@@ -108,21 +105,9 @@ primitive StringFrameHandler is FramedSourceHandler[String]
   fun decode(data: Array[U8] val): String =>
     String.from_array(data)
 
-primitive ExtractFirstLetter
+primitive ExtractWord
   fun apply(input: String): Key =>
-    try
-      let first = input(0)?
-      if (first >= 'a') and (first <= 'z') then
-        recover String.from_utf32(first.u32()) end
-      else
-        "!"
-      end
-    else
-      // Fail()
-      // TODO: We shouldn't end up here but we might need to add more
-      // functionality so we can say "no key, drop this message"
-      "!"
-    end
+    input
 
 primitive RunningTotalEncoder
   fun apply(t: RunningTotal, wb: Writer = Writer): Array[ByteSeq] val =>
