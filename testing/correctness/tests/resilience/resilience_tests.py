@@ -37,9 +37,8 @@ TC = Creator(this)
 # - [x] Clean out dev debug logs
 
 
-
-CMD_PONY = 'multi_partition_detector --depth 1 --gen-source'
-CMD_PYTHON = 'machida --application-module multi_partition_detector --depth 1 --gen-source'
+CMD_PONY = 'multi_partition_detector --depth 1 --gen-source --run-with-resilience'
+CMD_PYTHON = 'machida --application-module multi_partition_detector --depth 1 --gen-source --run-with-resilience'
 
 APIS = {'pony': CMD_PONY, 'python': CMD_PYTHON}
 
