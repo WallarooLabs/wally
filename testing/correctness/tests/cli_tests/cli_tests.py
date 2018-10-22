@@ -20,6 +20,7 @@ from integration import (Cluster,
 from integration.external import run_shell_cmd
 from integration.logger import set_logging
 from itertools import cycle
+import os
 import json
 from struct import pack
 import tempfile
@@ -27,6 +28,10 @@ import time
 
 INPUT_ITEMS=10
 CMD='machida --application-module dummy'
+
+# If resilience is on, add --run-with-resilience to commands
+if os.environ.get("resilience") == 'on':
+    CMD += ' --run-with-resilience'
 
 def test_partition_query():
     with Cluster(command=CMD,workers=3) as cluster:
