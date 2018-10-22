@@ -65,10 +65,7 @@ class WordTotals(object):
         self.word_totals = {}
 
     def update(self, word):
-        if word in self.word_totals:
-            self.word_totals[word] = self.word_totals[word] + 1
-        else:
-            self.word_totals[word] = 1
+        self.word_totals[word] = self.word_totals.get(word, 0) + 1
 
     def get_count(self, word):
         return WordCount(word, self.word_totals[word])
@@ -95,5 +92,4 @@ def decoder(bs):
 
 @wallaroo.encoder
 def encoder(data):
-    output = data.word + " => " + str(data.count) + "\n"
-    return output.encode("utf-8")
+    return (data.word + " => " + str(data.count) + "\n").encode('utf-8')

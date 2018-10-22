@@ -6,11 +6,11 @@ You should have already completed the [setup instructions](/book/getting-started
 
 ## Running the Application
 
-Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when `machida --application-module my_application` is run, `machida` (the binary we previously compiled), loads up the `my_application.py` module inside of its embedded Python runtime and executes its `application_setup()` function to retrieve the application topology it needs to construct in order to run the application.
+Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when `machida --application-module my_application` is run, `machida` (the binary we previously compiled), loads up the `my_application.py` module inside of its embedded Python runtime and executes its `application_setup()` function to retrieve the application topology it needs to construct in order to run the application. `machida3` does the same, but with an embedded Python 3 runtime instead of Python 2.7.
 
 Generally, in order to build a Wallaroo Python application, the following steps should be followed:
 
-* Build the machida binary (this only needs to be done once)
+* Build the `machida` or `machida3` binary (this only needs to be done once)
 * `import wallaroo` in the Python application's `.py` file
 * Create classes that provide the correct Wallaroo Python interfaces (more on this later)
 * Define an `application_setup` function that uses the `ApplicationBuilder` from the `wallaroo` module to construct the application topology.
@@ -20,7 +20,7 @@ Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate
 
 ### A Note About PYTHONPATH
 
-Machida uses the `PYTHONPATH` environment variable to find modules that are imported by the application. You will have at least two modules in your `PYTHONPATH`: the application module and the `wallaroo` module. For example, if you have followed the directions for setting up the tutorial then the Wallaroo Python module is in `$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/wallaroo.py` and the "Celsius to Fahrenheit" application module is in `$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius/celsius.py`, so you would export `PYTHONPATH` like this:
+Machida uses the `PYTHONPATH` environment variable to find modules that are imported by the application. You will have at least two modules in your `PYTHONPATH`: the application module and the `wallaroo` module. For example, if you have followed the directions for setting up the tutorial then the Wallaroo Python module is in `$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib/` and the "Celsius to Fahrenheit" application module is in `$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius/celsius.py`, you would export `PYTHONPATH` like this:
 
 ```bash
 export PYTHONPATH="$PYTHONPATH:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"

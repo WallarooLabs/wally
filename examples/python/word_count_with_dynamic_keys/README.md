@@ -27,6 +27,7 @@ The `decoder` function turns the input message into a string. That string is the
 ## Running Word Count With Dynamic Keys
 
 In order to run the application you will need Machida, Giles Sender, Data Receiver, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
+If you are using Python3, replace all instances of `machida` with `machida3` in your commands.
 
 You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details depending on your installation choice). Open each shell and go to the `examples/python/word_count_with_dynamic_keys` directory.
 

@@ -12,9 +12,13 @@ Follow the instructions on [the virtualenv website](https://virtualenv.pypa.io/e
 
 To create a virtualenv for your application, run the following command
 
-```bash
+
+{% codetabs name="Python 2.7", type="py" -%}
 virtualenv --python=python2 ENV
-```
+{% language name="Python 3", type="py" -%}
+virtualenv --python=python3 ENV
+{%- endcodetabs %}
+
 
 This will create a directory named `ENV` and set up all of the scripts and dependencies required to run an isolated Python2 virtual environment, located in `ENV`.
 
@@ -44,11 +48,13 @@ In order to work correctly, virtualenv needs to be set up with the correct Pytho
 virtualenv --python=`which python` ENV
 ```
 
-If you use a different Python, such as `python2` or `python2.7`, then substitute that into the `which` command:
+If you use a different Python, such as `python2` or `python3.5`, then substitute that into the `which` command:
 
 ```bash
-virtualenv --python=`which python2.7` ENV
+virtualenv --python=`which python3.5` ENV
 ```
+
+**Note**: it is critical that the Python version in the virtualenv is compatible with the version of Machida. For example, if you're using machida3, you need to setup your virtualenv for Python 3, and if you are using machida, you need to set up the virtualenv for Python 2.
 
 ## Cleaning up a Virtualenv
 
@@ -86,7 +92,7 @@ To exit the virtualenv, use the `deactivate` command.
 
 To run a Wallaroo application with virtualenv, run it within an activated shell:
 
-```bash
+{% codetabs name="Python 2.7", type="py" -%}
 source ENV/bin/activate
 export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
 $HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/build/machida --application-module celsius \
@@ -94,7 +100,15 @@ $HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/build/machi
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker-name \
   --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1 \
   --ponynoblock
-```
+{% language name="Python 3", type="py" -%}
+source ENV/bin/activate
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
+$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida3/build/machida3 --application-module celsius \
+  --in 127.0.0.1:7000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker-name \
+  --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1 \
+  --ponynoblock
+{%- endcodetabs %}
 
 Please be aware that you'll still need to setup a source and sink as well. To learn more you can look at [Giles Sender](/book/wallaroo-tools/giles-sender.md) for more detailed instructions on building and running Giles.
 
