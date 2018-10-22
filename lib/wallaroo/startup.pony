@@ -166,9 +166,13 @@ actor Startup
         _joining_listener = joining_listener
         _disposables.set(joining_listener)
       elseif _is_recovering then
-        (let checkpoint_id, let rollback_id) =
-          LatestCheckpointId.read(auth, _checkpoint_ids_file)
-        _initialize(checkpoint_id)
+        ifdef "resilience" then
+          (let checkpoint_id, let rollback_id) =
+            LatestCheckpointId.read(auth, _checkpoint_ids_file)
+          _initialize(checkpoint_id)
+        else
+          _initialize()
+        end
       else
         _initialize()
       end
@@ -385,11 +389,15 @@ actor Startup
       // the cluster of our control address. If the cluster connection
       // addresses were not yet recovered, we'd only notify the initializer.
       if _is_recovering then
-        match checkpoint_id
-        | let s_id: CheckpointId =>
-          connections.recover_connections(local_topology_initializer, s_id)
+        ifdef "resilience" then
+          match checkpoint_id
+          | let s_id: CheckpointId =>
+            connections.recover_connections(local_topology_initializer, s_id)
+          else
+            Fail()
+          end
         else
-          Fail()
+            connections.recover_connections(local_topology_initializer, None)
         end
       end
 
