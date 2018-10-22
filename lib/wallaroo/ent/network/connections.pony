@@ -542,7 +542,7 @@ actor Connections is Cluster
       spr_blueprints)
 
   be recover_connections(layout_initializer: LayoutInitializer,
-    checkpoint_target: CheckpointId)
+    checkpoint_target: (CheckpointId | None))
   =>
     var addresses: Map[String, Map[String, (String, String)]] val =
       recover val Map[String, Map[String, (String, String)]] end
