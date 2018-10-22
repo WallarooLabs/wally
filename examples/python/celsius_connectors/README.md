@@ -18,10 +18,13 @@ In order to run the application you will need Machida. We provide instructions f
 
 The script expects machida to be in a specific path so you may need to edit `run_sample` to use the correct path for your machida executable. Also be sure to have the correct PYTHONPATH environment variable (it should include the wallaroo package which is part of machida).
 
-One that is done, you can run the application within this directory using:
+Once that is done, you can run the application within this directory using:
 
 ```bash
 ./run_sample
 ```
 
 See the documentation on [using connectors](https://docs.wallaroolabs.com/book/python/using-connectors.html) for more information on how this example works.
+
+### Python3
+This example is currently not compatible with Python3. Python3 support for the experimental connectors feature is expected to arrive in the next release.

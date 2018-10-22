@@ -8,7 +8,7 @@ The simplest way to do some debugging would be to include a `print` statement in
 
 ```python
 def compute(self, data):
-    print "compute", data
+    print("compute", data)
     return data[::-1]
 ```
 
@@ -22,7 +22,7 @@ Using `print` in Python is not without risks. If you try to print a Unicode stri
 
 ```python
 >>> u = u'\ua000abcd\u07b4'
->>> print u
+>>> print(u)
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
 UnicodeEncodeError: 'ascii' codec can't encode character u'\ua000' in position 0: ordinal not in range(128)

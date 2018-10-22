@@ -7,7 +7,7 @@ There are a few Wallaroo support applications that you'll be interacting with fo
 - Our Metrics UI allows you to monitor the performance and health of your applications.
 - Data receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
-- Machida, our program for running Wallaroo Python applications.
+- Machida or Machida3, our programs for running Wallaroo Python 2.7 and Python 3.5+ applications, respectively.
 
 You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
 
@@ -74,7 +74,7 @@ First, we will need to set up the `PYTHONPATH` environment variable. Machida nee
 export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius:$PYTHONPATH"
 ```
 
-Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
+Now that we have Machida set up to run the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command (remember to use the `machida3` executable instead of `machida` if you are using Python 3.X):
 
 ```bash
 machida --application-module celsius --in 127.0.0.1:7000 \

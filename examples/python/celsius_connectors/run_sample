@@ -5,15 +5,20 @@ import struct
 import socket
 import SocketServer
 import subprocess
-import sys
 import threading
 import time
+
+
+parser = argparse.ArgumentParser("Celsius Connectors Example")
+parser.add_argument('--command', default='machida')
+pargs, _ = parser.parse_known_args()
+machida = pargs.command
 
 # This is imported to test that wallaroo's python library is reachable.
 try:
     import wallaroo
 except:
-    print("Unable to find wallaroo python library. Has the wallaroo "
+    raise ImportError("Unable to find wallaroo python library. Has the wallaroo "
           "environment been activated? "
           "See https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html")
 
@@ -22,6 +27,7 @@ class UDPHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         data = self.request[0].strip()
         print(data)
+
 
 def send_feed():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -32,15 +38,19 @@ def send_feed():
         value += 1
         time.sleep(1)
 
+
 def recv_conv():
     server = server = SocketServer.UDPServer(('127.0.0.1', 8901), UDPHandler)
     server.serve_forever()
 
+
 def terminate(_signal=None, _frame=None):
     print("terminating source")
-    source.terminate()
+    if source:
+        source.terminate()
     print("terminating sink")
-    sink.terminate()
+    if sink:
+        sink.terminate()
     if wallaroo:
         print("terminating wallaroo")
         wallaroo.terminate()
@@ -51,18 +61,22 @@ def terminate(_signal=None, _frame=None):
             subprocess.call(['stty', 'sane'])
         except:
             pass
+    print("Waiting one second for processes to exit cleanly")
     time.sleep(1)
-    source.poll()
-    if source.returncode is not None:
-        source.kill()
-    sink.poll()
-    if sink.returncode is not None:
-        sink.kill()
+    if source:
+        source.poll()
+        if source.returncode is None:
+            source.kill()
+    if sink:
+        sink.poll()
+        if sink.returncode is None:
+            sink.kill()
     if wallaroo:
         wallaroo.poll()
-        if wallaroo.returncode is not None:
+        if wallaroo.returncode is None:
             wallaroo.kill()
-    sys.exit(-1)
+    exit(-1)
+
 
 source = subprocess.Popen([
     "../../../connectors/udp_source",
@@ -91,7 +105,7 @@ thread.start()
 
 try:
     wallaroo = subprocess.Popen([
-        "machida",
+        machida,
         "--application-module", "celsius",
         "--metrics", "127.0.0.1:5001",
         "--control", "127.0.0.1:6000",
@@ -101,9 +115,10 @@ try:
         "--cluster-initializer",
         "--ponythreads=1", "--ponynoblock"])
 except:
-    print("Unable to run machida. Has the wallaroo environment "
+    print("Unable to run %s. Has the wallaroo environment "
           " been activated? "
-          "See https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html")
+          "See https://docs.wallaroolabs.com/book/getting-started/wallaroo-up.html"
+          % machida)
 
 signal.signal(signal.SIGINT, terminate)
 signal.signal(signal.SIGTERM, terminate)
