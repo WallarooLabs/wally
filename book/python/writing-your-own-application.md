@@ -17,7 +17,7 @@ Let's start with the computation, because that's the purpose of the application:
 ```python
 @wallaroo.computation(name='reverse'):
 def reverse(data):
-    print "compute", data
+    print("compute", data)
     return data[::-1]
 ```
 
@@ -27,14 +27,14 @@ Note that there is a `print` statement in the `compute` method (and in other met
 
 ### Sink Encoder
 
-Next, we are going to define how the output gets constructed for the sink. It is important to remember that Wallaroo sends its output over the network, so data going through the sink needs to be of type `bytes`. In Python2, this is the same as `str`.
+Next, we are going to define how the output gets constructed for the sink. It is important to remember that Wallaroo sends its output over the network, so data going through the sink needs to be of type `bytes`. In Python2, this is the same as `str`, but in Python3, strings are Unicode, and need to be converted to `bytes`. Luckily, we can use `encode()` to get a `bytes` from a string in both versions:
 
 ```python
 @wallaroo.encoder
 def encode(data):
     # data is a string
-    print "encode", data
-    return data + "\n"
+    print("encode", data)
+    return (data + "\n").encode()
 ```
 
 ### SourceDecoder
@@ -44,7 +44,7 @@ Now, we also need to decode the incoming bytes of the source.
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decode(bs):
-    print "decode", bs
+    print("decode", bs)
     return bs.decode("utf-8")
 ```
 
@@ -123,7 +123,7 @@ Wallaroo provides the convenience functions `tcp_parse_input_addrs` and `tcp_par
 
 ### Miscellaneous
 
-Of course, no Python module is complete without its imports. In this case, only two imports are required:
+Of course, no Python module is complete without its imports. In this case, only one import is required:
 
 ```python
 import wallaroo

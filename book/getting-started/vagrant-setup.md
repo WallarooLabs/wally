@@ -77,7 +77,9 @@ vagrant up
 
 ## What's Included in the Wallaroo Vagrant Box
 
-* **Machida**: runs Wallaroo Python applications.
+* **Machida**: runs Wallaroo Python applications for Python 2.7.
+
+* **Machida3**: runs Wallaroo Python applications for Python 3.x.
 
 * **Giles Sender**: supplies data to Wallaroo applications over TCP.
 

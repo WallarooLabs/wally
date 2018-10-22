@@ -30,7 +30,7 @@ And then we define a partitioning function which returns a key from the above li
 ```python
 @wallaroo.partition
 def partition(data):
-    return data.letter[0]
+    return data.letter
 ```
 
 Later when we build the application topology, we will pass both the keys and the function to the builder.

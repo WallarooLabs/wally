@@ -8,8 +8,6 @@ Depending on the type of sources and sinks used in your application, you might n
 
 In this document, we'll discuss most of the command line arguments that can be passed to a Wallaroo binary.  For a complete list, see [Wallaroo Command Line Options](/book/running-wallaroo/wallaroo-command-line-options.md).
 
-Remember to use the `machida3` executable instead of `machida` if you are using Python 3.X.
-
 ## Single Worker Setup
 
 If you are starting up a Wallaroo cluster with only one worker, then that worker must be configured as the "cluster initializer" by passing the `--cluster-initializer` flag. You must also specify a target address for metrics data using the `--metrics` parameter. And you must specify its control and data addresses via the `--control` and `--data` command line parameters (these will be used if more workers are added to the cluster later).
@@ -20,8 +18,12 @@ If you are using the Go or Pony APIs, then you will run a binary called `celsius
 
 Putting this all together, to run the Celsius Converter app, you would run the following command:
 
-{% codetabs name="Python", type="py" -%}
+{% codetabs name="Python 2.7", type="py" -%}
 machida --application-module celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+  --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
+  --cluster-initializer --ponythreads 1
+{% language name="Python 3", type="py" -%}
+machida3 --application-module celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --cluster-initializer --ponythreads 1
 {%- language name="Go", type="go" -%}
@@ -44,7 +46,7 @@ You can optionally set the control and data addresses that a non-initializer wil
 
 Assuming we are running a two worker cluster on a single machine, we would run the following commands:
 
-{% codetabs name="Python", type="py" -%}
+{% codetabs name="Python 2.7", type="py" -%}
 Worker 1
 
 machida --application-module celsius --in 127.0.0.1:6000 \
@@ -55,6 +57,19 @@ machida --application-module celsius --in 127.0.0.1:6000 \
 Worker 2
 
 machida --application-module celsius --in 127.0.0.1:6000 \
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:6500 --name Worker2 --ponythreads 1
+{% language name="Python 3", type="py" -%}
+Worker 1
+
+machida3 --application-module celsius --in 127.0.0.1:6000 \
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
+  --cluster-initializer --ponythreads 1
+
+Worker 2
+
+machida3 --application-module celsius --in 127.0.0.1:6000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --name Worker2 --ponythreads 1
 {%- language name="Go", type="go" -%}
@@ -82,11 +97,23 @@ Resilience files are based on the name you supply the worker so starting differe
 
 Wallaroo comes with a [cluster shutdown tool](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/utils/cluster_shutdown) that can be used to shut down a running cluster. In order to receive a cluster shutdown message, our workers must be listening on an "external channel". We provide an address for this via the `--external` command line argument. For example, to have our cluster initializer create an external channel listening on `127.0.0.1:5050`, we'd start it up with a command like the following:
 
-```bash
+{% codetabs name="Python 2.7", type="py" -%}
+machida --application-module celsius --in 127.0.0.1:6000 \
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
+  --cluster-initializer --ponythreads 1 \
+  --external 127.0.0.1:5050
+{% language name="Python 3", type="py" -%}
+machida3 --application-module celsius --in 127.0.0.1:6000 \
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
+  --cluster-initializer --ponythreads 1 \
+  --external 127.0.0.1:5050
+{%- language name="Go", type="go" -%}
 celsius --in 127.0.0.1:6000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --data 127.0.0.1:6501 --cluster-initializer \
   --external 127.0.0.1:5050
-```
+{%- endcodetabs %}
 
 Once the cluster is running, we can use the cluster shutdown tool to contact any running worker that's listening on an external channel. If we wanted to contact the worker started with the command above, we'd run:
 

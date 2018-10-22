@@ -62,7 +62,7 @@ def decode_feed(data):
 
 @wallaroo.experimental.stream_message_encoder
 def encode_conversion(data):
-    return str(data)
+    return str(data).encode()
 
 
 @wallaroo.experimental.stream_message_decoder

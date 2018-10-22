@@ -161,8 +161,16 @@ sudo make install
 
 ## Install Python Development Libraries
 
+### Python 2.7
+
 ```bash
-sudo apt-get install -y python-dev
+sudo apt-get install -y python python-dev
+```
+
+### Python 3
+
+```bash
+sudo apt-get install -y python3 python3-dev
 ```
 
 ## Download and configure the Metrics UI

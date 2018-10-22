@@ -4,14 +4,16 @@ Wallaroo is designed to support scale-independent development. It can adapt to c
 
 With autoscale enabled, you can add or remove workers from a running cluster. We call these “grow to fit” and “shrink to fit”, respectively (referring to the fact that the cluster grows or shrinks to fit your current resource requirements). To enable autoscale, you must build a Wallaroo binary using the `-D autoscale` command line argument. Autoscale is set by default when running `make` for building Machida or the example Wallaroo applications.
 
-Remember to use the `machida3` executable instead of `machida` if you are using Python 3.X.
-
 ## Grow to Fit
 
 While a Wallaroo cluster is running, new workers can join the cluster.  To add workers to a running cluster, you must know the control channel address of one of the workers in the running cluster.  Let’s assume it’s `127.0.0.1:12500`.  The following command would allow us to add one worker to a running cluster for the `alphabet` example app:
 
-{% codetabs name="Python", type="py" -%}
+{% codetabs name="Python 2.7", type="py" -%}
 machida --application-module alphabet --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 \
+  --ponythreads 1
+{% language name="Python 3", type="py" -%}
+machida3 --application-module alphabet --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 \
   --ponythreads 1
 {%- language name="Go", type="go" -%}
@@ -23,7 +25,7 @@ The `--in` argument specifies the port that the TCP source will listen on, and t
 
 If you want to add more than 1 new worker at a time, you must have all joining workers contact the same running worker and all must specify the same joining worker total as the `worker_count` command line argument.  For example, if 3 workers are joining, then in our case, they could all use `--join 127.0.0.1:12500` and `--worker-count 3`.  Their command lines might be as follows:
 
-{% codetabs name="Python", type="py" -%}
+{% codetabs name="Python 2.7", type="py" -%}
 machida --application-module alphabet --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 --worker-count 3 \
   --ponythreads 1
@@ -33,6 +35,18 @@ machida --application-module alphabet --in 127.0.0.1:7010 \
   --ponythreads 1
 
 machida --application-module alphabet --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w5 --worker-count 3 \
+  --ponythreads 1
+{% language name="Python 3", type="py" -%}
+machida3 --application-module alphabet --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 --worker-count 3 \
+  --ponythreads 1
+
+machida3 --application-module alphabet --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w4 --worker-count 3 \
+  --ponythreads 1
+
+machida3 --application-module alphabet --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w5 --worker-count 3 \
   --ponythreads 1
 {%- language name="Go", type="go" -%}

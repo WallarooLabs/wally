@@ -56,9 +56,9 @@ BLOCK 2:
 Fred needs help.
 ```
 
-In the case of word count, it doesn't matter what order we count the messages. We just want to do it quickly. `to_parallel` is our friend. However, if all words starting with the letter "h" were going to be sent along to the same state computation after splitting **and** the order they arrived was important than `to_parallel` would not be our friend. If the state computation that deals with the letter "h" needs to see "Hello" then "how" and then "help", you have to use `to`. It will maintain ordering by processing the incoming blocks sequentially rather than in parallel.
+In the case of word count, it doesn't matter what order we count the messages. We just want to do it quickly. `to_parallel` is our friend. However, if all words starting with the letter "h" were going to be sent along to the same state computation after splitting **and** the order they arrived was important then `to_parallel` would not be a good choice. If the state computation that deals with the letter "h" needs to see "Hello" then "how" and then "help", you have to use `to`. It will maintain ordering by processing the incoming blocks sequentially rather than in parallel.
 
-In our current case, counting words, we don't care about the order of the words, so `to_parallel` is fine.
+In our current case of counting words, we don't care about the order of the words, so `to_parallel` is fine.
 
 ### Application setup, the return
 
@@ -114,12 +114,12 @@ def split(data):
 
     for line in data.split("\n"):
         clean_line = line.lower().strip(punctuation)
-        for word in clean_line.split(' '):
+        for word in clean_line.split(" "):
             clean_word = word.strip(punctuation)
             words.append(clean_word)
 
     return words
-```  
+```
 
 Did you catch what is going on? Previously, we've seen our stateless computations wrapped by the `computation` decorator. Why do we have both `computation` and `computation_multi`? The answer lies in Python's type system.
 
@@ -165,10 +165,7 @@ class WordTotals(object):
         self.word_totals = {}
 
     def update(self, word):
-        if self.word_totals.has_key(word):
-            self.word_totals[word] = self.word_totals[word] + 1
-        else:
-            self.word_totals[word] = 1
+      self.word_totals[word] = self.word_totals.get(word, 0) + 1
 
     def get_count(self, word):
         return WordCount(word, self.word_totals[word])
@@ -176,12 +173,13 @@ class WordTotals(object):
 
 ### Hello world! I'm a `WordCount`.
 
-By this point, our word has almost made it to the end of the pipeline. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word and its count, and we format it into a single line of text that our receiver can record.
+By this point, our word has almost made it to the end of the pipeline. The only thing left is the sink and encoding. We don't do anything fancy with our encoding. We take the word and its count, and we format it into a single line of text that our receiver can record. As with the previous example, we encode the output for compatibility with both Python 2 and Python 3.
 
 ```python
 @wallaroo.encoder
 def encoder(data):
-    return data.word + " => " + str(data.count) + "\n"
+    return ("%s => %d\n" % (data.letter, data.votes)).encode()
+
 ```
 
 ### Running `word_count.py`

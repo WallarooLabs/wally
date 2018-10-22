@@ -67,8 +67,7 @@ cd examples/python/word_count_with_dynamic_keys
     data_receiver --listen 127.0.0.1:7002 | tee received.txt
     ```
 
-4. Shell 2: Start initializer
-
+4. Shell 2: Start initializer (remember to use `machida3-resilience` if using Python 3)
     ```bash
     machida-resilience --application-module word_count_with_dynamic_keys \
       --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
@@ -80,7 +79,7 @@ cd examples/python/word_count_with_dynamic_keys
       | tee initializer.log
     ```
 
-5. Shell 3: Start worker
+5. Shell 3: Start worker (remember to use `machida3-resilience` if using Python 3)
 
     ```bash
     machida-resilience --application-module word_count_with_dynamic_keys \
@@ -116,7 +115,7 @@ cd examples/python/word_count_with_dynamic_keys
     echo '<<CRASH-and-RECOVER>>' | nc -q1 127.0.0.1 7002
     ```
 
-11. Shell 3: Restart worker1 with the same command we used above, but save its log output to a new file
+11. Shell 3: Restart worker1 with the same command we used above, but save its log output to a new file (remember to use `machida3-resilience` if using Python 3)
 
     ```bash
     machida-resilience --application-module word_count_with_dynamic_keys \
