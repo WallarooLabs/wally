@@ -71,23 +71,25 @@ This map is the `state` object that `AddVotes.compute` above takes.
 An important thing to note here is that `get_votes` returns a _new_ `Votes` instance. This is important, as this is the value that is eventually passed to `Encoder.encode`, and if we passed a reference to a mutable object here, there is no guarantee that `Encoder.encode` will execute before another update to this object.
 
 ### Encoder
-The encoder is going to receive a `Votes` instance and encode into a string with the letter, followed by the vote count as a big-endian 64-bit unsigned integer:
+The encoder is going to receive a `Votes` instance and encode into a string of the form `LETTER => VOTES\n` where `LETTER` is the letter and `VOTES` is the number of votes for said letter. Each incoming message generates one output message.
+As with the previous example, the sink requires a `bytes` object. In Python 2 this can be the string itself, but in Python3 we need to encode it from unicode to `bytes`. Luckily, we can use `encode()` to get a `bytes` from a string in both versions:
 
 ```python
 @wallaroo.encoder
 def encode(data):
     # data is a Votes
-    return struct.pack(">IsQ", 9, data.letter, data.votes)
+    return ("%s => %d\n" % (data.letter, data.votes)).encode()
 ```
 
 ### Decoder
 
-The decoder, like the one in Reverse Word, is going to use a `header_length` of 4 bytes to denote a big-endian 32-bit unsigned integer. Then, for the data, it is expecting a single character followed by a big-endian 32-bit unsigned integer. Here we use the `struct` module to unpack these integers from the bytes string.
+The decoder, like the one in Reverse Word, is going to use a `header_length` of 4 bytes to denote a big-endian 32-bit unsigned integer. Then, for the data, it is expecting a single character followed by a big-endian 32-bit unsigned integer. Here we use the `struct` module to unpack these integers from the bytes string. We also decode the letter to convert it to Unicode:
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decode(bs):
     (letter, vote_count) = struct.unpack(">sI", bs)
+    letter = letter.decode('utf-8')
     return Votes(letter, vote_count)
 ```
 
@@ -125,6 +127,7 @@ That is, while the stateless computation constructor `to` took only a computatio
 ### Miscellaneous
 
 This module needs its imports:
+
 ```python
 import struct
 
