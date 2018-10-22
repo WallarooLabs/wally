@@ -7,7 +7,7 @@ There are a few Wallaroo support applications that you'll be interacting with fo
 - Our Metrics UI allows you to monitor the performance and health of your applications.
 - Data receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
-- Machida, our program for running Wallaroo Python applications.
+- Machida or Machida3, our program for running Wallaroo Python applications, for Python 2.7 and 3.x respectively..
 
 You're going to set up our "Celsius to Fahrenheit" example application. Giles sender will be used to pump data into the application. Data receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
 
