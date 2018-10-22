@@ -134,7 +134,8 @@ actor ApplicationDistributor is Distributor
 
       while frontier.size() > 0 do
         let next_id = frontier.pop()?
-        let node = logical_graph.get_node(next_id)?
+        var node = logical_graph.get_node(next_id)?
+        if processed.contains(node.id) then continue end
         match node.value
         | let rb: RunnerBuilder =>
           let grouper =
@@ -143,8 +144,106 @@ actor ApplicationDistributor is Distributor
             else
               None
             end
-          let s_builder = StepBuilder(_app_name, _app_name, rb,
-            node.id, rb.routing_group(), grouper, rb.is_stateful())
+
+          // Create the StepBuilder for this stage. If the stage is a state
+          // computation, then we can simply create it. If the stage is
+          // a stateless computation, we try to coalesce it onto predecessor
+          // stateless computations if we can.
+          let s_builder =
+            if rb.is_stateful() then
+              StepBuilder(_app_name, _app_name, rb,
+                node.id, rb.routing_group(), grouper, rb.is_stateful())
+            else
+              // We are going to try to coalesce this onto the previous
+              // node, and continue in this way one predecessor node a time,
+              // checking if each is stateless and has only one output.
+              // As long as this is true, we continue building a list of
+              // runner builders until we come to the earliest one we can
+              // coalesce onto. We then use the outputs of the last node
+              // in the sequence and the inputs of the earliest one.
+              // We create a RunnerSequenceBuilder and pass it into the
+              // StepBuilder for this stage.
+
+              // We use this id to route the coalesced computations to the
+              // outputs of the last node in the coalesced sequence.
+              var output_id = node.id
+
+              // We are building up an array of RunnerBuilders that we will
+              // coalesce into a RunnerSequenceBuilder. Each node added after
+              // this one must be unshifted (i.e. added to the front), since
+              // we are traversing the graph backwards.
+              let coalesced_comps = recover iso Array[RunnerBuilder] end
+              coalesced_comps.unshift(rb)
+
+              // We will use the parallelism value of the earliest node in
+              // the sequence as the parallelism value of the stage.
+              var parallelism = rb.parallelism()
+
+              // For each node we try to coalesce onto, we need to check that
+              // it has only one input. For now, we can only coalesce a
+              // linear pipeline of stateless computations.
+              var inputs = Array[DagNode[Stage] val]
+              for n in node.ins() do
+                inputs.push(n)
+              end
+
+              var reached_last_predecessor = false
+              while not reached_last_predecessor do
+                var should_coalesce = false
+                // We only coalesce linear pipelines, so we must make
+                // sure we have only one input.
+                if inputs.size() == 1 then
+                  let i_node = inputs(0)?
+                  match i_node.value
+                  // We only coalesce computations, so we check if the next
+                  // node is a RunnerBuilder.
+                  | let i_rb: RunnerBuilder =>
+                    // We only coalesce stateless computations.
+                    // !@ TODO: There is no longer any reason not to coalesce
+                    // these onto a stateful computation and stop there. But
+                    // if it's stateful, we shouldn't add its inputs to the
+                    // input array.
+                    if not i_rb.is_stateful() then
+                      should_coalesce = true
+                      // We mark this node as done processing since we don't
+                      // want to visit it again in the outer while loop
+                      // working through frontier.
+                      processed.set(node.id)
+                      // We set the input as our current node.
+                      node = i_node
+                      // We put this RunnerBuilder at the front of our
+                      // array of coalesced RunnerBuilders.
+                      coalesced_comps.unshift(i_rb)
+                      // This value will end up being the parallelism of the
+                      // first node in the coalesced sequence.
+                      parallelism = i_rb.parallelism()
+                      // We set inputs to be those of the new current node,
+                      // so we can check them on the next iteration.
+                      inputs.clear()
+                      for i in node.ins() do
+                        inputs.push(i)
+                      end
+                    end
+                  end
+                end
+                if not should_coalesce then
+                  reached_last_predecessor = true
+                end
+              end
+              // We need to reroute all outputs from the last node in the
+              // coalesced sequence to be outputs from the coalesced node.
+              // We do this step by step as we move back through the sequence.
+              let outs = edges(output_id)?
+              edges.remove(output_id)?
+              edges(node.id) = outs
+              output_id = node.id
+
+              let new_rb = RunnerSequenceBuilder(consume coalesced_comps,
+                parallelism)
+              StepBuilder(_app_name, _app_name, new_rb, node.id,
+                rb.routing_group(), grouper, rb.is_stateful())
+            end
+
           interm_graph.add_node(s_builder, node.id)
 
           // If this is part of a step group, assign a special routing id

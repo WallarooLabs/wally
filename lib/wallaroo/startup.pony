@@ -829,8 +829,6 @@ actor Startup
     else
       Fail()
     end
-    //!@
-    @exit[None](U8(0))
 
   be dispose() =>
     @printf[I32]("Shutting down Startup...\n".cstring())
