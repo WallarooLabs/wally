@@ -28,15 +28,6 @@ this = sys.modules[__name__]  # Passed to create_test
 TC = Creator(this)
 
 
-# TODO:
-# - [x] Figure out issue with sender unable to connect
-# - [x] Add test code generator
-# - [ ] add: AddSource operation (and logic to validate)
-# - [x] background crash detector with notifier-short-circuit capability
-#       to eliminate timeout periods when a test fails due to crashed workers
-# - [x] Clean out dev debug logs
-
-
 CMD_PONY = 'multi_partition_detector --depth 1 --gen-source --run-with-resilience'
 CMD_PYTHON = 'machida --application-module multi_partition_detector --depth 1 --gen-source --run-with-resilience'
 CMD_PYTHON3 = 'machida3 --application-module multi_partition_detector --depth 1 --gen-source --run-with-resilience'
