@@ -377,7 +377,8 @@ actor Connections is Cluster
 
   fun _update_boundaries(layout_initializer: LayoutInitializer,
     checkpoint_target: (CheckpointId | None) = None,
-    router_registry: (RouterRegistry | None) = None)
+    router_registry: (RouterRegistry | None) = None,
+    recovering_without_resilience: Bool = false)
   =>
     let out_bs_trn = recover trn Map[String, OutgoingBoundary] end
 
@@ -408,8 +409,9 @@ actor Connections is Cluster
     // boundaries should trigger initialization, but this is the point
     // at which initialization is possible for a joining or recovering
     // worker in a multiworker cluster.
-    if _is_joining then
-      layout_initializer.initialize()
+    if _is_joining or recovering_without_resilience then
+      layout_initializer.initialize(where recovering_without_resilience =
+        recovering_without_resilience)
     else
       match checkpoint_target
       | let s_id: CheckpointId => layout_initializer.initialize(
@@ -542,7 +544,8 @@ actor Connections is Cluster
       spr_blueprints)
 
   be recover_connections(layout_initializer: LayoutInitializer,
-    checkpoint_target: (CheckpointId | None))
+    checkpoint_target: (CheckpointId | None),
+    recovering_without_resilience: Bool = false)
   =>
     var addresses: Map[String, Map[String, (String, String)]] val =
       recover val Map[String, Map[String, (String, String)]] end
@@ -585,7 +588,8 @@ actor Connections is Cluster
       end
 
       _update_boundaries(layout_initializer
-        where checkpoint_target = checkpoint_target)
+        where checkpoint_target = checkpoint_target,
+        recovering_without_resilience = recovering_without_resilience)
 
       @printf[I32]((_worker_name +
         ": Interconnections with other workers created.\n").cstring())

@@ -689,7 +689,6 @@ actor LocalTopologyInitializer is LayoutInitializer
     _router_registry.rollback_keys(local_keys, promise)
 
   be recover_and_initialize(ws: Array[WorkerName] val,
-    target_checkpoint_id: CheckpointId,
     cluster_initializer: (ClusterInitializer | None) = None)
   =>
     _recovering = true
@@ -813,7 +812,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
-    checkpoint_target: (CheckpointId | None) = None)
+    checkpoint_target: (CheckpointId | None) = None,
+    recovering_without_resilience: Bool = false)
   =>
     _recovering =
       match checkpoint_target
@@ -1777,6 +1777,10 @@ actor LocalTopologyInitializer is LayoutInitializer
           @printf[I32](("Phases I-II skipped (this topology must only have " +
             "sources.)\n").cstring())
           _application_ready_to_work()
+        end
+
+        if recovering_without_resilience then
+          _data_receivers.recovery_complete()
         end
       else
         @printf[I32](("Local Topology Initializer: No local topology to " +

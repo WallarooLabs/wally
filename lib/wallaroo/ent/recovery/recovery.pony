@@ -266,7 +266,7 @@ actor Recovery
       @printf[I32]("|~~ - Recovery COMPLETE - ~~|\n".cstring())
     end
     _router_registry.resume_the_world(_worker_name)
-    _data_receivers.recovery_complete(this)
+    _data_receivers.recovery_complete()
     _router_registry.recovery_protocol_complete()
     _recovery_phase = _FinishedRecovering
     match _initializer
@@ -287,7 +287,7 @@ actor Recovery
     then we finish our boundary connections and then abort, ceding the recovery
     protocol to the other worker.
     """
-    _data_receivers.recovery_complete(this)
+    _data_receivers.recovery_complete()
     @printf[I32]("|~~ - Recovery initiated at %s. Ceding control. - ~~|\n"
       .cstring(), worker.cstring())
     match _initializer

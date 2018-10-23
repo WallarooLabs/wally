@@ -79,6 +79,7 @@ actor Startup
   let _disposables: SetIs[DisposableActor] = _disposables.create()
   var _is_joining: Bool = false
   var _is_recovering: Bool = false
+  var _recovering_without_resilience: Bool = false
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -111,6 +112,11 @@ actor Startup
       _startup_options = WallarooConfig.wallaroo_args(_env.args)?
       _set_recovery_file_names(auth)
       _is_recovering = is_recovering(auth)
+      if _is_recovering then
+        ifdef not "resilience" then
+          _recovering_without_resilience = true
+        end
+      end
       _is_joining = (not _is_recovering) and _startup_options.is_joining
 
       if _is_joining then
@@ -177,7 +183,7 @@ actor Startup
         _initialize()
       end
     else
-      StartupHelp()
+      Fail()
     end
 
   be recover_and_initialize(checkpoint_id: CheckpointId) =>
@@ -397,7 +403,8 @@ actor Startup
             Fail()
           end
         else
-            connections.recover_connections(local_topology_initializer, None)
+          connections.recover_connections(local_topology_initializer, None
+            where recovering_without_resilience = true)
         end
       end
 
@@ -418,11 +425,11 @@ actor Startup
           worker_names_filepath)
         if recovered_workers.size() > 1 then
           local_topology_initializer.recover_and_initialize(
-            recovered_workers, checkpoint_id as CheckpointId,
-            _cluster_initializer)
+            recovered_workers, _cluster_initializer)
         else
           local_topology_initializer.initialize(
-            where checkpoint_target = checkpoint_id)
+            where checkpoint_target = checkpoint_id,
+            recovering_without_resilience = _recovering_without_resilience)
         end
       end
 
@@ -435,7 +442,7 @@ actor Startup
         end
       end
     else
-      StartupHelp()
+      Fail()
     end
 
   be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg) =>
