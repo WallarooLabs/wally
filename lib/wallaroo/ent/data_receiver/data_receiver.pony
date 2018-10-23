@@ -176,7 +176,7 @@ actor DataReceiver is Producer
       @printf[I32]("Rcvd pipeline msg at DataReceiver\n".cstring())
     end
     if seq_id > _last_id_seen then
-      ifdef debug then
+      ifdef "resilience" and debug then
         Invariant((seq_id - _last_id_seen) == 1)
       end
       _ack_counter = _ack_counter + 1
@@ -205,7 +205,7 @@ actor DataReceiver is Producer
     seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if seq_id > _last_id_seen then
-      ifdef debug then
+      ifdef "resilience" and debug then
         Invariant((seq_id - _last_id_seen) == 1)
       end
       _last_id_seen = seq_id

@@ -134,7 +134,7 @@ actor DataReceivers
     _recovery_complete()
     recovery.data_receivers_ack()
 
-  be recovery_complete(recovery: Recovery) =>
+  be recovery_complete() =>
     _recovery_complete()
 
   fun ref _recovery_complete() =>

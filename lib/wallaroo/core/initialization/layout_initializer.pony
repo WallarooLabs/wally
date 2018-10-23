@@ -26,7 +26,8 @@ use "wallaroo/ent/checkpoint"
 
 trait tag LayoutInitializer
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
-    checkpoint_target: (CheckpointId | None) = None)
+    checkpoint_target: (CheckpointId | None) = None,
+    recovering_without_resilience: Bool = false)
 
   be report_created(initializable: Initializable)
 
