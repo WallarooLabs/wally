@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="61833d2b2b32eec1f204de61599c2853  -"
+MD5="c1582e71806e9eda4990a058847911de  -"
 
 set -eEuo pipefail
 
@@ -428,7 +428,7 @@ install_required_dependencies() {
 
       # figure out which packages need installing
       if [ "$PYTHON_INSTALL" == "true" ]; then
-        PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-dev"
+        PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-dev python3-dev"
       fi
       if [ "$PONYC_VERSION" != "" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL ponyc=${PONYC_VERSION}"
@@ -460,7 +460,7 @@ install_required_dependencies() {
       # figure out which packages need installing
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL which"
       if [ "$PYTHON_INSTALL" == "true" ]; then
-        PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-devel"
+        PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-devel python3-devel"
       fi
       if [ "$PONYC_VERSION" != "" ]; then
         PKGS_TO_INSTALL="ponyc-${PONYC_VERSION} $PKGS_TO_INSTALL"
@@ -495,7 +495,7 @@ install_required_dependencies() {
       # figure out which packages need installing
       PKGS_TO_INSTALL="$PKGS_TO_INSTALL which"
       if [ "$PYTHON_INSTALL" == "true" ]; then
-        PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-devel"
+        PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-devel python3-devel"
       fi
       if [ "$PONYC_VERSION" != "" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL ponyc-${PONYC_VERSION}"
