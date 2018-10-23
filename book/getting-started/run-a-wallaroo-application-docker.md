@@ -19,26 +19,48 @@ Let's get started!
 
 Since Wallaroo is a distributed application, its components need to run separately, and concurrently, so that they may connect to one another to form the application cluster. For this example, you will need 6 separate terminal shells to start the docker container, run the metrics UI, run a source, run a sink, run the Celsius application, and eventually, to send a cluster shutdown command.
 
-## Shell 1: Start the Wallaroo Docker container
+## Shell 1: Start the Wallaroo Docker container for Machida
 
 {% codetabs name="UNIX Bash", type="bash" -%}
 docker run --rm -it --privileged -p 4000:4000 \
 -v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo \
--v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv:/src/python-virtualenv \
+-v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida:/src/python-virtualenv \
 --name wally \
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 {%- language name="Windows Powershell", type="bash" -%}
 docker run --rm -it --privileged -p 4000:4000 `
 -v c:/wallaroo-docker/wallaroo--{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo `
--v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv:/src/python-virtualenv `
+-v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida:/src/python-virtualenv `
 --name wally `
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 {%- language name="Windows Command Prompt", type="bash" -%}
 docker run --rm -it --privileged -p 4000:4000 ^
 -v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo ^
--v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv:/src/python-virtualenv ^
+-v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida:/src/python-virtualenv ^
 --name wally ^
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
+{%- endcodetabs %}
+
+## Shell 1: Start the Wallaroo Docker container for Machida3
+
+{% codetabs name="UNIX Bash", type="bash" -%}
+docker run --rm -it --privileged -p 4000:4000 \
+-v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo \
+-v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida3:/src/python-virtualenv \
+--name wally \
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }} -p python3
+{%- language name="Windows Powershell", type="bash" -%}
+docker run --rm -it --privileged -p 4000:4000 `
+-v c:/wallaroo-docker/wallaroo--{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo `
+-v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida3:/src/python-virtualenv `
+--name wally `
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }} -p python3
+{%- language name="Windows Command Prompt", type="bash" -%}
+docker run --rm -it --privileged -p 4000:4000 ^
+-v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo ^
+-v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida3:/src/python-virtualenv ^
+--name wally ^
+wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }} -p python3
 {%- endcodetabs %}
 
 ### Breaking down the Docker command
@@ -55,9 +77,11 @@ wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 
 * `-v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo`: Mounts a host directory as a data volume within the container. The first time you run this, an empty directory needs to be used in order for the Docker container to copy the Wallaroo source code to your host. If an empty directory is not used, we are assuming it is prepopulated with the Wallaroo source code from this point forward. This allows you to open and modify the Wallaroo source code with the editor of your choice on your host. The Wallaroo source code will persist on your machine after the container is stopped or deleted. This setting is optional, but without it you would need to use an editor within the container to view or modify the Wallaroo source code.
 
-* `-v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv:/src/python-virtualenv`: Mounts a host directory as a data volume within the container. The first time this is run for the provided directory, this command will setup a persistent Python virtual environment using [virtualenv](https://virtualenv.pypa.io/en/stable/) for the container on your host. Thus, if you need to install any python modules using `pip` or `easy_install` they will persist after the container is stopped or deleted. This setting is optional, but without it, you will not have a persistent `virtualenv` for the container.
+* `-v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida(machida3):/src/python-virtualenv`: Mounts a host directory as a data volume within the container. The first time this is run for the provided directory, this command will setup a persistent Python virtual environment using [virtualenv](https://virtualenv.pypa.io/en/stable/) for the container on your host. Thus, if you need to install any python modules using `pip` or `easy_install` they will persist after the container is stopped or deleted. This setting is optional, but without it, you will not have a persistent `virtualenv` for the container. We ask you to mount to `/tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida` when using `machida` and `/tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/python-virtualenv-machida3` when using `machida3` to avoid having conflicting `virtualenv` environments.
 
 * `--name wally`: The name for the container. This setting is optional but makes it easier to reference the container in later commands.
+
+* `-p python3`: This is a required argument if you will be running `machida3`. This argument allows us to set the python interpreter for the `virtualenv` environment to `python3` instead of the default `python2`. If you plan to run `machida`, this argument is not needed.
 
 ## Starting new shells
 
@@ -65,9 +89,11 @@ For each Shell you're expected to setup, you'd have to run the following to ente
 
 Enter the Wallaroo Docker container:
 
-```bash
+{% codetabs name="Machida", type="bash" -%}
 docker exec -it wally env-setup
-```
+{%- language name="Machida3", type="bash" -%}
+docker exec -it wally env-setup -p python3
+{%- endcodetabs %}
 
 This command will start a new Bash shell within the container, which will run the `env-setup` script to ensure our persistent Python `virtualenv` is set up.
 
