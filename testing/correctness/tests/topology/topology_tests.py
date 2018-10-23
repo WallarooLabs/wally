@@ -157,6 +157,11 @@ APIS = {'python': {'cmd': 'machida --application-module app_gen',
         #'python3': {'cmd': 'machida3 --application-module app_gen',
         #            'validation_cmd': 'python2 app_gen.py'}}
 
+# If resilience is on, add --run-with-resilience to commands
+import os
+if os.environ.get("resilience") == 'on':
+    for a in APIS:
+        APIS[a]['cmd'] += ' --run-with-resilience'
 
 COMPS = ['to', 'to-parallel', 'to-stateful', 'to-state-partition']
 for steps in itertools.combinations_with_replacement(COMPS, 3):
