@@ -10,7 +10,7 @@ Wallaroo uses an embedded Python runtime wrapped with a C API around it that let
 
 Generally, in order to build a Wallaroo Python application, the following steps should be followed:
 
-* Build the machida or machida3 binary (this only needs to be done once)
+* Build the `machida` or `machida3` binary (this only needs to be done once)
 * `import wallaroo` in the Python application's `.py` file
 * Create classes that provide the correct Wallaroo Python interfaces (more on this later)
 * Define an `application_setup` function that uses the `ApplicationBuilder` from the `wallaroo` module to construct the application topology.
