@@ -70,6 +70,7 @@ actor Connections is Cluster
   let _the_journal: SimpleJournal
   let _do_local_file_io: Bool
   let _log_rotation: Bool
+  let _timers: Timers = Timers
 
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
@@ -794,6 +795,8 @@ actor Connections is Cluster
       d.dispose()
     end
 
+    _timers(Timer(_ExitTimerNotify, 5_000_000_000))
+
     @printf[I32]("Connections: Finished shutdown procedure.\n".cstring())
 
   be rotate_log_files(worker_name: String) =>
@@ -840,3 +843,14 @@ actor Connections is Cluster
 
     @printf[I32]("SLF: TODO Connections.update_worker_data_service: anything with _data_conns iteration & update?\n".cstring())
     // TODO ^^^^
+
+
+// Ensures that the cluster shuts down, even if there are straggler actors.
+class _ExitTimerNotify is TimerNotify
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    ifdef debug then
+      @printf[I32]("Warning: Not all actors were disposed so we exited early\n"
+        .cstring())
+    end
+    @exit[None](U8(0))
+    false
