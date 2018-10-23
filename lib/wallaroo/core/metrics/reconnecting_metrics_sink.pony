@@ -501,6 +501,12 @@ actor ReconnectingMetricsSink
       end
     end
 
+  be _write_again() =>
+    """
+    Resume writing.
+    """
+    _pending_writes()
+
   fun ref _pending_writes(): Bool =>
     """
     Send pending data. If any data can't be sent, keep it and mark as not
@@ -512,9 +518,15 @@ actor ReconnectingMetricsSink
       let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
       var num_to_send: USize = 0
       var bytes_to_send: USize = 0
+      var bytes_sent: USize = 0
       while _writeable and not _shutdown_peer
         and (_pending_writev_total > 0)
       do
+        // yield if we sent max bytes
+        if bytes_sent > _max_size then
+          _write_again()
+          return false
+        end
         try
           //determine number of bytes and buffers to send
           if (_pending_writev.size()/2) < writev_batch_size then
@@ -533,6 +545,8 @@ actor ReconnectingMetricsSink
           // Write as much data as possible.
           var len = @pony_os_writev[USize](_event,
             _pending_writev.cpointer(), num_to_send) ?
+
+          bytes_sent = bytes_sent + len
 
           if len < bytes_to_send then
             while len > 0 do
