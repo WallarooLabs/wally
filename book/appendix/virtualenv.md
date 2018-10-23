@@ -54,7 +54,7 @@ If you use a different Python, such as `python2` or `python3.5`, then substitute
 virtualenv --python=`which python3.5` ENV
 ```
 
-**Note**: it is critical that the python version in the virtualenv is compatible with the version of machida. For example, if you're using machida3, you need to setup your virtualenv for Python 3, and if you are using machida, you need to set up the virtualenv for Python 2.
+**Note**: it is critical that the Python version in the virtualenv is compatible with the version of Machida. For example, if you're using machida3, you need to setup your virtualenv for Python 3, and if you are using machida, you need to set up the virtualenv for Python 2.
 
 ## Cleaning up a Virtualenv
 
