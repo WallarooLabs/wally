@@ -34,6 +34,17 @@ interface val SourceConfig
 
 interface val TypedSourceConfig[In: Any val] is SourceConfig
 
+class val SourceConfigWrapper
+  let _name: String
+  let _source_config: SourceConfig
+
+  new val create(n: String, sc: SourceConfig) =>
+    _name = n
+    _source_config = sc
+
+  fun name(): String => _name
+  fun source_config(): SourceConfig => _source_config
+
 trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   StatusReporter)
   be register_downstreams(promise: Promise[Source])

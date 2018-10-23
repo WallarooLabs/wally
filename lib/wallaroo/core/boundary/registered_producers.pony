@@ -58,7 +58,10 @@ class RegisteredProducers
           try
             _producers.remove(producer_id)?
           else
-            Fail()
+            ifdef debug then
+              @printf[I32]("Attempted to remove unknown producer %s\n"
+                .cstring(), producer_id.string().cstring())
+            end
           end
         end
       else

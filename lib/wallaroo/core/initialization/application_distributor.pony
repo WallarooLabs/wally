@@ -106,7 +106,7 @@ actor ApplicationDistributor is Distributor
       let frontier = Array[U128]
       let processed = SetIs[U128]
       let edges = Map[U128, SetIs[U128]]
-      let groupers = Map[U128, (Shuffle | GroupByKey)]
+      let groupers = Map[U128, (Shuffle | GroupByKey | None)]
 
       // Add Wallaroo sinks to intermediate graph
       for sink_node in logical_graph.sinks() do
@@ -145,12 +145,21 @@ actor ApplicationDistributor is Distributor
               None
             end
 
+          // We initially set this to Shuffle. If this is a stateless
+          // computation then we'll use Shuffle. If it's a state computation
+          // and there's no prior key_by, then we use direct routing, set
+          // later by using None.
+          var input_grouper: (GroupByKey | Shuffle | None) = Shuffle
+
           // Create the StepBuilder for this stage. If the stage is a state
           // computation, then we can simply create it. If the stage is
           // a stateless computation, we try to coalesce it onto predecessor
           // stateless computations if we can.
           let s_builder =
             if rb.is_stateful() then
+              // If this stage is preceded by a key_by, this will be
+              // ignored. If not, then this default will be used.
+              input_grouper = None
               StepBuilder(_app_name, _app_name, rb,
                 node.id, rb.routing_group(), grouper, rb.is_stateful())
             else
@@ -265,7 +274,7 @@ actor ApplicationDistributor is Distributor
 
           for i_node in node.ins() do
             // !@ We're parallelizing all computations
-            groupers(i_node.id) = Shuffle
+            groupers(i_node.id) = input_grouper
 
             if not frontier.contains(i_node.id) and
               not processed.contains(i_node.id)
@@ -282,7 +291,7 @@ actor ApplicationDistributor is Distributor
             // Set edge from this input to us if it's a computation or
             // source
             match i_node.value
-            | let input: (RunnerBuilder | SourceConfig) =>
+            | let input: (RunnerBuilder | SourceConfigWrapper) =>
               edges.insert_if_absent(i_node.id, SetIs[U128])?
                 .set(node.id)
             end
@@ -301,18 +310,19 @@ actor ApplicationDistributor is Distributor
               frontier.push(i_node.id)
             end
           end
-        | let sc: SourceConfig =>
+        | let sc_wrapper: SourceConfigWrapper =>
+          let source_name = sc_wrapper.name()
+          let sc = sc_wrapper.source_config()
           let grouper =
             if groupers.contains(node.id) then
               groupers(node.id)?
             else
               None
             end
-          // !@ Using an empty runner sequence builder since I'm not yet
-          // coalescing.
+
           let r_builder = RunnerSequenceBuilder(
             recover Array[RunnerBuilder] end where parallelism' = 0)
-          let source_data = SourceData(node.id, _app_name, r_builder,
+          let source_data = SourceData(node.id, source_name, r_builder,
             sc.source_listener_builder_builder(), grouper)
           interm_graph.add_node(source_data, node.id)
         else

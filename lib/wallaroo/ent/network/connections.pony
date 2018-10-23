@@ -770,7 +770,7 @@ actor Connections is Cluster
       d.dispose()
     end
 
-    _timers(Timer(_ExitTimerNotify, 5_000_000_000))
+    _timers(Timer(_ExitTimerNotify, 2_000_000_000))
 
     @printf[I32]("Connections: Finished shutdown procedure.\n".cstring())
 

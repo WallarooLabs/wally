@@ -52,18 +52,16 @@ primitive Wallaroo
     end
 
 trait BasicPipeline
-  fun name(): String
   fun graph(): this->Dag[Stage]
   fun source_id(): USize
   fun is_finished(): Bool
   fun size(): USize
 
-type Stage is (RunnerBuilder | SinkBuilder | SourceConfig | Shuffle |
+type Stage is (RunnerBuilder | SinkBuilder | SourceConfigWrapper | Shuffle |
   GroupByKey)
 
 class Pipeline[Out: Any val] is BasicPipeline
   let _pipeline_id: USize
-  let _name: String
 
   let _stages: Dag[Stage]
   let _dag_sink_ids: Array[RoutingId]
@@ -76,16 +74,16 @@ class Pipeline[Out: Any val] is BasicPipeline
     source_config: TypedSourceConfig[Out])
   =>
     _pipeline_id = p_id
-    _name = n
     _stages = Dag[Stage]
     _dag_sink_ids = Array[RoutingId]
     _finished = false
     _last_is_shuffle = false
     _last_is_key_by = false
-    let source_id' = _stages.add_node(source_config)
+    let sc_wrapper = SourceConfigWrapper(n, source_config)
+    let source_id' = _stages.add_node(sc_wrapper)
     _dag_sink_ids.push(source_id')
 
-  new create(p_id: USize, n: String,
+  new create(p_id: USize,
     stages: Dag[Stage] = Dag[Stage],
     dag_sink_ids: Array[RoutingId] = Array[RoutingId],
     finished: Bool = false,
@@ -93,7 +91,6 @@ class Pipeline[Out: Any val] is BasicPipeline
     last_is_key_by: Bool = false)
   =>
     _pipeline_id = p_id
-    _name = n
     _stages = stages
     _dag_sink_ids = dag_sink_ids
     _finished = finished
@@ -122,11 +119,11 @@ class Pipeline[Out: Any val] is BasicPipeline
         Unreachable()
       end
       _dag_sink_ids.append(pipeline._dag_sink_ids)
-      return Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids
+      return Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids
         where last_is_shuffle = _last_is_shuffle,
         last_is_key_by = _last_is_key_by)
     end
-    Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids)
+    Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids)
 
   fun ref to[Next: Any val](comp: Computation[Out, Next],
     parallelization: USize = 1): Pipeline[Next]
@@ -143,10 +140,10 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Next](_pipeline_id, _name, _stages, [node_id])
+      Pipeline[Next](_pipeline_id, _stages, [node_id])
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Next](_pipeline_id, _name, _stages, _dag_sink_ids)
+      Pipeline[Next](_pipeline_id, _stages, _dag_sink_ids)
     end
 
   fun ref to_state[Next: Any val, S: State ref](
@@ -164,10 +161,10 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Next](_pipeline_id, _name, _stages, [node_id])
+      Pipeline[Next](_pipeline_id, _stages, [node_id])
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Next](_pipeline_id, _name, _stages, _dag_sink_ids)
+      Pipeline[Next](_pipeline_id, _stages, _dag_sink_ids)
     end
 
     //!@ TODO: What about multiple sinks?
@@ -182,11 +179,11 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Out](_pipeline_id, _name, _stages, [node_id]
+      Pipeline[Out](_pipeline_id, _stages, [node_id]
         where finished = true)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids)
+      Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids)
     end
 
   fun ref key_by(pf: KeyExtractor[Out]): Pipeline[Out] =>
@@ -199,11 +196,11 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Out](_pipeline_id, _name, _stages, [node_id]
+      Pipeline[Out](_pipeline_id, _stages, [node_id]
         where last_is_key_by = true)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Out](_pipeline_id, _name, _stages, _dag_sink_ids)
+      Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids)
     end
 
   fun graph(): this->Dag[Stage] => _stages
@@ -211,8 +208,6 @@ class Pipeline[Out: Any val] is BasicPipeline
   fun source_id(): USize => _pipeline_id
 
   fun size(): USize => _stages.size()
-
-  fun name(): String => _name
 
   fun _try_add_to_finished_pipeline() =>
     FatalUserError("You can't add further stages after a sink!")
