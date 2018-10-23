@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="61833d2b2b32eec1f204de61599c2853  -"
+MD5="e20ca96b867d31ae7eef10827bd69ba5  -"
 
 set -eEuo pipefail
 
@@ -69,6 +69,14 @@ ubuntu-xenial
 ubuntu-artful
 ubuntu-bionic
 debian-jessie
+debian-stretch
+debian-buster
+"
+
+VALID_DISTRO_VERSIONS_PYTHON3="
+ubuntu-xenial
+ubuntu-artful
+ubuntu-bionic
 debian-stretch
 debian-buster
 "
@@ -429,6 +437,9 @@ install_required_dependencies() {
       # figure out which packages need installing
       if [ "$PYTHON_INSTALL" == "true" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL python-dev"
+        if echo "$VALID_DISTRO_VERSIONS_PYTHON3" | grep "^$dist-$dist_version\$" >/dev/null; then
+          PKGS_TO_INSTALL="$PKGS_TO_INSTALL python3-dev"
+        fi
       fi
       if [ "$PONYC_VERSION" != "" ]; then
         PKGS_TO_INSTALL="$PKGS_TO_INSTALL ponyc=${PONYC_VERSION}"
@@ -684,17 +695,20 @@ configure_wallaroo() {
 
     echo "building machida with resilience"
     run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all resilience=on $REDIRECT"
-    echo "building machida3 with resilience"
-    run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida3-all resilience=on $REDIRECT"
     run_cmd "mv machida/build/machida bin/machida-resilience $REDIRECT"
-    run_cmd "mv machida3/build/machida3 bin/machida3-resilience $REDIRECT"
     echo "building machida without resilience"
     run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida-all $REDIRECT"
-    echo "building machida3 without resilience"
-    run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida3-all $REDIRECT"
     run_cmd "cp machida/build/machida bin $REDIRECT"
-    run_cmd "cp machida3/build/machida3 bin $REDIRECT"
     run_cmd "cp -r machida/lib bin/pylib $REDIRECT"
+
+    if echo "$VALID_DISTRO_VERSIONS_PYTHON3" | grep "^$dist-$dist_version\$" >/dev/null; then
+      echo "building machida3 with resilience"
+      run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida3-all resilience=on $REDIRECT"
+      run_cmd "mv machida3/build/machida3 bin/machida3-resilience $REDIRECT"
+      echo "building machida3 without resilience"
+      run_cmd "make ${CUSTOM_WALLAROO_BUILD_ARGS:-} build-machida3-all $REDIRECT"
+      run_cmd "cp machida3/build/machida3 bin $REDIRECT"
+    fi
   fi
 
   # copy binaries to the bin directory
