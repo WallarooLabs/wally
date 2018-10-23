@@ -1,22 +1,109 @@
-#!/bin/sh
+#!/bin/bash
 
+# default python interpreter arguments
+VALID_PYTHON_INTERPRETER_ARGS="
+python2
+python3
+"
+
+# sets default python interpreter to python2
+PYTHON_INTERPRETER="python2"
+
+# sets the wallaroo source directory within the Docker container
 WALLAROO_DIR="/src/wallaroo"
+
+# function to output usage instructions for this script
+usage() {
+  cat 1>&2 <<EOF
+  The environment setup script for Wallaroo in Docker development
+  USAGE:
+    env_setup [FLAGS ][OPTIONS]
+
+  FLAGS:
+    -h        Prints help information
+
+  OPTIONS:
+    -p <python interpreter> Choose the python interpreter to use for the virtualenv (python2/python3)
+EOF
+}
+
+# function to output errors and exit
+error() {
+    echo -e "ERROR: $1" >&2
+    exit 1
+}
+
+# parse command line options
+while getopts 'h:p:' OPTION; do
+  case "$OPTION" in
+    h)
+      usage
+      exit 1
+      ;;
+    p)
+      WALLAROO_PYTHON_ARG="$(echo "$OPTARG" | tr '[:upper:]' '[:lower:]')"
+      ;;
+    ?)
+      usage
+      exit 1
+      ;;
+  esac
+done
+shift "$((OPTIND -1))"
+
+# validate arguments and set variables
+if ! echo "$VALID_PYTHON_INTERPRETER_ARGS" | grep "^$WALLAROO_PYTHON_ARG\$" > /dev/null; then
+  usage
+  echo
+  error "Invalid Python interpreter arg: '$WALLAROO_PYTHON_ARG'"
+else
+  case "$WALLAROO_PYTHON_ARG" in
+    python2)
+      PYTHON_INTERPRETER="python2"
+      ;;
+    python3)
+      PYTHON_INTERPRETER="python3"
+      ;;
+  esac
+fi
+
+# copies wallaroo source code to the source directory if it is empty
 cd $WALLAROO_DIR
 if [ ! "$(ls -A $WALLAROO_DIR)" ]; then
   echo "====== Copying Wallaroo Source Code to Working Directory (/src/wallaroo) ======"
   cp -r /wallaroo-src/* /src/wallaroo
 fi
+
+# create a virtualenv only if the user mounted a directory to /src/python-virtualenv
 if [ -d /src/python-virtualenv ]; then
   cd /src/python-virtualenv
+  # setup virtualenv if bin/activate is not present in the mounted directory
   if [ ! -f bin/activate ]; then
     echo "====== Setting up Persistent Python Virtual Environment ======"
-    virtualenv .
+    if [ "$PYTHON_INTERPRETER" = "python2" ]; then
+      virtualenv .
+    elif [ "$PYTHON_INTERPRETER" = "python3" ]; then
+      virtualenv -p "python3" .
+    fi
     echo "====== Done Setting up Persistent Python Virtual Environment ======"
   fi
   echo "====== Activating Persistent Python Virtual Environment ======"
   echo "====== WARNING: Any software installed via apt-get will not be persistent ======"
   echo "====== WARNING: Please make sure to use pip/easy_install instead ======"
   . bin/activate
+  PYTHON_VERSION=$(python --version 2>&1)
+  case "$PYTHON_INTERPRETER" in
+    python2)
+      PYTHON_INTERPRETER_NUM="Python 2."
+      ;;
+    python3)
+      PYTHON_INTERPRETER_NUM="Python 3."
+      ;;
+      esac
+  # verify the user provided interpreter matches the interpreter in the exisiting virtualenv, error out if it does not
+  if [[ $PYTHON_VERSION != *"${PYTHON_INTERPRETER_NUM}"* ]]; then
+    error "The Python interpreter provided: '$PYTHON_INTERPRETER' does not match the python interpreter in the current virtualenv: '$PYTHON_VERSION'.\nPlease provide the matching interpreter or map a different directory from your local machine to the Docker container."
+  fi
 else
   echo "====== WARNING: Any software installed via apt-get will not be persistent ======"
 fi

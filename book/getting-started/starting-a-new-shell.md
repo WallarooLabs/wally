@@ -8,9 +8,11 @@ For each Shell you're expected to setup, you'd have to run the following to ente
 
 Enter the Wallaroo Docker container:
 
-```bash
+{% codetabs name="Machida", type="bash" -%}
 docker exec -it wally env-setup
-```
+{%- language name="Machida3", type="bash" -%}
+docker exec -it wally env-setup -p python3
+{%- endcodetabs %}
 
 This command will start a new Bash shell within the container, which will run the `env-setup` script to ensure our persistent Python `virtualenv` is set up.
 
