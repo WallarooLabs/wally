@@ -26,6 +26,10 @@ use "wallaroo_labs/mort"
 trait Grouper
   fun ref apply[D: Any val](d: D): Key
 
+primitive OneToOneGroup
+  fun apply(): OneToOneGrouper =>
+    OneToOneGrouper
+
 class OneToOneGrouper is Grouper
   fun ref apply[D: Any val](d: D): Key =>
     "one-to-one-grouping-key"

@@ -49,14 +49,16 @@ class Dag[V: Any val]
         try
           _nodes(from_id)?
         else
-          @printf[I32]("There is no node for from_id\n".cstring())
+          @printf[I32]("There is no node for from_id %s\n".cstring(),
+            from_id.string().cstring())
           error
         end
       let to =
         try
           _nodes(to_id)?
         else
-          @printf[I32]("There is no node for to_id\n".cstring())
+          @printf[I32]("There is no node for to_id %s\n".cstring(),
+            to_id.string().cstring())
           error
         end
 

@@ -41,10 +41,10 @@ MARKET_SPREAD_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-examples-python-market_spread: build-machida
-build-examples-python-market_spread: build-machida3
+# build-examples-python-market_spread: build-machida3
 integration-tests-examples-python-market_spread: build-examples-python-market_spread
 integration-tests-examples-python-market_spread: market_spread_py_test
-integration-tests-examples-python-market_spread: market_spread_py3_test
+# integration-tests-examples-python-market_spread: market_spread_py3_test
 
 market_spread_py_test:
 	cd $(MARKET_SPREAD_PY_PATH) && \
