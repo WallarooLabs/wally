@@ -79,7 +79,7 @@ vagrant up
 
 * **Machida**: runs Wallaroo Python applications for Python 2.7.
 
-* **Machida3**: runs Wallaroo Python applications for Python 3.x.
+* **Machida3**: runs Wallaroo Python applications for Python 3.6+.
 
 * **Giles Sender**: supplies data to Wallaroo applications over TCP.
 

@@ -34,7 +34,7 @@ docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }
 
 * **Machida**: runs Wallaroo Python applications for Python 2.7.
 
-* **Machida3**: runs Wallaroo Python applications for Python 3.x.
+* **Machida3**: runs Wallaroo Python applications for Python 3.6+.
 
 * **Giles Sender**: supplies data to Wallaroo applications over TCP.
 
@@ -48,7 +48,7 @@ docker pull wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }
 
 * **Machida with Resilience**: runs Wallaroo Python 2.7 applications and writes state to disk for recovery. This version of Machida can be used via the `machida-resilience` and `machida3-resilience` binaries. See the [Interworker Serialization and Resilience](/book/python/interworker-serialization-and-resilience.md) documentation for general information and the [Resilience](/book/running-wallaroo/wallaroo-command-line-options.md#resilience) section of our [Command Line Options](/book/running-wallaroo/wallaroo-command-line-options.md) documentation for information on its usage.
 
-* **Machida3 with Resilience**: similar to Machida with Resilience, but for Python 3.x.
+* **Machida3 with Resilience**: similar to Machida with Resilience, but for Python 3.6+.
 
 ## Additional Windows Setup
 
