@@ -72,8 +72,8 @@ install_monitoring_hub_dependencies() {
   curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | NVM_DIR="/home/vagrant/.nvm" PROFILE="vagrant" bash
   NVM_DIR="/home/vagrant/.nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  nvm install node
-  nvm alias default node
+  nvm install 10.9.0
+  nvm alias default 10.9.0
 
   echo "** Monitoring hub dependencies installed"
 }

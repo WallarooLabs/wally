@@ -619,7 +619,7 @@ build-metrics-ui-appimage:
           -v /etc/passwd:/etc/passwd:ro \
           -w $(abs_wallaroo_dir) \
           wallaroolabs/metrics_ui-centos-builder:2018.08.03.1 \
-          sh -c 'export HOME=/tmp && mkdir /tmp/.nvm && curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | NVM_DIR="/tmp/.nvm" bash && export NVM_DIR="/tmp/.nvm" && [ -s "$$NVM_DIR/nvm.sh" ] && . "$$NVM_DIR/nvm.sh" && nvm install node && nvm alias default node && make release-monitoring_hub-apps-metrics_reporter_ui'
+          sh -c 'export HOME=/tmp && mkdir /tmp/.nvm && curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | NVM_DIR="/tmp/.nvm" bash && export NVM_DIR="/tmp/.nvm" && [ -s "$$NVM_DIR/nvm.sh" ] && . "$$NVM_DIR/nvm.sh" && nvm install 10.9.0 && nvm alias default 10.9.0 && make release-monitoring_hub-apps-metrics_reporter_ui'
 
 # put files into AppDir
 	$(QUIET)docker run --rm -i $(docker_user_arg) -v \
