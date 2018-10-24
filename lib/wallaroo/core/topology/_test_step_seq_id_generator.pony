@@ -74,6 +74,7 @@ class iso _TestCurrentDoesNotIncrement is UnitTest
     let gen = StepSeqIdGenerator
 
     h.assert_eq[SeqId](0,gen.current_seq_id())
+    h.assert_eq[SeqId](0,gen.current_seq_id())
 
 
 class iso _TestCurrentWithoutNew is UnitTest
