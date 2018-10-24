@@ -92,9 +92,10 @@ The build process comprises the following files:
 * [`ami-release.sh`](../../.release/ami-release.sh): This script is launched on
   the Vagrant box. It orchestrates the entire build process.
 * [`template.json`](../../.release/ami/template.json): The [Packer template][packer_template] for the AMI
-* [`ami/install_runtime_deps.sh`](../../.release/ami/install_runtime_deps.sh):
+* [`ami/initial_system_setup.sh`](../../.release/ami/install_runtime_deps.sh):
   This script is run on the EC2 instance. It is responsible for installing the
-  runtime dependencies for `machida`.
+  runtime dependencies for `machida`, and setting up an `/etc/rc.local` script to run
+  on system startup.
 * [`regions`](../../.release/ami/regions): A text file listing the AWS regions
   where the public AMI will be available.
 
