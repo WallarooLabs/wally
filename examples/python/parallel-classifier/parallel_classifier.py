@@ -40,16 +40,11 @@ def application_setup(args):
     ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode))
     return ab.build()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
+
 @wallaroo.state_computation(name='Batch single entries, emit batchs')
 def batch_rows(row, row_buffer):
     return (row_buffer.update_with(row), True)
 
->>>>>>> 9ee6eaff... Remove possiblity of duplicating sequence ids when reading latest id
-=======
->>>>>>> 5385dc97... Update doc in example app, remove unused computation
 @wallaroo.computation(name="Classify")
 def classify(x):
     return str(x)+":"+PID
