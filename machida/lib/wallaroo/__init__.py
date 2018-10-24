@@ -308,9 +308,9 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
             def encode(self, data, partition=None, sequence=None):
                 encoded = func(data)
                 if partition:
-                    part = str(partition)
+                    part = str(partition).encode('utf-8')
                 else:
-                    part = ''
+                    part = b''
                 if sequence:
                     seq = int(sequence)
                 else:
