@@ -125,7 +125,8 @@ class SinkConnector(object):
         self._pending = []
 
     def listen(self, host=None, port=None, backlog=0):
-        acceptor = socket.socket()
+        acceptor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        acceptor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         acceptor.bind((host or self._host, int(port or self._port)))
         acceptor.listen(backlog)
         self._acceptor = acceptor
