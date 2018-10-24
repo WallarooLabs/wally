@@ -867,7 +867,6 @@ actor Startup
     for worker_name in file.lines() do ws.push(consume worker_name) end
     @printf[I32]("recover_worker_names: %s\n".cstring(),
       ",".join(ws.values()).cstring())
-
     ws
 
   fun ref _setup_shutdown_handler(c: Connections, r: RecoveryFileCleaner,
