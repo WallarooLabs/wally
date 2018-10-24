@@ -23,9 +23,11 @@ use "net"
 
 use "wallaroo"
 use "wallaroo/core/sink"
+use "wallaroo/core/sink/connector_sink"
 use "wallaroo/core/sink/kafka_sink"
 use "wallaroo/core/sink/tcp_sink"
 use "wallaroo/core/source"
+use "wallaroo/core/source/connector_source"
 use "wallaroo/core/source/kafka_source"
 use "wallaroo/core/source/gen_source"
 use "wallaroo/core/source/tcp_source"
@@ -501,6 +503,46 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
   fun _final() =>
     Machida.dec_ref(_sink_encoder)
 
+
+class PyConnectorEncoder is ConnectorSinkEncoder[PyData val]
+  var _sink_encoder: Pointer[U8] val
+
+  new create(sink_encoder: Pointer[U8] val) =>
+    _sink_encoder = sink_encoder
+
+  fun apply(data: PyData val, wb: Writer): Array[ByteSeq] val =>
+    let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
+    if not Machida.is_py_none(byte_buffer) then
+      let byte_string = @py_bytes_or_unicode_as_char(byte_buffer)
+
+      if not byte_string.is_null() then
+        let arr = recover val
+          // create a temporary Array[U8] wrapper for the C array, then clone it
+          Array[U8].from_cpointer(@py_bytes_or_unicode_as_char(byte_buffer),
+            @PyBytes_Size(byte_buffer)).clone()
+        end
+        Machida.dec_ref(byte_buffer)
+        wb.write(arr)
+      else
+        Machida.print_errors()
+        Fail()
+      end
+    end
+    wb.done()
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_sink_encoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_sink_encoder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _sink_encoder = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_sink_encoder)
+
+
 primitive Machida
   fun print_errors(): Bool =>
     if err_occurred() then
@@ -570,6 +612,10 @@ primitive Machida
       let action_p = @get_application_setup_action(item)
       let action = String.copy_cstring(action_p)
       match action
+      | "source_connector" =>
+        None
+      | "sink_connector" =>
+        None
       | "new_pipeline" =>
         let name = recover val
           Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(item, 1))
@@ -954,6 +1000,22 @@ primitive _SourceConfig
       end
 
       KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
+    | "connector" =>
+      let host = recover val
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 1))
+      end
+
+      let port = recover val
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 2))
+      end
+
+      let decoder = recover val
+        let d = @PyTuple_GetItem(source_config_tuple, 3)
+        Machida.inc_ref(d)
+        PyFramedSourceHandler(d)?
+      end
+
+      ConnectorSourceConfig[(PyData val | None)](decoder, host, port)
     else
       error
     end
@@ -1040,6 +1102,22 @@ primitive _SinkConfig
       end
 
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
+    | "connector" =>
+      let host = recover val
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 1))
+      end
+
+      let port = recover val
+        Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(sink_config_tuple, 2))
+      end
+
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
+      Machida.inc_ref(encoderp)
+      let encoder = recover val
+        PyConnectorEncoder(encoderp)
+      end
+
+      ConnectorSinkConfig[PyData val](encoder, host, port)
     else
       error
     end
