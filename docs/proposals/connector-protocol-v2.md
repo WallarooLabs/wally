@@ -162,11 +162,10 @@ ok(InitialCredits, PointsOfReference) ->
         ?OK,
         u32(InitialCredits),
         % This encodes each point of reference in sequence using the
-        % remaining bytes in the frame. This is list-comprehension syntax.
-        [
+        % remaining bytes in the frame.
+        lists:map(fun ({Stream, Ref}) ->
             [u64(Stream), point_of_reference(Ref)]
-            || {Stream, Ref} <- PointsOfReference
-        ]
+        end, PointsOfReference)
     ]).
 
 -spec error(string()) -> frame().
@@ -255,10 +254,9 @@ ack(Credits, MessageAcks) ->
     framed([
         ?ACK,
         u32(Credits),
-        [
+        lists:map(fun ({StreamId, MessageId}) ->
             [u64(StreamId), u64(MessageId)]
-            || {StreamId, MessageId} <- MessageAcks
-        ]
+        end, MessageAcks)
     ]).
 
 nack(Credits, StreamId, undefined) ->
