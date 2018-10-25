@@ -9,15 +9,15 @@ Terms like connector, worker, and so on are assumed to be familiar to the reader
 
 ## Overview
 
-The scope of the protocol is transmission of one or more streams. Once a connection has established a session by completing the handshake, streams are multiplexed over this connection. Each stream has a transmission order [A0] which is freely interleaved with other parts of the transmission. The following is an overview of the connection lifecycle. Detailed parts will be explored in more detail below.
+The scope of the protocol is transmission of one or more streams. Once a connection has established a session by completing the handshake, streams are multiplexed over this connection. Each stream has a transmission order <sup>A0</sup> which is freely interleaved with other parts of the transmission. The following is an overview of the connection lifecycle. Detailed parts will be explored in more detail below.
 
 Each connection made between a connector and a Wallaroo worker is treated as a full-duplex and asynchronous communication channel. Each protocol message is sent independently in one direction and, other than the handshake, does not await for a response. We'll use 'frame' to refer to protocol messages to avoid confusion with application messages.
 
-Connections start with a handshake that establishes a session. The session encompasses a relatively lightweight amount of state. The connector sends a number of fields in order to establish a session including a version GUID [A1], a secret cookie [A2], the connector program name, and the connector instance name. The latter is what allows the connector to be appropriately routed to your application pipelines.
+Connections start with a handshake that establishes a session. The session encompasses a relatively lightweight amount of state. The connector sends a number of fields in order to establish a session including a version GUID <sup>A1</sup>, a secret cookie <sup>A2</sup>, the connector program name, and the connector instance name. The latter is what allows the connector to be appropriately routed to your application pipelines.
 
-The worker that receives the handshake [A3] will respond with an ok or error. The error will end the connection and the connector will need to reopen a socket to attempt a new connection. On success, the ok message will include any points of reference [A4] that belonged to prior and active sessions to allow correct resumption as well as a credit count to allow stream flow to start [A5].
+The worker that receives the handshake <sup>A3</sup> will respond with an ok or error. The error will end the connection and the connector will need to reopen a socket to attempt a new connection. On success, the ok message will include any points of reference <sup>A4</sup> that belonged to prior and active sessions to allow correct resumption as well as a credit count to allow stream flow to start <sup>A5</sup>.
 
-With a credit count established for this session, we may start pushing frames for our streams. Before we send messages streams are introduced with notification frame types to establish a mapping between the stream's fully qualified name and the id which message frames will use when transmitting messages [A6]. Stream notifications do consume one credit.
+With a credit count established for this session, we may start pushing frames for our streams. Before we send messages streams are introduced with notification frame types to establish a mapping between the stream's fully qualified name and the id which message frames will use when transmitting messages <sup>A6</sup>. Stream notifications do consume one credit.
 
 Once a stream notification as been sent, the open stream can have any number of messages for that stream sent so long as the credit count remains above zero. In order to replenish credits, Wallaroo is expected to send ack frames to the connector. This will include the number of credits to be added to the session's current count as well as a list of stream id * message id pairs that have been properly processed. This allows the connector to do bookkeeping and make progress as long as Wallaroo is keeping up.
 
@@ -25,26 +25,26 @@ The protocol has been given plenty of room to grow and may be optimized over tim
 
 ---
 
-[A0] Transmission order relates to the order of the messages as encoded in the connected medium. This order is not necessarily sorted by event time. Messages may include event time to allow Wallaroo to implement time-based processing windows. This is out of scope of the protocol.
+<sup>A0</sup> Transmission order relates to the order of the messages as encoded in the connected medium. This order is not necessarily sorted by event time. Messages may include event time to allow Wallaroo to implement time-based processing windows. This is out of scope of the protocol.
 
-[A1] Exact matching will be enforced. Incremented version numbers are avoided here as we are currently expecting source-level consistency between both parties. This means the connector runtime should be upgraded along with the worker runtime. This restriction may be lifted later and lead to stable versions of the protocol supported across releases.
+<sup>A1</sup> Exact matching will be enforced. Incremented version numbers are avoided here as we are currently expecting source-level consistency between both parties. This means the connector runtime should be upgraded along with the worker runtime. This restriction may be lifted later and lead to stable versions of the protocol supported across releases.
 
-[A2] Secret is applied loosely here. This is not meant to be the only security measure. Still, it can be an effective mitigation during incidental exposure of a network to hosts that shouldn't have direct access to a working cluster. It also protects against accidental cross-cluster configuration mistakes, which may be common when running many ephemeral clusters.
+<sup>A2</sup> Secret is applied loosely here. This is not meant to be the only security measure. Still, it can be an effective mitigation during incidental exposure of a network to hosts that shouldn't have direct access to a working cluster. It also protects against accidental cross-cluster configuration mistakes, which may be common when running many ephemeral clusters.
 
-[A3] This is currently only the initializer but this restriction will be lifted so we'll assume for now that it is any appropriate worker.
+<sup>A3</sup> This is currently only the initializer but this restriction will be lifted so we'll assume for now that it is any appropriate worker.
 
-[A4] The term point of reference is use in an attempt to avoid too much baggage with any given medium. These could be things like partition offsets in Kafka, file names, counters, dotted logical clocks, timestamps (considering the caveats of course).
+<sup>A4</sup> The term point of reference is use in an attempt to avoid too much baggage with any given medium. These could be things like partition offsets in Kafka, file names, counters, dotted logical clocks, timestamps (considering the caveats of course).
 
-[A5] The initial implementation may be allowed to leave points of reference for stream progress out but it will be required for implementing safe recovery with effectively once or at least once semantics. Credits could be partitioned to a more refined scope like a single logical stream but it quickly becomes impractical under some circumstances where the set of streams a session must deal with becomes dynamic.
+<sup>A5</sup> The initial implementation may be allowed to leave points of reference for stream progress out but it will be required for implementing safe recovery with effectively once or at least once semantics. Credits could be partitioned to a more refined scope like a single logical stream but it quickly becomes impractical under some circumstances where the set of streams a session must deal with becomes dynamic.
 
-[A6] The layer of indirection allows for a much more efficient message frame but also serves as a way to set the state of a stream as "open". As we'll see later, streams may have ends in some cases which will cause them to assume they are closed to new messages.
+<sup>A6</sup> The layer of indirection allows for a much more efficient message frame but also serves as a way to set the state of a stream as "open". As we'll see later, streams may have ends in some cases which will cause them to assume they are closed to new messages.
 
 
 ## Wire Format
 
-Each frame transmitted by either side uses a 32bit little endian [B0] length denoting all bytes that come after the 4 bytes comprising the length [B1]. This makes it much easier to consistently split up data which might be captured and recorded for analysis after the fact and could speed the development of other tools which can do primitive routing and management of frames without requiring a full description of the format of each frame type.
+Each frame transmitted by either side uses a 32bit little endian <sup>B0</sup> length denoting all bytes that come after the 4 bytes comprising the length <sup>B1</sup>. This makes it much easier to consistently split up data which might be captured and recorded for analysis after the fact and could speed the development of other tools which can do primitive routing and management of frames without requiring a full description of the format of each frame type.
 
-This framing mechanism applies to all messages including the handshake. The worker reading the hello frame should be careful to check the version and cookie value placed in fixed locations at the start before continuing the decoding. This allows the protocol to sidestep any unintended behaviors if the framing changes in the future [B0].
+This framing mechanism applies to all messages including the handshake. The worker reading the hello frame should be careful to check the version and cookie value placed in fixed locations at the start before continuing the decoding. This allows the protocol to sidestep any unintended behaviors if the framing changes in the future <sup>B0</sup>.
 
 After the length, each frame is tagged with a message type. This is a single byte since the protocol is simple. Any further data in the frame depends on the type. In some cases, the final field may have variable length data and will implicitly use the remaining length in the frame.
 
@@ -52,7 +52,7 @@ When possible, fixed sized fields are used to encode data.
 
 ### Primitive Type Definitions
 
-This document uses Erlang code to describe the frame format and content. You don't need to be fluent in Erlang to read most of this but it may help to review the (bitstring syntax)[http://erlang.org/doc/programming_examples/bit_syntax.html].
+This document uses Erlang code to describe the frame format and content. You don't need to be fluent in Erlang to read most of this but it may help to review the [bitstring syntax](http://erlang.org/doc/programming_examples/bit_syntax.html).
 
 #### Constants
 
@@ -136,9 +136,9 @@ Aside: The iolist type in Erlang is a sequencing mechanism. The literal byte rep
 
 ---
 
-[B0] Big vs little endian: (Brian) I think we should move most of this to little endian. There is not much advantage to network byte order tradition. This is easy to change so if people have issues with this, we can always go replace it all and replace the version GUID (or perhaps we'll a truncated 128bit part of the current git commit hash).
+<sup>B0</sup> Big vs little endian: (Brian) I think we should move most of this to little endian. There is not much advantage to network byte order tradition. This is easy to change so if people have issues with this, we can always go replace it all and replace the version GUID (or perhaps we'll a truncated 128bit part of the current git commit hash).
 
-[B1] The length needs to have a max size set in Wallaroo. Wallaroo would have issues if someone thought it'd be cleaver to send 4GiB messages. To avoid this, it may be worth using a more conservative size of a few megabytes with a configuration option to change this limit.
+<sup>B1</sup> The length needs to have a max size set in Wallaroo. Wallaroo would have issues if someone thought it'd be cleaver to send 4GiB messages. To avoid this, it may be worth using a more conservative size of a few megabytes with a configuration option to change this limit.
 
 
 ## Handshake
@@ -183,11 +183,11 @@ This section assumes transport discovery and configuration has been handled else
 
 Upon connection, the connector must send a hello frame which establishes the protocol version and includes some descriptive metadata about the script as well as a preconfigured nonce called a cookie. These fields allows the wallaroo worker to determine if it belongs with to the application or cluster and if so, how to route messages.
 
-The cookie is optional and can have it's length set to zero if you haven't configured one somewhere [C0]. This will be default for easy development but it'll be encouraged to be used in a deployed cluster to prevent accidental and unwanted connections from being made, especially in the case where more than one cluster may be run. It is not a strong security mechanism by itself but designing by the rule of defense in depth, this becomes a reasonable mitigation.
+The cookie is optional and can have it's length set to zero if you haven't configured one somewhere <sup>C0</sup>. This will be default for easy development but it'll be encouraged to be used in a deployed cluster to prevent accidental and unwanted connections from being made, especially in the case where more than one cluster may be run. It is not a strong security mechanism by itself but designing by the rule of defense in depth, this becomes a reasonable mitigation.
 
 NOTE: The connector doesn't necessarily enumerate streams at this point. We expect some amount of change to be possible during the runtime of a connector (henceforth session) and as such, we avoid making too many assumptions during handshakes. The handshake is only to establish plausible common ground as we'll see notifications are able to handle resource description.
 
-In response to the hello frame, the worker should send either an ok frame or an error frame. Errors will include a short reason meant for the programmer or operator. Ok frames will include the initial credit count and a list of stream id + reference point pairs [C1]. These can be used by the connector to resume from prior progress in a way that is coherent with Wallaroo's last checkpoint [C2].
+In response to the hello frame, the worker should send either an ok frame or an error frame. Errors will include a short reason meant for the programmer or operator. Ok frames will include the initial credit count and a list of stream id + reference point pairs <sup>C1</sup>. These can be used by the connector to resume from prior progress in a way that is coherent with Wallaroo's last checkpoint <sup>C2</sup>.
 
 NOTE: An example of this initialization data would be resuming from Kafka using a consumer group. In order to ensure all data is processed, the partition progress should be set to Wallaroo's if it is lower than the current offset on any given partition. Optionally, the connector could also jump forward to what Wallaroo has if Kafka offset commits are infrequent or suffer reliability problems of their own.
 
@@ -197,11 +197,11 @@ If no error has occurred and the connection has remained opened, the protocol no
 
 ---
 
-[C0] Both sides are required to set this to an empty value. If the worker does not expect a cookie but the connector gives one, this might signal a configuration error and it'd be better to fail loudly rather than continue silently.
+<sup>C0</sup> Both sides are required to set this to an empty value. If the worker does not expect a cookie but the connector gives one, this might signal a configuration error and it'd be better to fail loudly rather than continue silently.
 
-[C1] These pairs use the stream id as set by the notify frame. This should always be a deterministic mapping and the convention is set by the connector implementation. They are not unique stream id's across the application but instead only apply to that connector instance, so for example, a partition number could be used or a hash of the topic name and partition could be used if multiple topics are being used under the name of a single source.
+<sup>C1</sup> These pairs use the stream id as set by the notify frame. This should always be a deterministic mapping and the convention is set by the connector implementation. They are not unique stream id's across the application but instead only apply to that connector instance, so for example, a partition number could be used or a hash of the topic name and partition could be used if multiple topics are being used under the name of a single source.
 
-[C2] Because this protocol is asynchronous, we must assume that this data is eventually consistent but not always perfectly up to date. These values are meant as hints for the connector. Right now we also don't dot the point of reference with some generational counter. This prevents certain advanced scenarios to be played out. It's out of scope for now the first few revisions of this protocol. Further issues with reprocessing are handled with nack frames discussed in the streaming section.
+<sup>C2</sup> Because this protocol is asynchronous, we must assume that this data is eventually consistent but not always perfectly up to date. These values are meant as hints for the connector. Right now we also don't dot the point of reference with some generational counter. This prevents certain advanced scenarios to be played out. It's out of scope for now the first few revisions of this protocol. Further issues with reprocessing are handled with nack frames discussed in the streaming section.
 
 
 ## Streaming
@@ -291,9 +291,9 @@ The worker should keep note of these mappings for metrics and debugging purposes
 
 Sending a message falls into two categories: boundaries and payloads.
 
-Boundary messages are treated as markers and carry no message payload. Boundary messages still require a message id which may be used as a point of reference for resuming or rewinding a stream if the UNSTABLE_REFERENCE flag is set to 0. Boundaries may also denote the end of the stream if there is no message to apply that notation to [D0].
+Boundary messages are treated as markers and carry no message payload. Boundary messages still require a message id which may be used as a point of reference for resuming or rewinding a stream if the UNSTABLE_REFERENCE flag is set to 0. Boundaries may also denote the end of the stream if there is no message to apply that notation to <sup>D0</sup>.
 
-Payloads are what you might expect and are transmitted using the remaining bytes in the frame. Encoding is specific to the connector definition given in the application, so these bytes are effectively opaque. An optional event time can be applied to events, though the worker may not make use of this at the moment [D1].
+Payloads are what you might expect and are transmitted using the remaining bytes in the frame. Encoding is specific to the connector definition given in the application, so these bytes are effectively opaque. An optional event time can be applied to events, though the worker may not make use of this at the moment <sup>D1</sup>.
 
 Message ids are currently 64 bits in this version of the protocol. To allow variable sized id representations in the future, we may add a message flag for this variant but chose not to for the first iteration. Wallaroo does not make any assumptions around monotonicity of message ids currently. There may be cases where this becomes an advantage to leverage when available but it is currently left out of scope for later consideration.
 
@@ -321,29 +321,29 @@ This is a newer feature and it aligns nicely with GenSource. Generators and batc
 
 ### Acks and Nacks
 
-The worker should acknowledge frames of all types. These do not need to be 1-1 acknowledgments but it may be convenient to write it as such initially since all frames take one credit and each session needs to have these continuously replenished to avoid stuttered flow [D2]. Ack frames serve this purpose, almost like a regular heartbeat. Technically an ack could be sent with zero credits but we don't currently see this as a very useful feature [D3].
+The worker should acknowledge frames of all types. These do not need to be 1-1 acknowledgments but it may be convenient to write it as such initially since all frames take one credit and each session needs to have these continuously replenished to avoid stuttered flow <sup>D2</sup>. Ack frames serve this purpose, almost like a regular heartbeat. Technically an ack could be sent with zero credits but we don't currently see this as a very useful feature <sup>D3</sup>.
 
-Acks also provide a list of message ids for each stream which have completed some safe level of processing in Wallaroo [D4].
+Acks also provide a list of message ids for each stream which have completed some safe level of processing in Wallaroo <sup>D4</sup>.
 
 NOTE: All messages ids must be sent back as ack'ed but it may be enough to leverage transmission ordering and ack only the last transmitted in the set for each stream. This may be a future optimization to consider.
 
 Nacks are slightly different from an ack. They provide credits to allow new frames to be transmitted but not represent forward progress. This happens when Wallaroo needs to reset a given stream's state to a specific point of reference after the session has already been started. The stream is put into a nack'ed state in the worker which effectively causes all message frames to be ignored for that stream until a new notify message is sent for that stream to reset it to an open state with a specific point of reference to continue from.
 
-If the connector is unable to resume from the given point of reference then it should not notify but instead send an error and exit the session [D5].
+If the connector is unable to resume from the given point of reference then it should not notify but instead send an error and exit the session <sup>D5</sup>.
 
 ---
 
-[D0] These cases can happen for empty streams. It may also be a matter of convenience and effort for certain mediums where the end of a stream may only be discovered after the last message has been sent.
+<sup>D0</sup> These cases can happen for empty streams. It may also be a matter of convenience and effort for certain mediums where the end of a stream may only be discovered after the last message has been sent.
 
-[D1] It could be argued that event time might make sense on boundaries as well for providing relative time in at a coarse granularity but it seems wise to leave this out for now. If that is required for the application, it makes sense to encode the time as the message id for these cases as these are also opaque fields.
+<sup>D1</sup> It could be argued that event time might make sense on boundaries as well for providing relative time in at a coarse granularity but it seems wise to leave this out for now. If that is required for the application, it makes sense to encode the time as the message id for these cases as these are also opaque fields.
 
-[D2] Some amount of stuttering is okay. This can improve throughput at the cost of some latency so it's worth tuning the pipeline depth but trying different credit counts. Smarter connectors may also be able to spend their credits more intelligently on frames that are more important.
+<sup>D2</sup> Some amount of stuttering is okay. This can improve throughput at the cost of some latency so it's worth tuning the pipeline depth but trying different credit counts. Smarter connectors may also be able to spend their credits more intelligently on frames that are more important.
 
-[D3] An idle link carries some risks but we currently expect local networking so we'll not worry about this for now. The main issue with relying on timeliness is that the current Pony mute/unmute system can create a bit of a problem when paired with head of line blocking issues. Alternative solutions exist to allow multiplexing to get around this problem but the complexity is not worth the benefit at the moment.
+<sup>D3</sup> An idle link carries some risks but we currently expect local networking so we'll not worry about this for now. The main issue with relying on timeliness is that the current Pony mute/unmute system can create a bit of a problem when paired with head of line blocking issues. Alternative solutions exist to allow multiplexing to get around this problem but the complexity is not worth the benefit at the moment.
 
-[D4] One might assume the pipeline has completed processing messages up to that point of reference across all pipelines that use that source. There are plenty of other ways this could be configured to work, depending on the trade-offs an application requires and which options are enabled in Wallaroo.
+<sup>D4</sup> One might assume the pipeline has completed processing messages up to that point of reference across all pipelines that use that source. There are plenty of other ways this could be configured to work, depending on the trade-offs an application requires and which options are enabled in Wallaroo.
 
-[D5] Wallaroo does not have very sophisticated error handling at the application level for cases like these so we'll assume the connector script has been customized to do the right thing in most cases. An error here should always mean halt. If that is not expected then it should not continue sending from that stream and should not notify to reset the stream until the stream state itself has been repaired in some way.
+<sup>D5</sup> Wallaroo does not have very sophisticated error handling at the application level for cases like these so we'll assume the connector script has been customized to do the right thing in most cases. An error here should always mean halt. If that is not expected then it should not continue sending from that stream and should not notify to reset the stream until the stream state itself has been repaired in some way.
 
 
 ## Protocol State Machine
@@ -447,7 +447,7 @@ TODO: Decide if this protocol should define a few frames that require a debug fl
 
 ## TODO
 
-- use proper markdown for the footnotes
+- ~~use proper markdown for the footnotes~~
 - consider some ASCII notation rather than Erlang
     - I like the Erlang and I did use bit-strings in more clever ways in an earlier version
     - now that it's all on the byte boundary this may not matter as much
