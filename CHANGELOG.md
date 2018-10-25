@@ -6,12 +6,11 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
-
 ### Added
 
+- Added Python3 support for Wallaroo in our Docker image and in installations via Vagrant, Wallaroo Up (on Ubuntu (Xenial, Artful, and Bionic) and Debian (Stretch and Buster)), as well as for installation from source on systems with Python 3.5 or higher (python3-dev is also required).
 
 ### Changed
-
 
 ## [0.5.3] - 2018-09-28
 
