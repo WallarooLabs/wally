@@ -148,9 +148,9 @@ actor RouterRegistry
 
   var _data_receivers_initialized: Bool = false
   var _waiting_to_finish_join: Bool = false
-  var _joining_state_routing_ids: (Map[StateName, RoutingId] val | None)
+  var _joining_state_routing_ids: (Map[StateName, RoutingId] val | None) = None
   var _joining_stateless_partition_routing_ids:
-    (Map[RoutingId, RoutingId] val | None)
+    (Map[RoutingId, RoutingId] val | None) = None
 
   var _event_log: (EventLog | None) = None
 
@@ -169,10 +169,7 @@ actor RouterRegistry
     barrier_initiator: BarrierInitiator,
     checkpoint_initiator: CheckpointInitiator,
     autoscale_initiator: AutoscaleInitiator,
-    contacted_worker: (WorkerName | None) = None,
-    joining_state_routing_ids: (Map[StateName, RoutingId] val | None) = None,
-    joining_stateless_partition_routing_ids:
-      (Map[RoutingId, RoutingId] val | None) = None)
+    contacted_worker: (WorkerName | None) = None)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -187,9 +184,6 @@ actor RouterRegistry
     _id = (digestof this).u128()
     _data_receivers.set_router_registry(this)
     _contacted_worker = contacted_worker
-    _joining_state_routing_ids = joining_state_routing_ids
-    _joining_stateless_partition_routing_ids =
-      joining_stateless_partition_routing_ids
     _data_router =
       DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
         recover Map[StateName, Array[Step] val] end,
@@ -596,49 +590,51 @@ actor RouterRegistry
       source_listener.update_boundary_builders(boundary_builders_to_send)
     end
 
-  be create_partition_routers_from_blueprints(workers: Array[WorkerName] val,
-    state_steps: Map[StateName, Array[Step] val] val,
-    state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
-    partition_blueprints: Map[StateName, StatePartitionRouterBlueprint] val)
-  =>
-    let obs_trn = recover trn Map[WorkerName, OutgoingBoundary] end
-    for (w, ob) in _outgoing_boundaries.pairs() do
-      obs_trn(w) = ob
-    end
-    let obs = consume val obs_trn
-    for (state_name, b) in partition_blueprints.pairs() do
-      try
-        let local_state_steps = state_steps(state_name)?
-        let local_state_step_ids = state_step_ids(state_name)?
-        let next_router = b.build_router(_worker_name, workers,
-          local_state_steps, local_state_step_ids, obs, _auth)
-        _distribute_partition_router(next_router)
-        _partition_routers(state_name) = next_router
+  //!@ remove
+  // be create_partition_routers_from_blueprints(workers: Array[WorkerName] val,
+  //   state_steps: Map[StateName, Array[Step] val] val,
+  //   state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
+  //   partition_blueprints: Map[StateName, StatePartitionRouterBlueprint] val)
+  // =>
+  //   let obs_trn = recover trn Map[WorkerName, OutgoingBoundary] end
+  //   for (w, ob) in _outgoing_boundaries.pairs() do
+  //     obs_trn(w) = ob
+  //   end
+  //   let obs = consume val obs_trn
+  //   for (state_name, b) in partition_blueprints.pairs() do
+  //     try
+  //       let local_state_steps = state_steps(state_name)?
+  //       let local_state_step_ids = state_step_ids(state_name)?
+  //       let next_router = b.build_router(_worker_name, workers,
+  //         local_state_steps, local_state_step_ids, obs, _auth)
+  //       _distribute_partition_router(next_router)
+  //       _partition_routers(state_name) = next_router
 
-        if not _local_keys.contains(state_name) then
-          _local_keys(state_name) = SetIs[Key]
-        end
-      else
-        Fail()
-      end
-    end
+  //       if not _local_keys.contains(state_name) then
+  //         _local_keys(state_name) = SetIs[Key]
+  //       end
+  //     else
+  //       Fail()
+  //     end
+  //   end
 
-  be create_stateless_partition_routers_from_blueprints(
-    partition_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
-  =>
-    let obs_trn = recover trn Map[String, OutgoingBoundary] end
-    for (w, ob) in _outgoing_boundaries.pairs() do
-      obs_trn(w) = ob
-    end
-    let obs = consume val obs_trn
-    for (id, b) in partition_blueprints.pairs() do
-      None
-      //!@ TODO: Uncomment these lines once we've worked out how we create from
-      // blueprints.
-      // let next_router = b.build_router(_worker_name, obs, _auth)
-      // _distribute_stateless_partition_router(next_router)
-      // _stateless_partition_routers(id) = next_router
-    end
+  //!@ remove
+  // be create_stateless_partition_routers_from_blueprints(
+  //   partition_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
+  // =>
+  //   let obs_trn = recover trn Map[String, OutgoingBoundary] end
+  //   for (w, ob) in _outgoing_boundaries.pairs() do
+  //     obs_trn(w) = ob
+  //   end
+  //   let obs = consume val obs_trn
+  //   for (id, b) in partition_blueprints.pairs() do
+  //     None
+  //     //!@ TODO: Uncomment these lines once we've worked out how we create from
+  //     // blueprints.
+  //     // let next_router = b.build_router(_worker_name, obs, _auth)
+  //     // _distribute_stateless_partition_router(next_router)
+  //     // _stateless_partition_routers(id) = next_router
+  //   end
 
   be producers_register_downstream(promise: Promise[None]) =>
     for p in _producers.values() do
@@ -903,15 +899,17 @@ actor RouterRegistry
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     coordinator: WorkerName)
   =>
-    for w in ws.values() do
-      try
-        _update_state_routing_ids(w, new_state_routing_ids(w)?)
-        _update_stateless_partition_routing_ids(w,
-          new_stateless_partition_routing_ids(w)?)
-      else
-        Fail()
-      end
-    end
+    //!@ Do we need this to happen here?
+    // for w in ws.values() do
+    //   try
+    //     _update_state_routing_ids(w, new_state_routing_ids(w)?)
+    //     _add_joining_worker_to_stateless_partition_routers(w,
+    //       new_stateless_partition_routing_ids(w)?)
+    //   else
+    //     Fail()
+    //   end
+    // end
+
     try
       (_autoscale as Autoscale).connect_to_joining_workers(ws, coordinator)
     else
@@ -923,7 +921,7 @@ actor RouterRegistry
     stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     _update_state_routing_ids(worker, state_routing_ids)
-    _update_stateless_partition_routing_ids(worker,
+    _add_joining_worker_to_stateless_partition_routers(worker,
       stateless_partition_routing_ids)
     try
       (_autoscale as Autoscale).joining_worker_initialized(worker,
@@ -947,16 +945,25 @@ actor RouterRegistry
       end
     end
 
-  fun ref _update_stateless_partition_routing_ids(worker: WorkerName,
+  fun ref _add_joining_worker_to_stateless_partition_routers(
+    worker: WorkerName,
     stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     for (p_id, id) in stateless_partition_routing_ids.pairs() do
       try
+        @printf[I32]("!@ --> look up routing id\n".cstring())
         let new_stateless_partition_routing_id =
           stateless_partition_routing_ids(p_id)?
+
+        @printf[I32]("!@ --> look up boundary\n".cstring())
+        let proxy_router = ProxyRouter(_worker_name,
+          _outgoing_boundaries(worker)?,
+          ProxyAddress(worker, new_stateless_partition_routing_id), _auth)
+
+        @printf[I32]("!@ --> look up partition router\n".cstring())
         let new_router = _stateless_partition_routers(p_id)?
-          .add_stateless_partition_routing_id(worker,
-            new_stateless_partition_routing_id)
+          .add_worker(worker, new_stateless_partition_routing_id,
+            proxy_router)
         _stateless_partition_routers(p_id) = new_router
         _distribute_stateless_partition_router(new_router)
       else
@@ -968,21 +975,21 @@ actor RouterRegistry
     local_topology: LocalTopology, checkpoint_id: CheckpointId,
     rollback_id: RollbackId)
   =>
-    let state_blueprints =
-      recover iso Map[StateName, StatePartitionRouterBlueprint] end
-    for (w, r) in _partition_routers.pairs() do
-      state_blueprints(w) = r.blueprint()
-    end
-
-    let stateless_blueprints =
-      recover iso Map[U128, StatelessPartitionRouterBlueprint] end
-    for (id, r) in _stateless_partition_routers.pairs() do
-      stateless_blueprints(id) = r.blueprint()
-    end
+    //!@ remove
+    // let state_blueprints =
+    //   recover iso Map[StateName, StatePartitionRouterBlueprint] end
+    // for (w, r) in _partition_routers.pairs() do
+    //   state_blueprints(w) = r.blueprint()
+    // end
+    //
+    // let stateless_blueprints =
+    //   recover iso Map[U128, StatelessPartitionRouterBlueprint] end
+    // for (id, r) in _stateless_partition_routers.pairs() do
+    //   stateless_blueprints(id) = r.blueprint()
+    // end
 
     _connections.inform_joining_worker(conn, worker, local_topology,
-      checkpoint_id, rollback_id, _initializer_name, consume state_blueprints,
-      consume stateless_blueprints)
+      checkpoint_id, rollback_id, _initializer_name)
 
   be inform_contacted_worker_of_initialization(
     state_routing_ids: Map[StateName, RoutingId] val,
@@ -1005,6 +1012,9 @@ actor RouterRegistry
           state_routing_ids, stateless_partition_routing_ids)
         true
       else
+        _joining_state_routing_ids = state_routing_ids
+        _joining_stateless_partition_routing_ids =
+          stateless_partition_routing_ids
         _waiting_to_finish_join = true
         false
       end
@@ -1534,20 +1544,15 @@ actor RouterRegistry
   // Key moved onto this worker
   /////////////////////////////////////////////////////////////////////////////
 
-  //!@ What should happen here?
-  // be receive_immigrant_key(subpartition: StateSubpartitions,
-  //   runner_builder: RunnerBuilder, reporter: MetricsReporter iso,
-  //   recovery_replayer: RecoveryReconnecter, msg: KeyMigrationMsg)
-  // =>
-  //   try
-  //     _register_key(msg.state_name(), msg.key(), msg.checkpoint_id())
-
-  //     _partition_routers(msg.state_name())?
-  //       .receive_key_state(msg.key(), msg.state())
-  //     _connections.notify_cluster_of_new_key(msg.key(), msg.state_name())
-  //   else
-  //     Fail()
-  //   end
+  be receive_immigrant_key(msg: KeyMigrationMsg) =>
+    try
+      _register_key(msg.state_name(), msg.key(), msg.checkpoint_id())
+      _partition_routers(msg.state_name())?
+        .receive_key_state(msg.key(), msg.state())
+      _connections.notify_cluster_of_new_key(msg.key(), msg.state_name())
+    else
+      Fail()
+    end
 
   /////////////////////////////////////////////////////////////////////////////
   // EXTERNAL QUERIES

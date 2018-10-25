@@ -242,7 +242,7 @@ actor ApplicationDistributor is Distributor
       //!@
       @printf[I32]("Initializer Graph:\n%s\n".cstring(), initializer_graph.string().cstring())
 
-      let worker_graph = interm_graph.without_sources()?.clone()?
+      let worker_graph = interm_graph.clone()?
 
       let other_local_topologies =
         recover iso Map[WorkerName, LocalTopology] end

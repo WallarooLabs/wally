@@ -522,26 +522,28 @@ actor Connections is Cluster
       Fail()
     end
 
-  be quick_initialize_data_connections(li: LayoutInitializer) =>
-    for boundary in _data_conns.values() do
-      boundary.quick_initialize(li)
-    end
+  //!@ remove?
+  // be quick_initialize_data_connections(li: LayoutInitializer) =>
+  //   for boundary in _data_conns.values() do
+  //     boundary.quick_initialize(li)
+  //   end
 
-  be create_routers_from_blueprints(workers: Array[WorkerName] val,
-    pr_blueprints: Map[StateName, StatePartitionRouterBlueprint] val,
-    spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    local_sinks: Map[RoutingId, Consumer] val,
-    state_steps: Map[StateName, Array[Step] val] val,
-    state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
-    router_registry: RouterRegistry, lti: LocalTopologyInitializer)
-  =>
-    // We delegate to router registry through here to ensure that we've
-    // already sent the outgoing boundaries to the router registry when
-    // create_connections was called.
-    router_registry.create_partition_routers_from_blueprints(workers,
-      state_steps, state_step_ids, pr_blueprints)
-    router_registry.create_stateless_partition_routers_from_blueprints(
-      spr_blueprints)
+  //!@ remove
+  // be create_routers_from_blueprints(workers: Array[WorkerName] val,
+  //   pr_blueprints: Map[StateName, StatePartitionRouterBlueprint] val,
+  //   spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
+  //   local_sinks: Map[RoutingId, Consumer] val,
+  //   state_steps: Map[StateName, Array[Step] val] val,
+  //   state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
+  //   router_registry: RouterRegistry, lti: LocalTopologyInitializer)
+  // =>
+  //   // We delegate to router registry through here to ensure that we've
+  //   // already sent the outgoing boundaries to the router registry when
+  //   // create_connections was called.
+  //   router_registry.create_partition_routers_from_blueprints(workers,
+  //     state_steps, state_step_ids, pr_blueprints)
+  //   router_registry.create_stateless_partition_routers_from_blueprints(
+  //     spr_blueprints)
 
   be recover_connections(layout_initializer: LayoutInitializer,
     checkpoint_target: (CheckpointId | None),
@@ -673,10 +675,11 @@ actor Connections is Cluster
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
     local_topology: LocalTopology, checkpoint_id: CheckpointId,
-    rollback_id: RollbackId, primary_checkpoint_worker: String,
-    partition_blueprints: Map[String, StatePartitionRouterBlueprint] val,
-    stateless_partition_blueprints:
-      Map[U128, StatelessPartitionRouterBlueprint] val)
+    rollback_id: RollbackId, primary_checkpoint_worker: String)
+    //!@ remove
+    // partition_blueprints: Map[String, StatePartitionRouterBlueprint] val,
+    // stateless_partition_blueprints:
+    //   Map[U128, StatelessPartitionRouterBlueprint] val)
   =>
     _register_disposable(conn)
     if not _control_addrs.contains(worker) then
@@ -694,11 +697,10 @@ actor Connections is Cluster
 
       try
         let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
-          _app_name, local_topology.for_new_worker(worker),
+          _app_name, local_topology.assign_routing_ids(_routing_id_gen),
           checkpoint_id, rollback_id, _metrics_host, _metrics_service,
-          consume c_addrs, consume d_addrs,
-          local_topology.worker_names, primary_checkpoint_worker,
-          partition_blueprints, stateless_partition_blueprints, _auth)?
+          consume c_addrs, consume d_addrs, local_topology.worker_names,
+          primary_checkpoint_worker, _auth)?
         conn.writev(inform_msg)
         @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
           "necessary information.***\n").cstring(), worker.cstring())

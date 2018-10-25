@@ -104,6 +104,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _router_registry = router_registry
     _id = id
 
+    @printf[I32]("!@ Spinning up Step %s\n".cstring(), _id.string().cstring())
+
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
@@ -424,6 +426,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _routes.contains(c)
 
   be register_producer(id: RoutingId, producer: Producer) =>
+    @printf[I32]("!@ Producer %s registered at Step %s\n".cstring(), id.string().cstring(), _id.string().cstring())
     _inputs(id) = producer
     _upstreams.set(producer)
 

@@ -188,10 +188,10 @@ actor GenSource[V: Any val] is Source
 
     let next = _cur_value
     match next
-    | (let next': V) =>
+    | let next': V =>
       _cur_value = _generator(next')
       (let is_finished, let last_ts) =
-        _runner.run[V](_pipeline_name, pipeline_time_spent, next,
+        _runner.run[V](_pipeline_name, pipeline_time_spent, next',
           "gen-source-key", _source_id, this, _router,
           _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
           _metrics_reporter)

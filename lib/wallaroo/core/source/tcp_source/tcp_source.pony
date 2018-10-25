@@ -220,6 +220,7 @@ actor TCPSource[In: Any val] is Source
       | let pr: StatePartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
+        @printf[I32]("!@ TCPSource update_router StatelessPartitionRouter\n".cstring())
         spr.update_boundaries(_outgoing_boundaries)
       else
         router'

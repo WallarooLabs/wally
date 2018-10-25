@@ -264,9 +264,10 @@ primitive ChannelMsgEncoder
     control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
     worker_names: Array[String] val, primary_checkpoint_worker: String,
-    partition_blueprints: Map[String, StatePartitionRouterBlueprint] val,
-    stateless_partition_blueprints:
-      Map[U128, StatelessPartitionRouterBlueprint] val,
+    //!@ remove
+    // partition_blueprints: Map[String, StatePartitionRouterBlueprint] val,
+    // stateless_partition_blueprints:
+    //   Map[U128, StatelessPartitionRouterBlueprint] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -274,8 +275,7 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
       checkpoint_id, rollback_id, metric_host, metric_service, control_addrs,
-      data_addrs, worker_names, primary_checkpoint_worker,
-      partition_blueprints, stateless_partition_blueprints), auth)?
+      data_addrs, worker_names, primary_checkpoint_worker), auth)?
 
   fun inform_join_error(msg: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -1195,10 +1195,11 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let worker_names: Array[WorkerName] val
   // The worker currently in control of checkpoints
   let primary_checkpoint_worker: WorkerName
-  let partition_router_blueprints:
-    Map[StateName, StatePartitionRouterBlueprint] val
-  let stateless_partition_router_blueprints:
-    Map[U128, StatelessPartitionRouterBlueprint] val
+  //!@ remove
+  // let partition_router_blueprints:
+  //   Map[StateName, StatePartitionRouterBlueprint] val
+  // let stateless_partition_router_blueprints:
+  //   Map[U128, StatelessPartitionRouterBlueprint] val
 
   new val create(sender: WorkerName, app: String, l_topology: LocalTopology,
     checkpoint_id': CheckpointId, rollback_id': RollbackId,
@@ -1206,9 +1207,10 @@ class val InformJoiningWorkerMsg is ChannelMsg
     c_addrs: Map[WorkerName, (String, String)] val,
     d_addrs: Map[WorkerName, (String, String)] val,
     w_names: Array[String] val,
-    p_checkpoint_worker: WorkerName,
-    p_blueprints: Map[StateName, StatePartitionRouterBlueprint] val,
-    stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
+    p_checkpoint_worker: WorkerName)
+    //!@ remove
+    // p_blueprints: Map[StateName, StatePartitionRouterBlueprint] val,
+    // stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val)
   =>
     sender_name = sender
     local_topology = l_topology
@@ -1221,8 +1223,9 @@ class val InformJoiningWorkerMsg is ChannelMsg
     data_addrs = d_addrs
     worker_names = w_names
     primary_checkpoint_worker = p_checkpoint_worker
-    partition_router_blueprints = p_blueprints
-    stateless_partition_router_blueprints = stateless_p_blueprints
+    //!@ remove
+    // partition_router_blueprints = p_blueprints
+    // stateless_partition_router_blueprints = stateless_p_blueprints
 
 class val InformJoinErrorMsg is ChannelMsg
   let message: String
