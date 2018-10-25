@@ -49,6 +49,6 @@ integration-tests-testing-correctness-tests-autoscale: autoscale_tests
 
 autoscale_tests:
 	cd $(AUTOSCALE_PATH) && \
-	python2 -m pytest -c $(integration_path)/pytest.ini autoscale_tests.py $(pytest_exp)
+	python3 -m pytest -c $(integration_path)/pytest.ini autoscale_tests.py $(pytest_exp)
 
 endif

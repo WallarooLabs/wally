@@ -29,5 +29,5 @@ class Creator(object):
             _test_resilience(cmd, ops=ops, cycles=cycles, initial=initial,
                              validate_output=validate_output, sources=sources,
                              api=api)
-        f.func_name = test_name
+        f.__name__ = test_name
         setattr(self.module, test_name, f)

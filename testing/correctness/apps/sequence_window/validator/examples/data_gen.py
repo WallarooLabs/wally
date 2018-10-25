@@ -62,7 +62,7 @@ r1 = Ring()
 timestamp = 0
 file_name = 'pass.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,1001):
+    for x in range(1,1001):
         inc_and_write(x,f)
 
 
@@ -72,7 +72,7 @@ r1 = Ring()
 timestamp = 0
 file_name = 'fail_expect_max.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,1003):
+    for x in range(1,1003):
         inc_and_write(x,f)
 
 
@@ -82,9 +82,9 @@ r1 = Ring()
 timestamp = 0
 file_name = 'fail_increments.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,101):
+    for x in range(1,101):
         inc_and_write(x,f)
-    for x in xrange(81, 1001):
+    for x in range(81, 1001):
         inc_and_write(x,f)
 
 
@@ -94,11 +94,11 @@ r1 = Ring()
 timestamp = 0
 file_name = 'fail_sequentiality.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,101):
+    for x in range(1,101):
         inc_and_write(x,f)
-    for x in xrange(101,111):
+    for x in range(101,111):
         inc(x)
-    for x in xrange(111, 1001):
+    for x in range(111, 1001):
         inc_and_write(x,f)
 
 
@@ -108,13 +108,13 @@ r1 = Ring()
 timestamp = 0
 file_name = 'fail_size.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,101):
+    for x in range(1,101):
         inc_and_write(x,f)
     r0.r.insert(0, 92)
-    for x in xrange(101,111):
+    for x in range(101,111):
         inc_and_write(x,f)
     r0.r.pop(0)
-    for x in xrange(111,1001):
+    for x in range(111,1001):
         inc_and_write(x,f)
 
 
@@ -124,10 +124,10 @@ r1 = Ring()
 timestamp = 0
 file_name = 'fail_no_nonlead_zeroes.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,101):
+    for x in range(1,101):
         inc_and_write(x,f)
     r0.push(0)
-    for x in xrange(101,1001):
+    for x in range(101,1001):
         inc_and_write(x,f)
 
 
@@ -137,10 +137,10 @@ r1 = Ring()
 timestamp = 0
 file_name = 'fail_parity.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,101):
+    for x in range(1,101):
         inc_and_write(x,f)
     r0.push(101)  # push 101 to the even partition
-    for x in xrange(102,1001):
+    for x in range(102,1001):
         inc_and_write(x,f)
 
 
@@ -150,7 +150,7 @@ r1 = Ring()
 timestamp = 0
 file_name = 'fail_expected_difference.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,999):
+    for x in range(1,999):
         inc_and_write(x,f)
     inc_and_write(1000, f)
 
@@ -161,7 +161,7 @@ r1 = Ring()
 timestamp = 0
 file_name = 'pass_with_atleastonce.txt'
 with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
-    for x in xrange(1,501):
+    for x in range(1,501):
         inc_and_write(x,f)
     r0.r = [394,396,398,400]
     r1.r = [393,395,397,399]

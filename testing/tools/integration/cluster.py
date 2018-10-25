@@ -64,7 +64,7 @@ from .validations import (validate_migration,
 # Make string instance checking py2 and py3 compatible below
 try:
     basestring
-except:
+except NameError:
     basestring = str
 
 
@@ -119,9 +119,11 @@ class Runner(threading.Thread):
                                   command.splitlines())
         self.cmd_args = shlex.split(self.command)
         self.error = None
-        self.file = tempfile.NamedTemporaryFile()
+        self._file = tempfile.NamedTemporaryFile()
         self.p = None
         self.pid = None
+        self._returncode = None
+        self._output = None
         self.name = name
         self.control = control
         self.data = data
@@ -136,10 +138,14 @@ class Runner(threading.Thread):
             # TODO: Figure out why this hangs sometimes!
             # Possible clue: https://github.com/dropbox/pyannotate/issues/67
             self.p = subprocess.Popen(args=self.cmd_args,
-                                      stdout=self.file,
+                                      stdout=self._file,
                                       stderr=subprocess.STDOUT)
             self.pid = self.p.pid
             self.p.wait()
+            self._returncode = self.p.returncode
+            self._output = self.get_output()
+            self.p = None
+            self._file = None
         except Exception as err:
             self.error = err
             logging.warn("{}: Stopped running!".format(self.name))
@@ -147,25 +153,30 @@ class Runner(threading.Thread):
 
     def send_signal(self, signal):
         logging.log(1, "send_signal(signal={})".format(signal))
-        self.p.send_signal(signal)
+        if self.p:
+            self.p.send_signal(signal)
 
     def stop(self):
         logging.log(1, "stop()")
         try:
-            self.p.terminate()
+            if self.p:
+                self.p.terminate()
         except:
             pass
 
     def kill(self):
         logging.log(1, "kill()")
         try:
-            self.p.kill()
+            if self.p:
+                self.p.kill()
         except:
             pass
 
     def is_alive(self):
         logging.log(1, "is_alive()")
-        if self.p is None:
+        if self._returncode is not None:
+            return False
+        elif self.p is None:
             raise RunnerHasntStartedError("Runner {} failed to start"
                 .format(self.name))
         status = self.p.poll()
@@ -176,22 +187,28 @@ class Runner(threading.Thread):
 
     def poll(self):
         logging.log(1, "poll()")
-        if self.p is None:
+        if self._returncode is not None:
+            return self._returncode
+        elif self.p is None:
             raise RunnerHasntStartedError("Runner {} failed to start"
                 .format(self.name))
         return self.p.poll()
 
     def returncode(self):
         logging.log(1, "returncode()")
-        if self.p is None:
+        if self._returncode is not None:
+            return self._returncode
+        elif self.p is None:
             raise RunnerHasntStartedError("Runner {} failed to start"
                 .format(self.name))
         return self.p.returncode
 
     def get_output(self, start_from=0):
         logging.log(1, "get_output(start_from={})".format(start_from))
-        self.file.flush()
-        with open(self.file.name, 'rb') as ro:
+        if self._output:
+            return self._output[start_from:]
+        self._file.flush()
+        with open(self._file.name, 'r') as ro:
             ro.seek(start_from)
             return ro.read()
 
@@ -200,7 +217,7 @@ class Runner(threading.Thread):
         """
         Return the STDOUT file's current position
         """
-        return self.file.tell()
+        return self._file.tell() if self._file else 0
 
     def respawn(self):
         logging.log(1, "respawn()")
@@ -478,7 +495,7 @@ class Cluster(object):
             (self.source_addrs, worker_addrs) = (
                 addresses[:sources],
                 [addresses[sources:][i:i+3]
-                 for i in xrange(0, len(addresses[sources:]), 3)])
+                 for i in range(0, len(addresses[sources:]), 3)])
             start_runners(self.workers, self.command, self.source_addrs,
                           self.sink_addrs,
                           self.metrics_addr, self.res_dir, workers,
@@ -710,7 +727,7 @@ class Cluster(object):
     def get_crashed_workers(self,
             func=lambda r: r.poll() not in (None, 0,-9,-15)):
         logging.log(1, "get_crashed_workers()")
-        return filter(func, self.runners)
+        return list(filter(func, self.runners))
 
     #########
     # Sinks #

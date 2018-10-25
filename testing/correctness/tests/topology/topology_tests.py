@@ -66,7 +66,7 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
             try:
                 # clean up data collection before each attempt
                 persistent_data.clear()
-                log_stream.reset()
+                log_stream.seek(0)
                 log_stream.truncate()
 
                 # start test attempt
@@ -159,8 +159,8 @@ def create_test(api, cmd, validation_cmd, steps, workers=1):
         workers=workers,
         topo='_'.join(steps)))
     def f():
-        run_test(api, cmd, validation_cmd, steps)
-    f.func_name = test_name
+        run_test(api, cmd, validation_cmd, steps, workers)
+    f.__name__ = test_name
     globals()[test_name] = f
 
 # Create tests!

@@ -164,7 +164,7 @@ def get_func_name(f):
     functions created with `functools.partial`.
     """
     if isinstance(f, FunctionType):
-        return f.func_name
+        return f.__name__
     elif isinstance(f, partial):
         return get_func_name(f.func)
     raise ValueError("Can't get func_name of provided function {}".format(f))
@@ -311,7 +311,7 @@ class RunnerReadyChecker(StoppableThread):
         self.error = None
 
     def run(self):
-        with open(self._path, 'rb') as r:
+        with open(self._path, 'r') as r:
             started = time.time()
             while not self.stopped():
                 r.seek(0)
@@ -353,7 +353,7 @@ class RunnerChecker(StoppableThread):
         self.compiled = [re.compile(p) for p in patterns]
 
     def run(self):
-        with open(self._path, 'rb') as r:
+        with open(self._path, 'r') as r:
             last_match = self.start_from
             started = time.time()
             while not self.stopped():

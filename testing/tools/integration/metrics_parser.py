@@ -58,32 +58,32 @@ class MetricsParser(object):
     def parse_join(cls, payload=''):
         buf = BufferedReader(BytesIO(payload))
         topic_size = unpack('>I', buf.read(4))[0]
-        topic = unpack(_s(topic_size), buf.read(topic_size))[0]
+        topic = unpack(_s(topic_size), buf.read(topic_size))[0].decode()
         worker_name_size = unpack('>I', buf.read(4))[0]
         worker_name = unpack(_s(worker_name_size),
-                             buf.read(worker_name_size))[0]
+                             buf.read(worker_name_size))[0].decode()
         return {'type': 'join', 'topic': topic, 'worker_name': worker_name}
 
     def parse_metrics(cls, payload):
         buf = BufferedReader(BytesIO(payload))
         event_size = unpack('>I', buf.read(4))[0]
-        event = unpack(_s(event_size), buf.read(event_size))[0]
+        event = unpack(_s(event_size), buf.read(event_size))[0].decode()
         topic_size = unpack('>I', buf.read(4))[0]
-        topic = unpack(_s(topic_size), buf.read(topic_size))[0]
+        topic = unpack(_s(topic_size), buf.read(topic_size))[0].decode()
         payload_size = unpack('>I', buf.read(4))[0]
         payload_header = unpack('>I', buf.read(4))[0]
         metric_name_size = unpack('>I', buf.read(4))[0]
         metric_name = unpack(_s(metric_name_size),
-                             buf.read(metric_name_size))[0]
+                             buf.read(metric_name_size))[0].decode()
         metric_category_size = unpack('>I', buf.read(4))[0]
         metric_category = unpack(_s(metric_category_size),
-                                 buf.read(metric_category_size))[0]
+                                 buf.read(metric_category_size))[0].decode()
         worker_name_size = unpack('>I', buf.read(4))[0]
         worker_name = unpack(_s(worker_name_size),
-                             buf.read(worker_name_size))[0]
+                             buf.read(worker_name_size))[0].decode()
         pipeline_name_size = unpack('>I', buf.read(4))[0]
         pipeline_name = unpack(_s(pipeline_name_size),
-                               buf.read(pipeline_name_size))[0]
+                               buf.read(pipeline_name_size))[0].decode()
         ID = unpack('>H', buf.read(2))[0]
         latency_histogram = [unpack('>Q', buf.read(8))[0] for x in range(65)]
         max_latency = unpack('>Q', buf.read(8))[0]
@@ -144,7 +144,7 @@ class MetricsData(MetricsParser):
             if header:
                 payload = buf.read(header-1)
             else:
-                payload = ''
+                payload = b''
             self.records.append({'type': MSG_TYPES.get(msg_type, None),
                                  'payload': payload,
                                  'raw_type': msg_type})
