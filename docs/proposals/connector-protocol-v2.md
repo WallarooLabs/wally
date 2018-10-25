@@ -338,6 +338,100 @@ If the connector is unable to resume from the given point of reference then it s
 [D5] Wallaroo does not have very sophisticated error handling at the application level for cases like these so we'll assume the connector script has been customized to do the right thing in most cases. An error here should always mean halt. If that is not expected then it should not continue sending from that stream and should not notify to reset the stream until the stream state itself has been repaired in some way.
 
 
+## Protocol State Machine
+
+Each connection must follow the following state machine definition.
+
+```
+ +-----------+       +-----------+     +-----------+
+ | Connected +------>| Handshake +---->| Streaming |
+ +-----------+       +-----------+     +-----------+
+         |                |                  |
+         |                +--------+         |
+         |                V        |         |
+         |            +--------+   |         |
+         +----------> | Error  | <-----------+
+         |            +--------+   |         |
+         |                |        |         |
+         |                V        V         |
+         |       +-------------------+       |
+         +------>+  Disconnected     |<------+
+                 +-------------------+
+```
+
+In the connected state the following frame types are valid:
+
+    - HELLO: Connector -> Worker (next state = handshake)
+    - ERROR: * -> * (next state = error)
+
+In the handshake state the following frame types are valid:
+
+    - OK: Worker -> Connector (next state = streaming)
+    - ERROR: * -> * (next state = error)
+
+In the streaming state the following frame types are valid:
+
+   - NOFITY: Connector -> Worker
+   - MESSAGE: Connector -> Worker
+   - ACK: Worker -> Connector
+   - NACK: Worker -> Connector
+   - ERROR: * -> * (next state = error)
+
+In the error state no frames are valid. It is recommended that the transport be closed properly, though any local processing may be completed if there are bits of work that are still in progress. Any data received after the error frame should be discarded.
+
+The disconnected state has no communication but it is recommended that the connecting party use backoff during reconnects and/or retry limits.
+
+
+## Stream State Machine
+
+Each stream during a session must be in one of the following states:
+
+```
+                  +----------------------------+
+                  |                            |
+                  |                            V
+ +-------+     +------+     +--------+     +-------+
+ | Intro +---> | Open +---> | Closed +---> | Reset |
+ +-------+     +------+     +--------+     +-------+
+                  ^             |              |
+                  |             |              |
+                  +-------------+--------------+
+```
+
+New streams must be introduced and reset streams must be reintroduced. The connector may not know if a notification is the first reintroduction or not. If it's a reintroduction, the handshake may include information on where to resume from. The state machine will always end up in the open state after a notification.
+
+In the intro state, the following actions are valid:
+
+    - NOTIFY: Connector -> Worker (provide a stream id and a fully qualified name)
+
+If a notify is received in the introduction state, it should assume that it should be processed as in the open state and a reintroduction should follow appropriately.
+
+In the open state, the following actions are valid:
+
+    - MESSAGE: Connector -> Worker (production of stream data)
+        * if the EOS flag is set the next state is closed
+    - ACK: Worker -> Connector
+        * the are not 1-1 with MESSAGE frames
+    - NACK: Worker -> Connector (next state is reset)
+
+In the closed state, the following actions are valid:
+
+    - NOTIFY: Connector -> Worker (next state is open)
+        * reopens the stream
+    - NACK: Worker -> Connector (next state is reset)
+        * worker is requesting that the stream be reprocessed in some way
+    - ACK: Worker -> Connector
+        * these can arrive asynchronously and should be processed accordingly
+
+In the reset state, the following actions are valid:
+
+    - NOTIFY: Connector -> Worker (next state is open)
+    - ACK: Worker -> Connector
+        * these can arrive asynchronously and should be processed accordingly
+
+NACKs may be handled when in invalid states but they MUST be treated as if there was a stack of NACKs. Each NACK will require a NOTIFY. If the connector or worker is unable to satisfy this, and error should be used and the session should be reset by disconnecting and redoing the handshake.
+
+
 ## Debugging
 
 TODO: Decide if this protocol should define a few frames that require a debug flag in order to work. This might be useful when testing, adding the ability to do certain kinds of fault injection like stuttering to simulate timeouts without actually waiting for the wall clock.
