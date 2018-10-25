@@ -36,7 +36,7 @@ trait Route
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
 
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg,
+  fun ref forward(delivery_msg: DeliveryMsg,
     pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)
@@ -107,7 +107,7 @@ class EmptyRoute is Route
     Fail()
     true
 
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg,
+  fun ref forward(delivery_msg: DeliveryMsg,
     pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)

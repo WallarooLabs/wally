@@ -313,19 +313,11 @@ actor OutgoingBoundary is Consumer
     // process_message() should never be called on an OutgoingBoundary
     Fail()
 
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, producer_id: RoutingId, producer: Producer,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, incoming_seq_id: SeqId,
-    route_id: RouteId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    // Should never be called on an OutgoingBoundary
-    Fail()
-
   // TODO: open question: how do we reconnect if our external system goes away?
-  be forward(delivery_msg: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    i_producer_id: RoutingId,
-    i_producer: Producer, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64)
+  be forward(delivery_msg: DeliveryMsg, pipeline_time_spent: U64,
+    i_producer_id: RoutingId, i_producer: Producer, i_seq_id: SeqId,
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     let metric_name = delivery_msg.metric_name()
     // TODO: delete
@@ -424,20 +416,14 @@ actor OutgoingBoundary is Consumer
     // registrations.
     resend_producer_registrations()
 
-    try
-      var cur_id = _lowest_queue_id
-      for msg in _queue.values() do
-        if cur_id >= idx then
-          _writev(ChannelMsgEncoder.replay(msg, _auth)?)
-        end
-        cur_id = cur_id + 1
+    var cur_id = _lowest_queue_id
+    for msg in _queue.values() do
+      if cur_id >= idx then
+        _writev(msg)
       end
-      _unsent.clear()
-      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _step_id,
-        _auth)?)
-    else
-      Fail()
+      cur_id = cur_id + 1
     end
+    _unsent.clear()
 
   be update_router(router: Router) =>
     """

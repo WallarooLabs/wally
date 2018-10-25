@@ -245,9 +245,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             host, m.service)
           _router_registry.reconnect_source_boundaries(m.worker_name)
         end
-      | let m: ReplayBoundaryCountMsg =>
+      | let m: InformOfBoundaryCountMsg =>
         ifdef "trace" then
-          @printf[I32]("Received ReplayBoundaryCountMsg on Control Channel\n"
+          @printf[I32]("Received InformOfBoundaryCountMsg on Control Channel\n"
             .cstring())
         end
         _recovery_replayer.add_expected_boundary_count(m.sender_name,

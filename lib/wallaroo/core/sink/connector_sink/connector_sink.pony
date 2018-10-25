@@ -251,19 +251,6 @@ actor ConnectorSink is Sink
 
     _maybe_mute_or_unmute_upstreams()
 
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
-    i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
-  =>
-    //TODO: deduplication like in the Step <- this is pointless if the Sink
-    //doesn't have state, because on recovery we won't have a list of "seen
-    //messages", which we would normally get from the eventlog.
-    run[D](metric_name, pipeline_time_spent, data, key, i_producer_id,
-      i_producer, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
-      metrics_id, worker_ingress_ts)
-
   be update_router(router: Router) =>
     """
     No-op: ConnectorSink has no router

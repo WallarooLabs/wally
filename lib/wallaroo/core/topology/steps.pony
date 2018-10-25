@@ -48,8 +48,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   let _runner: Runner
   var _router: Router = EmptyRouter
   let _metrics_reporter: MetricsReporter
-  // list of envelopes
-  let _deduplication_list: DeduplicationList = _deduplication_list.create()
   let _event_log: EventLog
   var _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
 
@@ -386,29 +384,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   ///////////
   // RECOVERY
-  fun ref _is_duplicate(msg_uid: MsgId, frac_ids: FractionalMessageId): Bool =>
-    MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
-
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
-    i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
-  =>
-    if not _is_duplicate(msg_uid, frac_ids) then
-      _deduplication_list.push((msg_uid, frac_ids))
-
-      process_message[D](metric_name, pipeline_time_spent, data, key,
-        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
-    else
-      ifdef "trace" then
-        @printf[I32]("Filtering a dupe in replay\n".cstring())
-      end
-
-      _seq_id_generator.new_id()
-    end
-
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
     ifdef debug then
       Invariant(_seq_id_initialized_on_recovery == false)

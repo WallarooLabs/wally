@@ -187,33 +187,6 @@ actor DataReceiver is Producer
       _maybe_ack()
     end
 
-  be replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    if seq_id > _last_id_seen then
-      replay_process_message(r, pipeline_time_spent, seq_id, latest_ts,
-        metrics_id, worker_ingress_ts)
-    end
-
-  fun ref replay_process_message(r: ReplayableDeliveryMsg,
-    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
-  =>
-    _phase.replay_deliver(r, pipeline_time_spent, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
-
-  fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    if seq_id > _last_id_seen then
-      ifdef "resilience" and debug then
-        Invariant((seq_id - _last_id_seen) == 1)
-      end
-      _last_id_seen = seq_id
-      _router.replay_route(r, pipeline_time_spent, _id, this, seq_id,
-        latest_ts, metrics_id, worker_ingress_ts)
-    end
-
   fun ref _maybe_ack() =>
     if (_ack_counter % 512) == 0 then
       _ack_latest()

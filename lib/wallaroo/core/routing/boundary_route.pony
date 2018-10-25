@@ -71,18 +71,11 @@ class BoundaryRoute is Route
     // Run should never be called on a BoundaryRoute
     Fail()
 
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg,
+  fun ref forward(delivery_msg: DeliveryMsg,
     pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)
   =>
-    //!@ TODO: Do we need this?
-    // ifdef debug then
-    //   match _step
-    //   | let source: (TCPSource ref | ConnectorSource ref) =>
-    //     Invariant(not source.is_muted())
-    //   end
-    // end
     ifdef "trace" then
       @printf[I32]("Rcvd msg at BoundaryRoute (%s)\n".cstring(),
         _step_type.cstring())
@@ -102,7 +95,7 @@ class BoundaryRoute is Route
   fun unregister_producer(target_id: RoutingId) =>
     _consumer.forward_unregister_producer(_step_id, target_id, _step)
 
-  fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg,
+  fun ref _send_message_on_route(delivery_msg: DeliveryMsg,
     pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)

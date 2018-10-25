@@ -432,8 +432,6 @@ actor Startup
       end
 
       if _is_recovering then
-        // need to do this before recreating the data connection as at
-        // that point replay starts
         let recovered_workers = _recover_worker_names(
           worker_names_filepath)
         if recovered_workers.size() > 1 then
