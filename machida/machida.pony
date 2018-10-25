@@ -375,15 +375,14 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
     _name = Machida.get_name(_computation)
     _is_multi = Machida.implements_compute_multi(_computation)
 
-  fun apply(input: PyData val,
-    sc_repo: StateChangeRepository[PyState], state: PyState):
-    ((PyData val | Array[PyData val] val | None), (None | DirectStateChange))
+  fun apply(input: PyData val, state: PyState):
+    (PyData val | Array[PyData val] val | None)
   =>
     (let data, let persist) =
       Machida.stateful_computation_compute(_computation, input.obj(),
         state.obj(), _is_multi)
 
-    let d = recover if Machida.is_py_none(data) then
+    recover if Machida.is_py_none(data) then
         Machida.dec_ref(data)
         None
       else
@@ -391,18 +390,8 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
       end
     end
 
-    let p = if Machida.bool_check(persist) then
-      DirectStateChange
-    else
-      None
-    end
-    (d, p)
-
   fun name(): String =>
     _name
-
-  fun state_change_builders(): Array[StateChangeBuilder[PyState]] val =>
-    recover val Array[StateChangeBuilder[PyState] val] end
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_computation)

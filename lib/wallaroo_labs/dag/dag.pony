@@ -22,16 +22,22 @@ use "../guid"
 class Dag[V: Any val]
   let _nodes: Map[U128, DagNode[V]] = _nodes.create()
   let _edges: Array[(DagNode[V], DagNode[V])] = _edges.create()
+  let _sinks: SetIs[DagNode[V]] = _sinks.create()
 
   fun ref add_node(value: V, id': U128 = 0): U128 =>
     let id = if id' == 0 then _gen_guid() else id' end
-    _nodes(id) = DagNode[V](value, id)
+    let node = DagNode[V](value, id)
+    _nodes(id) = node
+    _sinks.set(node)
     id
 
   fun contains(id: U128): Bool =>
     _nodes.contains(id)
 
   fun get_node(id: U128): this->DagNode[V] ? =>
+    //!@
+    if not contains(id) then @printf[I32]("!@ Dag doesn't contain id! Can't get!\n".cstring()) end
+
     _nodes(id)?
 
   fun nodes(): Iterator[this->DagNode[V]] =>
@@ -66,13 +72,52 @@ class Dag[V: Any val]
         _edges.push((from, to))
         from.add_output(to)
         to.add_input(from)
+        if _sinks.contains(from) then
+          _sinks.unset(from)
+        end
       end
     else
       @printf[I32]("Failed to add edge to graph\n".cstring())
       error
     end
 
+  fun ref merge(dag: Dag[V]) ? =>
+    for (n_id, n) in dag._nodes.pairs() do
+      if _nodes.contains(n_id) then
+        @printf[I32]("Can't merge Dag with duplicate node id\n".cstring())
+        error
+      end
+      add_node(n.value, n_id)
+    end
+    for (from, to) in dag._edges.values() do
+      add_edge(from.id, to.id)?
+    end
+
+  fun without_sources(): Dag[V] val ? =>
+    let new_dag = recover iso Dag[V] end
+    let removed = SetIs[U128]
+
+    for n in _nodes.values() do
+      if n.is_source() then
+        removed.set(n.id)
+      else
+        new_dag.add_node(n.value, n.id)
+      end
+    end
+    for e in _edges.values() do
+      (let from, let to) = e
+      if not (removed.contains(from.id) or removed.contains(to.id)) then
+        new_dag.add_edge(from.id, to.id)?
+      end
+    end
+    consume new_dag
+
+  fun sinks(): Iterator[this->DagNode[V]] =>
+    _sinks.values()
+
   fun is_empty(): Bool => _nodes.size() == 0
+
+  fun size(): USize => _nodes.size()
 
   fun clone(): Dag[V] val ? =>
     let c = recover trn Dag[V] end

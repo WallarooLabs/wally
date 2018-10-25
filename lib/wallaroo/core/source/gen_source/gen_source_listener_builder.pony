@@ -40,7 +40,6 @@ class val GenSourceListenerBuilder[In: Any val]
   let _auth: AmbientAuth
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
-  let _pre_state_target_ids: Array[RoutingId] val
   let _target_router: Router
   let _generator: GenSourceGenerator[In]
 
@@ -50,8 +49,7 @@ class val GenSourceListenerBuilder[In: Any val]
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
-    target_router: Router, generator: GenSourceGenerator[In])
+    recovering: Bool, target_router: Router, generator: GenSourceGenerator[In])
   =>
     _worker_name = worker_name
     _pipeline_name = pipeline_name
@@ -65,7 +63,6 @@ class val GenSourceListenerBuilder[In: Any val]
     _auth = auth
     _layout_initializer = layout_initializer
     _recovering = recovering
-    _pre_state_target_ids = pre_state_target_ids
     _target_router = target_router
     _generator = generator
 
@@ -73,8 +70,7 @@ class val GenSourceListenerBuilder[In: Any val]
     GenSourceListener[In](env, _worker_name, _pipeline_name, _runner_builder,
       _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth,
-      _layout_initializer, _recovering, _pre_state_target_ids,
-      _target_router, _generator)
+      _layout_initializer, _recovering, _target_router, _generator)
 
 class val GenSourceListenerBuilderBuilder[In: Any val]
   let _generator: GenSourceGenerator[In]
@@ -88,11 +84,10 @@ class val GenSourceListenerBuilderBuilder[In: Any val]
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
-    target_router: Router = EmptyRouter): GenSourceListenerBuilder[In]
+    recovering: Bool, target_router: Router = EmptyRouter):
+    GenSourceListenerBuilder[In]
   =>
     GenSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
       router, metrics_conn, consume metrics_reporter, router_registry,
       outgoing_boundary_builders, event_log, auth,
-      layout_initializer, recovering, pre_state_target_ids,
-      target_router, _generator)
+      layout_initializer, recovering, target_router, _generator)

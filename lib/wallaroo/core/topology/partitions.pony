@@ -49,7 +49,7 @@ class val Partitions[In: Any val]
   fun function(): PartitionFunction[In] val => _function
   fun keys(): Array[Key] val => _keys
 
-interface PartitionFunction[In: Any val]
+interface val PartitionFunction[In: Any val]
   fun apply(input: In): Key
 
 primitive SingleStepPartitionFunction[In: Any val] is

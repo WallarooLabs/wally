@@ -61,7 +61,6 @@ actor TCPSourceListener[In: Any val] is SourceListener
   let _auth: AmbientAuth
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
-  let _pre_state_target_ids: Array[RoutingId] val
   let _target_router: Router
   let _parallelism: USize
   let _handler: FramedSourceHandler[In] val
@@ -85,8 +84,7 @@ actor TCPSourceListener[In: Any val] is SourceListener
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
-    target_router: Router = EmptyRouter, parallelism: USize,
+    recovering: Bool, target_router: Router = EmptyRouter, parallelism: USize,
     handler: FramedSourceHandler[In] val,
     host: String = "", service: String = "0",
     init_size: USize = 64, max_size: USize = 16384)
@@ -107,7 +105,6 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _auth = auth
     _layout_initializer = layout_initializer
     _recovering = recovering
-    _pre_state_target_ids = pre_state_target_ids
     _target_router = target_router
     _parallelism = parallelism
     _handler = handler
@@ -138,7 +135,7 @@ actor TCPSourceListener[In: Any val] is SourceListener
       let source_id = _routing_id_gen()
       let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
         _auth, _handler, _runner_builder, _router, _metrics_reporter.clone(),
-        _event_log, _target_router, _pre_state_target_ids)
+        _event_log, _target_router)
       let source = TCPSource[In](source_id, _auth, this,
         consume notify, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,

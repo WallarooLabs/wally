@@ -46,8 +46,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   var _id: U128
   let _runner: Runner
   var _router: Router = EmptyRouter
-  // For use if this is a state step, otherwise EmptyTargetIdRouter
-  var _target_id_router: TargetIdRouter
   let _metrics_reporter: MetricsReporter
   // list of envelopes
   let _deduplication_list: DeduplicationList = _deduplication_list.create()
@@ -92,8 +90,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     recovery_replayer: RecoveryReconnecter,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router_registry: RouterRegistry,
-    router': Router = EmptyRouter,
-    target_id_router: TargetIdRouter = EmptyTargetIdRouter)
+    router': Router = EmptyRouter)
   =>
     _auth = auth
     _runner = consume runner
@@ -101,7 +98,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     | let r: RollbackableRunner => r.set_step_id(id)
     end
     _metrics_reporter = consume metrics_reporter
-    _target_id_router = target_id_router
     _event_log = event_log
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
@@ -286,23 +282,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       Fail()
     end
 
-  be update_target_id_router(target_id_router: TargetIdRouter) =>
-    let old_router = _target_id_router
-    _target_id_router = target_id_router
-    for (old_id, outdated_consumer) in
-      old_router.routes_not_in(_target_id_router).pairs()
-    do
-      if _outputs.contains(old_id) then
-        _unregister_output(old_id, outdated_consumer)
-      end
-    end
-
-    for (id, consumer) in target_id_router.routes().pairs() do
-      _register_output(id, consumer)
-    end
-
-    _add_boundaries(target_id_router.boundaries())
-
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
     _add_boundaries(boundaries)
 
@@ -330,19 +309,19 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
+    key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
-    _step_message_processor.run[D](metric_name, pipeline_time_spent, data,
+    _step_message_processor.run[D](metric_name, pipeline_time_spent, data, key,
       i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
       latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -369,7 +348,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
-      pipeline_time_spent, data, _id, this, _router, _target_id_router,
+      pipeline_time_spent, data, key, _id, this, _router,
       msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
       _metrics_reporter)
 
@@ -409,15 +388,16 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     if not _is_duplicate(msg_uid, frac_ids) then
       _deduplication_list.push((msg_uid, frac_ids))
 
-      process_message[D](metric_name, pipeline_time_spent, data, i_producer_id,
-        i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
+      process_message[D](metric_name, pipeline_time_spent, data, key,
+        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts)
     else
       ifdef "trace" then

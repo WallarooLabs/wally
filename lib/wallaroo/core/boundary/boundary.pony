@@ -297,7 +297,7 @@ actor OutgoingBoundary is Consumer
     _step_id = step_id
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
+    key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -305,7 +305,7 @@ actor OutgoingBoundary is Consumer
     Fail()
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -314,9 +314,9 @@ actor OutgoingBoundary is Consumer
     Fail()
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, producer_id: RoutingId, producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, incoming_seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    data: D, key: Key, producer_id: RoutingId, producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, incoming_seq_id: SeqId,
+    route_id: RouteId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Should never be called on an OutgoingBoundary
     Fail()

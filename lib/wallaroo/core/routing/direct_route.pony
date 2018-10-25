@@ -62,7 +62,7 @@ class DirectRoute is Route
     _route.dispose()
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
+    data: D, key: Key, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
     frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
@@ -71,8 +71,8 @@ class DirectRoute is Route
         _step_type.cstring())
     end
 
-    _send_message_on_route[D](metric_name, pipeline_time_spent, data, cfp_id,
-      cfp, msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+    _send_message_on_route[D](metric_name, pipeline_time_spent, data, key,
+      cfp_id, cfp, msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg,
     pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
@@ -89,9 +89,9 @@ class DirectRoute is Route
     _consumer.unregister_producer(_step_id, _step)
 
   fun ref _send_message_on_route[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, cfp_id: RoutingId, cfp: Producer ref,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64)
+    pipeline_time_spent: U64, data: D, key: Key, cfp_id: RoutingId,
+    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
@@ -113,6 +113,7 @@ class DirectRoute is Route
     _consumer.run[D](metric_name,
       pipeline_time_spent,
       data,
+      key,
       cfp_id,
       cfp,
       msg_uid,

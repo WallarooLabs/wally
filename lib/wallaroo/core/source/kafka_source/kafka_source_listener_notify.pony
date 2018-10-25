@@ -32,13 +32,11 @@ class KafkaSourceListenerNotify[In: Any val]
   let _metrics_reporter: MetricsReporter
   let _event_log: EventLog
   let _target_router: Router
-  let _pre_state_target_ids: Array[RoutingId] val
 
   new iso create(pipeline_name: String, auth: AmbientAuth,
     handler: SourceHandler[In] val, runner_builder: RunnerBuilder,
     router': Router, metrics_reporter: MetricsReporter iso,
-    event_log: EventLog, target_router: Router,
-    pre_state_target_ids: Array[RoutingId] val)
+    event_log: EventLog, target_router: Router)
   =>
     _pipeline_name = pipeline_name
     _auth = auth
@@ -48,11 +46,10 @@ class KafkaSourceListenerNotify[In: Any val]
     _metrics_reporter = consume metrics_reporter
     _event_log = event_log
     _target_router = target_router
-    _pre_state_target_ids = pre_state_target_ids
 
   fun ref build_source(source_id: RoutingId, env: Env):
     KafkaSourceNotify[In] iso^
   =>
     KafkaSourceNotify[In](source_id, _pipeline_name, env, _auth,
       _handler, _runner_builder, _router, _metrics_reporter.clone(),
-      _event_log, _target_router, _pre_state_target_ids)
+      _event_log, _target_router)
