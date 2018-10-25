@@ -60,7 +60,6 @@ class iso _TestLengthEncode is UnitTest
     let s0: String = ""
     let s1: String = "a"
     let s3: String = "aaa"
-
     let s0_enc: Array[ByteSeq] val = Bytes.length_encode(s0)
     let s1_enc: Array[ByteSeq] val = Bytes.length_encode(s1)
     let s3_enc: Array[ByteSeq] val = Bytes.length_encode(s3)

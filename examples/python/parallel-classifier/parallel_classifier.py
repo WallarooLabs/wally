@@ -17,7 +17,6 @@
 This is a test example that showcases the parallelization capabilites of
 Wallaroo, by tagging every input message with the OS-level PID of the
 worker that has processed the input.
-
 """
 
 from collections import namedtuple
@@ -40,6 +39,11 @@ def application_setup(args):
     ab.to_parallel(classify)
     ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode))
     return ab.build()
+
+
+@wallaroo.state_computation(name='Batch single entries, emit batchs')
+def batch_rows(row, row_buffer):
+    return (row_buffer.update_with(row), True)
 
 @wallaroo.computation(name="Classify")
 def classify(x):
