@@ -56,7 +56,9 @@ actor DataReceivers
     _data_router =
       DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
         recover Map[StateName, Array[Step] val] end,
-        recover Map[RoutingId, StateName] end)
+        recover Map[RoutingId, Array[Step] val] end,
+        recover Map[RoutingId, StateName] end,
+        recover Map[RoutingId, RoutingId] end)
     _is_recovering = is_recovering
     if not _is_recovering then
       _initialized = true

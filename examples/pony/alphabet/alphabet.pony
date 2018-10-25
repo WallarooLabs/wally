@@ -32,23 +32,19 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      let letter_partition = Partitions[Votes val](
-        LetterPartitionFunction, PartitionsFileReader("letters.txt",
-          env.root as AmbientAuth))
+      let pipeline = recover val
+          let votes = Wallaroo.source[Votes val]("Alphabet Votes",
+                TCPSourceConfig[Votes val].from_options(VotesDecoder,
+                  TCPSourceConfigCLIParser(env.args)?(0)?))
 
-      let application = recover val
-        Application("Alphabet Popularity Contest")
-          .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes",
-            TCPSourceConfig[Votes val].from_options(VotesDecoder,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_state_partition[LetterTotal val,
-              LetterState](AddVotes, LetterStateBuilder, "letter-state",
-              letter_partition where multi_worker = true)
+          votes
+            .group_by_key(ExtractFirstLetter)
+            .to_state[LetterTotal val, LetterState](AddVotes)
             .to_sink(TCPSinkConfig[LetterTotal val].from_options(
-              LetterTotalEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))
-      end
-      Startup(env, application, "alphabet-contest")
+              LetterTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+        end
+
+      Wallaroo.build_application(env, "Alphabet Contest", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
@@ -60,64 +56,15 @@ class LetterState is State
   var letter: String = " "
   var count: U64 = 0
 
-class AddVotesStateChange is StateChange[LetterState]
-  var _id: U64
-  var _votes: Votes val = Votes(" ", 0)
-
-  new create(id': U64) =>
-    _id = id'
-
-  fun name(): String => "AddVotes"
-  fun id(): U64 => _id
-
-  fun ref update(votes': Votes val) =>
-    _votes = votes'
-
-  fun apply(state: LetterState ref) =>
-    state.letter = _votes.letter
-    state.count = state.count + _votes.count
-
-  fun write_log_entry(out_writer: Writer) =>
-    out_writer.u32_be(_votes.letter.size().u32())
-    out_writer.write(_votes.letter)
-    out_writer.u64_be(_votes.count)
-
-  fun ref read_log_entry(in_reader: Reader) ? =>
-    let letter_size = in_reader.u32_be()?.usize()
-    let letter = String.from_array(in_reader.block(letter_size)?)
-    let count = in_reader.u64_be()?
-    _votes = Votes(letter, count)
-
-class AddVotesStateChangeBuilder is StateChangeBuilder[LetterState]
-  fun apply(id: U64): StateChange[LetterState] =>
-    AddVotesStateChange(id)
-
 primitive AddVotes is StateComputation[Votes val, LetterTotal val, LetterState]
   fun name(): String => "Add Votes"
 
-  fun apply(votes: Votes val,
-    sc_repo: StateChangeRepository[LetterState],
-    state: LetterState): (LetterTotal val, StateChange[LetterState] ref)
-  =>
-    let state_change: AddVotesStateChange ref =
-      try
-        sc_repo.lookup_by_name("AddVotes")? as AddVotesStateChange
-      else
-        AddVotesStateChange(0)
-      end
+  fun apply(votes: Votes val, state: LetterState): LetterTotal val =>
+    state.count = votes.count + state.count
+    LetterTotal(votes.letter, state.count)
 
-    state_change.update(votes)
-
-    (LetterTotal(votes.letter, votes.count + state.count), state_change)
-
-  fun state_change_builders():
-    Array[StateChangeBuilder[LetterState]] val
-  =>
-    recover val
-      let scbs = Array[StateChangeBuilder[LetterState]]
-      scbs.push(recover val AddVotesStateChangeBuilder end)
-      scbs
-    end
+  fun initial_state(): LetterState =>
+    LetterState
 
 primitive VotesDecoder is FramedSourceHandler[Votes val]
   fun header_length(): USize =>
@@ -132,8 +79,8 @@ primitive VotesDecoder is FramedSourceHandler[Votes val]
     let count = Bytes.to_u32(data(1)?, data(2)?, data(3)?, data(4)?)
     Votes(letter, count.u64())
 
-primitive LetterPartitionFunction
-  fun apply(votes: Votes val): String =>
+primitive ExtractFirstLetter
+  fun apply(votes: Votes val): Key =>
     votes.letter
 
 class Votes

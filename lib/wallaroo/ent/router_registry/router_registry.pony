@@ -60,7 +60,6 @@ actor RouterRegistry
   let _checkpoint_initiator: CheckpointInitiator
   let _autoscale_initiator: AutoscaleInitiator
   var _data_router: DataRouter
-  var _pre_state_data: (Array[PreStateData] val | None) = None
   var _local_keys: Map[StateName, SetIs[Key]] = _local_keys.create()
   let _partition_routers: Map[StateName, PartitionRouter] =
     _partition_routers.create()
@@ -79,10 +78,6 @@ actor RouterRegistry
 
   var _local_topology_initializer: (LocalTopologyInitializer | None) = None
 
-  // Map from state name to router for use on the corresponding state steps
-  var _target_id_routers: Map[StateName, TargetIdRouter] =
-    _target_id_routers.create()
-
   var _application_ready_to_work: Bool = false
 
   ////////////////
@@ -96,11 +91,6 @@ actor RouterRegistry
   let _stateless_partition_router_subs:
     Map[U128, SetIs[_RouterSub]] =
       _stateless_partition_router_subs.create()
-  // All steps that have a TargetIdRouter (state steps), registered by state
-  // name. The StateStepCreator is also registered here.
-  let _target_id_router_updatables:
-    Map[StateName, SetIs[_TargetIdRouterUpdatable]] =
-      _target_id_router_updatables.create()
 
   // Certain TargetIdRouters need to keep track of changes to particular
   // stateless partition routers. This is true when a state step needs to
@@ -159,6 +149,8 @@ actor RouterRegistry
   var _data_receivers_initialized: Bool = false
   var _waiting_to_finish_join: Bool = false
   var _joining_state_routing_ids: (Map[StateName, RoutingId] val | None)
+  var _joining_stateless_partition_routing_ids:
+    (Map[RoutingId, RoutingId] val | None)
 
   var _event_log: (EventLog | None) = None
 
@@ -178,7 +170,9 @@ actor RouterRegistry
     checkpoint_initiator: CheckpointInitiator,
     autoscale_initiator: AutoscaleInitiator,
     contacted_worker: (WorkerName | None) = None,
-    joining_state_routing_ids: (Map[StateName, RoutingId] val | None) = None)
+    joining_state_routing_ids: (Map[StateName, RoutingId] val | None) = None,
+    joining_stateless_partition_routing_ids:
+      (Map[RoutingId, RoutingId] val | None) = None)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -194,10 +188,14 @@ actor RouterRegistry
     _data_receivers.set_router_registry(this)
     _contacted_worker = contacted_worker
     _joining_state_routing_ids = joining_state_routing_ids
-    _data_router = DataRouter(_worker_name,
-      recover Map[RoutingId, Consumer] end,
-      recover Map[StateName, Array[Step] val] end,
-      recover Map[RoutingId, StateName] end)
+    _joining_stateless_partition_routing_ids =
+      joining_stateless_partition_routing_ids
+    _data_router =
+      DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
+        recover Map[StateName, Array[Step] val] end,
+        recover Map[RoutingId, Array[Step] val] end,
+        recover Map[RoutingId, StateName] end,
+        recover Map[RoutingId, RoutingId] end)
     _initializer_name = initializer_name
     _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining)
 
@@ -223,9 +221,12 @@ actor RouterRegistry
   be data_receivers_initialized() =>
     _data_receivers_initialized = true
     if _waiting_to_finish_join then
-      match _joining_state_routing_ids
-      | let sri: Map[StateName, RoutingId] val =>
-        if _inform_contacted_worker_of_initialization(sri) then
+      match (_joining_state_routing_ids,
+        _joining_stateless_partition_routing_ids)
+      | (let sri: Map[StateName, RoutingId] val,
+        let spri: Map[RoutingId, RoutingId] val)
+      =>
+        if _inform_contacted_worker_of_initialization(sri, spri) then
           _waiting_to_finish_join = false
         end
       else
@@ -237,9 +238,6 @@ actor RouterRegistry
     _data_router = dr
     _distribute_data_router()
 
-  be set_pre_state_data(psd: Array[PreStateData] val) =>
-    _pre_state_data = psd
-
   be set_partition_router(state_name: StateName, pr: PartitionRouter) =>
     _partition_routers(state_name) = pr
     if not _local_keys.contains(state_name) then
@@ -250,23 +248,6 @@ actor RouterRegistry
     pr: StatelessPartitionRouter)
   =>
     _stateless_partition_routers(partition_id) = pr
-
-  be set_target_id_router(state_name: StateName, t: TargetIdRouter) =>
-    _set_target_id_router(state_name, t)
-
-  fun ref _set_target_id_router(state_name: StateName, t: TargetIdRouter) =>
-    var new_router = t.update_boundaries(_outgoing_boundaries)
-    for id in new_router.stateless_partition_ids().values() do
-      try
-        _stateless_partition_routers_router_subs.insert_if_absent(id,
-          _StringSet)?
-        _stateless_partition_routers_router_subs(id)?.set(state_name)
-      else
-        Fail()
-      end
-    end
-    _target_id_routers(state_name) = new_router
-    _distribute_target_id_router(state_name)
 
   be set_event_log(e: EventLog) =>
     _event_log = e
@@ -322,9 +303,12 @@ actor RouterRegistry
     if _waiting_to_finish_join and
       (_control_channel_listeners.size() != 0)
     then
-      match _joining_state_routing_ids
-      | let sri: Map[StateName, RoutingId] val =>
-        _inform_contacted_worker_of_initialization(sri)
+      match (_joining_state_routing_ids,
+        _joining_stateless_partition_routing_ids)
+      | (let sri: Map[StateName, RoutingId] val,
+        let spri: Map[RoutingId, RoutingId] val)
+      =>
+        _inform_contacted_worker_of_initialization(sri, spri)
         _waiting_to_finish_join = false
       else
         Fail()
@@ -336,9 +320,12 @@ actor RouterRegistry
     if _waiting_to_finish_join and
       (_data_channel_listeners.size() != 0)
     then
-      match _joining_state_routing_ids
-      | let sri: Map[StateName, RoutingId] val =>
-        _inform_contacted_worker_of_initialization(sri)
+      match (_joining_state_routing_ids,
+        _joining_stateless_partition_routing_ids)
+      | (let sri: Map[StateName, RoutingId] val,
+        let spri: Map[RoutingId, RoutingId] val)
+      =>
+        _inform_contacted_worker_of_initialization(sri, spri)
         _waiting_to_finish_join = false
       else
         Fail()
@@ -405,30 +392,6 @@ actor RouterRegistry
       Fail()
     end
 
-  be register_target_id_router_updatable(state_name: StateName,
-    sub: _TargetIdRouterUpdatable)
-  =>
-    _register_target_id_router_updatable(state_name, sub)
-
-  fun ref _register_target_id_router_updatable(state_name: StateName,
-    sub: _TargetIdRouterUpdatable)
-  =>
-    try
-      _target_id_router_updatables.insert_if_absent(state_name,
-        SetIs[_TargetIdRouterUpdatable])?
-      _target_id_router_updatables(state_name)?.set(sub)
-    else
-      Fail()
-    end
-    if _target_id_routers.contains(state_name) then
-      try
-        let target_id_router = _target_id_routers(state_name)?
-        sub.update_target_id_router(target_id_router)
-      else
-        Unreachable()
-      end
-    end
-
   be register_boundaries(bs: Map[WorkerName, OutgoingBoundary] val,
     bbs: Map[WorkerName, OutgoingBoundaryBuilder] val)
   =>
@@ -457,11 +420,6 @@ actor RouterRegistry
         | let s: Step =>
           s.add_boundaries(new_boundaries_sendable)
         end
-      end
-    end
-    for updatables in _target_id_router_updatables.values() do
-      for updatable in updatables.values() do
-        updatable.add_boundaries(new_boundaries_sendable)
       end
     end
     for step in _data_router.routes().values() do
@@ -557,30 +515,6 @@ actor RouterRegistry
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)
 
-  fun ref _distribute_target_id_router(state_name: StateName) =>
-    """
-    Distribute the TargetIdRouter used by state steps corresponding to state
-    name.
-    """
-    try
-      let target_id_router = _target_id_routers(state_name)?
-      _target_id_router_updatables.insert_if_absent(state_name,
-        SetIs[_TargetIdRouterUpdatable])?
-
-      for updatable in _target_id_router_updatables(state_name)?.values() do
-        updatable.update_target_id_router(target_id_router)
-      end
-
-      match _local_topology_initializer
-      | let lti: LocalTopologyInitializer =>
-        lti.update_target_id_router(state_name, target_id_router)
-      else
-        Fail()
-      end
-    else
-      Fail()
-    end
-
   fun ref _distribute_partition_router(partition_router: PartitionRouter) =>
     let state_name = partition_router.state_name()
 
@@ -613,26 +547,6 @@ actor RouterRegistry
       Fail()
     end
 
-    if _stateless_partition_routers_router_subs.contains(partition_id) then
-      try
-        let state_names =
-          _stateless_partition_routers_router_subs(partition_id)?
-        for state_name in state_names.values() do
-          try
-            let target_id_router = _target_id_routers(state_name)?
-            _target_id_routers(state_name) = target_id_router.
-              update_stateless_partition_router(partition_id, partition_router)
-            _distribute_target_id_router(state_name)
-          else
-            // We should have already registered this TargetIdRouter at startup
-            Fail()
-          end
-        end
-      else
-        Unreachable()
-      end
-    end
-
   fun ref _remove_worker(worker: WorkerName) =>
     try
       _data_receiver_map.remove(worker)?
@@ -656,11 +570,6 @@ actor RouterRegistry
         | let r: BoundaryUpdatable =>
           r.remove_boundary(worker)
         end
-      end
-    end
-    for updatables in _target_id_router_updatables.values() do
-      for updatable in updatables.values() do
-        updatable.remove_boundary(worker)
       end
     end
 
@@ -727,34 +636,13 @@ actor RouterRegistry
     end
     let obs = consume val obs_trn
     for (id, b) in partition_blueprints.pairs() do
-      let next_router = b.build_router(_worker_name, obs, _auth)
-      _distribute_stateless_partition_router(next_router)
-      _stateless_partition_routers(id) = next_router
+      None
+      //!@ TODO: Uncomment these lines once we've worked out how we create from
+      // blueprints.
+      // let next_router = b.build_router(_worker_name, obs, _auth)
+      // _distribute_stateless_partition_router(next_router)
+      // _stateless_partition_routers(id) = next_router
     end
-
-  be create_target_id_routers_from_blueprint(
-    target_id_router_blueprints: Map[StateName, TargetIdRouterBlueprint] val,
-    state_steps: Map[StateName, Array[Step] val] val,
-    local_sinks: Map[RoutingId, Consumer] val,
-    lti: LocalTopologyInitializer)
-  =>
-    let obs_trn = recover trn Map[WorkerName, OutgoingBoundary] end
-    for (w, ob) in _outgoing_boundaries.pairs() do
-      obs_trn(w) = ob
-    end
-    let obs = consume val obs_trn
-    for (state_name, tidr) in target_id_router_blueprints.pairs() do
-      let new_target_id_router = tidr.build_router(_worker_name, obs,
-        local_sinks, _auth)
-      _set_target_id_router(state_name, new_target_id_router)
-      try
-        for step in state_steps(state_name)?.values() do
-          _register_target_id_router_updatable(state_name, step)
-        end
-      end
-      lti.update_target_id_router(state_name, new_target_id_router)
-    end
-    lti.initialize_join_initializables()
 
   be producers_register_downstream(promise: Promise[None]) =>
     for p in _producers.values() do
@@ -1015,11 +903,15 @@ actor RouterRegistry
 
   be connect_to_joining_workers(ws: Array[WorkerName] val,
     new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    new_stateless_partition_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     coordinator: WorkerName)
   =>
     for w in ws.values() do
       try
         _update_state_routing_ids(w, new_state_routing_ids(w)?)
+        _update_stateless_partition_routing_ids(w,
+          new_stateless_partition_routing_ids(w)?)
       else
         Fail()
       end
@@ -1031,12 +923,15 @@ actor RouterRegistry
     end
 
   be joining_worker_initialized(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     _update_state_routing_ids(worker, state_routing_ids)
+    _update_stateless_partition_routing_ids(worker,
+      stateless_partition_routing_ids)
     try
       (_autoscale as Autoscale).joining_worker_initialized(worker,
-        state_routing_ids)
+        state_routing_ids, stateless_partition_routing_ids)
     else
       Fail()
     end
@@ -1051,6 +946,23 @@ actor RouterRegistry
           .add_state_routing_id(worker, new_state_routing_id)
         _partition_routers(state_name) = new_router
         _distribute_partition_router(new_router)
+      else
+        Fail()
+      end
+    end
+
+  fun ref _update_stateless_partition_routing_ids(worker: WorkerName,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
+  =>
+    for (p_id, id) in stateless_partition_routing_ids.pairs() do
+      try
+        let new_stateless_partition_routing_id =
+          stateless_partition_routing_ids(p_id)?
+        let new_router = _stateless_partition_routers(p_id)?
+          .add_stateless_partition_routing_id(worker,
+            new_stateless_partition_routing_id)
+        _stateless_partition_routers(p_id) = new_router
+        _distribute_stateless_partition_router(new_router)
       else
         Fail()
       end
@@ -1072,23 +984,20 @@ actor RouterRegistry
       stateless_blueprints(id) = r.blueprint()
     end
 
-    let tidr_blueprints =
-      recover iso Map[StateName, TargetIdRouterBlueprint] end
-    for (state_name, tidr) in _target_id_routers.pairs() do
-      tidr_blueprints(state_name) = tidr.blueprint()
-    end
-
     _connections.inform_joining_worker(conn, worker, local_topology,
       checkpoint_id, rollback_id, _initializer_name, consume state_blueprints,
-      consume stateless_blueprints, consume tidr_blueprints)
+      consume stateless_blueprints)
 
   be inform_contacted_worker_of_initialization(
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
-    _inform_contacted_worker_of_initialization(state_routing_ids)
+    _inform_contacted_worker_of_initialization(state_routing_ids,
+      stateless_partition_routing_ids)
 
   fun ref _inform_contacted_worker_of_initialization(
-    state_routing_ids: Map[StateName, RoutingId] val): Bool
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val): Bool
   =>
     match _contacted_worker
     | let cw: WorkerName =>
@@ -1097,7 +1006,7 @@ actor RouterRegistry
          _data_receivers_initialized
       then
         _connections.inform_contacted_worker_of_initialization(cw,
-          state_routing_ids)
+          state_routing_ids, stateless_partition_routing_ids)
         true
       else
         _waiting_to_finish_join = true
@@ -1478,7 +1387,7 @@ actor RouterRegistry
     leaving_workers: Array[WorkerName] val)
   =>
     for (p_id, router) in _stateless_partition_routers.pairs() do
-      let new_router = router.calculate_shrink(remaining_workers)
+      let new_router = router.remove_workers(leaving_workers)
       _distribute_stateless_partition_router(new_router)
       _stateless_partition_routers(p_id) = new_router
     end

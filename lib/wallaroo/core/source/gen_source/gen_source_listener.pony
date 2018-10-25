@@ -70,7 +70,6 @@ actor GenSourceListener[In: Any val] is SourceListener
   let _auth: AmbientAuth
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
-  let _pre_state_target_ids: Array[RoutingId] val
   let _target_router: Router
 
   let _sources: Array[GenSource[In]] = _sources.create()
@@ -81,8 +80,7 @@ actor GenSourceListener[In: Any val] is SourceListener
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
-    target_router: Router, generator: GenSourceGenerator[In])
+    recovering: Bool, target_router: Router, generator: GenSourceGenerator[In])
   =>
     _env = env
 
@@ -98,7 +96,6 @@ actor GenSourceListener[In: Any val] is SourceListener
     _auth = auth
     _layout_initializer = layout_initializer
     _recovering = recovering
-    _pre_state_target_ids = pre_state_target_ids
     _target_router = target_router
     _generator = generator
 
@@ -124,7 +121,7 @@ actor GenSourceListener[In: Any val] is SourceListener
     let source = GenSource[In](source_id, _auth, _pipeline_name,
       _runner_builder, _router, _target_router, _generator, _event_log,
       _outgoing_boundary_builders, _layout_initializer,
-      _metrics_reporter.clone(), _router_registry, _pre_state_target_ids)
+      _metrics_reporter.clone(), _router_registry)
 
     source.mute(this)
     _router_registry.register_source(source, source_id)

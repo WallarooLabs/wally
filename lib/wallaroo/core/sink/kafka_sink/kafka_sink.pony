@@ -281,16 +281,16 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
+    key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
     frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _message_processor.process_message[D](metric_name, pipeline_time_spent,
-      data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-      latest_ts, metrics_id, worker_ingress_ts)
+      data, key, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
+      i_route_id, latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
@@ -305,16 +305,16 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
         metrics_id
       end
 
-
     ifdef "trace" then
       @printf[I32]("Rcvd msg at KafkaSink\n".cstring())
     end
     try
-      (let encoded_value, let encoded_key, let part_id) = _encoder.encode[D](data, _wb)?
+      (let encoded_value, let encoded_key, let part_id) =
+        _encoder.encode[D](data, _wb)?
       my_metrics_id = ifdef "detailed-metrics" then
           var old_ts = my_latest_ts = Time.nanos()
-          _metrics_reporter.step_metric(metric_name, "Sink encoding time", 9998,
-          old_ts, my_latest_ts)
+          _metrics_reporter.step_metric(metric_name, "Sink encoding time",
+            9998, old_ts, my_latest_ts)
           metrics_id + 1
         else
           metrics_id
@@ -350,9 +350,10 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
     end
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("replay_run in %s\n".cstring(), _name.cstring())

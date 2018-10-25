@@ -28,8 +28,11 @@ use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 
-interface val SourceConfig[In: Any val]
+
+interface val SourceConfig
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
+
+interface val TypedSourceConfig[In: Any val] is SourceConfig
 
 trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   StatusReporter)

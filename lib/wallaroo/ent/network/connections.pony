@@ -273,7 +273,9 @@ actor Connections is Cluster
 
   be notify_joining_workers_of_joining_addresses(
     joining_workers: Array[WorkerName] val,
-    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    new_stateless_partition_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val)
   =>
     for w1 in joining_workers.values() do
       let others_control = recover iso Map[WorkerName, (String, String)] end
@@ -289,7 +291,7 @@ actor Connections is Cluster
       try
         let msg = ChannelMsgEncoder.announce_connections(
           consume others_control, consume others_data,
-          new_state_routing_ids, _auth)?
+          new_state_routing_ids, new_stateless_partition_routing_ids, _auth)?
         _send_control(w1, msg)
       else
         Fail()
@@ -298,7 +300,9 @@ actor Connections is Cluster
 
   be notify_current_workers_of_joining_addresses(
     joining_workers: Array[WorkerName] val,
-    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    new_stateless_partition_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val)
   =>
     let joining_control = recover iso Map[WorkerName, (String, String)] end
     let joining_data = recover iso Map[WorkerName, (String, String)] end
@@ -313,7 +317,7 @@ actor Connections is Cluster
     try
       let msg = ChannelMsgEncoder.announce_joining_workers(_worker_name,
         consume joining_control, consume joining_data,
-        new_state_routing_ids, _auth)?
+        new_state_routing_ids, new_stateless_partition_routing_ids, _auth)?
       _send_control_to_cluster(msg where exclusions = joining_workers)
     else
       Fail()
@@ -526,7 +530,6 @@ actor Connections is Cluster
   be create_routers_from_blueprints(workers: Array[WorkerName] val,
     pr_blueprints: Map[StateName, PartitionRouterBlueprint] val,
     spr_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
-    tidr_blueprints: Map[StateName, TargetIdRouterBlueprint] val,
     local_sinks: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
     state_step_ids: Map[StateName, Map[RoutingId, Step] val] val,
@@ -535,10 +538,6 @@ actor Connections is Cluster
     // We delegate to router registry through here to ensure that we've
     // already sent the outgoing boundaries to the router registry when
     // create_connections was called.
-
-    // We must create the target_id_router first
-    router_registry.create_target_id_routers_from_blueprint(tidr_blueprints,
-      state_steps, local_sinks, lti)
     router_registry.create_partition_routers_from_blueprints(workers,
       state_steps, state_step_ids, pr_blueprints)
     router_registry.create_stateless_partition_routers_from_blueprints(
@@ -647,6 +646,7 @@ actor Connections is Cluster
   be create_data_connection_to_joining_worker(target_name: WorkerName,
     host: String, service: String, new_boundary_id: RoutingId,
     state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val,
     lti: LocalTopologyInitializer)
   =>
     _data_addrs(target_name) = (host, service)
@@ -659,9 +659,9 @@ actor Connections is Cluster
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
     lti.add_boundary_to_joining_worker(target_name, outgoing_boundary,
-      boundary_builder, state_routing_ids)
+      boundary_builder, state_routing_ids, stateless_partition_routing_ids)
 
-  be update_boundary_ids(boundary_ids: Map[String, RoutingId] val) =>
+  be update_boundary_ids(boundary_ids: Map[WorkerName, RoutingId] val) =>
     for (worker, boundary) in _data_conns.pairs() do
       try
         boundary.register_step_id(boundary_ids(worker)?)
@@ -676,8 +676,7 @@ actor Connections is Cluster
     rollback_id: RollbackId, primary_checkpoint_worker: String,
     partition_blueprints: Map[String, PartitionRouterBlueprint] val,
     stateless_partition_blueprints:
-      Map[U128, StatelessPartitionRouterBlueprint] val,
-    tidr_blueprints: Map[String, TargetIdRouterBlueprint] val)
+      Map[U128, StatelessPartitionRouterBlueprint] val)
   =>
     _register_disposable(conn)
     if not _control_addrs.contains(worker) then
@@ -695,12 +694,11 @@ actor Connections is Cluster
 
       try
         let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
-          _app_name, local_topology.for_new_worker(worker)?,
+          _app_name, local_topology.for_new_worker(worker),
           checkpoint_id, rollback_id, _metrics_host, _metrics_service,
           consume c_addrs, consume d_addrs,
           local_topology.worker_names, primary_checkpoint_worker,
-          partition_blueprints, stateless_partition_blueprints,
-          tidr_blueprints, _auth)?
+          partition_blueprints, stateless_partition_blueprints, _auth)?
         conn.writev(inform_msg)
         @printf[I32](("***Worker %s attempting to join the cluster. Sent " +
           "necessary information.***\n").cstring(), worker.cstring())
@@ -720,7 +718,8 @@ actor Connections is Cluster
     end
 
   be inform_contacted_worker_of_initialization(contacted_worker: String,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     try
       if not _has_registered_my_addrs() then
@@ -733,7 +732,8 @@ actor Connections is Cluster
         "I have completed initialization\n").cstring(),
         contacted_worker.cstring())
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
-        _my_control_addr, _my_data_addr, state_routing_ids, _auth)?
+        _my_control_addr, _my_data_addr, state_routing_ids,
+        stateless_partition_routing_ids, _auth)?
       _send_control(contacted_worker, msg)
     else
       Fail()

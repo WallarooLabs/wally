@@ -33,13 +33,11 @@ primitive KafkaSourceNotifyBuilder[In: Any val]
     auth: AmbientAuth, handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router,
-    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end):
-    KafkaSourceNotify[In] iso^
+    target_router: Router): KafkaSourceNotify[In] iso^
   =>
     KafkaSourceNotify[In](source_id, pipeline_name, env, auth, handler,
       runner_builder, router, consume metrics_reporter, event_log,
-      target_router, pre_state_target_ids)
+      target_router)
 
 class KafkaSourceNotify[In: Any val]
   let _source_id: RoutingId
@@ -51,15 +49,13 @@ class KafkaSourceNotify[In: Any val]
   let _handler: SourceHandler[In] val
   let _runner: Runner
   var _router: Router
-  let _target_id_router: TargetIdRouter = EmptyTargetIdRouter
   let _metrics_reporter: MetricsReporter
 
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SourceHandler[In] val,
     runner_builder: RunnerBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router,
-    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
+    target_router: Router)
   =>
     _source_id = source_id
     _pipeline_name = pipeline_name
@@ -67,8 +63,7 @@ class KafkaSourceNotify[In: Any val]
     _env = env
     _auth = auth
     _handler = handler
-    _runner = runner_builder(event_log, auth, None,
-      target_router, pre_state_target_ids)
+    _runner = runner_builder(event_log, auth, None, target_router)
     _router = _runner.clone_router_and_set_input_type(router')
     _metrics_reporter = consume metrics_reporter
 
@@ -120,8 +115,9 @@ class KafkaSourceNotify[In: Any val]
             " source\n").cstring())
         end
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          _source_id, source, _router, _target_id_router, _msg_id_gen(), None,
-          decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
+          "kafka-source-key", _source_id, source, _router,
+          _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
+          _metrics_reporter)
       else
         @printf[I32](("Unable to decode message at " + _pipeline_name +
           " source\n").cstring())

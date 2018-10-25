@@ -71,7 +71,6 @@ actor GenSource[V: Any val] is Source
   let _auth: AmbientAuth
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   var _router: Router
-  let _target_id_router: TargetIdRouter = EmptyTargetIdRouter
 
   let _routes: MapIs[Consumer, Route] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
@@ -114,8 +113,7 @@ actor GenSource[V: Any val] is Source
     generator: GenSourceGenerator[V], event_log: EventLog,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
-    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
+    metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry)
   =>
     @printf[I32]("!@ Spinning up GenSource %s\n".cstring(), source_id.string().cstring())
     _pipeline_name = pipeline_name
@@ -132,8 +130,7 @@ actor GenSource[V: Any val] is Source
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
-    _runner = runner_builder(event_log, auth, None,
-      target_router, pre_state_target_ids)
+    _runner = runner_builder(event_log, auth, None, target_router)
     _router = _runner.clone_router_and_set_input_type(router')
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
@@ -194,9 +191,9 @@ actor GenSource[V: Any val] is Source
     | (let next': V) =>
       _cur_value = _generator(next')
       (let is_finished, let last_ts) =
-        _runner.run[V](_pipeline_name, pipeline_time_spent, next',
-          _source_id, this, _router, _target_id_router, _msg_id_gen(),
-          None, decode_end_ts, latest_metrics_id, ingest_ts,
+        _runner.run[V](_pipeline_name, pipeline_time_spent, next,
+          "gen-source-key", _source_id, this, _router,
+          _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
           _metrics_reporter)
 
       if is_finished then
