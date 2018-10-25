@@ -399,7 +399,7 @@ Each stream during a session must be in one of the following states:
                   |                            |
                   |                            V
  +-------+     +------+     +--------+     +-------+
- | Intro +---> | Open +---> | Closed +---> | Reset |
+ | Intro +---->| Open +---->| Closed +---->| Reset |
  +-------+     +------+     +--------+     +-------+
                   ^             |              |
                   |             |              |
