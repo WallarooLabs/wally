@@ -262,7 +262,6 @@ def attach_to_module(cls, cls_name, func):
     return globals()[name]
 
 
-
 def _wallaroo_wrap(name, func, base_cls, **kwargs):
     # Case 1: Computations
     if issubclass(base_cls, Computation):
@@ -299,13 +298,31 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                 return res
 
     # Case 3: Encoder
-    elif base_cls is Encoder:
+    elif base_cls is OctetEncoder:
         class C(base_cls):
             def encode(self, data):
                 return func(data)
 
+    elif base_cls is ConnectorEncoder:
+        class C(base_cls):
+            def encode(self, data, partition=None, sequence=None):
+                encoded = func(data)
+                if partition:
+                    part = str(partition).encode('utf-8')
+                else:
+                    part = b''
+                if sequence:
+                    seq = int(sequence)
+                else:
+                    seq = -1
+                # struct.calcsize('<q') = 8
+                meta = struct.pack('<H{}sq'.format(len(part)), len(part) + 8, part, seq)
+                return struct.pack(
+                    '<I{}s{}s'.format(len(meta), len(encoded)),
+                    len(meta) + len(encoded), meta, encoded)
+
     # Case 4: Decoder
-    elif base_cls is Decoder:
+    elif base_cls is OctetDecoder:
         header_length = kwargs['header_length']
         length_fmt = kwargs['length_fmt']
         class C(base_cls):
@@ -315,6 +332,23 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                 return struct.unpack(length_fmt, bs)[0]
             def decode(self, bs):
                 return func(bs)
+
+    elif base_cls is ConnectorDecoder:
+        class C(base_cls):
+            def header_length(self):
+                # struct.calcsize('<I')
+                return 4
+            def payload_length(self, bs):
+                return struct.unpack("<I", bs)[0]
+            def decode(self, bs):
+                meta_len = struct.unpack_from('<H', bs)[0]
+                # We dropping the metadata on the floor for now, slice out the
+                # remaining data for message decoding.
+                # struct.calcsize('<H') = 2
+                message_data = bs[2 + meta_len :]
+                return func(message_data)
+            def decoder(self):
+                return func
 
     # Attach the new class to the module's global namespace and return it
     return attach_to_module(C, base_cls.__name__, func)
@@ -346,11 +380,19 @@ class Partition(BaseWrapped):
     pass
 
 
-class Decoder(BaseWrapped):
+class OctetDecoder(BaseWrapped):
     pass
 
 
-class Encoder(BaseWrapped):
+class OctetEncoder(BaseWrapped):
+    pass
+
+
+class ConnectorDecoder(BaseWrapped):
+    pass
+
+
+class ConnectorEncoder(BaseWrapped):
     pass
 
 
@@ -407,7 +449,7 @@ def partition(func):
 def decoder(header_length, length_fmt):
     def wrapped(func):
         _validate_arity_compatability(func, 1)
-        C = _wallaroo_wrap(func.__name__, func, Decoder,
+        C = _wallaroo_wrap(func.__name__, func, OctetDecoder,
                            header_length = header_length,
                            length_fmt = length_fmt)
         return C()
@@ -416,7 +458,7 @@ def decoder(header_length, length_fmt):
 
 def encoder(func):
     _validate_arity_compatability(func, 1)
-    C = _wallaroo_wrap(func.__name__, func, Encoder)
+    C = _wallaroo_wrap(func.__name__, func, OctetEncoder)
     return C()
 
 
@@ -461,6 +503,7 @@ class CustomKafkaSourceCLIParser(object):
     def to_tuple(self):
         return ("kafka", self.topic, self.brokers, self.log_level, self.decoder)
 
+
 class CustomKafkaSinkCLIParser(object):
     def __init__(self, args, encoder):
         (out_topic, out_brokers, out_log_level, out_max_produce_buffer_ms,
@@ -477,6 +520,7 @@ class CustomKafkaSinkCLIParser(object):
         return ("kafka", self.topic, self.brokers, self.log_level,
                 self.max_produce_buffer_ms, self.max_message_size, self.encoder)
 
+
 class DefaultKafkaSourceCLIParser(object):
     def __init__(self, decoder, name="kafka_source"):
         self.decoder = decoder
@@ -485,6 +529,7 @@ class DefaultKafkaSourceCLIParser(object):
     def to_tuple(self):
         return ("kafka-internal", self.name, self.decoder)
 
+
 class DefaultKafkaSinkCLIParser(object):
     def __init__(self, encoder, name="kafka_sink"):
         self.encoder = encoder
@@ -492,6 +537,7 @@ class DefaultKafkaSinkCLIParser(object):
 
     def to_tuple(self):
         return ("kafka-internal", self.name, self.encoder)
+
 
 def tcp_parse_input_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
@@ -550,6 +596,7 @@ def kafka_parse_sink_options(args):
 
     return (known_args.topic, brokers, known_args.log_level,
             known_args.max_produce_buffer_ms, known_args.max_message_size)
+
 
 def _kafka_parse_broker(broker):
     """
