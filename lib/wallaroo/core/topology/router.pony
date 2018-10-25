@@ -938,10 +938,6 @@ class val StatePartitionRouter is Router
       _step_ids, _hashed_node_routes, _hash_partitions,
       consume new_state_routing_ids)
 
-  fun blueprint(): StatePartitionRouterBlueprint =>
-    StatePartitionRouterBlueprint(_state_name, _hash_partitions,
-      _state_routing_ids)
-
   fun distribution_digest(): Map[WorkerName, Array[String] val] val =>
     // Return a map of form {worker_name: routing_ids_as_strings}
     let digest = recover iso Map[WorkerName, Array[String] val] end
@@ -972,50 +968,6 @@ class val StatePartitionRouter is Router
 
   fun hash(): USize =>
     _state_name.hash()
-
-class val StatePartitionRouterBlueprint
-  let _state_name: String
-  let _hash_partitions: HashPartitions
-  let _state_routing_ids: Map[WorkerName, RoutingId] val
-
-  new val create(state_name: String, hash_partitions: HashPartitions,
-    state_routing_ids: Map[WorkerName, RoutingId] val)
-  =>
-    _state_name = state_name
-    _hash_partitions = hash_partitions
-    _state_routing_ids = state_routing_ids
-
-  fun build_router(worker_name: String, workers: Array[String] val,
-    state_steps: Array[Step] val, state_step_ids: Map[RoutingId, Step] val,
-    outgoing_boundaries: Map[WorkerName, OutgoingBoundary] val,
-    auth: AmbientAuth): StatePartitionRouter
-  =>
-    let hashed_node_routes = recover trn Map[WorkerName, HashedProxyRouter] end
-    for (w, b) in outgoing_boundaries.pairs() do
-      hashed_node_routes(w) = HashedProxyRouter(worker_name, b, _state_name,
-        auth)
-    end
-    let current_workers = Array[WorkerName]
-    let joining_workers = recover trn Array[WorkerName] end
-    for c in _hash_partitions.claimants() do
-      current_workers.push(c)
-    end
-    for w in workers.values() do
-      if not ArrayHelpers[String].contains[String](current_workers, w) then
-        joining_workers.push(w)
-      end
-    end
-    let new_hash_partitions =
-      try
-        _hash_partitions.add_claimants(consume joining_workers)?
-      else
-        Fail()
-        _hash_partitions
-      end
-
-    StatePartitionRouter(_state_name, worker_name,
-      state_steps, state_step_ids, consume hashed_node_routes,
-      new_hash_partitions, _state_routing_ids)
 
 class val StatelessPartitionRouter is Router
   let _partition_id: RoutingId
@@ -1157,23 +1109,37 @@ class val StatelessPartitionRouter is Router
       _stateless_partition_routing_ids, consume new_proxies,
       _steps_per_worker)
 
-  fun add_stateless_partition_routing_id(worker: WorkerName,
-    routing_id: RoutingId): StatelessPartitionRouter
+  fun add_worker(joining_worker: WorkerName, group_routing_id: RoutingId,
+    proxy_router: ProxyRouter): StatelessPartitionRouter
   =>
+    let new_workers = recover iso Array[WorkerName] end
+    for w in _workers.values() do
+      new_workers.push(w)
+    end
+    new_workers.push(joining_worker)
+
     let new_r_ids = recover iso Map[WorkerName, RoutingId] end
     for (w, r_id) in _stateless_partition_routing_ids.pairs() do
       new_r_ids(w) = r_id
     end
-    new_r_ids(worker) = routing_id
-    StatelessPartitionRouter(_partition_id, _worker_name, _workers,
-      _local_partitions, _local_partition_ids, consume new_r_ids, _proxies,
-      _steps_per_worker)
+    new_r_ids(joining_worker) = group_routing_id
+
+    let new_proxies = recover iso Map[WorkerName, ProxyRouter] end
+    for (w, pr) in _proxies.pairs() do
+      new_proxies(w) = pr
+    end
+    new_proxies(joining_worker) = proxy_router
+
+    StatelessPartitionRouter(_partition_id, _worker_name, consume new_workers,
+      _local_partitions, _local_partition_ids, consume new_r_ids,
+      consume new_proxies, _steps_per_worker)
 
   fun remove_workers(leaving_workers: Array[WorkerName] val):
     StatelessPartitionRouter
   =>
     let new_workers = recover iso Array[WorkerName] end
     let new_proxies = recover iso Map[WorkerName, ProxyRouter] end
+    let new_r_ids = recover iso Map[WorkerName, RoutingId] end
 
     for w in _workers.values() do
       if not ArrayHelpers[WorkerName].contains[WorkerName](leaving_workers,
@@ -1189,37 +1155,17 @@ class val StatelessPartitionRouter is Router
         new_proxies(w) = pr
       end
     end
+    for (w, r_id) in _stateless_partition_routing_ids.pairs() do
+      if not ArrayHelpers[WorkerName].contains[WorkerName](leaving_workers,
+        w)
+      then
+        new_r_ids(w) = r_id
+      end
+    end
+
     StatelessPartitionRouter(_partition_id, _worker_name,
       consume new_workers, _local_partitions, _local_partition_ids,
-      _stateless_partition_routing_ids, consume new_proxies, _steps_per_worker)
-
-  fun add_workers(joining_workers: Array[WorkerName] val):
-    StatelessPartitionRouter
-  =>
-    let new_workers = recover iso Array[WorkerName] end
-    let new_proxies = recover iso Map[WorkerName, ProxyRouter] end
-
-    for w in _workers.values() do
-      new_workers.push(w)
-    end
-    for w in joining_workers.values() do
-      new_workers.push(w)
-    end
-    for (w, pr) in _proxies.pairs() do
-      new_proxies(w) = pr
-    end
-    //!@ TODO: We need to add proxies for the joining workers!
-    for w in joining_workers.values() do
-      //!@
-      None
-    end
-    StatelessPartitionRouter(_partition_id, _worker_name,
-      consume new_workers, _local_partitions, _local_partition_ids,
-      _stateless_partition_routing_ids, consume new_proxies, _steps_per_worker)
-
-  fun blueprint(): StatelessPartitionRouterBlueprint =>
-    StatelessPartitionRouterBlueprint(_partition_id, _workers,
-      _stateless_partition_routing_ids, _steps_per_worker)
+      consume new_r_ids, consume new_proxies, _steps_per_worker)
 
   fun distribution_digest(): Map[String, Array[String] val] val =>
     // Return a map of form {worker_name: step_ids_as_strings}
@@ -1248,52 +1194,6 @@ class val StatelessPartitionRouter is Router
 
   fun hash(): USize =>
     _partition_id.hash()
-
-class val StatelessPartitionRouterBlueprint
-  let _partition_id: RoutingId
-  let _workers: Array[WorkerName] val
-  let _stateless_partition_routing_ids: Map[WorkerName, RoutingId] val
-  let _steps_per_worker: USize
-
-  new val create(p_id: RoutingId, workers: Array[WorkerName] val,
-    stateless_partition_routing_ids: Map[WorkerName, RoutingId] val,
-    steps_per_worker: USize)
-  =>
-    _partition_id = p_id
-    _workers = workers
-    _stateless_partition_routing_ids = stateless_partition_routing_ids
-    _steps_per_worker = steps_per_worker
-
-  fun build_router(worker_name: String,
-    local_partitions: Array[Step] val,
-    local_partition_ids: MapIs[Step, RoutingId] val,
-    local_stateless_partition_routing_id: RoutingId,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    auth: AmbientAuth): StatelessPartitionRouter
-  =>
-    let proxies = recover iso Map[WorkerName, ProxyRouter] end
-    let new_stateless_partition_routing_ids = recover iso
-      Map[WorkerName, RoutingId] end
-    new_stateless_partition_routing_ids(worker_name) =
-      local_stateless_partition_routing_id
-
-    for (w, r_id) in _stateless_partition_routing_ids.pairs() do
-      new_stateless_partition_routing_ids(w) = r_id
-      try
-        if w != worker_name then
-          let proxy_router = ProxyRouter(w, outgoing_boundaries(w)?,
-            ProxyAddress(w, r_id), auth)
-          proxies(w) = proxy_router
-        end
-      else
-        Fail()
-      end
-    end
-
-    StatelessPartitionRouter(_partition_id, worker_name, _workers,
-      local_partitions, local_partition_ids,
-      consume new_stateless_partition_routing_ids, consume proxies,
-      _steps_per_worker)
 
 class val HashedProxyRouter is Router
   let _target_worker_name: String

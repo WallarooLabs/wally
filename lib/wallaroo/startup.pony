@@ -95,11 +95,17 @@ actor Startup
     ifdef "autoscale" then
       @printf[I32]("****AUTOSCALE MODE is active****\n".cstring())
     end
+    ifdef "checkpoint_trace" then
+      @printf[I32]("****CHECKPOINT TRACE is active****\n".cstring())
+    end
     ifdef "trace" then
       @printf[I32]("****TRACE is active****\n".cstring())
     end
     ifdef "spike" then
       @printf[I32]("****SPIKE is active****\n".cstring())
+    end
+    ifdef debug then
+      @printf[I32]("****DEBUG is active****\n".cstring())
     end
 
     try
@@ -456,11 +462,10 @@ actor Startup
     try
       let auth = _env.root as AmbientAuth
 
-      let local_keys_filepath: FilePath = FilePath(auth,
-        _local_keys_file)?
+      let local_keys_filepath: FilePath = FilePath(auth, _local_keys_file)?
 
-      // TODO: Replace this with the name of this worker, whatever it
-      // happens to be.
+      // TODO: Replace this with the name of the initializer worker, whatever
+      // it happens to be.
       let initializer_name = "initializer"
 
       let metrics_conn = ReconnectingMetricsSink(m.metrics_host,
@@ -481,26 +486,6 @@ actor Startup
         else
           m.data_addrs("initializer")?
         end
-
-      let routing_id_gen = RoutingIdGenerator
-
-      // Generate state routing ids
-      let new_state_routing_ids_iso = recover iso Map[StateName, RoutingId] end
-      for state_name in m.partition_router_blueprints.keys() do
-        let next_id = routing_id_gen()
-        new_state_routing_ids_iso(state_name) = next_id
-      end
-      let new_state_routing_ids = consume val new_state_routing_ids_iso
-
-      // Generate stateless partition routing ids
-      let new_stateless_partition_routing_ids_iso =
-        recover iso Map[RoutingId, RoutingId] end
-      for p_id in m.stateless_partition_router_blueprints.keys() do
-        let next_id = routing_id_gen()
-        new_stateless_partition_routing_ids_iso(p_id) = next_id
-      end
-      let new_stateless_partition_routing_ids =
-        consume val new_stateless_partition_routing_ids_iso
 
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _the_journal = _start_journal(auth)
@@ -570,12 +555,9 @@ actor Startup
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
-        connections, this,
-        _startup_options.stop_the_world_pause, _is_joining, initializer_name,
-        barrier_initiator, checkpoint_initiator, autoscale_initiator,
-        m.sender_name where joining_state_routing_ids = new_state_routing_ids,
-        joining_stateless_partition_routing_ids =
-          new_stateless_partition_routing_ids)
+        connections, this, _startup_options.stop_the_world_pause, _is_joining,
+        initializer_name, barrier_initiator, checkpoint_initiator,
+        autoscale_initiator, m.sender_name)
       router_registry.set_event_log(event_log)
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
@@ -595,10 +577,7 @@ actor Startup
           barrier_initiator, _local_topology_file, _data_channel_file,
           _worker_names_file, local_keys_filepath,
           _the_journal as SimpleJournal, _startup_options.do_local_file_io
-          where is_joining = true,
-          joining_state_routing_ids = new_state_routing_ids,
-          joining_stateless_partition_routing_ids =
-            new_stateless_partition_routing_ids)
+          where is_joining = true)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -611,29 +590,7 @@ actor Startup
           _external_host.cstring(), _external_service.cstring())
       end
 
-      let dr_state_routing_ids = recover iso Map[RoutingId, StateName] end
-      for (s_name, r_id) in new_state_routing_ids.pairs() do
-        dr_state_routing_ids(r_id) = s_name
-      end
-      let dr_stateless_partition_routing_ids =
-        recover iso Map[RoutingId, RoutingId] end
-      for (p_id, r_id) in new_stateless_partition_routing_ids.pairs() do
-        dr_stateless_partition_routing_ids(r_id) = p_id
-      end
-
-      let data_router = DataRouter(_startup_options.worker_name,
-        recover Map[RoutingId, Consumer] end,
-        recover Map[StateName, Array[Step] val] end,
-        recover Map[RoutingId, Array[Step] val] end,
-        consume dr_state_routing_ids,
-        consume dr_stateless_partition_routing_ids)
-
-      router_registry.set_data_router(data_router)
-      var updated_topology = m.local_topology.add_state_routing_ids(
-        _startup_options.worker_name, new_state_routing_ids)
-      updated_topology = m.local_topology.add_stateless_partition_routing_ids(
-        _startup_options.worker_name, new_stateless_partition_routing_ids)
-      local_topology_initializer.update_topology(updated_topology)
+      local_topology_initializer.update_topology(m.local_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)
 
@@ -679,10 +636,14 @@ actor Startup
       // initialization order
       local_topology_initializer.create_connections(consume control_addrs,
         consume data_addrs)
-      local_topology_initializer.quick_initialize_data_connections()
-      local_topology_initializer.set_partition_router_blueprints(
-        m.partition_router_blueprints,
-        m.stateless_partition_router_blueprints)
+
+      //!@ remove?
+      // local_topology_initializer.quick_initialize_data_connections()
+
+      //!@ remove
+      // local_topology_initializer.set_partition_router_blueprints(
+      //   m.partition_router_blueprints,
+      //   m.stateless_partition_router_blueprints)
 
       // Dispose of temporary listener
       match _joining_listener
