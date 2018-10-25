@@ -416,26 +416,26 @@ If a notify is received in the introduction state, it should assume that it shou
 
 In the open state, the following actions are valid:
 
-    - MESSAGE: Connector -> Worker (production of stream data)
-        * if the EOS flag is set the next state is closed
-    - ACK: Worker -> Connector
-        * the are not 1-1 with MESSAGE frames
-    - NACK: Worker -> Connector (next state is reset)
+- MESSAGE: Connector -> Worker (production of stream data)
+    * if the EOS flag is set the next state is closed
+- ACK: Worker -> Connector
+    * the are not 1-1 with MESSAGE frames
+- NACK: Worker -> Connector (next state is reset)
 
 In the closed state, the following actions are valid:
 
-    - NOTIFY: Connector -> Worker (next state is open)
-        * reopens the stream
-    - NACK: Worker -> Connector (next state is reset)
-        * worker is requesting that the stream be reprocessed in some way
-    - ACK: Worker -> Connector
-        * these can arrive asynchronously and should be processed accordingly
+- NOTIFY: Connector -> Worker (next state is open)
+    * reopens the stream
+- NACK: Worker -> Connector (next state is reset)
+    * worker is requesting that the stream be reprocessed in some way
+- ACK: Worker -> Connector
+    * these can arrive asynchronously and should be processed accordingly
 
 In the reset state, the following actions are valid:
 
-    - NOTIFY: Connector -> Worker (next state is open)
-    - ACK: Worker -> Connector
-        * these can arrive asynchronously and should be processed accordingly
+- NOTIFY: Connector -> Worker (next state is open)
+- ACK: Worker -> Connector
+    * these can arrive asynchronously and should be processed accordingly
 
 NACKs may be handled when in invalid states but they MUST be treated as if there was a stack of NACKs. Each NACK will require a NOTIFY. If the connector or worker is unable to satisfy this, and error should be used and the session should be reset by disconnecting and redoing the handshake.
 
