@@ -395,9 +395,9 @@ The disconnected state has no communication but it is recommended that the conne
 Each stream during a session must be in one of the following states:
 
 ```
-                  +----------------------------+
-                  |                            |
-                  |                            V
+                  +-------------+--------------+
+                  |             |              |
+                  |             |              V
  +-------+     +------+     +--------+     +-------+
  | Intro +---->| Open +---->| Closed +---->| Reset |
  +-------+     +------+     +--------+     +-------+
