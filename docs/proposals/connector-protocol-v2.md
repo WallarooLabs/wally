@@ -1,5 +1,7 @@
 # Wallaroo Connector Protocol: source-only, async, credit based flow
 
+**STATUS: Accepted as draft, Under revision**
+
 This protocol provides a method for source connectors to transmit streams of messages to Wallaroo over a reliable transport like TCP/IP. The protocol does not require that any specific mechanism or party initiate the connection, thought a particular implementation may further specify this.
 
 Terms like connector, worker, and so on are assumed to be familiar to the reader. They may be refined where useful but familiarity with Wallaroo's application model should be enough. If not, it's recommended that the reader reviews the Wallaroo documentation first.
@@ -74,7 +76,7 @@ Message bit-flags:
 -define(EPHEMERAL, 1).
 -define(BOUNDARY, 2).
 -define(EOS, 4).
--define(REFERENCE, 8).
+-define(UNSTABLE_REFERENCE, 8).
 -define(EVENT_TIME, 16).
 ```
 
@@ -289,17 +291,23 @@ The worker should keep note of these mappings for metrics and debugging purposes
 
 Sending a message falls into two categories: boundaries and payloads.
 
-Boundary messages are treated as markers and carry no message payload. Boundary messages still require a message id which may be used as a point of reference for resuming or rewinding a stream if the REFERENCE flag is set to 1. Boundaries may also denote the end of the stream if there is no message to apply that notation to [D0].
+Boundary messages are treated as markers and carry no message payload. Boundary messages still require a message id which may be used as a point of reference for resuming or rewinding a stream if the UNSTABLE_REFERENCE flag is set to 0. Boundaries may also denote the end of the stream if there is no message to apply that notation to [D0].
 
 Payloads are what you might expect and are transmitted using the remaining bytes in the frame. Encoding is specific to the connector definition given in the application, so these bytes are effectively opaque. An optional event time can be applied to events, though the worker may not make use of this at the moment [D1].
 
 Message ids are currently 64 bits in this version of the protocol. To allow variable sized id representations in the future, we may add a message flag for this variant but chose not to for the first iteration. Wallaroo does not make any assumptions around monotonicity of message ids currently. There may be cases where this becomes an advantage to leverage when available but it is currently left out of scope for later consideration.
+
+### Message Bit-flags
+
+Messages currently have a 16bit field for bit-flags. Most of the bits are reserved for future use and should be set to zero. Some of the valid settings are defined in the constants above and explained in more detail below.
 
 ### Ephemeral Messaging
 
 Messages can be marked as ephemeral denoting that the identity and content of the message may not be retrieved later. The message id is still provided for correlation purposes but should not be treated as a unique identifier by itself. Each should be unique within a session but will not guarantee this property across sessions. This feature is designed to be used for one-shot mediums like UDP or trivial TCP.
 
 ### Points of Reference
+
+NOTE: This section is under revision and should be considered slightly out of date. Please ask in the integrations slack channel for more up to date information.
 
 Each message id may be remembered but it can be expensive to remember them all. Thus we have points of reference to define position in a stream relative to its content, assuming there is some determinism in the ordering each time the content is replayed. The issue with determinism is what drives this to be selective. Certain mediums can only provide coarser granularity during replay. This involves the guarantee that messages sorted before and after that point of reference form a disjoint set. The whole stream itself may not have a total order but the disjoint sets formed by each point of reference do have a total order.
 
@@ -441,7 +449,7 @@ TODO: Decide if this protocol should define a few frames that require a debug fl
 
 - use proper markdown for the footnotes
 - consider some ASCII notation rather than Erlang
-    - I like the Erlang and I did use bitstrings in more clever ways in an earlier version
+    - I like the Erlang and I did use bit-strings in more clever ways in an earlier version
     - now that it's all on the byte boundary this may not matter as much
     - Erlang is less ambiguous here but it's also unfamiliar to some
 - move the Erlang specs out of the main document and into the reference functions
