@@ -349,37 +349,6 @@ actor KafkaSink is (Sink & KafkaClientManager & KafkaProducer)
       Fail()
     end
 
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
-    i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
-  =>
-    ifdef "trace" then
-      @printf[I32]("replay_run in %s\n".cstring(), _name.cstring())
-    end
-    // TODO: implement this once state save/recover is handled
-    Fail()
-
-  be log_replay_finished()
-  =>
-    ifdef "trace" then
-      @printf[I32]("log_replay_finished in %s\n".cstring(), _name.cstring())
-    end
-    _recovering = false
-    if _mute_outstanding then
-      _unmute_upstreams()
-    end
-
-  be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq)
-  =>
-    ifdef "trace" then
-      @printf[I32]("replay_log_entry in %s\n".cstring(), _name.cstring())
-    end
-    // TODO: implement this for resilience/recovery
-    Fail()
-
   be initialize_seq_id_on_recovery(seq_id: SeqId) =>
     ifdef "trace" then
       @printf[I32]("initialize_seq_id_on_recovery in %s\n".cstring(), _name.cstring())

@@ -359,22 +359,7 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
 
 
 
-  //!@
-  /////////////
-  // STUFF TO REMOVE
-  ////////////
-  //!@
-  be log_replay_finished() =>
-    None
-  //!@
-  be replay_log_entry(resilient_id: RoutingId,
-    uid: U128, frac_ids: FractionalMessageId,
-    statechange_id: U64, payload: ByteSeq val)
-  =>
-    None
-  //!@
-  be initialize_seq_ids(seq_ids: Map[RoutingId, SeqId] val) =>
-    None
+
 
 
 

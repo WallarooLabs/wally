@@ -716,7 +716,7 @@ actor Connections is Cluster
 
   be inform_worker_of_boundary_count(target_worker: String, count: USize) =>
     try
-      let msg = ChannelMsgEncoder.replay_boundary_count(_worker_name, count,
+      let msg = ChannelMsgEncoder.inform_of_boundary_count(_worker_name, count,
         _auth)?
       _send_control(target_worker, msg)
       @printf[I32]("Informed %s that I have %lu boundaries to it\n".cstring(),

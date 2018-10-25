@@ -45,10 +45,10 @@ primitive ChannelMsgEncoder
     end
     wb.done()
 
-  fun data_channel(delivery_msg: ReplayableDeliveryMsg,
+  fun data_channel(delivery_msg: DeliveryMsg,
     producer_id: RoutingId, pipeline_time_spent: U64, seq_id: SeqId,
-    wb: Writer, auth: AmbientAuth,
-    latest_ts: U64, metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
+    wb: Writer, auth: AmbientAuth, latest_ts: U64, metrics_id: U16,
+    metric_name: String): Array[ByteSeq] val ?
   =>
     _encode(DataMsg(delivery_msg, producer_id, pipeline_time_spent, seq_id,
       latest_ts, metrics_id, metric_name), auth, wb)?
@@ -207,20 +207,10 @@ primitive ChannelMsgEncoder
   =>
     _encode(StartNormalDataSendingMsg(last_id_seen), auth)?
 
-  fun replay_complete(sender_name: String, boundary_id: U128,
-    auth: AmbientAuth): Array[ByteSeq] val ?
-  =>
-    _encode(ReplayCompleteMsg(sender_name, boundary_id), auth)?
-
   fun ack_data_received(sender_name: String, sender_step_id: RoutingId,
     seq_id: SeqId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(AckDataReceivedMsg(sender_name, sender_step_id, seq_id), auth)?
-
-  fun replay(delivery_bytes: Array[ByteSeq] val, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(ReplayMsg(delivery_bytes), auth)?
 
   fun request_recovery_info(worker_name: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -330,10 +320,10 @@ primitive ChannelMsgEncoder
   =>
     _encode(RequestBoundaryCountMsg(sender), auth)?
 
-  fun replay_boundary_count(sender: String, count: USize, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+  fun inform_of_boundary_count(sender: String, count: USize,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ReplayBoundaryCountMsg(sender, count), auth)?
+    _encode(InformOfBoundaryCountMsg(sender, count), auth)?
 
   fun announce_connections(control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
@@ -696,7 +686,7 @@ class val RequestBoundaryCountMsg is ChannelMsg
   new val create(from: String) =>
     sender_name = from
 
-class val ReplayBoundaryCountMsg is ChannelMsg
+class val InformOfBoundaryCountMsg is ChannelMsg
   let sender_name: String
   let boundary_count: USize
 
@@ -824,12 +814,12 @@ class val DataMsg is ChannelMsg
   let pipeline_time_spent: U64
   let producer_id: RoutingId
   let seq_id: SeqId
-  let delivery_msg: ReplayableDeliveryMsg
+  let delivery_msg: DeliveryMsg
   let latest_ts: U64
   let metrics_id: U16
   let metric_name: String
 
-  new val create(msg: ReplayableDeliveryMsg, producer_id': RoutingId,
+  new val create(msg: DeliveryMsg, producer_id': RoutingId,
     pipeline_time_spent': U64, seq_id': SeqId, latest_ts': U64,
     metrics_id': U16, metric_name': String)
   =>
@@ -840,37 +830,6 @@ class val DataMsg is ChannelMsg
     latest_ts = latest_ts'
     metrics_id = metrics_id'
     metric_name = metric_name'
-
-class val ReplayMsg is ChannelMsg
-  let data_bytes: Array[ByteSeq] val
-
-  new val create(db: Array[ByteSeq] val) =>
-    data_bytes = db
-
-  fun msg(auth: AmbientAuth): (DataMsg | ForwardBarrierMsg) ? =>
-    var size: USize = 0
-    for bytes in data_bytes.values() do
-      size = size + bytes.size()
-    end
-
-    let buffer = recover trn Array[U8](size) end
-    for bytes in data_bytes.values() do
-      buffer.append(bytes)
-    end
-
-    // trim first 4 bytes that are for size of tcp header
-    buffer.trim_in_place(4)
-
-    match ChannelMsgDecoder(consume buffer, auth)
-    | let r: DataMsg =>
-      r
-    | let fbm: ForwardBarrierMsg =>
-      fbm
-    else
-      @printf[I32]("Trouble reconstituting replayed data msg\n".cstring())
-      error
-    end
-
 
 trait val DeliveryMsg is ChannelMsg
   fun sender_name(): String
@@ -883,21 +842,10 @@ trait val DeliveryMsg is ChannelMsg
     consumer_ids: MapIs[Consumer, RoutingId] val,
     target_ids_to_route_ids: Map[RoutingId, RouteId] val,
     route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
-
-trait val ReplayableDeliveryMsg is DeliveryMsg
-  fun val replay_deliver(pipeline_time_spent: U64,
-    data_routes: Map[RoutingId, Consumer] val,
-    state_steps: Map[StateName, Array[Step] val] val,
-    stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val,
-    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
-  fun input(): Any val
   fun metric_name(): String
-  fun msg_uid(): MsgId
+  fun msg_uid(): U128
 
-class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
+class val ForwardMsg[D: Any val] is DeliveryMsg
   let _target_id: RoutingId
   let _sender_name: String
   let _data: D
@@ -949,23 +897,7 @@ class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
       metrics_id, worker_ingress_ts)
     route_id
 
-  fun val replay_deliver(pipeline_time_spent: U64,
-    data_routes: Map[RoutingId, Consumer] val,
-    state_steps: Map[StateName, Array[Step] val] val,
-    stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val,
-    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
-  =>
-    let target_step = data_routes(_target_id)?
-    let route_id = target_ids_to_route_ids(_target_id)?
-    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, _key,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
-      metrics_id, worker_ingress_ts)
-    route_id
-
-class val ForwardStatePartitionMsg[D: Any val] is ReplayableDeliveryMsg
+class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
   let _target_state_name: String
   let _target_key: Key
   let _sender_name: String
@@ -1023,34 +955,7 @@ class val ForwardStatePartitionMsg[D: Any val] is ReplayableDeliveryMsg
       error
     end
 
-  fun val replay_deliver(pipeline_time_spent: U64,
-    data_routes: Map[RoutingId, Consumer] val,
-    state_steps: Map[StateName, Array[Step] val] val,
-    stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val,
-    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
-  =>
-    try
-      let local_state_steps = state_steps(_target_state_name)?
-      let idx =
-        (HashKey(_target_key) % local_state_steps.size().u128()).usize()
-      let target_step = local_state_steps(idx)?
-
-      let target_id = consumer_ids(target_step)?
-      let route_id = target_ids_to_route_ids(target_id)?
-
-      target_step.replay_run[D](_metric_name, pipeline_time_spent,
-        _data, _target_key, producer_id, producer, _msg_uid, _frac_ids, seq_id,
-        route_id, latest_ts, metrics_id, worker_ingress_ts)
-
-      route_id
-    else
-      error
-    end
-
-class val ForwardStatelessPartitionMsg[D: Any val] is ReplayableDeliveryMsg
+class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
   let _target_partition_id: RoutingId
   let _key: Key
   let _sender_name: String
@@ -1092,39 +997,18 @@ class val ForwardStatelessPartitionMsg[D: Any val] is ReplayableDeliveryMsg
     end
 
     try
+      @printf[I32]("!@--1\n".cstring())
       let partitions = stateless_partitions(_target_partition_id)?
       let idx = HashKey(_key).usize() % partitions.size()
+      @printf[I32]("!@--2\n".cstring())
       let target_step = partitions(idx)?
 
+      @printf[I32]("!@--3\n".cstring())
       let target_id = consumer_ids(target_step)?
+      @printf[I32]("!@--4\n".cstring())
       let route_id = target_ids_to_route_ids(target_id)?
 
       target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
-        producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
-      route_id
-    else
-      error
-    end
-
-  fun val replay_deliver(pipeline_time_spent: U64,
-    data_routes: Map[RoutingId, Consumer] val,
-    state_steps: Map[StateName, Array[Step] val] val,
-    stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val,
-    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
-    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
-  =>
-    try
-      let partitions = stateless_partitions(_target_partition_id)?
-      let idx = HashKey(_key).usize() % partitions.size()
-      let target_step = partitions(idx)?
-
-      let target_id = consumer_ids(target_step)?
-      let route_id = target_ids_to_route_ids(target_id)?
-
-      target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, _key,
         producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id,
         latest_ts, metrics_id, worker_ingress_ts)
       route_id

@@ -107,10 +107,6 @@ actor DataReceivers
     conn.identify_data_receiver(dr, sender_boundary_id, highest_seq_id)
     _inform_subscribers(boundary_id, dr)
 
-    //!@ TODO: Remove
-  be start_replay_processing() =>
-    None
-
   be start_normal_message_processing() =>
     _initialized = true
     for dr in _data_receivers.values() do

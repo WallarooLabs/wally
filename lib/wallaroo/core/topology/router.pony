@@ -412,19 +412,6 @@ class val DataRouter is Equatable[DataRouter]
       Fail()
     end
 
-  fun replay_route(r_msg: ReplayableDeliveryMsg, pipeline_time_spent: U64,
-    producer_id: RoutingId, producer: DataReceiver ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    try
-      r_msg.replay_deliver(pipeline_time_spent,
-        _data_routes, _state_steps, _stateless_partitions, _consumer_ids,
-        _target_ids_to_route_ids, producer_id, producer, seq_id, latest_ts,
-        metrics_id, worker_ingress_ts)?
-    else
-      Fail()
-    end
-
   fun register_producer(input_id: RoutingId, output_id: RoutingId,
     producer: DataReceiver ref)
   =>
@@ -1241,7 +1228,7 @@ class val HashedProxyRouter is Router
       end
 
       match data
-      | let m: ReplayableDeliveryMsg =>
+      | let m: DeliveryMsg =>
         r.forward(m, pipeline_time_spent, producer_id, producer,
           latest_ts, metrics_id, metric_name, worker_ingress_ts)
       else
