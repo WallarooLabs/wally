@@ -71,8 +71,7 @@ class SourceConnector(object):
                 action for action in actions
                 if action[0] == "source_connector" and action[1] == params.connector_name)
         except:
-            print("Unable to find a source connector with the name " + params.connector_name)
-            exit(-1)
+            raise RuntimeError("Unable to find a source connector with the name " + params.connector_name)
         self.params = params
         self._encoder = encoder
         self._host = '127.0.0.1'
@@ -113,8 +112,7 @@ class SinkConnector(object):
                 action for action in actions
                 if action[0] == "sink_connector" and action[1] == params.connector_name)
         except:
-            print("Unable to find a sink connector with the name " + params.connector_name)
-            exit(-1)
+            raise RuntimeError("Unable to find a sink connector with the name " + params.connector_name)
         self.params = params
         self._decoder = decoder
         self._host = '127.0.0.1'
