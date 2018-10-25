@@ -79,7 +79,7 @@ us-west-2: ami-abcdef012
 
 ### Stop the Wallaroo Vagrant Box
 
-After all AMIs
+After all AMIs have been created successfully, run the following to stop the Vagrant virtual machine:
 
 ```bash
 vagrant halt
