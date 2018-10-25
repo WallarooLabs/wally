@@ -315,8 +315,11 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                     seq = int(sequence)
                 else:
                     seq = -1
-                meta = struct.pack('<H', len(part) + struct.calcsize('<q')) + part + struct.pack('<q', seq)
-                return struct.pack('<I', len(meta) + len(encoded)) + meta + encoded
+                # struct.calcsize('<q') = 8
+                meta = struct.pack('<H{}sq'.format(len(part)), len(part) + 8, part, seq)
+                return struct.pack(
+                    '<I{}s{}s'.format(len(meta), len(encoded)),
+                    len(meta) + len(encoded), meta, encoded)
 
     # Case 4: Decoder
     elif base_cls is OctetDecoder:
@@ -333,14 +336,16 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
     elif base_cls is ConnectorDecoder:
         class C(base_cls):
             def header_length(self):
-                return struct.calcsize('<I')
+                # struct.calcsize('<I')
+                return 4
             def payload_length(self, bs):
                 return struct.unpack("<I", bs)[0]
             def decode(self, bs):
                 meta_len = struct.unpack_from('<H', bs)[0]
                 # We dropping the metadata on the floor for now, slice out the
                 # remaining data for message decoding.
-                message_data = bs[struct.calcsize('<H') + meta_len :]
+                # struct.calcsize('<H') = 2
+                message_data = bs[2 + meta_len :]
                 return func(message_data)
             def decoder(self):
                 return func
