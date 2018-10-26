@@ -2,6 +2,6 @@
 
 . ./COMMON.sh
 
-RESILIENCE_FLAG="resilience=off"
+export RESILIENCE_FLAG="resilience=on"
 
 ./CLONE-CHECKOUT-MAKE.sh
