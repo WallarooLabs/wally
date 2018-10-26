@@ -301,7 +301,7 @@ class SinkAwaitAction(argparse.Action):
         if len(values) == 1:
             values.append('>I')
         elif len(values) != 2:
-            msg = ('Argumet "{f}" requires 1 or 2 arguments specifying '
+            msg = ('Argument "{f}" requires 1 or 2 arguments specifying '
                    'value [header]'.format(f=self.dest))
             raise argparse.ArgumentTypeError(msg)
         dest = getattr(namespace, self.dest)
@@ -309,7 +309,7 @@ class SinkAwaitAction(argparse.Action):
             dest = []
             setattr(namespace, self.dest, dest)
         if values[1]:
-            dest.append(struct.pack(values[1], len(values[0])) + values[0])
+            dest.append(struct.pack(values[1], len(values[0])) + values[0].encode())
         else:
             dest.append(values[0])
 
