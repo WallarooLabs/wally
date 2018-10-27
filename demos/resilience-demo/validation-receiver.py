@@ -13,10 +13,6 @@ import struct
 import sys
 import time
 
-print ('SLF: before stderr swap')
-sys.stdout = sys.stderr
-print ('SLF: after stderr swap')
-
 sink_hostsvc = sys.argv[1]
 expect = int(sys.argv[2])
 num_part_keys = int(sys.argv[3])

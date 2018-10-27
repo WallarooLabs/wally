@@ -3,13 +3,13 @@
 VALIDATION_TOTAL=2000
 VALIDATION_MIDWAY=1000
 
-export START_RECEIVER_CMD='env PYTHONPATH="./testing/tools/integration" \
+export START_RECEIVER_CMD='env PYTHONPATH="./demos/resilience-demo/lib" \
   python ./demos/resilience-demo/validation-receiver.py ${SERVER1}:5555 \
   '$VALIDATION_TOTAL' 11 600 ./received.txt'
 
 export WALLAROO_BIN="./testing/correctness/apps/multi_partition_detector/multi_partition_detector"
 
-export START_SENDER_CMD2='env PYTHONPATH="./testing/tools/integration" \
+export START_SENDER_CMD2='env PYTHONPATH="./demos/resilience-demo/lib" \
   python ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
   '$VALIDATION_MIDWAY' '$VALIDATION_TOTAL' 100 0.05 11'
 
