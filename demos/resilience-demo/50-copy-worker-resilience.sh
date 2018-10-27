@@ -20,6 +20,7 @@ if [ $RESTORE_VIA_JOURNAL_DUMP = y ]; then
 
     echo Extract journalled I/O ops from the journal file
     # ssh -n $USER@$TARGET_EXT "echo BEFORE ; ls -l /tmp/mar*"
+    ssh -n $USER@$TARGET_EXT "touch /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.local-keys"
     ssh -n $USER@$TARGET_EXT "cd wallaroo ; python ./testing/tools/dos-dumb-object-service/journal-dump.py /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.journal"
     echo Copy ${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog.journal '->' ${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog
     ssh -n $USER@$TARGET_EXT "cp /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog.journal /tmp/${WALLAROO_NAME}-worker${SOURCE_WORKER}.evlog"
