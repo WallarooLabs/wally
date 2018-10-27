@@ -90,6 +90,10 @@ On your laptop, run the following two commands:
 
     ./VERIFY.3worker.sh
 
+### Demo: stop all VERIFY* script processes
+
+    env WALLAROO_BIN=./testing/correctness/apps/multi_partition_detector/multi_partition_detector ./99-stop-everything.sh
+
 ### Demo: Start market-spread on a 2-worker cluster
 
     ./20-start-2worker-cluster.sh
@@ -108,15 +112,17 @@ The Wallaroo metrics UI agent will be available at `http://$SERVER1:4000`
 
 ### Demo: Crash a worker, then migrate the worker's state to a new machine then restart
 
-We will crash the `worker2` Wallaroo process on `$SERVER2` and then
-move `worker2`'s state over to `$SERVER4` then restart `worker2` on
-`$SERVER4`.
+Start a 3 worker cluster, then crash the `worker2` Wallaroo process on
+`$SERVER2` and then move `worker2`'s state over to `$SERVER4` then
+restart `worker2` on `$SERVER4`.
 
-    ./40-kill-worker.sh 2 2 && \
+    ./21-start-3worker-cluster.sh && \
+        ./30-start-sender.sh && sleep 3 && \
+        ./40-kill-worker.sh 2 2 && \
         ./50-copy-worker-resilience.sh 2 2 4 && \
         ./60-restart-worker.sh 2 4
 
-### Demo: move worker2 from $SERVER2 -> $SERVER4  then restart several times
+### Demo: move worker2 from $SERVER2 -> $SERVER4 then restart worker2 several times
 
     ./20-start-2worker-cluster.sh && \
         ./30-start-sender.sh && sleep 3 && \

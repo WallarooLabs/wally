@@ -14,7 +14,7 @@ fi
 SKIP_DOS_SERVER_START=y
 . ./START-DOS-SERVER.sh
 
-ssh -n $USER@$TARGET_EXT "cd wallaroo ; mkdir -p /tmp/run-dir/OLD; mv /tmp/run-dir/market*out /tmp/run-dir/OLD; $WALLAROO_BIN -i ${SERVER1}:7000,${SERVER1}:7001 -o ${SERVER1}:5555 -m ${SERVER1}:5001 -c ${SERVER1}:12500 -n worker${SOURCE_WORKER} --my-control ${TARGET}:3131 --my-data ${TARGET}:3132 $W_DOS_SERVER_ARG --ponynoblock > /tmp/run-dir/${WALLAROO_NAME}${SOURCE_WORKER}.`date +%s`.out 2>&1" > /dev/null 2>&1 &
+ssh -n $USER@$TARGET_EXT "cd wallaroo ; mkdir -p /tmp/run-dir/OLD; mv /tmp/run-dir/market*out /tmp/run-dir/OLD; $WALLAROO_BIN --run-with-resilience -i ${SERVER1}:7000,${SERVER1}:7001 -o ${SERVER1}:5555 -m ${SERVER1}:5001 -c ${SERVER1}:12500 -n worker${SOURCE_WORKER} --my-control ${TARGET}:3131 --my-data ${TARGET}:3132 $W_DOS_SERVER_ARG --ponynoblock > /tmp/run-dir/${WALLAROO_NAME}${SOURCE_WORKER}.`date +%s`.out 2>&1" > /dev/null 2>&1 &
 if [ -z "$RESTART_SLEEP" ]; then
     sleep 2
 else

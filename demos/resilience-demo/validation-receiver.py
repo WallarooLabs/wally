@@ -32,7 +32,7 @@ for p in range(0, num_part_keys):
 	last_value = '(key_{}.TraceID-1.TraceWindow-1,[{}])' \
 		.format(p, ','.join((str(expect-v) for v in range(3,-1,-1))))
 	await_values.append(last_value)
-print "await_values = %s" % await_values
+print("await_values = %s" % await_values)
 
 sink = Sink(sink_host, int(sink_port), mode='framed')
 sink.start()
