@@ -58,7 +58,7 @@ USER=`whoami`
 REPO_URL=https://github.com/WallarooLabs/wallaroo.git
 
 # Source branch name to test with
-REPO_BRANCH=resilience-demo-patches
+REPO_BRANCH=master
 
 # If the environment variable WALLAROO_BIN is set, then use it
 # for the path to our Wallaroo executable.

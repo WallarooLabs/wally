@@ -17,7 +17,7 @@ sleep 1
 if [ ! -z "$START_RECEIVER_CMD" ]; then
     echo Start receiver via external var
     CMD=`eval echo $START_RECEIVER_CMD`
-    echo "CMD = $CMD"
+    #echo "CMD = $CMD"
     ssh -n $USER@$SERVER1_EXT "cd wallaroo ; $CMD > /tmp/run-dir/receiver.out 2>&1" > /dev/null 2>&1 &
 else
     echo Start receiver
