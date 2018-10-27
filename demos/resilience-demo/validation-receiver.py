@@ -1,12 +1,4 @@
-
-from end_points import (
-						 Reader,
-						 Sink,
-						 sequence_generator
-	)
-from control import (
-					 SinkAwaitValue
-	)
+from testing.tools.integration.__init__ import *
 
 import re
 import struct
@@ -33,6 +25,7 @@ for p in range(0, num_part_keys):
 		.format(p, ','.join((str(expect-v) for v in range(3,-1,-1))))
 	await_values.append(last_value)
 print("await_values = %s" % await_values)
+sys.stdout.flush()
 
 sink = Sink(sink_host, int(sink_port), mode='framed')
 sink.start()

@@ -1,22 +1,22 @@
 #!/bin/sh
 
-export START_SENDER_CMD1='env PYTHONPATH="./testing/tools/integration" \
-  python ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
+export START_SENDER_CMD1='env PYTHONPATH="." \
+  python3 ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
   0 500 100 0.05 11'
-export START_SENDER_CMD1b='env PYTHONPATH="./testing/tools/integration" \
-  python ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
+export START_SENDER_CMD1b='env PYTHONPATH="." \
+  python3 ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
   500 600 100 0.05 11'
-export START_SENDER_CMD1c='env PYTHONPATH="./testing/tools/integration" \
-  python ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
+export START_SENDER_CMD1c='env PYTHONPATH="." \
+  python3 ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
   600 700 100 0.05 11'
-export START_SENDER_CMD1d='env PYTHONPATH="./testing/tools/integration" \
-  python ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
+export START_SENDER_CMD1d='env PYTHONPATH="." \
+  python3 ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
   700 800 100 0.05 11'
-export START_SENDER_CMD1e='env PYTHONPATH="./testing/tools/integration" \
-  python ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
+export START_SENDER_CMD1e='env PYTHONPATH="." \
+  python3 ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
   800 900 100 0.05 11'
-export START_SENDER_CMD1f='env PYTHONPATH="./testing/tools/integration" \
-  python ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
+export START_SENDER_CMD1f='env PYTHONPATH="." \
+  python3 ./demos/resilience-demo/validation-sender.py ${SERVER1}:7000 \
   900 1000 100 0.05 11'
 
 ssh -n $USER@$SERVER1_EXT "cd wallaroo ; ./demos/resilience-demo/received-wait-for.sh ./received.txt 11 500 20" & P2=$!
