@@ -1145,16 +1145,14 @@ class val PyPipelineTree
     | "to_sink" =>
       pipeline = pipeline.to_sink(
         _SinkConfig.from_tuple(@PyTuple_GetItem(stage, 1), env)?)
-    // !@ TODO: Implement when to_sinks is available
-    // | "to_sinks" =>
-    //   let list = @PyTuple_GetItem(stage, 1)
-    //   let sink_count = @PyList_Size(list)
-    //   let sinks = Array[SinkConfig[PyData val]]
-    //   for i in Range(0, sink_count) do
-    //     let sink = _SinkConfig.from_tuple(@PyList_GetItem(list, i), env)?
-    //     sinks.push(sink)
-    //   end
-    //   pipeline = pipeline.to_sinks(sinks)
-    //   latest
+    | "to_sinks" =>
+      let list = @PyTuple_GetItem(stage, 1)
+      let sink_count = @PyList_Size(list)
+      let sinks = Array[SinkConfig[PyData val]]
+      for i in Range(0, sink_count) do
+        let sink = _SinkConfig.from_tuple(@PyList_GetItem(list, i), env)?
+        sinks.push(sink)
+      end
+      pipeline = pipeline.to_sinks(sinks)
     end
     pipeline

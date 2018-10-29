@@ -53,17 +53,17 @@ def application_setup(args):
             wallaroo.TCPSourceConfig(nbbo_host, nbbo_port,
                                      market_data_decoder))
 
+    # !@ remove these tests
     # orders2 = wallaroo.source("Orders2",
     #         wallaroo.TCPSourceConfig("127.0.0.1", "9998", order_decoder))
 
     # orders3 = wallaroo.source("Orders3",
     #         wallaroo.TCPSourceConfig("127.0.0.1", "9997", order_decoder))
 
-    # # pipeline1 = orders\
     # pipeline1 = orders.merge(market_data)\
     #     .to(check_market_data)
 
-    # pipeline2 = orders2\
+    # pipeline2 = orders2.merge(orders3)\
     #     .to(check_market_data)
 
     # pipeline = pipeline1.merge(pipeline2)\
@@ -86,10 +86,6 @@ class SymbolData(object):
     def __init__(self, last_bid=0.0, last_offer=0.0, should_reject_trades=True):
         self.last_bid = last_bid
         self.last_offer = last_offer
-
-        #!@
-        # self.should_reject_trades = False
-
         self.should_reject_trades = should_reject_trades
 
 @wallaroo.key_extractor

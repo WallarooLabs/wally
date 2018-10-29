@@ -57,8 +57,8 @@ trait BasicPipeline
   fun is_finished(): Bool
   fun size(): USize
 
-type Stage is (RunnerBuilder | SinkBuilder | SourceConfigWrapper | Shuffle |
-  GroupByKey)
+type Stage is (RunnerBuilder | SinkBuilder | Array[SinkBuilder] val |
+  SourceConfigWrapper | Shuffle | GroupByKey)
 
 class Pipeline[Out: Any val] is BasicPipeline
   let _pipeline_id: USize
@@ -167,11 +167,35 @@ class Pipeline[Out: Any val] is BasicPipeline
       Pipeline[Next](_pipeline_id, _stages, _dag_sink_ids)
     end
 
-    //!@ TODO: What about multiple sinks?
   fun ref to_sink(sink_information: SinkConfig[Out]): Pipeline[Out] =>
     if not _finished then
       let sink_builder = sink_information()
       let node_id = _stages.add_node(sink_builder)
+      try
+        for dag_sink_id in _dag_sink_ids.values() do
+          _stages.add_edge(dag_sink_id, node_id)?
+        end
+      else
+        Fail()
+      end
+      Pipeline[Out](_pipeline_id, _stages, [node_id]
+        where finished = true)
+    else
+      _try_add_to_finished_pipeline()
+      Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids)
+    end
+
+  fun ref to_sinks(sink_configs: Array[SinkConfig[Out]] box): Pipeline[Out] =>
+    if not _finished then
+      if sink_configs.size() == 0 then
+        FatalUserError("You must specify at least one sink when using " +
+          "to_sinks()")
+      end
+      let sink_bs = recover iso Array[SinkBuilder] end
+      for config in sink_configs.values() do
+        sink_bs.push(config())
+      end
+      let node_id = _stages.add_node(consume sink_bs)
       try
         for dag_sink_id in _dag_sink_ids.values() do
           _stages.add_edge(dag_sink_id, node_id)?

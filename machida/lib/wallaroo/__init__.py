@@ -102,28 +102,27 @@ class Pipeline(object):
             self._pipeline_tree.add_stage(("to_sink", sink_config.to_tuple()))
         return self
 
+    def to_sinks(self, sink_configs):
+        return self.clone().__to_sinks__(sink_configs)
+
+    def __to_sinks__(self, sink_configs):
+        sinks = []
+        for sc in sink_configs:
+            if isinstance(sc, str):
+                (port, encoder) = self._connectors[sc]
+                connector = wallaroo.experimental.SinkConnectorConfig(host='localhost', port=port, encoder=encoder)
+                sinks.append(connector.to_tuple())
+            else:
+                sinks.append(sc.to_tuple())
+        self._pipeline_tree.add_stage(("to_sinks", sinks))
+        return self
+
     def key_by(self, key_extractor):
         return self.clone().__key_by__(key_extractor)
 
     def __key_by__(self, key_extractor):
         self._pipeline_tree.add_stage(("key_by", key_extractor))
         return self
-
-    #!@ TODO: Support when this is available
-    # def to_sinks(self, sink_configs):
-    # return self.clone().__to_sinks__(sink_configs)
-
-    # def __to_sinks__(self, sink_configs):
-    #     sinks = []
-    #     for sc in sink_configs:
-    #         if isinstance(sc, str):
-    #             (port, encoder) = self._connectors[sc]
-    #             connector = wallaroo.experimental.SinkConnectorConfig(host='localhost', port=port, encoder=encoder)
-    #             sinks.append(connector.to_tuple())
-    #         else:
-    #             sinks.append(sc.to_tuple())
-    #     self._pipeline_tree.add_stage(("to_sinks", sinks))
-    #     return self
 
     def merge(self, pipeline):
         return self.clone().__merge__(pipeline.clone())

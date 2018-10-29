@@ -480,7 +480,9 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         _save_local_topology()
+        @printf[I32]("!@ LocalTopology saved\n".cstring())
         _save_worker_names()
+        @printf[I32]("!@ worker names saved\n".cstring())
 
         // Determine if we need to read in local keys for our state collections
         let local_keys: Map[StateName, SetIs[Key] val] val =
@@ -803,6 +805,36 @@ actor LocalTopologyInitializer is LayoutInitializer
               data_routes(next_id) = sink
 
               let sink_router = DirectRouter(next_id, sink)
+              built_routers(next_id) = sink_router
+            | let multi_sink_builder: MultiSinkBuilder =>
+            ////////////////////////////////////
+            // MULTI SINK BUILDER
+            ////////////////////////////////////
+              let next_id = multi_sink_builder.id()
+              let routers = recover iso Array[Router] end
+              let sink_ids = Array[RoutingId]
+              for s_id in t.routing_ids()(next_id)?.values() do
+                sink_ids.push(s_id)
+              end
+              let sink_reporter = MetricsReporter(t.name(), _worker_name,
+                _metrics_conn)
+
+              let sinks = multi_sink_builder(_worker_name,
+                consume sink_reporter, _event_log, _recovering,
+                _barrier_initiator, _checkpoint_initiator, _env, _auth,
+                _outgoing_boundaries)
+
+              for i in Range[USize](0, sinks.size()) do
+                let sink = sinks(i)?
+                let sink_id = sink_ids(i)?
+                _connections.register_disposable(sink)
+                _initializables.set(sink)
+                data_routes(sink_id) = sink
+                let next_router = DirectRouter(sink_id, sink)
+                routers.push(next_router)
+              end
+
+              let sink_router = MultiRouter(consume routers)
               built_routers(next_id) = sink_router
             | let source_data: SourceData =>
             /////////////////
@@ -1304,13 +1336,16 @@ actor LocalTopologyInitializer is LayoutInitializer
           Fail()
           error
         end
+        @printf[I32]("!@ Created local_topology_file\n".cstring())
         // TODO: Back up old file before clearing it?
         let file = AsyncJournalledFile(local_topology_file, _the_journal,
           _auth, _do_local_file_io)
+        @printf[I32]("!@ Created AsyncJournalledFile\n".cstring())
         // Clear contents of file.
         file.set_length(0)
         let wb = Writer
         let sa = SerialiseAuth(_auth)
+        @printf[I32]("!@ About to serizlie topology\n".cstring())
         let s = try
           Serialised(sa, t)?
         else
@@ -1318,9 +1353,11 @@ actor LocalTopologyInitializer is LayoutInitializer
           Fail()
           error
         end
+        @printf[I32]("!@ Serialized topology\n".cstring())
         let osa = OutputSerialisedAuth(_auth)
         let serialised_topology: Array[U8] val = s.output(osa)
         wb.write(serialised_topology)
+        @printf[I32]("!@ wb.write(serialised_topology)\n".cstring())
         file.writev(recover val wb.done() end)
         file.sync()
         file.dispose()
