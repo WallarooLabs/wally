@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../Makefile
+include ../../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times
@@ -40,10 +40,10 @@ PARALLEL_CLASSIFIER_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-examples-python-parallel_classifier: build-machida
-integration-tests-examples-python-parallel_classifier: build-examples-python-parallel_classifier
-integration-tests-examples-python-parallel_classifier: parallel_classifier_py_test
-clean-examples-python-alphabet: parallel_classifier_py_clean
+build-testing-correctness-apps-python-parallel_classifier: build-machida
+integration-tests-testing-correctness-apps-python-parallel_classifier: build-testing-correctness-apps-python-parallel_classifier
+integration-tests-testing-correctness-apps-python-parallel_classifier: parallel_classifier_py_test
+clean-testing-correctness-apps-python-alphabet: parallel_classifier_py_clean
 
 INPUT_ITEMS:=2500
 .PHONY: generate_inputs
