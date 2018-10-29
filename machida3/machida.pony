@@ -865,6 +865,7 @@ primitive Machida
         end
         if (err != 0) or ps.is_null() then
           @printf[U32]("unexpected non-string value\n".cstring())
+          print_errors()
           Fail()
           Array[U8]
         elseif ps_size < 0 then
