@@ -19,7 +19,6 @@ virtualenv --python=python2 ENV
 virtualenv --python=python3 ENV
 {%- endcodetabs %}
 
-
 This will create a directory named `ENV` and set up all of the scripts and dependencies required to run an isolated Python2 virtual environment, located in `ENV`.
 
 ### Import Errors when Loading your Application
@@ -68,6 +67,8 @@ rm -fr ENV
 
 ## Using Virtualenv
 
+It is assumed that every shell you start for Wallaroo was set up by following [Starting a new shell for Wallaroo](/book/getting-started/starting-a-new-shell.md) for your environment.
+
 To use the virtualenv, activate it in your shell. In the bash shell, this command is
 
 ```bash
@@ -95,7 +96,7 @@ To run a Wallaroo application with virtualenv, run it within an activated shell:
 {% codetabs name="Python 2.7", type="py" -%}
 source ENV/bin/activate
 export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
-$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/build/machida --application-module celsius \
+machida --application-module celsius \
   --in 127.0.0.1:7000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker-name \
   --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1 \
@@ -103,7 +104,7 @@ $HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/build/machi
 {% language name="Python 3", type="py" -%}
 source ENV/bin/activate
 export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
-$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida3/build/machida3 --application-module celsius \
+machida3 --application-module celsius \
   --in 127.0.0.1:7000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker-name \
   --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1 \
@@ -115,13 +116,13 @@ Please be aware that you'll still need to setup a source and sink as well. To le
 To run a sink for our example with Data Receiver, run
 
 ```bash
-$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/utils/data_receiver/data_receiver --framed --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock
+data_receiver --framed --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock
 ```
 
 or if you prefer to log the output into a file:
 
 ```bash
-$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/utils/data_receiver/data_receiver \
+data_receiver \
 --framed --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock > output
 ```
 
