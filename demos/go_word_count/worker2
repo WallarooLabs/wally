@@ -2,4 +2,5 @@
 
 ./go_word_count --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --name worker2 -j 127.0.0.1:6000 --ponynoblock
+  --name worker2 -j 127.0.0.1:6000 --ponynoblock \
+  --my-control 127.0.0.1:13302 --my-data 127.0.0.1:13402

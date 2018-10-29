@@ -242,11 +242,10 @@ primitive WallarooConfig
       end
     end
 
-    if (not so.is_initializer and (so.dos_host != "")) and
+    if not so.is_initializer and
       ((so.my_d_host == "") or (so.my_c_host == "")) then
-        FatalUserError("Non-initializer nodes that use " +
-          "--resilience-dos-server must specify --my-control and --my-data " +
-          "flags")
+        FatalUserError("Non-initializer nodes must specify --my-control and " +
+          " --my-data flags")
     end
 
     ifdef "resilience" then
