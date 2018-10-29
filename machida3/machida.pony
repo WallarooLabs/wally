@@ -866,9 +866,9 @@ primitive Machida
         if (err != 0) or ps.is_null() then
           @printf[U32]("unexpected non-string value\n".cstring())
           Fail()
-          recover Array[U8] end
+          Array[U8]
         elseif ps_size < 0 then
-          recover Array[U8] end
+          Array[U8]
         else
           Array[U8].from_cpointer(ps, ps_size.usize()).clone()
         end
