@@ -87,6 +87,7 @@ use @is_py_none[I32](o: Pointer[U8] box)
 use @py_incref[None](o: Pointer[U8] box)
 use @py_decref[None](o: Pointer[U8] box)
 use @py_list_check[I32](b: Pointer[U8] box)
+use @py_bytes_check[I32](b: Pointer[U8] tag)
 use @py_bytes_or_unicode_size[USize](str: Pointer[U8] tag)
 use @py_bytes_or_unicode_as_char[Pointer[U8]](str: Pointer[U8] tag)
 
@@ -95,9 +96,11 @@ use @PyErr_Clear[None]()
 use @PyErr_Occurred[Pointer[U8]]()
 use @PyErr_print[None]()
 use @PyTuple_GetItem[Pointer[U8] val](t: Pointer[U8] val, idx: USize)
+use @PyBytes_AsStringAndSize[I32](str: Pointer[U8] tag, out: Pointer[Pointer[U8]], size: Pointer[ISize] box)
 use @PyBytes_Size[USize](str: Pointer[U8] box)
 use @PyUnicode_GetLength[USize](str: Pointer[U8] box)
 use @PyUnicode_AsUTF8[Pointer[U8]](str: Pointer[U8] box)
+use @PyUnicode_AsUTF8AndSize[Pointer[U8]](str: Pointer[U8] tag, size: Pointer[ISize] box)
 use @PyUnicode_FromStringAndSize[Pointer[U8]](str: Pointer[U8] tag, size: USize)
 use @PyList_New[Pointer[U8] val](size: USize)
 use @PyList_Size[USize](l: Pointer[U8] box)
@@ -424,8 +427,7 @@ class PyTCPEncoder is TCPSinkEncoder[PyData val]
       if not byte_string.is_null() then
         let arr = recover val
           // create a temporary Array[U8] wrapper for the C array, then clone it
-          Array[U8].from_cpointer(@py_bytes_or_unicode_as_char(byte_buffer),
-            @PyBytes_Size(byte_buffer)).clone()
+          Machida.py_bytes_or_unicode_to_pony_array(byte_buffer)
         end
         Machida.dec_ref(byte_buffer)
         wb.write(arr)
@@ -466,17 +468,15 @@ class PyKafkaEncoder is KafkaSinkEncoder[PyData val]
 
     let out = wb.>write(recover val
         // create a temporary Array[U8] wrapper for the C array, then clone it
-        Array[U8].from_cpointer(@py_bytes_or_unicode_as_char(out_p),
-          @PyBytes_Size(out_p)).clone()
+        Machida.py_bytes_or_unicode_to_pony_array(out_p)
       end).done()
 
     let key = if Machida.is_py_none(key_p) then
         None
       else
         wb.>write(recover
-          Array[U8].from_cpointer(@py_bytes_or_unicode_as_char(out_p),
-            @PyBytes_Size(out_p)).clone()
-          end).done()
+          Machida.py_bytes_or_unicode_to_pony_array(key_p)
+        end).done()
       end
 
     let part_id = if Machida.is_py_none(part_id_p) then
@@ -834,10 +834,47 @@ primitive Machida
 
   fun py_bytes_or_unicode_to_pony_string(p: Pointer[U8] box): String =>
     recover
-      let ps = @py_bytes_or_unicode_as_char(p)
-      let ps_size = @py_bytes_or_unicode_size(p)
-      String.copy_cpointer(ps, ps_size)
+      var ps: Pointer[U8] = Pointer[U8]
+      var ps_size: ISize = 0
+      var err: I32 = 0
+      if @py_bytes_check(p) == 0 then
+        ps = @PyUnicode_AsUTF8AndSize(p, addressof ps_size)
+      else
+        err = @PyBytes_AsStringAndSize(p, addressof ps,  addressof ps_size)
+      end
+      if (err != 0) or ps.is_null() then
+        @printf[U32]("unexpected non-string value\n".cstring())
+        Fail()
+        String
+      elseif ps_size < 0 then
+        String
+      else
+        String.copy_cpointer(ps, ps_size.usize())
+      end
     end
+
+    fun py_bytes_or_unicode_to_pony_array(p: Pointer[U8] box): Array[U8] iso^ =>
+      recover
+        var ps: Pointer[U8] = Pointer[U8]
+        var ps_size: ISize = 0
+        var err: I32 = 0
+        if @py_bytes_check(p) == 0 then
+          ps = @PyUnicode_AsUTF8AndSize(p, addressof ps_size)
+        else
+          err = @PyBytes_AsStringAndSize(p, addressof ps, addressof ps_size)
+        end
+        if (err != 0) or ps.is_null() then
+          @printf[U32]("unexpected non-string value\n".cstring())
+          Fail()
+          recover Array[U8] end
+        elseif ps_size < 0 then
+          recover Array[U8] end
+        else
+          Array[U8].from_cpointer(ps, ps_size.usize()).clone()
+        end
+      end
+
+
 
   fun set_user_serialization_fns(m: Pointer[U8] val) =>
     @set_user_serialization_fns(m)
