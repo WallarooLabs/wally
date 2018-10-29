@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="2652f12abccbccfde0fc2a46627a4d4c  -"
+MD5="150361a08d2319097bdf054a4e8103fb  -"
 
 set -eEuo pipefail
 
@@ -62,7 +62,6 @@ centos-7
 rhel-7
 ol-7
 amzn-2
-fedora-26
 fedora-27
 fedora-28
 ubuntu-trusty

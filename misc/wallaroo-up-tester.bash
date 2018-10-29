@@ -83,7 +83,6 @@ declare -a DISTROS_TO_TEST=(
 "ubuntu:bionic,ubuntu/bionic64"
 "ubuntu:artful,ubuntu/artful64"
 "centos:7,centos/7"
-"fedora:26,fedora/26-cloud-base"
 "fedora:27,fedora/27-cloud-base"
 "fedora:28,fedora/28-cloud-base"
 "amazonlinux:2,gbailey/amzn2"
@@ -249,7 +248,7 @@ do
   if [[ "${DOCKER_TEST}" == "true" ]]; then
     # set and create tmp directory for this test run
     tmp_for_run="${TESTING_TMP}/docker/${docker_distro/:/-}"
-    mkdir -p "${tmp_for_run}" 
+    mkdir -p "${tmp_for_run}"
     ${SUDO_COMMAND} rm -rf "${tmp_for_run}/"*
     pushd "${tmp_for_run}"
     LOG_FILE="${tmp_for_run}/docker.log"
@@ -280,7 +279,7 @@ do
     # set and create tmp directory for this test run
     echo "vagrant: $vagrant_distro"
     tmp_for_run="${TESTING_TMP}/vagrant/${vagrant_distro/\//-}"
-    mkdir -p "${tmp_for_run}" 
+    mkdir -p "${tmp_for_run}"
     ${SUDO_COMMAND} rm -rf "${tmp_for_run}/"*
     pushd "${tmp_for_run}"
     LOG_FILE="${tmp_for_run}/vagrant.log"

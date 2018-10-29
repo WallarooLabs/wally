@@ -1,6 +1,6 @@
 # Setting Up Your Wallaroo Development Environment using Wallaroo Up
 
-Wallaroo Up has been tested on Ubuntu Artful/Bionic/Trusty/Xenial, Fedora 26/27/28, CentOS 7, Debian Jessie/Stretch/Buster (Testing), Oracle Linux 7, and Amazon Linux 2 releases. It should also work on Red Hat Enterprise Linux 7.
+Wallaroo Up has been tested on Ubuntu Artful/Bionic/Trusty/Xenial, Fedora 27/28, CentOS 7, Debian Jessie/Stretch/Buster (Testing), Oracle Linux 7, and Amazon Linux 2 releases. It should also work on Red Hat Enterprise Linux 7.
 
 ## Memory requirements
 
