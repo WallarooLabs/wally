@@ -116,6 +116,11 @@ actor ApplicationDistributor is Distributor
           let egress_builder = EgressBuilder(_app_name, sink_node.id,
             sb)
           interm_graph.add_node(egress_builder, sink_node.id)
+        | let sbs: Array[SinkBuilder] val =>
+          // !@ Passing in app_name for pipeline name
+          let multi_sink_builder = MultiSinkBuilder(_app_name, sink_node.id,
+            sbs)
+          interm_graph.add_node(multi_sink_builder, sink_node.id)
         else
           // All sinks in logical graph should be Wallaroo sinks
           Fail()
@@ -299,11 +304,18 @@ actor ApplicationDistributor is Distributor
         | let gbk: GroupByKey =>
           for i_node in node.ins() do
             groupers(i_node.id) = gbk
-            // Reroute inputs to our outputs
+
+            // Reroute inputs to our outputs.
             for edge_target in node.outs() do
               edges.insert_if_absent(i_node.id, SetIs[U128])?
                 .set(edge_target.id)
             end
+            // Remove edges created from this node id, since we rerouted
+            // our input nodes to our output nodes.
+            if edges.contains(node.id) then
+              edges.remove(node.id)?
+            end
+
             if not frontier.contains(i_node.id) and
               not processed.contains(i_node.id)
             then
@@ -324,6 +336,7 @@ actor ApplicationDistributor is Distributor
             recover Array[RunnerBuilder] end where parallelism' = 0)
           let source_data = SourceData(node.id, source_name, r_builder,
             sc.source_listener_builder_builder(), grouper)
+
           interm_graph.add_node(source_data, node.id)
         else
           // This shouldn't be any other kind

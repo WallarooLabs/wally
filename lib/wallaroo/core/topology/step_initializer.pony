@@ -35,7 +35,8 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 
 
-type StepInitializer is (StepBuilder | SourceData | EgressBuilder)
+type StepInitializer is (StepBuilder | SourceData | EgressBuilder |
+  MultiSinkBuilder)
 
 class val StepBuilder
   let _app_name: String
@@ -150,3 +151,41 @@ class val EgressBuilder
   =>
     _sink_builder(_name, event_log, reporter.clone(), env, barrier_initiator,
       checkpoint_initiator, recovering)
+
+class val MultiSinkBuilder
+  let _name: String
+  let _pipeline_name: String
+  let _id: RoutingId
+  let _sink_builders: Array[SinkBuilder] val
+
+  new val create(pipeline_name': String, id': RoutingId,
+    sink_builders: Array[SinkBuilder] val)
+  =>
+    _pipeline_name = pipeline_name'
+    _name = _pipeline_name + " sinks"
+    _id = id'
+    _sink_builders = sink_builders
+
+  fun name(): String => _name
+  fun routing_group(): (StateName | RoutingId | None) => None
+  fun pipeline_name(): String => _pipeline_name
+  fun id(): RoutingId => _id
+  fun is_prestate(): Bool => false
+  fun is_stateful(): Bool => false
+  fun is_partitioned(): Bool => false
+  fun parallelism(): USize => _sink_builders.size()
+
+  fun apply(worker_name: String, reporter: MetricsReporter ref,
+    event_log: EventLog, recovering: Bool,
+    barrier_initiator: BarrierInitiator,
+    checkpoint_initiator: CheckpointInitiator, env: Env, auth: AmbientAuth,
+    proxies: Map[String, OutgoingBoundary] val =
+      recover Map[String, OutgoingBoundary] end): Array[Sink] val
+  =>
+    let sinks = recover iso Array[Sink] end
+    for sb in _sink_builders.values() do
+      let next_sink = sb(_name, event_log, reporter.clone(), env,
+        barrier_initiator, checkpoint_initiator, recovering)
+      sinks.push(next_sink)
+    end
+    consume sinks
