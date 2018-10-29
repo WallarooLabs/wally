@@ -40,7 +40,7 @@ def application_setup(args):
 def decoder(bs):
     try:
       return float(bs.decode("utf-8"))
-    except ValueError,e:
+    except ValueError as e:
       return 0.0
 
 @wallaroo.computation(name="multiply by 1.8")
