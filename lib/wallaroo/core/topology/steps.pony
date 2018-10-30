@@ -503,7 +503,11 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         _id.string().cstring())
     end
     ifdef debug then
-      Invariant(_step_message_processor.barrier_in_progress())
+      Invariant(
+        match _step_message_processor
+        | let dsmp: DisposedStepMessageProcessor => true
+        else _step_message_processor.barrier_in_progress() end
+      )
     end
     match barrier_token
     | let sbt: CheckpointBarrierToken =>

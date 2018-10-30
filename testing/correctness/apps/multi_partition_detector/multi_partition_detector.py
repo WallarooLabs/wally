@@ -34,10 +34,6 @@ def application_setup(args):
                     help="Number of partitions for use with internal source")
     pargs, _ = parser.parse_known_args(args)
 
-
-    partitions = []
-
-    ab = wallaroo.ApplicationBuilder("Multi Partition Detector")
     if pargs.gen_source:
         print("Using internal source generator")
         source = wallaroo.GenSourceConfig(MultiPartitionGenerator(pargs.partitions))
@@ -45,16 +41,17 @@ def application_setup(args):
         print("Using TCP Source")
         in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
         source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
-    ab.new_pipeline("Detector", source)
+
+    p = wallaroo.source("Detector", source)
     for x in range(pargs.depth):
-        ab.to(trace_id)
-        ab.to_state_partition(trace_window, WindowState,
-                          "state{}".format(x), partition,
-                          partitions)
+        p = p.key_by(extract_key)
+        p = p.to(trace_id)
+        p = p.key_by(extract_key)
+        p = p.to(trace_window)
 
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
-    return ab.build()
+    p = p.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
+    return wallaroo.build_application("Multi Partition Detector", p)
 
 
 class MultiPartitionGenerator(object):
@@ -83,8 +80,8 @@ class MultiPartitionGenerator(object):
         return m
 
 
-@wallaroo.partition
-def partition(msg):
+@wallaroo.key_extractor
+def extract_key(msg):
     return msg.key.split(".")[0]
 
 
@@ -183,12 +180,12 @@ def trace_id(msg):
     return Message(msg.key + ".TraceID", msg.value())
 
 
-@wallaroo.state_computation(name="TraceWindow")
+@wallaroo.state_computation(name="TraceWindow", state=WindowState)
 def trace_window(msg, state):
     print("trace_window({}, {})".format(msg, state))
     state.push(msg)
     print("trace_window.updated: {}".format(state))
-    return (Message(msg.key + ".TraceWindow", state.window()), True)
+    return Message(msg.key + ".TraceWindow", state.window())
 
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
