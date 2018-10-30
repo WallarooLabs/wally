@@ -118,7 +118,7 @@ export KAFKA_IP=$(docker inspect local_kafka_1_1 | grep kafka_ip | grep -Eo '[0-
 To run `kafkacat` to listen to the `test-out` topic via Docker:
 
 ```bash
-docker run --rm -i --name kafkacatconsumer ryane/kafkacat -C -b ${KAFKA_IP}:9092 -t test-out -q
+docker run --rm -i --name kafkacatconsumer ryane/kafkacat -C -b ${KAFKA_IP}:9092 -t test-out -q -u
 ```
 
 ### Shell 3: Celsius-kafka
