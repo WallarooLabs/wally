@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/grouping"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/core/initialization"
@@ -31,6 +32,7 @@ class val ConnectorSourceListenerBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
+  let _grouper_builder: GrouperBuilder
   let _router: Router
   let _metrics_conn: MetricsSink
   let _metrics_reporter: MetricsReporter
@@ -47,7 +49,8 @@ class val ConnectorSourceListenerBuilder[In: Any val]
   let _service: String
 
   new val create(worker_name: WorkerName, pipeline_name: String,
-    runner_builder: RunnerBuilder, router: Router, metrics_conn: MetricsSink,
+    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
+    metrics_conn: MetricsSink,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -59,6 +62,7 @@ class val ConnectorSourceListenerBuilder[In: Any val]
     _worker_name = worker_name
     _pipeline_name = pipeline_name
     _runner_builder = runner_builder
+    _grouper_builder = grouper
     _router = router
     _metrics_conn = metrics_conn
     _metrics_reporter = consume metrics_reporter
@@ -75,7 +79,8 @@ class val ConnectorSourceListenerBuilder[In: Any val]
     _service = service
 
   fun apply(env: Env): SourceListener =>
-    ConnectorSourceListener[In](env, _worker_name, _pipeline_name, _runner_builder,
+    ConnectorSourceListener[In](env, _worker_name, _pipeline_name,
+      _runner_builder, _grouper_builder,
       _router, _metrics_conn, _metrics_reporter.clone(), _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
       _recovering, _target_router, _parallelism, _handler, _host, _service)
@@ -95,7 +100,8 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val]
     _handler = handler
 
   fun apply(worker_name: WorkerName, pipeline_name: String,
-    runner_builder: RunnerBuilder, router: Router, metrics_conn: MetricsSink,
+    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
+    metrics_conn: MetricsSink,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -103,7 +109,8 @@ class val ConnectorSourceListenerBuilderBuilder[In: Any val]
     recovering: Bool, target_router: Router = EmptyRouter):
     ConnectorSourceListenerBuilder[In]
   =>
-    ConnectorSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
+    ConnectorSourceListenerBuilder[In](worker_name, pipeline_name,
+      runner_builder, grouper,
       router, metrics_conn, consume metrics_reporter, router_registry,
       outgoing_boundary_builders, event_log, auth,
       layout_initializer, recovering, target_router, _parallelism, _handler,

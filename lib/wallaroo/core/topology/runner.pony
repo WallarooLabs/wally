@@ -61,7 +61,7 @@ trait val RunnerBuilder
   fun apply(event_log: EventLog, auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    grouper: (Shuffle | GroupByKey | None) = None): Runner iso^
+    grouper: GrouperBuilder = OneToOneGroup): Runner iso^
 
   fun name(): String
   fun routing_group(): (StateName | RoutingId)
@@ -89,7 +89,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    grouper: (Shuffle | GroupByKey | None) = None): Runner iso^
+    grouper: GrouperBuilder = OneToOneGroup): Runner iso^
   =>
     var remaining: USize = _runner_builders.size()
     var latest_runner: Runner iso = RouterRunner(grouper)
@@ -152,7 +152,7 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    grouper: (Shuffle | GroupByKey | None) = None): Runner iso^
+    grouper: GrouperBuilder = OneToOneGroup): Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
@@ -183,7 +183,7 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    grouper: (Shuffle | GroupByKey | None) = None): Runner iso^
+    grouper: GrouperBuilder = OneToOneGroup): Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
@@ -517,13 +517,8 @@ interface Stringablike
 class iso RouterRunner is Runner
   let _grouper: Grouper
 
-  new iso create(g: (Shuffle | GroupByKey | None)) =>
-    match g
-    | let s: Shuffle => _grouper = s()
-    | let kg: GroupByKey => _grouper = kg()
-    else
-      _grouper = OneToOneGrouper
-    end
+  new iso create(g: GrouperBuilder) =>
+    _grouper = g()
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, producer_id: RoutingId, producer: Producer ref,

@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
 use "wallaroo/core/common"
+use "wallaroo/core/grouping"
 use "wallaroo/core/metrics"
 use "wallaroo/core/source"
 use "wallaroo/core/topology"
@@ -28,6 +29,7 @@ class KafkaSourceListenerNotify[In: Any val]
   let _auth: AmbientAuth
   let _handler: SourceHandler[In] val
   let _runner_builder: RunnerBuilder
+  let _grouper_builder: GrouperBuilder
   let _router: Router
   let _metrics_reporter: MetricsReporter
   let _event_log: EventLog
@@ -35,13 +37,15 @@ class KafkaSourceListenerNotify[In: Any val]
 
   new iso create(pipeline_name: String, auth: AmbientAuth,
     handler: SourceHandler[In] val, runner_builder: RunnerBuilder,
-    router': Router, metrics_reporter: MetricsReporter iso,
+    grouper: GrouperBuilder, router': Router,
+    metrics_reporter: MetricsReporter iso,
     event_log: EventLog, target_router: Router)
   =>
     _pipeline_name = pipeline_name
     _auth = auth
     _handler = handler
     _runner_builder = runner_builder
+    _grouper_builder = grouper
     _router = router'
     _metrics_reporter = consume metrics_reporter
     _event_log = event_log
@@ -51,5 +55,5 @@ class KafkaSourceListenerNotify[In: Any val]
     KafkaSourceNotify[In] iso^
   =>
     KafkaSourceNotify[In](source_id, _pipeline_name, env, _auth,
-      _handler, _runner_builder, _router, _metrics_reporter.clone(),
-      _event_log, _target_router)
+      _handler, _runner_builder, _grouper_builder, _router,
+      _metrics_reporter.clone(), _event_log, _target_router)

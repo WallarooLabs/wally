@@ -23,10 +23,13 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 
+trait val GrouperBuilder
+  fun apply(): Grouper
+
 trait Grouper
   fun ref apply[D: Any val](d: D): Key
 
-primitive OneToOneGroup
+primitive OneToOneGroup is GrouperBuilder
   fun apply(): OneToOneGrouper =>
     OneToOneGrouper
 
@@ -34,7 +37,7 @@ class OneToOneGrouper is Grouper
   fun ref apply[D: Any val](d: D): Key =>
     "one-to-one-grouping-key"
 
-primitive Shuffle
+primitive Shuffle is GrouperBuilder
   fun apply(): Shuffler =>
     Shuffler
 
@@ -47,7 +50,7 @@ class Shuffler is Grouper
   fun ref apply[D: Any val](d: D): Key =>
     _rand.next().string()
 
-trait val GroupByKey
+trait val GroupByKey is GrouperBuilder
   fun apply(): KeyGrouper
 
 class val TypedGroupByKey[In: Any val] is GroupByKey

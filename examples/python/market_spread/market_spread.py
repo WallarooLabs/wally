@@ -47,11 +47,10 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     orders = wallaroo.source("Orders",
-            wallaroo.TCPSourceConfig(order_host, order_port, order_decoder))
+        wallaroo.TCPSourceConfig(order_host, order_port, order_decoder))
 
     market_data = wallaroo.source("Market Data",
-            wallaroo.TCPSourceConfig(nbbo_host, nbbo_port,
-                                     market_data_decoder))
+        wallaroo.TCPSourceConfig(nbbo_host, nbbo_port, market_data_decoder))
 
     pipeline = (orders.merge(market_data)
         .key_by(extract_symbol)
@@ -72,13 +71,14 @@ class SymbolData(object):
 
 @wallaroo.key_extractor
 def extract_symbol(data):
+    print("!@ Extracting symbol " + data.symbol)
     return data.symbol
 
 @wallaroo.state_computation(name="Check Market Data", state=SymbolData)
 def check_market_data(data, state):
     if data.is_order:
         if state.should_reject_trades:
-            print("!@Rejecting " + data.symbol + " order")
+            print("!@Rejecting " + data.symbol + " order with offer of " + str(state.last_offer))
             ts = int(time.time() * 100000)
             return OrderResult(data, state.last_bid, state.last_offer, ts)
         print("!@Not rejecting " + data.symbol + " order")
@@ -94,7 +94,7 @@ def check_market_data(data, state):
         if should_reject_trades:
             print("!@Updating " + data.symbol + " as reject")
         else:
-            print("!@Not updating " + data.symbol + " as reject")
+            print("!@Not updating " + data.symbol + " as reject: offer " + str(data.offer) + " last_offer now: " + str(state.last_offer))
 
         state.should_reject_trades = should_reject_trades
         return None
@@ -122,6 +122,7 @@ class MarketDataMessage(object):
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def order_decoder(bs):
+    print("!@ Decoding message at Source")
     """
     0 -  1b - FixType (U8)
     1 -  1b - side (U8)

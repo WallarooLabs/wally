@@ -21,6 +21,7 @@ use "pony-kafka"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/grouping"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
@@ -31,12 +32,12 @@ use "wallaroo_labs/mort"
 primitive KafkaSourceNotifyBuilder[In: Any val]
   fun apply(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SourceHandler[In] val,
-    runner_builder: RunnerBuilder, router: Router,
+    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router): KafkaSourceNotify[In] iso^
   =>
     KafkaSourceNotify[In](source_id, pipeline_name, env, auth, handler,
-      runner_builder, router, consume metrics_reporter, event_log,
+      runner_builder, grouper, router, consume metrics_reporter, event_log,
       target_router)
 
 class KafkaSourceNotify[In: Any val]
@@ -53,7 +54,7 @@ class KafkaSourceNotify[In: Any val]
 
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SourceHandler[In] val,
-    runner_builder: RunnerBuilder, router': Router,
+    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router)
   =>
@@ -63,7 +64,8 @@ class KafkaSourceNotify[In: Any val]
     _env = env
     _auth = auth
     _handler = handler
-    _runner = runner_builder(event_log, auth, None, target_router)
+    _runner = runner_builder(event_log, auth, None, target_router,
+      grouper)
     _router = router'
     _metrics_reporter = consume metrics_reporter
 
