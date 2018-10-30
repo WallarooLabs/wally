@@ -12,6 +12,8 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Changed
 
+- Deprecate giles receiver in favor of data receiver ([PR #2341](https://github.com/WallarooLabs/wallaroo/pull/2341))
+
 ## [0.5.3] - 2018-09-28
 
 ### Fixed
