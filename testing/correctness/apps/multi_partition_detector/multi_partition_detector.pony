@@ -90,6 +90,7 @@ actor Main
         // Add as many layers of depth as specified in the `--depth` option
         for x in Range[USize](1, depth + 1) do
           env.out.print("Adding level " + x.string())
+          p = p.key_by(WindowPartitionFunction)
           p = p.to[t.Message](TraceID(x.string()))
           p = p.key_by(WindowPartitionFunction)
           p = p.to_state[t.Message, WindowState](TraceWindow(x.string()))
