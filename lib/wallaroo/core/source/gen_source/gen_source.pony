@@ -35,6 +35,7 @@ use "serialise"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/grouping"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
@@ -109,8 +110,9 @@ actor GenSource[V: Any val] is Source
   let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
 
   new create(source_id: RoutingId, auth: AmbientAuth, pipeline_name: String,
-    runner_builder: RunnerBuilder, router': Router, target_router: Router,
-    generator: GenSourceGenerator[V], event_log: EventLog,
+    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router': Router,
+    target_router: Router, generator: GenSourceGenerator[V],
+    event_log: EventLog,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
     metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
@@ -130,7 +132,8 @@ actor GenSource[V: Any val] is Source
     _layout_initializer = layout_initializer
     _router_registry = router_registry
 
-    _runner = runner_builder(event_log, auth, None, target_router)
+    _runner = runner_builder(event_log, auth, None, target_router,
+      grouper)
     _router = router'
 
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do

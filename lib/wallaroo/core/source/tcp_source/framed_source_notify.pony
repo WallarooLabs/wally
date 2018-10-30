@@ -21,6 +21,7 @@ use "time"
 use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/grouping"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
@@ -47,7 +48,7 @@ class TCPSourceNotify[In: Any val]
 
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
-    runner_builder: RunnerBuilder, router': Router,
+    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router)
   =>
@@ -57,7 +58,8 @@ class TCPSourceNotify[In: Any val]
     _env = env
     _auth = auth
     _handler = handler
-    _runner = runner_builder(event_log, auth, None, target_router)
+    _runner = runner_builder(event_log, auth, None, target_router,
+      grouper)
     _router = router'
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()

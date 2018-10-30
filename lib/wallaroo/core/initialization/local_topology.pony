@@ -34,6 +34,7 @@ use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo/ent/checkpoint"
 use "wallaroo/core/data_channel"
+use "wallaroo/core/grouping"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
@@ -904,10 +905,11 @@ actor LocalTopologyInitializer is LayoutInitializer
 
               // Set up SourceListener builders
               let source_runner_builder = source_data.runner_builder()
+              let grouper = source_data.grouper()
               let sl_builder_builder =
                 source_data.source_listener_builder_builder()
               let sl_builder = sl_builder_builder(_worker_name,
-                pipeline_name, source_runner_builder, out_router,
+                pipeline_name, source_runner_builder, grouper, out_router,
                 _metrics_conn, consume source_reporter, _router_registry,
                 _outgoing_boundary_builders, _event_log, _auth, this,
                 _recovering)

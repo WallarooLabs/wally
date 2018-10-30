@@ -106,7 +106,7 @@ actor ApplicationDistributor is Distributor
       let frontier = Array[U128]
       let processed = SetIs[U128]
       let edges = Map[U128, SetIs[U128]]
-      let groupers = Map[U128, (Shuffle | GroupByKey | None)]
+      let groupers = Map[U128, GrouperBuilder]
 
       // Add Wallaroo sinks to intermediate graph
       for sink_node in logical_graph.sinks() do
@@ -138,7 +138,7 @@ actor ApplicationDistributor is Distributor
       end
 
       while frontier.size() > 0 do
-        let next_id = frontier.pop()?
+        let next_id = frontier.shift()?
         var node = logical_graph.get_node(next_id)?
         if processed.contains(node.id) then continue end
         match node.value
@@ -147,14 +147,14 @@ actor ApplicationDistributor is Distributor
             if groupers.contains(node.id) then
               groupers(node.id)?
             else
-              None
+              OneToOneGroup
             end
 
           // We initially set this to Shuffle. If this is a stateless
           // computation then we'll use Shuffle. If it's a state computation
           // and there's no prior key_by, then we use direct routing, set
           // later by using None.
-          var input_grouper: (GroupByKey | Shuffle | None) = Shuffle
+          var input_grouper: GrouperBuilder = Shuffle
 
           // Create the StepBuilder for this stage. If the stage is a state
           // computation, then we can simply create it. If the stage is
@@ -164,7 +164,7 @@ actor ApplicationDistributor is Distributor
             if rb.is_stateful() then
               // If this stage is preceded by a key_by, this will be
               // ignored. If not, then this default will be used.
-              input_grouper = None
+              input_grouper = OneToOneGroup
               StepBuilder(_app_name, _app_name, rb,
                 node.id, rb.routing_group(), grouper, rb.is_stateful())
             else
@@ -278,8 +278,10 @@ actor ApplicationDistributor is Distributor
           end
 
           for i_node in node.ins() do
-            // !@ We're parallelizing all computations
-            groupers(i_node.id) = input_grouper
+            // !@ Does this check make sense, or should we override sometimes?
+            if not groupers.contains(i_node.id) then
+              groupers(i_node.id) = input_grouper
+            end
 
             if not frontier.contains(i_node.id) and
               not processed.contains(i_node.id)
@@ -329,7 +331,7 @@ actor ApplicationDistributor is Distributor
             if groupers.contains(node.id) then
               groupers(node.id)?
             else
-              None
+              OneToOneGroup
             end
 
           let r_builder = RunnerSequenceBuilder(

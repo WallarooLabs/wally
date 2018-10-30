@@ -44,21 +44,21 @@ class val StepBuilder
   let _routing_group: (StateName | RoutingId)
   let _runner_builder: RunnerBuilder
   let _id: RoutingId
-  let _grouper: (Shuffle | GroupByKey | None)
+  let _grouper: GrouperBuilder
   let _is_stateful: Bool
   let _parallelism: USize
 
   new val create(app_name: String,
     pipeline_name': String, r: RunnerBuilder, id': RoutingId,
     routing_group': (StateName | RoutingId),
-    grouper: (Shuffle | GroupByKey | None) = None, is_stateful': Bool = false)
+    grouper': GrouperBuilder = OneToOneGroup, is_stateful': Bool = false)
   =>
     _app_name = app_name
     _pipeline_name = pipeline_name'
     _runner_builder = r
     _routing_group = routing_group'
     _id = id'
-    _grouper = grouper
+    _grouper = grouper'
     _is_stateful = is_stateful'
     _parallelism = r.parallelism()
 
@@ -69,6 +69,7 @@ class val StepBuilder
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
+  fun grouper(): GrouperBuilder => _grouper
   fun parallelism(): USize => _parallelism
 
   fun apply(routing_id: RoutingId, worker_name: WorkerName, next: Router,
@@ -91,19 +92,23 @@ class val SourceData
   let _pipeline_name: String
   let _name: String
   let _runner_builder: RunnerBuilder
-  let _grouper: (Shuffle | GroupByKey | None)
+  let _grouper: GrouperBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
 
   new val create(id': RoutingId, p_name: String, r: RunnerBuilder,
-    s: SourceListenerBuilderBuilder,
-    grouper: (Shuffle | GroupByKey | None) = None)
+    s: SourceListenerBuilderBuilder, grouper': GrouperBuilder)
   =>
     _id = id'
     _pipeline_name = p_name
     _name = "| " + _pipeline_name + " source | " + r.name() + "|"
     _runner_builder = r
-    _grouper = grouper
+    _grouper = grouper'
     _source_listener_builder_builder = s
+
+    //!@
+    match grouper'
+    | let gbk: GroupByKey => @printf[I32]("!@Source %s got GroupByKey grouper!\n".cstring(), _pipeline_name.cstring())
+    else @printf[I32]("!@Source %s did NOT got GroupByKey grouper!\n".cstring(), _pipeline_name.cstring()) end
 
   fun runner_builder(): RunnerBuilder => _runner_builder
 
@@ -114,6 +119,7 @@ class val SourceData
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
+  fun grouper(): GrouperBuilder => _grouper
   fun parallelism(): USize => 1
 
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
@@ -140,6 +146,7 @@ class val EgressBuilder
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
+  fun grouper(): GrouperBuilder => OneToOneGroup
   fun parallelism(): USize => 0
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,
@@ -173,6 +180,7 @@ class val MultiSinkBuilder
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
+  fun grouper(): GrouperBuilder => OneToOneGroup
   fun parallelism(): USize => _sink_builders.size()
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,

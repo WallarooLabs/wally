@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/grouping"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -34,7 +35,7 @@ interface val SourceListenerBuilder
 
 interface val SourceListenerBuilderBuilder
   fun apply(worker_name: String, pipeline_name: String,
-    runner_builder: RunnerBuilder, router: Router,
+    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
     metrics_conn: MetricsSink, metrics_reporter: MetricsReporter iso,
     router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
