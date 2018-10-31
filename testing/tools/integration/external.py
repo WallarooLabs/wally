@@ -42,7 +42,7 @@ def run_shell_cmd(cmd):
             return ShellCmdResult(False, str(err), 2, cmd)
         else:
             raise
-    return ShellCmdResult(True, out, 0, shlex.split(cmd))
+    return ShellCmdResult(True, out.decode(), 0, shlex.split(cmd))
 
 
 def setup_resilience_path(res_dir):
@@ -160,7 +160,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
     try:
         makedirs_if_not_exists(base_dir)
         if log_stream:
-            with open(os.path.join(base_dir, 'test.error.log'), 'wb') as f:
+            with open(os.path.join(base_dir, 'test.error.log'), 'w') as f:
                 f.write(log_stream.getvalue())
         runner_data = persistent_data.get('runner_data', [])
 
@@ -171,7 +171,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
                 code=rd.returncode,
                 pid=rd.pid,
                 time=strftime(rd.start_time, STRFTIME_FMT))
-            with open(os.path.join(base_dir, worker_log_name), 'wb') as f:
+            with open(os.path.join(base_dir, worker_log_name), 'w') as f:
                 f.write('{identifier} ->\n\n{stdout}\n\n{identifier} <-'
                     .format(identifier="--- {name} (pid: {pid}, rc: {rc})"
                         .format(name=rd.name, pid=rd.pid,
@@ -189,7 +189,8 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
                 port=sd.port,
                 time=strftime(sd.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sender_log_name), 'wb') as f:
-                f.write(''.join(sd.data))
+                for d in sd.data:
+                    f.write(d)
 
         # save sinks data to files
         sink_data = persistent_data.get('sink_data', [])
@@ -202,7 +203,8 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
                 port=sk.port,
                 time=strftime(sk.start_time, STRFTIME_FMT))
             with open(os.path.join(base_dir, sink_log_name), 'wb') as f:
-                f.write(''.join(sk.data))
+                for d in sk.data:
+                    f.write(d)
         logging.warn("Error logs saved to {}".format(base_dir))
 
         # save core files if they exist

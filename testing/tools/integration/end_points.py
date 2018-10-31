@@ -24,6 +24,11 @@ from .errors import TimeoutError
 from .logger import INFO2
 from .stoppable_thread import StoppableThread
 
+try:
+    basestring
+except:
+    basestring = (str, bytes)
+
 
 class SingleSocketReceiver(StoppableThread):
     """
@@ -62,7 +67,7 @@ class SingleSocketReceiver(StoppableThread):
         if self.mode == 'framed':
             self.accumulator.append(bs)
         else:
-            self.accumulator.append('{}\n'.format(bs))
+            self.accumulator.append(bs + b'\n')
 
     def run(self):
         if self.mode == 'framed':
@@ -77,15 +82,15 @@ class SingleSocketReceiver(StoppableThread):
             if not buf:
                 self.stop()
                 if data:
-                    self.append(''.join(data))
+                    self.append(b''.join(data))
             # We must be careful not to accidentally join two separate lines
             # nor split a line
-            split = buf.split('\n')  # '\n' show as '' in list after split
+            split = buf.split(b'\n')  # '\n' show as '' in list after split
             s0 = split.pop(0)
             if s0:
                 if data:
                     data.append(s0)
-                    self.append(''.join(data))
+                    self.append(b''.join(data))
                     data = []
                 else:
                     self.append(s0)
@@ -93,7 +98,7 @@ class SingleSocketReceiver(StoppableThread):
                 # s0 is '', so first line is a '\n', and overflow is a
                 # complete message if it isn't empty
                 if data:
-                    self.append(''.join(data))
+                    self.append(b''.join(data))
                     data = []
             for s in split[:-1]:
                 self.append(s)
@@ -113,7 +118,7 @@ class SingleSocketReceiver(StoppableThread):
             if not data:
                 self.stop()
             else:
-                self.append(''.join((header, data)))
+                self.append(b''.join((header, data)))
                 time.sleep(0.000001)
 
     def stop(self):
@@ -295,7 +300,7 @@ class Sender(StoppableThread):
 
     def batch_send_final(self):
         if self.batch:
-            self.send(''.join(self.batch))
+            self.send(b''.join(self.batch))
             self.batch = []
 
     def run(self):
@@ -321,7 +326,7 @@ class Sender(StoppableThread):
                     if not body:
                         self.maybe_stop()
                         break
-                    self.batch_append(''.join((header, body)))
+                    self.batch_append(header + body)
                     self.batch_send()
                     time.sleep(0.000000001)
                 self.batch_send_final()
@@ -385,7 +390,8 @@ class MultiSequenceGenerator(object):
         self.lock = threading.Lock()
 
     def format_value(self, value, partition):
-        return struct.pack('>IQ7s', 15, value, '{:07d}'.format(partition))
+        return struct.pack('>IQ7s', 15, value,
+                           '{:07d}'.format(partition).encode())
 
     def _next_value_(self):
         # Normal operation next value: round robin through the sets
@@ -441,6 +447,9 @@ class MultiSequenceGenerator(object):
         return self
 
     def next(self):
+        return self.__next__()
+
+    def __next__(self):
         return self.send(None)
 
     def close(self):
@@ -466,9 +475,10 @@ def sequence_generator(stop=1000, start=0, header_fmt='>I', partition=''):
     `partition` is a string representing the optional partition key. It is
     empty by default.
     """
+    partition = partition.encode()
     size = 8 + len(partition)
     fmt = '>Q{}s'.format(len(partition)) if partition else '>Q'
-    for x in xrange(start+1, stop+1):
+    for x in range(start+1, stop+1):
         yield struct.pack(header_fmt, size)
         if partition:
             yield struct.pack(fmt, x, partition)
@@ -476,23 +486,27 @@ def sequence_generator(stop=1000, start=0, header_fmt='>I', partition=''):
             yield struct.pack(fmt, x)
 
 
-def iter_generator(items, to_string=lambda s: str(s), header_fmt='>I',
-                   on_next=None):
+def iter_generator(items,
+    to_bytes=lambda s: s.encode()
+                       if isinstance(s, basestring) else str(s).encode(),
+    header_fmt='>I',
+    on_next=None):
     """
     Generate a sequence of length encoded binary records from an iterator.
 
     `items` is the iterator of items to encode
-    `to_string` is a function for converting items to a string
-    (default:`lambda s: str(s)`)
+    `to_bytes` is a function for converting items to a bytes
+    (default:`lambda s: s.encode() if isinstance(s, basestring) else
+              str(s).encode()`)
     `header_fmt` is the format to use for encoding the length using
     `struct.pack`
     """
     for val in items:
         if on_next:
             on_next(val)
-        strung = to_string(val)
-        yield struct.pack(header_fmt, len(strung))
-        yield strung
+        byt = to_bytes(val)  # bite->bit, so byte->byt ;)
+        yield struct.pack(header_fmt, len(byt))
+        yield byt
 
 
 def files_generator(files, mode='framed', header_fmt='>I', on_next=None):
@@ -534,7 +548,7 @@ def newline_file_generator(filepath, header_fmt='>I', on_next=None):
         fin = f.tell()
         f.seek(0)
         while f.tell() < fin:
-            o = f.readline().strip('\n')
+            o = f.readline().strip(b'\n')
             if o:
                 if on_next:
                     on_next(o)
@@ -568,7 +582,7 @@ class Reader(object):
     """
     def __init__(self, generator):
         self.gen = generator
-        self.overflow = ''
+        self.overflow = b''
 
     def read(self, num):
         remaining = num
@@ -576,7 +590,7 @@ class Reader(object):
         remaining -= out.write(self.overflow)
         while remaining > 0:
             try:
-                remaining -= out.write(self.gen.next())
+                remaining -= out.write(next(self.gen))
             except StopIteration:
                 break
         # first num bytes go to return, remainder to overflow

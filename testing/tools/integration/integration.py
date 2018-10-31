@@ -30,6 +30,10 @@ from .end_points import (Sender,
 from .errors import PipelineTestError
 from .logger import INFO2
 
+try:
+    basestring
+except NameError:
+    basestring = (str, bytes)
 
 
 DEFAULT_SINK_STOP_TIMEOUT = 30
@@ -232,7 +236,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 # Validate captured output against expected output
                 if isinstance(expected, basestring):
                     expected = io.BufferedReader(io.BytesIO(expected))
-                if isinstance(expected, (file, io.BufferedReader)):
+                if hasattr(expected, 'read') and hasattr(expected, 'tell'):
                     if isinstance(processed, list):
                         bytesio = io.BytesIO()
                         for part in processed:
@@ -263,7 +267,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                     flattened = list(itertools.chain.from_iterable(processed))
                     if mode == 'newlines':
                         # add newlines to expected
-                        expected = ['{}\n'.format(e) for e in expected]
+                        expected = [e + b'\n' for e in expected]
                     try:
                         assert(expected == flattened)
                     except:

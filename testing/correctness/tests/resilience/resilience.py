@@ -54,8 +54,8 @@ FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 # Keep only the key as a string, and the final output tuple as a
 # string
 def parse_sink_value(s):
-    return (s[4:].strip("()").split(',',1)[0].split(".",1)[0],
-        s[4:].strip("()").split(",",1)[1])
+    return (s[4:].strip(b"()").split(b',',1)[0].split(b".",1)[0],
+        s[4:].strip(b"()").split(b",",1)[1])
 
 
 # TODO: refactor and move to control.py
@@ -73,8 +73,8 @@ def pause_senders_and_sink_await(cluster, timeout=10):
     msg = cluster.senders[0].reader.gen
     await_values = []
     for part, val in enumerate(msg.seqs):
-        key = '{:07d}'.format(part)
-        data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)])
+        key = '{:07d}'.format(part).encode()
+        data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)]).encode()
         await_values.append((key, data))
     cluster.sink_await(values=await_values, func=parse_sink_value)
     # Since snapshots happen at a 1 second frequency, we need to wait
@@ -457,8 +457,8 @@ def _run(persistent_data, res_ops, command, ops=[], initial=None, sources=1,
             # the multi sequence generator
             await_values = []
             for part, val in enumerate(msg.seqs):
-                key = '{:07d}'.format(part)
-                data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)])
+                key = '{:07d}'.format(part).encode()
+                data = '[{},{},{},{}]'.format(*[val-x for x in range(3,-1,-1)]).encode()
                 await_values.append((key, data))
             cluster.sink_await(values=await_values, func=parse_sink_value)
 

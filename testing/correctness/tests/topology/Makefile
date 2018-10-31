@@ -48,12 +48,12 @@ integration-tests-testing-correctness-tests-topology: topology_tests
 
 topology_python_unit_tests:
 	cd $(TOPOLOGY_TESTS_PATH) && \
-		python2 -m pytest -c $(integration_path)/pytest.ini components.py $(pytest_exp) && \
-		python3 -m pytest -c $(integration_path)/pytest.ini components.py $(pytest_exp)
+		python2 -m pytest -c $(integration_path)/pytest.ini components.py && \
+		python3 -m pytest -c $(integration_path)/pytest.ini components.py
 
 topology_tests:
 	cd $(TOPOLOGY_TESTS_PATH) && \
-		python2 -m pytest -c $(integration_path)/pytest.ini topology_tests.py $(pytest_exp)
+		python3 -m pytest -c $(integration_path)/pytest.ini topology_tests.py $(pytest_exp)
 
 # end of prevent rules from being evaluated/included multiple times
 endif

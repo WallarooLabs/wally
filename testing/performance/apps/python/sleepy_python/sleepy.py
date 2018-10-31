@@ -95,7 +95,7 @@ class TuplePartitioner(object):
         assignment).
         """
         self.slot = slot
-        self.partitions = [str(x) for x in xrange(0, size)]
+        self.partitions = [str(x) for x in range(0, size)]
 
     def partition(self, tuple):
         return str(self.partitions[tuple[self.slot] % len(self.partitions)])

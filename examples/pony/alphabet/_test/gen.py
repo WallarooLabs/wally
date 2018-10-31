@@ -21,7 +21,7 @@ from struct import pack
 # Construct input data list, and total votes as a dict
 expected = {}
 data = []
-for x in xrange(1000):
+for x in range(1000):
     c = choice(lowercase)
     v = randrange(1,10000)
     data.append(pack('>IsI',5, c, v))

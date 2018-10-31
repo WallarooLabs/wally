@@ -45,6 +45,6 @@ integration-tests-testing-correctness-tests-cli_tests: cli_tests
 
 cli_tests:
 	cd $(CLI_PATH) && \
-	python2 -m pytest -c $(integration_path)/pytest.ini cli_tests.py $(pytest_exp)
+	python3 -m pytest -c $(integration_path)/pytest.ini cli_tests.py $(pytest_exp)
 
 endif

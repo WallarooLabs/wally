@@ -106,7 +106,7 @@ def _test_log_rotation_external_trigger_no_recovery(command):
         ports = get_port_values(num=num_ports, host=host)
         (input_ports, worker_ports) = (
             ports[:sources],
-            [ports[sources:][i:i+3] for i in xrange(0,
+            [ports[sources:][i:i+3] for i in range(0,
                 len(ports[sources:]), 3)])
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
@@ -446,7 +446,7 @@ def _test_log_rotation_file_size_trigger_no_recovery(command):
         ports = get_port_values(num=num_ports, host=host)
         (input_ports, worker_ports) = (
             ports[:sources],
-            [ports[sources:][i:i+3] for i in xrange(0,
+            [ports[sources:][i:i+3] for i in range(0,
                 len(ports[sources:]), 3)])
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])
@@ -588,7 +588,7 @@ def _test_log_rotation_file_size_trigger_recovery(command):
         ports = get_port_values(num=num_ports, host=host)
         (input_ports, worker_ports) = (
             ports[:sources],
-            [ports[sources:][i:i+3] for i in xrange(0,
+            [ports[sources:][i:i+3] for i in range(0,
                 len(ports[sources:]), 3)])
         inputs = ','.join(['{}:{}'.format(host, p) for p in
                            input_ports])

@@ -224,13 +224,14 @@ class CrashChecker(StoppableThread):
         super(CrashChecker, self).__init__()
         self.cluster = cluster
         self.func = func
+        logging.debug('Crash Checker: {!r}, {!r}'.format(cluster, func))
 
     def run(self):
         while not self.stopped():
             if self.func:
-                crashed = self.cluster.get_crashed_workers(self.func)
+                crashed = list(self.cluster.get_crashed_workers(self.func))
             else:
-                crashed = self.cluster.get_crashed_workers()
+                crashed = list(self.cluster.get_crashed_workers())
             if crashed:
                 logging.debug("CrashChecker, results: {}".format(crashed))
                 err = ClusterError("A crash was detected in the workers: {}"

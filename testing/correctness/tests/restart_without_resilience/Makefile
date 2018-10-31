@@ -53,7 +53,7 @@ restart_without_resilience_tests:
 else
 restart_without_resilience_tests:
 	cd $(RESTART_WITHOUT_RESILIENCE_PATH) && \
-	python2 -m pytest -c $(integration_path)/pytest.ini restart_without_resilience.py $(pytest_exp)
+	python3 -m pytest -c $(integration_path)/pytest.ini restart_without_resilience.py $(pytest_exp)
 endif
 
 endif

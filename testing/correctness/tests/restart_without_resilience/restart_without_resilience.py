@@ -46,7 +46,7 @@ def test_restart_machida():
     _test_restart(command)
 
 
-def test_restart_machida():
+def test_restart_machida3():
     command = 'machida3 --application-module sequence_window'
     _test_restart(command)
 
@@ -101,8 +101,8 @@ def _run(command, persistent_data):
     sink_mode = 'framed'
     workers = 2
     expect = 200
-    last_value_0 = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2))))
-    last_value_1 = '[{}]'.format(','.join((str(expect-1-v) for v in range(6,-2,-2))))
+    last_value_0 = '[{}]'.format(','.join((str(expect-v) for v in range(6,-2,-2)))).encode()
+    last_value_1 = '[{}]'.format(','.join((str(expect-1-v) for v in range(6,-2,-2)))).encode()
     await_values = (struct.pack('>I', len(last_value_0)) + last_value_0,
                    struct.pack('>I', len(last_value_1)) + last_value_1)
 
