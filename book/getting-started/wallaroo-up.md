@@ -1,6 +1,6 @@
 # Setting Up Your Wallaroo Development Environment using Wallaroo Up
 
-Wallaroo Up has been tested on Ubuntu Artful/Bionic/Trusty/Xenial, Fedora 26/27/28, CentOS 7, Debian Jessie/Stretch/Buster (Testing), Oracle Linux 7, and Amazon Linux 2 releases. It should also work on Red Hat Enterprise Linux 7.
+Wallaroo Up has been tested on Ubuntu Artful/Bionic/Trusty/Xenial, Fedora 27/28, CentOS 7, Debian Jessie/Stretch/Buster (Testing), Oracle Linux 7, and Amazon Linux 2 releases. It should also work on Red Hat Enterprise Linux 7.
 
 ## Memory requirements
 
@@ -25,14 +25,6 @@ bash /tmp/wallaroo-up.sh -t python
 Follow the prompts to have Wallaroo Up install and configure Wallaroo and its dependencies.
 
 Once Wallaroo Up has finished installing and configuring Wallaroo for your environment, it will also create an `activate` script that can be used to set up the appropriate environment variables.
-
-## Register
-
-Register today and receive a Wallaroo T-shirt and a one-hour phone consultation with Sean, our V.P. of Engineering, to discuss your streaming data questions. Not sure if you have a streaming data problem? Not sure how to go about architecting a streaming data system? Looking to improve an existing system? Not sure how Wallaroo can help? Sean has extensive experience and is happy to help you work through your questions.
-
-Please register here: [https://www.wallaroolabs.com/register](https://www.wallaroolabs.com/register).
-
-Your email address will only be used to facilitate the above.
 
 ## Conclusion
 

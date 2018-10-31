@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="e20ca96b867d31ae7eef10827bd69ba5  -"
+MD5="d404135a72affc910c29a7680fa043ba  -"
 
 set -eEuo pipefail
 
 WALLAROO_UP_DEST_DEFAULT=~/wallaroo-tutorial
 WALLAROO_UP_DEST_ARG="$WALLAROO_UP_DEST_DEFAULT"
 WALLAROO_UP_INSTALL_TYPE=UNSPECIFIED
-WALLAROO_VERSION_DEFAULT=use-ponyc-0.25
+WALLAROO_VERSION_DEFAULT=0.5.4
 WALLAROO_VERSION="$WALLAROO_VERSION_DEFAULT"
 WALLAROO_TOOLS_TO_BUILD="build-giles-sender-all build-utils-all"
 
@@ -44,6 +44,7 @@ GOLANG_DL_URL=https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz
 # sample wallaroo version to ponyc version map entry: W0.4.3=0.21.0
 # another sample entry: W4807928=0.22.6
 WALLAROO_PONYC_MAP="
+W0.5.4=0.25.0
 W0.5.3=0.24.4
 W0.5.2=0.24.4
 Wuse-ponyc-0.25=0.25.0
@@ -61,7 +62,6 @@ centos-7
 rhel-7
 ol-7
 amzn-2
-fedora-26
 fedora-27
 fedora-28
 ubuntu-trusty

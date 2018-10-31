@@ -2,16 +2,15 @@
 
 All notable changes to Wallaroo will be documented in this file.
 
-## [unreleased] - unreleased
-
-### Fixed
-
+## [0.5.4] - 2018-10-31
 
 ### Added
 
+- Added Python3 support for Wallaroo in our Docker image and in installations via Vagrant, Wallaroo Up (on Ubuntu (Xenial, Artful, and Bionic) and Debian (Stretch and Buster)), as well as for installation from source on systems with Python 3.5 or higher (python3-dev is also required).
 
 ### Changed
 
+- Deprecate giles receiver in favor of data receiver ([PR #2341](https://github.com/WallarooLabs/wallaroo/pull/2341))
 
 ## [0.5.3] - 2018-09-28
 
