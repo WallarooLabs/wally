@@ -41,7 +41,8 @@ include $(rules_mk_path)
 
 
 build-testing-correctness-tests-topology: build-machida
-build-testing-correctness-tests-topology: build-machida3
+#!@
+# build-testing-correctness-tests-topology: build-machida3
 unit-tests-testing-correctness-tests-topology: topology_python_unit_tests
 integration-tests-testing-correctness-tests-topology: build-testing-correctness-tests-topology
 integration-tests-testing-correctness-tests-topology: topology_tests
