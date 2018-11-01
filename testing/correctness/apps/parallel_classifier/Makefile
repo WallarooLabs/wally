@@ -57,7 +57,7 @@ parallel_classifier_py_test: generate_inputs
 	 	--output 'received.txt' \
 	 	--batch-size 100 \
 	 	--log-level error \
-	 	--command 'machida --application-module parallel_classifier' \
+	 	--command 'machida --application-module parallel_classifier $(RUN_WITH_RESILIENCE)' \
 	 	--sink-mode framed \
 	 	--sink-stop-timeout 10 \
 	 	--sink-expect $(INPUT_ITEMS)
@@ -67,7 +67,7 @@ parallel_classifier_py_test: generate_inputs
 		--output 'received.txt' \
 		--log-level error \
 		--batch-size 100 \
-		--command 'machida --application-module parallel_classifier' \
+		--command 'machida --application-module parallel_classifier $(RUN_WITH_RESILIENCE)' \
 		--sink-mode framed \
 		--sink-expect $(INPUT_ITEMS) \
 		--sink-stop-timeout 20 \
@@ -78,7 +78,7 @@ parallel_classifier_py_test: generate_inputs
 		--output 'received.txt' \
 		--log-level error \
 		--batch-size 100 \
-		--command 'machida --application-module parallel_classifier' \
+		--command 'machida --application-module parallel_classifier $(RUN_WITH_RESILIENCE)' \
 		--sink-mode framed \
 		--sink-expect $(INPUT_ITEMS) \
 		--sink-stop-timeout 20 \

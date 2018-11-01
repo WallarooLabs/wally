@@ -78,7 +78,7 @@ multi_partition_detector_test_python:
 	  --sequence-sender '(0,100]' 0 '>I' key_0 \
 	  --sequence-sender '(0,100]' 0 '>I' key_1 \
 	  --log-level error \
-		--command 'machida --application-module multi_partition_detector' \
+		--command 'machida --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -e 100 -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -90,7 +90,7 @@ multi_partition_detector_test_python_gen_source:
 	integration_test \
 	  --log-level error \
 		--sources 0 \
-		--command 'machida --application-module multi_partition_detector --gen-source' \
+		--command 'machida --application-module multi_partition_detector --gen-source $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -112,7 +112,7 @@ multi_partition_detector_test_python_10_worker:
 	  --sequence-sender '(0,1000]' 0 '>I' key_8 \
 	  --sequence-sender '(0,1000]' 0 '>I' key_9 \
 	  --log-level error \
-		--command 'machida --application-module multi_partition_detector' \
+		--command 'machida --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -e 1000 -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -124,7 +124,7 @@ multi_partition_detector_test_python_gen_source_10_worker:
 	integration_test \
 	  --log-level error \
 		--sources 0 \
-		--command 'machida --application-module multi_partition_detector --gen-source' \
+		--command 'machida --application-module multi_partition_detector --gen-source $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -139,7 +139,7 @@ multi_partition_detector_test_python3:
 	  --sequence-sender '(0,100]' 0 '>I' key_0 \
 	  --sequence-sender '(0,100]' 0 '>I' key_1 \
 	  --log-level error \
-		--command 'machida3 --application-module multi_partition_detector' \
+		--command 'machida3 --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -e 100 -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -151,7 +151,7 @@ multi_partition_detector_test_python3_gen_source:
 	integration_test \
 	  --log-level error \
 		--sources 0 \
-		--command 'machida3 --application-module multi_partition_detector --gen-source' \
+		--command 'machida3 --application-module multi_partition_detector --gen-source $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -173,7 +173,7 @@ multi_partition_detector_test_python3_10_worker:
 	  --sequence-sender '(0,1000]' 0 '>I' key_8 \
 	  --sequence-sender '(0,1000]' 0 '>I' key_9 \
 	  --log-level error \
-		--command 'machida3 --application-module multi_partition_detector' \
+		--command 'machida3 --application-module multi_partition_detector $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -e 1000 -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -185,7 +185,7 @@ multi_partition_detector_test_python3_gen_source_10_worker:
 	integration_test \
 	  --log-level error \
 		--sources 0 \
-		--command 'machida3 --application-module multi_partition_detector --gen-source' \
+		--command 'machida3 --application-module multi_partition_detector --gen-source $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -200,7 +200,7 @@ multi_partition_detector_test_pony:
 	  --sequence-sender '(0,100]' 0 '>I' key_0 \
 	  --sequence-sender '(0,100]' 0 '>I' key_1 \
 	  --log-level error \
-		--command './multi_partition_detector' \
+		--command './multi_partition_detector $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -e 100 -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -211,7 +211,7 @@ multi_partition_detector_test_pony_gen_source:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
 	  --log-level error \
-		--command './multi_partition_detector --gen-source' \
+		--command './multi_partition_detector --gen-source $(RUN_WITH_RESILIENCE)' \
 		--sources 0 \
 		--validation-cmd './validator/validator -a -i' \
 		--output 'received.txt' \
@@ -234,7 +234,7 @@ multi_partition_detector_test_pony_10_worker:
 	  --sequence-sender '(0,1000]' 0 '>I' key_8 \
 	  --sequence-sender '(0,1000]' 0 '>I' key_9 \
 	  --log-level error \
-		--command './multi_partition_detector' \
+		--command './multi_partition_detector $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -e 1000 -a -i' \
 		--output 'received.txt' \
 		--batch-size 10 \
@@ -245,7 +245,7 @@ multi_partition_detector_test_pony_gen_source_10_worker:
 	cd $(MULTI_PARTITION_DETECTOR_PATH) && \
 	integration_test \
 	  --log-level error \
-		--command './multi_partition_detector --gen-source' \
+		--command './multi_partition_detector --gen-source $(RUN_WITH_RESILIENCE)' \
 		--sources 0 \
 		--validation-cmd './validator/validator -a -i' \
 		--output 'received.txt' \

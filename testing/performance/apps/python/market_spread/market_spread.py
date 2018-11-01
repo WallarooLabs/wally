@@ -39,26 +39,20 @@ def application_setup(args):
 
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    symbol_partitions = [x.rjust(4) for x in load_valid_symbols()]
+    orders = wallaroo.source("Orders",
+        wallaroo.TCPSourceConfig(order_host, order_port, order_decoder))
 
-    ab = wallaroo.ApplicationBuilder("market-spread")
-    ab.new_pipeline(
-            "Orders",
-            wallaroo.TCPSourceConfig(order_host, order_port, order_decoder)
-        ).to_state_partition(
-            check_order, SymbolData, "symbol-data",
-            symbol_partition_function, symbol_partitions
-        ).to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
-                                        order_result_encoder)
-        ).new_pipeline(
-            "Market Data",
-            wallaroo.TCPSourceConfig(nbbo_host, nbbo_port,
-                                     market_data_decoder)
-        ).to_state_partition(
-            update_market_data, SymbolData, "symbol-data",
-            symbol_partition_function, symbol_partitions
-        ).done()
-    return ab.build()
+    market_data = wallaroo.source("Market Data",
+        wallaroo.TCPSourceConfig(nbbo_host, nbbo_port, market_data_decoder))
+
+    pipeline = (orders.merge(market_data)
+        .key_by(extract_symbol)
+        .to(check_market_data)
+        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
+                                        order_result_encoder)))
+
+    return wallaroo.build_application("Market Spread", pipeline)
+
 
 
 class SerializedTypes(IntEnum):
@@ -168,19 +162,6 @@ class SymbolData(object):
         self.should_reject_trades = should_reject_trades
 
 
-@wallaroo.partition
-def symbol_partition_function(data):
-    return data.symbol
-
-
-@wallaroo.state_computation(name="Check Order")
-def check_order(data, state):
-    if state.should_reject_trades:
-        ts = int(time.time() * 100000)
-        return (OrderResult(data, state.last_bid, state.last_offer, ts), False)
-    return (None, False)
-
-
 class Order(object):
     def __init__(self, side, account, order_id, symbol, qty, price,
                  transact_time):
@@ -274,15 +255,33 @@ def market_data_decoder(bs):
     return MarketDataMessage(symbol, transact_time, bid, offer)
 
 
-@wallaroo.state_computation(name="Update Market Data")
-def update_market_data(data, state):
-    offer_bid_difference = data.offer - data.bid
+@wallaroo.key_extractor
+def extract_symbol(data):
+    print("!@ Extracting symbol " + data.symbol)
+    return data.symbol
 
-    should_reject_trades = ((offer_bid_difference >= 0.05) or
-                            ((offer_bid_difference / data.mid) >= 0.05))
+@wallaroo.state_computation(name="Check Market Data", state=SymbolData)
+def check_market_data(data, state):
+    if data.is_order:
+        if state.should_reject_trades:
+            print("!@Rejecting " + data.symbol + " order with offer of " + str(state.last_offer))
+            ts = int(time.time() * 100000)
+            return OrderResult(data, state.last_bid, state.last_offer, ts)
+        print("!@Not rejecting " + data.symbol + " order")
+        return None
+    else:
+        offer_bid_difference = data.offer - data.bid
+        should_reject_trades = ((offer_bid_difference >= 0.05) or
+                                ((offer_bid_difference / data.mid) >= 0.05))
+        state.last_bid = data.bid
+        state.last_offer = data.offer
 
-    state.last_bid = data.bid
-    state.last_offer = data.offer
-    state.should_reject_trades = should_reject_trades
+        #!@
+        if should_reject_trades:
+            print("!@Updating " + data.symbol + " as reject")
+        else:
+            print("!@Not updating " + data.symbol + " as reject: offer " + str(data.offer) + " last_offer now: " + str(state.last_offer))
 
-    return (None, True)
+        state.should_reject_trades = should_reject_trades
+        return None
+

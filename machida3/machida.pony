@@ -1134,7 +1134,7 @@ primitive _SinkConfig
         // Build left pipeline
         var pipeline = _build_from(edges(0)?)?
         // Merge with right pipeline
-        pipeline = pipeline.merge(_build_from(edges(1)?)?)
+        pipeline = pipeline.merge[PyData val](_build_from(edges(1)?)?)
         // Do some stage building starting after the merge.
         // There might not be any stages immediately after the merge.
         let stages_size = @list_item_count(stages)

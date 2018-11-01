@@ -1,4 +1,4 @@
-/* 
+/*
 
 Copyright 2017 The Wallaroo Authors.
 
@@ -90,196 +90,64 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      var symbols_file_path: (String | None) = None
-      let options = Options(env.args, false)
-
-      options
-        .add("initial-nbbo-file", "f", StringArgument)
-        .add("symbols-file", "s", StringArgument)
-
-      for option in options do
-        match option
-        | ("symbols-file", let arg: String) =>
-          symbols_file_path = arg
-        end
-      end
-      let order_data_partition = if symbols_file_path is None then
-          Partitions[FixOrderMessage val](
-            SymbolPartitionFunction, LegalSymbols.symbols)
-        else
-          Partitions[FixOrderMessage val](
-            SymbolPartitionFunction,
-            PartitionsFileReader(symbols_file_path as String,
-              env.root as AmbientAuth))
-        end
-      let nbbo_data_partition = if symbols_file_path is None then
-          Partitions[FixNbboMessage val](
-            SymbolPartitionFunction, LegalSymbols.symbols)
-        else
-          Partitions[FixNbboMessage val](
-            SymbolPartitionFunction,
-            PartitionsFileReader(symbols_file_path as String,
-              env.root as AmbientAuth))
-        end
-
-      let initial_report_msgs_trn = recover trn Array[Array[ByteSeq] val] end
-      let connect_msg = HubProtocol.connect()
-      let join_msg = HubProtocol.join("reports:market-spread")
-      initial_report_msgs_trn.push(connect_msg)
-      initial_report_msgs_trn.push(join_msg)
-      let initial_report_msgs: Array[Array[ByteSeq] val] val =
-        consume initial_report_msgs_trn
-
-      let application = recover val
-        Application("Market Spread App")
-          .new_pipeline[FixOrderMessage val, OrderResult val](
-            "Orders",
+      let pipeline = recover val
+        let orders = Wallaroo.source[FixOrderMessage val]("Orders",
             TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
-            .to_state_partition[(OrderResult val | None), SymbolData](
-              CheckOrder, SymbolDataBuilder, "symbol-data",
-              order_data_partition where multi_worker = true)
-            //!! TODO: Update to use command line for host/service
-            .to_sink(TCPSinkConfig[OrderResult val].from_options(OrderResultEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))
-          .new_pipeline[FixNbboMessage val, None](
-            "Nbbo",
+          .key_by(OrderSymbolExtractor)
+
+        let nbbos = Wallaroo.source[FixNbboMessage val]("Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
               TCPSourceConfigCLIParser(env.args)?(1)?))
-            .to_state_partition[None, SymbolData](UpdateNbbo,
-              SymbolDataBuilder, "symbol-data",
-              nbbo_data_partition where multi_worker = true)
-            .done()
+          .key_by(NbboSymbolExtractor)
+
+        orders.merge[FixNbboMessage val](nbbos)
+          .to_state[OrderResult val, SymbolData](CheckMarketData)
+          .to_sink(TCPSinkConfig[OrderResult val].from_options(
+            OrderResultEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+
       end
-      Startup(env, application, "market-spread")
+      Wallaroo.build_application(env, "Market Spread", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
 
-primitive Identity[In: Any val]
-  fun name(): String => "identity"
-  fun apply(r: In): In =>
-    // @printf[I32]("Identity!!\n".cstring())
-    r
-
-primitive IdentityBuilder[In: Any val]
-  fun apply(): Computation[In, In] val =>
-    Identity[In]
-
-
-interface Symboly
-  fun symbol(): String
-
-class val SymbolDataBuilder
-  fun apply(): SymbolData => SymbolData
-  fun name(): String => "Market Data"
 
 class SymbolData is State
   var should_reject_trades: Bool = true
   var last_bid: F64 = 0
   var last_offer: F64 = 0
 
-class SymbolDataStateChange is StateChange[SymbolData]
-  let _id: U64
-  let _name: String
-  var _should_reject_trades: Bool = false
-  var _last_bid: F64 = 0
-  var _last_offer: F64 = 0
+primitive CheckMarketData is StateComputation[
+  (FixOrderMessage val | FixNbboMessage val), OrderResult val, SymbolData]
+  fun name(): String => "Check Market Data"
 
-  fun name(): String => _name
-  fun id(): U64 => _id
-
-  new create(id': U64, name': String) =>
-    _id = id'
-    _name = name'
-
-  fun ref update(should_reject_trades: Bool, last_bid: F64, last_offer: F64) =>
-    _should_reject_trades = should_reject_trades
-    _last_bid = last_bid
-    _last_offer = last_offer
-
-  fun apply(state: SymbolData ref) =>
-    // @printf[I32]("State change!!\n".cstring())
-    state.last_bid = _last_bid
-    state.last_offer = _last_offer
-    state.should_reject_trades = _should_reject_trades
-
-  fun write_log_entry(out_writer: Writer) =>
-    out_writer.f64_be(_last_bid)
-    out_writer.f64_be(_last_offer)
-    out_writer.u8(BoolConverter.bool_to_u8(_should_reject_trades))
-
-  fun ref read_log_entry(in_reader: Reader) ? =>
-    _last_bid = in_reader.f64_be()?
-    _last_offer = in_reader.f64_be()?
-    _should_reject_trades = BoolConverter.u8_to_bool(in_reader.u8()?)
-
-class SymbolDataStateChangeBuilder is StateChangeBuilder[SymbolData]
-  fun apply(id: U64): StateChange[SymbolData] =>
-    SymbolDataStateChange(id, "SymbolDataStateChange")
-
-primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
-  fun name(): String => "Update NBBO"
-
-  fun apply(msg: FixNbboMessage val,
-    sc_repo: StateChangeRepository[SymbolData],
-    state: SymbolData): (None, StateChange[SymbolData] ref)
+  fun apply(msg: (FixOrderMessage val | FixNbboMessage val),
+    state: SymbolData): (OrderResult val | None)
   =>
-    ifdef debug then
-      try
-        Assert(sc_repo.contains("SymbolDataStateChange"),
-        "Invariant violated: sc_repo.contains('SymbolDataStateChange')")?
+    match msg
+    | let order: FixOrderMessage val =>
+      if state.should_reject_trades then
+        let res = OrderResult(order, state.last_bid, state.last_offer,
+          Time.nanos())
+        res
       else
-        //TODO: how do we bail out here?
         None
       end
+    | let nbbo: FixNbboMessage val =>
+      let offer_bid_difference = nbbo.offer_px() - nbbo.bid_px()
+
+      let should_reject_trades = (offer_bid_difference >= 0.05) or
+        ((offer_bid_difference / nbbo.mid()) >= 0.05)
+
+      state.last_bid = nbbo.bid_px()
+      state.last_offer = nbbo.offer_px()
+      state.should_reject_trades = should_reject_trades
+      None
     end
 
-    // @printf[I32]("!!Update NBBO\n".cstring())
-    let state_change: SymbolDataStateChange ref =
-      try
-        sc_repo.lookup_by_name("SymbolDataStateChange")? as SymbolDataStateChange
-      else
-        //TODO: ideally, this should also register it. Not sure how though.
-        SymbolDataStateChange(0, "SymbolDataStateChange")
-      end
-    let offer_bid_difference = msg.offer_px() - msg.bid_px()
-
-    let should_reject_trades = (offer_bid_difference >= 0.05) or
-      ((offer_bid_difference / msg.mid()) >= 0.05)
-
-    state_change.update(should_reject_trades, msg.bid_px(), msg.offer_px())
-    (None, state_change)
-
-  fun state_change_builders(): Array[StateChangeBuilder[SymbolData]] val =>
-    recover val
-      let scbs = Array[StateChangeBuilder[SymbolData]]
-      scbs.push(recover val SymbolDataStateChangeBuilder end)
-      scbs
-    end
-
-class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
-  SymbolData]
-  fun name(): String => "Check Order against NBBO"
-
-  fun apply(msg: FixOrderMessage val,
-    sc_repo: StateChangeRepository[SymbolData],
-    state: SymbolData): ((OrderResult val | None), None)
-  =>
-    // @printf[I32]("!!CheckOrder\n".cstring())
-    if state.should_reject_trades then
-      let res = OrderResult(msg, state.last_bid, state.last_offer,
-        Time.nanos())
-      (res, None)
-    else
-      (None, None)
-    end
-
-  fun state_change_builders(): Array[StateChangeBuilder[SymbolData]] val =>
-    recover val
-      Array[StateChangeBuilder[SymbolData]]
-    end
+  fun initial_state(): SymbolData =>
+    SymbolData
 
 primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
   fun header_length(): USize =>
@@ -315,8 +183,12 @@ primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
       error
     end
 
-primitive SymbolPartitionFunction
-  fun apply(input: Symboly val): Key =>
+primitive OrderSymbolExtractor
+  fun apply(input: FixOrderMessage val): Key =>
+    input.symbol()
+
+primitive NbboSymbolExtractor
+  fun apply(input: FixNbboMessage val): Key =>
     input.symbol()
 
 class OrderResult
@@ -368,381 +240,3 @@ primitive OrderResultEncoder
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
     wb.done()
-
-class LegalSymbols
-  let symbols: Array[String] val
-
-  new create() =>
-    let padded = recover trn Array[String] end
-    for symbol in RawSymbols().values() do
-      padded.push(RawSymbols.pad_symbol(symbol))
-    end
-    symbols = consume padded
-
-primitive RawSymbols
-  fun pad_symbol(s: String): String =>
-    if s.size() == 4 then
-      s
-    else
-      let diff = 4 - s.size()
-      var padded = s
-      for i in Range(0, diff) do
-        padded = " " + padded
-      end
-      padded
-    end
-
-  fun apply(): Array[String] val =>
-    recover
-      [
-"AA"
-"BAC"
-"AAPL"
-"FCX"
-"SUNE"
-"FB"
-"RAD"
-"INTC"
-"GE"
-"WMB"
-"S"
-"ATML"
-"YHOO"
-"F"
-"T"
-"MU"
-"PFE"
-"CSCO"
-"MEG"
-"HUN"
-"GILD"
-"MSFT"
-"SIRI"
-"SD"
-"C"
-"NRF"
-"TWTR"
-"ABT"
-"VSTM"
-"NLY"
-"AMAT"
-"X"
-"NFLX"
-"SDRL"
-"CHK"
-"KO"
-"JCP"
-"MRK"
-"WFC"
-"XOM"
-"KMI"
-"EBAY"
-"MYL"
-"ZNGA"
-"FTR"
-"MS"
-"DOW"
-"ATVI"
-"ORCL"
-"JPM"
-"FOXA"
-"HPQ"
-"JBLU"
-"RF"
-"CELG"
-"HST"
-"QCOM"
-"AKS"
-"EXEL"
-"ABBV"
-"CY"
-"VZ"
-"GRPN"
-"HAL"
-"GPRO"
-"CAT"
-"OPK"
-"AAL"
-"JNJ"
-"XRX"
-"GM"
-"MHR"
-"DNR"
-"PIR"
-"MRO"
-"NKE"
-"MDLZ"
-"V"
-"HLT"
-"TXN"
-"SWN"
-"AGN"
-"EMC"
-"CVX"
-"BMY"
-"SLB"
-"SBUX"
-"NVAX"
-"ZIOP"
-"NE"
-"COP"
-"EXC"
-"OAS"
-"VVUS"
-"BSX"
-"SE"
-"NRG"
-"MDT"
-"WFM"
-"ARIA"
-"WFT"
-"MO"
-"PG"
-"CSX"
-"MGM"
-"SCHW"
-"NVDA"
-"KEY"
-"RAI"
-"AMGN"
-"HTZ"
-"ZTS"
-"USB"
-"WLL"
-"MAS"
-"LLY"
-"WPX"
-"CNW"
-"WMT"
-"ASNA"
-"LUV"
-"GLW"
-"BAX"
-"HCA"
-"NEM"
-"HRTX"
-"BEE"
-"ETN"
-"DD"
-"XPO"
-"HBAN"
-"VLO"
-"DIS"
-"NRZ"
-"NOV"
-"MET"
-"MNKD"
-"MDP"
-"DAL"
-"XON"
-"AEO"
-"THC"
-"AGNC"
-"ESV"
-"FITB"
-"ESRX"
-"BKD"
-"GNW"
-"KN"
-"GIS"
-"AIG"
-"SYMC"
-"OLN"
-"NBR"
-"CPN"
-"TWO"
-"SPLS"
-"AMZN"
-"UAL"
-"MRVL"
-"BTU"
-"ODP"
-"AMD"
-"GLNG"
-"APC"
-"HL"
-"PPL"
-"HK"
-"LNG"
-"CVS"
-"CYH"
-"CCL"
-"HD"
-"AET"
-"CVC"
-"MNK"
-"FOX"
-"CRC"
-"TSLA"
-"UNH"
-"VIAB"
-"P"
-"AMBA"
-"SWFT"
-"CNX"
-"BWC"
-"SRC"
-"WETF"
-"CNP"
-"ENDP"
-"JBL"
-"YUM"
-"MAT"
-"PAH"
-"FINL"
-"BK"
-"ARWR"
-"SO"
-"MTG"
-"BIIB"
-"CBS"
-"ARNA"
-"WYNN"
-"TAP"
-"CLR"
-"LOW"
-"NYMT"
-"AXTA"
-"BMRN"
-"ILMN"
-"MCD"
-"NAVI"
-"FNFG"
-"AVP"
-"ON"
-"DVN"
-"DHR"
-"OREX"
-"CFG"
-"DHI"
-"IBM"
-"HCP"
-"UA"
-"KR"
-"AES"
-"STWD"
-"BRCM"
-"APA"
-"STI"
-"MDVN"
-"EOG"
-"QRVO"
-"CBI"
-"CL"
-"ALLY"
-"CALM"
-"SN"
-"FEYE"
-"VRTX"
-"KBH"
-"ADXS"
-"HCBK"
-"OXY"
-"TROX"
-"NBL"
-"MON"
-"PM"
-"MA"
-"HDS"
-"EMR"
-"CLF"
-"AVGO"
-"INCY"
-"M"
-"PEP"
-"WU"
-"KERX"
-"CRM"
-"BCEI"
-"PEG"
-"NUE"
-"UNP"
-"SWKS"
-"SPW"
-"COG"
-"BURL"
-"MOS"
-"CIM"
-"CLNY"
-"BBT"
-"UTX"
-"LVS"
-"DE"
-"ACN"
-"DO"
-"LYB"
-"MPC"
-"SNDK"
-"AGEN"
-"GGP"
-"RRC"
-"CNC"
-"PLUG"
-"JOY"
-"HP"
-"CA"
-"LUK"
-"AMTD"
-"GERN"
-"PSX"
-"LULU"
-"SYY"
-"HON"
-"PTEN"
-"NWSA"
-"MCK"
-"SVU"
-"DSW"
-"MMM"
-"CTL"
-"BMR"
-"PHM"
-"CIE"
-"BRCD"
-"ATW"
-"BBBY"
-"BBY"
-"HRB"
-"ISIS"
-"NWL"
-"ADM"
-"HOLX"
-"MM"
-"GS"
-"AXP"
-"BA"
-"FAST"
-"KND"
-"NKTR"
-"ACHN"
-"REGN"
-"WEN"
-"CLDX"
-"BHI"
-"HFC"
-"GNTX"
-"GCA"
-"CPE"
-"ALL"
-"ALTR"
-"QEP"
-"NSAM"
-"ITCI"
-"ALNY"
-"SPF"
-"INSM"
-"PPHM"
-"NYCB"
-"NFX"
-"TMO"
-"TGT"
-"GOOG"
-"SIAL"
-"GPS"
-"MYGN"
-"MDRX"
-"TTPH"
-"NI"
-"IVR"
-"SLH"]
-end

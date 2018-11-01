@@ -30,22 +30,20 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      let application = recover val
-        Application("Decoder Filter Test App")
-          .new_pipeline[U64, U64]("Filter Test",
+      let pipeline = recover val
+        Wallaroo.source[U64]("Filter Test",
             TCPSourceConfig[(U64 | None)].from_options(OddFilterDecoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-          // .to[U64]({(): PassThrough => PassThrough})
+          // .to(PassThrough)
           .to_sink(TCPSinkConfig[U64].from_options(FramedU64Encoder,
             TCPSinkConfigCLIParser(env.args)?(0)?))
       end
-      Startup(env, application, "decoder-filter-test")
+      Wallaroo.build_application(env, "Decoder Filter Test App", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
 
 primitive OddFilterDecoder is FramedSourceHandler[(U64 | None)]
-
     fun header_length(): USize =>
     4
 

@@ -40,7 +40,7 @@ TESTING_ALPHABET27_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-integration-tests-testing-correctness-apps-alphabet27: testing_alphabet27_test
+# integration-tests-testing-correctness-apps-alphabet27: testing_alphabet27_test
 
 testing_alphabet27_test:
 	cd $(TESTING_ALPHABET27_PATH) && \
@@ -53,7 +53,7 @@ testing_alphabet27_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command './alphabet27' \
+		--command './alphabet27 $(RUN_WITH_RESILIENCE)' \
 		--workers 10 \
 		--sink-expect 4000
 

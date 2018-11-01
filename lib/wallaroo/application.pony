@@ -99,7 +99,9 @@ class Pipeline[Out: Any val] is BasicPipeline
 
   fun is_finished(): Bool => _finished
 
-  fun ref merge(pipeline: Pipeline[Out]): Pipeline[Out] =>
+  fun ref merge[MergeOut: Any val](pipeline: Pipeline[MergeOut]):
+    Pipeline[(Out | MergeOut)]
+  =>
     if _finished then
       _try_merge_with_finished_pipeline()
     elseif (_last_is_shuffle and not pipeline._last_is_shuffle) or
@@ -119,11 +121,11 @@ class Pipeline[Out: Any val] is BasicPipeline
         Unreachable()
       end
       _dag_sink_ids.append(pipeline._dag_sink_ids)
-      return Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids
+      return Pipeline[(Out | MergeOut)](_pipeline_id, _stages, _dag_sink_ids
         where last_is_shuffle = _last_is_shuffle,
         last_is_key_by = _last_is_key_by)
     end
-    Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids)
+    Pipeline[(Out | MergeOut)](_pipeline_id, _stages, _dag_sink_ids)
 
   fun ref to[Next: Any val](comp: Computation[Out, Next],
     parallelization: USize = 1): Pipeline[Next]
