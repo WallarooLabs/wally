@@ -186,7 +186,20 @@ class TCPReceiver(StoppableThread):
             self.host, self.port = self.sock.getsockname()
             self.event.set()
             while not self.stopped():
-                (clientsocket, address) = self.sock.accept()
+                try:
+                    (clientsocket, address) = self.sock.accept()
+                except OSError as err:
+                    if err.errno == 53:
+                        # [ECONNABORTED] A connection arrived, but it was
+                        # closed while waiting on the listen queue.
+                        # This happens on macOS during normal
+                        # harness shutdown.
+                        return
+                    else:
+                        logging.error("socket accept errno {}"
+                            .format(err.errno))
+                        self.err = err
+                        raise
                 cl = SingleSocketReceiver(clientsocket, self.data, self.mode,
                                           self.header_fmt,
                                           name='{}-{}'.format(
