@@ -48,7 +48,7 @@ market-spread_pony_test:
 	integration_test --framed-file-sender _market.txt 1 \
 	  --framed-file-sender _orders.txt 0 \
 	  --log-level error \
-	  --command './market-spread' \
+	  --command './market-spread $(RUN_WITH_RESILIENCE)' \
 	  --validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PONY_PATH)/_expected.txt --output' \
 	  --output 'received.txt' \
 	  --sources 2 \

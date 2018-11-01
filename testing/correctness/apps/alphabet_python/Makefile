@@ -40,13 +40,13 @@ TESTING_ALPHABET_PYTHON_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-testing-correctness-apps-alphabet_python: build-machida
-build-testing-correctness-apps-alphabet_python: build-machida3
-integration-tests-testing-correctness-apps-alphabet_python: build-testing-correctness-apps-alphabet_python
-integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python_test
-integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python_test_toparallel
-integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python3_test
-integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python3_test_toparallel
+# build-testing-correctness-apps-alphabet_python: build-machida
+# build-testing-correctness-apps-alphabet_python: build-machida3
+# integration-tests-testing-correctness-apps-alphabet_python: build-testing-correctness-apps-alphabet_python
+# integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python_test
+# integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python_test_toparallel
+# integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python3_test
+# integration-tests-testing-correctness-apps-alphabet_python: testing_alphabet_python3_test_toparallel
 
 testing_alphabet_python_test:
 	cd $(TESTING_ALPHABET_PYTHON_PATH) && \
@@ -59,7 +59,7 @@ testing_alphabet_python_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command 'machida --application-module alphabet' \
+		--command 'machida --application-module alphabet $(RUN_WITH_RESILIENCE)' \
 		--workers 10 \
 		--sink-expect 4000
 
@@ -74,7 +74,7 @@ testing_alphabet_python_test_toparallel:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command 'machida --application-module alphabet --to-parallel' \
+		--command 'machida --application-module alphabet --to-parallel $(RUN_WITH_RESILIENCE)' \
 		--workers 10 \
 		--sink-expect 4000
 
@@ -89,7 +89,7 @@ testing_alphabet_python3_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command 'machida3 --application-module alphabet' \
+		--command 'machida3 --application-module alphabet $(RUN_WITH_RESILIENCE)' \
 		--workers 10 \
 		--sink-expect 4000
 
@@ -104,7 +104,7 @@ testing_alphabet_python3_test_toparallel:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command 'machida3 --application-module alphabet --to-parallel' \
+		--command 'machida3 --application-module alphabet --to-parallel $(RUN_WITH_RESILIENCE)' \
 		--workers 10 \
 		--sink-expect 4000
 

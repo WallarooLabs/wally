@@ -49,7 +49,7 @@ multi_sink_test:
 		--validation-cmp \
 	  --expected-file _expected.msg \
 		--log-level error \
-		--command './multi_sink' \
+		--command './multi_sink $(RUN_WITH_RESILIENCE)' \
 		--sink-expect 100 \
 		--sinks 2 \
 		--sources 1

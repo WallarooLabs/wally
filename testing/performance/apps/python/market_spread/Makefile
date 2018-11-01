@@ -51,7 +51,7 @@ struct_market_spread_py_test:
 	integration_test --framed-file-sender _market.txt 1 \
 		--framed-file-sender _orders.txt 0 \
 	  --log-level error \
-		--command 'machida --application-module market_spread' \
+		--command 'machida --application-module market_spread $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _test/validate.py --expected $(STRUCT_MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
 		--output 'received.txt' \
 		--workers 5 \

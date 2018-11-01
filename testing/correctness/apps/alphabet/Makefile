@@ -40,8 +40,8 @@ TESTING_ALPHABET_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-integration-tests-testing-correctness-apps-alphabet: testing_alphabet_test
-integration-tests-testing-correctness-apps-alphabet: testing_alphabet_test_toparallel
+# integration-tests-testing-correctness-apps-alphabet: testing_alphabet_test
+# integration-tests-testing-correctness-apps-alphabet: testing_alphabet_test_toparallel
 
 testing_alphabet_test:
 	cd $(TESTING_ALPHABET_PATH) && \
@@ -54,7 +54,7 @@ testing_alphabet_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command './alphabet' \
+		--command './alphabet $(RUN_WITH_RESILIENCE)' \
 		--workers 10 \
 		--sink-expect 4000
 
@@ -69,7 +69,7 @@ testing_alphabet_test_toparallel:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command './alphabet --to-parallel' \
+		--command './alphabet --to-parallel $(RUN_WITH_RESILIENCE)' \
 		--workers 10 \
 		--sink-expect 4000
 

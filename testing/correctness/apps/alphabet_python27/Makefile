@@ -40,11 +40,11 @@ TESTING_ALPHABET_PYTHON27_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
-build-testing-correctness-apps-alphabet_python27: build-machida
-build-testing-correctness-apps-alphabet_python27: build-machida3
-integration-tests-testing-correctness-apps-alphabet_python27: build-testing-correctness-apps-alphabet_python27
-integration-tests-testing-correctness-apps-alphabet_python27: testing_alphabet_python27_test
-integration-tests-testing-correctness-apps-alphabet_python27: testing_alphabet_python27_python3_test
+# build-testing-correctness-apps-alphabet_python27: build-machida
+# build-testing-correctness-apps-alphabet_python27: build-machida3
+# integration-tests-testing-correctness-apps-alphabet_python27: build-testing-correctness-apps-alphabet_python27
+# integration-tests-testing-correctness-apps-alphabet_python27: testing_alphabet_python27_test
+# integration-tests-testing-correctness-apps-alphabet_python27: testing_alphabet_python27_python3_test
 
 testing_alphabet_python27_test:
 	cd $(TESTING_ALPHABET_PYTHON27_PATH) && \
@@ -57,7 +57,7 @@ testing_alphabet_python27_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command 'machida --application-module alphabet27' \
+		--command 'machida --application-module alphabet27 $(RUN_WITH_RESILIENCE)' \
 		--workers 1 \
 		--sink-expect 4000
 
@@ -72,7 +72,7 @@ testing_alphabet_python27_python3_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command 'machida3 --application-module alphabet27' \
+		--command 'machida3 --application-module alphabet27 $(RUN_WITH_RESILIENCE)' \
 		--workers 1 \
 		--sink-expect 4000
 
