@@ -26,12 +26,13 @@ def application_setup(args):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    p = wallaroo.source("Celsius Conversion",
+    inputs = wallaroo.source("Celsius Conversion",
                         wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-    p = p.to(multiply)
-    p = p.to(add)
-    pipeline = p.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
 
+    pipeline = (inputs
+        .to(multiply)
+        .to(add)
+        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
 
     return wallaroo.build_application("Celsius to Fahrenheit", pipeline)
 

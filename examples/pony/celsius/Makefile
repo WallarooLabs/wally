@@ -48,7 +48,7 @@ celsius_pony_test:
 	  --validation-cmp \
 	  --expected-file _expected.msg \
 		--log-level error \
-		--command './celsius' \
+		--command './celsius $(RUN_WITH_RESILIENCE)' \
 		--sink-expect 100
 
 # end of prevent rules from being evaluated/included multiple times

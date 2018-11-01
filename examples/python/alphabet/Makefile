@@ -55,7 +55,7 @@ alphabet_py_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command 'machida --application-module alphabet' \
+		--command 'machida --application-module alphabet $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 1000
 
@@ -67,7 +67,7 @@ alphabet_py3_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command 'machida3 --application-module alphabet' \
+		--command 'machida3 --application-module alphabet $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 1000
 

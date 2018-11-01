@@ -51,7 +51,7 @@ sequence_window_test:
 	cd $(SEQUENCE_WINDOW_PATH) && \
 	integration_test --sequence-sender '(0,1000]' \
 	  --log-level error \
-		--command './sequence_window' \
+		--command './sequence_window $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd './validator/validator -e 1000 -a -i' \
 		--output 'received.txt' \
 		--giles-mode \
