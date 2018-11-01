@@ -41,18 +41,19 @@ actor Main
     end
 
     try
-      let application = recover val
-        Application("Celsius Conversion App")
-          .new_pipeline[F32, F32]("Celsius Conversion",
-            KafkaSourceConfig[F32](ksource_clip.parse_options(env.args)?,
-            env.root as AmbientAuth, CelsiusKafkaDecoder))
-            .to[F32]({(): Multiply => Multiply})
-            .to[F32]({(): Add => Add})
-            .to_sink(KafkaSinkConfig[F32](FahrenheitEncoder,
-              ksink_clip.parse_options(env.args)?,
-              env.root as AmbientAuth))
+      let pipeline = recover val
+        let inputs = Wallaroo.source[F32]("Celsius Conversion",
+          KafkaSourceConfig[F32](ksource_clip.parse_options(env.args)?,
+          env.root as AmbientAuth, CelsiusKafkaDecoder))
+
+        inputs
+          .to[F32](Multiply)
+          .to[F32](Add)
+          .to_sink(KafkaSinkConfig[F32](FahrenheitEncoder,
+            ksink_clip.parse_options(env.args)?,
+            env.root as AmbientAuth))
       end
-      Startup(env, application, "celsius-conversion")
+      Wallaroo.build_application(env, "Celsius Conversion", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
