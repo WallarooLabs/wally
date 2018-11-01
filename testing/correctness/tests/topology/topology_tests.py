@@ -171,6 +171,13 @@ def remove_key_by_chains(steps):
         if not ((last_step == 'key-by') and (s == 'key-by')):
             res.append(s)
             last_step = s
+    if len(res) == 3:
+        # Real pipelines won't end with 'key_by()'.
+        if res[2] == 'key-by':
+            new_res = []
+            new_res.append(res[0])
+            new_res.append(res[1])
+            res = new_res
     return res
 
 # Create tests!
