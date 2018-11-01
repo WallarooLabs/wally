@@ -29,14 +29,12 @@ import components
 #######################
 
 def parser_add_args(parser):
-    parser.add_argument('--to', dest='topology', action='append_const',
-                        const='to')
-    parser.add_argument('--to-parallel', dest='topology', action='append_const',
-                        const='to_parallel')
-    parser.add_argument('--to-stateful', dest='topology', action='append_const',
-                        const='to_stateful')
-    parser.add_argument('--to-state-partition', dest='topology', action='append_const',
-                        const='to_state_partition')
+    parser.add_argument('--to-stateless', dest='topology', action='append_const',
+                        const='to_stateless')
+    parser.add_argument('--to-state', dest='topology', action='append_const',
+                        const='to_state')
+    parser.add_argument('--key-by', dest='topology', action='append_const',
+                        const='key_by')
 
 
 def application_setup(args):
@@ -48,23 +46,19 @@ def application_setup(args):
     app_name = "topology test"
     pipe_name = "topology test pipeline"
 
-    ab = wallaroo.ApplicationBuilder(app_name)
-
     print("Using TCP Source")
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     source = wallaroo.TCPSourceConfig(in_host, in_port, decoder)
-
-    ab.new_pipeline(pipe_name, source)
+    inputs = wallaroo.source(pipe_name, source)
 
     # programmatically add computations
     topology = Topology(pargs.topology)
-    ab = topology.build(ab)
-
+    pipeline = topology.build(inputs)
 
     print("Using TCP Sink")
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
-    return ab.build()
+    pipeline = pipeline.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
+    return wallaroo.build_application(app_name, pipeline)
 
 
 class Topology(object):
@@ -74,48 +68,32 @@ class Topology(object):
         self.steps = []
         for node in topology:
             c[node] += 1
-            if node == 'to':
-                # to
+            if node == 'to_stateless':
                 f = components.Tag('{}{}'.format(node, c[node]))
                 comp = wallaroo.computation(f.__name__)(f)
-                self.steps.append((node, comp, f.__name__))
-            elif node == 'to_stateful':
-                # to_stateful
+                self.steps.append(('to', comp, f.__name__))
+            elif node == 'to_state':
                 f = components.TagState('{}{}'.format(node, c[node]))
-                comp = wallaroo.state_computation(f.__name__)(f)
-                self.steps.append((node, comp, f.__name__))
-            elif node == 'to_parallel':
-
-                # to_parallel
-                f = components.Tag('{}{}'.format(node, c[node]))
-                comp = wallaroo.computation(f.__name__)(f)
-                self.steps.append((node, comp, f.__name__))
-            elif node == 'to_state_partition':
-                # to_state_partition
-                f = components.TagState('{}{}'.format(node, c[node]))
-                comp = wallaroo.state_computation(f.__name__)(f)
-                self.steps.append((node, comp, f.__name__))
+                comp = wallaroo.state_computation(f.__name__, components.State)(f)
+                self.steps.append(('to', comp, f.__name__))
+            elif node == 'key_by':
+                comp = wallaroo.key_extractor(components.key_extractor)
+                self.steps.append(('key_by', comp, 'key-by'))
             else:
                 raise ValueError("Unknown topology node type: {!r}. Please use "
                                  "'to', 'to_parallel', 'to_stateful', or "
                                  "'to_state_partition'".format(node))
 
-    def build(self, ab):
+    def build(self, p):
         print("Building topology")
-        partition = wallaroo.partition(components.partition)
         for node, comp, tag in self.steps:
             print("Adding step: ({!r}, {!r}, {!r})".format(
                 node, tag, comp))
             if node == 'to':
-                ab.to(comp)
-            elif node == 'to_stateful':
-                ab = ab.to_stateful(comp, components.State, tag)
-            elif node == 'to_parallel':
-                ab = ab.to_parallel(comp)
-            elif node == 'to_state_partition':
-                ab = ab.to_state_partition(comp, components.State,
-                                      tag, partition, [])
-        return ab
+                p = p.to(comp)
+            elif node == 'key_by':
+                p = p.key_by(comp)
+        return p
 
 
     # onetomany
