@@ -160,7 +160,7 @@ push_release_latest_docker_images() {
   then
     ## Conditional check for whether the Wallaroo latest Docker path has been set, does not
     ## upload image if it hasn't. Otherwise uploads to Bintray.
-    if [ -n "$wallaroo_docker_image_latest_path"]
+    if [ -n "$wallaroo_docker_image_latest_path" ]
     then
       # push the image
       if docker push "$wallaroo_docker_image_latest_path"
