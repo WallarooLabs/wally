@@ -22,6 +22,7 @@ jobs:
       - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
+          ulimit -a
           make integration-tests debug=true
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
@@ -33,6 +34,7 @@ jobs:
       - run: .circleci/clone_tracker.sh
       - run: |
           ulimit -c unlimited
+          ulimit -a
           make integration-tests-testing-correctness-tests-all resilience=on debug=true
       - store_artifacts:
           path: /tmp/wallaroo_test_errors
