@@ -53,29 +53,11 @@ def application_setup(args):
             wallaroo.TCPSourceConfig(nbbo_host, nbbo_port,
                                      market_data_decoder))
 
-    # !@ remove these tests
-    # orders2 = wallaroo.source("Orders2",
-    #         wallaroo.TCPSourceConfig("127.0.0.1", "9998", order_decoder))
-
-    # orders3 = wallaroo.source("Orders3",
-    #         wallaroo.TCPSourceConfig("127.0.0.1", "9997", order_decoder))
-
-    # pipeline1 = orders.merge(market_data)\
-    #     .to(check_market_data)
-
-    # pipeline2 = orders2.merge(orders3)\
-    #     .to(check_market_data)
-
-    # pipeline = pipeline1.merge(pipeline2)\
-    #     .key_by(extract_symbol)\
-    #     .to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
-    #                                     order_result_encoder))
-
-    pipeline = orders.merge(market_data)\
-        .key_by(extract_symbol)\
-        .to(check_market_data)\
+    pipeline = (orders.merge(market_data)
+        .key_by(extract_symbol)
+        .to(check_market_data)
         .to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
-                                        order_result_encoder))
+                                        order_result_encoder)))
 
     return wallaroo.build_application("Market Spread", pipeline)
 

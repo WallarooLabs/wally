@@ -29,12 +29,15 @@ def application_setup(args):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    ab = wallaroo.ApplicationBuilder("alphabet")
-    ab.new_pipeline("alphabet",
-                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-    ab.to_stateful(add_votes, AllVotes, "letter state")
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
-    return ab.build()
+    votes = wallaroo.source("alphabet",
+                       wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+
+    pipeline = (votes
+        .key_by(extract_letter)
+        .to(add_votes)
+        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
+
+    return wallaroo.build_application("alphabet", pipeline)
 
 
 class Votes(object):
@@ -59,6 +62,9 @@ class AllVotes(object):
         # Return a new Votes instance here!
         return Votes(letter, vbl.votes)
 
+@wallaroo.key_extractor
+def extract_letter(data):
+    return data.letter
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
@@ -67,10 +73,10 @@ def decoder(bs):
     return Votes(letter, vote_count)
 
 
-@wallaroo.state_computation(name="add votes")
+@wallaroo.state_computation(name="add votes", state=AllVotes)
 def add_votes(data, state):
     state.update(data)
-    return (state.get_votes(data.letter), True)
+    return state.get_votes(data.letter)
 
 
 @wallaroo.encoder

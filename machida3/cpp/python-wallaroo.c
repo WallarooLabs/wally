@@ -65,6 +65,21 @@ extern char *get_application_setup_action(PyObject *item)
   return rtn;
 }
 
+extern PyObject *get_list_item(PyObject *list, size_t idx)
+{
+  return PyList_GetItem(list, idx);
+}
+
+extern char *get_stage_command(PyObject *item)
+{
+  printf("!@ get_stage_command");
+  PyObject *command = PyTuple_GetItem(item, 0);
+  char * rtn = PyBytes_AsString(command);
+  printf("!@ get_stage_command:got string");
+  Py_DECREF(command);
+  return rtn;
+}
+
 extern size_t source_decoder_header_length(PyObject *source_decoder)
 {
   PyObject *pFunc, *pValue;
@@ -196,17 +211,6 @@ extern void py_decref(PyObject *o)
   Py_DECREF(o);
 }
 
-extern PyObject *state_builder_build_state(PyObject *state_builder)
-{
-  PyObject *pFunc, *pArgs, *pValue;
-
-  pFunc = PyObject_GetAttrString(state_builder, "____wallaroo_build____");
-  pValue = PyObject_CallFunctionObjArgs(pFunc, NULL);
-  Py_DECREF(pFunc);
-
-  return pValue;
-}
-
 extern PyObject *stateful_computation_compute(PyObject *computation,
   PyObject *data, PyObject *state, char *method)
 {
@@ -217,6 +221,17 @@ extern PyObject *stateful_computation_compute(PyObject *computation,
   Py_DECREF(pFunc);
 
   return pValue;
+}
+
+extern PyObject *initial_state(PyObject *computation)
+{
+  PyObject *pFunc, *pState;
+
+  pFunc = PyObject_GetAttrString(computation, "initial_state");
+  pState = PyObject_CallFunctionObjArgs(pFunc, NULL);
+  Py_DECREF(pFunc);
+
+  return pState;
 }
 
 extern long key_hash(PyObject *key)
@@ -230,11 +245,11 @@ extern int key_eq(PyObject *key, PyObject* other)
   return PyObject_RichCompareBool(key, other, Py_EQ);
 }
 
-extern PyObject *partition_function_partition(PyObject *partition_function, PyObject *data)
+extern PyObject *extract_key(PyObject *key_extractor, PyObject *data)
 {
   PyObject *pFunc, *pValue;
 
-  pFunc = PyObject_GetAttrString(partition_function, "partition");
+  pFunc = PyObject_GetAttrString(key_extractor, "extract_key");
   pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
   Py_DECREF(pFunc);
 
@@ -326,6 +341,11 @@ extern int is_py_none(PyObject *o)
 extern int py_list_check(PyObject *l)
 {
   return PyList_Check(l);
+}
+
+extern int py_tuple_check(PyObject *t)
+{
+  return PyTuple_Check(t);
 }
 
 extern int py_unicode_check(PyObject *o)

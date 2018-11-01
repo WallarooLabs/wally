@@ -28,11 +28,11 @@ def application_setup(args):
 
     lines = wallaroo.source("Split and Count",
                         wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-    pipeline = lines\
-        .to(split)\
-        .key_by(extract_word)\
-        .to(count_word)\
-        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
+    pipeline = (lines
+        .to(split)
+        .key_by(extract_word)
+        .to(count_word)
+        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
 
     return wallaroo.build_application("Word Count Application", pipeline)
 

@@ -53,7 +53,7 @@ market_spread_py_test:
 		--framed-file-sender _market.txt 1 \
 		--framed-file-sender _orders.txt 0 \
 		--log-level error \
-		--command 'machida --application-module market_spread' \
+		--command 'machida --application-module market_spread $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
 		--output 'received.txt' \
 		--workers 5 \
@@ -68,7 +68,7 @@ market_spread_py3_test:
 		--framed-file-sender _market.txt 1 \
 		--framed-file-sender _orders.txt 0 \
 		--log-level error \
-		--command 'machida3 --application-module market_spread' \
+		--command 'machida3 --application-module market_spread $(RUN_WITH_RESILIENCE)' \
 		--validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
 		--output 'received.txt' \
 		--workers 5 \

@@ -303,15 +303,6 @@ class PyGenSourceHandler is GenSourceGenerator[PyData val]
   fun _final() =>
     Machida.dec_ref(_source_generator)
 
-class PyComputationBuilder
-  var _computation: PyComputation val
-
-  new create(computation: Pointer[U8] val) =>
-    _computation = recover val PyComputation(computation) end
-
-  fun apply(): PyComputation val =>
-    _computation
-
 class val PyComputation is Computation[PyData val, PyData val]
   var _computation: Pointer[U8] val
   let _name: String
