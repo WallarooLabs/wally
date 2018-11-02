@@ -486,6 +486,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
           else
             Fail()
           end
+        | let dmp: DisposedStepMessageProcessor => None
         else
           // !@ Should barriers be possible in other states?
           Fail()
