@@ -71,17 +71,14 @@ class SymbolData(object):
 
 @wallaroo.key_extractor
 def extract_symbol(data):
-    print("!@ Extracting symbol " + data.symbol)
     return data.symbol
 
 @wallaroo.state_computation(name="Check Market Data", state=SymbolData)
 def check_market_data(data, state):
     if data.is_order:
         if state.should_reject_trades:
-            print("!@Rejecting " + data.symbol + " order with offer of " + str(state.last_offer))
             ts = int(time.time() * 100000)
             return OrderResult(data, state.last_bid, state.last_offer, ts)
-        print("!@Not rejecting " + data.symbol + " order")
         return None
     else:
         offer_bid_difference = data.offer - data.bid
@@ -89,12 +86,6 @@ def check_market_data(data, state):
                                 ((offer_bid_difference / data.mid) >= 0.05))
         state.last_bid = data.bid
         state.last_offer = data.offer
-
-        #!@
-        if should_reject_trades:
-            print("!@Updating " + data.symbol + " as reject")
-        else:
-            print("!@Not updating " + data.symbol + " as reject: offer " + str(data.offer) + " last_offer now: " + str(state.last_offer))
 
         state.should_reject_trades = should_reject_trades
         return None
@@ -122,7 +113,6 @@ class MarketDataMessage(object):
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def order_decoder(bs):
-    print("!@ Decoding message at Source")
     """
     0 -  1b - FixType (U8)
     1 -  1b - side (U8)
