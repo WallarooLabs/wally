@@ -1065,26 +1065,18 @@ class val PyPipelineTree
     if edges.size() == 0 then
       // This node is a leaf, which means it begins with a source. Start the
       // pipeline with the source.
-      @printf[I32]("!@ 1\n".cstring())
       let source = @get_list_item(stages, 0)
-      @printf[I32]("!@ 2\n".cstring())
       let source_name = recover val String.copy_cstring(@PyString_AsString(
         @PyTuple_GetItem(source, 1))) end
-      @printf[I32]("!@ 3 %s\n".cstring(), source_name.cstring())
       let source_config = @PyTuple_GetItem(source, 2)
-      @printf[I32]("!@ 4\n".cstring())
       var pipeline = Wallaroo.source[PyData val](source_name,
         _SourceConfig.from_tuple(source_config, env)?)
 
-      @printf[I32]("!@ 5\n".cstring())
       let stages_size = @list_item_count(stages)
-      @printf[I32]("!@ 6 %s\n".cstring(), stages_size.string().cstring())
       if stages_size > 1 then
         // Do some stage building starting after the source
         for i in Range(1, stages_size) do
-      @printf[I32]("!@ 7 %s\n".cstring(), i.string().cstring())
           let next_stage = @get_list_item(stages, i)
-      @printf[I32]("!@ 8 %s\n".cstring(), i.string().cstring())
           pipeline = _add_next_stage(pipeline, next_stage)?
         end
       end
@@ -1097,11 +1089,9 @@ class val PyPipelineTree
       // Do some stage building starting after the merge.
       // There might not be any stages immediately after the merge.
       let stages_size = @list_item_count(stages)
-      @printf[I32]("!@ 9merge with %s following\n".cstring(), stages_size.string().cstring())
       if stages_size > 0 then
         // Do some stage building starting after the merge.
         for i in Range(0, stages_size) do
-          @printf[I32]("!@ 10 %s\n".cstring(), i.string().cstring())
           let next_stage = @get_list_item(stages, i)
           pipeline = _add_next_stage(pipeline, next_stage)?
         end

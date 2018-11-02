@@ -1045,7 +1045,6 @@ primitive _SinkConfig
     let app_name: String
 
     new val create(p_graph: Pointer[U8] val, env': Env) =>
-      @printf[I32]("!@ Creating PyPipelineTree\n".cstring())
       env = env'
 
       // p_graph points to a tuple of the form:
@@ -1059,8 +1058,6 @@ primitive _SinkConfig
       let stage_vs = @PyTuple_GetItem(p_graph, 2)
       let stage_es = @PyTuple_GetItem(p_graph, 3)
 
-      @printf[I32]("!@ 1\n".cstring())
-
       // Extract list of stage vertices
       vs =
         recover val
@@ -1072,8 +1069,6 @@ primitive _SinkConfig
           end
           arr
         end
-
-      @printf[I32]("!@ 2\n".cstring())
 
       // Extract list of edges
       es =
@@ -1100,8 +1095,6 @@ primitive _SinkConfig
           arr
         end
 
-      @printf[I32]("!@ 3\n".cstring())
-
     fun build(): Pipeline[PyData val] ? =>
       // Recursively build the pipeline.
       _build_from(root_idx)?
@@ -1109,7 +1102,6 @@ primitive _SinkConfig
     fun _build_from(idx: USize): Pipeline[PyData val] ? =>
       let stages = vs(idx)?
       let edges = es(idx)?
-      @printf[I32]("!@ 4\n".cstring())
       if edges.size() == 0 then
         // This node is a leaf, which means it begins with a source. Start the
         // pipeline with the source.
@@ -1151,14 +1143,11 @@ primitive _SinkConfig
     fun _add_next_stage(p: Pipeline[PyData val], stage: Pointer[U8] val):
       Pipeline[PyData val] ?
     =>
-      @printf[I32]("!@ _add_next_stage\n".cstring())
-
       var pipeline = p
       // let command_p = @get_stage_command(stage)
       // let command = Machida.py_bytes_or_unicode_to_pony_string(command_p)
       let command = Machida.py_bytes_or_unicode_to_pony_string(
         @PyTuple_GetItem(stage, 0))
-      @printf[I32]("!@ _add_next_stage:got command\n".cstring())
       match command
       | "to" =>
         let raw_computation = @PyTuple_GetItem(stage, 1)
