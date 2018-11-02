@@ -790,6 +790,7 @@ actor Startup
   be clean_shutdown() =>
     let promise = Promise[None]
     promise.next[None]({(n: None): None => _self.clean_recovery_files()})
+    try (_event_log as EventLog).dispose() end
     match _router_registry
     | let rr: RouterRegistry =>
       rr.dispose_producers(promise)
