@@ -27,6 +27,7 @@ def application_setup(args):
                     wallaroo.TCPSourceConfig(in_host, in_port, decoder))
 
     pipeline = (inputs
+        .key_by(constant)
         .to(maybe_one_to_many)
         .key_by(extract_window)
         .to(observe_new_value)
@@ -34,6 +35,10 @@ def application_setup(args):
 
     return wallaroo.build_application("Sequence Window", pipeline)
 
+
+@wallaroo.key_extractor
+def constant(data):
+    return "constant"
 
 @wallaroo.key_extractor
 def extract_window(data):
