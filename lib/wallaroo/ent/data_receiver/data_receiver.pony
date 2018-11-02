@@ -283,7 +283,7 @@ actor DataReceiver is Producer
   // REGISTER PRODUCERS
   /////////////////////////////////////////////////////////////////////////////
   be register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    if _state_routing_ids.contains(output_id) then
+    if _state_partition_producers.contains(output_id) then
       try
         _state_partition_producers.insert_if_absent(output_id,
           SetIs[RoutingId])?.set(input_id)
@@ -302,7 +302,7 @@ actor DataReceiver is Producer
     _queued_unregister_producers.push((input_id, output_id))
 
   be unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
-    if _state_routing_ids.contains(output_id) then
+    if _state_partition_producers.contains(output_id) then
       try
         let set = _state_partition_producers(output_id)?
         set.unset(input_id)
