@@ -9,7 +9,7 @@ In order to compile the Wallaroo example applications, your system will need to 
 ## Download Wallaroo Up script
 
 ```bash
-curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/{{ book.wallaroo_version }}/misc/wallaroo-up.sh -o /tmp/wallaroo-up.sh -J -L
+curl https://raw.githubusercontent.com/WallarooLabs/wallaroo/0.5.4/misc/wallaroo-up.sh -o /tmp/wallaroo-up.sh -J -L
 ```
 
 ## Run the Wallaroo Up script

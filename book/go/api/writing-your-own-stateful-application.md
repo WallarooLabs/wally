@@ -211,7 +211,7 @@ ToStatePartition(&AddVotes{}, &RunningVotesTotalBuilder{}, "running vote totals"
 
 ## Next Steps
 
-The complete alphabet example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/go/alphabet/). To run it, follow the [Alphabet application instructions](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/go/alphabet/README.md)
+The complete alphabet example is available [here](https://github.com/WallarooLabs/wallaroo/tree/0.5.4/examples/go/alphabet/). To run it, follow the [Alphabet application instructions](https://github.com/WallarooLabs/wallaroo/tree/0.5.4/examples/go/alphabet/README.md)
 
 To see how everything we've learned so far comes together, check out our [Word Count walkthrough](word-count.md)
 

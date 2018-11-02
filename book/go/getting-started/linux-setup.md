@@ -27,14 +27,14 @@ mkdir ~/wallaroo-tutorial
 cd ~/wallaroo-tutorial
 ```
 
-This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-{{ book.wallaroo_version }}`):
+This will be our base directory in what follows. Download the Wallaroo sources (this will create a subdirectory called `wallaroo-0.5.4`):
 
 ```bash
-curl -L -o wallaroo-{{ book.wallaroo_version }}.tar.gz '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/wallaroo-{{ book.wallaroo_version }}.tar.gz'
-mkdir wallaroo-{{ book.wallaroo_version }}
-tar -C wallaroo-{{ book.wallaroo_version }} --strip-components=1 -xzf wallaroo-{{ book.wallaroo_version }}.tar.gz
-rm wallaroo-{{ book.wallaroo_version }}.tar.gz
-cd wallaroo-{{ book.wallaroo_version }}
+curl -L -o wallaroo-0.5.4.tar.gz '{{ book.bintray_repo_url }}/wallaroo/0.5.4/wallaroo-0.5.4.tar.gz'
+mkdir wallaroo-0.5.4
+tar -C wallaroo-0.5.4 --strip-components=1 -xzf wallaroo-0.5.4.tar.gz
+rm wallaroo-0.5.4.tar.gz
+cd wallaroo-0.5.4
 ```
 
 ## Install Go
@@ -175,14 +175,14 @@ sudo make install
 ## Download and configure the Metrics UI
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
+cd ~/wallaroo-tutorial/wallaroo-0.5.4/
 mkdir bin
-curl -L -o Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage '{{ book.bintray_repo_url }}/wallaroo/{{ book.wallaroo_version }}/Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage'
-chmod +x Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
-./Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage --appimage-extract
+curl -L -o Wallaroo_Metrics_UI-0.5.4-x86_64.AppImage '{{ book.bintray_repo_url }}/wallaroo/0.5.4/Wallaroo_Metrics_UI-0.5.4-x86_64.AppImage'
+chmod +x Wallaroo_Metrics_UI-0.5.4-x86_64.AppImage
+./Wallaroo_Metrics_UI-0.5.4-x86_64.AppImage --appimage-extract
 mv squashfs-root bin/metrics_ui
 sed -i 's/sleep 4/sleep 0/' bin/metrics_ui/AppRun
-rm Wallaroo_Metrics_UI-{{ book.wallaroo_version }}-x86_64.AppImage
+rm Wallaroo_Metrics_UI-0.5.4-x86_64.AppImage
 ln -s metrics_ui/AppRun bin/metrics_reporter_ui
 ```
 
@@ -197,7 +197,7 @@ The Cluster Shrinker tool is used to tell a running cluster to reduce the number
 To compile all of the tools, change to the root Wallaroo directory:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/
+cd ~/wallaroo-tutorial/wallaroo-0.5.4/
 make build-giles-sender-all build-utils-all
 cp utils/data_receiver/data_receiver bin
 cp utils/cluster_shrinker/cluster_shrinker bin
