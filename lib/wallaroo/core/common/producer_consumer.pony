@@ -17,8 +17,10 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
+use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/initialization"
+use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
@@ -31,11 +33,13 @@ trait tag StatusReporter
   be report_status(code: ReportStatusCode)
 
 trait tag Producer is (Muteable & Resilient)
-  fun ref route_to(c: Consumer): (Route | None)
+  fun ref has_route_to(c: Consumer): Bool
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
+  fun ref metrics_reporter(): MetricsReporter
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
   be register_downstream()
+  be dispose_with_promise(promise: Promise[None])
 
 interface tag RouterUpdatable
   be update_router(r: Router)
@@ -55,20 +59,14 @@ trait tag Consumer is (Runnable & Initializable & StatusReporter &
 
 trait tag Runnable
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
 trait tag Muteable
   be mute(c: Consumer)

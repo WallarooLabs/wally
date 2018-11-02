@@ -20,6 +20,7 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "promises"
 use "serialise"
 use "time"
 use "wallaroo_labs/guid"
@@ -46,18 +47,14 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   var _id: U128
   let _runner: Runner
   var _router: Router = EmptyRouter
-  // For use if this is a state step, otherwise EmptyTargetIdRouter
-  var _target_id_router: TargetIdRouter
   let _metrics_reporter: MetricsReporter
-  // list of envelopes
-  let _deduplication_list: DeduplicationList = _deduplication_list.create()
   let _event_log: EventLog
   var _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
 
   var _step_message_processor: StepMessageProcessor = EmptyStepMessageProcessor
 
   // _routes contains one route per Consumer
-  let _routes: MapIs[Consumer, Route] = _routes.create()
+  let _routes: SetIs[Consumer] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -73,7 +70,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   var _initializer: (LocalTopologyInitializer | None) = None
   var _initialized: Bool = false
   var _seq_id_initialized_on_recovery: Bool = false
-  var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
   let _recovery_replayer: RecoveryReconnecter
 
   var _barrier_forwarder: (BarrierStepForwarder | None) = None
@@ -87,34 +83,33 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   var _next_checkpoint_id: CheckpointId = 1
 
   new create(auth: AmbientAuth, runner: Runner iso,
-    metrics_reporter: MetricsReporter iso,
+    metrics_reporter': MetricsReporter iso,
     id: U128, event_log: EventLog,
     recovery_replayer: RecoveryReconnecter,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router_registry: RouterRegistry,
-    router': Router = EmptyRouter,
-    target_id_router: TargetIdRouter = EmptyTargetIdRouter)
+    router': Router = EmptyRouter)
   =>
     _auth = auth
     _runner = consume runner
     match _runner
     | let r: RollbackableRunner => r.set_step_id(id)
     end
-    _metrics_reporter = consume metrics_reporter
-    _target_id_router = target_id_router
+    _metrics_reporter = consume metrics_reporter'
     _event_log = event_log
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
     _router_registry = router_registry
     _id = id
 
+    @printf[I32]("!@ Spinning up Step %s\n".cstring(), _id.string().cstring())
+
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
     _event_log.register_resilient(id, this)
 
-    let initial_router = _runner.clone_router_and_set_input_type(router')
-    _update_router(initial_router)
+    _update_router(router')
 
     for (c_id, consumer) in _router.routes().pairs() do
       _register_output(c_id, consumer)
@@ -130,10 +125,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer) =>
-    for r in _routes.values() do
-      r.application_created()
-    end
-
     _initialized = true
     initializer.report_initialized(this)
 
@@ -145,25 +136,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   fun ref _prepare_ready_to_work(initializer: LocalTopologyInitializer) =>
     _initializer = initializer
-    if _routes.size() > 0 then
-      for r in _routes.values() do
-        r.application_initialized("Step")
-      end
-    else
-      _report_ready_to_work()
-    end
-
-  fun ref report_route_ready_to_work(r: RouteLogic) =>
-    if not _ready_to_work_routes.contains(r) then
-      _ready_to_work_routes.set(r)
-
-      if _ready_to_work_routes.size() == _routes.size() then
-        _report_ready_to_work()
-      end
-    else
-      // A route should only signal this once
-      Fail()
-    end
+    _report_ready_to_work()
 
   fun ref _report_ready_to_work() =>
     match _initializer
@@ -175,6 +148,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
+
+  fun ref metrics_reporter(): MetricsReporter =>
+    _metrics_reporter
 
   be update_router(router': Router) =>
     _update_router(router')
@@ -215,21 +191,12 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
     _outputs(id) = c
-    if not _routes.contains(c) then
-      let new_route = RouteBuilder(_id, this, c, _metrics_reporter)
-      _routes(c) = new_route
-      new_route.register_producer(id)
-    else
-      try
-        _routes(c)?.register_producer(id)
-      else
-        Unreachable()
-      end
-    end
+    _routes.set(c)
+    Route.register_producer(_id, id, this, c)
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
-      _routes(c)?.unregister_producer(id)
+      Route.unregister_producer(_id, id, this, c)
       _outputs.remove(id)?
       _remove_route_if_no_output(c)
     else
@@ -280,28 +247,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
   fun ref _remove_route(c: Consumer) =>
-    try
-      _routes.remove(c)?._2
-    else
-      Fail()
-    end
-
-  be update_target_id_router(target_id_router: TargetIdRouter) =>
-    let old_router = _target_id_router
-    _target_id_router = target_id_router
-    for (old_id, outdated_consumer) in
-      old_router.routes_not_in(_target_id_router).pairs()
-    do
-      if _outputs.contains(old_id) then
-        _unregister_output(old_id, outdated_consumer)
-      end
-    end
-
-    for (id, consumer) in target_id_router.routes().pairs() do
-      _register_output(id, consumer)
-    end
-
-    _add_boundaries(target_id_router.boundaries())
+    _routes.unset(c)
 
   be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
     _add_boundaries(boundaries)
@@ -310,8 +256,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     for (worker, boundary) in boundaries.pairs() do
       if not _outgoing_boundaries.contains(worker) then
         _outgoing_boundaries(worker) = boundary
-        let new_route = RouteBuilder(_id, this, boundary, _metrics_reporter)
-        _routes(boundary) = new_route
+        _routes.set(boundary)
       end
     end
 
@@ -321,31 +266,22 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref _remove_boundary(worker: String) =>
     None
 
-  be remove_route_for(step: Consumer) =>
-    try
-      _routes.remove(step)?
-    else
-      @printf[I32](("Tried to remove route for step but there was no route " +
-        "to remove\n").cstring())
-    end
-
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
-    _step_message_processor.run[D](metric_name, pipeline_time_spent, data,
-      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-      latest_ts, metrics_id, worker_ingress_ts)
+    _step_message_processor.run[D](metric_name, pipeline_time_spent, data, key,
+      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, i_producer_id: RoutingId,
+    pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
     i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_id()
 
@@ -369,7 +305,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
-      pipeline_time_spent, data, _id, this, _router, _target_id_router,
+      pipeline_time_spent, data, key, _id, this, _router,
       msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
       _metrics_reporter)
 
@@ -403,44 +339,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   fun ref current_sequence_id(): SeqId =>
     _seq_id_generator.current_seq_id()
 
-  ///////////
-  // RECOVERY
-  fun ref _is_duplicate(msg_uid: MsgId, frac_ids: FractionalMessageId): Bool =>
-    MessageDeduplicator.is_duplicate(msg_uid, frac_ids, _deduplication_list)
-
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    if not _is_duplicate(msg_uid, frac_ids) then
-      _deduplication_list.push((msg_uid, frac_ids))
-
-      process_message[D](metric_name, pipeline_time_spent, data, i_producer_id,
-        i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
-    else
-      ifdef "trace" then
-        @printf[I32]("Filtering a dupe in replay\n".cstring())
-      end
-
-      _seq_id_generator.new_id()
-    end
-
-  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
-    ifdef debug then
-      Invariant(_seq_id_initialized_on_recovery == false)
-    end
-    _seq_id_generator = StepSeqIdGenerator(seq_id)
-    _seq_id_initialized_on_recovery = true
-
-  fun ref route_to(c: Consumer): (Route | None) =>
-    try
-      _routes(c)?
-    else
-      None
-    end
-
   fun has_route_to(c: Consumer): Bool =>
     _routes.contains(c)
 
@@ -473,15 +371,12 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     match code
     | BoundaryCountStatus =>
       var b_count: USize = 0
-      for r in _routes.values() do
-        match r
-        | let br: BoundaryRoute => b_count = b_count + 1
+      for c in _routes.values() do
+        match c
+        | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
       @printf[I32]("Step %s has %s boundaries.\n".cstring(), _id.string().cstring(), b_count.string().cstring())
-    end
-    for r in _routes.values() do
-      r.report_status(code)
     end
 
   be mute(c: Consumer) =>
@@ -494,10 +389,23 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       u.unmute(c)
     end
 
+  be dispose_with_promise(promise: Promise[None]) =>
+    _dispose()
+    promise(None)
+
   be dispose() =>
-    @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
-    _event_log.unregister_resilient(_id, this)
-    _unregister_all_outputs()
+    _dispose()
+
+  fun ref _dispose() =>
+    match _step_message_processor
+    | let dsmp: DisposedStepMessageProcessor =>
+      None
+    else
+      @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
+      _event_log.unregister_resilient(_id, this)
+      _unregister_all_outputs()
+      _step_message_processor = DisposedStepMessageProcessor
+    end
 
   ///////////////
   // GROW-TO-FIT
@@ -578,6 +486,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
           else
             Fail()
           end
+        | let dmp: DisposedStepMessageProcessor => None
         else
           // !@ Should barriers be possible in other states?
           Fail()
@@ -595,7 +504,11 @@ actor Step is (Producer & Consumer & BarrierProcessor)
         _id.string().cstring())
     end
     ifdef debug then
-      Invariant(_step_message_processor.barrier_in_progress())
+      Invariant(
+        match _step_message_processor
+        | let dsmp: DisposedStepMessageProcessor => true
+        else _step_message_processor.barrier_in_progress() end
+      )
     end
     match barrier_token
     | let sbt: CheckpointBarrierToken =>

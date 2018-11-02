@@ -24,8 +24,8 @@ use "wallaroo/ent/checkpoint"
 
 trait StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
+    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
@@ -47,8 +47,8 @@ trait StepMessageProcessor
 
 class EmptyStepMessageProcessor is StepMessageProcessor
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
+    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     Fail()
@@ -63,13 +63,13 @@ class NormalStepMessageProcessor is StepMessageProcessor
     step = s
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
+    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    step.process_message[D](metric_name, pipeline_time_spent, data,
-      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-      latest_ts, metrics_id, worker_ingress_ts)
+    step.process_message[D](metric_name, pipeline_time_spent, data, key,
+      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
 
   fun ref queued(): Array[_Queued] =>
     Array[_Queued]
@@ -95,20 +95,20 @@ class BarrierStepMessageProcessor is StepMessageProcessor
     _barrier_forwarder = barrier_forwarder
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, i_route_id: RouteId,
+    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if _barrier_forwarder.input_blocking(i_producer_id) then
       let msg = TypedQueuedMessage[D](metric_name, pipeline_time_spent,
-        data, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
-        i_route_id, latest_ts, metrics_id, worker_ingress_ts)
+        data, key, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
+        latest_ts, metrics_id, worker_ingress_ts)
       _queued.push(msg)
     else
       @printf[I32]("!@ Input not blocking so processing waiting for barrier\n".cstring())
-      step.process_message[D](metric_name, pipeline_time_spent, data,
-        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id, worker_ingress_ts)
+      step.process_message[D](metric_name, pipeline_time_spent, data, key,
+        i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, latest_ts,
+        metrics_id, worker_ingress_ts)
     end
 
   fun barrier_in_progress(): Bool =>
@@ -134,3 +134,27 @@ class BarrierStepMessageProcessor is StepMessageProcessor
       qd.push(q)
     end
     qd
+
+class DisposedStepMessageProcessor is StepMessageProcessor
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, key: Key, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    None
+
+  fun barrier_in_progress(): Bool =>
+    false
+
+  fun ref receive_new_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref receive_barrier(step_id: RoutingId, producer: Producer,
+    barrier_token: BarrierToken)
+  =>
+    None
+
+  fun ref queued(): Array[_Queued] =>
+    Array[_Queued]

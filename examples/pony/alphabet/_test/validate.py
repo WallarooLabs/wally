@@ -17,6 +17,8 @@ import argparse
 from json import loads
 from struct import calcsize, unpack
 
+print("Validating Alphabet")
+
 fmt = '>LsQ'
 def decoder(bs):
     return unpack(fmt, bs)[1:3]

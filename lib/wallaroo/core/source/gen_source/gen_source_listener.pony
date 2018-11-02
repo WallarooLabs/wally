@@ -33,6 +33,7 @@ use "collections"
 use "crypto"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/grouping"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -61,6 +62,7 @@ actor GenSourceListener[In: Any val] is SourceListener
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
+  let _grouper_builder: GrouperBuilder
   var _router: Router
   let _metrics_conn: MetricsSink
   let _metrics_reporter: MetricsReporter
@@ -70,25 +72,25 @@ actor GenSourceListener[In: Any val] is SourceListener
   let _auth: AmbientAuth
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
-  let _pre_state_target_ids: Array[RoutingId] val
   let _target_router: Router
 
   let _sources: Array[GenSource[In]] = _sources.create()
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
-    runner_builder: RunnerBuilder, router: Router, metrics_conn: MetricsSink,
+    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
+    metrics_conn: MetricsSink,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
-    target_router: Router, generator: GenSourceGenerator[In])
+    recovering: Bool, target_router: Router, generator: GenSourceGenerator[In])
   =>
     _env = env
 
     _worker_name = worker_name
     _pipeline_name = pipeline_name
     _runner_builder = runner_builder
+    _grouper_builder = grouper
     _router = router
     _metrics_conn = metrics_conn
     _metrics_reporter = consume metrics_reporter
@@ -98,17 +100,16 @@ actor GenSourceListener[In: Any val] is SourceListener
     _auth = auth
     _layout_initializer = layout_initializer
     _recovering = recovering
-    _pre_state_target_ids = pre_state_target_ids
     _target_router = target_router
     _generator = generator
 
     match router
-    | let pr: PartitionRouter =>
+    | let pr: StatePartitionRouter =>
       _router_registry.register_partition_router_subscriber(pr.state_name(),
         this)
     | let spr: StatelessPartitionRouter =>
       _router_registry.register_stateless_partition_router_subscriber(
-        spr.partition_id(), this)
+        spr.partition_routing_id(), this)
     end
 
     _create_source()
@@ -122,19 +123,19 @@ actor GenSourceListener[In: Any val] is SourceListener
     let source_id = try rb.u128_le()? else Fail(); 0 end
 
     let source = GenSource[In](source_id, _auth, _pipeline_name,
-      _runner_builder, _router, _target_router, _generator, _event_log,
-      _outgoing_boundary_builders, _layout_initializer,
-      _metrics_reporter.clone(), _router_registry, _pre_state_target_ids)
+      _runner_builder, _grouper_builder, _router, _target_router, _generator,
+      _event_log, _outgoing_boundary_builders, _layout_initializer,
+      _metrics_reporter.clone(), _router_registry)
 
     source.mute(this)
     _router_registry.register_source(source, source_id)
     match _router
-    | let pr: PartitionRouter =>
+    | let pr: StatePartitionRouter =>
       _router_registry.register_partition_router_subscriber(
         pr.state_name(), source)
     | let spr: StatelessPartitionRouter =>
       _router_registry.register_stateless_partition_router_subscriber(
-        spr.partition_id(), source)
+        spr.partition_routing_id(), source)
     end
     _sources.push(source)
 
@@ -145,9 +146,6 @@ actor GenSourceListener[In: Any val] is SourceListener
 
   be update_router(router: Router) =>
     _router = router
-
-  be remove_route_for(moving_step: Consumer) =>
-    None
 
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)

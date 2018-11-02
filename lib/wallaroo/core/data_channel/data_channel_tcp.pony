@@ -334,35 +334,6 @@ class _DataReceiver is _DataReceiverWrapper
           .cstring())
       end
       Fail()
-    | let r: ReplayMsg =>
-      ifdef "trace" then
-        @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
-      end
-      try
-        match r.msg(_auth)?
-        | let data_msg: DataMsg =>
-          _metrics_reporter.step_metric(data_msg.metric_name,
-            "Before replay receive on data channel (network time)",
-            data_msg.metrics_id, data_msg.latest_ts, ingest_ts)
-          _data_receiver.replay_received(data_msg.delivery_msg,
-            data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
-            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
-            my_latest_ts)
-        | let fbm: ForwardBarrierMsg =>
-          _data_receiver.forward_barrier(fbm.target_id, fbm.origin_id,
-            fbm.token, fbm.seq_id)
-        end
-      else
-        Fail()
-      end
-    | let c: ReplayCompleteMsg =>
-      ifdef "trace" then
-        @printf[I32]("Received ReplayCompleteMsg on Data Channel\n"
-          .cstring())
-      end
-      //!@ We should probably be removing this whole message
-      // _recovery_replayer.add_boundary_replay_complete(c.sender_name,
-      //   c.boundary_id)
     | let m: SpinUpLocalTopologyMsg =>
       @printf[I32]("Received spin up local topology message!\n".cstring())
     | let m: ReportStatusMsg =>

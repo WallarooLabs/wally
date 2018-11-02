@@ -24,20 +24,29 @@ import wallaroo.experimental
 
 
 def application_setup(args):
-    ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit")
+    # ab.source_connector("celsius_feed",
+    #     encoder=encode_feed,
+    #     decoder=decode_feed)
+    # ab.sink_connector("fahrenheit_conversion",
+    #     encoder=encode_conversion,
+    #     decoder=decode_conversion)
 
-    ab.source_connector("celsius_feed",
-        encoder=encode_feed,
-        decoder=decode_feed)
-    ab.sink_connector("fahrenheit_conversion",
-        encoder=encode_conversion,
-        decoder=decode_conversion)
+    # ab.new_pipeline("Celsius Conversion", "celsius_feed")
+    # ab.to(multiply)
+    # ab.to(add)
+    # ab.to_sink("fahrenheit_conversion")
+    # return ab.build()
 
-    ab.new_pipeline("Celsius Conversion", "celsius_feed")
-    ab.to(multiply)
-    ab.to(add)
-    ab.to_sink("fahrenheit_conversion")
-    return ab.build()
+    #!@
+    values = wallaroo.source("convert",
+                    wallaroo.???(decoder))
+
+    pipeline = (values
+        .to(multiply)
+        .to(add)
+        .to_sink(wallaroo.DefaultKafkaSinkCLIParser(encoder)))
+    return wallaroo.build_application("Celsius to Fahrenheit", pipeline)
+
 
 
 @wallaroo.computation(name="multiply by 1.8")

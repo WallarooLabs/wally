@@ -43,7 +43,7 @@ include $(rules_mk_path)
 build-testing-correctness-tests-resilience: build-testing-correctness-apps-multi_partition_detector
 build-testing-correctness-tests-resilience: build-utils-cluster_shrinker
 build-testing-correctness-tests-resilience: build-machida
-#build-testing-correctness-tests-resilience: build-machida3
+build-testing-correctness-tests-resilience: build-machida3
 integration-tests-testing-correctness-tests-resilience: build-testing-correctness-tests-resilience
 integration-tests-testing-correctness-tests-resilience: resilience_tests
 

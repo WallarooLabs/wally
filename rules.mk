@@ -181,6 +181,9 @@ endif
 
 ifeq ($(resilience),on)
   resilience_arg := -D resilience
+  RUN_WITH_RESILIENCE := --run-with-resilience
+else
+  RUN_WITH_RESILIENCE :=
 endif
 
 # validation of variable

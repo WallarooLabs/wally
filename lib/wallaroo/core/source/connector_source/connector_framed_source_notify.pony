@@ -21,6 +21,7 @@ use "time"
 use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
+use "wallaroo/core/grouping"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
@@ -42,16 +43,14 @@ class ConnectorSourceNotify[In: Any val]
   let _handler: FramedSourceHandler[In] val
   let _runner: Runner
   var _router: Router
-  let _target_id_router: TargetIdRouter = EmptyTargetIdRouter
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
-    runner_builder: RunnerBuilder, router': Router,
-    metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router,
-    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
+    runner_builder: RunnerBuilder, grouper_builder: GrouperBuilder,
+    router': Router, metrics_reporter: MetricsReporter iso,
+    event_log: EventLog, target_router: Router)
   =>
     _source_id = source_id
     _pipeline_name = pipeline_name
@@ -60,8 +59,8 @@ class ConnectorSourceNotify[In: Any val]
     _auth = auth
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
-      target_router, pre_state_target_ids)
-    _router = _runner.clone_router_and_set_input_type(router')
+      target_router, grouper_builder)
+    _router = router'
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
 
@@ -112,9 +111,9 @@ class ConnectorSourceNotify[In: Any val]
           end
           if decoded isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              _source_id, source, _router, _target_id_router, _msg_id_gen(),
-              None, decode_end_ts, latest_metrics_id, ingest_ts,
-              _metrics_reporter)
+              "connector-source-key", _source_id, source, _router,
+              _msg_id_gen(), None, decode_end_ts,
+              latest_metrics_id, ingest_ts, _metrics_reporter)
           else
             (true, ingest_ts)
           end
@@ -157,11 +156,11 @@ class ConnectorSourceNotify[In: Any val]
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
     match _router
-    | let p_router: PartitionRouter =>
+    | let p_router: StatePartitionRouter =>
       _router = p_router.update_boundaries(_auth, obs)
     else
       ifdef "trace" then
-        @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +
+        @printf[I32](("FramedSourceNotify doesn't have StatePartitionRouter." +
           " Updating boundaries is a noop for this kind of Source.\n")
           .cstring())
       end

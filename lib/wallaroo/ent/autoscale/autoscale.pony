@@ -163,10 +163,13 @@ class Autoscale
   fun ref wait_for_joiner_initialization(joining_worker_count: USize,
     initialized_workers: _StringSet,
     new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    new_stateless_partition_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     current_worker_count: USize)
   =>
     _phase = _WaitingForJoinerInitialization(this, joining_worker_count,
-      initialized_workers, new_state_routing_ids, current_worker_count)
+      initialized_workers, new_state_routing_ids,
+      new_stateless_partition_routing_ids, current_worker_count)
 
   fun ref wait_for_connections(new_workers: Array[WorkerName] val,
     current_worker_count: USize)
@@ -177,26 +180,32 @@ class Autoscale
     _phase.worker_connected_to_joining_workers(_worker_name)
 
   fun ref joining_worker_initialized(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
-    _phase.joining_worker_initialized(worker, state_routing_ids)
+    _phase.joining_worker_initialized(worker, state_routing_ids,
+      stateless_partition_routing_ids)
 
   fun ref worker_connected_to_joining_workers(worker: WorkerName) =>
     _phase.worker_connected_to_joining_workers(worker)
 
   fun notify_current_workers_of_joining_addresses(
     new_workers: Array[WorkerName] val,
-    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    new_stateless_partition_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val)
   =>
     _connections.notify_current_workers_of_joining_addresses(new_workers,
-      new_state_routing_ids)
+      new_state_routing_ids, new_stateless_partition_routing_ids)
 
   fun notify_joining_workers_of_joining_addresses(
     new_workers: Array[WorkerName] val,
-    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val)
+    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    new_stateless_partition_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val)
   =>
     _connections.notify_joining_workers_of_joining_addresses(new_workers,
-      new_state_routing_ids)
+      new_state_routing_ids, new_stateless_partition_routing_ids)
 
   fun ref connect_to_joining_workers(ws: Array[WorkerName] val,
     coordinator: String)
@@ -371,7 +380,8 @@ trait _AutoscalePhase
     Fail()
 
   fun ref joining_worker_initialized(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     _invalid_call()
     Fail()
@@ -414,6 +424,10 @@ trait _AutoscalePhase
     Fail()
 
   fun ref receive_leaving_migration_ack(worker: WorkerName) =>
+    _invalid_call()
+    Fail()
+
+  fun ref producers_disposed() =>
     _invalid_call()
     Fail()
 
@@ -559,6 +573,9 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
   var _new_state_routing_ids:
     Map[WorkerName, Map[StateName, RoutingId] val] iso =
     recover Map[WorkerName, Map[StateName, RoutingId] val] end
+  var _new_stateless_partition_routing_ids:
+    Map[WorkerName, Map[RoutingId, RoutingId] val] iso =
+      recover Map[WorkerName, Map[RoutingId, RoutingId] val] end
   let _joining_worker_count: USize
   let _current_worker_count: USize
   let _checkpoint_id: CheckpointId
@@ -592,17 +609,25 @@ class _InjectAutoscaleBarrier is _AutoscalePhase
       Map[WorkerName, Map[StateName, RoutingId] val] val =
         (_new_state_routing_ids = recover Map[WorkerName, Map[StateName,
           RoutingId] val] end)
+    let new_stateless_partition_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val =
+        (_new_stateless_partition_routing_ids =
+          recover Map[WorkerName, Map[RoutingId, RoutingId] val] end)
     _autoscale.wait_for_joiner_initialization(_joining_worker_count,
-      _initialized_workers, new_state_routing_ids, _current_worker_count)
+      _initialized_workers, new_state_routing_ids,
+      new_stateless_partition_routing_ids, _current_worker_count)
 
   fun ref joining_worker_initialized(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     // It's possible some workers will be initialized when we're still in
     // this phase. We need to keep track of this to hand off that info to
     // the next phase.
     _initialized_workers.set(worker)
     _new_state_routing_ids(worker) = state_routing_ids
+    _new_stateless_partition_routing_ids(worker) =
+      stateless_partition_routing_ids
     if _initialized_workers.size() >= _joining_worker_count then
       // We should have already transitioned to the next phase before this.
       Fail()
@@ -616,10 +641,15 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
   var _new_state_routing_ids:
     Map[WorkerName, Map[StateName, RoutingId] val] iso =
     recover Map[WorkerName, Map[StateName, RoutingId] val] end
+  var _new_stateless_partition_routing_ids:
+    Map[WorkerName, Map[RoutingId, RoutingId] val] iso =
+    recover Map[WorkerName, Map[RoutingId, RoutingId] val] end
 
   new create(autoscale: Autoscale ref, joining_worker_count: USize,
     initialized_workers: _StringSet,
     new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
+    new_stateless_partition_routing_ids:
+      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     current_worker_count: USize)
   =>
     ifdef debug then
@@ -634,6 +664,9 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
     for (w, sri) in new_state_routing_ids.pairs() do
       _new_state_routing_ids(w) = sri
     end
+    for (w, spri) in new_stateless_partition_routing_ids.pairs() do
+      _new_stateless_partition_routing_ids(w) = spri
+    end
     @printf[I32](("AUTOSCALE: Waiting for %s joining workers to initialize. " +
       "Already initialized: %s. Current cluster size is %s\n").cstring(),
       _joining_worker_count.string().cstring(),
@@ -643,10 +676,13 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
   fun name(): String => "WaitingForJoinerInitialization"
 
   fun ref joining_worker_initialized(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     _initialized_joining_workers.set(worker)
     _new_state_routing_ids(worker) = state_routing_ids
+    _new_stateless_partition_routing_ids(worker) =
+      stateless_partition_routing_ids
     if _initialized_joining_workers.size() == _joining_worker_count then
       let nws = recover trn Array[String] end
       for w in _initialized_joining_workers.values() do
@@ -657,10 +693,14 @@ class _WaitingForJoinerInitialization is _AutoscalePhase
         Map[WorkerName, Map[StateName, RoutingId] val] val =
           (_new_state_routing_ids = recover Map[WorkerName, Map[StateName,
             RoutingId] val] end)
+      let new_stateless_partition_routing_ids:
+        Map[WorkerName, Map[RoutingId, RoutingId] val] val =
+          (_new_stateless_partition_routing_ids =
+            recover Map[WorkerName, Map[RoutingId, RoutingId] val] end)
       _autoscale.notify_joining_workers_of_joining_addresses(new_workers,
-        new_state_routing_ids)
+        new_state_routing_ids, new_stateless_partition_routing_ids)
       _autoscale.notify_current_workers_of_joining_addresses(new_workers,
-        new_state_routing_ids)
+        new_state_routing_ids, new_stateless_partition_routing_ids)
       _autoscale.wait_for_connections(new_workers, _current_worker_count)
     end
 
@@ -725,7 +765,8 @@ class _WaitingToConnectToJoiners is _AutoscalePhase
 
   //!@ What do we do here with state_routing_ids?
   fun ref joining_worker_initialized(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     _new_boundaries.set(worker)
     ifdef debug then
@@ -835,7 +876,8 @@ class _JoiningWorker is _AutoscalePhase
     None
 
   fun ref joining_worker_initialized(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val)
+    state_routing_ids: Map[StateName, RoutingId] val,
+    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     None
 
@@ -1000,6 +1042,15 @@ class _WaitingForLeavingMigrationAcks is _AutoscalePhase
       _autoscale.clean_shutdown()
     end
 
+class _ShuttingDown is _AutoscalePhase
+  new create() =>
+    @printf[I32]("AUTOSCALE: Shutting down.\n".cstring())
+
+  fun name(): String => "ShuttingDown"
+
+  fun ref autoscale_complete() =>
+    None
+
 /////////////////////////////////////////////////
 // SHARED PHASES
 /////////////////////////////////////////////////
@@ -1028,15 +1079,6 @@ class _WaitingForResumeTheWorld is _AutoscalePhase
       end
     end
     _autoscale.mark_autoscale_complete()
-
-class _ShuttingDown is _AutoscalePhase
-  new create() =>
-    @printf[I32]("AUTOSCALE: Shutting down.\n".cstring())
-
-  fun name(): String => "ShuttingDown"
-
-  fun ref autoscale_complete() =>
-    None
 
 
 /////////////////////////////////////////////////////////////////////////////

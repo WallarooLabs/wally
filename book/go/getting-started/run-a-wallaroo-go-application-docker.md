@@ -22,17 +22,17 @@ Since Wallaroo is a distributed application, its components need to run separate
 
 {% codetabs name="UNIX Bash", type="bash" -%}
 docker run --rm -it --privileged -p 4000:4000 \
--v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo \
+-v /tmp/wallaroo-docker/wallaroo-0.5.4/wallaroo-src:/src/wallaroo \
 --name wally \
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 {%- language name="Windows Powershell", type="bash" -%}
 docker run --rm -it --privileged -p 4000:4000 `
--v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo `
+-v c:/wallaroo-docker/wallaroo-0.5.4/wallaroo-src:/src/wallaroo `
 --name wally `
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 {%- language name="Windows Command Prompt", type="bash" -%}
 docker run --rm -it --privileged -p 4000:4000 ^
--v c:/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo ^
+-v c:/wallaroo-docker/wallaroo-0.5.4/wallaroo-src:/src/wallaroo ^
 --name wally ^
 wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 {%- endcodetabs %}
@@ -49,7 +49,7 @@ wallaroo-labs-docker-wallaroolabs.bintray.io/{{ docker_version_url }}
 
 * `-p 4000:4000`: Maps the default port for HTTP requests for the Metrics UI from the container to the host. This makes it possible to call up the Metrics UI from a browser on the host.
 
-* `-v /tmp/wallaroo-docker/wallaroo-{{ book.wallaroo_version }}/wallaroo-src:/src/wallaroo`: Mounts a host directory as a data volume within the container. The first time you run this, an empty directory needs to be used in order for the Docker container to copy the Wallaroo source code to your host. If an empty directory is not used, we are assuming it is prepopulated with the Wallaroo source code from this point forward. This allows you to open and modify the Wallaroo source code with the editor of your choice on your host. The Wallaroo source code will persist on your machine after the container is stopped or deleted. This setting is optional, but without it you would need to use an editor within the container to view or modify the Wallaroo source code.
+* `-v /tmp/wallaroo-docker/wallaroo-0.5.4/wallaroo-src:/src/wallaroo`: Mounts a host directory as a data volume within the container. The first time you run this, an empty directory needs to be used in order for the Docker container to copy the Wallaroo source code to your host. If an empty directory is not used, we are assuming it is prepopulated with the Wallaroo source code from this point forward. This allows you to open and modify the Wallaroo source code with the editor of your choice on your host. The Wallaroo source code will persist on your machine after the container is stopped or deleted. This setting is optional, but without it you would need to use an editor within the container to view or modify the Wallaroo source code.
 
 * `--name wally`: The name for the container. This setting is optional but makes it easier to reference the container in later commands.
 

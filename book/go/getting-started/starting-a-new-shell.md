@@ -21,7 +21,7 @@ If your Wallaroo docker container isn't set up or running, you'll get an error w
 For each Shell you're expected to setup, you'd have to run the following to access the Vagrant Box:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
+cd ~/wallaroo-tutorial/wallaroo-0.5.4/vagrant
 vagrant ssh
 ```
 
@@ -32,7 +32,7 @@ If your Wallaroo vagrant box isn't set up or running, you'll get an error with t
 For each Shell you're expected to setup, you'd have to run the following to configure the Wallaroo environment:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}
+cd ~/wallaroo-tutorial/wallaroo-0.5.4
 source bin/activate
 ```
 

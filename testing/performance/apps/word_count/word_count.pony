@@ -38,23 +38,19 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      let word_totals_partition = Partitions[String](
-        WordPartitionFunction, PartitionsFileReader("letters.txt",
-          env.root as AmbientAuth))
+      let pipeline = recover val
+        let lines = Wallaroo.source[String]("Word Count",
+          TCPSourceConfig[String].from_options(StringFrameHandler,
+                TCPSourceConfigCLIParser(env.args)?(0)?, 1))
 
-      let application = recover val
-        Application("Word Count App")
-          .new_pipeline[String, RunningTotal]("Word Count",
-            TCPSourceConfig[String].from_options(StringFrameHandler,
-              TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to_parallel[String](SplitBuilder)
-            .to_state_partition[RunningTotal, WordTotals](
-              AddCount, WordTotalsBuilder, "word-totals",
-              word_totals_partition where multi_worker = true)
-            .to_sink(TCPSinkConfig[RunningTotal].from_options(
-              RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
+        lines
+          .to[String](Split)
+          .key_by(ExtractWord)
+          .to_state[RunningTotal, WordTotal](AddCount)
+          .to_sink(TCPSinkConfig[RunningTotal].from_options(
+            RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
       end
-      Startup(env, application, "word-count")
+      Wallaroo.build_application(env, "Word Count", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
@@ -75,10 +71,6 @@ primitive Split
     end
     consume words
 
-primitive SplitBuilder
-  fun apply(): Computation[String, String] val =>
-    Split
-
 class val RunningTotal
   let word: String
   let count: U64
@@ -87,82 +79,21 @@ class val RunningTotal
     word = w
     count = c
 
-class val WordTotalsBuilder
-  fun apply(): WordTotals => WordTotals
-  fun name(): String => "Word Totals"
+class WordTotal is State
+  var count: U64
 
-class WordTotals is State
-  // Map from word to current count
-  var word_totals: Map[String, U64] = word_totals.create()
+  new create(c: U64) =>
+    count = c
 
-class WordTotalsStateChange is StateChange[WordTotals]
-  let _id: U64
-  let _name: String
-  var _word: String = ""
-  var _count: U64 = 0
-
-  fun name(): String => _name
-  fun id(): U64 => _id
-
-  new create(id': U64, name': String) =>
-    _id = id'
-    _name = name'
-
-  fun ref update(word: String, count: U64) =>
-    _word = word
-    _count = count
-
-  fun apply(state: WordTotals) =>
-    // @printf[I32]("State change!!\n".cstring())
-    state.word_totals(_word) = _count
-
-  fun write_log_entry(out_writer: Writer) =>
-    out_writer.u32_be(_word.size().u32())
-    out_writer.write(_word)
-    out_writer.u64_be(_count)
-
-  fun ref read_log_entry(in_reader: Reader) ? =>
-    let word_size = in_reader.u32_be()?.usize()
-    let word = String.from_array(in_reader.block(word_size)?)
-    let count = in_reader.u64_be()?
-    _word = word
-    _count = count
-
-class WordTotalsStateChangeBuilder is StateChangeBuilder[WordTotals]
-  fun apply(id: U64): StateChange[WordTotals] =>
-    WordTotalsStateChange(id, "WordTotalsStateChange")
-
-primitive AddCount is StateComputation[String, RunningTotal, WordTotals]
+primitive AddCount is StateComputation[String, RunningTotal, WordTotal]
   fun name(): String => "Add Count"
 
-  fun apply(word: String,
-    sc_repo: StateChangeRepository[WordTotals],
-    state: WordTotals): (RunningTotal, StateChange[WordTotals] ref)
-  =>
-    let state_change: WordTotalsStateChange ref =
-      try
-        sc_repo.lookup_by_name("WordTotalsStateChange")? as
-          WordTotalsStateChange
-      else
-        WordTotalsStateChange(0, "WordTotalsStateChange")
-      end
-    let new_count =
-      if state.word_totals.contains(word) then
-        try state.word_totals(word)? + 1 else 1 end
-      else
-        1
-      end
+  fun apply(word: String, state: WordTotal): RunningTotal =>
+    state.count = state.count + 1
+    RunningTotal(word, state.count)
 
-    state_change.update(word, new_count)
-
-    (RunningTotal(word, new_count), state_change)
-
-  fun state_change_builders(): Array[StateChangeBuilder[WordTotals]] val =>
-    recover val
-      let scbs = Array[StateChangeBuilder[WordTotals]]
-      scbs.push(recover WordTotalsStateChangeBuilder end)
-      scbs
-    end
+  fun initial_state(): WordTotal =>
+    WordTotal(0)
 
 primitive StringFrameHandler is FramedSourceHandler[String]
   fun header_length(): USize =>
@@ -174,21 +105,9 @@ primitive StringFrameHandler is FramedSourceHandler[String]
   fun decode(data: Array[U8] val): String =>
     String.from_array(data)
 
-primitive WordPartitionFunction
+primitive ExtractWord
   fun apply(input: String): Key =>
-    try
-      let first = input(0)?
-      if (first >= 'a') and (first <= 'z') then
-        recover String.from_utf32(first.u32()) end
-      else
-        "!"
-      end
-    else
-      // Fail()
-      // TODO: We shouldn't end up here but we might need to add more
-      // functionality so we can say "no key, drop this message"
-      "!"
-    end
+    input
 
 primitive RunningTotalEncoder
   fun apply(t: RunningTotal, wb: Writer = Writer): Array[ByteSeq] val =>

@@ -16,7 +16,9 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "time"
 use "wallaroo_labs/guid"
+use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo_labs/mort"
 use "wallaroo/core/invariant"
@@ -24,103 +26,63 @@ use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/topology"
 
-trait Route
-  fun ref application_created()
-  fun ref application_initialized(step_type: String)
-  fun id(): U64
-  fun ref dispose()
-  // Return false to indicate queue is full and if producer is a Source, it
-  // should mute
-  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
 
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg,
+primitive Route
+  fun run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, key: Key, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64, consumer: Consumer)
+  =>
+    let o_seq_id = cfp.next_sequence_id()
+
+    let my_latest_ts = ifdef "detailed-metrics" then
+        Time.nanos()
+      else
+        latest_ts
+      end
+
+    let new_metrics_id = ifdef "detailed-metrics" then
+        cfp.metrics_reporter().step_metric(metric_name,
+          "Before send to next step via behavior", metrics_id,
+          latest_ts, my_latest_ts)
+        metrics_id + 1
+      else
+        metrics_id
+      end
+
+    consumer.run[D](metric_name, pipeline_time_spent, data, key, cfp_id,
+      cfp, msg_uid, frac_ids, o_seq_id, my_latest_ts, new_metrics_id,
+      worker_ingress_ts)
+
+  fun forward(delivery_msg: DeliveryMsg,
     pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
     latest_ts: U64, metrics_id: U16, metric_name: String,
-    worker_ingress_ts: U64)
-
-  fun register_producer(target_id: RoutingId)
-  fun unregister_producer(target_id: RoutingId)
-
-  fun ref report_status(code: ReportStatusCode)
-
-trait RouteLogic
-  fun ref application_initialized(step_type: String)
-  fun ref dispose()
-
-class _RouteLogic is RouteLogic
-  let _step_id: RoutingId
-  let _step: Producer ref
-  let _consumer: Consumer
-  var _step_type: String = ""
-  var _route_type: String = ""
-
-  new create(step_id: RoutingId, step: Producer ref, consumer: Consumer,
-    r_type: String)
+    worker_ingress_ts: U64, boundary: OutgoingBoundary)
   =>
-    _step_id = step_id
-    _step = step
-    _consumer = consumer
-    _route_type = r_type
+    ifdef "trace" then
+      @printf[I32]("Route.forward msg\n".cstring())
+    end
+    let o_seq_id = cfp.next_sequence_id()
 
-  fun ref application_initialized(step_type: String) =>
-    _step_type = step_type
-    _report_ready_to_work()
+    boundary.forward(delivery_msg, pipeline_time_spent, producer_id, cfp,
+      o_seq_id, latest_ts, metrics_id, worker_ingress_ts)
 
-  fun ref dispose() =>
-    None
-
-  fun ref _report_ready_to_work() =>
-    match _step
-    | let s: Step ref =>
-      s.report_route_ready_to_work(this)
+  fun register_producer(producer_id: RoutingId, target_id: RoutingId,
+    producer: Producer, consumer: Consumer)
+  =>
+    match consumer
+    | let ob: OutgoingBoundary =>
+      ob.forward_register_producer(producer_id, target_id, producer)
+    else
+      consumer.register_producer(producer_id, producer)
     end
 
-class _EmptyRouteLogic is RouteLogic
-  fun ref application_initialized(step_type: String) =>
-    Fail()
-    None
-
-  fun ref dispose() =>
-    Fail()
-    None
-
-class EmptyRoute is Route
-  let _route_id: U64 = 1 + RouteIdGenerator()
-
-  fun ref application_created() =>
-    None
-
-  fun ref application_initialized(step_type: String) =>
-    None
-
-  fun id(): U64 => _route_id
-  fun ref dispose() => None
-
-  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, cfp_id: RoutingId, cfp: Producer ref, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
-    worker_ingress_ts: U64)
+  fun unregister_producer(producer_id: RoutingId, target_id: RoutingId,
+    producer: Producer, consumer: Consumer)
   =>
-    Fail()
-    true
-
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg,
-    pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
-    latest_ts: U64, metrics_id: U16, metric_name: String,
-    worker_ingress_ts: U64)
-  =>
-    Fail()
-    true
-
-
-  fun register_producer(target_id: RoutingId) =>
-    Fail()
-
-  fun unregister_producer(target_id: RoutingId) =>
-    Fail()
-
-  fun ref report_status(code: ReportStatusCode) =>
-    Fail()
+    match consumer
+    | let ob: OutgoingBoundary =>
+      ob.forward_unregister_producer(producer_id, target_id, producer)
+    else
+      consumer.unregister_producer(producer_id, producer)
+    end

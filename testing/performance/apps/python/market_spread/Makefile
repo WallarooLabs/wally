@@ -46,16 +46,33 @@ integration-tests-testing-performance-apps-python-market_spread: build-testing-p
 integration-tests-testing-performance-apps-python-market_spread: struct_market_spread_py_test
 
 struct_market_spread_py_test:
-	cd $(STRUCT_MARKET_SPREAD_PY_PATH) && \
+	cd $(MARKET_SPREAD_PY_PATH) && \
 	python _test/gen.py && \
-	integration_test --framed-file-sender _market.txt 1 \
+	integration_test \
+		--framed-file-sender _market.txt 1 \
 		--framed-file-sender _orders.txt 0 \
-	  --log-level error \
-		--command 'machida --application-module market_spread' \
-		--validation-cmd 'python _test/validate.py --expected $(STRUCT_MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
+		--log-level error \
+		--command 'machida --application-module market_spread $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
 		--output 'received.txt' \
 		--workers 5 \
 		--sources 2 \
+		--sink-mode framed \
+		--sink-expect 1000
+
+struct_market_spread_py3_test:
+	cd $(MARKET_SPREAD_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test \
+		--framed-file-sender _market.txt 1 \
+		--framed-file-sender _orders.txt 0 \
+		--log-level error \
+		--command 'machida3 --application-module market_spread $(RUN_WITH_RESILIENCE)' \
+		--validation-cmd 'python _test/validate.py --expected $(MARKET_SPREAD_PY_PATH)/_expected.txt --output' \
+		--output 'received.txt' \
+		--workers 5 \
+		--sources 2 \
+		--sink-mode framed \
 		--sink-expect 1000
 
 clean-testing-performance-apps-python-market_spread: struct_market_spread_py_clean

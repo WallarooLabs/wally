@@ -24,16 +24,14 @@ import wallaroo
 
 
 def application_setup(args):
-    ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit with Kafka")
-
-    ab.new_pipeline("convert",
+    values = wallaroo.source("convert",
                     wallaroo.DefaultKafkaSourceCLIParser(decoder))
 
-    ab.to(multiply)
-    ab.to(add)
-
-    ab.to_sink(wallaroo.DefaultKafkaSinkCLIParser(encoder))
-    return ab.build()
+    pipeline = (values
+        .to(multiply)
+        .to(add)
+        .to_sink(wallaroo.DefaultKafkaSinkCLIParser(encoder)))
+    return wallaroo.build_application("Celsius to Fahrenheit with Kafka", pipeline)
 
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")

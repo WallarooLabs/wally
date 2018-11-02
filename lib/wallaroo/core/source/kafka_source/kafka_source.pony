@@ -40,7 +40,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   let _auth: AmbientAuth
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
   var _router: Router
-  let _routes: MapIs[Consumer, Route] = _routes.create()
+  let _routes: SetIs[Consumer] = _routes.create()
   // _outputs keeps track of all output targets by step id. There might be
   // duplicate consumers in this map (unlike _routes) since there might be
   // multiple target step ids over a boundary
@@ -96,7 +96,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     event_log: EventLog, router': Router,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     layout_initializer: LayoutInitializer,
-    metrics_reporter: MetricsReporter iso,
+    metrics_reporter': MetricsReporter iso,
     topic: String, partition_id: KafkaPartitionId,
     kafka_client: KafkaClient tag, router_registry: RouterRegistry,
     recovering: Bool)
@@ -107,7 +107,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _partition_id = partition_id
     _kc = kafka_client
 
-    _metrics_reporter = consume metrics_reporter
+    _metrics_reporter = consume metrics_reporter'
     _listen = listen
     _notify = consume notify
     _event_log = event_log
@@ -135,18 +135,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
     _notify.update_boundaries(_outgoing_boundaries)
 
-    for r in _routes.values() do
-      // TODO: this is a hack, we shouldn't be calling application events
-      // directly. route lifecycle needs to be broken out better from
-      // application lifecycle
-      r.application_created()
-     end
-
-    for r in _routes.values() do
-      r.application_initialized("KafkaSource-" + topic + "-"
-        + partition_id.string())
-    end
-
     _mute()
     ifdef "resilience" then
       _mute_local()
@@ -156,13 +144,11 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _unmute_local()
     _is_pending = false
     for (id, c) in _outputs.pairs() do
-      try
-        let route = _routes(c)?
-        route.register_producer(id)
-      else
-        Fail()
-      end
+      Route.register_producer(_source_id, id, this, c)
     end
+
+  fun ref metrics_reporter(): MetricsReporter =>
+    _metrics_reporter
 
   be update_router(router': Router) =>
     _update_router(router')
@@ -170,7 +156,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
   fun ref _update_router(router': Router) =>
     let new_router =
       match router'
-      | let pr: PartitionRouter =>
+      | let pr: StatePartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
         spr.update_boundaries(_outgoing_boundaries)
@@ -220,20 +206,9 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       end
 
       _outputs(id) = c
-      if not _routes.contains(c) then
-        let new_route = RouteBuilder(_source_id, this, c, _metrics_reporter)
-        _routes(c) = new_route
-        if not _is_pending then
-          new_route.register_producer(id)
-        end
-      else
-        try
-          if not _is_pending then
-            _routes(c)?.register_producer(id)
-          end
-        else
-          Unreachable()
-        end
+      _routes.set(c)
+      if not _is_pending then
+        Route.register_producer(_source_id, id, this, c)
       end
     end
 
@@ -258,9 +233,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
   fun ref _unregister_output(id: RoutingId, c: Consumer) =>
     try
-      if not _is_pending then
-        _routes(c)?.unregister_producer(id)
-      end
+      Route.unregister_producer(_source_id, id, this, c)
       _outputs.remove(id)?
       _remove_route_if_no_output(c)
     else
@@ -277,11 +250,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     end
 
   fun ref _remove_route(c: Consumer) =>
-    try
-      _routes.remove(c)?._2
-    else
-      Fail()
-    end
+    _routes.unset(c)
 
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)
@@ -297,9 +266,7 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
           target_worker_name, _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _router_registry.register_disposable(boundary)
-        let new_route = RouteBuilder(_source_id, this, boundary,
-          _metrics_reporter)
-        _routes(boundary) = new_route
+        _routes.set(boundary)
       end
     end
     _notify.update_boundaries(_outgoing_boundaries)
@@ -328,21 +295,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
           .cstring(), worker.cstring())
       end
     end
-
-  be remove_route_for(step: Consumer) =>
-    try
-      _routes.remove(step)?
-    else
-      Fail()
-    end
-
-  be initialize_seq_id_on_recovery(seq_id: SeqId) =>
-    ifdef "trace" then
-      @printf[I32](("initializing sequence id on recovery: " + seq_id.string() +
-        " in %s\n").cstring(), _name.cstring())
-    end
-    // update to use correct seq_id for recovery
-    _seq_id = seq_id
 
   be update_worker_data_service(worker: WorkerName,
     host: String, service: String)
@@ -414,12 +366,8 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
 
 
 
-  fun ref route_to(c: Consumer): (Route | None) =>
-    try
-      _routes(c)?
-    else
-      None
-    end
+  fun ref has_route_to(c: Consumer): Bool =>
+    _routes.contains(c)
 
   fun ref next_sequence_id(): SeqId =>
     _seq_id = _seq_id + 1
@@ -433,14 +381,11 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       var b_count: USize = 0
       for r in _routes.values() do
         match r
-        | let br: BoundaryRoute => b_count = b_count + 1
+        | let ob: OutgoingBoundary => b_count = b_count + 1
         end
       end
       @printf[I32]("KafkaSource %s has %s boundaries.\n".cstring(),
         _source_id.string().cstring(), b_count.string().cstring())
-    end
-    for route in _routes.values() do
-      route.report_status(code)
     end
 
   fun ref _mute() =>
@@ -534,7 +479,14 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
       _unregister_output(id, consumer)
     end
 
+  be dispose_with_promise(promise: Promise[None]) =>
+    _dispose()
+    promise(None)
+
   be dispose() =>
+    _dispose()
+
+  fun ref _dispose() =>
     @printf[I32]("Shutting down %s\n".cstring(), _name.cstring())
 
     if not _disposed then

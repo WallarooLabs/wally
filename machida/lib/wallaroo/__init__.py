@@ -50,77 +50,62 @@ def serialize(o):
 def deserialize(bs):
     return pickle.loads(bs)
 
-
 class WallarooParameterError(Exception):
     pass
 
+def source(name, source_config):
+    return Pipeline.from_source(name, source_config)
 
-class ApplicationBuilder(object):
-    def __init__(self, name):
-        self._connectors = {}
-        self._next_source_connector_port = 7100
-        self._next_sink_connector_port = 7200
-        self._actions = [("name", name)]
+def build_application(app_name, pipeline):
+    # pipeline.validate_actions()
+    return pipeline.to_tuple(app_name)
 
-    def source_connector(self, name, encoder, decoder, port=None):
-        port_num = port or self._next_source_connector_port
-        # for lookup in the connector script
-        self._actions.append(("source_connector", name, port_num, encoder, decoder))
-        # for lookup in the pipeline builder
-        self._connectors[name] = (port_num, decoder)
-        self._next_source_connector_port += 1
-        return self
+class Pipeline(object):
+    def __init__(self, pipeline_tree):
+        self._pipeline_tree = pipeline_tree
 
-    def sink_connector(self, name, encoder, decoder, port=None):
-        port_num = port or self._next_sink_connector_port
-        # for lookup in the connector script
-        self._actions.append(("sink_connector", name, port_num, encoder, decoder))
-        # for lookup in the pipeline builder
-        self._connectors[name] = (port_num, encoder)
-        self._next_sink_connector_port += 1
-        return self
+    @classmethod
+    def from_source(class_object, name, source_config):
+        pipeline_tree = _PipelineTree(("source", name, source_config.to_tuple()))
+        return Pipeline(pipeline_tree)
 
-    def new_pipeline(self, name, source_config):
-        if isinstance(source_config, str):
-            (port, decoder) = self._connectors[source_config]
-            connector = wallaroo.experimental.SourceConnectorConfig(host='localhost', port=port, decoder=decoder)
-            self._actions.append(("new_pipeline", name, connector.to_tuple()))
-        else:
-            self._actions.append(("new_pipeline", name, source_config.to_tuple()))
-        return self
+        # !@ We need to improve this when Brian updates connectors API.
+        # if isinstance(source_config, str):
+        #     (port, decoder) = self._connectors[source_config]
+        #     connector = wallaroo.experimental.SourceConnectorConfig(host='localhost', port=port, decoder=decoder)
+        #     self._actions.append(("source", name, connector.to_tuple()))
+        # else:
+        #     self._actions.append(("source", name, source_config.to_tuple()))
 
+    def to_tuple(self, app_name):
+        return self._pipeline_tree.to_tuple(app_name)
 
     def to(self, computation):
-        self._actions.append(("to", computation))
-        return self
+        return self.clone().__to__(computation)
 
-    def to_parallel(self, computation):
-        self._actions.append(("to_parallel", computation))
-        return self
-
-    def to_stateful(self, computation, state_class, state_name):
-        self._actions.append(("to_stateful", computation,
-                              StateBuilder(state_name, state_class),
-                              state_name))
-        return self
-
-    def to_state_partition(self, computation, state_class, state_name,
-                           partition_function, partition_keys = []):
-        self._actions.append(("to_state_partition", computation,
-                              StateBuilder(state_name, state_class),
-                              state_name, partition_function, partition_keys))
+    def __to__(self, computation):
+        if computation.is_stateful:
+            self._pipeline_tree.add_stage(("to_state", computation))
+        else:
+            self._pipeline_tree.add_stage(("to", computation))
         return self
 
     def to_sink(self, sink_config):
+        return self.clone().__to_sink__(sink_config)
+
+    def __to_sink__(self, sink_config):
         if isinstance(sink_config, str):
             (port, encoder) = self._connectors[sink_config]
             connector = wallaroo.experimental.SinkConnectorConfig(host='localhost', port=port, encoder=encoder)
-            self._actions.append(("to_sink", connector.to_tuple()))
+            self._pipeline_tree.add_stage(("to_sink", connector.to_tuple()))
         else:
-            self._actions.append(("to_sink", sink_config.to_tuple()))
+            self._pipeline_tree.add_stage(("to_sink", sink_config.to_tuple()))
         return self
 
     def to_sinks(self, sink_configs):
+        return self.clone().__to_sinks__(sink_configs)
+
+    def __to_sinks__(self, sink_configs):
         sinks = []
         for sc in sink_configs:
             if isinstance(sc, str):
@@ -129,100 +114,143 @@ class ApplicationBuilder(object):
                 sinks.append(connector.to_tuple())
             else:
                 sinks.append(sc.to_tuple())
-        self._actions.append(("to_sinks", sinks))
+        self._pipeline_tree.add_stage(("to_sinks", sinks))
         return self
 
-    def done(self):
-        self._actions.append(("done",))
+    def key_by(self, key_extractor):
+        return self.clone().__key_by__(key_extractor)
+
+    def __key_by__(self, key_extractor):
+        self._pipeline_tree.add_stage(("key_by", key_extractor))
         return self
 
-    def build(self):
-        self._validate_actions()
-        return self._actions
+    def merge(self, pipeline):
+        return self.clone().__merge__(pipeline.clone())
 
-    def _validate_actions(self):
-        self._steps = {}
-        self._pipelines = {}
-        self._states = {}
-        last_action = None
-        has_sink = False
-        # Ensure that we don't add steps unless we are in an unclosed pipeline
-        expect_steps = False
+    def __merge__(self, pipeline):
+        self._pipeline_tree.merge(pipeline._pipeline_tree)
+        return self
 
-        for action in self._actions:
-            if action[0][0:2] == "to" and not expect_steps:
-                if last_action == "to_sink":
-                    raise WallarooParameterError(
-                        "Unable to add a computation step after a sink. "
-                        "Please declare a new pipeline first.")
-                else:
-                    raise WallarooParameterError(
-                        "Please declare a new pipeline before adding "
-                        "computation steps.")
+    def clone(self):
+        return Pipeline(self._pipeline_tree.clone())
 
-            if action[0] == "new_pipeline":
-                self._validate_unique_pipeline_name(action[1], action[2])
-                expect_steps = True
-            elif action[0] == "to_state_partition":
-                self._validate_state(action[2], action[3], action[5])
-                self._validate_unique_partition_labels(action[5])
-                self._validate_partition_function(action[4])
-            elif action[0] == "to_stateful":
-                self._validate_state(action[2], action[3])
-            elif action[0] == "to_sink":
-                has_sink = True
-                expect_steps = False
+##!@
+# class ApplicationBuilder(object):
+#     def __init__(self, name):
+#         self._connectors = {}
+#         self._next_source_connector_port = 7100
+#         self._next_sink_connector_port = 7200
+#         self._actions = [("name", name)]
 
-            last_action = action[0]
+#     def source_connector(self, name, encoder, decoder, port=None):
+#         port_num = port or self._next_source_connector_port
+#         # for lookup in the connector script
+#         self._actions.append(("source_connector", name, port_num, encoder, decoder))
+#         # for lookup in the pipeline builder
+#         self._connectors[name] = (port_num, decoder)
+#         self._next_source_connector_port += 1
+#         return self
 
-        # After checking all of our actions, we should have seen at least one
-        # pipeline terminated with a sink.
-        if not has_sink:
-            raise WallarooParameterError(
-                "At least one pipeline must define a sink")
+#     def sink_connector(self, name, encoder, decoder, port=None):
+#         port_num = port or self._next_sink_connector_port
+#         # for lookup in the connector script
+#         self._actions.append(("sink_connector", name, port_num, encoder, decoder))
+#         # for lookup in the pipeline builder
+#         self._connectors[name] = (port_num, encoder)
+#         self._next_sink_connector_port += 1
+#         return self
 
-    def _validate_unique_pipeline_name(self, pipeline, source_config):
-        if pipeline in self._pipelines:
-            raise WallarooParameterError((
-                "A computation named {0} is defined more than once. "
-                "Please use unique names for your steps."
-                ).format(repr(computation.name)))
-        else:
-            self._pipelines[pipeline] = source_config
+#     def done(self):
+#         self._actions.append(("done",))
+#         return self
 
-    def _validate_state(self, ctor, name, partitions = None):
-        if name in self._states:
-            (other_ctor, other_partitions) = self._states[name]
-            if other_ctor.state_cls != ctor.state_cls:
-                raise WallarooParameterError((
-                    "A state with the name {0} has already been defined with "
-                    "an different type {1}, instead of {2}."
-                    ).format(repr(name), other_ctor.state_cls, ctor.state_cls))
-            if other_partitions != partitions:
-                raise WallarooParameterError((
-                    "A state with the name {0} has already been defined with "
-                    "an different paritioning scheme {1}, instead of {2}."
-                    ).format(repr(name), repr(other_partitions), repr(partitions)))
-        else:
-            self._states[name] = (ctor, partitions)
+#     def build(self):
+#         self._validate_actions()
+#         return self._actions
 
-    def _validate_unique_partition_labels(self, partitions):
-        if type(partitions) != list:
-            raise WallarooParameterError(
-                "Partitions lists should be of type list. Got a {0} instead."
-                .format(type(partitions)))
-        if len(set(partitions)) != len(partitions):
-            raise WallarooParameterError(
-                "Partition labels should be uniquely identified via equality "
-                "and support hashing. You might have duplicates or objects "
-                "which can't be used as keys in a dict.")
+#     def _validate_actions(self):
+#         self._steps = {}
+#         self._pipelines = {}
+#         self._states = {}
+#         last_action = None
+#         has_sink = False
+#         # Ensure that we don't add steps unless we are in an unclosed pipeline
+#         expect_steps = False
 
-    def _validate_partition_function(self, partition_function):
-        if not getattr(partition_function, "partition", None):
-            raise WallarooParameterError(
-                "Partition function is missing partition method. "
-                "Did you forget to use the @wallaroo.partition_function "
-                "decorator?")
+#         for action in self._actions:
+#             if action[0][0:2] == "to" and not expect_steps:
+#                 if last_action == "to_sink":
+#                     raise WallarooParameterError(
+#                         "Unable to add a computation step after a sink. "
+#                         "Please declare a new pipeline first.")
+#                 else:
+#                     raise WallarooParameterError(
+#                         "Please declare a new pipeline before adding "
+#                         "computation steps.")
+
+#             if action[0] == "new_pipeline":
+#                 self._validate_unique_pipeline_name(action[1], action[2])
+#                 expect_steps = True
+#             elif action[0] == "to_state_partition":
+#                 self._validate_state(action[2], action[3], action[5])
+#                 self._validate_unique_partition_labels(action[5])
+#                 self._validate_partition_function(action[4])
+#             elif action[0] == "to_stateful":
+#                 self._validate_state(action[2], action[3])
+#             elif action[0] == "to_sink":
+#                 has_sink = True
+#                 expect_steps = False
+
+#             last_action = action[0]
+
+#         # After checking all of our actions, we should have seen at least one
+#         # pipeline terminated with a sink.
+#         if not has_sink:
+#             raise WallarooParameterError(
+#                 "At least one pipeline must define a sink")
+
+#     def _validate_unique_pipeline_name(self, pipeline, source_config):
+#         if pipeline in self._pipelines:
+#             raise WallarooParameterError((
+#                 "A computation named {0} is defined more than once. "
+#                 "Please use unique names for your steps."
+#                 ).format(repr(computation.name)))
+#         else:
+#             self._pipelines[pipeline] = source_config
+
+#     def _validate_state(self, ctor, name, partitions = None):
+#         if name in self._states:
+#             (other_ctor, other_partitions) = self._states[name]
+#             if other_ctor.state_cls != ctor.state_cls:
+#                 raise WallarooParameterError((
+#                     "A state with the name {0} has already been defined with "
+#                     "an different type {1}, instead of {2}."
+#                     ).format(repr(name), other_ctor.state_cls, ctor.state_cls))
+#             if other_partitions != partitions:
+#                 raise WallarooParameterError((
+#                     "A state with the name {0} has already been defined with "
+#                     "an different paritioning scheme {1}, instead of {2}."
+#                     ).format(repr(name), repr(other_partitions), repr(partitions)))
+#         else:
+#             self._states[name] = (ctor, partitions)
+
+#     def _validate_unique_partition_labels(self, partitions):
+#         if type(partitions) != list:
+#             raise WallarooParameterError(
+#                 "Partitions lists should be of type list. Got a {0} instead."
+#                 .format(type(partitions)))
+#         if len(set(partitions)) != len(partitions):
+#             raise WallarooParameterError(
+#                 "Partition labels should be uniquely identified via equality "
+#                 "and support hashing. You might have duplicates or objects "
+#                 "which can't be used as keys in a dict.")
+
+#     def _validate_partition_function(self, partition_function):
+#         if not getattr(partition_function, "partition", None):
+#             raise WallarooParameterError(
+#                 "Partition function is missing partition method. "
+#                 "Did you forget to use the @wallaroo.partition_function "
+#                 "decorator?")
 
 
 def _validate_arity_compatability(obj, arity):
@@ -268,9 +296,11 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         # Create the appropriate computation signature
         if base_cls._is_state:
             def comp(self, data, state):
+            # def comp(data, state):
                 return func(data, state)
         else:
             def comp(self, data):
+            # def comp(data):
                 return func(data)
 
         # Create a custom class type for the computation
@@ -288,10 +318,26 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         else:
             C.compute = comp
 
+        if base_cls._is_state:
+            initial_state = kwargs['state']
+            def build_initial_state(self):
+                try:
+                    state = initial_state()
+                    return state
+                except Exception as err:
+                    print(err)
+                    # What should we do here?
+
+            C.initial_state = build_initial_state
+            C.is_stateful = True
+        else:
+            C.is_stateful = False
+
+
     # Case 2: Partition
-    elif base_cls is Partition:
+    elif base_cls is KeyExtractor:
         class C(base_cls):
-            def partition(self, data):
+            def extract_key(self, data):
                 res = func(data)
                 if isinstance(res, int):
                     return chr(res)
@@ -376,7 +422,7 @@ class StateComputationMulti(StateComputation):
     _is_multi = True
 
 
-class Partition(BaseWrapped):
+class KeyExtractor(BaseWrapped):
     pass
 
 
@@ -404,12 +450,20 @@ def computation(name):
     return wrapped
 
 
-def state_computation(name):
+def state_computation(name, state):
     def wrapped(func):
         _validate_arity_compatability(func, 2)
-        C = _wallaroo_wrap(name, func, StateComputation)
+        C = _wallaroo_wrap(name, func, StateComputation, state=state)
+        # C = _wallaroo_wrap(name, func, StateComputation, state=StateBuilder(state))
         return C()
     return wrapped
+
+# def state_computation(name):
+#     def wrapped(func):
+#         _validate_arity_compatability(func, 2)
+#         C = _wallaroo_wrap(name, func, StateComputation)
+#         return C()
+#     return wrapped
 
 
 def computation_multi(name):
@@ -419,30 +473,33 @@ def computation_multi(name):
         return C()
     return wrapped
 
-
-def state_computation_multi(name):
+def state_computation_multi(name, state):
     def wrapped(func):
         _validate_arity_compatability(func, 2)
-        C = _wallaroo_wrap(name, func, StateComputationMulti)
+        C = _wallaroo_wrap(name, func, StateComputationMulti, state=StateBuilder(state))
         return C()
     return wrapped
 
+# def state_computation_multi(name):
+#     def wrapped(func):
+#         _validate_arity_compatability(func, 2)
+#         C = _wallaroo_wrap(name, func, StateComputationMulti)
+#         return C()
+#     return wrapped
+
 
 class StateBuilder(object):
-    def __init__(self, name, state_cls):
-        self.name = name
+    def __init__(self, state_cls):
         self.state_cls = state_cls
 
-    def ____wallaroo_build____(self):
+    def initial_state(self):
         return self.state_cls()
 
-    def name(self):
-        return self.name
 
 
-def partition(func):
+def key_extractor(func):
     _validate_arity_compatability(func, 1)
-    C = _wallaroo_wrap(func.__name__, func, Partition)
+    C = _wallaroo_wrap(func.__name__, func, KeyExtractor)
     return C()
 
 
@@ -611,3 +668,61 @@ def _kafka_parse_broker(broker):
         port = host_and_port[1]
 
     return (host, port)
+
+
+# Each node is a list of stages. Each of these lists will either begin with a "source" stage
+# (if it is a leaf of the tree) or a "merge" stage (if it is not a leaf).
+class _PipelineTree(object):
+    def __init__(self, source_stage):
+        self.root_idx = 0
+        self.vs = [[source_stage]]
+        self.es = [[]]
+
+    def is_empty(self):
+        return len(self.vs == 0)
+
+    def add_stage(self, stage):
+        self.vs[self.root_idx].append(stage)
+        return self
+
+    def merge(self, p_graph):
+        idx = len(self.vs)
+        self.vs.append([])
+        self.es.append([self.root_idx])
+        self.root_idx = idx
+        diff = len(self.vs)
+        for v in p_graph.vs:
+            stages_clone = []
+            for stage in v:
+                stages_clone.append(stage)
+            self.vs.append(stages_clone)
+        for es in p_graph.es:
+            new_es = []
+            for e_idx in es:
+                new_es.append(e_idx + diff)
+            self.es.append(new_es)
+        self.es[self.root_idx].append(p_graph.root_idx + diff)
+        return self
+
+    def to_tuple(self, app_name):
+        p_tree = self.clone()
+        return (app_name, p_tree.root_idx, p_tree.vs, p_tree.es)
+
+    def clone(self):
+        new_vs = []
+        new_es = []
+        for v in self.vs:
+            new_stages = []
+            for stage in v:
+                new_stages.append(stage)
+            new_vs.append(new_stages)
+        for es in self.es:
+            new_outs = []
+            for out in es:
+                new_outs.append(out)
+            new_es.append(new_outs)
+        pt = _PipelineTree(None)
+        pt.root_idx = self.root_idx
+        pt.vs = new_vs
+        pt.es = new_es
+        return pt

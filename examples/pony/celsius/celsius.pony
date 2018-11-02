@@ -31,17 +31,18 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      let application = recover val
-        Application("Celsius Conversion App")
-          .new_pipeline[F32, F32]("Celsius Conversion",
+      let pipeline = recover val
+        let inputs = Wallaroo.source[F32]("Celsius Conversion",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to[F32]({(): Multiply => Multiply})
-            .to[F32]({(): Add => Add})
-            .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
-              TCPSinkConfigCLIParser(env.args)?(0)?))
+
+        inputs
+          .to[F32](Multiply)
+          .to[F32](Add)
+          .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+            TCPSinkConfigCLIParser(env.args)?(0)?))
       end
-      Startup(env, application, "celsius-conversion")
+      Wallaroo.build_application(env, "Celsius Conversion", pipeline)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end

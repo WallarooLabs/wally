@@ -42,11 +42,11 @@ include $(rules_mk_path)
 
 
 build-examples-python-celsius: build-machida
-build-examples-python-celsius: build-machida3
+# build-examples-python-celsius: build-machida3
 integration-tests-examples-python-celsius: build-examples-python-celsius
 
 integration-tests-examples-python-celsius: celsius_py_test
-integration-tests-examples-python-celsius: celsius_py3_test
+# integration-tests-examples-python-celsius: celsius_py3_test
 
 celsius_py_test:
 	cd $(CELSIUS_PY_PATH) && \
@@ -54,7 +54,7 @@ celsius_py_test:
 	  _test.txt --validation-cmp \
 	  --expected-file _expected.txt \
 		--log-level error \
-		--command 'machida --application-module celsius' \
+		--command 'machida --application-module celsius $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 100
 
@@ -64,7 +64,7 @@ celsius_py3_test:
 	  _test.txt --validation-cmp \
 	  --expected-file _expected.txt \
 		--log-level error \
-		--command 'machida3 --application-module celsius' \
+		--command 'machida3 --application-module celsius $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 100
 endif

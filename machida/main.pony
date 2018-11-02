@@ -63,12 +63,13 @@ actor Main
 
         try
           Machida.set_user_serialization_fns(module)
+
           let application_setup =
             Machida.application_setup(module, options.remaining())?
-          let application = recover val
+          (let app_name, let pipeline) = recover val
             Machida.apply_application_setup(application_setup, env)?
           end
-          Startup(env, application, module_name)
+          Wallaroo.build_application(env, app_name, pipeline)
         else
           @printf[I32]("Something went wrong while building the application\n"
             .cstring())

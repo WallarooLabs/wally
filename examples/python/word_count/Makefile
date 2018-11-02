@@ -41,10 +41,10 @@ WORD_COUNT_PY_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(rules_mk_path)
 
 build-examples-python-word_count: build-machida
-build-examples-python-word_count: build-machida3
+# build-examples-python-word_count: build-machida3
 integration-tests-examples-python-word_count: build-examples-python-word_count
 integration-tests-examples-python-word_count: word_count_py_test
-integration-tests-examples-python-word_count: word_count_py3_test
+# integration-tests-examples-python-word_count: word_count_py3_test
 clean-examples-python-alphabet: word_count_py_clean
 
 word_count_py_test:
@@ -54,7 +54,7 @@ word_count_py_test:
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida --application-module word_count' \
+		--command 'machida --application-module word_count $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 482
 	cd $(WORD_COUNT_PY_PATH) && \
@@ -63,7 +63,7 @@ word_count_py_test:
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida --application-module word_count' \
+		--command 'machida --application-module word_count $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 482 \
 		--workers 2
@@ -73,7 +73,7 @@ word_count_py_test:
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida --application-module word_count' \
+		--command 'machida --application-module word_count $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 482 \
 		--workers 3
@@ -85,7 +85,7 @@ word_count_py3_test:
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida3 --application-module word_count' \
+		--command 'machida3 --application-module word_count $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 482
 	cd $(WORD_COUNT_PY_PATH) && \
@@ -94,7 +94,7 @@ word_count_py3_test:
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida3 --application-module word_count' \
+		--command 'machida3 --application-module word_count $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 482 \
 		--workers 2
@@ -104,7 +104,7 @@ word_count_py3_test:
 		--log-level error \
 		--batch-size 1 \
 		--output 'received.txt' \
-		--command 'machida3 --application-module word_count' \
+		--command 'machida3 --application-module word_count $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
 		--sink-expect 482 \
 		--workers 3
