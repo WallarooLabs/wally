@@ -98,6 +98,7 @@ actor Main
               TCPSourceConfigCLIParser(env.args)?(0)?))
 
         inputs
+          .key_by(Constant)
           .to[U64](MaybeOneToMany)
           .key_by(ExtractWindow)
           .to_state[String val, WindowState](ObserveNewValue)
@@ -109,6 +110,10 @@ actor Main
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
+
+primitive Constant
+  fun apply(u: U64): Key =>
+    "constant"
 
 primitive ExtractWindow
   fun apply(u: U64 val): Key =>
