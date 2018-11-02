@@ -1,3 +1,0 @@
-#!/bin/bash
-
-../../utils/data_receiver/data_receiver --listen 127.0.0.1:7002
