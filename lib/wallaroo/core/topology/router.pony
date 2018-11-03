@@ -600,9 +600,9 @@ class val StatePartitionRouter is Router
     else
       try
         let r = _hashed_node_routes(worker)?
-        let msg = r.build_msg[D](metric_name, pipeline_time_spent, data,
-          key, producer_id, producer, i_msg_uid, frac_ids, latest_ts,
-          metrics_id, worker_ingress_ts)
+        let msg = r.build_msg[D](_worker_name, metric_name, 
+          pipeline_time_spent, data, key, producer_id, producer, i_msg_uid, 
+          frac_ids, latest_ts, metrics_id, worker_ingress_ts)
         r.route[ForwardStatePartitionMsg[D]](metric_name,
           pipeline_time_spent, msg, key, producer_id, producer, i_msg_uid,
           frac_ids, latest_ts, metrics_id, worker_ingress_ts)
@@ -1148,27 +1148,28 @@ class val StatelessPartitionRouter is Router
     _partition_id.hash()
 
 class val HashedProxyRouter is Router
-  let _target_worker_name: String
+  let _target_worker_name: WorkerName
   let _target: OutgoingBoundary
-  let _target_state_name: String
+  let _target_state_name: StateName
   let _auth: AmbientAuth
 
-  new val create(target_worker: String, target: OutgoingBoundary,
-    target_state_name: String, auth: AmbientAuth)
+  new val create(target_worker: WorkerName, target: OutgoingBoundary,
+    target_state_name: StateName, auth: AmbientAuth)
   =>
     _target_worker_name = target_worker
     _target = target
     _target_state_name = target_state_name
     _auth = auth
 
-  fun build_msg[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, producer_id: RoutingId, producer: Producer ref,
-    i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64): ForwardStatePartitionMsg[D]
+  fun build_msg[D: Any val](worker_name: WorkerName, metric_name: String, 
+    pipeline_time_spent: U64, data: D, key: Key, producer_id: RoutingId, 
+    producer: Producer ref, i_msg_uid: MsgId, frac_ids: FractionalMessageId, 
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): 
+    ForwardStatePartitionMsg[D]
   =>
     ForwardStatePartitionMsg[D](
       _target_state_name,
-      _target_worker_name,
+      worker_name,
       data,
       key,
       metric_name,
