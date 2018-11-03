@@ -263,6 +263,12 @@ class _RecoveringEventLogPhase is _EventLogPhase
     @printf[I32](("EventLog: Recovering so ignoring checkpoint state for " +
       "resilient %s\n").cstring(), resilient_id.string().cstring())
 
+  fun ref write_checkpoint_id(checkpoint_id: CheckpointId,
+    promise: Promise[CheckpointId])
+  =>
+    @printf[I32](("EventLog: Recovering so ignoring write checkpoint id for " +
+      "resilient %s\n").cstring(), checkpoint_id.string().cstring())
+
 class _RollbackEventLogPhase is _EventLogPhase
   let _event_log: EventLog ref
   let _promise: Promise[CheckpointRollbackBarrierToken]
