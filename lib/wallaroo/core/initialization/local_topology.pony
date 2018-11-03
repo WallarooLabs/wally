@@ -481,9 +481,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         _save_local_topology()
-        @printf[I32]("!@ LocalTopology saved\n".cstring())
         _save_worker_names()
-        @printf[I32]("!@ worker names saved\n".cstring())
 
         // Determine if we need to read in local keys for our state collections
         let local_keys: Map[StateName, SetIs[Key] val] val =
@@ -595,8 +593,6 @@ actor LocalTopologyInitializer is LayoutInitializer
                 "node was still expected\n").cstring())
               error
             end
-
-          @printf[I32]("!@ next_node.id %s\n".cstring(), next_node.id.string().cstring())
 
           if built_routers.contains(next_node.id) then
             @printf[I32](("We've already handled %s with id %s\n").cstring(),
@@ -983,6 +979,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           consume data_router_state_routing_ids,
           consume data_router_stateless_routing_ids)
         _router_registry.set_data_router(data_router)
+
         _data_receivers.update_data_router(data_router)
 
         ////////////////////////////
@@ -1021,7 +1018,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         // Kick off final initialization Phases
         _initializables.application_begin_reporting(this)
 
-        @printf[I32]("Local topology initialized\n".cstring())
+        @printf[I32]("Local topology initialized.\n".cstring())
         _topology_initialized = true
 
         if _initializables.size() == 0 then
@@ -1129,7 +1126,6 @@ actor LocalTopologyInitializer is LayoutInitializer
       if _created.size() == _initializables.size() then
         @printf[I32]("|~~ INIT PHASE I: Application is created! ~~|\n"
           .cstring())
-        _spin_up_source_listeners()
         _initializables.application_created(this)
       end
     else
@@ -1210,6 +1206,7 @@ actor LocalTopologyInitializer is LayoutInitializer
   fun ref _application_ready_to_work() =>
     @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
       .cstring())
+    _spin_up_source_listeners()
     _initializables.application_ready_to_work(this)
 
     if _is_initializer then
@@ -1338,16 +1335,13 @@ actor LocalTopologyInitializer is LayoutInitializer
           Fail()
           error
         end
-        @printf[I32]("!@ Created local_topology_file\n".cstring())
         // TODO: Back up old file before clearing it?
         let file = AsyncJournalledFile(local_topology_file, _the_journal,
           _auth, _do_local_file_io)
-        @printf[I32]("!@ Created AsyncJournalledFile\n".cstring())
         // Clear contents of file.
         file.set_length(0)
         let wb = Writer
         let sa = SerialiseAuth(_auth)
-        @printf[I32]("!@ About to serizlie topology\n".cstring())
         let s = try
           Serialised(sa, t)?
         else
@@ -1355,11 +1349,9 @@ actor LocalTopologyInitializer is LayoutInitializer
           Fail()
           error
         end
-        @printf[I32]("!@ Serialized topology\n".cstring())
         let osa = OutputSerialisedAuth(_auth)
         let serialised_topology: Array[U8] val = s.output(osa)
         wb.write(serialised_topology)
-        @printf[I32]("!@ wb.write(serialised_topology)\n".cstring())
         file.writev(recover val wb.done() end)
         file.sync()
         file.dispose()
