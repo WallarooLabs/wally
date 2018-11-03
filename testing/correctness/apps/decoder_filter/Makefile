@@ -52,7 +52,7 @@ testing_decoder_filter_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command './decoder_filter $(RUN_WITH_RESILIENCE)' \
+		--command './decoder_filter' \
 		--workers 1 \
 		--sink-expect 500
 

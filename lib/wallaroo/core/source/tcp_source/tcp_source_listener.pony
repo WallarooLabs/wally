@@ -31,7 +31,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/core/grouping"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -53,7 +52,6 @@ actor TCPSourceListener[In: Any val] is SourceListener
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
-  let _grouper_builder: GrouperBuilder
   var _router: Router
   let _metrics_conn: MetricsSink
   let _metrics_reporter: MetricsReporter
@@ -63,6 +61,7 @@ actor TCPSourceListener[In: Any val] is SourceListener
   let _auth: AmbientAuth
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
+  let _pre_state_target_ids: Array[RoutingId] val
   let _target_router: Router
   let _parallelism: USize
   let _handler: FramedSourceHandler[In] val
@@ -81,13 +80,13 @@ actor TCPSourceListener[In: Any val] is SourceListener
   let _available_sources: Array[TCPSource[In]] = _available_sources.create()
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
-    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
-    metrics_conn: MetricsSink,
+    runner_builder: RunnerBuilder, router: Router, metrics_conn: MetricsSink,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router = EmptyRouter, parallelism: USize,
+    recovering: Bool, pre_state_target_ids: Array[RoutingId] val,
+    target_router: Router = EmptyRouter, parallelism: USize,
     handler: FramedSourceHandler[In] val,
     host: String = "", service: String = "0",
     init_size: USize = 64, max_size: USize = 16384)
@@ -99,7 +98,6 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _worker_name = worker_name
     _pipeline_name = pipeline_name
     _runner_builder = runner_builder
-    _grouper_builder = grouper
     _router = router
     _metrics_conn = metrics_conn
     _metrics_reporter = consume metrics_reporter
@@ -109,6 +107,7 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _auth = auth
     _layout_initializer = layout_initializer
     _recovering = recovering
+    _pre_state_target_ids = pre_state_target_ids
     _target_router = target_router
     _parallelism = parallelism
     _handler = handler
@@ -123,12 +122,12 @@ actor TCPSourceListener[In: Any val] is SourceListener
     _fd = @pony_asio_event_fd(_event)
 
     match router
-    | let pr: StatePartitionRouter =>
+    | let pr: PartitionRouter =>
       _router_registry.register_partition_router_subscriber(pr.state_name(),
         this)
     | let spr: StatelessPartitionRouter =>
       _router_registry.register_stateless_partition_router_subscriber(
-        spr.partition_routing_id(), this)
+        spr.partition_id(), this)
     end
 
     @printf[I32]((pipeline_name + " source attempting to listen on "
@@ -138,8 +137,8 @@ actor TCPSourceListener[In: Any val] is SourceListener
     for i in Range(0, _limit) do
       let source_id = _routing_id_gen()
       let notify = TCPSourceNotify[In](source_id, _pipeline_name, _env,
-        _auth, _handler, _runner_builder, _grouper_builder, _router,
-        _metrics_reporter.clone(), _event_log, _target_router)
+        _auth, _handler, _runner_builder, _router, _metrics_reporter.clone(),
+        _event_log, _target_router, _pre_state_target_ids)
       let source = TCPSource[In](source_id, _auth, this,
         consume notify, _event_log, _router,
         _outgoing_boundary_builders, _layout_initializer,
@@ -148,12 +147,12 @@ actor TCPSourceListener[In: Any val] is SourceListener
 
       _router_registry.register_source(source, source_id)
       match _router
-      | let pr: StatePartitionRouter =>
+      | let pr: PartitionRouter =>
         _router_registry.register_partition_router_subscriber(
           pr.state_name(), source)
       | let spr: StatelessPartitionRouter =>
         _router_registry.register_stateless_partition_router_subscriber(
-          spr.partition_routing_id(), source)
+          spr.partition_id(), source)
       end
 
       _available_sources.push(source)
@@ -174,6 +173,9 @@ actor TCPSourceListener[In: Any val] is SourceListener
 
   be update_router(router: Router) =>
     _router = router
+
+  be remove_route_for(moving_step: Consumer) =>
+    None
 
   be add_boundary_builders(
     boundary_builders: Map[String, OutgoingBoundaryBuilder] val)

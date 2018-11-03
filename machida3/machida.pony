@@ -55,19 +55,15 @@ use @get_application_setup_item[Pointer[U8] val](list: Pointer[U8] val,
   idx: USize)
 use @get_application_setup_action[Pointer[U8] val](item: Pointer[U8] val)
 
-
-use @get_list_item[Pointer[U8] val](list: Pointer[U8] val, idx: USize)
-use @get_stage_command[Pointer[U8] val](item: Pointer[U8] val)
-
-
 use @get_name[Pointer[U8] val](o: Pointer[U8] val)
 
 use @computation_compute[Pointer[U8] val](c: Pointer[U8] val,
   d: Pointer[U8] val, method: Pointer[U8] tag)
 
+use @state_builder_build_state[Pointer[U8] val](sb: Pointer[U8] val)
+
 use @stateful_computation_compute[Pointer[U8] val](c: Pointer[U8] val,
   d: Pointer[U8] val, s: Pointer[U8] val, m: Pointer[U8] tag)
-use @initial_state[Pointer[U8] val](computation: Pointer[U8] val)
 
 use @source_decoder_header_length[USize](source_decoder: Pointer[U8] val)
 use @source_decoder_payload_length[USize](source_decoder: Pointer[U8] val,
@@ -82,8 +78,8 @@ use @source_generator_apply[Pointer[U8] val](source_generator: Pointer[U8] val,
 use @sink_encoder_encode[Pointer[U8] val](sink_encoder: Pointer[U8] val,
   data: Pointer[U8] val)
 
-use @extract_key[Pointer[U8] val](key_extractor: Pointer[U8] val,
-  data: Pointer[U8] val)
+use @partition_function_partition[Pointer[U8] val](
+  partition_function: Pointer[U8] val, data: Pointer[U8] val)
 
 use @key_hash[USize](key: Pointer[U8] val)
 use @key_eq[I32](key: Pointer[U8] val, other: Pointer[U8] val)
@@ -93,7 +89,6 @@ use @is_py_none[I32](o: Pointer[U8] box)
 use @py_incref[None](o: Pointer[U8] box)
 use @py_decref[None](o: Pointer[U8] box)
 use @py_list_check[I32](b: Pointer[U8] box)
-use @py_tuple_check[I32](p: Pointer[U8] box)
 use @py_bytes_check[I32](b: Pointer[U8] tag)
 use @py_bytes_or_unicode_size[USize](str: Pointer[U8] tag)
 use @py_bytes_or_unicode_as_char[Pointer[U8]](str: Pointer[U8] tag)
@@ -162,19 +157,44 @@ class PyState is State
   fun _final() =>
     Machida.dec_ref(_state)
 
-class val PyKeyExtractor
-  var _key_extractor: Pointer[U8] val
+class PyStateBuilder
+  var _state_builder: Pointer[U8] val
 
-  new val create(key_extractor: Pointer[U8] val) =>
-    _key_extractor = key_extractor
+  new create(state_builder: Pointer[U8] val) =>
+    _state_builder = state_builder
+
+  fun apply(): PyState =>
+    let py_state = @state_builder_build_state(_state_builder)
+    Machida.print_errors()
+    if py_state.is_null() then Fail() end
+    PyState(py_state)
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_state_builder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_state_builder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _state_builder = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_state_builder)
+
+class PyPartitionFunction
+  var _partition_function: Pointer[U8] val
+
+  new create(partition_function: Pointer[U8] val) =>
+    _partition_function = partition_function
 
   fun apply(data: PyData val): String =>
     recover
-      let ps = Machida.extract_key(_key_extractor, data.obj())
+      let ps = Machida.partition_function_partition(_partition_function,
+        data.obj())
       Machida.print_errors()
 
       if ps.is_null() then
-        @printf[I32]("Error in key extractor function".cstring())
+        @printf[I32]("Error in partition function".cstring())
         Fail()
       end
 
@@ -186,16 +206,16 @@ class val PyKeyExtractor
     end
 
   fun _serialise_space(): USize =>
-    Machida.user_serialization_get_size(_key_extractor)
+    Machida.user_serialization_get_size(_partition_function)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    Machida.user_serialization(_key_extractor, bytes)
+    Machida.user_serialization(_partition_function, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _key_extractor = recover Machida.user_deserialization(bytes) end
+    _partition_function = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
-    Machida.dec_ref(_key_extractor)
+    Machida.dec_ref(_partition_function)
 
 class PySourceHandler is SourceHandler[(PyData val | None)]
   var _source_decoder: Pointer[U8] val
@@ -300,17 +320,26 @@ class PyGenSourceHandler is GenSourceGenerator[PyData val]
   fun _final() =>
     Machida.dec_ref(_source_generator)
 
-class val PyComputation is Computation[PyData val, PyData val]
+class PyComputationBuilder
+  var _computation: PyComputation val
+
+  new create(computation: Pointer[U8] val) =>
+    _computation = recover val PyComputation(computation) end
+
+  fun apply(): PyComputation val =>
+    _computation
+
+class PyComputation is Computation[PyData val, PyData val]
   var _computation: Pointer[U8] val
   let _name: String
   let _is_multi: Bool
 
-  new val create(computation: Pointer[U8] val) =>
+  new create(computation: Pointer[U8] val) =>
     _computation = computation
     _name = Machida.get_name(_computation)
     _is_multi = Machida.implements_compute_multi(_computation)
 
-  fun apply(input: PyData val): (PyData val | Array[PyData val] val | None) =>
+  fun apply(input: PyData val): (PyData val | Array[PyData val] val |None) =>
     let r: Pointer[U8] val =
       Machida.computation_compute(_computation, input.obj(), _is_multi)
 
@@ -345,10 +374,11 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
     _name = Machida.get_name(_computation)
     _is_multi = Machida.implements_compute_multi(_computation)
 
-  fun apply(input: PyData val, state: PyState):
-    (PyData val | Array[PyData val] val | None)
+  fun apply(input: PyData val,
+    sc_repo: StateChangeRepository[PyState], state: PyState):
+    ((PyData val | Array[PyData val] val | None), (None | DirectStateChange))
   =>
-    let data =
+    (let data, let persist) =
       Machida.stateful_computation_compute(_computation, input.obj(),
         state.obj(), _is_multi)
 
@@ -360,13 +390,18 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
       end
     end
 
-    d
+    let p = if Machida.bool_check(persist) then
+      DirectStateChange
+    else
+      None
+    end
+    (d, p)
 
   fun name(): String =>
     _name
 
-  fun initial_state(): PyState =>
-    Machida.initial_state(_computation)
+  fun state_change_builders(): Array[StateChangeBuilder[PyState]] val =>
+    recover val Array[StateChangeBuilder[PyState] val] end
 
   fun _serialise_space(): USize =>
     Machida.user_serialization_get_size(_computation)
@@ -546,14 +581,144 @@ primitive Machida
     r
 
   fun apply_application_setup(application_setup_data: Pointer[U8] val,
-    env: Env): (String, Pipeline[PyData val] val) ?
+    env: Env):
+    Application ?
   =>
-    recover val
-      let pipeline_tree = PyPipelineTree(application_setup_data, env)
-      let pipeline = pipeline_tree.build()?
-      Machida.dec_ref(application_setup_data)
-      (pipeline_tree.app_name, pipeline)
+    let application_setup_item_count = @list_item_count(application_setup_data)
+
+    var app: (None | Application) = None
+
+    for idx in Range(0, application_setup_item_count) do
+      let item = @get_application_setup_item(application_setup_data, idx)
+      let action_p = @get_application_setup_action(item)
+      let action = String.copy_cstring(action_p)
+      if action == "name" then
+        let name = recover val
+          Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(item, 1))
+        end
+        app = Application(name)
+        break
+      end
     end
+
+    var source_idx: USize = 0
+    var sink_idx: USize = 0
+
+    var latest: (Application | PipelineBuilder[PyData val, PyData val,
+      PyData val]) = (app as Application)
+
+    for idx in Range(0, application_setup_item_count) do
+      let item = @get_application_setup_item(application_setup_data, idx)
+      let action_p = @get_application_setup_action(item)
+      let action = String.copy_cstring(action_p)
+      match action
+      | "source_connector" =>
+        None
+      | "sink_connector" =>
+        None
+      | "new_pipeline" =>
+        let name = recover val
+          Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(item, 1))
+        end
+
+        let source_config = recover val
+          let sct = @PyTuple_GetItem(item, 2)
+          _SourceConfig.from_tuple(sct, env)?
+        end
+
+        latest = (latest as Application).new_pipeline[PyData val, PyData val](
+          name,
+          source_config)
+        source_idx = source_idx + 1
+      | "to" =>
+        let computation = @PyTuple_GetItem(item, 1)
+        Machida.inc_ref(computation)
+        let builder = recover val PyComputationBuilder(computation) end
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        latest = pb.to[PyData val](builder)
+      | "to_parallel" =>
+        let computation = @PyTuple_GetItem(item, 1)
+        Machida.inc_ref(computation)
+        let builder = recover val PyComputationBuilder(computation) end
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        latest = pb.to_parallel[PyData val](builder)
+      | "to_stateful" =>
+        let state_computationp = @PyTuple_GetItem(item, 1)
+        Machida.inc_ref(state_computationp)
+        let state_computation = recover val
+          PyStateComputation(state_computationp)
+        end
+
+        let state_builderp = @PyTuple_GetItem(item, 2)
+        Machida.inc_ref(state_builderp)
+        let state_builder = recover val
+          PyStateBuilder(state_builderp)
+        end
+
+        let state_name = recover val
+          Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(item, 3))
+        end
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        latest = pb.to_stateful[PyData val, PyState](state_computation,
+          state_builder, state_name)
+      | "to_state_partition" =>
+        let state_computationp = @PyTuple_GetItem(item, 1)
+        Machida.inc_ref(state_computationp)
+        let state_computation = recover val
+          PyStateComputation(state_computationp)
+        end
+
+        let state_builderp = @PyTuple_GetItem(item, 2)
+        Machida.inc_ref(state_builderp)
+        let state_builder = recover val
+          PyStateBuilder(state_builderp)
+        end
+
+        let state_name = recover val
+          Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(item, 3))
+        end
+
+        let partition_functionp = @PyTuple_GetItem(item, 4)
+        Machida.inc_ref(partition_functionp)
+        let partition_function = recover val
+          PyPartitionFunction(partition_functionp)
+        end
+
+        let partition_values = Machida.py_list_to_pony_array_string(
+          @PyTuple_GetItem(item, 5))
+
+        let partition = Partitions[PyData val](partition_function,
+          partition_values)
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        latest = pb.to_state_partition[PyData val, PyState](
+          state_computation, state_builder, state_name, partition)
+      | "to_sink" =>
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        latest = pb.to_sink(
+          _SinkConfig.from_tuple(@PyTuple_GetItem(item, 1), env)?)
+        sink_idx = sink_idx + 1
+        latest
+      | "to_sinks" =>
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        let list = @PyTuple_GetItem(item, 1)
+        let sink_count = @PyList_Size(list)
+        let sinks = Array[SinkConfig[PyData val]]
+        for i in Range(0, sink_count) do
+          let sink = _SinkConfig.from_tuple(@PyList_GetItem(list, i), env)?
+          sinks.push(sink)
+        end
+        latest = pb.to_sinks(sinks)
+        sink_idx = sink_idx + 1
+        latest
+      | "done" =>
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        latest = pb.done()
+        latest
+      end
+    end
+
+    Machida.dec_ref(application_setup_data)
+    app as Application
 
   fun framed_source_decoder_header_length(source_decoder: Pointer[U8] val): USize =>
     @PyErr_Clear[None]()
@@ -621,7 +786,7 @@ primitive Machida
 
   fun stateful_computation_compute(computation: Pointer[U8] val,
     data: Pointer[U8] val, state: Pointer[U8] val, multi: Bool):
-    Pointer[U8] val
+  (Pointer[U8] val, Pointer[U8] val)
   =>
     let method = if multi then "compute_multi" else "compute" end
     let r =
@@ -629,10 +794,18 @@ primitive Machida
 
     print_errors()
     if r.is_null() then Fail() end
-    r
 
-  fun initial_state(computation: Pointer[U8] val): PyState =>
-    PyState(@initial_state(computation))
+    let msg = @PyTuple_GetItem(r, 0)
+    let persist = @PyTuple_GetItem(r, 1)
+
+    inc_ref(msg)
+    inc_ref(persist)
+
+    let rt = (msg, persist)
+
+    dec_ref(r)
+
+    rt
 
   fun key_hash(key: Pointer[U8] val): USize =>
     let r = @key_hash(key)
@@ -644,10 +817,10 @@ primitive Machida
     print_errors()
     r
 
-  fun extract_key(key_extractor: Pointer[U8] val,
+  fun partition_function_partition(partition_function: Pointer[U8] val,
     data: Pointer[U8] val): Pointer[U8] val
   =>
-    let r = @extract_key(key_extractor, data)
+    let r = @partition_function_partition(partition_function, data)
     print_errors()
     if r.is_null() then Fail() end
     r
@@ -699,7 +872,7 @@ primitive Machida
       if not ps.is_null() then
         let ret = Machida.py_bytes_or_unicode_to_pony_string(ps)
         dec_ref(ps)
-	      ret
+	ret
       else
         "undefined-name"
       end
@@ -811,7 +984,7 @@ primitive Machida
 
 primitive _SourceConfig
   fun from_tuple(source_config_tuple: Pointer[U8] val, env: Env):
-    SourceConfig ?
+    SourceConfig[PyData val] ?
   =>
     let name = recover val
       Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source_config_tuple, 0))
@@ -1023,162 +1196,3 @@ primitive _SinkConfig
     let max_message_size = @PyLong_AsLong(@PyTuple_GetItem(source_config_tuple, 5)).i32()
 
     KafkaConfigOptions("Wallaroo Kafka Sink", KafkaProduceOnly, topic, brokers, log_level, max_produce_buffer_ms, max_message_size)
-
-  class val PyPipelineTree
-    """
-    A read-only tree of pipeline fragments. Each node is a list of stages, each
-    one either beginning with a source_config or a "merge" command. The tree
-    represents the recursive merges of pipelines starting with sources.
-    """
-    let env: Env
-    // Each member of this array is a list of stages. Each of these lists will
-    // either begin with a "source" stage (if it is a leaf of the tree) or
-    // a "merge" stage (if it is not a leaf).
-    let vs: Array[Pointer[U8] val] val
-    // This list of list of edges represents the out-edges for each element
-    // in the vs array. Each element in vs should have either 0 or 2 out edges.
-    // This is because each element is either a leaf (representing a source
-    // plus 0 or more stages following it) or a merge of two pipeline fragments
-    // (plus 0 or more stages following the merge in sequence).
-    let es: Array[Array[USize] val] val
-    let root_idx: USize
-    let app_name: String
-
-    new val create(p_graph: Pointer[U8] val, env': Env) =>
-      env = env'
-
-      // p_graph points to a tuple of the form:
-      // (app_name, root_idx, vertices, edges)
-      app_name =
-        recover val
-          let ps = @PyTuple_GetItem(p_graph, 0)
-          Machida.py_bytes_or_unicode_to_pony_string(ps)
-        end
-      root_idx = @PyLong_AsLong(@PyTuple_GetItem(p_graph, 1)).usize()
-      let stage_vs = @PyTuple_GetItem(p_graph, 2)
-      let stage_es = @PyTuple_GetItem(p_graph, 3)
-
-      // Extract list of stage vertices
-      vs =
-        recover val
-          let arr = Array[Pointer[U8] val]
-          let vs_size = @list_item_count(stage_vs)
-          for i in Range(0, vs_size) do
-            let next_v = @get_list_item(stage_vs, i)
-            arr.push(next_v)
-          end
-          arr
-        end
-
-      // Extract list of edges
-      es =
-        recover val
-          let arr = Array[Array[USize] val]
-          let es_size = @list_item_count(stage_es)
-          for i in Range(0, es_size) do
-            let next_es = recover iso Array[USize] end
-            let next_e_list = @get_list_item(stage_es, i)
-            let next_e_list_size = @list_item_count(next_e_list)
-            if not ((next_e_list_size == 0) or (next_e_list_size == 2)) then
-              @printf[I32](("Each node in the Machida pipeline tree should " +
-                "have either 0 or 2 children, but one node had %s\n")
-                .cstring(), next_e_list_size.string().cstring())
-              Fail()
-            end
-            for j in Range(0, next_e_list_size) do
-              let next_out_edge =
-                @PyLong_AsLong(@get_list_item(next_e_list, j)).usize()
-              next_es.push(next_out_edge)
-            end
-            arr.push(consume next_es)
-          end
-          arr
-        end
-
-    fun build(): Pipeline[PyData val] ? =>
-      // Recursively build the pipeline.
-      _build_from(root_idx)?
-
-    fun _build_from(idx: USize): Pipeline[PyData val] ? =>
-      let stages = vs(idx)?
-      let edges = es(idx)?
-      if edges.size() == 0 then
-        // This node is a leaf, which means it begins with a source. Start the
-        // pipeline with the source.
-        let source = @get_list_item(stages, 0)
-        let source_name = recover val
-          Machida.py_bytes_or_unicode_to_pony_string(@PyTuple_GetItem(source,
-            1)) end
-        let source_config = @PyTuple_GetItem(source, 2)
-        var pipeline = Wallaroo.source[PyData val](source_name,
-          _SourceConfig.from_tuple(source_config, env)?)
-
-        let stages_size = @list_item_count(stages)
-        if stages_size > 1 then
-          // Do some stage building starting after the source
-          for i in Range(1, stages_size) do
-            let next_stage = @get_list_item(stages, i)
-            pipeline = _add_next_stage(pipeline, next_stage)?
-          end
-        end
-        pipeline
-      else
-        // Build left pipeline
-        var pipeline = _build_from(edges(0)?)?
-        // Merge with right pipeline
-        pipeline = pipeline.merge[PyData val](_build_from(edges(1)?)?)
-        // Do some stage building starting after the merge.
-        // There might not be any stages immediately after the merge.
-        let stages_size = @list_item_count(stages)
-        if stages_size > 0 then
-          // Do some stage building starting after the merge.
-          for i in Range(0, stages_size) do
-            let next_stage = @get_list_item(stages, i)
-            pipeline = _add_next_stage(pipeline, next_stage)?
-          end
-        end
-        pipeline
-      end
-
-    fun _add_next_stage(p: Pipeline[PyData val], stage: Pointer[U8] val):
-      Pipeline[PyData val] ?
-    =>
-      var pipeline = p
-      // let command_p = @get_stage_command(stage)
-      // let command = Machida.py_bytes_or_unicode_to_pony_string(command_p)
-      let command = Machida.py_bytes_or_unicode_to_pony_string(
-        @PyTuple_GetItem(stage, 0))
-      match command
-      | "to" =>
-        let raw_computation = @PyTuple_GetItem(stage, 1)
-        let computation = PyComputation(raw_computation)
-        Machida.inc_ref(raw_computation)
-        pipeline = pipeline.to[PyData val](computation)
-      | "to_state" =>
-        let state_computationp = @PyTuple_GetItem(stage, 1)
-        Machida.inc_ref(state_computationp)
-        let state_computation = recover val
-          PyStateComputation(state_computationp)
-        end
-        pipeline = pipeline.to_state[PyData val, PyState](state_computation)
-      | "key_by" =>
-        let raw_key_extractor = @PyTuple_GetItem(stage, 1)
-        let key_extractor = PyKeyExtractor(raw_key_extractor)
-        Machida.inc_ref(raw_key_extractor)
-        pipeline = pipeline.key_by(key_extractor)
-      | "to_sink" =>
-        pipeline = pipeline.to_sink(
-          _SinkConfig.from_tuple(@PyTuple_GetItem(stage, 1), env)?)
-      | "to_sinks" =>
-        let list = @PyTuple_GetItem(stage, 1)
-        let sink_count = @PyList_Size(list)
-        let sinks = Array[SinkConfig[PyData val]]
-        for i in Range(0, sink_count) do
-          let sink = _SinkConfig.from_tuple(@PyList_GetItem(list, i), env)?
-          sinks.push(sink)
-        end
-        pipeline = pipeline.to_sinks(sinks)
-      end
-      pipeline
-
-

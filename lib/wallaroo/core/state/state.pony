@@ -24,8 +24,7 @@ trait ref State
   fun write_log_entry(out_writer: Writer, auth: AmbientAuth) =>
     try
       let serialized =
-        Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(
-          auth))
+        Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(auth))
       out_writer.write(serialized)
     else
       Fail()

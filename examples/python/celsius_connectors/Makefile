@@ -1,6 +1,6 @@
 # include root makefile
 ifndef ROOT_MAKEFILE_MK
-include ../../../Makefile
+include ../../../../Makefile
 endif
 
 # prevent rules from being evaluated/included multiple times

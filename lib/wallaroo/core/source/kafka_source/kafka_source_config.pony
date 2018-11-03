@@ -27,7 +27,7 @@ primitive KafkaSourceConfigCLIParser
   fun apply(out: OutStream, prefix: String = "kafka_source"): KafkaConfigCLIParser =>
     KafkaConfigCLIParser(out, KafkaConsumeOnly where prefix = prefix)
 
-class val KafkaSourceConfig[In: Any val] is SourceConfig
+class val KafkaSourceConfig[In: Any val] is SourceConfig[In]
   let _ksco: KafkaConfigOptions val
   let _auth: TCPConnectionAuth
   let _handler: SourceHandler[In] val

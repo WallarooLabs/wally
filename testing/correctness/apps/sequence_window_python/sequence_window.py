@@ -23,25 +23,20 @@ def application_setup(args):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    inputs = wallaroo.source("Sequence Window",
+    sequence_partitions = ['0', '1']
+    ab = wallaroo.ApplicationBuilder("Sequence Window")
+    ab.new_pipeline("Sequence Window",
                     wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-
-    pipeline = (inputs
-        .key_by(constant)
-        .to(maybe_one_to_many)
-        .key_by(extract_window)
-        .to(observe_new_value)
-        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
-
-    return wallaroo.build_application("Sequence Window", pipeline)
+    ab.to(maybe_one_to_many)
+    ab.to_state_partition(observe_new_value, SequenceWindow,
+                          "Sequence Window", partition,
+                          sequence_partitions)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
+    return ab.build()
 
 
-@wallaroo.key_extractor
-def constant(data):
-    return "constant"
-
-@wallaroo.key_extractor
-def extract_window(data):
+@wallaroo.partition
+def partition(data):
     return str(data % 2)
 
 
@@ -89,10 +84,10 @@ def maybe_one_to_many(data):
         return [data]
 
 
-@wallaroo.state_computation(name="Observer New Value", state=SequenceWindow)
+@wallaroo.state_computation(name="Observer New Value")
 def observe_new_value(data, state):
     state.update(data)
-    return state.get_window()
+    return (state.get_window(), True)
 
 
 @wallaroo.encoder

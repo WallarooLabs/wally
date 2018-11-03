@@ -93,21 +93,31 @@ use "window_codecs"
 actor Main
   new create(env: Env) =>
     try
-      let pipeline = recover val
-        Wallaroo.source[U64]("Sequence Window",
-            TCPSourceConfig[U64].from_options(U64FramedHandler,
+      let part_ar: Array[Key] val = recover
+        let pa = Array[Key]
+        pa.push("0")
+        pa.push("1")
+        consume pa
+      end
+      let partition = Partitions[U64](WindowPartitionFunction, part_ar)
+
+      let application = recover val
+        Application("Sequence Window Printer")
+          .new_pipeline[U64 val, String val]("Sequence Window",
+            TCPSourceConfig[U64 val].from_options(U64FramedHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-          .key_by(ExtractWindow)
-          .to_state[String val, WindowState](ObserveNewValue)
+          .to_state_partition[String val,
+            WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
+              partition where multi_worker = true)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?))
       end
-      Wallaroo.build_application(env, "Sequence Window", pipeline)
+      Startup(env, application, "sequence_window")
     else
       env.out.print("Couldn't build topology")
     end
 
-primitive ExtractWindow
+primitive WindowPartitionFunction
   fun apply(u: U64 val): Key =>
     // Always use the same partition
     (u % 2).string()
@@ -153,9 +163,15 @@ class WindowState is State
 primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
   fun name(): String => "Observe new value"
 
-  fun apply(u: U64 val, state: WindowState): String val =>
+  fun apply(u: U64 val,
+    sc_repo: StateChangeRepository[WindowState],
+    state: WindowState): (String val, DirectStateChange)
+  =>
     state.push(u)
-    state.string()
 
-  fun initial_state(): WindowState =>
-    WindowState
+    (state.string(), DirectStateChange)
+
+  fun state_change_builders():
+    Array[StateChangeBuilder[WindowState]] val
+  =>
+    recover Array[StateChangeBuilder[WindowState]] end

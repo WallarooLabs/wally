@@ -34,6 +34,12 @@ trait _DataReceiverPhase
     _invalid_call()
     Fail()
 
+  fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _invalid_call()
+    Fail()
+
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)
   =>
@@ -72,6 +78,16 @@ class _RecoveringDataReceiverPhase is _DataReceiverPhase
   fun ref deliver(d: DeliveryMsg, producer_id: RoutingId,
     pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
+  =>
+    // Drop non-barriers
+    ifdef debug then
+      @printf[I32]("Recovering DataReceiver dropping non-rollback-barrier\n"
+        .cstring())
+    end
+    _data_receiver._update_last_id_seen(seq_id, true)
+
+  fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Drop non-barriers
     ifdef debug then
@@ -121,6 +137,12 @@ class _NormalDataReceiverPhase is _DataReceiverPhase
   =>
     _data_receiver.deliver(d, producer_id, pipeline_time_spent, seq_id,
       latest_ts, metrics_id, worker_ingress_ts)
+
+  fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    _data_receiver.replay_deliver(r, pipeline_time_spent, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
 
   fun ref forward_barrier(input_id: RoutingId, output_id: RoutingId,
     token: BarrierToken, seq_id: SeqId)

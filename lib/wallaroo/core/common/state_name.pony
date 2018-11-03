@@ -16,5 +16,4 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
-//!@ TODO: Replace this with RoutingId (i.e. step group id)
 type StateName is String

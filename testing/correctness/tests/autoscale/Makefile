@@ -43,7 +43,7 @@ include $(rules_mk_path)
 build-testing-correctness-tests-autoscale: build-testing-correctness-apps-multi_partition_detector
 build-testing-correctness-tests-autoscale: build-utils-cluster_shrinker
 build-testing-correctness-tests-autoscale: build-machida
-build-testing-correctness-tests-autoscale: build-machida3
+#build-testing-correctness-tests-autoscale: build-machida3
 integration-tests-testing-correctness-tests-autoscale: build-testing-correctness-tests-autoscale
 integration-tests-testing-correctness-tests-autoscale: autoscale_tests
 

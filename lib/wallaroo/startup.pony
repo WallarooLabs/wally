@@ -21,7 +21,6 @@ use "collections"
 use "files"
 use "itertools"
 use "net"
-use "promises"
 use "signals"
 use "time"
 use "wallaroo_labs/hub"
@@ -45,11 +44,10 @@ use "wallaroo/ent/spike"
 
 
 actor Startup
-  let _self: Startup tag = this
   let _env: Env
   var _startup_options: StartupOptions = StartupOptions
 
-  let _pipeline: BasicPipeline val
+  let _application: Application val
   let _app_name: String
 
   var _external_host: String = ""
@@ -77,18 +75,22 @@ actor Startup
   var _checkpoint_ids_file: String = ""
 
   var _connections: (Connections | None) = None
-  var _router_registry: (RouterRegistry | None) = None
 
   let _disposables: SetIs[DisposableActor] = _disposables.create()
   var _is_joining: Bool = false
   var _is_recovering: Bool = false
   var _recovering_without_resilience: Bool = false
 
-  new create(env: Env, app_name: String, pipeline: BasicPipeline val) =>
+  new create(env: Env, application: Application val,
+    app_name: (String | None))
+  =>
     _env = env
-    _app_name = app_name
-    _pipeline = pipeline
-
+    _application = application
+    _app_name = match app_name
+      | let n: String => n
+      else
+        ""
+      end
     ifdef "resilience" then
       @printf[I32]("****RESILIENCE MODE is active****\n".cstring())
     end
@@ -98,17 +100,11 @@ actor Startup
     ifdef "autoscale" then
       @printf[I32]("****AUTOSCALE MODE is active****\n".cstring())
     end
-    ifdef "checkpoint_trace" then
-      @printf[I32]("****CHECKPOINT TRACE is active****\n".cstring())
-    end
     ifdef "trace" then
       @printf[I32]("****TRACE is active****\n".cstring())
     end
     ifdef "spike" then
       @printf[I32]("****SPIKE is active****\n".cstring())
-    end
-    ifdef debug then
-      @printf[I32]("****DEBUG is active****\n".cstring())
     end
 
     try
@@ -220,7 +216,7 @@ actor Startup
       // TODO::joining
       let connect_auth = TCPConnectAuth(auth)
       let metrics_conn = ReconnectingMetricsSink(m_addr(0)?,
-          m_addr(1)?, _app_name, _startup_options.worker_name)
+          m_addr(1)?, _application.name(), _startup_options.worker_name)
 
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _the_journal = _start_journal(auth)
@@ -287,7 +283,7 @@ actor Startup
       end
       let event_log = _event_log as EventLog
 
-      let connections = Connections(_app_name,
+      let connections = Connections(_application.name(),
         _startup_options.worker_name, auth,
         _startup_options.c_host, _startup_options.c_service,
         _startup_options.d_host, _startup_options.d_service,
@@ -323,18 +319,16 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
-      let reporter = MetricsReporter(_app_name, _startup_options.worker_name,
-        metrics_conn)
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name, consume reporter, _is_recovering)
+        _startup_options.worker_name, _is_recovering)
 
-      let router_registry = RouterRegistry(auth, _startup_options.worker_name,
-        data_receivers, connections, this,
+      let router_registry = RouterRegistry(auth,
+        _startup_options.worker_name, data_receivers,
+        connections, this,
         _startup_options.stop_the_world_pause, _is_joining, initializer_name,
         barrier_initiator, checkpoint_initiator, autoscale_initiator,
         initializer_name)
       router_registry.set_event_log(event_log)
-      _router_registry = router_registry
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, _startup_options.my_d_service,
@@ -347,7 +341,7 @@ actor Startup
 
       let local_topology_initializer =
         LocalTopologyInitializer(
-          _app_name, _startup_options.worker_name,
+          _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers, event_log, recovery,
           recovery_reconnecter, checkpoint_initiator, barrier_initiator,
@@ -368,8 +362,8 @@ actor Startup
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
-        _application_distributor = ApplicationDistributor(auth, _app_name,
-          _pipeline, local_topology_initializer)
+        _application_distributor = ApplicationDistributor(auth, _application,
+          local_topology_initializer)
 
         match _application_distributor
         | let ad: ApplicationDistributor =>
@@ -385,29 +379,16 @@ actor Startup
         end
       end
 
-      (let c_host, let c_service, let d_host, let d_service) =
-        if _startup_options.is_initializer then
-          (_startup_options.c_host,
-            _startup_options.c_service,
-            _startup_options.d_host,
-            _startup_options.d_service)
-        else
-          (_startup_options.my_c_host,
-            _startup_options.my_c_service,
-            _startup_options.my_d_host,
-            _startup_options.my_d_service)
-        end
-
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, local_topology_initializer, recovery,
           recovery_reconnecter, router_registry, barrier_initiator,
           checkpoint_initiator, control_channel_filepath,
-          d_host, d_service, event_log,
+          _startup_options.my_d_host, _startup_options.my_d_service, event_log,
           this, _the_journal as SimpleJournal,
           _startup_options.do_local_file_io,
-          c_host, c_service)
+          _startup_options.my_c_host, _startup_options.my_c_service)
 
       // We need to recover connections before creating our control
       // channel listener, since it's at that point that we notify
@@ -438,6 +419,8 @@ actor Startup
       end
 
       if _is_recovering then
+        // need to do this before recreating the data connection as at
+        // that point replay starts
         let recovered_workers = _recover_worker_names(
           worker_names_filepath)
         if recovered_workers.size() > 1 then
@@ -466,14 +449,15 @@ actor Startup
     try
       let auth = _env.root as AmbientAuth
 
-      let local_keys_filepath: FilePath = FilePath(auth, _local_keys_file)?
+      let local_keys_filepath: FilePath = FilePath(auth,
+        _local_keys_file)?
 
-      // TODO: Replace this with the name of the initializer worker, whatever
-      // it happens to be.
+      // TODO: Replace this with the name of this worker, whatever it
+      // happens to be.
       let initializer_name = "initializer"
 
       let metrics_conn = ReconnectingMetricsSink(m.metrics_host,
-        m.metrics_service, _app_name, _startup_options.worker_name)
+        m.metrics_service, _application.name(), _startup_options.worker_name)
 
       // TODO: Are we creating connections to all addresses or just
       // initializer?
@@ -490,6 +474,15 @@ actor Startup
         else
           m.data_addrs("initializer")?
         end
+
+      // Generate state routing ids
+      let new_state_routing_ids_iso = recover iso Map[StateName, RoutingId] end
+      let routing_id_gen = RoutingIdGenerator
+      for state_name in m.partition_router_blueprints.keys() do
+        let next_id = routing_id_gen()
+        new_state_routing_ids_iso(state_name) = next_id
+      end
+      let new_state_routing_ids = consume val new_state_routing_ids_iso
 
       let event_log_dir_filepath = _event_log_dir_filepath as FilePath
       _the_journal = _start_journal(auth)
@@ -524,7 +517,7 @@ actor Startup
       end
       let event_log = _event_log as EventLog
 
-      let connections = Connections(_app_name,
+      let connections = Connections(_application.name(),
         _startup_options.worker_name,
         auth, c_host, c_service, d_host, d_service,
         metrics_conn, m.metrics_host, m.metrics_service,
@@ -554,18 +547,16 @@ actor Startup
 
       _setup_shutdown_handler(connections, this, auth)
 
-      let reporter = MetricsReporter(_app_name, _startup_options.worker_name,
-        metrics_conn)
       let data_receivers = DataReceivers(auth, connections,
-        _startup_options.worker_name, consume reporter)
+        _startup_options.worker_name)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
-        connections, this, _startup_options.stop_the_world_pause, _is_joining,
-        initializer_name, barrier_initiator, checkpoint_initiator,
-        autoscale_initiator, m.sender_name)
+        connections, this,
+        _startup_options.stop_the_world_pause, _is_joining, initializer_name,
+        barrier_initiator, checkpoint_initiator, autoscale_initiator,
+        m.sender_name where joining_state_routing_ids = new_state_routing_ids)
       router_registry.set_event_log(event_log)
-      _router_registry = router_registry
 
       let recovery_reconnecter = RecoveryReconnecter(auth,
         _startup_options.worker_name, _startup_options.my_d_service,
@@ -577,14 +568,15 @@ actor Startup
 
       let local_topology_initializer =
         LocalTopologyInitializer(
-          _app_name, _startup_options.worker_name,
+          _application, _startup_options.worker_name,
           _env, auth, connections, router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
           event_log, recovery, recovery_reconnecter, checkpoint_initiator,
           barrier_initiator, _local_topology_file, _data_channel_file,
           _worker_names_file, local_keys_filepath,
           _the_journal as SimpleJournal, _startup_options.do_local_file_io
-          where is_joining = true)
+          where is_joining = true,
+          joining_state_routing_ids = new_state_routing_ids)
 
       if (_external_host != "") or (_external_service != "") then
         let external_channel_notifier =
@@ -597,7 +589,20 @@ actor Startup
           _external_host.cstring(), _external_service.cstring())
       end
 
-      local_topology_initializer.update_topology(m.local_topology)
+      let dr_state_routing_ids = recover iso Map[RoutingId, StateName] end
+      for (s_name, r_id) in new_state_routing_ids.pairs() do
+        dr_state_routing_ids(r_id) = s_name
+      end
+
+      let data_router = DataRouter(_startup_options.worker_name,
+        recover Map[RoutingId, Consumer] end,
+        recover Map[StateName, Array[Step] val] end,
+        consume dr_state_routing_ids)
+
+      router_registry.set_data_router(data_router)
+      let updated_topology = m.local_topology.add_state_routing_ids(
+        _startup_options.worker_name, new_state_routing_ids)
+      local_topology_initializer.update_topology(updated_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
         _startup_options.my_d_host, _startup_options.my_d_service)
 
@@ -643,6 +648,10 @@ actor Startup
       // initialization order
       local_topology_initializer.create_connections(consume control_addrs,
         consume data_addrs)
+      local_topology_initializer.quick_initialize_data_connections()
+      local_topology_initializer.set_partition_router_blueprints(
+        m.partition_router_blueprints,
+        m.stateless_partition_router_blueprints, m.target_id_router_blueprints)
 
       // Dispose of temporary listener
       match _joining_listener
@@ -785,17 +794,6 @@ actor Startup
     else
       Fail()
       false
-    end
-
-  be clean_shutdown() =>
-    let promise = Promise[None]
-    promise.next[None]({(n: None): None => _self.clean_recovery_files()})
-    try (_event_log as EventLog).dispose() end
-    match _router_registry
-    | let rr: RouterRegistry =>
-      rr.dispose_producers(promise)
-    else
-      Fail()
     end
 
   be clean_recovery_files() =>

@@ -26,28 +26,30 @@ def application_setup(args):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    inputs = wallaroo.source("Celsius Conversion",
-                        wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+    ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit")
+    ab.new_pipeline("Celsius Conversion",
+                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+    ab.to(multiply)
+    ab.to(add)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
+    return ab.build()
 
-    pipeline = (inputs
-        .to(multiply)
-        .to(add)
-        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
-
-    return wallaroo.build_application("Celsius to Fahrenheit", pipeline)
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     return struct.unpack(">f", bs)[0]
 
+
 @wallaroo.computation(name="multiply by 1.8")
 def multiply(data):
     return data * 1.8
+
 
 @wallaroo.computation(name="add 32")
 def add(data):
     return data + 32
 
+
 @wallaroo.encoder
 def encoder(data):
-    return ("%.6f\n" % data).encode()
+    return ("%.6f\n" % (data)).encode()

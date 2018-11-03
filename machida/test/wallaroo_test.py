@@ -73,15 +73,15 @@ def test_my_computation_multi_serialization():
 #
 
 
-@wallaroo.state_computation(name="My State Computation", state="world")
+@wallaroo.state_computation(name="My State Computation")
 def my_state_computation(data, state):
-    return (data, state)
+    return ((data, state), True)
 
 
 def test_my_state_computation():
     assert(my_state_computation.name() == "My State Computation")
     assert(my_state_computation.compute("hello", "world") ==
-           ("hello", "world"))
+           (("hello", "world"), True))
 
 
 def test_my_state_computation_serializatin():
@@ -89,7 +89,7 @@ def test_my_state_computation_serializatin():
     deserialized = pickle.loads(serialized)
     assert(deserialized.name() == "My State Computation")
     assert(deserialized.compute("hello", "world") ==
-           ("hello", "world"))
+           (("hello", "world"), True))
 
 
 #
@@ -97,15 +97,15 @@ def test_my_state_computation_serializatin():
 #
 
 
-@wallaroo.state_computation_multi(name="My State Computation Multi", state="world")
+@wallaroo.state_computation_multi(name="My State Computation Multi")
 def my_state_computation_multi(data, state):
-    return (data.split(" "), state)
+    return ((data.split(" "), state), True)
 
 
 def test_my_state_computation_multi():
     assert(my_state_computation_multi.name() == "My State Computation Multi")
     assert(my_state_computation_multi.compute_multi("hello world", 1) ==
-           (["hello", "world"], 1))
+           ((["hello", "world"], 1), True))
 
 
 def test_my_state_computation_multi_serialization():
@@ -113,7 +113,7 @@ def test_my_state_computation_multi_serialization():
     deserialized = pickle.loads(serialized)
     assert(deserialized.name() == "My State Computation Multi")
     assert(deserialized.compute_multi("hello world", 1) ==
-           (["hello", "world"], 1))
+           ((["hello", "world"], 1), True))
 
 
 #
@@ -181,20 +181,20 @@ def test_MyState_serialization():
 #
 
 
-@wallaroo.key_extractor
+@wallaroo.partition
 def my_partition(data):
     return data[0]
 
 
 def test_my_partition():
-    assert(my_partition.extract_key('abcde') == 'a')
-    assert(my_partition.extract_key('d') == 'd')
+    assert(my_partition.partition('abcde') == 'a')
+    assert(my_partition.partition('d') == 'd')
 
 
 def test_my_partition_serialization():
     serialized = pickle.dumps(my_partition)
     deserialized = pickle.loads(serialized)
-    assert(deserialized.extract_key('abcde') == 'a')
+    assert(deserialized.partition('abcde') == 'a')
 
 
 #

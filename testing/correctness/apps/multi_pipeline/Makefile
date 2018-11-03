@@ -51,9 +51,9 @@ multi_pipeline_test:
 		--validation-cmp \
 	  --expected-file _expected.msg \
 		--log-level error \
-		--command './multi_pipeline $(RUN_WITH_RESILIENCE)' \
-		--sink-expect 200 \
-		--sinks 1 \
+		--command './multi_pipeline' \
+		--sink-expect 100 \
+		--sinks 2 \
 		--sources 2
 
 # end of prevent rules from being evaluated/included multiple times

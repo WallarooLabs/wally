@@ -23,7 +23,7 @@ use "wallaroo/core/topology"
 primitive _PipelineIdentifierCreator
   fun apply(router: Router): _PipelineIdentifier =>
     match router
-    | let pr: StatePartitionRouter =>
+    | let pr: PartitionRouter =>
       _PartitionRouterPId(pr)
     | let spr: StatelessPartitionRouter =>
       _StatelessPartitionRouterPId(spr)
@@ -51,9 +51,9 @@ class val _UnchangingRouterPId is _PipelineIdentifier
     _router.hash()
 
 class val _PartitionRouterPId is _PipelineIdentifier
-  let _router: StatePartitionRouter
+  let _router: PartitionRouter
 
-  new val create(pr: StatePartitionRouter) =>
+  new val create(pr: PartitionRouter) =>
     _router = pr
 
   fun eq(that: box->_PipelineIdentifier): Bool =>
@@ -76,7 +76,7 @@ class val _StatelessPartitionRouterPId is _PipelineIdentifier
   fun eq(that: box->_PipelineIdentifier): Bool =>
     match that
     | let ir: _StatelessPartitionRouterPId =>
-      _router.partition_routing_id() == ir._router.partition_routing_id()
+      _router.partition_id() == ir._router.partition_id()
     else
       false
     end

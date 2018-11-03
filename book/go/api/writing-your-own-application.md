@@ -1,6 +1,6 @@
 # Writing Your Own Wallaroo Go Application
 
-In this section, we will go over the components that are required in order to write a Wallaroo Go application. We will start with the stateless `reverse`application from the [examples](https://github.com/WallarooLabs/wallaroo/tree/0.5.4/examples/go/reverse/) section, then move on to an application that maintains and modifies state.
+In this section, we will go over the components that are required in order to write a Wallaroo Go application. We will start with the stateless `reverse`application from the [examples](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/go/reverse/) section, then move on to an application that maintains and modifies state.
 
 ## A Stateless Application - Reverse Words
 
@@ -169,7 +169,7 @@ Configuration objects are used to pass information about sources and sinks to th
 
 ## Running `reverse`
 
-The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/0.5.4/examples/go/reverse/). To run it, follow the [Reverse application instructions](https://github.com/WallarooLabs/wallaroo/tree/0.5.4/examples/go/reverse/README.md)
+The complete example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/go/reverse/). To run it, follow the [Reverse application instructions](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/go/reverse/README.md)
 
 ## Next Steps
 

@@ -17,10 +17,8 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 use "collections"
-use "promises"
 use "wallaroo/core/boundary"
 use "wallaroo/core/initialization"
-use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/data_receiver"
@@ -30,8 +28,8 @@ use "wallaroo/ent/checkpoint"
 
 actor DummyProducer is Producer
   // Producer
-  fun ref has_route_to(c: Consumer): Bool =>
-    false
+  fun ref route_to(c: Consumer): (Route | None) =>
+    None
 
   fun ref next_sequence_id(): SeqId =>
     0
@@ -77,21 +75,3 @@ actor DummyProducer is Producer
   be register_downstream() =>
     None
 
-  be dispose_with_promise(promise: Promise[None]) =>
-    None
-
-  fun ref metrics_reporter(): MetricsReporter =>
-    MetricsReporter("", "", _NullMetricsSink)
-
-actor _NullMetricsSink
-  be send_metrics(metrics: MetricDataList val) =>
-    None
-
-  fun ref set_nodelay(state: Bool) =>
-    None
-
-  be writev(data: ByteSeqIter) =>
-    None
-
-  be dispose() =>
-    None

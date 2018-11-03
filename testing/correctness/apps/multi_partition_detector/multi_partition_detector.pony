@@ -76,29 +76,33 @@ actor Main
         end
       end
 
-      let pipeline = recover val
-        var p = if gen_source then
-          Wallaroo.source[t.Message]("Detector",
-            GenSourceConfig[t.Message](
-              MultiPartitionGenerator(partition_count)))
+      // Still requires passing an array here... even though it's empty
+      let partition = Partitions[t.Message](WindowPartitionFunction, [])
+
+      let application = recover val
+        let a = Application("Multi Partition Detector")
+        let p = if gen_source then
+          a.new_pipeline[t.Message, String]("Detector",
+            GenSourceConfig[t.Message](MultiPartitionGenerator(partition_count)))
         else
-          Wallaroo.source[t.Message]("Detector",
-            TCPSourceConfig[t.Message]
-              .from_options(PartitionedU64FramedHandler,
-                TCPSourceConfigCLIParser(env.args)?(0)?))
+          a.new_pipeline[t.Message, String]("Detector",
+            TCPSourceConfig[t.Message].from_options(PartitionedU64FramedHandler,
+              TCPSourceConfigCLIParser(env.args)?(0)?))
         end
         // Add as many layers of depth as specified in the `--depth` option
         for x in Range[USize](1, depth + 1) do
           env.out.print("Adding level " + x.string())
-          p = p.key_by(WindowPartitionFunction)
-          p = p.to[t.Message](TraceID(x.string()))
-          p = p.key_by(WindowPartitionFunction)
-          p = p.to_state[t.Message, WindowState](TraceWindow(x.string()))
+          p.to[t.Message]({(): TraceID => TraceID(x.string())})
+          p.to_state_partition[t.Message,
+            WindowState](TraceWindow(x.string()), WindowStateBuilder,
+            "state" + x.string(),
+            partition where multi_worker = true)
         end
         p.to_sink(TCPSinkConfig[t.Message].from_options(MessageEncoder,
             TCPSinkConfigCLIParser(env.args)?(0)?))
+        consume a
       end
-      Wallaroo.build_application(env, "multi_partition_detector", pipeline)
+      Startup(env, application, "multi_partition_detector")
     else
       env.out.print("Couldn't build topology!")
     end
@@ -142,6 +146,10 @@ class val MultiPartitionGenerator
       Fail()
       t.Message("0", 1)
     end
+
+class val WindowStateBuilder
+  fun apply(): WindowState => WindowState
+  fun name(): String => "Window State"
 
 class WindowState is State
   var _window: t.Window = t.Window(t.WindowSize())
@@ -215,7 +223,10 @@ class val TraceWindow is StateComputation[t.Message, t.Message, WindowState]
   fun rekey(k: String): String =>
     k + "." + _id
 
-  fun apply(m: t.Message, state: WindowState): t.Message =>
+  fun apply(m: t.Message,
+    sc_repo: StateChangeRepository[WindowState],
+    state: WindowState): (t.Message, DirectStateChange)
+  =>
     ifdef debug then
       @printf[I32](("%s computing on '%s' with state " +
         "'%s'\n").cstring(),
@@ -224,7 +235,9 @@ class val TraceWindow is StateComputation[t.Message, t.Message, WindowState]
 
     state.push(m)
 
-    t.Message(rekey(m.key()), state.window())
+    (t.Message(rekey(m.key()), state.window()), DirectStateChange)
 
-  fun initial_state(): WindowState =>
-    WindowState
+  fun state_change_builders():
+    Array[StateChangeBuilder[WindowState]] val
+  =>
+    recover Array[StateChangeBuilder[WindowState]] end

@@ -17,4 +17,4 @@ Copyright 2017 The Wallaroo Authors.
 */
 
 interface tag RecoveryFileCleaner
-  be clean_shutdown()
+  be clean_recovery_files()

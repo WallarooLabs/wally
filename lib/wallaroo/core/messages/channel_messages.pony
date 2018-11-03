@@ -45,10 +45,10 @@ primitive ChannelMsgEncoder
     end
     wb.done()
 
-  fun data_channel(delivery_msg: DeliveryMsg,
+  fun data_channel(delivery_msg: ReplayableDeliveryMsg,
     producer_id: RoutingId, pipeline_time_spent: U64, seq_id: SeqId,
-    wb: Writer, auth: AmbientAuth, latest_ts: U64, metrics_id: U16,
-    metric_name: String): Array[ByteSeq] val ?
+    wb: Writer, auth: AmbientAuth,
+    latest_ts: U64, metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
   =>
     _encode(DataMsg(delivery_msg, producer_id, pipeline_time_spent, seq_id,
       latest_ts, metrics_id, metric_name), auth, wb)?
@@ -142,6 +142,15 @@ primitive ChannelMsgEncoder
   =>
     _encode(UnmuteRequestMsg(originating_worker), auth)?
 
+  fun delivery[D: Any val](target_id: RoutingId,
+    from_worker_name: String, msg_data: D,
+    metric_name: String, auth: AmbientAuth,
+    proxy_address: ProxyAddress, msg_uid: MsgId,
+    frac_ids: FractionalMessageId): Array[ByteSeq] val ?
+  =>
+    _encode(ForwardMsg[D](target_id, from_worker_name,
+      msg_data, metric_name, proxy_address, msg_uid, frac_ids), auth)?
+
   fun identify_control_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -207,10 +216,20 @@ primitive ChannelMsgEncoder
   =>
     _encode(StartNormalDataSendingMsg(last_id_seen), auth)?
 
+  fun replay_complete(sender_name: String, boundary_id: U128,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ReplayCompleteMsg(sender_name, boundary_id), auth)?
+
   fun ack_data_received(sender_name: String, sender_step_id: RoutingId,
     seq_id: SeqId, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(AckDataReceivedMsg(sender_name, sender_step_id, seq_id), auth)?
+
+  fun replay(delivery_bytes: Array[ByteSeq] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(ReplayMsg(delivery_bytes), auth)?
 
   fun request_recovery_info(worker_name: WorkerName, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -244,6 +263,10 @@ primitive ChannelMsgEncoder
     control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
     worker_names: Array[String] val, primary_checkpoint_worker: String,
+    partition_blueprints: Map[String, PartitionRouterBlueprint] val,
+    stateless_partition_blueprints:
+      Map[U128, StatelessPartitionRouterBlueprint] val,
+    target_id_router_blueprints: Map[String, TargetIdRouterBlueprint] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -251,7 +274,9 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
       checkpoint_id, rollback_id, metric_host, metric_service, control_addrs,
-      data_addrs, worker_names, primary_checkpoint_worker), auth)?
+      data_addrs, worker_names, primary_checkpoint_worker,
+      partition_blueprints, stateless_partition_blueprints,
+      target_id_router_blueprints), auth)?
 
   fun inform_join_error(msg: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -263,15 +288,15 @@ primitive ChannelMsgEncoder
 
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
     d_addr: (String, String), state_routing_ids: Map[StateName, RoutingId] val,
-    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
-    This message is sent after a joining worker initializes its topology. It
-    indicates that it is ready to receive migrated steps.
+    This message is sent after a joining worker uses partition blueprints and
+    other topology information to initialize its topology. It indicates that
+    it is ready to receive migrated steps.
     """
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr,
-      state_routing_ids, stateless_partition_routing_ids), auth)?
+      state_routing_ids), auth)?
 
   fun initiate_stop_the_world_for_join_migration(sender: WorkerName,
     new_workers: Array[String] val, auth: AmbientAuth): Array[ByteSeq] val ?
@@ -320,31 +345,27 @@ primitive ChannelMsgEncoder
   =>
     _encode(RequestBoundaryCountMsg(sender), auth)?
 
-  fun inform_of_boundary_count(sender: String, count: USize,
-    auth: AmbientAuth): Array[ByteSeq] val ?
+  fun replay_boundary_count(sender: String, count: USize, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
-    _encode(InformOfBoundaryCountMsg(sender, count), auth)?
+    _encode(ReplayBoundaryCountMsg(sender, count), auth)?
 
   fun announce_connections(control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
     new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
-    new_stateless_partition_routing_ids:
-      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(AnnounceConnectionsMsg(control_addrs, data_addrs,
-      new_state_routing_ids, new_stateless_partition_routing_ids), auth)?
+      new_state_routing_ids), auth)?
 
   fun announce_joining_workers(sender: String,
     control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
     new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
-    new_stateless_partition_routing_ids:
-      Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(AnnounceJoiningWorkersMsg(sender, control_addrs, data_addrs,
-      new_state_routing_ids, new_stateless_partition_routing_ids), auth)?
+      new_state_routing_ids), auth)?
 
   fun announce_hash_partitions_grow(sender: String,
     joining_workers: Array[String] val,
@@ -355,7 +376,7 @@ primitive ChannelMsgEncoder
     Once migration is complete, the coordinator of a grow autoscale event
     informs all joining workers of all hash partitions. We include the joining
     workers list to make it more straightforward for the recipients to update
-    the HashProxyRouters in their StatePartitionRouters.
+    the HashProxyRouters in their PartitionRouters.
     """
     _encode(AnnounceHashPartitionsGrowMsg(sender, joining_workers,
       hash_partitions), auth)?
@@ -686,7 +707,7 @@ class val RequestBoundaryCountMsg is ChannelMsg
   new val create(from: String) =>
     sender_name = from
 
-class val InformOfBoundaryCountMsg is ChannelMsg
+class val ReplayBoundaryCountMsg is ChannelMsg
   let sender_name: String
   let boundary_count: USize
 
@@ -814,12 +835,12 @@ class val DataMsg is ChannelMsg
   let pipeline_time_spent: U64
   let producer_id: RoutingId
   let seq_id: SeqId
-  let delivery_msg: DeliveryMsg
+  let delivery_msg: ReplayableDeliveryMsg
   let latest_ts: U64
   let metrics_id: U16
   let metric_name: String
 
-  new val create(msg: DeliveryMsg, producer_id': RoutingId,
+  new val create(msg: ReplayableDeliveryMsg, producer_id': RoutingId,
     pipeline_time_spent': U64, seq_id': SeqId, latest_ts': U64,
     metrics_id': U16, metric_name': String)
   =>
@@ -831,6 +852,37 @@ class val DataMsg is ChannelMsg
     metrics_id = metrics_id'
     metric_name = metric_name'
 
+class val ReplayMsg is ChannelMsg
+  let data_bytes: Array[ByteSeq] val
+
+  new val create(db: Array[ByteSeq] val) =>
+    data_bytes = db
+
+  fun msg(auth: AmbientAuth): (DataMsg | ForwardBarrierMsg) ? =>
+    var size: USize = 0
+    for bytes in data_bytes.values() do
+      size = size + bytes.size()
+    end
+
+    let buffer = recover trn Array[U8](size) end
+    for bytes in data_bytes.values() do
+      buffer.append(bytes)
+    end
+
+    // trim first 4 bytes that are for size of tcp header
+    buffer.trim_in_place(4)
+
+    match ChannelMsgDecoder(consume buffer, auth)
+    | let r: DataMsg =>
+      r
+    | let fbm: ForwardBarrierMsg =>
+      fbm
+    else
+      @printf[I32]("Trouble reconstituting replayed data msg\n".cstring())
+      error
+    end
+
+
 trait val DeliveryMsg is ChannelMsg
   fun sender_name(): String
   fun val deliver(pipeline_time_spent: U64,
@@ -838,16 +890,26 @@ trait val DeliveryMsg is ChannelMsg
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
-    stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val) ?
-  fun metric_name(): String
-  fun msg_uid(): U128
+    consumer_ids: MapIs[Consumer, RoutingId] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
 
-class val ForwardMsg[D: Any val] is DeliveryMsg
+trait val ReplayableDeliveryMsg is DeliveryMsg
+  fun val replay_deliver(pipeline_time_spent: U64,
+    data_routes: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    consumer_ids: MapIs[Consumer, RoutingId] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
+  fun input(): Any val
+  fun metric_name(): String
+  fun msg_uid(): MsgId
+
+class val ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_id: RoutingId
   let _sender_name: String
   let _data: D
-  let _key: Key
   let _metric_name: String
   let _proxy_address: ProxyAddress
   let _msg_uid: MsgId
@@ -859,13 +921,12 @@ class val ForwardMsg[D: Any val] is DeliveryMsg
   fun frac_ids(): FractionalMessageId => _frac_ids
 
   new val create(t_id: RoutingId, from: String,
-    m_data: D, k: Key, m_name: String, proxy_address: ProxyAddress,
+    m_data: D, m_name: String, proxy_address: ProxyAddress,
     msg_uid': MsgId, frac_ids': FractionalMessageId)
   =>
     _target_id = t_id
     _sender_name = from
     _data = m_data
-    _key = k
     _metric_name = m_name
     _proxy_address = proxy_address
     _msg_uid = msg_uid'
@@ -878,19 +939,38 @@ class val ForwardMsg[D: Any val] is DeliveryMsg
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
-    stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val) ?
+    consumer_ids: MapIs[Consumer, RoutingId] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
   =>
     let target_step = data_routes(_target_id)?
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
 
-    target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+    let route_id = target_ids_to_route_ids(_target_id)?
 
-class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
+    target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+      producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+      worker_ingress_ts)
+    route_id
+
+  fun val replay_deliver(pipeline_time_spent: U64,
+    data_routes: Map[RoutingId, Consumer] val,
+    state_steps: Map[StateName, Array[Step] val] val,
+    consumer_ids: MapIs[Consumer, RoutingId] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
+  =>
+    let target_step = data_routes(_target_id)?
+    let route_id = target_ids_to_route_ids(_target_id)?
+    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data,
+      producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts,
+      metrics_id, worker_ingress_ts)
+    route_id
+
+class val ForwardKeyedMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_state_name: String
   let _target_key: Key
   let _sender_name: String
@@ -904,11 +984,11 @@ class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
   fun msg_uid(): U128 => _msg_uid
   fun frac_ids(): FractionalMessageId => _frac_ids
 
-  new val create(state_name: StateName, from: String, m_data: D, k: Key,
+  new val create(t_s_n: String, tk: Key, from: String, m_data: D,
     m_name: String, msg_uid': MsgId, frac_ids': FractionalMessageId)
   =>
-    _target_state_name = state_name
-    _target_key = k
+    _target_state_name = t_s_n
+    _target_key = tk
     _sender_name = from
     _data = m_data
     _metric_name = m_name
@@ -922,75 +1002,56 @@ class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     data_routes: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
-    stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val) ?
+    consumer_ids: MapIs[Consumer, RoutingId] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, RoutingId] val): RouteId ?
   =>
     ifdef "trace" then
       @printf[I32]("DataRouter found Step\n".cstring())
     end
 
-    let local_state_steps = state_steps(_target_state_name)?
-    let idx =
-      (HashKey(_target_key) % local_state_steps.size().u128()).usize()
-    let target_step = local_state_steps(idx)?
+    try
+      let local_state_steps = state_steps(_target_state_name)?
+      let idx =
+        (HashKey(_target_key) % local_state_steps.size().u128()).usize()
+      let target_step = local_state_steps(idx)?
 
-    let target_id = consumer_ids(target_step)?
+      let target_id = consumer_ids(target_step)?
+      let route_id = target_ids_to_route_ids(target_id)?
 
-    target_step.run[D](_metric_name, pipeline_time_spent, _data, _target_key,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+      target_step.run[D](_metric_name, pipeline_time_spent, _data, producer_id,
+        producer, _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
+        worker_ingress_ts)
+      route_id
+    else
+      error
+    end
 
-class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
-  let _target_partition_id: RoutingId
-  let _key: Key
-  let _sender_name: String
-  let _data: D
-  let _metric_name: String
-  let _msg_uid: MsgId
-  let _frac_ids: FractionalMessageId
-
-  fun input(): Any val => _data
-  fun metric_name(): String => _metric_name
-  fun msg_uid(): U128 => _msg_uid
-  fun frac_ids(): FractionalMessageId => _frac_ids
-
-  new val create(target_p_id: RoutingId, from: String, m_data: D, k: Key,
-    m_name: String, msg_uid': MsgId, frac_ids': FractionalMessageId)
-  =>
-    _target_partition_id = target_p_id
-    _key = k
-    _sender_name = from
-    _data = m_data
-    _metric_name = m_name
-    _msg_uid = msg_uid'
-    _frac_ids = frac_ids'
-
-  fun sender_name(): String => _sender_name
-
-  fun val deliver(pipeline_time_spent: U64,
-    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+  fun val replay_deliver(pipeline_time_spent: U64,
     data_routes: Map[RoutingId, Consumer] val,
     state_steps: Map[StateName, Array[Step] val] val,
-    stateless_partitions: Map[RoutingId, Array[Step] val] val,
-    consumer_ids: MapIs[Consumer, RoutingId] val) ?
+    consumer_ids: MapIs[Consumer, RoutingId] val,
+    target_ids_to_route_ids: Map[RoutingId, RouteId] val,
+    producer_id: RoutingId, producer: Producer ref, seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): RouteId ?
   =>
-    ifdef "trace" then
-      @printf[I32]("DataRouter found Step\n".cstring())
+    try
+      let local_state_steps = state_steps(_target_state_name)?
+      let idx =
+        (HashKey(_target_key) % local_state_steps.size().u128()).usize()
+      let target_step = local_state_steps(idx)?
+
+      let target_id = consumer_ids(target_step)?
+      let route_id = target_ids_to_route_ids(target_id)?
+
+      target_step.replay_run[D](_metric_name, pipeline_time_spent,
+        _data, producer_id, producer, _msg_uid, _frac_ids, seq_id, route_id,
+        latest_ts, metrics_id, worker_ingress_ts)
+
+      route_id
+    else
+      error
     end
-
-    @printf[I32]("!@--1\n".cstring())
-    let partitions = stateless_partitions(_target_partition_id)?
-    let idx = HashKey(_key).usize() % partitions.size()
-    @printf[I32]("!@--2\n".cstring())
-    let target_step = partitions(idx)?
-
-    @printf[I32]("!@--3\n".cstring())
-    let target_id = consumer_ids(target_step)?
-
-    target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
 
 class val RequestRecoveryInfoMsg is ChannelMsg
   """
@@ -1040,6 +1101,10 @@ class val InformJoiningWorkerMsg is ChannelMsg
   let worker_names: Array[WorkerName] val
   // The worker currently in control of checkpoints
   let primary_checkpoint_worker: WorkerName
+  let partition_router_blueprints: Map[StateName, PartitionRouterBlueprint] val
+  let stateless_partition_router_blueprints:
+    Map[U128, StatelessPartitionRouterBlueprint] val
+  let target_id_router_blueprints: Map[StateName, TargetIdRouterBlueprint] val
 
   new val create(sender: WorkerName, app: String, l_topology: LocalTopology,
     checkpoint_id': CheckpointId, rollback_id': RollbackId,
@@ -1047,7 +1112,10 @@ class val InformJoiningWorkerMsg is ChannelMsg
     c_addrs: Map[WorkerName, (String, String)] val,
     d_addrs: Map[WorkerName, (String, String)] val,
     w_names: Array[String] val,
-    p_checkpoint_worker: WorkerName)
+    p_checkpoint_worker: WorkerName,
+    p_blueprints: Map[StateName, PartitionRouterBlueprint] val,
+    stateless_p_blueprints: Map[U128, StatelessPartitionRouterBlueprint] val,
+    tidr_blueprints: Map[StateName, TargetIdRouterBlueprint] val)
   =>
     sender_name = sender
     local_topology = l_topology
@@ -1060,6 +1128,9 @@ class val InformJoiningWorkerMsg is ChannelMsg
     data_addrs = d_addrs
     worker_names = w_names
     primary_checkpoint_worker = p_checkpoint_worker
+    partition_router_blueprints = p_blueprints
+    stateless_partition_router_blueprints = stateless_p_blueprints
+    target_id_router_blueprints = tidr_blueprints
 
 class val InformJoinErrorMsg is ChannelMsg
   let message: String
@@ -1073,17 +1144,14 @@ class val JoiningWorkerInitializedMsg is ChannelMsg
   let control_addr: (String, String)
   let data_addr: (String, String)
   let state_routing_ids: Map[StateName, RoutingId] val
-  let stateless_partition_routing_ids: Map[RoutingId, RoutingId] val
 
   new val create(name: String, c_addr: (String, String),
-    d_addr: (String, String), s_routing_ids: Map[StateName, RoutingId] val,
-    s_p_routing_ids: Map[RoutingId, RoutingId] val)
+    d_addr: (String, String), s_routing_ids: Map[StateName, RoutingId] val)
   =>
     worker_name = name
     control_addr = c_addr
     data_addr = d_addr
     state_routing_ids = s_routing_ids
-    stateless_partition_routing_ids = s_p_routing_ids
 
 class val InitiateStopTheWorldForJoinMigrationMsg is ChannelMsg
   let sender: WorkerName
@@ -1126,38 +1194,30 @@ class val AnnounceConnectionsMsg is ChannelMsg
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
   let new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val
-  let new_stateless_partition_routing_ids:
-    Map[WorkerName, Map[RoutingId, RoutingId] val] val
 
   new val create(c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
-    sri: Map[WorkerName, Map[StateName, RoutingId] val] val,
-    spri: Map[WorkerName, Map[RoutingId, RoutingId] val] val)
+    sri: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
     control_addrs = c_addrs
     data_addrs = d_addrs
     new_state_routing_ids = sri
-    new_stateless_partition_routing_ids = spri
 
 class val AnnounceJoiningWorkersMsg is ChannelMsg
   let sender: String
   let control_addrs: Map[String, (String, String)] val
   let data_addrs: Map[String, (String, String)] val
   let new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val
-  let new_stateless_partition_routing_ids:
-    Map[WorkerName, Map[RoutingId, RoutingId] val] val
 
   new val create(sender': String,
     c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
-    sri: Map[WorkerName, Map[StateName, RoutingId] val] val,
-    spri: Map[WorkerName, Map[RoutingId, RoutingId] val] val)
+    sri: Map[WorkerName, Map[StateName, RoutingId] val] val)
   =>
     sender = sender'
     control_addrs = c_addrs
     data_addrs = d_addrs
     new_state_routing_ids = sri
-    new_stateless_partition_routing_ids = spri
 
 class val AnnounceHashPartitionsGrowMsg is ChannelMsg
   let sender: String

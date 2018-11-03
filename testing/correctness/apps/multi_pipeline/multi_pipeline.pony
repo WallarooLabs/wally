@@ -29,24 +29,24 @@ use "wallaroo/core/topology"
 actor Main
   new create(env: Env) =>
     try
-      let pipeline = recover val
-        let inputs1 = Wallaroo.source[F32]("Celsius Conversion",
+      let application = recover val
+        Application("Celsius Conversion App")
+          .new_pipeline[F32, F32]("Celsius Conversion",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-            .to[F32](Multiply)
-            .to[F32](Add)
-
-        let inputs2 = Wallaroo.source[F32]("Celsius Conversion",
+            .to[F32]({(): Multiply => Multiply})
+            .to[F32]({(): Add => Add})
+            .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+               TCPSinkConfigCLIParser(env.args)?(0)?))
+          .new_pipeline[F32, F32]("Celsius Conversion",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
               TCPSourceConfigCLIParser(env.args)?(1)?))
-            .to[F32](Multiply)
-            .to[F32](Add)
-
-        inputs1.merge[F32](inputs2)
-          .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
-            TCPSinkConfigCLIParser(env.args)?(0)?))
+            .to[F32]({(): Multiply => Multiply})
+            .to[F32]({(): Add => Add})
+            .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+               TCPSinkConfigCLIParser(env.args)?(1)?))
       end
-      Wallaroo.build_application(env, "celsius-multi-pipeline", pipeline)
+      Startup(env, application, "celsius-multi-pipeline")
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end

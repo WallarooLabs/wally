@@ -15,7 +15,7 @@ The Metrics UI process will be run in the background. The other three processes 
 For each Shell you're expected to setup, you'd have to run the following to access the Vagrant Box:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-0.5.4/vagrant
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
 vagrant ssh
 ```
 
@@ -66,14 +66,14 @@ Data Receiver will start up and receive data without creating any output. By def
 First, we need to build the application.
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-0.5.4/examples/go/celsius
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius
 make
 ```
 
 Now that we have set up the "Celsius to Fahrenheit" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-0.5.4/examples/go/celsius
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius
 ./celsius --in 127.0.0.1:7000 \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
   --data 127.0.0.1:6001 --name worker-name --external 127.0.0.1:5050 \
@@ -91,7 +91,7 @@ You will now be able to start the `sender` with the following command:
 ```bash
 sender --host 127.0.0.1:7000 --messages 25000000 --binary --batch-size 300 \
   --repeat --no-write --msg-size 8 --ponythreads=1 --ponynoblock \
-  --file ~/wallaroo-tutorial/wallaroo-0.5.4/examples/go/celsius/celsius.msg
+  --file ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/go/celsius/celsius.msg
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.

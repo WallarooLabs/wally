@@ -59,7 +59,7 @@ REJECTED = {}
 NOT_REJECTED = {}
 
 
-def create_order(reject):
+def create_order(reject=False):
     global ORDERS_COUNTER
     global REJECTED
     fix_type = FIXTYPE_ORDER
@@ -88,7 +88,7 @@ def create_order(reject):
 
 
 MarketOrder = namedtuple("MarketOrder", ["bid", "offer"])
-def create_market_data(reject):
+def create_market_data(reject=False):
     global REJECTED
     global NOT_REJECTED
     fix_type = FIXTYPE_MARKET_DATA
@@ -96,6 +96,7 @@ def create_market_data(reject):
     bid = 1000
     if reject:
         symbol = choice(SYMBOLS_REJECT)
+        # offer - bid
         offer_px = bid + 1
         REJECTED[symbol] = MarketOrder(bid, offer_px)
     else:

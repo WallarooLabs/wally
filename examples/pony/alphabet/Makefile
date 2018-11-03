@@ -50,7 +50,7 @@ alphabet_pony_test:
 		--log-level error \
 		--batch-size 10 \
 		--output 'received.txt' \
-		--command './alphabet $(RUN_WITH_RESILIENCE)' \
+		--command './alphabet' \
 		--workers 4 \
 		--sink-expect 1000
 

@@ -245,9 +245,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             host, m.service)
           _router_registry.reconnect_source_boundaries(m.worker_name)
         end
-      | let m: InformOfBoundaryCountMsg =>
+      | let m: ReplayBoundaryCountMsg =>
         ifdef "trace" then
-          @printf[I32]("Received InformOfBoundaryCountMsg on Control Channel\n"
+          @printf[I32]("Received ReplayBoundaryCountMsg on Control Channel\n"
             .cstring())
         end
         _recovery_replayer.add_expected_boundary_count(m.sender_name,
@@ -338,12 +338,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             let control_addr = m.control_addrs(w)?
             let data_addr = m.data_addrs(w)?
             let new_state_routing_ids = m.new_state_routing_ids(w)?
-            let new_stateless_partition_routing_ids =
-              m.new_stateless_partition_routing_ids(w)?
             match _layout_initializer
             | let lti: LocalTopologyInitializer =>
               lti.add_joining_worker(w, host, control_addr, data_addr,
-                new_state_routing_ids, new_stateless_partition_routing_ids)
+                new_state_routing_ids)
             else
               Fail()
             end
@@ -355,8 +353,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
           lti.connect_to_joining_workers(m.sender, m.control_addrs,
-            m.data_addrs, m.new_state_routing_ids,
-            m.new_stateless_partition_routing_ids)
+            m.data_addrs, m.new_state_routing_ids)
         else
           Fail()
         end
@@ -379,8 +376,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
             lti.add_joining_worker(m.worker_name, joining_host, m.control_addr,
-              m.data_addr, m.state_routing_ids,
-              m.stateless_partition_routing_ids)
+              m.data_addr, m.state_routing_ids)
           else
             Fail()
           end
@@ -616,7 +612,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           .cstring())
         _event_log.start_rotation()
       | let m: CleanShutdownMsg =>
-        _recovery_file_cleaner.clean_shutdown()
+        _recovery_file_cleaner.clean_recovery_files()
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else

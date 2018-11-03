@@ -64,12 +64,11 @@ actor Main
 
       // Start it up!
       let listener_addr = l_arg as Array[String]
-      let host = listener_addr(0)?
-      let port = listener_addr(1)?
       let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
       TCPListener(tcp_auth,
-        ListenerNotify(env.out, env.err, input_mode, output_mode, host, port),
-        host, port)
+        ListenerNotify(env.out, env.err, input_mode, output_mode),
+        listener_addr(0)?,
+        listener_addr(1)?)
     else
       usage(env.out)
     end
@@ -92,25 +91,16 @@ class ListenerNotify is TCPListenNotify
   let _stderr: OutStream
   let _input_mode: InputMode
   let _output_mode: OutputMode
-  let _host: String
-  let _port: String
 
   new iso create(stdout: OutStream,
     stderr: OutStream,
     input_mode: InputMode,
-    output_mode: OutputMode,
-    host: String,
-    port: String)
+    output_mode: OutputMode)
   =>
     _stdout = stdout
     _stderr = stderr
     _input_mode = input_mode
     _output_mode = output_mode
-    _host = host
-    _port = port
-
-  fun ref listening(listen: TCPListener ref) =>
-    _stdout.print("Listening on " + _host + ":" + _port)
 
   fun ref not_listening(listen: TCPListener ref) =>
     _stderr.print("Unable to listen\n")

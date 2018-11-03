@@ -143,7 +143,7 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
           try
             let clean_shutdown_msg = ChannelMsgEncoder.clean_shutdown(_auth)?
             _connections.send_control_to_cluster(clean_shutdown_msg)
-            _recovery_file_cleaner.clean_shutdown()
+            _recovery_file_cleaner.clean_recovery_files()
           else
             Fail()
           end

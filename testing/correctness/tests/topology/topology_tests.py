@@ -163,27 +163,10 @@ def create_test(api, cmd, validation_cmd, steps, workers=1):
     f.__name__ = test_name
     globals()[test_name] = f
 
-def remove_key_by_chains(steps):
-    res = []
-    last_step = ''
-    for s in steps:
-        # There should never be two key_by calls in a row.
-        if not ((last_step == 'key-by') and (s == 'key-by')):
-            res.append(s)
-            last_step = s
-    if len(res) == 3:
-        # Real pipelines won't end with 'key_by()'.
-        if res[2] == 'key-by':
-            new_res = []
-            new_res.append(res[0])
-            new_res.append(res[1])
-            res = new_res
-    return res
-
 # Create tests!
 APIS = {'python': {'cmd': 'machida --application-module app_gen',
                    'validation_cmd': 'python2 app_gen.py'},
-       'python3': {'cmd': 'machida3 --application-module app_gen',
+        'python3': {'cmd': 'machida3 --application-module app_gen',
                     'validation_cmd': 'python3 app_gen.py'},
        }
 
@@ -195,14 +178,11 @@ if os.environ.get("resilience") == 'on':
 
 sizes = [1,2,3]
 depth = 3
-# COMPS = ['to', 'to-parallel', 'to-stateful', 'to-state-partition']
-COMPS = ['to-stateless', 'to-state', 'key-by', 'to-stateless', 'to-state', 'key-by']
-# COMPS = ['to', 'key-by']
-# COMPS = ['to']
+COMPS = ['to', 'to-parallel', 'to-stateful', 'to-state-partition']
 for size in sizes:
     for steps in itertools.chain.from_iterable(
-            (itertools.permutations(COMPS, d)
+            (itertools.combinations_with_replacement(COMPS, d)
              for d in range(1, depth+1))):
         for api in APIS:
             create_test(api, APIS[api]['cmd'], APIS[api]['validation_cmd'],
-                        remove_key_by_chains(steps), size)
+                        steps, size)

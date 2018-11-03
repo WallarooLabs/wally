@@ -21,7 +21,6 @@ use "pony-kafka"
 use "time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/core/grouping"
 use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/source"
@@ -32,13 +31,15 @@ use "wallaroo_labs/mort"
 primitive KafkaSourceNotifyBuilder[In: Any val]
   fun apply(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SourceHandler[In] val,
-    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
+    runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router): KafkaSourceNotify[In] iso^
+    target_router: Router,
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end):
+    KafkaSourceNotify[In] iso^
   =>
     KafkaSourceNotify[In](source_id, pipeline_name, env, auth, handler,
-      runner_builder, grouper, router, consume metrics_reporter, event_log,
-      target_router)
+      runner_builder, router, consume metrics_reporter, event_log,
+      target_router, pre_state_target_ids)
 
 class KafkaSourceNotify[In: Any val]
   let _source_id: RoutingId
@@ -50,13 +51,15 @@ class KafkaSourceNotify[In: Any val]
   let _handler: SourceHandler[In] val
   let _runner: Runner
   var _router: Router
+  let _target_id_router: TargetIdRouter = EmptyTargetIdRouter
   let _metrics_reporter: MetricsReporter
 
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: SourceHandler[In] val,
-    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router': Router,
+    runner_builder: RunnerBuilder, router': Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router)
+    target_router: Router,
+    pre_state_target_ids: Array[RoutingId] val = recover Array[RoutingId] end)
   =>
     _source_id = source_id
     _pipeline_name = pipeline_name
@@ -64,9 +67,9 @@ class KafkaSourceNotify[In: Any val]
     _env = env
     _auth = auth
     _handler = handler
-    _runner = runner_builder(event_log, auth, None, target_router,
-      grouper)
-    _router = router'
+    _runner = runner_builder(event_log, auth, None,
+      target_router, pre_state_target_ids)
+    _router = _runner.clone_router_and_set_input_type(router')
     _metrics_reporter = consume metrics_reporter
 
   fun routes(): Map[RoutingId, Consumer] val =>
@@ -117,9 +120,8 @@ class KafkaSourceNotify[In: Any val]
             " source\n").cstring())
         end
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          "kafka-source-key", _source_id, source, _router,
-          _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
-          _metrics_reporter)
+          _source_id, source, _router, _target_id_router, _msg_id_gen(), None,
+          decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
       else
         @printf[I32](("Unable to decode message at " + _pipeline_name +
           " source\n").cstring())
@@ -149,11 +151,11 @@ class KafkaSourceNotify[In: Any val]
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
     match _router
-    | let p_router: StatePartitionRouter =>
+    | let p_router: PartitionRouter =>
       _router = p_router.update_boundaries(_auth, obs)
     else
       ifdef "trace" then
-        @printf[I32](("KafkaSourceNotify doesn't have StatePartitionRouter. " +
+        @printf[I32](("KafkaSourceNotify doesn't have PartitionRouter. " +
           "Updating boundaries is a noop for this kind of Source.\n").cstring())
       end
     end

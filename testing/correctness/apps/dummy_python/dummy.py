@@ -20,15 +20,17 @@ def application_setup(args):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    pipeline = (wallaroo.source("Dummy",
+    ab = wallaroo.ApplicationBuilder("Dummy")
+    ab.new_pipeline("Dummy",
                     wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-      .to(count)
-      .key_by(partition)
-      .to(count_partitioned)
-      .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
-    return wallaroo.build_application("Dummy", pipeline)
+    ab.to_stateful(count, StateObject, "DummyState")
+    ab.to_state_partition(count_partitioned, PartitionedStateObject,
+                          "PartitionedDummyState", partition)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
+    return ab.build()
 
-@wallaroo.key_extractor
+
+@wallaroo.partition
 def partition(data):
     return str(hash(data))
 
@@ -48,12 +50,12 @@ class PartitionedStateObject(object):
         self.val = value
         return value
 
-@wallaroo.state_computation(name="Count State Updates", state=StateObject)
+@wallaroo.state_computation(name="Count State Updates")
 def count(data, state):
     res = state.update(data)
     return (res, True)
 
-@wallaroo.state_computation(name="Count Partitioned State Updates", state=PartitionedStateObject)
+@wallaroo.state_computation(name="Count Partitioned State Updates")
 def count_partitioned(data, state):
     res = state.update(data)
     return (res, True)

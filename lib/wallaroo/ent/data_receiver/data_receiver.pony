@@ -18,13 +18,11 @@ Copyright 2018 The Wallaroo Authors.
 
 use "collections"
 use "net"
-use "promises"
 use "time"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
-use "wallaroo/core/metrics"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
 use "wallaroo/ent/barrier"
@@ -48,8 +46,6 @@ actor DataReceiver is Producer
   var _ack_counter: USize = 0
 
   var _last_request: USize = 0
-
-  let _metrics_reporter: MetricsReporter
 
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
@@ -79,7 +75,6 @@ actor DataReceiver is Producer
 
   new create(auth: AmbientAuth, id: RoutingId, worker_name: String,
     sender_name: String, data_router: DataRouter,
-    metrics_reporter': MetricsReporter iso,
     initialized: Bool = false, is_recovering: Bool = false)
   =>
     _id = id
@@ -87,16 +82,12 @@ actor DataReceiver is Producer
     _worker_name = worker_name
     _sender_name = sender_name
     _router = data_router
-    _metrics_reporter = consume metrics_reporter'
     _state_routing_ids = _router.state_routing_ids()
     if is_recovering then
       _phase = _RecoveringDataReceiverPhase(this)
     else
       _phase = _NormalDataReceiverPhase(this)
     end
-
-  fun ref metrics_reporter(): MetricsReporter =>
-    _metrics_reporter
 
   be update_router(router': DataRouter) =>
     _router = router'
@@ -195,6 +186,33 @@ actor DataReceiver is Producer
       _maybe_ack()
     end
 
+  be replay_received(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    if seq_id > _last_id_seen then
+      replay_process_message(r, pipeline_time_spent, seq_id, latest_ts,
+        metrics_id, worker_ingress_ts)
+    end
+
+  fun ref replay_process_message(r: ReplayableDeliveryMsg,
+    pipeline_time_spent: U64, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
+  =>
+    _phase.replay_deliver(r, pipeline_time_spent, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
+
+  fun ref replay_deliver(r: ReplayableDeliveryMsg, pipeline_time_spent: U64,
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    if seq_id > _last_id_seen then
+      ifdef "resilience" and debug then
+        Invariant((seq_id - _last_id_seen) == 1)
+      end
+      _last_id_seen = seq_id
+      _router.replay_route(r, pipeline_time_spent, _id, this, seq_id,
+        latest_ts, metrics_id, worker_ingress_ts)
+    end
+
   fun ref _maybe_ack() =>
     if (_ack_counter % 512) == 0 then
       _ack_latest()
@@ -283,7 +301,7 @@ actor DataReceiver is Producer
   // REGISTER PRODUCERS
   /////////////////////////////////////////////////////////////////////////////
   be register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    if _state_partition_producers.contains(output_id) then
+    if _state_routing_ids.contains(output_id) then
       try
         _state_partition_producers.insert_if_absent(output_id,
           SetIs[RoutingId])?.set(input_id)
@@ -302,7 +320,7 @@ actor DataReceiver is Producer
     _queued_unregister_producers.push((input_id, output_id))
 
   be unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
-    if _state_partition_producers.contains(output_id) then
+    if _state_routing_ids.contains(output_id) then
       try
         let set = _state_partition_producers(output_id)?
         set.unset(input_id)
@@ -395,14 +413,11 @@ actor DataReceiver is Producer
   /////////////////////////////////////////////////////////////////////////////
   // PRODUCER
   /////////////////////////////////////////////////////////////////////////////
-  fun ref has_route_to(c: Consumer): Bool =>
-    false
+  fun ref route_to(c: Consumer): (Route | None) =>
+    None
 
   fun ref next_sequence_id(): SeqId =>
     0
 
   fun ref current_sequence_id(): SeqId =>
     0
-
-  be dispose_with_promise(promise: Promise[None]) =>
-    None

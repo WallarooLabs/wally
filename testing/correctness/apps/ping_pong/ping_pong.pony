@@ -63,23 +63,25 @@ actor Main
     end
 
     try
-      let pipeline =
+      let application =
         recover val
           match app_type
           | Ping =>
-            Wallaroo.source[U8]("Ping",
-              TCPSourceConfig[U8].from_options(PongDecoder,
-                TCPSourceConfigCLIParser(env.args)?(0)?))
-              .to[U8](Pingify)
-              .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
-                TCPSinkConfigCLIParser(env.args)?(0)?))
+            Application("Ping App")
+              .new_pipeline[U8, U8]("Ping",
+                TCPSourceConfig[U8].from_options(PongDecoder,
+                  TCPSourceConfigCLIParser(env.args)?(0)?))
+                .to[U8]({(): Pingify => Pingify})
+                .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
+                  TCPSinkConfigCLIParser(env.args)?(0)?))
           | Pong =>
-            Wallaroo.source[U8]("Pong",
-              TCPSourceConfig[U8].from_options(PingDecoder,
-                TCPSourceConfigCLIParser(env.args)?(0)?))
-              .to[U8](Pongify)
-              .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
-                TCPSinkConfigCLIParser(env.args)?(0)?))
+            Application("Pong App")
+              .new_pipeline[U8, U8]("Pong",
+                TCPSourceConfig[U8].from_options(PingDecoder,
+                  TCPSourceConfigCLIParser(env.args)?(0)?))
+                .to[U8]({(): Pongify => Pongify})
+                .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
+                  TCPSinkConfigCLIParser(env.args)?(0)?))
           else
             @printf[I32]("Use --ping or --pong to start app.\n".cstring())
             error
@@ -89,11 +91,10 @@ actor Main
       match app_type
       | Ping =>
         @printf[I32]("Starting up as Ping\n".cstring())
-        Wallaroo.build_application(env, "Ping", pipeline)
       | Pong =>
         @printf[I32]("Starting up as Pong\n".cstring())
-        Wallaroo.build_application(env, "Pong", pipeline)
       end
+      Startup(env, application, "ping-app")
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end

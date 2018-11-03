@@ -17,12 +17,12 @@ cd ~/wallaroo-tutorial
 This will be our base directory in what follows. Create a directory for the current Wallaroo version and download the Wallaroo Vagrantfile:
 
 ```bash
-mkdir wallaroo-0.5.4
-cd wallaroo-0.5.4
+mkdir wallaroo-{{ book.wallaroo_version }}
+cd wallaroo-{{ book.wallaroo_version }}
 mkdir vagrant
 cd vagrant
 curl -o Vagrantfile -J -L \
-  https://raw.githubusercontent.com/WallarooLabs/wallaroo/0.5.4/vagrant/Vagrantfile
+  https://raw.githubusercontent.com/WallarooLabs/wallaroo/{{ book.wallaroo_version }}/vagrant/Vagrantfile
 ```
 
 ### Windows via Powershell
@@ -40,12 +40,12 @@ cd ~/wallaroo-tutorial
 This will be our base directory in what follows. Create a directory for the current Wallaroo version and download the Wallaroo Vagrantfile:
 
 ```bash
-mkdir wallaroo-0.5.4
-cd wallaroo-0.5.4
+mkdir wallaroo-{{ book.wallaroo_version }}
+cd wallaroo-{{ book.wallaroo_version }}
 mkdir vagrant
 cd vagrant
 Invoke-WebRequest -OutFile Vagrantfile `
-  https://raw.githubusercontent.com/WallarooLabs/wallaroo/0.5.4/vagrant/Vagrantfile
+  https://raw.githubusercontent.com/WallarooLabs/wallaroo/{{ book.wallaroo_version }}/vagrant/Vagrantfile
 ```
 
 ## Installing VirtualBox
@@ -71,7 +71,7 @@ Provisioning should take about 10 to 15 minutes. When it finishes, you will have
 To provision, run the following commands:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-0.5.4/vagrant
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
 vagrant up
 ```
 
@@ -92,7 +92,7 @@ vagrant up
 You can shut down the Vagrant Box by running the following on your host machine:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-0.5.4/vagrant
+cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
 vagrant halt
 ```
 

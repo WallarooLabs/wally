@@ -92,30 +92,32 @@ use "window_codecs"
 actor Main
   new create(env: Env) =>
     try
-      let pipeline = recover val
-        let inputs = Wallaroo.source[U64]("Sequence Window",
+      let part_ar: Array[Key] val = recover
+        let pa = Array[Key]
+        pa.push("0")
+        pa.push("1")
+        consume pa
+      end
+      let partition = Partitions[U64](WindowPartitionFunction, part_ar)
+
+      let application = recover val
+        Application("Sequence Window Printer")
+          .new_pipeline[U64 val, String val]("Sequence Window",
             TCPSourceConfig[U64 val].from_options(U64FramedHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
-
-        inputs
-          .key_by(Constant)
-          .to[U64](MaybeOneToMany)
-          .key_by(ExtractWindow)
-          .to_state[String val, WindowState](ObserveNewValue)
+          .to[U64]({(): MaybeOneToMany => MaybeOneToMany})
+          .to_state_partition[String val,
+            WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
+              partition where multi_worker = true)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?))
       end
-
-      Wallaroo.build_application(env, "Sequence Window Printer", pipeline)
+      Startup(env, application, "sequence_window")
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
 
-primitive Constant
-  fun apply(u: U64): Key =>
-    "constant"
-
-primitive ExtractWindow
+primitive WindowPartitionFunction
   fun apply(u: U64 val): Key =>
     // Always use the same partition
     (u % 2).string()
@@ -151,6 +153,10 @@ primitive MaybeOneToMany is Computation[U64, U64]
       end
     end
 
+class val WindowStateBuilder
+  fun apply(): WindowState => WindowState
+  fun name(): String => "Window State"
+
 class WindowState is State
   var ring: Ring[U64] = Ring[U64].from_array(recover [0; 0; 0; 0] end, 4, 0)
 
@@ -183,12 +189,72 @@ class WindowState is State
     ar.reverse_in_place()
     consume ar
 
+class WindowStateChange is StateChange[WindowState]
+  var _id: U64
+  var _last_value: U64 = 0
+
+  new create(id': U64) =>
+    _id = id'
+
+  fun name(): String => "UpdateWindow"
+  fun id(): U64 => _id
+
+  fun ref update(u: U64 val) =>
+    _last_value = u
+
+  fun apply(state: WindowState) =>
+    state.push(_last_value)
+
+  fun string(state: WindowState): String =>
+    // This is necessary because in the StateChange (rather than
+    // DirectStateChange) scenario, at the time where ObserveNewValue is
+    // returning an output to be encoded for the sink, the state_change hasn't
+    // yet been applied to the state. So if State still has the previous
+    // copmutation's values, and state_change has the next value to be applied,
+    // we need to construct the output of the current computation from the two
+    // in order to return _this computation's output_ to the sink encoder.
+    let ring = state.ring.clone()
+    ring.push(_last_value)
+    try
+      ring.string(where fill = "0")?
+    else
+      "Error: failed to convert sequence window into a string."
+    end
+
+  fun write_log_entry(out_writer: Writer) =>
+    WindowStateEncoder(_last_value, out_writer)
+
+  fun ref read_log_entry(in_reader: Reader) ? =>
+    _last_value = WindowStateDecoder(in_reader)?
+
+class WindowStateChangeBuilder is StateChangeBuilder[WindowState]
+  fun apply(id: U64): StateChange[WindowState] =>
+    WindowStateChange(id)
+
 primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
   fun name(): String => "Observe new value"
 
-  fun apply(u: U64 val, state: WindowState): String val =>
-    state.push(u)
-    state.string()
+  fun apply(u: U64 val,
+    sc_repo: StateChangeRepository[WindowState],
+    state: WindowState): (String val, StateChange[WindowState] ref)
+  =>
+    let state_change: WindowStateChange ref =
+      try
+        sc_repo.lookup_by_name("UpdateWindow")? as WindowStateChange
+      else
+        WindowStateChange(0)
+      end
+    state_change.update(u)
 
-  fun initial_state(): WindowState =>
-    WindowState
+    // TODO: This is ugly since this is where we need to simulate the state
+    // change in order to produce a result
+    (state_change.string(state), state_change)
+
+  fun state_change_builders():
+    Array[StateChangeBuilder[WindowState] val] val
+  =>
+    recover val
+      let scbs = Array[StateChangeBuilder[WindowState]]
+      scbs.push(recover val WindowStateChangeBuilder end)
+      scbs
+    end

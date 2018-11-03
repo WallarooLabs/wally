@@ -25,30 +25,139 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
 
-trait val BasicComputation
+trait BasicComputation
   fun name(): String
 
-trait val BasicStateComputation is BasicComputation
-
-interface val Computation[In: Any val, Out: Any val] is BasicComputation
+interface Computation[In: Any val, Out: Any val] is BasicComputation
   fun apply(input: In): (Out | Array[Out] val | None)
+  fun name(): String
 
-interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
-  BasicStateComputation
+interface StateComputation[In: Any val, Out: Any val, S: State ref] is
+  BasicComputation
   // Return a tuple containing the result of the computation (which is None
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).
-  fun apply(input: In, state: S): (Out | Array[Out] val | None)
+  fun apply(input: In, sc_repo: StateChangeRepository[S], state: S):
+    ((Out | Array[Out] val | None),
+     (StateChange[S] ref | DirectStateChange | None))
 
-  fun initial_state(): S
+  fun name(): String
 
+  fun state_change_builders(): Array[StateChangeBuilder[S]] val
 
-//!@
-// interface val BasicComputationBuilder
-//   fun apply(): BasicComputation val
+trait val StateProcessor[S: State ref] is BasicComputation
+  fun name(): String
+  // Return a tuple containing a Bool indicating whether the message was
+  // finished processing here, a Bool indicating whether a route can still
+  // keep receiving data and the state change (or None if there was
+  // no state change).
+  fun apply(state: S, sc_repo: StateChangeRepository[S],
+    target_id_router: TargetIdRouter, metric_name: String,
+    pipeline_time_spent: U64, producer_id: RoutingId, producer: Producer ref,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64):
+    (Bool, (StateChange[S] ref | DirectStateChange | None), U64,
+      U64, U64)
+  fun state_name(): StateName
+  fun key(): Key
 
-// interface val ComputationBuilder[In: Any val, Out: Any val]
-//   fun apply(): Computation[In, Out] val
+trait KeyWrapper
+  fun key(): Key
 
-// interface val StateBuilder[S: State ref]
-//   fun apply(): S
+class val StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
+  is (StateProcessor[S] & KeyWrapper)
+  let _state_comp: StateComputation[In, Out, S] val
+  let _input: In
+  let _state_name: StateName
+  let _key: Key
+  let _target_ids: Array[RoutingId] val
+
+  new val create(input': In, state_name': StateName, key': Key,
+    state_comp: StateComputation[In, Out, S] val,
+    target_ids: Array[RoutingId] val)
+  =>
+    _state_comp = state_comp
+    _input = input'
+    _state_name = state_name'
+    _key = key'
+    _target_ids = target_ids
+
+  fun state_name(): StateName => _state_name
+  fun key(): Key => _key
+
+  fun apply(state: S, sc_repo: StateChangeRepository[S],
+    target_id_router: TargetIdRouter, metric_name: String,
+    pipeline_time_spent: U64, producer_id: RoutingId, producer: Producer ref,
+    i_msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64):
+    (Bool, (StateChange[S] ref | DirectStateChange | None), U64,
+      U64, U64)
+  =>
+    let computation_start = Time.nanos()
+    let result = _state_comp(_input, sc_repo, state)
+    let computation_end = Time.nanos()
+
+    // It matters that the None check comes first, since Out could be
+    // type None if you always filter/end processing there
+    match result
+    | (None, _) => (true, result._2, computation_start,
+        computation_end, computation_end) // This must come first
+    | (let output: Out, _) =>
+      (let is_finished, let last_ts) =
+        target_id_router.route_with_target_ids[Out](_target_ids, metric_name,
+        pipeline_time_spent, output, producer_id, producer, i_msg_uid,
+        frac_ids, computation_end, metrics_id, worker_ingress_ts)
+
+      (is_finished, result._2, computation_start, computation_end, last_ts)
+      | (let outputs: Array[Out] val, _) =>
+          var this_is_finished = true
+          var this_last_ts = computation_end
+
+          for (frac_id, output) in outputs.pairs() do
+            let o_frac_ids = match frac_ids
+            | None =>
+              recover val
+                Array[U32].init(frac_id.u32(), 1)
+              end
+            | let x: Array[U32 val] val =>
+              recover val
+                let z = Array[U32](x.size() + 1)
+                for xi in x.values() do
+                  z.push(xi)
+                end
+                z.push(frac_id.u32())
+                z
+              end
+            end
+
+            (let f, let ts) =
+              target_id_router.route_with_target_ids[Out](_target_ids,
+                metric_name, pipeline_time_spent, output, producer_id,
+                producer, i_msg_uid, o_frac_ids, computation_end, metrics_id,
+                worker_ingress_ts)
+
+            // we are sending multiple messages, only mark this message as
+            // finished if all are finished
+            if (f == false) then
+              this_is_finished = false
+            end
+
+            this_last_ts = ts
+          end
+          (this_is_finished, result._2, computation_start, computation_end,
+            this_last_ts)
+    else
+      (true, result._2, computation_start, computation_end,
+        computation_end)
+    end
+
+  fun name(): String => _state_comp.name()
+
+interface val BasicComputationBuilder
+  fun apply(): BasicComputation val
+
+interface val ComputationBuilder[In: Any val, Out: Any val]
+  fun apply(): Computation[In, Out] val
+
+interface val StateBuilder[S: State ref]
+  fun apply(): S

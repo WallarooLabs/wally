@@ -25,7 +25,7 @@ You can learn more about [Wallaroo][home-page] from our ["Hello Wallaroo!" blog 
 
 ### What makes Wallaroo unique
 
-Wallaroo is a little different than most stream processing tools. While most require the JVM, Wallaroo can be deployed as a separate binary. This means no more jar files. Wallaroo also isn't locked to just using [Kafka](kafka-link) as a source, use any source you like. Application logic can be written in Python 2, Python 3, or Pony.
+Wallaroo is a little different than most stream processing tools. While most require the JVM, Wallaroo can be deployed as a separate binary. This means no more jar files. Wallaroo also isn't locked to just using [Kafka](kafka-link) as a source, use any source you like. Application logic can be written in either Python 2, Go, or Pony; with more coming soon.
 
 ## Getting Started
 
@@ -41,70 +41,29 @@ Check out our [installation options][installation-options] page to learn more.
 
 ## Usage
 
-Once you've installed Wallaroo, Take a look at some of our examples. A great place to start are our [word_count][word_count] or [market spread][market-spread] examples in [Python](python-examples).
+Once you've installed Wallaroo, Take a look at some of our examples. A great place to start are our [reverse][reverse] or [market spread][market-spread] examples in either [Python](python-examples) or [Go](go-examples).
 
 ```python
 """
-This is a complete example application that receives lines of text and counts each word.
+This is an example application that receives strings as input and outputs the
+reversed strings.
 """
-import string
-import struct
-import wallaroo
 
 def application_setup(args):
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
-
-    lines = wallaroo.source("Split and Count",
-                        wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-    pipeline = (lines
-        .to(split)
-        .key_by(extract_word)
-        .to(count_word)
-        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
-
-    return wallaroo.build_application("Word Count Application", pipeline)
-
-@wallaroo.computation_multi(name="split into words")
-def split(data):
-    punctuation = " !\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~"
-
-    words = []
-
-    for line in data.split("\n"):
-        clean_line = line.lower().strip(punctuation)
-        for word in clean_line.split(" "):
-            clean_word = word.strip(punctuation)
-            words.append(clean_word)
-
-    return words
-
-class WordTotal(object):
-    count = 0
-
-@wallaroo.state_computation(name="count word", state=WordTotal)
-def count_word(word, word_total):
-    word_total.count = word_total.count + 1
-    return WordCount(word, word_total.count)
-
-class WordCount(object):
-    def __init__(self, word, count):
-        self.word = word
-        self.count = count
-
-@wallaroo.key_extractor
-def extract_word(data):
-    return data
+  # see ./examples/python/reverse/ for the full example and how to run it
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     return bs.decode("utf-8")
 
+@wallaroo.computation(name="reverse")
+def reverse(data):
+    return data[::-1]
+
 @wallaroo.encoder
 def encoder(data):
-    output = data.word + " => " + str(data.count) + "\n"
-    print output
-    return output.encode("utf-8")
+    # data is a string
+    return data + "\n"
 ```
 
 ## Documentation

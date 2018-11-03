@@ -19,7 +19,6 @@ Copyright 2018 The Wallaroo Authors.
 use "collections"
 use "wallaroo/core/common"
 use "wallaroo/core/data_channel"
-use "wallaroo/core/metrics"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -35,7 +34,6 @@ actor DataReceivers
   let _auth: AmbientAuth
   let _connections: Connections
   let _worker_name: String
-  let _metrics_reporter: MetricsReporter
 
   var _is_recovering: Bool
   var _initialized: Bool = false
@@ -50,18 +48,15 @@ actor DataReceivers
   var _updated_data_router: Bool = false
 
   new create(auth: AmbientAuth, connections: Connections, worker_name: String,
-    metrics_reporter: MetricsReporter iso, is_recovering: Bool = false)
+    is_recovering: Bool = false)
   =>
     _auth = auth
     _connections = connections
     _worker_name = worker_name
-    _metrics_reporter = consume metrics_reporter
     _data_router =
       DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
         recover Map[StateName, Array[Step] val] end,
-        recover Map[RoutingId, Array[Step] val] end,
-        recover Map[RoutingId, StateName] end,
-        recover Map[RoutingId, RoutingId] end)
+        recover Map[RoutingId, StateName] end)
     _is_recovering = is_recovering
     if not _is_recovering then
       _initialized = true
@@ -96,8 +91,7 @@ actor DataReceivers
         let id = RoutingIdGenerator()
 
         let new_dr = DataReceiver(_auth, id, _worker_name, sender_name,
-          _data_router, _metrics_reporter.clone(), _initialized,
-          _is_recovering)
+          _data_router, _initialized, _is_recovering)
         match _router_registry
         | let rr: RouterRegistry =>
           rr.register_data_receiver(sender_name, new_dr)
@@ -110,6 +104,10 @@ actor DataReceivers
       end
     conn.identify_data_receiver(dr, sender_boundary_id, highest_seq_id)
     _inform_subscribers(boundary_id, dr)
+
+    //!@ TODO: Remove
+  be start_replay_processing() =>
+    None
 
   be start_normal_message_processing() =>
     _initialized = true

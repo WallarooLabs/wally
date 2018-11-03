@@ -157,7 +157,6 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
     `runner_data` is a collection of `RunnerData` instances returned by
     a Cluster context.
     """
-    print("Saved test logs at " + base_dir)
     try:
         makedirs_if_not_exists(base_dir)
         if log_stream:

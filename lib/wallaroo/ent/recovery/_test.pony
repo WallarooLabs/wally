@@ -24,6 +24,7 @@ actor Main is TestList
   new make() => None
 
   fun tag tests(test: PonyTest) =>
+    _TestMessageDeduplicator.make().tests(test)
     test(_TestEventLogDummyCreation)
     test(_TestHexOffset)
     test(_TestFilterLogFiles)

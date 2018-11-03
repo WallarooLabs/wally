@@ -33,18 +33,17 @@ def application_setup(args):
     in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    inputs = wallaroo.source("App",
+    ab = wallaroo.ApplicationBuilder("Parallel Application")
+    ab.new_pipeline("App",
                     wallaroo.TCPSourceConfig(in_host, in_port, decode))
+    ab.to_parallel(classify)
+    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode))
+    return ab.build()
 
-    pipeline = (inputs
-      .to(classify)
-      .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode)))
 
-    return wallaroo.build_application("Parallel App", pipeline)
-
-# @wallaroo.state_computation(name='Batch single entries, emit batchs', state=RowBatches)
-# def batch_rows(row, row_buffer):
-#     return (row_buffer.update_with(row), True)
+@wallaroo.state_computation(name='Batch single entries, emit batchs')
+def batch_rows(row, row_buffer):
+    return (row_buffer.update_with(row), True)
 
 @wallaroo.computation(name="Classify")
 def classify(x):
