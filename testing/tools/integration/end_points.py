@@ -296,7 +296,16 @@ class Sender(StoppableThread):
         self.pause_event.clear()
 
     def send(self, bs):
-        self.sock.sendall(bs)
+        try:
+            self.sock.sendall(bs)
+        except OSError as err:
+            if err.errno == 104 or err.errno == 54:
+                # ECONNRESET on Linux or macOS, respectively
+                is_econnreset = true
+            else:
+                is_econnreset = false
+            logging.info("socket errno {} ECONNRESET {} stopped {}"
+                .format(err.errno, is_econnreset, self.stopped()))
         self.data.append(bs)
         self._bytes_sent += len(bs)
 
