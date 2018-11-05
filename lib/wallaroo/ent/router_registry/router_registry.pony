@@ -457,9 +457,7 @@ actor RouterRegistry
       if not _local_keys.contains(step_group) then
         _local_keys(step_group) = StringSet
       end
-      @printf[I32]("!@ _register_key: Setting key %s. Set size: %s\n".cstring(), key.cstring(), _local_keys(step_group)?.size().string().cstring())
       _local_keys(step_group)?.set(key)
-      @printf[I32]("!@ -- AFTER: Set size: %s\n".cstring(), _local_keys(step_group)?.size().string().cstring())
       (_local_topology_initializer as LocalTopologyInitializer)
         .register_key(step_group, key, checkpoint_id)
     else
