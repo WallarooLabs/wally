@@ -306,6 +306,7 @@ class Sender(StoppableThread):
                 is_econnreset = false
             logging.info("socket errno {} ECONNRESET {} stopped {}"
                 .format(err.errno, is_econnreset, self.stopped()))
+            raise err
         self.data.append(bs)
         self._bytes_sent += len(bs)
 
