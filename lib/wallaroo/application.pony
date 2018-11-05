@@ -39,8 +39,7 @@ primitive Wallaroo
   fun source[In: Any val](pipeline_name: String,
     source_config: TypedSourceConfig[In]): Pipeline[In]
   =>
-    //!@ Do we need the pipeline id anymore?
-    Pipeline[In].from_source(0, pipeline_name, source_config)
+    Pipeline[In].from_source(pipeline_name, source_config)
 
   fun build_application(env: Env, app_name: String,
     pipeline: BasicPipeline val)
@@ -53,7 +52,6 @@ primitive Wallaroo
 
 trait BasicPipeline
   fun graph(): this->Dag[Stage]
-  fun source_id(): USize
   fun is_finished(): Bool
   fun size(): USize
 
@@ -61,8 +59,6 @@ type Stage is (RunnerBuilder | SinkBuilder | Array[SinkBuilder] val |
   SourceConfigWrapper | Shuffle | GroupByKey)
 
 class Pipeline[Out: Any val] is BasicPipeline
-  let _pipeline_id: USize
-
   let _stages: Dag[Stage]
   let _dag_sink_ids: Array[RoutingId]
   var _finished: Bool
@@ -70,10 +66,7 @@ class Pipeline[Out: Any val] is BasicPipeline
   var _last_is_shuffle: Bool
   var _last_is_key_by: Bool
 
-  new from_source(p_id: USize, n: String,
-    source_config: TypedSourceConfig[Out])
-  =>
-    _pipeline_id = p_id
+  new from_source(n: String, source_config: TypedSourceConfig[Out]) =>
     _stages = Dag[Stage]
     _dag_sink_ids = Array[RoutingId]
     _finished = false
@@ -83,14 +76,12 @@ class Pipeline[Out: Any val] is BasicPipeline
     let source_id' = _stages.add_node(sc_wrapper)
     _dag_sink_ids.push(source_id')
 
-  new create(p_id: USize,
-    stages: Dag[Stage] = Dag[Stage],
+  new create(stages: Dag[Stage] = Dag[Stage],
     dag_sink_ids: Array[RoutingId] = Array[RoutingId],
     finished: Bool = false,
     last_is_shuffle: Bool = false,
     last_is_key_by: Bool = false)
   =>
-    _pipeline_id = p_id
     _stages = stages
     _dag_sink_ids = dag_sink_ids
     _finished = finished
@@ -121,11 +112,11 @@ class Pipeline[Out: Any val] is BasicPipeline
         Unreachable()
       end
       _dag_sink_ids.append(pipeline._dag_sink_ids)
-      return Pipeline[(Out | MergeOut)](_pipeline_id, _stages, _dag_sink_ids
+      return Pipeline[(Out | MergeOut)](_stages, _dag_sink_ids
         where last_is_shuffle = _last_is_shuffle,
         last_is_key_by = _last_is_key_by)
     end
-    Pipeline[(Out | MergeOut)](_pipeline_id, _stages, _dag_sink_ids)
+    Pipeline[(Out | MergeOut)](_stages, _dag_sink_ids)
 
   fun ref to[Next: Any val](comp: Computation[Out, Next],
     parallelization: USize = 1): Pipeline[Next]
@@ -142,10 +133,10 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Next](_pipeline_id, _stages, [node_id])
+      Pipeline[Next](_stages, [node_id])
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Next](_pipeline_id, _stages, _dag_sink_ids)
+      Pipeline[Next](_stages, _dag_sink_ids)
     end
 
   fun ref to_state[Next: Any val, S: State ref](
@@ -163,10 +154,10 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Next](_pipeline_id, _stages, [node_id])
+      Pipeline[Next](_stages, [node_id])
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Next](_pipeline_id, _stages, _dag_sink_ids)
+      Pipeline[Next](_stages, _dag_sink_ids)
     end
 
   fun ref to_sink(sink_information: SinkConfig[Out]): Pipeline[Out] =>
@@ -180,11 +171,11 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Out](_pipeline_id, _stages, [node_id]
+      Pipeline[Out](_stages, [node_id]
         where finished = true)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids)
+      Pipeline[Out](_stages, _dag_sink_ids)
     end
 
   fun ref to_sinks(sink_configs: Array[SinkConfig[Out]] box): Pipeline[Out] =>
@@ -205,11 +196,11 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Out](_pipeline_id, _stages, [node_id]
+      Pipeline[Out](_stages, [node_id]
         where finished = true)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids)
+      Pipeline[Out](_stages, _dag_sink_ids)
     end
 
   fun ref key_by(pf: KeyExtractor[Out]): Pipeline[Out] =>
@@ -222,16 +213,14 @@ class Pipeline[Out: Any val] is BasicPipeline
       else
         Fail()
       end
-      Pipeline[Out](_pipeline_id, _stages, [node_id]
+      Pipeline[Out](_stages, [node_id]
         where last_is_key_by = true)
     else
       _try_add_to_finished_pipeline()
-      Pipeline[Out](_pipeline_id, _stages, _dag_sink_ids)
+      Pipeline[Out](_stages, _dag_sink_ids)
     end
 
   fun graph(): this->Dag[Stage] => _stages
-
-  fun source_id(): USize => _pipeline_id
 
   fun size(): USize => _stages.size()
 

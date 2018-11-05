@@ -171,7 +171,6 @@ primitive ExternalMsgEncoder
   =>
     let digest_map = _state_entity_digest(local_keys)
     let seqr = StateEntityQueryEncoder.state_entity_keys(digest_map)
-    @printf[I32]("!@ HERE'S THE StateEntityResponse: %s\n".cstring(), seqr.cstring())
     _encode(_StateEntityQueryResponse(), seqr, wb)
 
   fun stateless_partition_query(wb: Writer = Writer): Array[ByteSeq] val =>
@@ -254,12 +253,6 @@ primitive ExternalMsgEncoder
 
 
       for k in keys.values() do
-        //!@
-        if ks.contains(k) then
-          @printf[I32]("!@ Already have %s!\n".cstring(), k.cstring())
-          Fail()
-        end
-
         ks.push(k)
       end
 
