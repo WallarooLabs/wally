@@ -19,7 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "collections"
 use "net"
 use "wallaroo/core/common"
-use "wallaroo/core/grouping"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
 use "wallaroo/core/sink"
@@ -56,7 +56,7 @@ trait BasicPipeline
   fun size(): USize
 
 type Stage is (RunnerBuilder | SinkBuilder | Array[SinkBuilder] val |
-  SourceConfigWrapper | Shuffle | GroupByKey)
+  SourceConfigWrapper | RandomPartitionerBuilder | KeyPartitionerBuilder)
 
 class Pipeline[Out: Any val] is BasicPipeline
   let _stages: Dag[Stage]
@@ -183,7 +183,7 @@ class Pipeline[Out: Any val] is BasicPipeline
 
   fun ref key_by(pf: KeyExtractor[Out]): Pipeline[Out] =>
     if not _finished then
-      let node_id = _stages.add_node(TypedGroupByKey[Out](pf))
+      let node_id = _stages.add_node(TypedKeyPartitionerBuilder[Out](pf))
       try
         for sink_id in _dag_sink_ids.values() do
           _stages.add_edge(sink_id, node_id)?

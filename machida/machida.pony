@@ -22,6 +22,7 @@ use "pony-kafka"
 use "net"
 
 use "wallaroo"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/sink"
 use "wallaroo/core/sink/connector_sink"
 use "wallaroo/core/sink/kafka_sink"
