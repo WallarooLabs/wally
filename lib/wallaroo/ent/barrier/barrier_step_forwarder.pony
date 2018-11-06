@@ -31,9 +31,6 @@ class BarrierStepForwarder
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
   let _removed_inputs: SetIs[RoutingId] = _removed_inputs.create()
 
-  // !@ Perhaps we need to add invariant wherever inputs and outputs can be
-  // updated in the encapsulating actor to check if barrier is in progress.
-  // <--- This shouldn't matter with a static graph.
   new create(step_id: RoutingId, step: Step ref) =>
     _step_id = step_id
     _step = step

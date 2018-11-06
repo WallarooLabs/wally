@@ -167,7 +167,6 @@ class val MultiRouter is Router
           end
         end
       (let is_f, _) =
-        //!@ OFFENDING LINE
         match router
         | let dr: DirectRouter =>
           dr.route[D](metric_name, pipeline_time_spent, data,
@@ -541,9 +540,7 @@ class val StatePartitionRouter is Router
     if worker == _worker_name then
       try
         let idx = (HashKey(key) % _state_steps.size().u128()).usize()
-        // let idx = HashKey(key).usize() % _state_steps.size()
 
-        // @printf[I32]("!@ Routing State msg to state step idx %s\n".cstring(), idx.string().cstring())
         let s = _state_steps(idx)?
         if producer.has_route_to(s) then
           ifdef "trace" then
@@ -965,9 +962,6 @@ class val StatelessPartitionRouter is Router
           (true, latest_ts)
         end
       else
-        //!@ TODO: We need to simplify this and improve use of ProxyRouters
-        // while avoiding Reachability problem when wrapping ForwardStateless
-        // in Forward
         let msg = ForwardStatelessPartitionMsg[D](_partition_id, _worker_name,
           data, key, metric_name, i_msg_uid, frac_ids)
         let proxy = _proxies(target_worker)?
@@ -980,10 +974,6 @@ class val StatelessPartitionRouter is Router
           Fail()
           (true, latest_ts)
         end
-        //!@
-        // EmptyRouter.route[ForwardStatelessPartitionMsg[D]](metric_name,
-        //   pipeline_time_spent, msg, key, producer_id, producer, i_msg_uid,
-        //   frac_ids, latest_ts, metrics_id, worker_ingress_ts)
       end
     else
       @printf[I32]("Can't find route!\n".cstring())
@@ -1106,7 +1096,7 @@ class val StatelessPartitionRouter is Router
   fun eq(that: box->Router): Bool =>
     match that
     | let o: box->StatelessPartitionRouter =>
-      //!@ We need to figure this out:
+      // !TODO!: We need to figure this out:
       true
     else
       false

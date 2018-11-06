@@ -256,7 +256,8 @@ actor BarrierInitiator is Initializable
           end
         end
 
-        //!@ We need to make sure this gets queued if we're in rollback mode
+        //!TODO!: We need to make sure this gets queued if we're in rollback
+        //mode
         _phase = _BlockingBarrierInitiatorPhase(this, barrier_token,
           wait_for_token)
         _phase.initiate_barrier(barrier_token, result_promise)
@@ -303,19 +304,16 @@ actor BarrierInitiator is Initializable
         Fail()
       end
 
-      try
-        if _workers.size() > 1 then
+      if _workers.size() > 1 then
+        try
           let msg = ChannelMsgEncoder.remote_initiate_barrier(_worker_name,
             barrier_token, _auth)?
           for w in _workers.values() do
             if w != _worker_name then _connections.send_control(w, msg) end
           end
         else
-          //!@
-          None
+          Fail()
         end
-      else
-        Fail()
       end
       _active_barriers.worker_ack_barrier_start(_worker_name, barrier_token)
     end

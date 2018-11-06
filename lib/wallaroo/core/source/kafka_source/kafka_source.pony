@@ -272,7 +272,6 @@ actor KafkaSource[In: Any val] is (Source & KafkaConsumer)
     _notify.update_boundaries(_outgoing_boundaries)
 
   be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
-    //!@ Should we fail here?
     None
 
   be remove_boundary(worker: String) =>

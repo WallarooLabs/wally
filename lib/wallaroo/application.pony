@@ -36,10 +36,10 @@ use "wallaroo_labs/dag"
 use "wallaroo_labs/mort"
 
 primitive Wallaroo
-  fun source[In: Any val](pipeline_name: String,
+  fun source[In: Any val](source_name: String,
     source_config: TypedSourceConfig[In]): Pipeline[In]
   =>
-    Pipeline[In].from_source(pipeline_name, source_config)
+    Pipeline[In].from_source(source_name, source_config)
 
   fun build_application(env: Env, app_name: String,
     pipeline: BasicPipeline val)

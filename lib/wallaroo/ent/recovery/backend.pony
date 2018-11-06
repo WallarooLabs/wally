@@ -367,7 +367,7 @@ primitive _LogDecoder
       error
     end
 
-//!@ Manage this with new checkpoint approach.
+//!TODO!: Manage this with new checkpoint approach.
 class RotatingFileBackend is Backend
   // _basepath identifies the worker
   // For unique file identifier, we use the sum of payload sizes saved as a

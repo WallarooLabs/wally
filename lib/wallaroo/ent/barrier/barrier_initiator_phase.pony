@@ -212,7 +212,7 @@ class _BlockingBarrierInitiatorPhase is _BarrierInitiatorPhase
         @printf[I32]("BlockPhase: Queuing barrier %s!\n".cstring(),
           barrier_token.string().cstring())
       end
-      // !@ We need to ensure that we don't queue checkpoints when we're
+      // TODO: We need to ensure that we don't queue checkpoints when we're
       // rolling back. This is a crude way to test that.
       if not (_wait_for_token > barrier_token) then
         _initiator.queue_barrier(barrier_token, result_promise)
@@ -244,7 +244,7 @@ class _RollbackBarrierInitiatorPhase is _BarrierInitiatorPhase
     if (barrier_token == _token) then
       _initiator.initiate_barrier(barrier_token, result_promise)
     else
-      // !@ TODO: Is it safe to queue barriers that arrive after the rollback
+      // !TODO!: Is it safe to queue barriers that arrive after the rollback
       // token? Or should we be dropping all barriers until rollback is
       // complete?
       _initiator.queue_barrier(barrier_token, result_promise)

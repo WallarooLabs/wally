@@ -29,9 +29,6 @@ class BarrierSinkAcker
   let _barrier_initiator: BarrierInitiator
   let _inputs_blocking: Map[RoutingId, Producer] = _inputs_blocking.create()
 
-  // !@ Perhaps to add invariant wherever inputs can be updated in
-  // the encapsulating actor to check if barrier is in progress. <-- This
-  // shouldn't matter with a static graph.
   new create(sink_id: RoutingId, sink: Sink ref,
     barrier_initiator: BarrierInitiator)
   =>

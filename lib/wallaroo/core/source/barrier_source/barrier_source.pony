@@ -40,13 +40,13 @@ actor BarrierSource is Source
   inject barriers.
   """
   let _source_id: RoutingId
-  // Routers for the pipelines with sources on this worker.
+  // Routers for the sources on this worker.
   var _routers: Map[String, Router] = _routers.create()
-  // Map from identifier to pipeline names to interpret routers we receive.
-  // Because multiple pipelines might route directly to the same state
-  // collection, we map from the id to an array of pipeline names.
-  var _pipeline_identifiers: Map[_PipelineIdentifier, SetIs[String]] =
-    _pipeline_identifiers.create()
+  // Map from identifier to source names to interpret routers we receive.
+  // Because multiple sources might route directly to the same state
+  // collection, we map from the id to an array of source names.
+  var _source_identifiers: Map[_SourceIdentifier, SetIs[String]] =
+    _source_identifiers.create()
 
   let _router_registry: RouterRegistry
   let _event_log: EventLog
@@ -54,12 +54,12 @@ actor BarrierSource is Source
   let _metrics_reporter: MetricsReporter
 
 ////////
-  // Map from pipeline name to outputs for sources in that pipeline.
-  let _pipeline_outputs: Map[String, Map[RoutingId, Consumer]] =
-    _pipeline_outputs.create()
+  // Map from source name to outputs for sources in that source.
+  let _source_outputs: Map[String, Map[RoutingId, Consumer]] =
+    _source_outputs.create()
 
   // All outputs from this BarrierSource. There might be duplicate entries
-  // across the _pipeline_outputs maps, so we use this for actually
+  // across the _source_outputs maps, so we use this for actually
   // sending barriers.
   let _outputs: Map[RoutingId, Consumer] = _outputs.create()
 ///////
@@ -67,8 +67,7 @@ actor BarrierSource is Source
   var _disposed: Bool = false
 
   ////////////////////
-  // !@ Probably remove these
-  // !@ Can we do without this? Probably, since we only send barriers.
+  // TODO: Can we do without this? Probably, since we only send barriers.
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
   ////////////////////
 
@@ -95,18 +94,17 @@ actor BarrierSource is Source
   fun ref has_route_to(c: Consumer): Bool =>
     false
 
-  be register_pipeline(pipeline_name: String, router': Router) =>
+  be register_source(source_name: String, router': Router) =>
     """
-    On this worker, we need to keep track of every pipeline that has at least
+    On this worker, we need to keep track of every source that has at least
     one Source. That's because we need to be able to forward barriers to
-    everything a Source for that pipeline would forward to on this worker.
+    everything a Source for that source would forward to on this worker.
     """
-    let p_identifier = _PipelineIdentifierCreator(router')
+    let s_identifier = _SourceIdentifierCreator(router')
     try
-      _pipeline_outputs.insert_if_absent(pipeline_name,
-        Map[RoutingId, Consumer])?
-      _pipeline_identifiers.insert_if_absent(p_identifier, SetIs[String])?
-      _pipeline_identifiers(p_identifier)?.set(pipeline_name)
+      _source_outputs.insert_if_absent(source_name, Map[RoutingId, Consumer])?
+      _source_identifiers.insert_if_absent(s_identifier, SetIs[String])?
+      _source_identifiers(s_identifier)?.set(source_name)
     else
       Fail()
     end
@@ -120,37 +118,37 @@ actor BarrierSource is Source
       _router_registry.register_stateless_partition_router_subscriber(
         spr.partition_routing_id(), this)
     end
-    _update_router(pipeline_name, router')
+    _update_router(source_name, router')
 
   be update_router(router': Router) =>
-    let pid = _PipelineIdentifierCreator(router')
+    let sid = _SourceIdentifierCreator(router')
     try
-      let pipelines = _pipeline_identifiers(pid)?
-      for p in pipelines.values() do
-        _update_router(p, router')
+      let sources = _source_identifiers(sid)?
+      for s in sources.values() do
+        _update_router(s, router')
       end
     else
       Fail()
     end
 
-  fun ref _update_router(pipeline_name: String, router': Router) =>
-    if _routers.contains(pipeline_name) then
+  fun ref _update_router(source_name: String, router': Router) =>
+    if _routers.contains(source_name) then
       try
-        let old_router = _routers(pipeline_name)?
-        _routers(pipeline_name) = router'
+        let old_router = _routers(source_name)?
+        _routers(source_name) = router'
         for (old_id, outdated_consumer) in
           old_router.routes_not_in(router').pairs()
         do
-          _unregister_output(pipeline_name, old_id, outdated_consumer)
+          _unregister_output(source_name, old_id, outdated_consumer)
         end
       else
         Unreachable()
       end
     else
-      _routers(pipeline_name) = router'
+      _routers(source_name) = router'
     end
     for (c_id, consumer) in router'.routes().pairs() do
-      _register_output(pipeline_name, c_id, consumer)
+      _register_output(source_name, c_id, consumer)
     end
 
   be remove_route_to_consumer(id: RoutingId, c: Consumer) =>
@@ -163,22 +161,22 @@ actor BarrierSource is Source
     """
     None
 
-  fun ref _register_output(pipeline: String, id: RoutingId, c: Consumer) =>
+  fun ref _register_output(source: String, id: RoutingId, c: Consumer) =>
     try
-      if _pipeline_outputs(pipeline)?.contains(id) then
+      if _source_outputs(source)?.contains(id) then
         try
           let old_c = _outputs(id)?
           if old_c is c then
             // We already know about this output.
             return
           end
-          _unregister_output(pipeline, id, old_c)
+          _unregister_output(source, id, old_c)
         else
           Unreachable()
         end
       end
 
-      _pipeline_outputs(pipeline)?(id) = c
+      _source_outputs(source)?(id) = c
       _outputs(id) = c
       match c
       | let ob: OutgoingBoundary =>
@@ -195,15 +193,15 @@ actor BarrierSource is Source
     This method should only be called if we are removing this source from the
     active graph (or on dispose())
     """
-    for (pipeline, outputs) in _pipeline_outputs.pairs() do
+    for (source, outputs) in _source_outputs.pairs() do
       for (id, consumer) in outputs.pairs() do
-        _unregister_output(pipeline, id, consumer)
+        _unregister_output(source, id, consumer)
       end
     end
 
-  fun ref _unregister_output(pipeline: String, id: RoutingId, c: Consumer) =>
+  fun ref _unregister_output(source: String, id: RoutingId, c: Consumer) =>
     try
-      _pipeline_outputs(pipeline)?.remove(id)?
+      _source_outputs(source)?.remove(id)?
       match c
       | let ob: OutgoingBoundary =>
         ob.forward_unregister_producer(_source_id, id, this)
@@ -211,7 +209,7 @@ actor BarrierSource is Source
         c.unregister_producer(_source_id, this)
       end
       var last_one = true
-      for (p, outputs) in _pipeline_outputs.pairs() do
+      for (p, outputs) in _source_outputs.pairs() do
         if outputs.contains(id) then last_one = false end
       end
       if last_one then
@@ -333,11 +331,9 @@ actor BarrierSource is Source
     """
     event_log.ack_rollback(_source_id)
 
-  ///////////////////////
-  // !@ STUFF TO BE REMOVED
-  ///////////////////////
-
-
+  ////////////
+  // PRODUCER
+  ////////////
   fun ref next_sequence_id(): SeqId =>
     _seq_id = _seq_id + 1
 

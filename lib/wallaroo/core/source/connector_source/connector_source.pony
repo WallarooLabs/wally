@@ -183,7 +183,6 @@ actor ConnectorSource[In: Any val] is Source
       _pending_reads()
     end
 
-  //!@
   be first_checkpoint_complete() =>
     """
     In case we pop into existence midway through a checkpoint, we need to
@@ -276,7 +275,6 @@ actor ConnectorSource[In: Any val] is Source
       end
     end
 
-  //!@ rename
   be register_downstreams(promise: Promise[Source]) =>
     promise(this)
 
@@ -321,7 +319,6 @@ actor ConnectorSource[In: Any val] is Source
     _notify.update_boundaries(_outgoing_boundaries)
 
   be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
-    //!@ Should we fail here?
     None
 
   be remove_boundary(worker: String) =>

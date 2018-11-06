@@ -445,7 +445,7 @@ actor CheckpointInitiator is Initializable
       end
       let filepath = FilePath(_auth, _checkpoint_id_file)?
       // TODO: We'll need to rotate this file since it will grow.
-      // !@ Hold onto this in a field so we don't open it every time.
+      // !TODO!: Hold onto this in a field so we don't open it every time.
       let file = AsyncJournalledFile(filepath, _the_journal, _auth,
         _do_local_file_io)
       file.seek_end(0)
@@ -493,13 +493,11 @@ primitive LatestCheckpointId
         (checkpoint_id, rollback_id)
       else
         @printf[I32]("No latest checkpoint id in recovery file.\n".cstring())
-        //!@ What do we do here?
         Fail()
         (0, 0)
       end
     else
       @printf[I32]("Error reading checkpoint id recovery file!".cstring())
-      //!@ What do we do here?
       Fail()
       (0, 0)
     end

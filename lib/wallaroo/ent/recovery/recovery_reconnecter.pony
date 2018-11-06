@@ -249,7 +249,7 @@ class _ReadyForNormalProcessing is _ReconnectPhase
   fun ref add_boundary_reconnect_complete(worker: WorkerName,
     boundary_id: RoutingId)
   =>
-    //!@ Do we need this anymore?
+    // TODO: Do we need this anymore?
     None
 
 class _WaitingForBoundaryCounts is _ReconnectPhase
@@ -327,7 +327,7 @@ primitive CheckCounts[Counted]
   =>
     try
       for (key, count) in expected_counts.pairs() do
-        //!@ Safe??
+        // !TODO!: Is it safe to allow this invariant to be violated?
         // ifdef debug then
         //   Invariant(counted(key)?.size() <= count)
         // end

@@ -20,28 +20,28 @@ use "collections"
 use "wallaroo/core/topology"
 
 
-primitive _PipelineIdentifierCreator
-  fun apply(router: Router): _PipelineIdentifier =>
+primitive _SourceIdentifierCreator
+  fun apply(router: Router): _SourceIdentifier =>
     match router
     | let pr: StatePartitionRouter =>
-      _PartitionRouterPId(pr)
+      _PartitionRouterSId(pr)
     | let spr: StatelessPartitionRouter =>
-      _StatelessPartitionRouterPId(spr)
+      _StatelessPartitionRouterSId(spr)
     else
-      _UnchangingRouterPId(router)
+      _UnchangingRouterSId(router)
     end
 
-trait val _PipelineIdentifier is (Hashable & Equatable[_PipelineIdentifier])
+trait val _SourceIdentifier is (Hashable & Equatable[_SourceIdentifier])
 
-class val _UnchangingRouterPId is _PipelineIdentifier
+class val _UnchangingRouterSId is _SourceIdentifier
   let _router: Router
 
   new val create(r: Router) =>
     _router = r
 
-  fun eq(that: box->_PipelineIdentifier): Bool =>
+  fun eq(that: box->_SourceIdentifier): Bool =>
     match that
-    | let ir: _UnchangingRouterPId =>
+    | let ir: _UnchangingRouterSId =>
       _router == ir._router
     else
       false
@@ -50,15 +50,15 @@ class val _UnchangingRouterPId is _PipelineIdentifier
   fun hash(): USize =>
     _router.hash()
 
-class val _PartitionRouterPId is _PipelineIdentifier
+class val _PartitionRouterSId is _SourceIdentifier
   let _router: StatePartitionRouter
 
   new val create(pr: StatePartitionRouter) =>
     _router = pr
 
-  fun eq(that: box->_PipelineIdentifier): Bool =>
+  fun eq(that: box->_SourceIdentifier): Bool =>
     match that
-    | let ir: _PartitionRouterPId =>
+    | let ir: _PartitionRouterSId =>
       _router.step_group() == ir._router.step_group()
     else
       false
@@ -67,15 +67,15 @@ class val _PartitionRouterPId is _PipelineIdentifier
   fun hash(): USize =>
     _router.hash()
 
-class val _StatelessPartitionRouterPId is _PipelineIdentifier
+class val _StatelessPartitionRouterSId is _SourceIdentifier
   let _router: StatelessPartitionRouter
 
   new val create(spr: StatelessPartitionRouter) =>
     _router = spr
 
-  fun eq(that: box->_PipelineIdentifier): Bool =>
+  fun eq(that: box->_SourceIdentifier): Bool =>
     match that
-    | let ir: _StatelessPartitionRouterPId =>
+    | let ir: _StatelessPartitionRouterSId =>
       _router.partition_routing_id() == ir._router.partition_routing_id()
     else
       false

@@ -165,8 +165,8 @@ class _RollbackLocalKeys is _RecoveryPhase
       @printf[I32]("_RollbackLocalKeys rcvd ack from %s\n".cstring(),
         w.cstring())
     end
-    //!@ Should we just ignore misses here (which indicate an overlapping
-    // recovery)?
+    // !TODO!: Should we just ignore misses here (which indicate an
+    // overlapping recovery)?
     if checkpoint_id == _checkpoint_id then
       _acked_workers.set(w)
       _check_completion()
