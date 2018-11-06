@@ -195,7 +195,7 @@ class val LocalTopology
     (_app_name == that._app_name) and
       (_worker_name == that._worker_name) and
       (_graph is that._graph) and
-      //!@
+      // TODO: Add further conditions to this eq test
       // MapEquality2[U128, ProxyAddress, U128](_step_map, that._step_map)
       //   and
       // MapEquality[String, StateSubpartitions](_state_builders,
@@ -737,9 +737,6 @@ actor LocalTopologyInitializer is LayoutInitializer
               _connections.register_disposable(sink)
               _initializables.set(sink)
 
-              //!@ I don't think we need this
-              // built_stateless_steps(next_id) = [sink]
-
               data_routes(next_id) = sink
 
               let sink_router = DirectRouter(next_id, sink)
@@ -779,7 +776,7 @@ actor LocalTopologyInitializer is LayoutInitializer
             // SOURCE DATA
             /////////////////
               let next_id = source_data.id()
-              let pipeline_name = source_data.pipeline_name()
+              let source_name = source_data.name()
 
               let out_ids: Array[RoutingId] val =
                 try
@@ -827,8 +824,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 barrier_source = b_source
               end
               try
-                (barrier_source as BarrierSource).register_pipeline(
-                  pipeline_name, out_router)
+                (barrier_source as BarrierSource).register_source(
+                  source_name, out_router)
               else
                 Unreachable()
               end
@@ -837,8 +834,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 _metrics_conn)
 
               let listen_auth = TCPListenAuth(_auth)
-              @printf[I32](("----Creating source for " + pipeline_name +
-                " pipeline with " + source_data.name() + "----\n").cstring())
+              @printf[I32](("----Creating source " + source_name +
+                " with " + source_data.computations_name() + "----\n").cstring())
 
               // Set up SourceListener builders
               let source_runner_builder = source_data.runner_builder()
@@ -846,7 +843,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               let sl_builder_builder =
                 source_data.source_listener_builder_builder()
               let sl_builder = sl_builder_builder(_worker_name,
-                pipeline_name, source_runner_builder, partitioner_builder,
+                source_name, source_runner_builder, partitioner_builder,
                 out_router, _metrics_conn, consume source_reporter,
                 _router_registry, _outgoing_boundary_builders, _event_log,
                 _auth, this, _recovering)
@@ -1073,7 +1070,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     else
       @printf[I32]("The same Initializable reported being initialized twice\n"
         .cstring())
-      //!@ Bring this back and solve bug
+      // !TODO!: Bring this back and solve bug
       // Fail()
     end
 
@@ -1115,9 +1112,6 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   be report_event_log_ready_to_work() =>
     _event_log_ready_to_work = true
-    // This should only get called after all initializables have reported
-    // they are ready to work, at which point we would have told the EventLog
-    // to start pipeline logging.
     Invariant(_ready_to_work.size() == _initializables.size())
 
     if _recovery_ready_to_work then

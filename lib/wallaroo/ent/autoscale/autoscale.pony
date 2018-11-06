@@ -474,8 +474,6 @@ class _WaitingForJoiners is _AutoscalePhase
   let _joining_worker_count: USize
   let _connected_joiners: Map[WorkerName, (TCPConnection, LocalTopology)] =
     _connected_joiners.create()
-  //!@
-  let _initialized_workers: StringSet = _initialized_workers.create()
   var _newstep_group_routing_ids:
     Map[WorkerName, Map[RoutingId, RoutingId] val] iso =
     recover Map[WorkerName, Map[RoutingId, RoutingId] val] end
@@ -732,7 +730,6 @@ class _WaitingToConnectToJoiners is _AutoscalePhase
 
   fun name(): String => "WaitingToConnectToJoiners"
 
-  //!@ What do we do here with step_group_routing_ids?
   fun ref joining_worker_initialized(worker: WorkerName,
     step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
@@ -858,10 +855,6 @@ class _JoiningWorker is _AutoscalePhase
 
   fun ref join_migration_initiated(checkpoint_id: CheckpointId) =>
     None
-
-//!2
-  // fun ref ready_for_join_migration() =>
-  //   None
 
   fun ref autoscale_complete() =>
     _autoscale.mark_autoscale_complete()

@@ -102,8 +102,6 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     _router_registry = router_registry
     _id = id
 
-    @printf[I32]("!@ Spinning up Step %s\n".cstring(), _id.string().cstring())
-
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _outgoing_boundaries(worker) = boundary
     end
@@ -488,7 +486,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
           end
         | let dmp: DisposedStepMessageProcessor => None
         else
-          // !@ Should barriers be possible in other states?
+          // TODO: Should barriers be possible in other states?
           Fail()
         end
       end

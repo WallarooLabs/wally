@@ -117,7 +117,6 @@ actor GenSource[V: Any val] is Source
     layout_initializer: LayoutInitializer,
     metrics_reporter': MetricsReporter iso, router_registry: RouterRegistry)
   =>
-    @printf[I32]("!@ Spinning up GenSource %s\n".cstring(), source_id.string().cstring())
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
 
@@ -205,7 +204,7 @@ actor GenSource[V: Any val] is Source
           pipeline_time_spent)
         _metrics_reporter.worker_metric(_pipeline_name, time_spent)
       end
-    // !@ USE TIMER
+      // TODO: Use Timer instead of processing as fast as possible
       next_message()
     else
       @printf[I32]("GenSource produced a None. Stopping GenSource.\n".cstring())
@@ -298,7 +297,6 @@ actor GenSource[V: Any val] is Source
       end
     end
 
-  //!@ rename
   be register_downstreams(promise: Promise[Source]) =>
     promise(this)
 
@@ -342,7 +340,6 @@ actor GenSource[V: Any val] is Source
     end
 
   be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
-    //!@ Should we fail here?
     None
 
   be remove_boundary(worker: String) =>
@@ -441,7 +438,10 @@ actor GenSource[V: Any val] is Source
   // BARRIER
   //////////////
   be initiate_barrier(token: BarrierToken) =>
-    @printf[I32]("!@ GenSource received initiate_barrier %s\n".cstring(), token.string().cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("GenSource received initiate_barrier %s\n".cstring(),
+        token.string().cstring())
+    end
     if not _is_pending then
       _initiate_barrier(token)
     end

@@ -94,8 +94,10 @@ actor ApplicationDistributor is Distributor
 
       let logical_graph = _pipeline.graph()
 
-      //!@
-      @printf[I32]("Logical Graph:\n%s\n".cstring(), logical_graph.string().cstring())
+      ifdef debug then
+        @printf[I32]("Logical Graph:\n%s\n".cstring(),
+          logical_graph.string().cstring())
+      end
 
       // Traverse graph from sinks to sources, moving any key_by stages back
       // to immediate upstream nodes.
@@ -110,12 +112,9 @@ actor ApplicationDistributor is Distributor
       for sink_node in logical_graph.sinks() do
         match sink_node.value
         | let sb: SinkBuilder =>
-          // !@ Passing in app_name for pipeline name
-          let egress_builder = EgressBuilder(_app_name, sink_node.id,
-            sb)
+          let egress_builder = EgressBuilder(_app_name, sink_node.id, sb)
           interm_graph.add_node(egress_builder, sink_node.id)
         | let sbs: Array[SinkBuilder] val =>
-          // !@ Passing in app_name for pipeline name
           let multi_sink_builder = MultiSinkBuilder(_app_name, sink_node.id,
             sbs)
           interm_graph.add_node(multi_sink_builder, sink_node.id)
@@ -164,9 +163,8 @@ actor ApplicationDistributor is Distributor
               // If this stage is preceded by a key_by, this will be
               // ignored. If not, then this default will be used.
               input_partitioner_builder = SinglePartitionerBuilder
-              StepBuilder(_app_name, _app_name, rb,
-                node.id, rb.routing_group(), partitioner_builder,
-                rb.is_stateful())
+              StepBuilder(_app_name, rb, node.id, rb.routing_group(),
+                partitioner_builder, rb.is_stateful())
             else
               // We are going to try to coalesce this onto the previous
               // node, and continue in this way one predecessor node a time,
@@ -213,7 +211,7 @@ actor ApplicationDistributor is Distributor
                   // node is a RunnerBuilder.
                   | let i_rb: RunnerBuilder =>
                     // We only coalesce stateless computations.
-                    // !@ TODO: There is no longer any reason not to coalesce
+                    // !TODO!: There is no longer any reason not to coalesce
                     // these onto a stateful computation and stop there. But
                     // if it's stateful, we shouldn't add its inputs to the
                     // input array.
@@ -254,8 +252,8 @@ actor ApplicationDistributor is Distributor
 
               let new_rb = RunnerSequenceBuilder(consume coalesced_comps,
                 parallelism)
-              StepBuilder(_app_name, _app_name, new_rb, node.id,
-                rb.routing_group(), partitioner_builder, rb.is_stateful())
+              StepBuilder(_app_name, new_rb, node.id, rb.routing_group(),
+                partitioner_builder, rb.is_stateful())
             end
 
           interm_graph.add_node(s_builder, node.id)
@@ -268,7 +266,8 @@ actor ApplicationDistributor is Distributor
             consume worker_map
 
           for i_node in node.ins() do
-            // !@ Does this check make sense, or should we override sometimes?
+            // TODO: Does this check make sense, or should we override
+            // sometimes?
             if not partitioner_builders.contains(i_node.id) then
               partitioner_builders(i_node.id) = input_partitioner_builder
             end
@@ -350,8 +349,9 @@ actor ApplicationDistributor is Distributor
 
       let initializer_graph = interm_graph.clone()?
 
-      //!@
-      @printf[I32]("Initializer Graph:\n%s\n".cstring(), initializer_graph.string().cstring())
+      ifdef debug then
+        @printf[I32]("Initializer Graph:\n%s\n".cstring(), initializer_graph.string().cstring())
+      end
 
       let worker_graph = interm_graph.clone()?
 

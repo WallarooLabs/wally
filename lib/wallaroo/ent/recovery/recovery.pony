@@ -126,8 +126,8 @@ actor Recovery
 
     if overriden then
       _recovery_reconnecter.abort_early(worker)
-      // !@ We should probably ensure DataReceivers has acked an override if
-      // that happens before acking.
+      // !TODO!: We should probably ensure DataReceivers has acked an
+      // override if that happens before acking.
       try
         let msg = ChannelMsgEncoder.ack_recovery_initiated(token, _worker_name,
           _auth)?
@@ -273,7 +273,7 @@ actor Recovery
     | let lti: LocalTopologyInitializer =>
       lti.report_recovery_ready_to_work()
 
-      //!@ Do we still want to do this?
+      // !TODO!: Do we still want to do this?
       _event_log.quick_initialize(lti)
     else
       Fail()

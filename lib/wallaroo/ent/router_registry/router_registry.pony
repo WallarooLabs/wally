@@ -43,8 +43,6 @@ use "wallaroo_labs/mort"
 use "wallaroo_labs/query"
 use "wallaroo_labs/string_set"
 
-//!@ clean this up
-type _TargetIdRouterUpdatable is Step
 
 type _RouterSub is (BoundaryUpdatable & RouterUpdatable)
 
@@ -69,7 +67,6 @@ actor RouterRegistry
   let _data_receiver_map: Map[WorkerName, DataReceiver] =
     _data_receiver_map.create()
 
-  //!@
   // TODO: Remove this. This is here to be threaded to joining workers as
   // the primary checkpoint initiator worker. We need to enable this role to
   // shift to other workers, and this means we need our CheckpointInitiator
@@ -621,7 +618,7 @@ actor RouterRegistry
   be stop_the_world(exclusions: Array[WorkerName] val =
     recover Array[WorkerName] end)
   =>
-    // !@ TODO: What do we do if one is already in progress?
+    // !TODO!: What do we do if one is already in progress?
     _stop_the_world(exclusions)
 
   be resume_the_world(initiator: WorkerName) =>
@@ -1445,13 +1442,13 @@ actor RouterRegistry
     for w in leaving_workers.values() do
       _barrier_initiator.remove_worker(w)
       _checkpoint_initiator.remove_worker(w)
-      //!@ ?? Do we need this ??
+      // !TODO!: Do we need this ??
       _unmute_request(w)
     end
     for (step_group, pr) in _partition_routers.pairs() do
       let new_pr = pr.recalculate_hash_partitions_for_shrink(leaving_workers)
       _partition_routers(step_group) = new_pr
-      //!@ Do we need to keep distributing like this?
+      // !TODO!: Do we need to keep distributing like this?
       _distribute_partition_router(new_pr)
     end
     _connections.request_cluster_unmute()

@@ -545,7 +545,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         })
         _checkpoint_initiator.initiate_rollback(promise, m.sender)
       | let m: PrepareForRollbackMsg =>
-        // !@ TODO: This promise can be used for acking. Right now it's a
+        // TODO: This promise can be used for acking. Right now it's a
         // placeholder.
         let promise = Promise[None]
         _event_log.prepare_for_rollback(promise, _checkpoint_initiator)

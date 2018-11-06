@@ -45,6 +45,8 @@ actor _TestRouterEquality is TestList
     // test(_TestLatestAfterNew)
     // test(_TestLatestWithoutNew)
 
+// TODO: Either bring these back by reevaluating and potentially rewriting or
+// remove these tests.
 // class iso _TestTargetIdRouterEquality is UnitTest
 //   """
 //   Test that updating TargetIdRouter creates the expected changes
@@ -257,7 +259,6 @@ actor _TestRouterEquality is TestList
 //       recover Map[U64, (Step | ProxyRouter)] end, 1)
 
 // actor _Cluster is Cluster
-//   //!@
 //   // be notify_cluster_of_new_key(key: Key,
 //   //   state_name: String, exclusions: Array[String] val =
 //   //   recover Array[String] end)

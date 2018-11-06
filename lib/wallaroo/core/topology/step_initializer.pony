@@ -40,7 +40,6 @@ type StepInitializer is (StepBuilder | SourceData | EgressBuilder |
 
 class val StepBuilder
   let _app_name: String
-  let _pipeline_name: String
   let _routing_group: (RoutingId)
   let _runner_builder: RunnerBuilder
   let _id: RoutingId
@@ -48,13 +47,11 @@ class val StepBuilder
   let _is_stateful: Bool
   let _parallelism: USize
 
-  new val create(app_name: String,
-    pipeline_name': String, r: RunnerBuilder, id': RoutingId,
+  new val create(app_name: String, r: RunnerBuilder, id': RoutingId,
     routing_group': RoutingId,
     partitioner_builder': PartitionerBuilder = SinglePartitionerBuilder, is_stateful': Bool = false)
   =>
     _app_name = app_name
-    _pipeline_name = pipeline_name'
     _runner_builder = r
     _routing_group = routing_group'
     _id = id'
@@ -64,7 +61,6 @@ class val StepBuilder
 
   fun name(): String => _runner_builder.name()
   fun routing_group(): RoutingId => _routing_group
-  fun pipeline_name(): String => _pipeline_name
   fun id(): RoutingId => _id
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => _is_stateful
@@ -89,32 +85,27 @@ class val StepBuilder
 
 class val SourceData
   let _id: RoutingId
-  let _pipeline_name: String
   let _name: String
+  let _comp_name: String
   let _runner_builder: RunnerBuilder
   let _partitioner_builder: PartitionerBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
 
-  new val create(id': RoutingId, p_name: String, r: RunnerBuilder,
+  new val create(id': RoutingId, name': String, r: RunnerBuilder,
     s: SourceListenerBuilderBuilder, partitioner_builder': PartitionerBuilder)
   =>
     _id = id'
-    _pipeline_name = p_name
-    _name = "| " + _pipeline_name + " source | " + r.name() + "|"
+    _name = name'
+    _comp_name = "| " + _name + " source | " + r.name() + "|"
     _runner_builder = r
     _partitioner_builder = partitioner_builder'
     _source_listener_builder_builder = s
 
-    //!@
-    match partitioner_builder'
-    | let gbk: KeyPartitionerBuilder => @printf[I32]("!@Source %s got KeyPartitionerBuilder partitioner_builder!\n".cstring(), _pipeline_name.cstring())
-    else @printf[I32]("!@Source %s did NOT got KeyPartitionerBuilder partitioner_builder!\n".cstring(), _pipeline_name.cstring()) end
-
   fun runner_builder(): RunnerBuilder => _runner_builder
 
   fun name(): String => _name
+  fun computations_name(): String => _comp_name
   fun routing_group(): (RoutingId | None) => None
-  fun pipeline_name(): String => _pipeline_name
   fun id(): RoutingId => _id
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => false
@@ -127,21 +118,17 @@ class val SourceData
 
 class val EgressBuilder
   let _name: String
-  let _pipeline_name: String
   let _id: RoutingId
   let _sink_builder: SinkBuilder
 
-  new val create(pipeline_name': String, id': RoutingId,
-    sink_builder: SinkBuilder)
+  new val create(app_name: String, id': RoutingId, sink_builder: SinkBuilder)
   =>
-    _pipeline_name = pipeline_name'
-    _name = _pipeline_name + " sink"
+    _name = app_name + " sink"
     _id = id'
     _sink_builder = sink_builder
 
   fun name(): String => _name
   fun routing_group(): (RoutingId | None) => None
-  fun pipeline_name(): String => _pipeline_name
   fun id(): RoutingId => _id
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
@@ -161,21 +148,18 @@ class val EgressBuilder
 
 class val MultiSinkBuilder
   let _name: String
-  let _pipeline_name: String
   let _id: RoutingId
   let _sink_builders: Array[SinkBuilder] val
 
-  new val create(pipeline_name': String, id': RoutingId,
+  new val create(app_name: String, id': RoutingId,
     sink_builders: Array[SinkBuilder] val)
   =>
-    _pipeline_name = pipeline_name'
-    _name = _pipeline_name + " sinks"
+    _name = app_name + " sinks"
     _id = id'
     _sink_builders = sink_builders
 
   fun name(): String => _name
   fun routing_group(): (RoutingId | None) => None
-  fun pipeline_name(): String => _pipeline_name
   fun id(): RoutingId => _id
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false

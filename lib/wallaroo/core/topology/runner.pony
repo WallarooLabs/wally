@@ -294,11 +294,9 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     _canonical_state = _state_comp.initial_state()
     _next_runner = consume next_runner
     _event_log = event_log
-    //!@
     _step_id = None
     _auth = auth
 
-  //!@
   fun ref set_step_id(id: RoutingId) =>
     _step_id = id
 
@@ -317,7 +315,6 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         try
           _state_map(key)?
         else
-          @printf[I32]("!@ Creating state for key %s\n".cstring(), key.cstring())
           match producer
           | let s: Step ref =>
             s.register_key(_step_group, key)

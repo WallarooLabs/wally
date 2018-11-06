@@ -334,7 +334,6 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _outgoing_boundary_builders = consume new_builders
 
   be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
-    //!@ Should we fail here?
     None
 
   be update_boundary_builders(

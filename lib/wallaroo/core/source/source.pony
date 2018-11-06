@@ -48,6 +48,7 @@ class val SourceConfigWrapper
 
 trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
   StatusReporter)
+  // TODO: Rename register_downstreams
   be register_downstreams(promise: Promise[Source])
   be update_router(router: StatePartitionRouter)
   be remove_route_to_consumer(id: RoutingId, c: Consumer)
@@ -63,6 +64,8 @@ trait tag Source is (Producer & DisposableActor & BoundaryUpdatable &
     host: String, service: String)
   // Called to indicate that an in progress checkpoint when Source was created
   // is complete.
+  // TODO: We can probably remove this with some improvements to our
+  // initialization order of events.
   be first_checkpoint_complete()
 
 trait tag SourceListener is (DisposableActor & BoundaryUpdatable)

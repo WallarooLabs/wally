@@ -182,7 +182,6 @@ actor TCPSource[In: Any val] is Source
       _pending_reads()
     end
 
-  //!@
   be first_checkpoint_complete() =>
     """
     In case we pop into existence midway through a checkpoint, we need to
@@ -206,7 +205,6 @@ actor TCPSource[In: Any val] is Source
       | let pr: StatePartitionRouter =>
         pr.update_boundaries(_auth, _outgoing_boundaries)
       | let spr: StatelessPartitionRouter =>
-        @printf[I32]("!@ TCPSource update_router StatelessPartitionRouter\n".cstring())
         spr.update_boundaries(_outgoing_boundaries)
       else
         router'
@@ -276,7 +274,6 @@ actor TCPSource[In: Any val] is Source
       end
     end
 
-  //!@ rename
   be register_downstreams(promise: Promise[Source]) =>
     promise(this)
 
@@ -321,7 +318,6 @@ actor TCPSource[In: Any val] is Source
     _notify.update_boundaries(_outgoing_boundaries)
 
   be add_boundaries(bs: Map[String, OutgoingBoundary] val) =>
-    //!@ Should we fail here?
     None
 
   be remove_boundary(worker: String) =>

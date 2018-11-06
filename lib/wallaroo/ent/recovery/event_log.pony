@@ -91,7 +91,6 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
   var _resilients_to_checkpoint: SetIs[RoutingId] =
     _resilients_to_checkpoint.create()
   var _rotating: Bool = false
-  //!@ What do we do with this?
   var _backend_bytes_after_checkpoint: USize
   var _disposed: Bool = false
 
@@ -315,8 +314,8 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
     end
     match origin
     | let r: Recovery =>
-      //!@ Currently we are immediately moving on without checking for other
-      //worker acks. Is this ok?
+      // !TODO!: Currently we are immediately moving on without checking for
+      // other worker acks. Is this ok?
       r.rollback_prep_complete()
     | let p: Promise[None] =>
       p(None)

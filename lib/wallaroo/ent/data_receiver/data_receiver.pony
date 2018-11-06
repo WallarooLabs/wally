@@ -320,9 +320,9 @@ actor DataReceiver is Producer
     end
     if seq_id > _last_id_seen then
       match barrier_token
-      //!@ This isn't good enough. We need to ensure that we've been overriden
-      // to make this change back from recovery phase. As it stands, this
-      // introduces a race condition if we receive an old resume token in
+      // !TODO!: This isn't good enough. We need to ensure that we've been
+      // overriden to make this change back from recovery phase. As it stands,
+      // this introduces a race condition if we receive an old resume token in
       // flight before we recovered.
       | let srt: CheckpointRollbackResumeBarrierToken =>
         _phase = _NormalDataReceiverPhase(this)
@@ -340,10 +340,6 @@ actor DataReceiver is Producer
     barrier_token: BarrierToken, seq_id: SeqId)
   =>
     if seq_id > _last_id_seen then
-      //!@
-      // ifdef debug then
-      //   Invariant((seq_id - _last_id_seen) == 1)
-      // end
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
       match barrier_token
