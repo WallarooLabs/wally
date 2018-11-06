@@ -21,7 +21,7 @@ use "files"
 use "net"
 use "wallaroo"
 use "wallaroo/core/common"
-use "wallaroo/core/grouping"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/invariant"
 use "wallaroo/core/messages"
 use "wallaroo/core/metrics"
@@ -66,8 +66,10 @@ actor ApplicationDistributor is Distributor
     worker_count: USize, worker_names: Array[WorkerName] val,
     initializer_name: WorkerName)
   =>
-    @printf[I32]("---------------------------------------------------------\n".cstring())
-    @printf[I32]("vvvvvv|Initializing Topologies for Workers|vvvvvv\n\n".cstring())
+    @printf[I32]("---------------------------------------------------------\n"
+      .cstring())
+    @printf[I32]("vvvvvv|Initializing Topologies for Workers|vvvvvv\n\n"
+      .cstring())
 
     try
       let all_workers_trn = recover trn Array[WorkerName] end
@@ -102,7 +104,7 @@ actor ApplicationDistributor is Distributor
       let frontier = Array[U128]
       let processed = SetIs[U128]
       let edges = Map[U128, SetIs[U128]]
-      let groupers = Map[U128, GrouperBuilder]
+      let partitioner_builders = Map[U128, PartitionerBuilder]
 
       // Add Wallaroo sinks to intermediate graph
       for sink_node in logical_graph.sinks() do
@@ -139,18 +141,19 @@ actor ApplicationDistributor is Distributor
         if processed.contains(node.id) then continue end
         match node.value
         | let rb: RunnerBuilder =>
-          let grouper =
-            if groupers.contains(node.id) then
-              groupers(node.id)?
+          let partitioner_builder =
+            if partitioner_builders.contains(node.id) then
+              partitioner_builders(node.id)?
             else
-              OneToOneGroup
+              SinglePartitionerBuilder
             end
 
-          // We initially set this to Shuffle. If this is a stateless
-          // computation then we'll use Shuffle. If it's a state computation
+          // We initially set this to RandomPartitionerBuilder. If this is a stateless
+          // computation then we'll use RandomPartitionerBuilder. If it's a state computation
           // and there's no prior key_by, then we use direct routing, set
           // later by using None.
-          var input_grouper: GrouperBuilder = Shuffle
+          var input_partitioner_builder: PartitionerBuilder =
+            RandomPartitionerBuilder
 
           // Create the StepBuilder for this stage. If the stage is a state
           // computation, then we can simply create it. If the stage is
@@ -160,9 +163,10 @@ actor ApplicationDistributor is Distributor
             if rb.is_stateful() then
               // If this stage is preceded by a key_by, this will be
               // ignored. If not, then this default will be used.
-              input_grouper = OneToOneGroup
+              input_partitioner_builder = SinglePartitionerBuilder
               StepBuilder(_app_name, _app_name, rb,
-                node.id, rb.routing_group(), grouper, rb.is_stateful())
+                node.id, rb.routing_group(), partitioner_builder,
+                rb.is_stateful())
             else
               // We are going to try to coalesce this onto the previous
               // node, and continue in this way one predecessor node a time,
@@ -251,7 +255,7 @@ actor ApplicationDistributor is Distributor
               let new_rb = RunnerSequenceBuilder(consume coalesced_comps,
                 parallelism)
               StepBuilder(_app_name, _app_name, new_rb, node.id,
-                rb.routing_group(), grouper, rb.is_stateful())
+                rb.routing_group(), partitioner_builder, rb.is_stateful())
             end
 
           interm_graph.add_node(s_builder, node.id)
@@ -265,8 +269,8 @@ actor ApplicationDistributor is Distributor
 
           for i_node in node.ins() do
             // !@ Does this check make sense, or should we override sometimes?
-            if not groupers.contains(i_node.id) then
-              groupers(i_node.id) = input_grouper
+            if not partitioner_builders.contains(i_node.id) then
+              partitioner_builders(i_node.id) = input_partitioner_builder
             end
 
             if not frontier.contains(i_node.id) and
@@ -289,9 +293,9 @@ actor ApplicationDistributor is Distributor
                 .set(node.id)
             end
           end
-        | let gbk: GroupByKey =>
+        | let gbk: KeyPartitionerBuilder =>
           for i_node in node.ins() do
-            groupers(i_node.id) = gbk
+            partitioner_builders(i_node.id) = gbk
 
             // Reroute inputs to our outputs.
             for edge_target in node.outs() do
@@ -313,17 +317,17 @@ actor ApplicationDistributor is Distributor
         | let sc_wrapper: SourceConfigWrapper =>
           let source_name = sc_wrapper.name()
           let sc = sc_wrapper.source_config()
-          let grouper =
-            if groupers.contains(node.id) then
-              groupers(node.id)?
+          let partitioner_builder =
+            if partitioner_builders.contains(node.id) then
+              partitioner_builders(node.id)?
             else
-              OneToOneGroup
+              SinglePartitionerBuilder
             end
 
           let r_builder = RunnerSequenceBuilder(
             recover Array[RunnerBuilder] end where parallelism' = 0)
           let source_data = SourceData(node.id, source_name, r_builder,
-            sc.source_listener_builder_builder(), grouper)
+            sc.source_listener_builder_builder(), partitioner_builder)
 
           interm_graph.add_node(source_data, node.id)
         else

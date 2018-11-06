@@ -23,25 +23,30 @@ use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 
-trait val GrouperBuilder
-  fun apply(): Grouper
+// The user defines a KeyExtractor for partitioning by key
+interface val KeyExtractor[In: Any val]
+  fun apply(input: In): Key
 
-trait Grouper
+
+trait val PartitionerBuilder
+  fun apply(): Partitioner
+
+trait Partitioner
   fun ref apply[D: Any val](d: D): Key
 
-primitive OneToOneGroup is GrouperBuilder
-  fun apply(): OneToOneGrouper =>
-    OneToOneGrouper
+primitive SinglePartitionerBuilder is PartitionerBuilder
+  fun apply(): SinglePartitioner =>
+    SinglePartitioner
 
-class OneToOneGrouper is Grouper
+class SinglePartitioner is Partitioner
   fun ref apply[D: Any val](d: D): Key =>
-    "one-to-one-grouping-key"
+    "single-partition-key"
 
-primitive Shuffle is GrouperBuilder
-  fun apply(): Shuffler =>
-    Shuffler
+primitive RandomPartitionerBuilder is PartitionerBuilder
+  fun apply(): RandomPartitioner =>
+    RandomPartitioner
 
-class Shuffler is Grouper
+class RandomPartitioner is Partitioner
   let _rand: Random
 
   new create(seed: U64 = Time.nanos()) =>
@@ -50,22 +55,22 @@ class Shuffler is Grouper
   fun ref apply[D: Any val](d: D): Key =>
     _rand.next().string()
 
-trait val GroupByKey is GrouperBuilder
-  fun apply(): KeyGrouper
+trait val KeyPartitionerBuilder is PartitionerBuilder
+  fun apply(): KeyPartitioner
 
-class val TypedGroupByKey[In: Any val] is GroupByKey
+class val TypedKeyPartitionerBuilder[In: Any val] is KeyPartitionerBuilder
   let key_extractor: KeyExtractor[In]
 
   new val create(ke: KeyExtractor[In]) =>
     key_extractor = ke
 
-  fun apply(): KeyGrouper =>
-    TypedKeyGrouper[In](key_extractor)
+  fun apply(): KeyPartitioner =>
+    TypedKeyPartitioner[In](key_extractor)
 
-trait KeyGrouper is Grouper
+trait KeyPartitioner is Partitioner
   fun ref apply[D: Any val](d: D): Key
 
-class TypedKeyGrouper[In: Any val] is KeyGrouper
+class TypedKeyPartitioner[In: Any val] is KeyPartitioner
   let key_extractor: KeyExtractor[In]
 
   new create(ke: KeyExtractor[In]) =>

@@ -23,7 +23,7 @@ use "net"
 use "pony-kafka"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/core/grouping"
+use "wallaroo/core/partitioning"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
 use "wallaroo_labs/mort"
@@ -45,9 +45,9 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
     _handler = handler
     _tcp_auth = tcp_auth
 
-  fun apply(worker_name: WorkerName, pipeline_name: String,
-    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
-    metrics_conn: MetricsSink,
+  fun apply(worker_name: String, pipeline_name: String,
+    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
+    router: Router, metrics_conn: MetricsSink,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -56,7 +56,7 @@ class val KafkaSourceListenerBuilderBuilder[In: Any val]
     KafkaSourceListenerBuilder[In]
   =>
     KafkaSourceListenerBuilder[In](worker_name, pipeline_name, runner_builder,
-      grouper, router, metrics_conn, consume metrics_reporter,
+      partitioner_builder, router, metrics_conn, consume metrics_reporter,
       router_registry, outgoing_boundary_builders, event_log, auth,
       layout_initializer, recovering, target_router, _ksco, _handler,
       _tcp_auth)
@@ -65,7 +65,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
-  let _grouper_builder: GrouperBuilder
+  let _partitioner_builder: PartitionerBuilder
   let _router: Router
   let _metrics_conn: MetricsSink
   let _metrics_reporter: MetricsReporter
@@ -81,8 +81,8 @@ class val KafkaSourceListenerBuilder[In: Any val]
   let _tcp_auth: TCPConnectionAuth
 
   new val create(worker_name: WorkerName, pipeline_name: String,
-    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
-    metrics_conn: MetricsSink,
+    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
+    router: Router, metrics_conn: MetricsSink,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -93,7 +93,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
     _worker_name = worker_name
     _pipeline_name = pipeline_name
     _runner_builder = runner_builder
-    _grouper_builder = grouper
+    _partitioner_builder = partitioner_builder
     _router = router
     _metrics_conn = metrics_conn
     _metrics_reporter = consume metrics_reporter
@@ -110,7 +110,7 @@ class val KafkaSourceListenerBuilder[In: Any val]
 
   fun apply(env: Env): SourceListener =>
     KafkaSourceListener[In](env, _worker_name, _pipeline_name, _runner_builder,
-      _grouper_builder, _router, _metrics_conn, _metrics_reporter.clone(),
+      _partitioner_builder, _router, _metrics_conn, _metrics_reporter.clone(),
       _router_registry,
       _outgoing_boundary_builders, _event_log, _auth, _layout_initializer,
       _recovering, _target_router, _ksco, _handler, _tcp_auth)
@@ -138,7 +138,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
-  let _grouper_builder: GrouperBuilder
+  let _partitioner_builder: PartitionerBuilder
   var _router: Router
   let _metrics_conn: MetricsSink
   let _metrics_reporter: MetricsReporter
@@ -162,8 +162,8 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
   let _rb: Reader = Reader
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
-    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
-    metrics_conn: MetricsSink,
+    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
+    router: Router, metrics_conn: MetricsSink,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -175,7 +175,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _worker_name = worker_name
     _pipeline_name = pipeline_name
     _runner_builder = runner_builder
-    _grouper_builder = grouper
+    _partitioner_builder = partitioner_builder
     _router = router
     _metrics_conn = metrics_conn
     _metrics_reporter = consume metrics_reporter
@@ -191,7 +191,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
     _tcp_auth = tcp_auth
 
     _notify = KafkaSourceListenerNotify[In](_pipeline_name, _auth,
-      _handler, _runner_builder, _grouper_builder, _router,
+      _handler, _runner_builder, _partitioner_builder, _router,
       _metrics_reporter.clone(), _event_log, _target_router)
 
     match router

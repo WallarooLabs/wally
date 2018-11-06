@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 use "collections"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
-use "wallaroo/core/grouping"
+use "wallaroo/core/partitioning"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/recovery"
 use "wallaroo/ent/router_registry"
@@ -53,7 +53,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _worker_name: WorkerName
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder
-  let _grouper_builder: GrouperBuilder
+  let _partitioner_builder: PartitionerBuilder
   var _router: Router
   let _metrics_conn: MetricsSink
   let _metrics_reporter: MetricsReporter
@@ -81,8 +81,8 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
   let _available_sources: Array[ConnectorSource[In]] = _available_sources.create()
 
   new create(env: Env, worker_name: WorkerName, pipeline_name: String,
-    runner_builder: RunnerBuilder, grouper: GrouperBuilder, router: Router,
-    metrics_conn: MetricsSink,
+    runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
+    router: Router, metrics_conn: MetricsSink,
     metrics_reporter: MetricsReporter iso, router_registry: RouterRegistry,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -99,7 +99,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     _worker_name = worker_name
     _pipeline_name = pipeline_name
     _runner_builder = runner_builder
-    _grouper_builder = grouper
+    _partitioner_builder = partitioner_builder
     _router = router
     _metrics_conn = metrics_conn
     _metrics_reporter = consume metrics_reporter
@@ -138,7 +138,7 @@ actor ConnectorSourceListener[In: Any val] is SourceListener
     for i in Range(0, _limit) do
       let source_id = _routing_id_gen()
       let notify = ConnectorSourceNotify[In](source_id, _pipeline_name,
-        _env, _auth, _handler, _runner_builder, _grouper_builder, _router,
+        _env, _auth, _handler, _runner_builder, _partitioner_builder, _router,
         _metrics_reporter.clone(), _event_log, _target_router)
       let source = ConnectorSource[In](source_id, _auth, this,
         consume notify, _event_log, _router,

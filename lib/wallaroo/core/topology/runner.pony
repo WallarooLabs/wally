@@ -23,7 +23,7 @@ use "net"
 use "time"
 use "serialise"
 use "wallaroo/core/common"
-use "wallaroo/core/grouping"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/initialization"
 use "wallaroo/core/invariant"
 use "wallaroo/core/metrics"
@@ -61,7 +61,8 @@ trait val RunnerBuilder
   fun apply(event_log: EventLog, auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    grouper: GrouperBuilder = OneToOneGroup): Runner iso^
+    partitioner_builder: PartitionerBuilder = SinglePartitionerBuilder):
+    Runner iso^
 
   fun name(): String
   fun routing_group(): RoutingId
@@ -89,10 +90,11 @@ class val RunnerSequenceBuilder is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    grouper: GrouperBuilder = OneToOneGroup): Runner iso^
+    partitioner_builder: PartitionerBuilder = SinglePartitionerBuilder):
+    Runner iso^
   =>
     var remaining: USize = _runner_builders.size()
-    var latest_runner: Runner iso = RouterRunner(grouper)
+    var latest_runner: Runner iso = RouterRunner(partitioner_builder)
     while remaining > 0 do
       let next_builder: (RunnerBuilder | None) =
         try
@@ -152,13 +154,14 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    grouper: GrouperBuilder = OneToOneGroup): Runner iso^
+    partitioner_builder: PartitionerBuilder = SinglePartitionerBuilder):
+    Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
       ComputationRunner[In, Out](_comp, consume r)
     else
-      ComputationRunner[In, Out](_comp, RouterRunner(grouper))
+      ComputationRunner[In, Out](_comp, RouterRunner(partitioner_builder))
     end
 
   fun name(): String => _comp.name()
@@ -183,7 +186,8 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    grouper: GrouperBuilder = OneToOneGroup): Runner iso^
+    partitioner_builder: PartitionerBuilder = SinglePartitionerBuilder):
+    Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
@@ -191,7 +195,7 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
         consume r)
     else
       StateRunner[In, Out, S](_step_group, _state_comp, event_log, auth,
-        RouterRunner(grouper))
+        RouterRunner(partitioner_builder))
     end
 
   fun name(): String => _state_comp.name()
@@ -516,10 +520,10 @@ interface Stringablike
   fun string(): String
 
 class iso RouterRunner is Runner
-  let _grouper: Grouper
+  let _partitioner: Partitioner
 
-  new iso create(g: GrouperBuilder) =>
-    _grouper = g()
+  new iso create(pb: PartitionerBuilder) =>
+    _partitioner = pb()
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, producer_id: RoutingId, producer: Producer ref,
@@ -527,7 +531,7 @@ class iso RouterRunner is Runner
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
-    let new_key = _grouper[D](data)
+    let new_key = _partitioner[D](data)
     router.route[D](metric_name, pipeline_time_spent, data, new_key,
       producer_id, producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
       worker_ingress_ts)
