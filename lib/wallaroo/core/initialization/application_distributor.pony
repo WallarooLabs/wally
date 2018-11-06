@@ -75,15 +75,11 @@ actor ApplicationDistributor is Distributor
       for w in worker_names.values() do all_workers_trn.push(w) end
       let all_workers: Array[WorkerName] val = consume all_workers_trn
 
-      // Since a worker doesn't know the specific routing ids of state
-      // steps on other workers (it only knows that certain keys are handled
-      // by certain workers), we need a more general way to route things
-      // like barriers to downstream state steps. To enable this, we create
-      // a RoutingId for each (state name, worker name) pair.
-      let state_routing_ids =
-        recover iso Map[StateName, Map[WorkerName, RoutingId] val] end
-
-      let stateless_partition_routing_ids =
+      // Since a worker doesn't know the specific routing ids of step group
+      // steps on other workers, we need a more general way to route things
+      // like barriers to downstream step groups. To enable this, we create
+      // a RoutingId for each (step group RoutingId, WorkerName) pair.
+      let step_group_routing_ids =
         recover iso Map[RoutingId, Map[WorkerName, RoutingId] val] end
 
       // Keep track of workers that cannot be removed during shrink to fit.
@@ -260,22 +256,12 @@ actor ApplicationDistributor is Distributor
 
           interm_graph.add_node(s_builder, node.id)
 
-          // If this is part of a step group, assign a special routing id
-          // for that group to each worker.
-          match s_builder.routing_group()
-          | let sn: StateName =>
-            let worker_map = recover iso Map[WorkerName, RoutingId] end
-            for w in all_workers.values() do
-              worker_map(w) = _routing_id_gen()
-            end
-            state_routing_ids(sn) = consume worker_map
-          | let ri: RoutingId =>
-            let worker_map = recover iso Map[WorkerName, RoutingId] end
-            for w in all_workers.values() do
-              worker_map(w) = _routing_id_gen()
-            end
-            stateless_partition_routing_ids(ri) = consume worker_map
+          let worker_map = recover iso Map[WorkerName, RoutingId] end
+          for w in all_workers.values() do
+            worker_map(w) = _routing_id_gen()
           end
+          step_group_routing_ids(s_builder.routing_group()) =
+            consume worker_map
 
           for i_node in node.ins() do
             // !@ Does this check make sense, or should we override sometimes?
@@ -356,10 +342,7 @@ actor ApplicationDistributor is Distributor
 
       let non_shrinkable_to_send = consume val non_shrinkable
 
-      //!@ We have to put values in these!
-      let state_routing_ids_to_send = consume val state_routing_ids
-      let stateless_partition_routing_ids_to_send =
-        consume val stateless_partition_routing_ids
+      let step_group_routing_ids_to_send = consume val step_group_routing_ids
 
       let initializer_graph = interm_graph.clone()?
 
@@ -384,9 +367,9 @@ actor ApplicationDistributor is Distributor
         let local_topology =
           LocalTopology(_app_name, w, graph_to_send,
             recover Map[U128, SetIs[RoutingId] val] end,
-            all_workers, non_shrinkable_to_send, state_routing_ids_to_send,
-            stateless_partition_routing_ids_to_send,
-            barrier_source_id).assign_routing_ids(_routing_id_gen)
+            all_workers, non_shrinkable_to_send,
+            step_group_routing_ids_to_send, barrier_source_id)
+              .assign_routing_ids(_routing_id_gen)
 
         // If this is the "initializer"'s (i.e. our) turn, then
         // immediately (asynchronously) begin initializing it. If not, add it

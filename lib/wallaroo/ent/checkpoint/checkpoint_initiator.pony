@@ -32,6 +32,7 @@ use "wallaroo/ent/barrier"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/string_set"
 
 
 actor CheckpointInitiator is Initializable
@@ -55,7 +56,7 @@ actor CheckpointInitiator is Initializable
   let _checkpoint_id_file: String
   let _source_ids: Map[USize, RoutingId] = _source_ids.create()
   var _timers: Timers = Timers
-  let _workers: _StringSet = _workers.create()
+  let _workers: StringSet = _workers.create()
   let _wb: Writer = Writer
   let _the_journal: SimpleJournal
   let _do_local_file_io: Bool
@@ -141,7 +142,7 @@ actor CheckpointInitiator is Initializable
     end
     _is_recovering = false
 
-  fun workers(): _StringSet box => _workers
+  fun workers(): StringSet box => _workers
 
   be add_worker(w: String) =>
     ifdef "checkpoint_trace" then
@@ -514,29 +515,3 @@ class _InitiateCheckpoint is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _si.initiate_checkpoint(_checkpoint_group)
     false
-
-/////////////////////////////////////////////////////////////////////////////
-// TODO: Replace using this with the badly named SetIs once we address a bug
-// in SetIs where unsetting doesn't reduce set size for type SetIs[String].
-class _StringSet
-  let _map: Map[String, String] = _map.create()
-
-  fun ref set(s: String) =>
-    _map(s) = s
-
-  fun ref unset(s: String) =>
-    try _map.remove(s)? end
-
-  fun contains(s: String): Bool =>
-    _map.contains(s)
-
-  fun ref clear() =>
-    _map.clear()
-
-  fun size(): USize =>
-    _map.size()
-
-  fun values(): MapValues[String, String, HashEq[String],
-    this->HashMap[String, String, HashEq[String]]]^
-  =>
-    _map.values()

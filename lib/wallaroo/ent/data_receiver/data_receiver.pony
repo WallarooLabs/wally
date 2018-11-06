@@ -64,13 +64,10 @@ actor DataReceiver is Producer
   let _queued_unregister_producers: Array[(RoutingId, RoutingId)] =
     _queued_register_producers.create()
 
-  // A special RoutingId that indicates that a barrier or register_producer
-  // request needs to be forwarded to all known state steps on this worker.
-  var _state_routing_ids: Map[RoutingId, StateName] val
   // Keeps track of all upstreams that produce messages for state steps.
   // The map is from state routing id to a set of upstream ids.
-  let _state_partition_producers: Map[RoutingId, SetIs[RoutingId]] =
-    _state_partition_producers.create()
+  let _step_group_producers: Map[RoutingId, SetIs[RoutingId]] =
+    _step_group_producers.create()
 
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
@@ -88,7 +85,6 @@ actor DataReceiver is Producer
     _sender_name = sender_name
     _router = data_router
     _metrics_reporter = consume metrics_reporter'
-    _state_routing_ids = _router.state_routing_ids()
     if is_recovering then
       _phase = _RecoveringDataReceiverPhase(this)
     else
@@ -100,8 +96,6 @@ actor DataReceiver is Producer
 
   be update_router(router': DataRouter) =>
     _router = router'
-
-    _state_routing_ids = _router.state_routing_ids()
 
     // If we have pending register_producer calls, then try to process them now
     var retries = Array[(RoutingId, RoutingId)]
@@ -123,11 +117,11 @@ actor DataReceiver is Producer
       _router.unregister_producer(input, output, this)
     end
 
-    // Reregister all state partition producers in case there were more
+    // Reregister all step group producers in case there were more
     // keys added to this worker.
-    for (state_r_id, producer_ids) in _state_partition_producers.pairs() do
+    for (r_id, producer_ids) in _step_group_producers.pairs() do
       for producer_id in producer_ids.values() do
-        _router.register_producer(producer_id, state_r_id, this)
+        _router.register_producer(producer_id, r_id, this)
       end
     end
 
@@ -283,9 +277,9 @@ actor DataReceiver is Producer
   // REGISTER PRODUCERS
   /////////////////////////////////////////////////////////////////////////////
   be register_producer(input_id: RoutingId, output_id: RoutingId) =>
-    if _state_partition_producers.contains(output_id) then
+    if _step_group_producers.contains(output_id) then
       try
-        _state_partition_producers.insert_if_absent(output_id,
+        _step_group_producers.insert_if_absent(output_id,
           SetIs[RoutingId])?.set(input_id)
       else
         Fail()
@@ -302,9 +296,9 @@ actor DataReceiver is Producer
     _queued_unregister_producers.push((input_id, output_id))
 
   be unregister_producer(input_id: RoutingId, output_id: RoutingId) =>
-    if _state_partition_producers.contains(output_id) then
+    if _step_group_producers.contains(output_id) then
       try
-        let set = _state_partition_producers(output_id)?
+        let set = _step_group_producers(output_id)?
         set.unset(input_id)
       else
         Unreachable()

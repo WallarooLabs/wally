@@ -196,7 +196,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
 
     match router
     | let pr: StatePartitionRouter =>
-      _router_registry.register_partition_router_subscriber(pr.state_name(),
+      _router_registry.register_partition_router_subscriber(pr.step_group(),
         this)
     | let spr: StatelessPartitionRouter =>
       _router_registry.register_stateless_partition_router_subscriber(
@@ -271,7 +271,7 @@ actor KafkaSourceListener[In: Any val] is (SourceListener & KafkaClientManager)
             match _router
             | let pr: StatePartitionRouter =>
               _router_registry.register_partition_router_subscriber(
-                pr.state_name(), source)
+                pr.step_group(), source)
             | let spr: StatelessPartitionRouter =>
               _router_registry.register_stateless_partition_router_subscriber(
                 spr.partition_routing_id(), source)

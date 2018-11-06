@@ -47,7 +47,7 @@ trait Runner
   fun name(): String
 
 trait SerializableStateRunner
-  fun ref import_key_state(step: Step ref, s_name: StateName, key: Key,
+  fun ref import_key_state(step: Step ref, s_group: RoutingId, key: Key,
     s: ByteSeq val)
   fun ref export_key_state(step: Step ref, key: Key): ByteSeq val
   fun ref serialize_state(): ByteSeq val
@@ -64,7 +64,7 @@ trait val RunnerBuilder
     grouper: GrouperBuilder = OneToOneGroup): Runner iso^
 
   fun name(): String
-  fun routing_group(): (StateName | RoutingId)
+  fun routing_group(): RoutingId
   fun parallelism(): USize
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool
@@ -72,7 +72,7 @@ trait val RunnerBuilder
 
 class val RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder] val
-  let _routing_group: (StateName | RoutingId)
+  let _routing_group: RoutingId
   let _parallelism: USize
 
   new val create(bs: Array[RunnerBuilder] val, parallelism': USize) =>
@@ -119,7 +119,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
       n + "|"
     end
 
-  fun routing_group(): (StateName | RoutingId) =>
+  fun routing_group(): RoutingId =>
     _routing_group
   fun parallelism(): USize => _parallelism
   fun is_prestate(): Bool =>
@@ -162,21 +162,21 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     end
 
   fun name(): String => _comp.name()
-  fun routing_group(): (StateName | RoutingId) => _routing_group
+  fun routing_group(): RoutingId => _routing_group
   fun parallelism(): USize => _parallelism
   fun is_stateful(): Bool => false
 
 class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   RunnerBuilder
   let _state_comp: StateComputation[In, Out, S] val
-  let _state_name: StateName
+  let _step_group: RoutingId
   let _parallelism: USize
 
   new val create(state_comp: StateComputation[In, Out, S] val,
     parallelism': USize)
   =>
     _state_comp = state_comp
-    _state_name = RoutingIdGenerator().string()
+    _step_group = RoutingIdGenerator()
     _parallelism = parallelism'
 
   fun apply(event_log: EventLog,
@@ -187,15 +187,15 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   =>
     match (consume next_runner)
     | let r: Runner iso =>
-      StateRunner[In, Out, S](_state_name, _state_comp, event_log, auth,
+      StateRunner[In, Out, S](_step_group, _state_comp, event_log, auth,
         consume r)
     else
-      StateRunner[In, Out, S](_state_name, _state_comp, event_log, auth,
+      StateRunner[In, Out, S](_step_group, _state_comp, event_log, auth,
         RouterRunner(grouper))
     end
 
   fun name(): String => _state_comp.name()
-  fun routing_group(): (StateName | RoutingId) => _state_name
+  fun routing_group(): RoutingId => _step_group
   fun parallelism(): USize => _parallelism
   fun is_stateful(): Bool => true
 
@@ -269,7 +269,7 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
 
 class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   RollbackableRunner & SerializableStateRunner)
-  let _state_name: StateName
+  let _step_group: RoutingId
   let _canonical_state: S
   let _state_comp: StateComputation[In, Out, S] val
   let _next_runner: Runner
@@ -281,11 +281,11 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   let _auth: AmbientAuth
   var _id: (RoutingId | None)
 
-  new iso create(state_name': StateName,
+  new iso create(step_group': RoutingId,
     state_comp: StateComputation[In, Out, S] val, event_log: EventLog,
     auth: AmbientAuth, next_runner: Runner iso)
   =>
-    _state_name = state_name'
+    _step_group = step_group'
     _state_comp = state_comp
     _canonical_state = _state_comp.initial_state()
     _next_runner = consume next_runner
@@ -313,9 +313,10 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         try
           _state_map(key)?
         else
+          @printf[I32]("!@ Creating state for key %s\n".cstring(), key.cstring())
           match producer
           | let s: Step ref =>
-            s.register_key(_state_name, key)
+            s.register_key(_step_group, key)
           else
             Fail()
           end
@@ -377,11 +378,11 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
 
   fun name(): String => _state_comp.name()
 
-  fun ref import_key_state(step: Step ref, s_name: StateName, key: Key,
+  fun ref import_key_state(step: Step ref, s_group: RoutingId, key: Key,
     s: ByteSeq val)
   =>
     ifdef debug then
-      Invariant(s_name == _state_name)
+      Invariant(s_group == _step_group)
     end
     if s.size() > 0 then
       try
@@ -401,7 +402,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
               key.cstring())
           end
           _state_map(key) = state
-          step.register_key(s_name, key)
+          step.register_key(s_group, key)
         else
           Fail()
         end
@@ -412,11 +413,11 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
       // We got the key but no accompanying state, so we initialize
       // ourselves.
       _state_map(key) = _state_comp.initial_state()
-      step.register_key(s_name, key)
+      step.register_key(s_group, key)
     end
 
   fun ref export_key_state(step: Step ref, key: Key): ByteSeq val =>
-    step.unregister_key(_state_name, key)
+    step.unregister_key(_step_group, key)
     try
       let state =
         try

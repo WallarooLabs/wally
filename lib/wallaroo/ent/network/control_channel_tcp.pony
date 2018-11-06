@@ -337,13 +337,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             let host = m.control_addrs(w)?._1
             let control_addr = m.control_addrs(w)?
             let data_addr = m.data_addrs(w)?
-            let new_state_routing_ids = m.new_state_routing_ids(w)?
-            let new_stateless_partition_routing_ids =
-              m.new_stateless_partition_routing_ids(w)?
+            let new_step_group_routing_ids = m.new_step_group_routing_ids(w)?
             match _layout_initializer
             | let lti: LocalTopologyInitializer =>
               lti.add_joining_worker(w, host, control_addr, data_addr,
-                new_state_routing_ids, new_stateless_partition_routing_ids)
+                new_step_group_routing_ids)
             else
               Fail()
             end
@@ -355,8 +353,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
           lti.connect_to_joining_workers(m.sender, m.control_addrs,
-            m.data_addrs, m.new_state_routing_ids,
-            m.new_stateless_partition_routing_ids)
+            m.data_addrs, m.new_step_group_routing_ids)
         else
           Fail()
         end
@@ -379,8 +376,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           match _layout_initializer
           | let lti: LocalTopologyInitializer =>
             lti.add_joining_worker(m.worker_name, joining_host, m.control_addr,
-              m.data_addr, m.state_routing_ids,
-              m.stateless_partition_routing_ids)
+              m.data_addr, m.step_group_routing_ids)
           else
             Fail()
           end

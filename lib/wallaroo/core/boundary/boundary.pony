@@ -273,11 +273,11 @@ actor OutgoingBoundary is Consumer
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
       + "\n").cstring())
 
-  be migrate_key(step_id: RoutingId, state_name: String, key: Key,
+  be migrate_key(step_id: RoutingId, step_group: RoutingId, key: Key,
     checkpoint_id: CheckpointId, state: ByteSeq val)
   =>
     try
-      let outgoing_msg = ChannelMsgEncoder.migrate_key(state_name, key,
+      let outgoing_msg = ChannelMsgEncoder.migrate_key(step_group, key,
         checkpoint_id, state, _worker_name, _auth)?
       _writev(outgoing_msg)
     else
