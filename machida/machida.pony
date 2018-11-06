@@ -303,7 +303,7 @@ class PyGenSourceHandler is GenSourceGenerator[PyData val]
   fun _final() =>
     Machida.dec_ref(_source_generator)
 
-class val PyComputation is Computation[PyData val, PyData val]
+class val PyComputation is StatelessComputation[PyData val, PyData val]
   var _computation: Pointer[U8] val
   let _name: String
   let _is_multi: Bool
@@ -1117,7 +1117,7 @@ class val PyPipelineTree
       let state_computation = recover val
         PyStateComputation(state_computationp)
       end
-      pipeline = pipeline.to_state[PyData val, PyState](state_computation)
+      pipeline = pipeline.to[PyData val](state_computation)
     | "key_by" =>
       let raw_key_extractor = @PyTuple_GetItem(stage, 1)
       let key_extractor = PyKeyExtractor(raw_key_extractor)

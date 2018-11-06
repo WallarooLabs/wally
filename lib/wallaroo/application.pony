@@ -119,34 +119,12 @@ class Pipeline[Out: Any val] is BasicPipeline
     Pipeline[(Out | MergeOut)](_stages, _dag_sink_ids)
 
   fun ref to[Next: Any val](comp: Computation[Out, Next],
-    parallelization: USize = 1): Pipeline[Next]
-  =>
-    let routing_id_gen = RoutingIdGenerator
-    if not _finished then
-      let runner_builder = ComputationRunnerBuilder[Out, Next](comp,
-        routing_id_gen(), parallelization)
-      let node_id = _stages.add_node(runner_builder)
-      try
-        for sink_id in _dag_sink_ids.values() do
-          _stages.add_edge(sink_id, node_id)?
-        end
-      else
-        Fail()
-      end
-      Pipeline[Next](_stages, [node_id])
-    else
-      _try_add_to_finished_pipeline()
-      Pipeline[Next](_stages, _dag_sink_ids)
-    end
-
-  fun ref to_state[Next: Any val, S: State ref](
-    s_comp: StateComputation[Out, Next, S] val,
     parallelization: USize = 10): Pipeline[Next]
   =>
+    let node_id = RoutingIdGenerator()
     if not _finished then
-      let runner_builder = StateRunnerBuilder[Out, Next, S](s_comp,
-        parallelization)
-      let node_id = _stages.add_node(runner_builder)
+      let runner_builder = comp.runner_builder(node_id, parallelization)
+      _stages.add_node(runner_builder, node_id)
       try
         for sink_id in _dag_sink_ids.values() do
           _stages.add_edge(sink_id, node_id)?

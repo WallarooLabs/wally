@@ -137,12 +137,12 @@ class val RunnerSequenceBuilder is RunnerBuilder
     end
 
 class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
-  let _comp: Computation[In, Out]
+  let _comp: StatelessComputation[In, Out]
   let _routing_group: RoutingId
   let _parallelism: USize
 
-  new val create(comp: Computation[In, Out], routing_group': RoutingId,
-    parallelism': USize)
+  new val create(comp: StatelessComputation[In, Out],
+    routing_group': RoutingId, parallelism': USize)
   =>
     _comp = comp
     _routing_group = routing_group'
@@ -173,10 +173,10 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   let _parallelism: USize
 
   new val create(state_comp: StateComputation[In, Out, S] val,
-    parallelism': USize)
+    step_group: RoutingId, parallelism': USize)
   =>
     _state_comp = state_comp
-    _step_group = RoutingIdGenerator()
+    _step_group = step_group
     _parallelism = parallelism'
 
   fun apply(event_log: EventLog,
@@ -201,10 +201,10 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
 
 class ComputationRunner[In: Any val, Out: Any val] is Runner
   let _next: Runner
-  let _computation: Computation[In, Out] val
+  let _computation: StatelessComputation[In, Out] val
   let _computation_name: String
 
-  new iso create(computation: Computation[In, Out] val,
+  new iso create(computation: StatelessComputation[In, Out] val,
     next: Runner iso)
   =>
     _computation = computation
@@ -279,7 +279,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   let _wb: Writer = Writer
   let _rb: Reader = Reader
   let _auth: AmbientAuth
-  var _id: (RoutingId | None)
+  var _step_id: (RoutingId | None)
 
   new iso create(step_group': RoutingId,
     state_comp: StateComputation[In, Out, S] val, event_log: EventLog,
@@ -291,12 +291,12 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     _next_runner = consume next_runner
     _event_log = event_log
     //!@
-    _id = None
+    _step_id = None
     _auth = auth
 
   //!@
   fun ref set_step_id(id: RoutingId) =>
-    _id = id
+    _step_id = id
 
   fun ref rollback(payload: ByteSeq val) =>
     replace_serialized_state(payload)
@@ -396,7 +396,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
               let us' = ns' / 1000
               let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'
                 .string())
-              @printf[I32]("DESERIALIZE (%s): loading new %s on step %s with tag %s\n".cstring(), ts'.cstring(), st.string().cstring(), _id.string().cstring(), (digestof this).string().cstring())
+              @printf[I32]("DESERIALIZE (%s): loading new %s on step %s with tag %s\n".cstring(), ts'.cstring(), st.string().cstring(), _step_id.string().cstring(), (digestof this).string().cstring())
             end
             @printf[I32]("Successfully imported key %s\n".cstring(),
               key.cstring())
@@ -445,7 +445,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
               us'.string())
             @printf[I32]("SERIALIZE (%s): %s on step %s with tag %s\n"
               .cstring(), ts'.cstring(), s.string().cstring(),
-              _id.string().cstring(), (digestof this).string().cstring())
+              _step_id.string().cstring(), (digestof this).string().cstring())
           end
           @printf[I32]("SERIALIZING KEY %s\n".cstring(), k.cstring())
         end
@@ -498,7 +498,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
               let us' = ns' / 1000
               let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." +
                 us'.string())
-              @printf[I32]("DESERIALIZE (%s): loading new state %s on step %s with tag %s\n".cstring(), ts'.cstring(), st.string().cstring(), _id.string().cstring(), (digestof this).string().cstring())
+              @printf[I32]("DESERIALIZE (%s): loading new state %s on step %s with tag %s\n".cstring(), ts'.cstring(), st.string().cstring(), _step_id.string().cstring(), (digestof this).string().cstring())
             end
             @printf[I32]("OVERWRITING STATE FOR KEY %s\n".cstring(),
               key.cstring())

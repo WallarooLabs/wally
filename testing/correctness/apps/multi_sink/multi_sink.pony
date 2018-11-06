@@ -48,13 +48,13 @@ actor Main
       @printf[I32]("Couldn't build topology\n".cstring())
     end
 
-primitive Multiply is Computation[F32, F32]
+primitive Multiply is StatelessComputation[F32, F32]
   fun apply(input: F32): F32 =>
     input * 1.8
 
   fun name(): String => "Multiply by 1.8"
 
-primitive Add is Computation[F32, F32]
+primitive Add is StatelessComputation[F32, F32]
   fun apply(input: F32): F32 =>
     input + 32
 

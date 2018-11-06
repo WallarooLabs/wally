@@ -98,7 +98,7 @@ actor Main
             TCPSourceConfig[U64].from_options(U64FramedHandler,
               TCPSourceConfigCLIParser(env.args)?(0)?))
           .key_by(ExtractWindow)
-          .to_state[String val, WindowState](ObserveNewValue)
+          .to[String val](ObserveNewValue)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?))
       end

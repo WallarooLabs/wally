@@ -98,14 +98,14 @@ actor Main
       @printf[I32]("Couldn't build topology\n".cstring())
     end
 
-primitive Pingify is Computation[U8, U8]
+primitive Pingify is StatelessComputation[U8, U8]
   fun apply(input: U8): U8 =>
     @printf[I32]("Rcvd Pong -> %s\n".cstring(), input.string().cstring())
     1
 
   fun name(): String => "Pingify"
 
-primitive Pongify is Computation[U8, U8]
+primitive Pongify is StatelessComputation[U8, U8]
   fun apply(input: U8): U8 =>
     @printf[I32]("Rcvd Ping -> %s\n".cstring(), input.string().cstring())
     0

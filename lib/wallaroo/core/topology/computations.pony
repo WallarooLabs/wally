@@ -25,16 +25,23 @@ use "wallaroo_labs/mort"
 use "wallaroo/core/routing"
 use "wallaroo/core/state"
 
-trait val BasicComputation
+
+interface val Computation[In: Any val, Out: Any val]
   fun name(): String
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
+    RunnerBuilder
 
-trait val BasicStateComputation is BasicComputation
-
-interface val Computation[In: Any val, Out: Any val] is BasicComputation
+interface val StatelessComputation[In: Any val, Out: Any val] is
+  Computation[In, Out]
   fun apply(input: In): (Out | Array[Out] val | None)
 
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
+    RunnerBuilder
+  =>
+    ComputationRunnerBuilder[In, Out](this, step_group_id, parallelization)
+
 interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
-  BasicStateComputation
+  Computation[In, Out]
   // Return a tuple containing the result of the computation (which is None
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).
@@ -42,13 +49,8 @@ interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
 
   fun initial_state(): S
 
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
+    RunnerBuilder
+  =>
+    StateRunnerBuilder[In, Out, S](this, step_group_id, parallelization)
 
-//!@
-// interface val BasicComputationBuilder
-//   fun apply(): BasicComputation val
-
-// interface val ComputationBuilder[In: Any val, Out: Any val]
-//   fun apply(): Computation[In, Out] val
-
-// interface val StateBuilder[S: State ref]
-//   fun apply(): S

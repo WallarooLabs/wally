@@ -46,7 +46,7 @@ actor Main
         lines
           .to[String](Split)
           .key_by(ExtractWord)
-          .to_state[RunningTotal, WordTotal](AddCount)
+          .to[RunningTotal](AddCount)
           .to_sink(TCPSinkConfig[RunningTotal].from_options(
             RunningTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
       end
