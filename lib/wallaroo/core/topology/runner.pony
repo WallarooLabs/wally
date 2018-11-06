@@ -138,7 +138,8 @@ class val RunnerSequenceBuilder is RunnerBuilder
       false
     end
 
-class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
+class val StatelessComputationRunnerBuilder[In: Any val, Out: Any val] is
+  RunnerBuilder
   let _comp: StatelessComputation[In, Out]
   let _routing_group: RoutingId
   let _parallelism: USize
@@ -159,9 +160,9 @@ class val ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   =>
     match (consume next_runner)
     | let r: Runner iso =>
-      ComputationRunner[In, Out](_comp, consume r)
+      StatelessComputationRunner[In, Out](_comp, consume r)
     else
-      ComputationRunner[In, Out](_comp, RouterRunner(partitioner_builder))
+      StatelessComputationRunner[In, Out](_comp, RouterRunner(partitioner_builder))
     end
 
   fun name(): String => _comp.name()
@@ -203,7 +204,7 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   fun parallelism(): USize => _parallelism
   fun is_stateful(): Bool => true
 
-class ComputationRunner[In: Any val, Out: Any val] is Runner
+class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
   let _next: Runner
   let _computation: StatelessComputation[In, Out] val
   let _computation_name: String
@@ -263,7 +264,7 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
 
       (is_finished, last_ts)
     else
-      @printf[I32]("ComputationRunner: Input was not correct type!\n"
+      @printf[I32]("StatelessComputationRunner: Input was not correct type!\n"
         .cstring())
       Fail()
       (true, latest_ts)
@@ -366,8 +367,8 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
 
       (is_finished, last_ts)
     else
-      @printf[I32]("StateComputationRunner: Input was not correct type!\n"
-        .cstring())
+      @printf[I32](("StateStatelessComputationRunner: Input was not correct " +
+        "type!\n").cstring())
       Fail()
       (true, latest_ts)
     end
