@@ -55,7 +55,7 @@ primitive OddFilterDecoder is FramedSourceHandler[(U64 | None)]
       data(5)?, data(6)?, data(7)?)
     if ((num % 2) == 0) then num else None end
 
-// primitive PassThrough is Computation[U64, U64]
+// primitive PassThrough is StatelessComputation[U64, U64]
 //   fun apply(input: U64): U64 =>
 //     @printf[I32](("Received: " + input.string() + "\n").cstring())
 //     input

@@ -101,7 +101,7 @@ actor Main
           .key_by(Constant)
           .to[U64](MaybeOneToMany)
           .key_by(ExtractWindow)
-          .to_state[String val, WindowState](ObserveNewValue)
+          .to[String val](ObserveNewValue)
           .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
               TCPSinkConfigCLIParser(env.args)?(0)?))
       end
@@ -120,7 +120,7 @@ primitive ExtractWindow
     // Always use the same partition
     (u % 2).string()
 
-primitive MaybeOneToMany is Computation[U64, U64]
+primitive MaybeOneToMany is StatelessComputation[U64, U64]
   """
   Possibly one to many this message.
 

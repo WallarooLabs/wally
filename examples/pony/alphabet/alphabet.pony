@@ -40,7 +40,7 @@ actor Main
 
           votes
             .key_by(ExtractFirstLetter)
-            .to_state[LetterTotal, LetterState](AddVotes)
+            .to[LetterTotal](AddVotes)
             .to_sink(TCPSinkConfig[LetterTotal].from_options(
               LetterTotalEncoder, TCPSinkConfigCLIParser(env.args)?(0)?))
         end

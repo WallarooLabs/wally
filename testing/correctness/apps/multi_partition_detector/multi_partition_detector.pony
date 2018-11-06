@@ -93,7 +93,7 @@ actor Main
           p = p.key_by(WindowPartitionFunction)
           p = p.to[t.Message](TraceID(x.string()))
           p = p.key_by(WindowPartitionFunction)
-          p = p.to_state[t.Message, WindowState](TraceWindow(x.string()))
+          p = p.to[t.Message](TraceWindow(x.string()))
         end
         p.to_sink(TCPSinkConfig[t.Message].from_options(MessageEncoder,
             TCPSinkConfigCLIParser(env.args)?(0)?))
@@ -183,7 +183,7 @@ class WindowState is State
   fun window(): t.Window val =>
     _window.clone()
 
-class val TraceID is Computation[t.Message, t.Message]
+class val TraceID is StatelessComputation[t.Message, t.Message]
   let _id: String
   let _name: String = "TraceID"
 
