@@ -38,7 +38,8 @@ interface val StatelessComputation[In: Any val, Out: Any val] is
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
     RunnerBuilder
   =>
-    ComputationRunnerBuilder[In, Out](this, step_group_id, parallelization)
+    StatelessComputationRunnerBuilder[In, Out](this, step_group_id,
+      parallelization)
 
 interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
   Computation[In, Out]

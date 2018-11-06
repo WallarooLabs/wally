@@ -55,7 +55,7 @@ actor Main
       @printf[I32]("Couldn't build topology\n".cstring())
     end
 
-primitive Split
+primitive Split is StatelessComputation[String, String]
   fun name(): String => "Split"
 
   fun apply(s: String): Array[String] val =>

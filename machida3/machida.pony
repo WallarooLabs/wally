@@ -121,10 +121,10 @@ type CString is Pointer[U8] tag
 
 type ModuleP is Pointer[U8] val
 
-class PyData
+class val PyData
   var _data: Pointer[U8] val
 
-  new create(data: Pointer[U8] val) =>
+  new val create(data: Pointer[U8] val) =>
     _data = data
 
   fun obj(): Pointer[U8] val =>
@@ -208,7 +208,7 @@ class PySourceHandler is SourceHandler[(PyData val | None)]
     let r = Machida.source_decoder_decode(_source_decoder, data.cpointer(),
         data.size())
     if not Machida.is_py_none(r) then
-      recover PyData(r) end
+      PyData(r)
     else
       None
     end
@@ -250,7 +250,7 @@ class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
     let r = Machida.source_decoder_decode(_source_decoder, data.cpointer(),
         data.size())
     if not Machida.is_py_none(r) then
-      recover PyData(r) end
+      PyData(r)
     else
       None
     end
@@ -276,7 +276,7 @@ class PyGenSourceHandler is GenSourceGenerator[PyData val]
   fun initial_value(): (PyData val | None) =>
     let r = Machida.source_generator_initial_value(_source_generator)
     if not Machida.is_py_none(r) then
-      recover PyData(r) end
+      PyData(r)
     else
       None
     end
@@ -284,7 +284,7 @@ class PyGenSourceHandler is GenSourceGenerator[PyData val]
   fun apply(data: PyData val): (PyData val | None) =>
     let r = Machida.source_generator_apply(_source_generator, data.obj())
     if not Machida.is_py_none(r) then
-      recover PyData(r) end
+      PyData(r)
     else
       None
     end
@@ -675,7 +675,7 @@ primitive Machida
       let obj = @PyList_GetItem(py_array, i)
       if not Machida.is_py_none(obj) then
         Machida.inc_ref(obj)
-        arr.push(recover val PyData(obj) end)
+        arr.push(PyData(obj))
       end
     end
     if arr.size() == 0 then
@@ -791,7 +791,7 @@ primitive Machida
     (PyData val | Array[PyData val] val | None)
   =>
     if not multi then
-      recover val PyData(data) end
+      PyData(data)
     else
       if @py_list_check(data) == 1 then
         let out = Machida.py_list_to_filtered_pony_array_pydata(data)

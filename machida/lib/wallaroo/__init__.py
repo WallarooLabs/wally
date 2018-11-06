@@ -57,8 +57,10 @@ def source(name, source_config):
     return Pipeline.from_source(name, source_config)
 
 def build_application(app_name, pipeline):
-    # pipeline.validate_actions()
-    return pipeline.to_tuple(app_name)
+    if not pipeline.__is_closed__():
+        print("\nAPI_Error: An application must end with to_sink/s.")
+        raise WallarooParameterError()
+    return pipeline.__to_tuple__(app_name)
 
 class Pipeline(object):
     def __init__(self, pipeline_tree):
@@ -77,8 +79,11 @@ class Pipeline(object):
         # else:
         #     self._actions.append(("source", name, source_config.to_tuple()))
 
-    def to_tuple(self, app_name):
+    def __to_tuple__(self, app_name):
         return self._pipeline_tree.to_tuple(app_name)
+
+    def __is_closed__(self):
+        return self._pipeline_tree.is_closed
 
     def to(self, computation):
         return self.clone().__to__(computation)
@@ -134,143 +139,26 @@ class Pipeline(object):
     def clone(self):
         return Pipeline(self._pipeline_tree.clone())
 
-##!@
-# class ApplicationBuilder(object):
-#     def __init__(self, name):
-#         self._connectors = {}
-#         self._next_source_connector_port = 7100
-#         self._next_sink_connector_port = 7200
-#         self._actions = [("name", name)]
-
-#     def source_connector(self, name, encoder, decoder, port=None):
-#         port_num = port or self._next_source_connector_port
-#         # for lookup in the connector script
-#         self._actions.append(("source_connector", name, port_num, encoder, decoder))
-#         # for lookup in the pipeline builder
-#         self._connectors[name] = (port_num, decoder)
-#         self._next_source_connector_port += 1
-#         return self
-
-#     def sink_connector(self, name, encoder, decoder, port=None):
-#         port_num = port or self._next_sink_connector_port
-#         # for lookup in the connector script
-#         self._actions.append(("sink_connector", name, port_num, encoder, decoder))
-#         # for lookup in the pipeline builder
-#         self._connectors[name] = (port_num, encoder)
-#         self._next_sink_connector_port += 1
-#         return self
-
-#     def done(self):
-#         self._actions.append(("done",))
-#         return self
-
-#     def build(self):
-#         self._validate_actions()
-#         return self._actions
-
-#     def _validate_actions(self):
-#         self._steps = {}
-#         self._pipelines = {}
-#         self._states = {}
-#         last_action = None
-#         has_sink = False
-#         # Ensure that we don't add steps unless we are in an unclosed pipeline
-#         expect_steps = False
-
-#         for action in self._actions:
-#             if action[0][0:2] == "to" and not expect_steps:
-#                 if last_action == "to_sink":
-#                     raise WallarooParameterError(
-#                         "Unable to add a computation step after a sink. "
-#                         "Please declare a new pipeline first.")
-#                 else:
-#                     raise WallarooParameterError(
-#                         "Please declare a new pipeline before adding "
-#                         "computation steps.")
-
-#             if action[0] == "new_pipeline":
-#                 self._validate_unique_pipeline_name(action[1], action[2])
-#                 expect_steps = True
-#             elif action[0] == "to_state_partition":
-#                 self._validate_state(action[2], action[3], action[5])
-#                 self._validate_unique_partition_labels(action[5])
-#                 self._validate_partition_function(action[4])
-#             elif action[0] == "to_stateful":
-#                 self._validate_state(action[2], action[3])
-#             elif action[0] == "to_sink":
-#                 has_sink = True
-#                 expect_steps = False
-
-#             last_action = action[0]
-
-#         # After checking all of our actions, we should have seen at least one
-#         # pipeline terminated with a sink.
-#         if not has_sink:
-#             raise WallarooParameterError(
-#                 "At least one pipeline must define a sink")
-
-#     def _validate_unique_pipeline_name(self, pipeline, source_config):
-#         if pipeline in self._pipelines:
-#             raise WallarooParameterError((
-#                 "A computation named {0} is defined more than once. "
-#                 "Please use unique names for your steps."
-#                 ).format(repr(computation.name)))
-#         else:
-#             self._pipelines[pipeline] = source_config
-
-#     def _validate_state(self, ctor, name, partitions = None):
-#         if name in self._states:
-#             (other_ctor, other_partitions) = self._states[name]
-#             if other_ctor.state_cls != ctor.state_cls:
-#                 raise WallarooParameterError((
-#                     "A state with the name {0} has already been defined with "
-#                     "an different type {1}, instead of {2}."
-#                     ).format(repr(name), other_ctor.state_cls, ctor.state_cls))
-#             if other_partitions != partitions:
-#                 raise WallarooParameterError((
-#                     "A state with the name {0} has already been defined with "
-#                     "an different paritioning scheme {1}, instead of {2}."
-#                     ).format(repr(name), repr(other_partitions), repr(partitions)))
-#         else:
-#             self._states[name] = (ctor, partitions)
-
-#     def _validate_unique_partition_labels(self, partitions):
-#         if type(partitions) != list:
-#             raise WallarooParameterError(
-#                 "Partitions lists should be of type list. Got a {0} instead."
-#                 .format(type(partitions)))
-#         if len(set(partitions)) != len(partitions):
-#             raise WallarooParameterError(
-#                 "Partition labels should be uniquely identified via equality "
-#                 "and support hashing. You might have duplicates or objects "
-#                 "which can't be used as keys in a dict.")
-
-#     def _validate_partition_function(self, partition_function):
-#         if not getattr(partition_function, "partition", None):
-#             raise WallarooParameterError(
-#                 "Partition function is missing partition method. "
-#                 "Did you forget to use the @wallaroo.partition_function "
-#                 "decorator?")
-
-
-def _validate_arity_compatability(obj, arity):
+def _validate_arity_compatability(name, obj, arity):
     """
     To assist in proper API use, it's convenient to fail fast with erros as
     soon as possible. We use this function to check things we decorate for
     compatibility with our desired number of arguments.
     """
     if not callable(obj):
-        raise WallarooParameterError(
-            "Expected a callable object but got a {0}".format(obj))
+        print("\nAPI_Error: Expected a callable object but got a {0} for {1}".format(obj, name))
+        raise WallarooParameterError()
     spec = inspect.getargspec(obj)
     upper_bound = len(spec.args)
     lower_bound = upper_bound - (len(spec.defaults) if spec.defaults else 0)
     if arity > upper_bound or arity < lower_bound:
-        raise WallarooParameterError((
-            "Incompatible function arity, your function must allow {0} "
-            "arguments."
-            ).format(arity))
-
+        if arity == 1:
+            param_term = 'parameter'
+        else:
+            param_term = 'parameters'
+        print("\nAPI_Error: Incompatible function arity, your function {0} must have {1} {2}."
+            ).format(name, arity, param_term)
+        raise WallarooParameterError()
 
 def attach_to_module(cls, cls_name, func):
     # Do some scope mangling to create a uniquely named class based on
@@ -444,7 +332,7 @@ class ConnectorEncoder(BaseWrapped):
 
 def computation(name):
     def wrapped(func):
-        _validate_arity_compatability(func, 1)
+        _validate_arity_compatability(name, func, 1)
         C = _wallaroo_wrap(name, func, Computation)
         return C()
     return wrapped
@@ -452,41 +340,25 @@ def computation(name):
 
 def state_computation(name, state):
     def wrapped(func):
-        _validate_arity_compatability(func, 2)
+        _validate_arity_compatability(name, func, 2)
         C = _wallaroo_wrap(name, func, StateComputation, state=state)
         # C = _wallaroo_wrap(name, func, StateComputation, state=StateBuilder(state))
         return C()
     return wrapped
 
-# def state_computation(name):
-#     def wrapped(func):
-#         _validate_arity_compatability(func, 2)
-#         C = _wallaroo_wrap(name, func, StateComputation)
-#         return C()
-#     return wrapped
-
-
 def computation_multi(name):
     def wrapped(func):
-        _validate_arity_compatability(func, 1)
+        _validate_arity_compatability(name, func, 1)
         C = _wallaroo_wrap(name, func, ComputationMulti)
         return C()
     return wrapped
 
 def state_computation_multi(name, state):
     def wrapped(func):
-        _validate_arity_compatability(func, 2)
+        _validate_arity_compatability(name, func, 2)
         C = _wallaroo_wrap(name, func, StateComputationMulti, state=StateBuilder(state))
         return C()
     return wrapped
-
-# def state_computation_multi(name):
-#     def wrapped(func):
-#         _validate_arity_compatability(func, 2)
-#         C = _wallaroo_wrap(name, func, StateComputationMulti)
-#         return C()
-#     return wrapped
-
 
 class StateBuilder(object):
     def __init__(self, state_cls):
@@ -495,29 +367,24 @@ class StateBuilder(object):
     def initial_state(self):
         return self.state_cls()
 
-
-
 def key_extractor(func):
-    _validate_arity_compatability(func, 1)
+    _validate_arity_compatability(func.__name__, func, 1)
     C = _wallaroo_wrap(func.__name__, func, KeyExtractor)
     return C()
 
-
 def decoder(header_length, length_fmt):
     def wrapped(func):
-        _validate_arity_compatability(func, 1)
+        _validate_arity_compatability(func.__name__, func, 1)
         C = _wallaroo_wrap(func.__name__, func, OctetDecoder,
                            header_length = header_length,
                            length_fmt = length_fmt)
         return C()
     return wrapped
 
-
 def encoder(func):
-    _validate_arity_compatability(func, 1)
+    _validate_arity_compatability(func.__name__, func, 1)
     C = _wallaroo_wrap(func.__name__, func, OctetEncoder)
     return C()
-
 
 class TCPSourceConfig(object):
     def __init__(self, host, port, decoder):
@@ -528,14 +395,12 @@ class TCPSourceConfig(object):
     def to_tuple(self):
         return ("tcp", self._host, self._port, self._decoder)
 
-
 class GenSourceConfig(object):
     def __init__(self, gen_instance):
         self._gen = gen_instance
 
     def to_tuple(self):
         return ("gen", self._gen)
-
 
 class TCPSinkConfig(object):
     def __init__(self, host, port, encoder):
@@ -545,7 +410,6 @@ class TCPSinkConfig(object):
 
     def to_tuple(self):
         return ("tcp", self._host, self._port, self._encoder)
-
 
 class CustomKafkaSourceCLIParser(object):
     def __init__(self, args, decoder):
@@ -559,7 +423,6 @@ class CustomKafkaSourceCLIParser(object):
 
     def to_tuple(self):
         return ("kafka", self.topic, self.brokers, self.log_level, self.decoder)
-
 
 class CustomKafkaSinkCLIParser(object):
     def __init__(self, args, encoder):
@@ -577,7 +440,6 @@ class CustomKafkaSinkCLIParser(object):
         return ("kafka", self.topic, self.brokers, self.log_level,
                 self.max_produce_buffer_ms, self.max_message_size, self.encoder)
 
-
 class DefaultKafkaSourceCLIParser(object):
     def __init__(self, decoder, name="kafka_source"):
         self.decoder = decoder
@@ -585,7 +447,6 @@ class DefaultKafkaSourceCLIParser(object):
 
     def to_tuple(self):
         return ("kafka-internal", self.name, self.decoder)
-
 
 class DefaultKafkaSinkCLIParser(object):
     def __init__(self, encoder, name="kafka_sink"):
@@ -595,7 +456,6 @@ class DefaultKafkaSinkCLIParser(object):
     def to_tuple(self):
         return ("kafka-internal", self.name, self.encoder)
 
-
 def tcp_parse_input_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
     parser.add_argument('-i', '--in', dest="input_addrs")
@@ -603,14 +463,12 @@ def tcp_parse_input_addrs(args):
     # split H1:P1,H2:P2... into [(H1, P1), (H2, P2), ...]
     return [tuple(x.split(':')) for x in input_addrs.split(',')]
 
-
 def tcp_parse_output_addrs(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
     parser.add_argument('-o', '--out', dest="output_addrs")
     output_addrs = parser.parse_known_args(args)[0].output_addrs
     # split H1:P1,H2:P2... into [(H1, P1), (H2, P2), ...]
     return [tuple(x.split(':')) for x in output_addrs.split(',')]
-
 
 def kafka_parse_source_options(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
@@ -627,7 +485,6 @@ def kafka_parse_source_options(args):
     brokers = [_kafka_parse_broker(b) for b in known_args.brokers.split(",")]
 
     return (known_args.topic, brokers, known_args.log_level)
-
 
 def kafka_parse_sink_options(args):
     parser = argparse.ArgumentParser(prog="wallaroo")
@@ -654,7 +511,6 @@ def kafka_parse_sink_options(args):
     return (known_args.topic, brokers, known_args.log_level,
             known_args.max_produce_buffer_ms, known_args.max_message_size)
 
-
 def _kafka_parse_broker(broker):
     """
     `broker` is a string of `host[:port]`, return a tuple of `(host, port)`
@@ -669,7 +525,6 @@ def _kafka_parse_broker(broker):
 
     return (host, port)
 
-
 # Each node is a list of stages. Each of these lists will either begin with a "source" stage
 # (if it is a leaf of the tree) or a "merge" stage (if it is not a leaf).
 class _PipelineTree(object):
@@ -677,12 +532,18 @@ class _PipelineTree(object):
         self.root_idx = 0
         self.vs = [[source_stage]]
         self.es = [[]]
+        self.is_closed = False
 
     def is_empty(self):
         return len(self.vs == 0)
 
     def add_stage(self, stage):
+        if self.is_closed:
+            print("\nAPI_Error: You can't add stages after to_sink/s.")
+            raise WallarooParameterError()
         self.vs[self.root_idx].append(stage)
+        if (stage[0] == 'to_sink') or (stage[0] == 'to_sinks'):
+            self.is_closed = True
         return self
 
     def merge(self, p_graph):
@@ -725,4 +586,5 @@ class _PipelineTree(object):
         pt.root_idx = self.root_idx
         pt.vs = new_vs
         pt.es = new_es
+        pt.is_closed = self.is_closed
         return pt
