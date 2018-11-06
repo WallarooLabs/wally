@@ -25,7 +25,7 @@ use "wallaroo/ent/checkpoint"
 use "wallaroo_labs/mort"
 
 primitive StepStateMigrator
-  fun receive_state(step: Step ref, runner: Runner, state_name: StateName,
+  fun receive_state(step: Step ref, runner: Runner, step_group: RoutingId,
     key: Key, state_bytes: ByteSeq val)
   =>
     ifdef "trace" then
@@ -33,19 +33,19 @@ primitive StepStateMigrator
     end
     match runner
     | let r: SerializableStateRunner =>
-      r.import_key_state(step, state_name, key, state_bytes)
+      r.import_key_state(step, step_group, key, state_bytes)
     else
       Fail()
     end
 
   fun send_state(step: Step ref, runner: Runner, id: RoutingId,
-    boundary: OutgoingBoundary, state_name: String, key: Key,
+    boundary: OutgoingBoundary, step_group: RoutingId, key: Key,
     checkpoint_id: CheckpointId, auth: AmbientAuth)
   =>
     match runner
     | let r: SerializableStateRunner =>
       let state_bytes = r.export_key_state(step, key)
-      boundary.migrate_key(id, state_name, key, checkpoint_id,
+      boundary.migrate_key(id, step_group, key, checkpoint_id,
         state_bytes)
     else
       Fail()

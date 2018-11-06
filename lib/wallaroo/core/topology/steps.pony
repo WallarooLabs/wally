@@ -409,34 +409,34 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   ///////////////
   // GROW-TO-FIT
-  be receive_key_state(state_name: StateName, key: Key,
+  be receive_key_state(step_group: RoutingId, key: Key,
     state_bytes: ByteSeq val)
   =>
     ifdef "autoscale" then
-      StepStateMigrator.receive_state(this, _runner, state_name, key,
+      StepStateMigrator.receive_state(this, _runner, step_group, key,
         state_bytes)
       @printf[I32]("Received state for step %s\n".cstring(),
         _id.string().cstring())
     end
 
-  be send_state(boundary: OutgoingBoundary, state_name: String, key: Key,
+  be send_state(boundary: OutgoingBoundary, step_group: RoutingId, key: Key,
     checkpoint_id: CheckpointId)
   =>
     ifdef "autoscale" then
       match _step_message_processor
       | let nmp: NormalStepMessageProcessor =>
-        StepStateMigrator.send_state(this, _runner, _id, boundary, state_name,
+        StepStateMigrator.send_state(this, _runner, _id, boundary, step_group,
           key, checkpoint_id, _auth)
       else
         Fail()
       end
     end
 
-  fun ref register_key(state_name: StateName, key: Key) =>
-    _router_registry.register_key(state_name, key)
+  fun ref register_key(step_group: RoutingId, key: Key) =>
+    _router_registry.register_key(step_group, key)
 
-  fun ref unregister_key(state_name: StateName, key: Key) =>
-    _router_registry.unregister_key(state_name, key)
+  fun ref unregister_key(step_group: RoutingId, key: Key) =>
+    _router_registry.unregister_key(step_group, key)
 
   //////////////
   // BARRIER

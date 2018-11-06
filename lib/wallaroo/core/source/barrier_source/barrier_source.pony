@@ -114,7 +114,7 @@ actor BarrierSource is Source
     // Subscribe to the router if it can be updated over time.
     match router'
     | let pr: StatePartitionRouter =>
-      _router_registry.register_partition_router_subscriber(pr.state_name(),
+      _router_registry.register_partition_router_subscriber(pr.step_group(),
         this)
     | let spr: StatelessPartitionRouter =>
       _router_registry.register_stateless_partition_router_subscriber(

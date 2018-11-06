@@ -41,7 +41,7 @@ type StepInitializer is (StepBuilder | SourceData | EgressBuilder |
 class val StepBuilder
   let _app_name: String
   let _pipeline_name: String
-  let _routing_group: (StateName | RoutingId)
+  let _routing_group: (RoutingId)
   let _runner_builder: RunnerBuilder
   let _id: RoutingId
   let _grouper: GrouperBuilder
@@ -50,7 +50,7 @@ class val StepBuilder
 
   new val create(app_name: String,
     pipeline_name': String, r: RunnerBuilder, id': RoutingId,
-    routing_group': (StateName | RoutingId),
+    routing_group': RoutingId,
     grouper': GrouperBuilder = OneToOneGroup, is_stateful': Bool = false)
   =>
     _app_name = app_name
@@ -63,7 +63,7 @@ class val StepBuilder
     _parallelism = r.parallelism()
 
   fun name(): String => _runner_builder.name()
-  fun routing_group(): (StateName | RoutingId | None) => _routing_group
+  fun routing_group(): RoutingId => _routing_group
   fun pipeline_name(): String => _pipeline_name
   fun id(): RoutingId => _id
   fun is_prestate(): Bool => _runner_builder.is_prestate()
@@ -113,7 +113,7 @@ class val SourceData
   fun runner_builder(): RunnerBuilder => _runner_builder
 
   fun name(): String => _name
-  fun routing_group(): (StateName | RoutingId | None) => None
+  fun routing_group(): (RoutingId | None) => None
   fun pipeline_name(): String => _pipeline_name
   fun id(): RoutingId => _id
   fun is_prestate(): Bool => _runner_builder.is_prestate()
@@ -140,7 +140,7 @@ class val EgressBuilder
     _sink_builder = sink_builder
 
   fun name(): String => _name
-  fun routing_group(): (StateName | RoutingId | None) => None
+  fun routing_group(): (RoutingId | None) => None
   fun pipeline_name(): String => _pipeline_name
   fun id(): RoutingId => _id
   fun is_prestate(): Bool => false
@@ -174,7 +174,7 @@ class val MultiSinkBuilder
     _sink_builders = sink_builders
 
   fun name(): String => _name
-  fun routing_group(): (StateName | RoutingId | None) => None
+  fun routing_group(): (RoutingId | None) => None
   fun pipeline_name(): String => _pipeline_name
   fun id(): RoutingId => _id
   fun is_prestate(): Bool => false

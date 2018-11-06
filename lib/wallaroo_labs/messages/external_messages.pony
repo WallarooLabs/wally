@@ -20,8 +20,10 @@ use "buffered"
 use "collections"
 use "net"
 use "../query"
+use "../string_set"
 use "../../wallaroo/core/common"
 use "../../wallaroo/core/topology"
+use "../../wallaroo_labs/mort"
 
 primitive _Print                                    fun apply(): U16 => 1
 primitive _RotateLog                                fun apply(): U16 => 2
@@ -98,7 +100,8 @@ primitive ExternalMsgEncoder
     """
     _encode(_PartitionQuery(), "", wb)
 
-  fun partition_query_response(state_routers: Map[String, StatePartitionRouter],
+  fun partition_query_response(
+    state_routers: Map[U128, StatePartitionRouter],
     stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
@@ -134,8 +137,9 @@ primitive ExternalMsgEncoder
     """
     _encode(_PartitionCountQuery(), "", wb)
 
-  fun partition_count_query_response(state_routers: Map[String,
-    StatePartitionRouter], stateless_routers: Map[U128, StatelessPartitionRouter],
+  fun partition_count_query_response(
+    state_routers: Map[U128, StatePartitionRouter],
+    stateless_routers: Map[U128, StatelessPartitionRouter],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
     let digest_map = _partition_digest(state_routers, stateless_routers)
@@ -162,11 +166,12 @@ primitive ExternalMsgEncoder
     _encode(_StateEntityQuery(), "", wb)
 
   fun state_entity_query_response(
-    local_keys: Map[StateName, SetIs[Key]],
+    local_keys: Map[RoutingId, StringSet],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
     let digest_map = _state_entity_digest(local_keys)
     let seqr = StateEntityQueryEncoder.state_entity_keys(digest_map)
+    @printf[I32]("!@ HERE'S THE StateEntityResponse: %s\n".cstring(), seqr.cstring())
     _encode(_StateEntityQueryResponse(), seqr, wb)
 
   fun stateless_partition_query(wb: Writer = Writer): Array[ByteSeq] val =>
@@ -192,7 +197,7 @@ primitive ExternalMsgEncoder
     _encode(_StateEntityCountQuery(), "", wb)
 
   fun state_entity_count_query_response(
-    local_keys: Map[String, SetIs[Key]],
+    local_keys: Map[U128, StringSet],
     wb: Writer = Writer): Array[ByteSeq] val
   =>
     let digest_map = _state_entity_digest(local_keys)
@@ -215,7 +220,7 @@ primitive ExternalMsgEncoder
       StatelessPartitionCountQueryEncoder.stateless_partition_count(digest_map)
     _encode(_StatelessPartitionCountQueryResponse(), spcqr, wb)
 
-  fun _partition_digest(state_routers: Map[StateName, StatePartitionRouter],
+  fun _partition_digest(state_routers: Map[U128, StatePartitionRouter],
     stateless_routers: Map[U128, StatelessPartitionRouter]):
     Map[String, Map[String, Map[String, Array[String] val] val] val] val
   =>
@@ -225,7 +230,7 @@ primitive ExternalMsgEncoder
       recover iso Map[String, Map[WorkerName, Array[String] val] val] end
 
     for (k, v) in state_routers.pairs() do
-      state_ps(k) = v.distribution_digest()
+      state_ps(k.string()) = v.distribution_digest()
     end
 
     for (k, v) in stateless_routers.pairs() do
@@ -239,17 +244,26 @@ primitive ExternalMsgEncoder
     digest_map("stateless_partitions") = consume stateless_ps
     consume digest_map
 
-  fun _state_entity_digest(local_keys: Map[StateName, SetIs[Key]]):
+  fun _state_entity_digest(local_keys: Map[RoutingId, StringSet]):
     Map[String, Array[String] val] val
   =>
-    let state_ps = recover trn Map[StateName, Array[Key] val] end
+    let state_ps = recover trn Map[String, Array[Key] val] end
 
-    for (s_name, keys) in local_keys.pairs() do
+    for (step_group, keys) in local_keys.pairs() do
       let ks = recover iso Array[Key] end
+
+
       for k in keys.values() do
+        //!@
+        if ks.contains(k) then
+          @printf[I32]("!@ Already have %s!\n".cstring(), k.cstring())
+          Fail()
+        end
+
         ks.push(k)
       end
-      state_ps(s_name) = consume ks
+
+      state_ps(step_group.string()) = consume ks
     end
 
     consume state_ps

@@ -41,6 +41,7 @@ use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/messages"
 use "wallaroo_labs/mort"
 use "wallaroo_labs/query"
+use "wallaroo_labs/string_set"
 
 //!@ clean this up
 type _TargetIdRouterUpdatable is Step
@@ -60,12 +61,12 @@ actor RouterRegistry
   let _checkpoint_initiator: CheckpointInitiator
   let _autoscale_initiator: AutoscaleInitiator
   var _data_router: DataRouter
-  var _local_keys: Map[StateName, SetIs[Key]] = _local_keys.create()
-  let _partition_routers: Map[StateName, StatePartitionRouter] =
+  var _local_keys: Map[RoutingId, StringSet] = _local_keys.create()
+  let _partition_routers: Map[RoutingId, StatePartitionRouter] =
     _partition_routers.create()
-  let _stateless_partition_routers: Map[U128, StatelessPartitionRouter] =
+  let _stateless_partition_routers: Map[RoutingId, StatelessPartitionRouter] =
     _stateless_partition_routers.create()
-  let _data_receiver_map: Map[StateName, DataReceiver] =
+  let _data_receiver_map: Map[WorkerName, DataReceiver] =
     _data_receiver_map.create()
 
   //!@
@@ -84,7 +85,7 @@ actor RouterRegistry
   // Subscribers
   // All steps that have a StatePartitionRouter, registered by partition
   // state name
-  let _partition_router_subs: Map[StateName, SetIs[_RouterSub]] =
+  let _partition_router_subs: Map[RoutingId, SetIs[_RouterSub]] =
     _partition_router_subs.create()
   // All steps that have a StatelessPartitionRouter, registered by
   // partition id
@@ -97,7 +98,7 @@ actor RouterRegistry
   // route outputs to a stateless partition. Map is from partition id to
   // state name of state steps that need to know.
   let _stateless_partition_routers_router_subs:
-    Map[U128, _StringSet] =
+    Map[U128, StringSet] =
     _stateless_partition_routers_router_subs.create()
   //
   ////////////////
@@ -129,10 +130,10 @@ actor RouterRegistry
 
   // TODO: Add management of pending keys to Autoscale protocol class
   // Keys migrated out and waiting for acknowledgement
-  let _key_waiting_list: _StringSet = _key_waiting_list.create()
+  let _key_waiting_list: StringSet = _key_waiting_list.create()
 
   // Workers in running cluster that have been stopped for stop the world
-  let _stopped_worker_waiting_list: _StringSet =
+  let _stopped_worker_waiting_list: StringSet =
     _stopped_worker_waiting_list.create()
 
   // TODO: Move management of this list to Autoscale class
@@ -148,8 +149,7 @@ actor RouterRegistry
 
   var _data_receivers_initialized: Bool = false
   var _waiting_to_finish_join: Bool = false
-  var _joining_state_routing_ids: (Map[StateName, RoutingId] val | None) = None
-  var _joining_stateless_partition_routing_ids:
+  var _joining_step_group_routing_ids:
     (Map[RoutingId, RoutingId] val | None) = None
 
   var _event_log: (EventLog | None) = None
@@ -186,9 +186,7 @@ actor RouterRegistry
     _contacted_worker = contacted_worker
     _data_router =
       DataRouter(_worker_name, recover Map[RoutingId, Consumer] end,
-        recover Map[StateName, Array[Step] val] end,
         recover Map[RoutingId, Array[Step] val] end,
-        recover Map[RoutingId, StateName] end,
         recover Map[RoutingId, RoutingId] end)
     _initializer_name = initializer_name
     _autoscale = Autoscale(_auth, _worker_name, this, _connections, is_joining)
@@ -215,12 +213,9 @@ actor RouterRegistry
   be data_receivers_initialized() =>
     _data_receivers_initialized = true
     if _waiting_to_finish_join then
-      match (_joining_state_routing_ids,
-        _joining_stateless_partition_routing_ids)
-      | (let sri: Map[StateName, RoutingId] val,
-        let spri: Map[RoutingId, RoutingId] val)
-      =>
-        if _inform_contacted_worker_of_initialization(sri, spri) then
+      match _joining_step_group_routing_ids
+      | let sri: Map[RoutingId, RoutingId] val =>
+        if _inform_contacted_worker_of_initialization(sri) then
           _waiting_to_finish_join = false
         end
       else
@@ -232,12 +227,12 @@ actor RouterRegistry
     _data_router = dr
     _distribute_data_router()
 
-  be set_state_partition_router(state_name: StateName,
+  be set_state_partition_router(step_group: RoutingId,
     pr: StatePartitionRouter)
   =>
-    _partition_routers(state_name) = pr
-    if not _local_keys.contains(state_name) then
-      _local_keys(state_name) = SetIs[Key]
+    _partition_routers(step_group) = pr
+    if not _local_keys.contains(step_group) then
+      _local_keys(step_group) = StringSet
     end
 
   be set_stateless_partition_router(partition_id: U128,
@@ -299,12 +294,9 @@ actor RouterRegistry
     if _waiting_to_finish_join and
       (_control_channel_listeners.size() != 0)
     then
-      match (_joining_state_routing_ids,
-        _joining_stateless_partition_routing_ids)
-      | (let sri: Map[StateName, RoutingId] val,
-        let spri: Map[RoutingId, RoutingId] val)
-      =>
-        _inform_contacted_worker_of_initialization(sri, spri)
+      match _joining_step_group_routing_ids
+      | let sri: Map[RoutingId, RoutingId] val =>
+        _inform_contacted_worker_of_initialization(sri)
         _waiting_to_finish_join = false
       else
         Fail()
@@ -316,12 +308,9 @@ actor RouterRegistry
     if _waiting_to_finish_join and
       (_data_channel_listeners.size() != 0)
     then
-      match (_joining_state_routing_ids,
-        _joining_stateless_partition_routing_ids)
-      | (let sri: Map[StateName, RoutingId] val,
-        let spri: Map[RoutingId, RoutingId] val)
-      =>
-        _inform_contacted_worker_of_initialization(sri, spri)
+      match _joining_step_group_routing_ids
+      | let sri: Map[RoutingId, RoutingId] val =>
+        _inform_contacted_worker_of_initialization(sri)
         _waiting_to_finish_join = false
       else
         Fail()
@@ -332,28 +321,28 @@ actor RouterRegistry
     // TODO: These need to be unregistered if they close
     _data_channels.set(dc)
 
-  be register_partition_router_subscriber(state_name: StateName,
+  be register_partition_router_subscriber(step_group: RoutingId,
     sub: _RouterSub)
   =>
-    _register_partition_router_subscriber(state_name, sub)
+    _register_partition_router_subscriber(step_group, sub)
 
-  fun ref _register_partition_router_subscriber(state_name: StateName,
+  fun ref _register_partition_router_subscriber(step_group: RoutingId,
     sub: _RouterSub)
   =>
     try
-      _partition_router_subs.insert_if_absent(state_name,
+      _partition_router_subs.insert_if_absent(step_group,
         SetIs[_RouterSub])?
-      _partition_router_subs(state_name)?.set(sub)
+      _partition_router_subs(step_group)?.set(sub)
     else
       Fail()
     end
 
-  be unregister_partition_router_subscriber(state_name: StateName,
+  be unregister_partition_router_subscriber(step_group: RoutingId,
     sub: _RouterSub)
   =>
-    Invariant(_partition_router_subs.contains(state_name))
+    Invariant(_partition_router_subs.contains(step_group))
     try
-      _partition_router_subs(state_name)?.unset(sub)
+      _partition_router_subs(step_group)?.unset(sub)
     else
       Fail()
     end
@@ -456,38 +445,40 @@ actor RouterRegistry
   be register_data_receiver(worker: WorkerName, dr: DataReceiver) =>
     _data_receiver_map(worker) = dr
 
-  be register_key(state_name: StateName, key: Key,
+  be register_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
   =>
-    _register_key(state_name, key, checkpoint_id)
+    _register_key(step_group, key, checkpoint_id)
 
-  fun ref _register_key(state_name: StateName, key: Key,
+  fun ref _register_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
   =>
     try
-      if not _local_keys.contains(state_name) then
-        _local_keys(state_name) = SetIs[Key]
+      if not _local_keys.contains(step_group) then
+        _local_keys(step_group) = StringSet
       end
-      _local_keys(state_name)?.set(key)
+      @printf[I32]("!@ _register_key: Setting key %s. Set size: %s\n".cstring(), key.cstring(), _local_keys(step_group)?.size().string().cstring())
+      _local_keys(step_group)?.set(key)
+      @printf[I32]("!@ -- AFTER: Set size: %s\n".cstring(), _local_keys(step_group)?.size().string().cstring())
       (_local_topology_initializer as LocalTopologyInitializer)
-        .register_key(state_name, key, checkpoint_id)
+        .register_key(step_group, key, checkpoint_id)
     else
       Fail()
     end
 
-  be unregister_key(state_name: StateName, key: Key,
+  be unregister_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
   =>
-    _unregister_key(state_name, key, checkpoint_id)
+    _unregister_key(step_group, key, checkpoint_id)
 
-  fun ref _unregister_key(state_name: StateName, key: Key,
+  fun ref _unregister_key(step_group: RoutingId, key: Key,
     checkpoint_id: (CheckpointId | None) = None)
   =>
     try
-      _local_keys.insert_if_absent(state_name, SetIs[Key])?
-      _local_keys(state_name)?.unset(key)
+      _local_keys.insert_if_absent(step_group, StringSet)?
+      _local_keys(step_group)?.unset(key)
       (_local_topology_initializer as LocalTopologyInitializer)
-        .unregister_key(state_name, key, checkpoint_id)
+        .unregister_key(step_group, key, checkpoint_id)
     else
       Fail()
     end
@@ -506,12 +497,12 @@ actor RouterRegistry
 
   fun ref _distribute_partition_router(partition_router: StatePartitionRouter)
   =>
-    let state_name = partition_router.state_name()
+    let step_group = partition_router.step_group()
 
     try
-      _partition_router_subs.insert_if_absent(state_name,
+      _partition_router_subs.insert_if_absent(step_group,
         SetIs[_RouterSub])?
-      for sub in _partition_router_subs(state_name)?.values() do
+      for sub in _partition_router_subs(step_group)?.values() do
         sub.update_router(partition_router)
       end
     else
@@ -811,16 +802,16 @@ actor RouterRegistry
   /////////////////////////////////////////////////////////////////////////////
   // ROLLBACK
   /////////////////////////////////////////////////////////////////////////////
-  be rollback_keys(r_keys: Map[StateName, SetIs[Key] val] val,
+  be rollback_keys(r_keys: Map[RoutingId, StringSet val] val,
     promise: Promise[None])
   =>
-    let new_keys = Map[StateName, SetIs[Key]]
-    for (state_name, keys) in r_keys.pairs() do
-      let ks = SetIs[Key]
+    let new_keys = Map[RoutingId, StringSet]
+    for (step_group, keys) in r_keys.pairs() do
+      let ks = StringSet
       for k in keys.values() do
         ks.set(k)
       end
-      new_keys(state_name) = ks
+      new_keys(step_group) = consume ks
     end
 
     _local_keys = new_keys
@@ -861,21 +852,10 @@ actor RouterRegistry
     end
 
   be connect_to_joining_workers(ws: Array[WorkerName] val,
-    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
-    new_stateless_partition_routing_ids:
+    new_step_group_routing_ids:
       Map[WorkerName, Map[RoutingId, RoutingId] val] val,
     coordinator: WorkerName)
   =>
-    //!@ Do we need this to happen here?
-    // for w in ws.values() do
-    //   try
-    //     _update_state_routing_ids(w, new_state_routing_ids(w)?)
-    //     _add_joining_worker_to_stateless_partition_routers(w,
-    //       new_stateless_partition_routing_ids(w)?)
-    //   else
-    //     Fail()
-    //   end
-    // end
     try
       (_autoscale as Autoscale).connect_to_joining_workers(ws, coordinator)
     else
@@ -883,57 +863,48 @@ actor RouterRegistry
     end
 
   be joining_worker_initialized(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val,
-    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
+    step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
-    _update_state_routing_ids(worker, state_routing_ids)
-    _add_joining_worker_to_stateless_partition_routers(worker,
-      stateless_partition_routing_ids)
+    _add_joining_worker_to_routers(worker, step_group_routing_ids)
     try
       (_autoscale as Autoscale).joining_worker_initialized(worker,
-        state_routing_ids, stateless_partition_routing_ids)
+        step_group_routing_ids)
     else
       Fail()
     end
 
-  fun ref _update_state_routing_ids(worker: WorkerName,
-    state_routing_ids: Map[StateName, RoutingId] val)
+  fun ref _add_joining_worker_to_routers(worker: WorkerName,
+    step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
-    for (state_name, id) in state_routing_ids.pairs() do
-      try
-        let new_state_routing_id = state_routing_ids(state_name)?
-        let new_router = _partition_routers(state_name)?
-          .add_state_routing_id(worker, new_state_routing_id)
-        _partition_routers(state_name) = new_router
-        _distribute_partition_router(new_router)
+    for (sg_rid, w_rid) in step_group_routing_ids.pairs() do
+      // Check if this is a step group we know about
+      if _partition_routers.contains(sg_rid) then
+        try
+          let new_router = _partition_routers(sg_rid)?
+            .add_worker_routing_id(worker, w_rid)
+          _partition_routers(sg_rid) = new_router
+          _distribute_partition_router(new_router)
+        else
+          Unreachable()
+        end
+      elseif _stateless_partition_routers.contains(sg_rid) then
+        try
+          let proxy_router = ProxyRouter(_worker_name,
+            _outgoing_boundaries(worker)?,
+            ProxyAddress(worker, w_rid), _auth)
+
+          let new_router = _stateless_partition_routers(sg_rid)?
+            .add_worker(worker, w_rid, proxy_router)
+          _stateless_partition_routers(sg_rid) = new_router
+          _distribute_stateless_partition_router(new_router)
+        else
+          Fail()
+        end
       else
-        Fail()
-      end
-    end
-
-  fun ref _add_joining_worker_to_stateless_partition_routers(
-    worker: WorkerName,
-    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
-  =>
-    for (p_id, id) in stateless_partition_routing_ids.pairs() do
-      try
-        @printf[I32]("!@ --> look up routing id\n".cstring())
-        let new_stateless_partition_routing_id =
-          stateless_partition_routing_ids(p_id)?
-
-        @printf[I32]("!@ --> look up boundary\n".cstring())
-        let proxy_router = ProxyRouter(_worker_name,
-          _outgoing_boundaries(worker)?,
-          ProxyAddress(worker, new_stateless_partition_routing_id), _auth)
-
-        @printf[I32]("!@ --> look up partition router\n".cstring())
-        let new_router = _stateless_partition_routers(p_id)?
-          .add_worker(worker, new_stateless_partition_routing_id,
-            proxy_router)
-        _stateless_partition_routers(p_id) = new_router
-        _distribute_stateless_partition_router(new_router)
-      else
-        Fail()
+        ifdef debug then
+          @printf[I32]("This worker doesn't know about step group %s\n"
+            .cstring(), sg_rid.string().cstring())
+        end
       end
     end
 
@@ -945,15 +916,12 @@ actor RouterRegistry
       checkpoint_id, rollback_id, _initializer_name)
 
   be inform_contacted_worker_of_initialization(
-    state_routing_ids: Map[StateName, RoutingId] val,
-    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
+    step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
-    _inform_contacted_worker_of_initialization(state_routing_ids,
-      stateless_partition_routing_ids)
+    _inform_contacted_worker_of_initialization(step_group_routing_ids)
 
   fun ref _inform_contacted_worker_of_initialization(
-    state_routing_ids: Map[StateName, RoutingId] val,
-    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val): Bool
+    step_group_routing_ids: Map[RoutingId, RoutingId] val): Bool
   =>
     match _contacted_worker
     | let cw: WorkerName =>
@@ -962,12 +930,10 @@ actor RouterRegistry
          _data_receivers_initialized
       then
         _connections.inform_contacted_worker_of_initialization(cw,
-          state_routing_ids, stateless_partition_routing_ids)
+          step_group_routing_ids)
         true
       else
-        _joining_state_routing_ids = state_routing_ids
-        _joining_stateless_partition_routing_ids =
-          stateless_partition_routing_ids
+        _joining_step_group_routing_ids = step_group_routing_ids
         _waiting_to_finish_join = true
         false
       end
@@ -1092,9 +1058,9 @@ actor RouterRegistry
       @printf[I32]("Migrating partitions to %s\n".cstring(), w.cstring())
     end
     var had_steps_to_migrate = false
-    for state_name in _partition_routers.keys() do
+    for step_group in _partition_routers.keys() do
       let had_steps_to_migrate_for_this_state =
-        _migrate_partition_steps(state_name, target_workers,
+        _migrate_partition_steps(step_group, target_workers,
           next_checkpoint_id)
       if had_steps_to_migrate_for_this_state then
         had_steps_to_migrate = true
@@ -1146,9 +1112,9 @@ actor RouterRegistry
     joining_workers: Array[WorkerName] val, is_coordinator: Bool)
   =>
     if is_coordinator then
-      let hash_partitions_trn = recover trn Map[StateName, HashPartitions] end
-      for (state_name, pr) in _partition_routers.pairs() do
-        hash_partitions_trn(state_name) = pr.hash_partitions()
+      let hash_partitions_trn = recover trn Map[RoutingId, HashPartitions] end
+      for (step_group, pr) in _partition_routers.pairs() do
+        hash_partitions_trn(step_group) = pr.hash_partitions()
       end
       let hash_partitions = consume val hash_partitions_trn
       try
@@ -1169,18 +1135,18 @@ actor RouterRegistry
 
   be update_partition_routers_after_grow(
     joining_workers: Array[WorkerName] val,
-    hash_partitions: Map[StateName, HashPartitions] val)
+    hash_partitions: Map[RoutingId, HashPartitions] val)
   =>
     """
     Called on joining workers after migration is complete and they've been
     informed of all hash partitions.
     """
-    for (state_name, pr) in _partition_routers.pairs() do
+    for (step_group, pr) in _partition_routers.pairs() do
       var new_pr = pr.update_boundaries(_auth, _outgoing_boundaries)
       try
-        new_pr = new_pr.update_hash_partitions(hash_partitions(state_name)?)
+        new_pr = new_pr.update_hash_partitions(hash_partitions(step_group)?)
         _distribute_partition_router(new_pr)
-        _partition_routers(state_name) = new_pr
+        _partition_routers(step_group) = new_pr
       else
         Fail()
       end
@@ -1193,7 +1159,7 @@ actor RouterRegistry
     """
     _connections.ack_migration_batch_complete(sender_name)
 
-  fun ref _migrate_partition_steps(state_name: StateName,
+  fun ref _migrate_partition_steps(step_group: RoutingId,
     target_workers: Array[WorkerName] val, next_checkpoint_id: CheckpointId): Bool
   =>
     """
@@ -1203,7 +1169,7 @@ actor RouterRegistry
     try
       for w in target_workers.values() do
         @printf[I32]("Migrating steps for %s partition to %s\n".cstring(),
-          state_name.cstring(), w.cstring())
+          step_group.string().cstring(), w.cstring())
       end
 
       let sorted_target_workers =
@@ -1214,24 +1180,24 @@ actor RouterRegistry
         let boundary = _outgoing_boundaries(w)?
         tws.push((w, boundary))
       end
-      let partition_router = _partition_routers(state_name)?
+      let partition_router = _partition_routers(step_group)?
       // Simultaneously calculate new partition router and initiate individual
       // step migration. We get the new router back as well as a Bool
       // indicating whether any steps were migrated.
       (let new_partition_router, let had_steps_to_migrate) =
         partition_router.rebalance_steps_grow(_auth, consume tws, this,
-          _local_keys(state_name)?, next_checkpoint_id)
+          _local_keys(step_group)?, next_checkpoint_id)
       // TODO: It could be if had_steps_to_migrate is false then we don't
       // need to distribute the router because it didn't change. Investigate.
       _distribute_partition_router(new_partition_router)
-      _partition_routers(state_name) = new_partition_router
+      _partition_routers(step_group) = new_partition_router
       had_steps_to_migrate
     else
       Fail()
       false
     end
 
-  fun ref _migrate_all_partition_steps(state_name: StateName,
+  fun ref _migrate_all_partition_steps(step_group: RoutingId,
     target_workers: Array[(WorkerName, OutgoingBoundary)] val,
     leaving_workers: Array[WorkerName] val,
     next_checkpoint_id: CheckpointId): Bool
@@ -1242,10 +1208,10 @@ actor RouterRegistry
     """
     try
       @printf[I32]("Migrating steps for %s partition to %d workers\n"
-        .cstring(), state_name.cstring(), target_workers.size())
-      let partition_router = _partition_routers(state_name)?
+        .cstring(), step_group.string().cstring(), target_workers.size())
+      let partition_router = _partition_routers(step_group)?
       partition_router.rebalance_steps_shrink(target_workers, leaving_workers,
-        this, _local_keys(state_name)?, next_checkpoint_id)
+        this, _local_keys(step_group)?, next_checkpoint_id)
     else
       Fail()
       false
@@ -1403,9 +1369,9 @@ actor RouterRegistry
       .cstring(), remaining_workers.size())
 
     var had_steps_to_migrate = false
-    for state_name in _partition_routers.keys() do
+    for step_group in _partition_routers.keys() do
       let steps_to_migrate_for_this_state =
-        _migrate_all_partition_steps(state_name, rws, leaving_workers,
+        _migrate_all_partition_steps(step_group, rws, leaving_workers,
           next_checkpoint_id)
       if steps_to_migrate_for_this_state then
         had_steps_to_migrate = true
@@ -1484,9 +1450,9 @@ actor RouterRegistry
       //!@ ?? Do we need this ??
       _unmute_request(w)
     end
-    for (state_name, pr) in _partition_routers.pairs() do
+    for (step_group, pr) in _partition_routers.pairs() do
       let new_pr = pr.recalculate_hash_partitions_for_shrink(leaving_workers)
-      _partition_routers(state_name) = new_pr
+      _partition_routers(step_group) = new_pr
       //!@ Do we need to keep distributing like this?
       _distribute_partition_router(new_pr)
     end
@@ -1499,10 +1465,10 @@ actor RouterRegistry
 
   be receive_immigrant_key(msg: KeyMigrationMsg) =>
     try
-      _register_key(msg.state_name(), msg.key(), msg.checkpoint_id())
-      _partition_routers(msg.state_name())?
+      _register_key(msg.step_group(), msg.key(), msg.checkpoint_id())
+      _partition_routers(msg.step_group())?
         .receive_key_state(msg.key(), msg.state())
-      _connections.notify_cluster_of_new_key(msg.key(), msg.state_name())
+      _connections.notify_cluster_of_new_key(msg.key(), msg.step_group())
     else
       Fail()
     end
@@ -1580,26 +1546,3 @@ actor RouterRegistry
     for source in _sources.values() do
       source.update_worker_data_service(worker, host, service)
     end
-
-/////////////////////////////////////////////////////////////////////////////
-// TODO: Replace using this with the badly named SetIs once we address a bug
-// in SetIs where unsetting doesn't reduce set size for type SetIs[String].
-class _StringSet
-  let _map: Map[String, String] = _map.create()
-
-  fun ref set(s: String) =>
-    _map(s) = s
-
-  fun ref unset(s: String) =>
-    try _map.remove(s)? end
-
-  fun ref clear() =>
-    _map.clear()
-
-  fun size(): USize =>
-    _map.size()
-
-  fun values(): MapValues[String, String, HashEq[String],
-    this->HashMap[String, String, HashEq[String]]]^
-  =>
-    _map.values()

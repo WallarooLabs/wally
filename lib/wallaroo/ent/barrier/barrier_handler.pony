@@ -21,6 +21,7 @@ use "wallaroo/core/invariant"
 use "wallaroo/core/sink"
 use "wallaroo_labs/collection_helpers"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/string_set"
 
 
 trait BarrierHandler
@@ -69,7 +70,7 @@ class PendingBarrierHandler is BarrierHandler
 
   new create(worker_name: String, i: BarrierInitiator ref,
     barrier_token: BarrierToken, sinks: SetIs[BarrierReceiver] box,
-    ws: _StringSet box, result_promise: BarrierResultPromise,
+    ws: StringSet box, result_promise: BarrierResultPromise,
     primary_worker: String)
   =>
     _worker_name = worker_name
@@ -167,7 +168,7 @@ class InProgressPrimaryBarrierHandler is BarrierHandler
   new create(worker_name: String, i: BarrierInitiator ref,
     barrier_token: BarrierToken, acked_sinks: SetIs[BarrierReceiver] box,
     acked_ws: SetIs[String] box, sinks: SetIs[BarrierReceiver] box,
-    ws: _StringSet box, result_promise: BarrierResultPromise)
+    ws: StringSet box, result_promise: BarrierResultPromise)
   =>
     _worker_name = worker_name
     _initiator = i
@@ -277,7 +278,7 @@ class WorkerAcksBarrierHandler is BarrierHandler
   let _result_promise: BarrierResultPromise
 
   new create(i: BarrierInitiator ref, ifa_id: BarrierToken,
-    ws: _StringSet box, ws_acked: SetIs[String] val,
+    ws: StringSet box, ws_acked: SetIs[String] val,
     result_promise: BarrierResultPromise)
   =>
     _initiator = i

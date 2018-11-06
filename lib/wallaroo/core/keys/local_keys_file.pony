@@ -24,6 +24,7 @@ use "wallaroo/core/common"
 use "wallaroo/ent/checkpoint"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/mort"
+use "wallaroo_labs/string_set"
 
 
 primitive LocalKeysFileCommand
@@ -34,8 +35,7 @@ class LocalKeysFile
   // Entry format:
   //   1 - LocalKeysFileCommand
   //   8 - CheckpointId
-  //   4 - StateName entry length x
-  //   x - StateName
+  //   16 - Step Group RoutingId
   //   4 - Key entry length y
   //   y - Key
   let _file: AsyncJournalledFile iso
@@ -50,37 +50,37 @@ class LocalKeysFile
     _file = recover iso AsyncJournalledFile(_filepath, the_journal, auth,
       do_local_file_io) end
 
-  fun ref add_key(state_name: StateName, k: Key, checkpoint_id: CheckpointId)
+  fun ref add_key(step_group: RoutingId, k: Key, checkpoint_id: CheckpointId)
   =>
-    let payload_size = 4 + state_name.size() + 4 + k.size()
+    let payload_size = 16 + 4 + k.size()
 
     _writer.u8(LocalKeysFileCommand.add())
     _writer.u64_be(checkpoint_id)
 
     _writer.u32_be(payload_size.u32())
-    _writer.u32_be(state_name.size().u32())
-    _writer.write(state_name)
+    _writer.u128_be(step_group)
     _writer.u32_be(k.size().u32())
     _writer.write(k)
     _file.writev(_writer.done())
 
-  fun ref remove_key(state_name: StateName, k: Key, checkpoint_id: CheckpointId) =>
-    let payload_size = 4 + state_name.size() + 4 + k.size()
+  fun ref remove_key(step_group: RoutingId, k: Key,
+    checkpoint_id: CheckpointId)
+  =>
+    let payload_size = 16 + 4 + k.size()
 
     _writer.u8(LocalKeysFileCommand.remove())
     _writer.u64_be(checkpoint_id)
 
     _writer.u32_be(payload_size.u32())
-    _writer.u32_be(state_name.size().u32())
-    _writer.write(state_name)
+    _writer.u128_be(step_group)
     _writer.u32_be(k.size().u32())
     _writer.write(k)
     _file.writev(_writer.done())
 
   fun ref read_local_keys(checkpoint_id: CheckpointId):
-    Map[StateName, SetIs[Key] val] val
+    Map[RoutingId, StringSet val] val
   =>
-    let lks = Map[StateName, SetIs[Key]]
+    let lks = Map[RoutingId, StringSet]
     let r = Reader
     _file.seek_start(0)
     if _file.size() > 0 then
@@ -102,10 +102,8 @@ class LocalKeysFile
             // Skip this entry
             _file.seek(payload_size.isize())
           else
-            r.append(_file.read(4))
-            let s_name_size = r.u32_be()?.usize()
-            r.append(_file.read(s_name_size))
-            let s_name: StateName = String.from_array(r.block(s_name_size)?)
+            r.append(_file.read(16))
+            let step_group = r.u128_be()?
             r.append(_file.read(4))
             let k_size = r.u32_be()?.usize()
             r.append(_file.read(k_size))
@@ -113,11 +111,11 @@ class LocalKeysFile
 
             match cmd
             | LocalKeysFileCommand.add() =>
-              lks.insert_if_absent(s_name, SetIs[Key])?.set(key)
+              lks.insert_if_absent(step_group, StringSet)?.set(key)
             | LocalKeysFileCommand.remove() =>
-              if lks.contains(s_name) then
+              if lks.contains(step_group) then
                 try
-                  let keys = lks(s_name)?
+                  let keys = lks(step_group)?
                   if keys.contains(key) then
                     keys.unset(key)
                   end
@@ -140,12 +138,12 @@ class LocalKeysFile
     end
     @printf[I32]("Finished reading local keys\n".cstring())
 
-    let lks_iso = recover iso Map[StateName, SetIs[Key] val] end
-    for (s, keys) in lks.pairs() do
-      let ks = recover iso SetIs[Key] end
+    let lks_iso = recover iso Map[RoutingId, StringSet val] end
+    for (r_id, keys) in lks.pairs() do
+      let ks = recover iso StringSet end
       for k in keys.values() do
         ks.set(k)
       end
-      lks_iso(s) = consume ks
+      lks_iso(r_id) = consume ks
     end
     consume lks_iso

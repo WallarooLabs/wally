@@ -273,8 +273,7 @@ actor Connections is Cluster
 
   be notify_joining_workers_of_joining_addresses(
     joining_workers: Array[WorkerName] val,
-    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
-    new_stateless_partition_routing_ids:
+    new_step_group_routing_ids:
       Map[WorkerName, Map[RoutingId, RoutingId] val] val)
   =>
     for w1 in joining_workers.values() do
@@ -291,7 +290,7 @@ actor Connections is Cluster
       try
         let msg = ChannelMsgEncoder.announce_connections(
           consume others_control, consume others_data,
-          new_state_routing_ids, new_stateless_partition_routing_ids, _auth)?
+          new_step_group_routing_ids, _auth)?
         _send_control(w1, msg)
       else
         Fail()
@@ -300,8 +299,7 @@ actor Connections is Cluster
 
   be notify_current_workers_of_joining_addresses(
     joining_workers: Array[WorkerName] val,
-    new_state_routing_ids: Map[WorkerName, Map[StateName, RoutingId] val] val,
-    new_stateless_partition_routing_ids:
+    new_step_group_routing_ids:
       Map[WorkerName, Map[RoutingId, RoutingId] val] val)
   =>
     let joining_control = recover iso Map[WorkerName, (String, String)] end
@@ -317,13 +315,13 @@ actor Connections is Cluster
     try
       let msg = ChannelMsgEncoder.announce_joining_workers(_worker_name,
         consume joining_control, consume joining_data,
-        new_state_routing_ids, new_stateless_partition_routing_ids, _auth)?
+        new_step_group_routing_ids, _auth)?
       _send_control_to_cluster(msg where exclusions = joining_workers)
     else
       Fail()
     end
 
-  be notify_cluster_of_new_key(key: Key, state_name: String) =>
+  be notify_cluster_of_new_key(key: Key, step_group: RoutingId) =>
     try
       let migration_complete_msg =
         ChannelMsgEncoder.key_migration_complete(key, _auth)?
@@ -624,8 +622,7 @@ actor Connections is Cluster
 
   be create_data_connection_to_joining_worker(target_name: WorkerName,
     host: String, service: String, new_boundary_id: RoutingId,
-    state_routing_ids: Map[StateName, RoutingId] val,
-    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val,
+    step_group_routing_ids: Map[RoutingId, RoutingId] val,
     lti: LocalTopologyInitializer)
   =>
     _data_addrs(target_name) = (host, service)
@@ -638,7 +635,7 @@ actor Connections is Cluster
     _register_disposable(outgoing_boundary)
     _data_conns(target_name) = outgoing_boundary
     lti.add_boundary_to_joining_worker(target_name, outgoing_boundary,
-      boundary_builder, state_routing_ids, stateless_partition_routing_ids)
+      boundary_builder, step_group_routing_ids)
 
   be update_boundary_ids(boundary_ids: Map[WorkerName, RoutingId] val) =>
     for (worker, boundary) in _data_conns.pairs() do
@@ -693,8 +690,7 @@ actor Connections is Cluster
     end
 
   be inform_contacted_worker_of_initialization(contacted_worker: String,
-    state_routing_ids: Map[StateName, RoutingId] val,
-    stateless_partition_routing_ids: Map[RoutingId, RoutingId] val)
+    step_group_routing_ids: Map[RoutingId, RoutingId] val)
   =>
     try
       if not _has_registered_my_addrs() then
@@ -707,8 +703,7 @@ actor Connections is Cluster
         "I have completed initialization\n").cstring(),
         contacted_worker.cstring())
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
-        _my_control_addr, _my_data_addr, state_routing_ids,
-        stateless_partition_routing_ids, _auth)?
+        _my_control_addr, _my_data_addr, step_group_routing_ids, _auth)?
       _send_control(contacted_worker, msg)
     else
       Fail()
