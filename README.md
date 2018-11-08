@@ -153,6 +153,7 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [irc-badge]: https://img.shields.io/badge/IRC-join%20chat%20%E2%86%92-blue.svg
 [irc-link]: https://webchat.freenode.net/?channels=#wallaroo
 [kafka-link]: https://kafka.apache.org/
+[word_count]: examples/python/word_count/
 [market-spread]: examples/python/market_spread/
 [overview-video]: https://vimeo.com/234753585
 [python-examples]: examples/python/
