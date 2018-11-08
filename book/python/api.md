@@ -4,9 +4,7 @@ The Wallaroo Python API allows developers to create Wallaroo applications in Pyt
 
 ## Overview
 
-In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each step in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function `application_setup`.
-
-The recommended way to create your topology structure is by using the [ApplicationBuilder](#applicationbuilder) in the `wallaroo` module.
+In order to create a Wallaroo application in Python, you need to create the functions and classes that provide the required interfaces for each stage in your pipeline, and then connect them together in a topology structure that is returned by the entry-point function `application_setup`. This function should always return the result of calling `wallaroo.build_application(app_name, pipeline)`.
 
 ## Table of Contents
 
@@ -17,7 +15,7 @@ The recommended way to create your topology structure is by using the [Applicati
 * [StateComputation](#statecomputation)
 * [Data](#data)
 * [Key](#key)
-* [Partition](#partition)
+* [KeyExtractor](#key-extractor)
 * [Sink](#sink)
 * [TCPSink](#tcpsink)
 * [KafkaSink](#kafkasink)
@@ -32,111 +30,163 @@ The recommended way to create your topology structure is by using the [Applicati
 
 After Machida loads a Wallaroo Python application module, it executes its entry point function, `application_setup(args)`, which returns an application topology structure that tells Wallaroo how to connect the classes, functions, and objects behind the scenes. A Wallaroo Python application must provide this function.
 
-The `wallaroo` module provides an [ApplicationBuilder](#wallarooapplicationbuilder) that facilitates the creation of this data structure. When `ApplicationBuilder` is used, a topology can be built using its methods and its structure can be returned by calling `ApplicationBuilder.build()`.
+#### Partial Pipelines
 
-For a simple application with a decoder, computation, and encoder, this function may look like
+A pipeline includes one or more sources. You use `wallaroo.source(...)` to define a stream originating from a source. Each source stream can be followed by one or more computation stages. A linear sequence from a source through zero or more computations constitutes a partial pipeline. For example:
+
+```python
+inputs = wallaroo.source("Source Name", source_config)
+partial_pipeline = inputs.to(my_computation)
+```
+
+This defines a partial pipeline that could be diagrammed as followed:
+
+```
+Source -> my_computation ->
+```
+
+The hanging arrow at the end indicates that the pipeline is partial. We can still add more stages, and to complete the pipeline we need one or more sinks.
+You create complete pipeline by terminating a partial pipeline with a call to `to_sink` or `to_sinks`. For example:
+
+```python
+inputs = wallaroo.source("Source Name", source_config)
+complete_pipeline = (inputs
+    .to(my_computation)
+    .to_sink(sink_config))
+```
+
+Our pipeline is now complete:
+
+```
+Source -> my_computation -> Sink
+```
+
+Unless a call to `to` using a stateless computation is preceded by a call to `key_by` (which partitions messages by key), there are no guarantees around the order messages will be processed in. That's because Wallaroo might parallelize a stateless computation if that is beneficial for scaling. That means the execution graph for the above pipeline could look like this:
+
+```
+         /-> my_stateless_computation -\
+        /                               \
+Source ----> my_stateless_computation ----> Sink
+        \                               /
+         \-> my_stateless_computation -/
+```
+
+Some messages will be routed to each of the parallel computation instances. When they merge again at the sink, these messages will be interleaved in a non-deterministic fashion.
+
+#### Merging Partial Pipelines
+
+You can merge two partial pipelines to form a new partial pipline. For example:
+
+```python
+inputs1 = wallaroo.source("Source 1", source_config)
+partial_pipeline1 = inputs1.to(computation1)
+
+inputs2 = wallaroo.source("Source 2", source_config)
+partial_pipeline2 = inputs2.to(computation2)
+
+partial_pipeline = inputs1.merge(inputs2)
+```
+
+The resulting partial pipeline could be 
+
+```
+Source1 -> computation1 ->\
+                           \
+                            ->
+                           /
+Source2 -> computation2 ->/
+```
+
+Again, the hanging arrow indicates we can still add more stages, and that to complete the pipeline we still need one or more sinks. You could also merge this partial pipeline with yet more partial pipelines. When you merge partial pipelines in this way, you are not creating a join in the sense familiar from SQL joins. Instead, you are combining two streams into one, with messages from the first stream interwoven with messages from the second. That combined stream is then passed to the next stage following the hanging arrow.
+
+The following is an example of a complete pipeline including a merge where we first add one more computation before the sink:
+
+```python
+pipeline = (inputs1.merge(inputs2)
+    .to(computation3)
+    .to_sink(sink_config))
+```
+
+The corresponding diagram for this definition would look like this:
+
+```
+Source1 -> computation1 ->\
+                           \
+                            -> computation3 -> Sink
+                           /
+Source2 -> computation2 ->/
+```
+
+#### Building an Application
+
+Once you have defined a complete pipeline, you must pass it into `wallaroo.build_application(app_name, pipeline)` in order to build the application object you must return from the `application_setup` function.
+
+For a simple application with a decoder, computation, and encoder, the `application_setup` function might look like
 
 ```python
 def application_setup(args):
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
-    out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
+    inputs = wallaroo.source("Source Name", source_config)
+    
+    pipeline = (inputs
+        .to(computation)
+        .to_sink(sink_config))
 
-    ab = wallaroo.ApplicationBuilder("My Application")
-    ab.new_pipeline("pipeline 1",
-                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-    ab.to(computation)
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
-    return ab.build()
+    return wallaroo.build_application("Application Name", pipeline)
 ```
 
 #### `args`
 
 Since the application is run in an embedded Python runtime, it does not have standard access to `sys.argv` from which various options parsers could be used. Instead, Wallaroo provides `application_setup` with `args`: a list of the string command-line arguments it has received.
 
-### ApplicationBuilder
+### `wallaroo`
 
-The `ApplicationBuilder` class in `wallaroo` is a utility for constructing application topologies. It also provides some additional validation on the input parameters.
+The `wallaroo` library provides two functions that are needed to define a Wallaroo application, `source` and `build_application`.  
 
-#### `ApplicationBuilder` Methods
+####`wallaroo.source(name, source_config)`
 
-##### `__init__(name)`
-
-Create a new application with the name `name`.
-
-##### `new_pipeline(name, source_config)`
-
-Create a new pipeline.
+Create a partial pipeline originating at a source.
 
 `name` must be a string.
 
 `source_config` must be one of the [SourceConfig](#source) classes.
 
-If you're adding more than one pipeline, make sure to call `done()` before creating another pipeline.
-
-##### `done()`
-
-Close the current pipeline object.
-
-This is necessary if you intend to add another pipeline.
+There are number of methods you can call on a partial pipeline object (such as the one returned by `source`). 
 
 ##### `to(computation)`
 
-Add a stateless computation _function_ to the current pipeline.
+Add a computation _function_ to the partial pipeline. This will either be a [stateless](#computation) or a [state](#statecomputation) computation. A call to `to` returns a new partial pipeline object.
 
-`computation` must be a [Computation](#computation).
+##### `key_by(key_extractor)`
 
-##### `to_parallel(computation)`
+Partition messages at this point based on the key extracted using the key_extractor function. A call to `key_by` returns a new partial pipeline object.
 
-Add a stateless computation _function_ to the current pipeline.
-Creates one copy of the computation per worker in the cluster allowing you to parallelize stateless work.
-
-`computation` must be a [Computation](#computation).
-
-##### `to_stateful(computation, state_class, state_name)`
-
-Add a state computation _function_, along with a [State](#state) _class_ and `state_name` to the current pipeline.
-
-`computation` must be a [StateComputation](#statecomputation).
-
-`state_class` must be a [State](#state).
-
-`state_name` must be a str. `state_name` is the name of the state object that we will run state computations against. You can share the object across pipelines by using the same name. Using different names for different partitions keeps them separate, acting as a namespace.
-
-##### `to_state_partition(computation, state, state_partition_name, partition_function, partition_keys)`
-
-Add a partitioned state computation to the current pipeline.
-
-`computation` must be a [StateComputation](#statecomputation).
-
-`state` must be [State](#state).
-
-`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run state computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions keeps them separate acting as a namespace.
-
-`partition_function` must be a [Partition](#partition).
-
-`partition_keys` is an optional list of strings.
+`key_extractor` must be a [KeyExtractor](#key_extractor).
 
 ##### `to_sink(sink_config)`
 
-Add a sink to the end of a pipeline.
+Add a sink to the end of a pipeline. This returns a complete pipeline object that is ready to be passed to `wallaroo.build_application`.
 
 `sink_config` must be one of the [SinkConfig](#sink) classes.
 
 ##### `to_sinks(sink_configs)`
 
-Add multiple sinks to the end of a pipeline.
+Add multiple sinks to the end of a pipeline. This returns a complete pipeline object that is ready to be passed to `wallaroo.build_application`.
 
 `sink_config` must be a list of [SinkConfig](#sink) classes.
 
 At the moment, the same pipeline output is sent via all sinks. The ability to determine what output should be sent to which sinks will be added in a future version of Wallaroo.
 
-##### `build()`
+#### `wallaroo.build_application(application_name, pipeline)`
 
-Return the complete list of topology tuples. This is the topology structure Wallaroo requires in order to construct the topology connecting all of the application components.
+Returns the topology structure Wallaroo requires in order to construct the topology connecting all of the application components. 
+
+`application_name` must be a string.
+
+`pipeline` must be a complete pipeline object returned from either `to_sink` or `to_sinks`.
 
 ### Computation
 
-A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. A stateless computation has _no side effects_.
+A stateless computation is a simple function that takes input, returns an output, and does not modify any variables outside of its scope. A stateless computation should have _no side effects_.
 
 A `computation` function must be decorated with one of the `@wallaroo.computation` or `@wallaroo.computation_multi` decorators, which take the name of the computation as their only argument.
 
@@ -169,7 +219,7 @@ Create a Wallaroo Computation from a function that takes `data` as its only argu
 
 `data` will be the output of the previous function in the pipeline.
 
-The output must be a list of items or `None`. Each item in the list will arrive individually at the next step, i.e. not as a list.
+The output must be a list of items or `None`. Each item in the list will arrive individually at the next stage, i.e. not as a list.
 
 ###### Example
 
@@ -188,9 +238,9 @@ def identity_and_double(data):
 
 State is an object that is passed to the [StateComputation](#statecomputation) function. It is a plain Python object and can be as simple or as complex as you would like.
 
-A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
+A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next stage, if another update to the state precedes the execution of the next stage, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a [Computation](#computation) or [StateComputation](#statecomputation) ought to be either unique, or immutable.
 
-In either case, it is up to the developer to provide a side-effect safe value for the computations to return!
+In either case, it is up to the Python developer to provide a side-effect safe value for the computations to return!
 
 #### Example State
 
@@ -220,67 +270,79 @@ AlphabetCounts(objects):
 
 A state computation is similar to a [Computation](#computation), except that it takes an additional argument: `state`.
 
-In order to provide resilience, Wallaroo needs to keep track of state changes, or side effects, and it does so by making `state` an explicit object that is given as input to any StateComputation step.
-
 Similarly to a Computation, a StateComputation function must be decorated with the `@wallaroo.state_computation` decorator.
 
-A `state_computation` function must be decorated with one of the `@wallaroo.state_computation` or `@wallaroo.state_computation_multi` decorators, which take the name of the computation as their only argument.
+A `state_computation` function must be decorated with one of the `@wallaroo.state_computation` or `@wallaroo.state_computation_multi` decorators, which take the name of the computation and the state class as their two arguments.
 
-#### `@wallaroo.state_computation(name)`
+#### `@wallaroo.state_computation(name, state)`
 
-Create a Wallaroo StateComputation from a function that takes `data` and `state` as its arguments and returns a tuple of `(output, save_state`).
+Create a Wallaroo StateComputation from a function that takes `data` and `state` as its arguments and optionally returns an `output`.
 
 `name` is the name of the computation in the pipeline, and must be unique.
 
-`data` is the output of the previous step in the pipeline.
+`state` is the class used to represent state for this computation.
 
-`output` is the output data of the function (and will become the next step's input data). If `output` is `None`, no message will be delivered to the next step in the pipeline as a result of this iteration of the StateComputation.
+`data` is the output of the previous stage in the pipeline and input to our state computation.
 
-`save_state` is a boolean indicating whether Wallaroo should persist the new state. This is useful if your application has infrequent but large state changes, where it would be beneficial to programmatically control when Wallaroo _persists_ a new state to its recovery logs.
+`output` is the output data of the function (and will become the next stage's input data). If `output` is `None`, no message will be delivered to the next stage in the pipeline as a result of this iteration of the StateComputation.
 
 ##### Example
 
 An example StateComputation that keeps track of the maximum integer value it has seen so far, and only persists the state if a new max has been set.
 
 ```python
-@wallaroo.state_computation(name='Compute Max'):
+class MaxState(object):
+    max = 0
+
+    def update(v):
+        if v > max:
+            max = v
+
+@wallaroo.state_computation(name='Compute Max', state=MaxState):
 def compute_max(data, state):
-    before = state.get_max()
+    before = state.max)
     state.update(data)
-    out = state.get_max()
-    return (out, True if out > before else False)
+    output = state.max
+    return output
 ```
 
-#### `@wallaroo.state_computation_multi(name)`
+#### `@wallaroo.state_computation_multi(name, state)`
 
 Create a Wallaroo StateComputation from a function that takes `data` and `state` as its arguments and returns a tuple of `(outputs, save_state`).
 
 `name` is the name of the computation in the pipeline, and must be unique.
 
-`data` is the output of the previous step in the pipeline.
+`state` is the class used to represent state for this computation.
 
-`outputs` is a list of output data of the function or `None`. Each item in the list will arrive at the next step in the pipeline as an individual message. If `outputs` is `None`, no messages will be delivered to the next step in the pipeline as a result of this iteration of the StateComputation.
+`data` is the output of the previous stage in the pipeline and input to our state computation.
 
-`save_state` is a boolean indicating whether Wallaroo should persist the new state. This is useful if your application has infrequent but large state changes, where it would be beneficial to programmatically control when Wallaroo _persists_ a new state to its recovery logs.
+`outputs` is a list of output data of the function or `None`. Each item in the list will arrive at the next stage in the pipeline as an individual message. If `outputs` is `None`, no messages will be delivered to the next stage in the pipeline as a result of this iteration of the StateComputation.
 
 ##### Example
 
-An example StateComputation that keeps track of the longest sentence it has seen so far, and outputs the words in each sentence as individual words to be counted in a subsequent `word_count` step.
+!@
+An example StateComputation that keeps track of the longest sentence it has seen so far, and outputs the words in a new sentence if it's the longest yet.
 
 ```python
-@wallaroo.state_computation(name='Longest Sentence and Split Words'):
+class MaxLength
+    max = 0
+
+    def update(v):
+        if v > max:
+            max = v
+
+@wallaroo.state_computation(name='Longest Sentence and Split Words', 
+    state=MaxLength):
 def longest_sentence_and_split_words(data, state):
-    before = state.longest()
-    longest = 0
+    before = state.max
     outputs = []
     for sentence in data.strip().split('.'):
         words = sentence.split(' ')
         longest = max(longest, len(words))
-        outputs.extend(words)
-    # only update if there's a longer sentence!
-    if longest > before:
-        state.update(data)
-    return (outputs, True longest > before else False)
+        if longest > before:
+            outputs.extend(words)
+        before = longest
+    return outputs
 ```
 
 ### Data
@@ -293,21 +355,18 @@ It is important to ensure that data returned is always immutable or unique to av
 
 Partition keys are `string` values.
 
-### Partition
+### KeyExtractor
 
-A partition function must be decorated with the `@wallaroo.partition` decorator and return the appropriate [Key](#key) for `data`.
+A key extractor function must be decorated with the `@wallaroo.key_extractor` decorator and return the appropriate [Key](#key) for `data`.
 
-#### Example Partition
+#### Example Key Extractor
 
-An example that partitions words for a word count based on their first character, and buckets all other cases to the empty string key:
+An example that partitions transactions based on the user assocatied with them:
 
 ```python
-@wallaroo.partition
-def partition(data):
-    try:
-        return data[0].lower() if data[0].isalpha() else ''
-    except:
-        return ''
+@wallaroo.key_extractor
+def extract_user(transaction):
+    return transaction.user
 ```
 
 ### Sink
@@ -372,7 +431,7 @@ A complete [TCPSink](#tcpsink) encoder example that takes a list of integers and
 
 ```python
 @wallaroo.encoder
-def tcp_encoder(data):
+def tcp_encode(data):
     fmt = '>H{}'.format('L'*len(data))
     return struct.pack(fmt, len(data), *data)
 ```
@@ -383,7 +442,7 @@ A complete `KafkaSink` encoder example that takes a word and sends it to the par
 
 ```python
 @wallaroo.encoder
-def kafka_encoder(data):
+def kafka_encode(data):
     word = data[:]
     letter_key = data[0]
     return (word, letter_key)
@@ -438,9 +497,9 @@ The Source Decoder is responsible for two tasks:
 1. Telling Wallaroo _how many bytes to read_ from its input source.
 2. Converting those bytes into an object that the rest of the application can process. `None` can be returned to completely discard a message.
 
-To define a source decoder, use the [@wallaroo.decoder](#@wallaroo.decoder) decorator to decorate a function that takes `bytes` and returns the correct data type for the next step in the pipeline.
+To define a source decoder, use the [@wallaroo.decoder](#@wallaroo.decoder) decorator to decorate a function that takes `bytes` and returns the correct data type for the next stage in the pipeline.
 
-It is up to the developer to determine how to translate `bytes` into the next step's input data type, and what information to keep or discard.
+It is up to the developer to determine how to translate `bytes` into the next stage's input data type, and what information to keep or discard.
 
 #### `@wallaroo.decoder(header_length, length_fmt)`
 
@@ -456,7 +515,7 @@ A complete `TCPSource` decoder example that decodes messages with a 32-bit unsig
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decoder(bs):
+def decode(bs):
     try:
         return struct.unpack('>1sL', bs)
     except struct.error:
@@ -469,7 +528,7 @@ A complete `KafkaSource` decoder example that decodes messages with a 32-bit uns
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decoder(bs):
+def decode(bs):
     try:
         return struct.unpack('>1sL', bs)
     except struct.error:

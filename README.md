@@ -56,12 +56,14 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     lines = wallaroo.source("Split and Count",
-                        wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+                        wallaroo.TCPSourceConfig(in_host, in_port, 
+                            decode_line))
     pipeline = (lines
         .to(split)
         .key_by(extract_word)
         .to(count_word)
-        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
+        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, 
+            encode_word_count)))
 
     return wallaroo.build_application("Word Count Application", pipeline)
 
@@ -93,17 +95,16 @@ class WordCount(object):
         self.count = count
 
 @wallaroo.key_extractor
-def extract_word(data):
-    return data
+def extract_word(word):
+    return word
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decoder(bs):
+def decode_line(bs):
     return bs.decode("utf-8")
 
 @wallaroo.encoder
-def encoder(data):
-    output = data.word + " => " + str(data.count) + "\n"
-    print output
+def encode_word_count(word_count):
+    output = word_count.word + " => " + str(word_count.count) + "\n"
     return output.encode("utf-8")
 ```
 
@@ -144,7 +145,6 @@ Wallaroo is licensed under the [Apache version 2][apache-2-license] license.
 [contribution-guide]: CONTRIBUTING.md
 [docker-link]: https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html
 [documentation]: https://docs.wallaroolabs.com/
-[go-examples]: examples/go/
 [group-badge]: https://img.shields.io/badge/mailing%20list-join%20%E2%86%92-%23551A8B.svg
 [group-link]: https://groups.io/g/wallaroo
 [hello-wallaroo-post]: https://blog.wallaroolabs.com/2017/03/hello-wallaroo/

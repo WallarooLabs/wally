@@ -63,7 +63,7 @@ Run Data Receiver to listen for TCP output on `127.0.0.1` port `7002`:
 data_receiver --ponythreads=1 --ponynoblock --listen 127.0.0.1:7002
 ```
 
-### Shell 3: Celsius
+### Shell 3: Alerts
 
 Run `machida` with `--application-module alerts`:
 

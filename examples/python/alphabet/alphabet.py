@@ -30,12 +30,12 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     votes = wallaroo.source("alphabet",
-                       wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+                       wallaroo.TCPSourceConfig(in_host, in_port, decode_votes))
 
     pipeline = (votes
         .key_by(extract_letter)
         .to(add_votes)
-        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
+        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode_votes)))
 
     return wallaroo.build_application("alphabet", pipeline)
 
@@ -67,7 +67,7 @@ def extract_letter(data):
     return data.letter
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decoder(bs):
+def decode_votes(bs):
     (letter, vote_count) = struct.unpack(">sI", bs)
     letter = letter.decode("utf-8")  # for Python3 comptibility
     return Votes(letter, vote_count)
@@ -80,6 +80,5 @@ def add_votes(data, state):
 
 
 @wallaroo.encoder
-def encoder(data):
-    # data is a Votes
-    return ("%s => %d\n" % (data.letter, data.votes)).encode()
+def encode_votes(votes):
+    return ("%s => %d\n" % (votes.letter, votes.votes)).encode()

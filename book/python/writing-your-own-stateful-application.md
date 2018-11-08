@@ -1,96 +1,70 @@
 # Writing Your Own Wallaroo Python Stateful Application
 
-In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless application example yet, you can find it [here](writing-your-own-application.md).
+In this section, we will go over how to write a stateful application with the Wallaroo Python API. If you haven't reviewed the simple stateless Alerts application example yet, you can find it [here](writing-your-own-application.md).
 
 ## A Stateful Application - Alphabet
 
-Our stateful application is going to be a vote counter, called Alphabet. It receives as its input a message containing an alphabet character and a number of votes, which it then increments in its internal state. After each update, it sends the new updated vote count of that character to its output.
+Our stateful application is going to add state to the Alerts example. Again, it receives as its inputs messages representing transactions. But now instead of statelessly checking individual transactions to see if they pass certain thresholds, it will add each transaction amount to a running total. It will then check that total to see if an alert should be emitted.
 
-As with the Reverse Word example, we will list the components required:
+As with the stateless Alerts example, we will list the components required:
 
-* Input decoding
 * Output encoding
-* Computation for adding votes
-* State objects
-* State change management
+* Computation for checking transactions
+* State object
 
-### StateComputation
+### State Computation
 
-The state computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and return some data that tells Wallaroo what to do next.
+The state computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and, based on a simple condition, determine whether we return some data representing an alert message.
 
+Our input type represents a transaction:
 ```python
-@wallaroo.state_computation(name='add votes')
-def add_votes(data, state):
-    state.update(data)
-    return (state.get_votes(data.letter), True)
+class Transaction(object):
+    def __init__(self, user, amount):
+        self.user = user
+        self.amount = amount
 ```
 
-Let's dig into that tuple that we are returning:
+We use these inputs to update state, and check whether the running total crosses certain thresholds, at which point we generate an alert:
 
 ```python
-(state.get_votes(data.letter), True)
+@wallaroo.state_computation(name="check transaction total", state=TransactionTotal)
+def check_transaction_total(transaction, state):
+    state.total = state.total + transaction.amount
+    if state.total > 2000:
+        return DepositAlert(transaction.user, state.total)
+    elif state.total < -2000:
+        return WithdrawalAlert(transaction.user, state.total)
 ```
 
-The first element, `state.get_votes(data.letter)`, is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element, `True`, is to let Wallaroo know if we should store an update for our state. By returning `True`, we are instructing Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing, so why wouldn't we always return `True`? There are two answers:
+### State
 
-1. Your state computation might not have updated the state, in which case saving its state for recovery is wasteful.
-2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a trade-off that can be made between performance and safety.
-
-### State and StateBuilder
-
-The state for this application is two-tiered. There is a vote count for each letter:
+The state for this application keeps track of a running total of transactions:
 
 ```python
-class Votes(object):
-    def __init__(self, letter, votes):
-        self.letter = letter
-        self.votes = votes
+class TransactionTotal(object):
+    total = 0
 ```
-
-And a state map:
-
-```python
-class AllVotes(object):
-    def __init__(self):
-        self.votes_by_letter = {}
-
-    def update(self, votes):
-        letter = votes.letter
-        vote_count = votes.votes
-
-        votes_for_letter = self.votes_by_letter.get(letter, Votes(letter, 0))
-        votes_for_letter.votes += vote_count
-        self.votes_by_letter[letter] = votes_for_letter
-
-    def get_votes(self, letter):
-        vbl = self.votes_by_letter[letter]
-        return Votes(letter, vbl.votes)
-```
-
-This map is the `state` object that `AddVotes.compute` above takes.
-An important thing to note here is that `get_votes` returns a _new_ `Votes` instance. This is important, as this is the value that is eventually passed to `Encoder.encode`, and if we passed a reference to a mutable object here, there is no guarantee that `Encoder.encode` will execute before another update to this object.
 
 ### Encoder
-The encoder is going to receive a `Votes` instance and encode into a string of the form `LETTER => VOTES\n` where `LETTER` is the letter and `VOTES` is the number of votes for said letter. Each incoming message generates one output message.
-As with the previous example, the sink requires a `bytes` object. In Python 2 this can be the string itself, but in Python3 we need to encode it from unicode to `bytes`. Luckily, we can use `encode()` to get a `bytes` from a string in both versions:
+The encoder is going to receive either a `DepositAlert` or `WithdrawalAlert` instance and encode it into a string. Since we only generate alerts when certain conditions are met, not every input into the application results in an output sent to teh sink.
+
+As with our previous stateless example, the sink requires a `bytes` object. In Python 2 this can be the string itself, but in Python3 we need to encode it from unicode to `bytes`. Luckily, we can use `encode()` to get a `bytes` from a string in both versions:
 
 ```python
 @wallaroo.encoder
-def encode(data):
-    # data is a Votes
-    return ("%s => %d\n" % (data.letter, data.votes)).encode()
+def encode_alert(alert):
+    return str(alert).encode()
 ```
 
-### Decoder
+### Partitioning
+In our stateless example, we looked at each transaction input in isolation and generated an alert based on its properties. This meant that Wallaroo could process all of these transactions in parallel without concern for how they were related to each other. But in our stateful example, we are accumulating totals. What do these totals refer to? For this applicaiton, they are the running totals per user. So each transaction object is associated with a particular user.
 
-The decoder, like the one in Reverse Word, is going to use a `header_length` of 4 bytes to denote a big-endian 32-bit unsigned integer. Then, for the data, it is expecting a single character followed by a big-endian 32-bit unsigned integer. Here we use the `struct` module to unpack these integers from the bytes string. We also decode the letter to convert it to Unicode:
+This means that a natural way to partition the work is by user. We accomplish this by defining a function for extracting keys from our input messages:
 
 ```python
-@wallaroo.decoder(header_length=4, length_fmt=">I")
-def decode(bs):
-    (letter, vote_count) = struct.unpack(">sI", bs)
-    letter = letter.decode('utf-8')
-    return Votes(letter, vote_count)
+@wallaroo.key_extractor
+def extract_user(transaction):
+    return transaction.user
 ```
 
 ### Application Setup
@@ -99,45 +73,39 @@ Finally, let's set up our application topology:
 
 ```python
 def application_setup(args):
-    in_host, in_port = wallaroo.tcp_parse_input_addrs(args)[0]
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
-    ab = wallaroo.ApplicationBuilder("alphabet")
-    ab.new_pipeline("alphabet",
-                    wallaroo.TCPSourceConfig(in_host, in_port, decoder))
-    ab.to_stateful(add_votes, AllVotes, "letter state")
-    ab.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
-    return ab.build()
+    gen_source = wallaroo.GenSourceConfig(TransactionsGenerator())
+
+    transactions = wallaroo.source("Alerts (stateful)", gen_source)
+    pipeline = (transactions
+        .key_by(extract_user)
+        .to(check_transaction_total)
+        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode_alert)))
+
+    return wallaroo.build_application("Alerts (stateful)", pipeline)
 ```
 
-The only difference between this setup and the stateless Reverse Word's one is that while in Reverse Word we used:
+The important difference between this setup and the stateless version from our last example (besides using a state computation rather than a stateless one) is the presence of: 
 
 ```python
-ab.to(reverse)
+.key_by(extract_user)
 ```
 
-here we use:
-
-```python
-ab.to_stateful(add_votes, AllVotes, "letter state")
-```
-
-That is, while the stateless computation constructor `to` took only a computation class as its argument, the state computation constructor `to_stateful` takes a state computation _function_, as well as a state _class_, along with the name of that state.
+This ensures that all transactions for a given user are sent to the same state
+partition. This means that when defining our state type, we can take for granted that the key is an implicit context. We don't need to refer to the user
+anywhere in the state definition if we don't want to (and in this case we don't need to).
 
 ### Miscellaneous
 
 This module needs its imports:
 
 ```python
-import struct
-
 import wallaroo
 ```
 
 ## Next Steps
 
-The complete alphabet example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet/). To run it, follow the [Alphabet application instructions](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet/README.md)
-
-To learn how to write a stateful application with partitioning, continue to [Writing Your Own Partitioned Stateful Application](writing-your-own-partitioned-stateful-application.md).
+The complete stateful alerts example is available [here](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alerts_stateful/). To run it, follow the [Alerts application instructions](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alerts_stateful/README.md)
 
 To learn how to make your application resilient and able to work across multiple workers, skip ahead to [Inter-worker Serialization and Resilience](interworker-serialization-and-resilience.md).

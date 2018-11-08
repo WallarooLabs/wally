@@ -12,24 +12,20 @@ In this document, we'll discuss most of the command line arguments that can be p
 
 If you are starting up a Wallaroo cluster with only one worker, then that worker must be configured as the "cluster initializer" by passing the `--cluster-initializer` flag. You must also specify a target address for metrics data using the `--metrics` parameter. And you must specify its control and data addresses via the `--control` and `--data` command line parameters (these will be used if more workers are added to the cluster later).
 
-If your application uses a TCP source, then you must specify a TCP input address via `--in`. Likewise, if your application uses a TCP sink, then you must specify a TCP output address via `--out`. In what follows, we'll be using the Celsius Converter example app which uses a TCP source and sink (there are versions of this app written in [Go](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/go/celsius) and [Python](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/celsius)).
+If your application uses a TCP source, then you must specify a TCP input address via `--in`. Likewise, if your application uses a TCP sink, then you must specify a TCP output address via `--out`. In what follows, we'll be using the [Alerts](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alerts_stateful) example app which uses a TCP sink.
 
-If you are using the Go or Pony APIs, then you will run a binary called `celsius` in order to run the Celsius Converter app. If you are using the Python API, then you will run [Machida](/book/python/intro.md), passing in the application name via `--application-module`. And since Machida is single-threaded, you must pass in `--ponythreads 1` (otherwise Machida will refuse to start).
+If you are using the Python API, then you will run [Machida](/book/python/intro.md), passing in the application name via `--application-module`. And since Machida is single-threaded, you must pass in `--ponythreads 1` (otherwise Machida will refuse to start).
 
-Putting this all together, to run the Celsius Converter app, you would run the following command:
+Putting this all together, to run the Alerts app, you would run the following command:
 
 {% codetabs name="Python 2.7", type="py" -%}
-machida --application-module celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+machida --application-module alerts --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --cluster-initializer --ponythreads 1
 {% language name="Python 3", type="py" -%}
-machida3 --application-module celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+machida3 --application-module alerts --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --cluster-initializer --ponythreads 1
-{%- language name="Go", type="go" -%}
-celsius --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --cluster-initializer
 {%- endcodetabs %}
 
 If you want to be able to send messages to your worker from external systems (for example, to trigger a cluster shutdown using the [Cluster Shutdown tool](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/utils/cluster_shutdown)), then you need to have the worker listen on an "external channel". This is accomplished by providing an address via the `--external` argument.
@@ -42,47 +38,36 @@ You must provide a name for any worker that's not the initializer via the `--nam
 
 You need to tell every non-initializer worker which addresses the initializer is listening on for its control channel. This is done via the `--control` argument. We must also specify the metrics target via `--metrics`, just as we did in the single worker case above. And if we are using a TCP source and sink (as in the Celsius Converter app we're using as an example), then we must also pass every worker an `--in` and `--out` argument to specify the source and sink addresses.
 
-You can optionally set the control and data addresses that a non-initializer will listen on by using the `--my-control` and `--my-data` arguments, respectively.
+For non-initializer workers, you also need to set the control and data addresses they will listen on by using the `--my-control` and `--my-data` arguments, respectively.
 
 Assuming we are running a two worker cluster on a single machine, we would run the following commands:
 
 {% codetabs name="Python 2.7", type="py" -%}
 Worker 1
 
-machida --application-module celsius --in 127.0.0.1:6000 \
+machida --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
   --cluster-initializer --ponythreads 1
 
 Worker 2
 
-machida --application-module celsius --in 127.0.0.1:6000 \
+machida --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --name Worker2 --ponythreads 1
 {% language name="Python 3", type="py" -%}
 Worker 1
 
-machida3 --application-module celsius --in 127.0.0.1:6000 \
+machida3 --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
   --cluster-initializer --ponythreads 1
 
 Worker 2
 
-machida3 --application-module celsius --in 127.0.0.1:6000 \
+machida3 --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --name Worker2 --ponythreads 1
-{%- language name="Go", type="go" -%}
-Worker 1
-
-celsius --in 127.0.0.1:6000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
-  --cluster-initializer
-
-Worker 2
-
-celsius --in 127.0.0.1:6000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:6500 --name Worker2
 {%- endcodetabs %}
 
 Remember that multi-worker runs require that you distribute the same binary to all machines that are involved. Attempting to connect different binaries into a multi-worker cluster will fail.
@@ -98,20 +83,16 @@ Resilience files are based on the name you supply the worker so starting differe
 Wallaroo comes with a [cluster shutdown tool](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/utils/cluster_shutdown) that can be used to shut down a running cluster. In order to receive a cluster shutdown message, our workers must be listening on an "external channel". We provide an address for this via the `--external` command line argument. For example, to have our cluster initializer create an external channel listening on `127.0.0.1:5050`, we'd start it up with a command like the following:
 
 {% codetabs name="Python 2.7", type="py" -%}
-machida --application-module celsius --in 127.0.0.1:6000 \
+machida --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
   --cluster-initializer --ponythreads 1 \
   --external 127.0.0.1:5050
 {% language name="Python 3", type="py" -%}
-machida3 --application-module celsius --in 127.0.0.1:6000 \
+machida3 --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6500 --data 127.0.0.1:6501 --worker-count 2 \
   --cluster-initializer --ponythreads 1 \
-  --external 127.0.0.1:5050
-{%- language name="Go", type="go" -%}
-celsius --in 127.0.0.1:6000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
-  --control 127.0.0.1:6500 --data 127.0.0.1:6501 --cluster-initializer \
   --external 127.0.0.1:5050
 {%- endcodetabs %}
 

@@ -23,6 +23,8 @@ When running a Wallaroo application, we use some of the following command line p
     initializing process (that status is meaningless after init is done)]
   --resilience-dir/-r [Sets directory to write resilience files to,
     e.g. -r /tmp/data (no trailing slash)]
+  --run-with-resilience [Enables resilience. Required (and only works)
+    if the Wallaroo binary was built in resilience mode.]
   --log-rotation [Enables log rotation. Default: off]
   --event-log-file-size/-l [Optionally set a file size for triggering
     event log file rotation. If no file size is set, log rotation is only
@@ -36,6 +38,7 @@ When running a Wallaroo application, we use some of the following command line p
     world]
   --time-between-checkpoints [Sets the interval between checkpoints for
     resilience (in nanoseconds)]
+  --run-with-resilience []
 ```
 
 Wallaroo currently supports one source per pipeline, which is setup by the application code. Each pipeline may have one or more sinks, each of which is also set up by the application code.

@@ -12,7 +12,7 @@ Since recovery involves a rollback to the last successful checkpoint, any data t
 
 When a crashed worker is restarted, if it can find its resilience files in the path specified by `--resilience-dir`, it will automatically start the recovery process. The simplest way to do this is to rerun the worker using the same command it was originally run with.
 
-For example, if we were running the bundled Python example [word_count_with_dynamic_keys](https://github.com/WallarooLabs/wallaroo/tree/master/examples/python/word_count_with_dynamic_keys/), this might look something like:
+For example, if we were running the bundled Python example [word_count_with_dynamic_keys](https://github.com/WallarooLabs/wallaroo/tree/master/examples/python/word_count/), this might look something like:
 
 ### Running the resilience example
 
@@ -26,7 +26,7 @@ For each shell you're expected to setup, you'd have to run the following to conf
 ```bash
 cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}
 source bin/activate
-cd examples/python/word_count_with_dynamic_keys
+cd examples/python/word_count
 ```
 
 1. Create the path where the workers will save their resilience snapshots.
@@ -69,7 +69,7 @@ cd examples/python/word_count_with_dynamic_keys
 
 4. Shell 2: Start initializer (remember to use `machida3-resilience` if using Python 3)
     ```bash
-    machida-resilience --application-module word_count_with_dynamic_keys \
+    machida-resilience --application-module word_count \
       --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --data 127.0.0.1:6001 --external 127.0.0.1:5050 \
@@ -82,7 +82,7 @@ cd examples/python/word_count_with_dynamic_keys
 5. Shell 3: Start worker (remember to use `machida3-resilience` if using Python 3)
 
     ```bash
-    machida-resilience --application-module word_count_with_dynamic_keys \
+    machida-resilience --application-module word_count \
       --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
@@ -118,7 +118,7 @@ cd examples/python/word_count_with_dynamic_keys
 11. Shell 3: Restart worker1 with the same command we used above, but save its log output to a new file (remember to use `machida3-resilience` if using Python 3)
 
     ```bash
-    machida-resilience --application-module word_count_with_dynamic_keys \
+    machida-resilience --application-module word_count \
       --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
       --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
