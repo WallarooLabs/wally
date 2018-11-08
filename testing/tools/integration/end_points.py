@@ -301,9 +301,9 @@ class Sender(StoppableThread):
         except OSError as err:
             if err.errno == 104 or err.errno == 54:
                 # ECONNRESET on Linux or macOS, respectively
-                is_econnreset = true
+                is_econnreset = True
             else:
-                is_econnreset = false
+                is_econnreset = False
             logging.info("socket errno {} ECONNRESET {} stopped {}"
                 .format(err.errno, is_econnreset, self.stopped()))
             raise err
