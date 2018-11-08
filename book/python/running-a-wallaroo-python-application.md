@@ -22,15 +22,15 @@ Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate
 
 Machida uses the `PYTHONPATH` environment variable to find modules that are imported by the application. You will have at least two modules in your `PYTHONPATH`: the application module and the `wallaroo` module. If you have installed Wallaroo as instructed and follow the [Starting a new shell for Wallaroo](/book/getting-started/starting-a-new-shell.md) instructions each time you start a new shell, the `walalroo` module and any application modules in your current directory will be automatically added to the `PYTHONPATH`.
 
-If the Python module you want is in a different directory than your current, like: `$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius/celsius.py`, in order to use the module you would export the `PYTHONPATH` like this:
+If the Python module you want is in a different directory than your current, like: `$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateless/alerts.py`, in order to use the module you would export the `PYTHONPATH` like this:
 
 ```bash
-export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius:$PYTHONPATH"
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateless:$PYTHONPATH"
 ```
 
 ## Next Steps
 
-To try running an example, go to [the Reverse example application](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/reverse/) and follow its [instructions](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/reverse/README.md).
+To try running an example, go to [the Alerts example application](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alerts_stateless/) and follow its [instructions](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alerts_stateless/README.md).
 
 To learn how to write your own Wallaroo Python application, continue to [Writing Your Own Application](writing-your-own-application.md)
 

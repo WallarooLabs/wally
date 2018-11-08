@@ -98,11 +98,11 @@ In this section, we'll give a page by page overview of the information presented
 
 ### Landing
 
-The landing page for the Metrics UI shows us a list of connected applications. In this case, we'll see the Celsius Conversion App.
+The landing page for the Metrics UI shows us a list of connected applications. In this case, we'll see the Alerts App.
 
 ![Landing Page](/book/metrics/images/landing-page.png)
 
-We can then click on a specific application's title, to take us to that application's dashboard. So if you click on `Celsius Conversion App`, we'll arrive at its application dashboard.
+We can then click on a specific application's title, to take us to that application's dashboard. So if you click on `Alerts App`, we'll arrive at its application dashboard.
 
 ### Application Dashboard
 
@@ -110,11 +110,11 @@ The application dashboard gives us a high-level overview of that application's p
 
 ![Application Dashboard Page](/book/metrics/images/application-dashboard-page.png)
 
-Let's look at the elements that make up our Celsius Conversion application. We have a general `Stats Overview Section` for each category.
+Let's look at the elements that make up our Alerts application. We have a general `Stats Overview Section` for each category.
 
-As we can see in our Pipeline Stats section, we're running a single pipeline `Celsius Conversion`. In our Worker Stats section we only have a single worker named `Initializer` processing data for our application. In our Computation Stats section we have 3 computations running: `Add 32`, `Decode Time in TCP Source`, and `Multiply By 1.8`.
+As we can see in our Pipeline Stats section, we're running a single pipeline `Alerts`. In our Worker Stats section we only have a single worker named `Initializer` processing data for our application. In our Computation Stats section we have 1 computation running: `CheckTransaction`.
 
-Let's click into our `Celsius Conversion` pipeline under `Pipeline Stats` to visit its `Detailed Metrics` page.
+Let's click into our `Alerts` pipeline under `Pipeline Stats` to visit its `Detailed Metrics` page.
 
 ### Detailed Metrics
 
@@ -122,7 +122,7 @@ Let's click into our `Celsius Conversion` pipeline under `Pipeline Stats` to vis
 
 #### Stats Overview Section
 
-The `Detailed Metrics` page gives us deeper dive into the stats for a given element within a section. Every `Detailed Metrics` page will include an expanded stats line, also including the `99.9%` and `99.99%` Percentile Bins. Having a look below we can see that `99.99%` of messages processed for the `Celsius Conversion` pipeline are less than or equal to 66 milliseconds. We can also see that we have a median throughput of 49k. Both these stats representing the last 5 minutes of processing data from the incoming stream.
+The `Detailed Metrics` page gives us deeper dive into the stats for a given element within a section. Every `Detailed Metrics` page will include an expanded stats line, also including the `99.9%` and `99.99%` Percentile Bins. Having a look below we can see that `99.99%` of messages processed for the `Alerts` pipeline are less than or equal to 66 milliseconds. We can also see that we have a median throughput of 49k. Both these stats representing the last 5 minutes of processing data from the incoming stream.
 
 ![Stats Overview Section](/book/metrics/images/stats-overview-section.png)
 
@@ -132,7 +132,7 @@ The `Detailed Metrics` page gives us deeper dive into the stats for a given elem
 
 The first graph we'll see is the Percent by Latency Bin graph. This graph is grouped by the following bins on the x-axis: ≤ 1 μs, ≤ 4 μs, ≤ 16 μs, ≤ 66 μs, ≤ 260 μs, ≤ 1 ms, ≤ 4 ms, ≤ 16 ms, ≤ 66 ms, ≤ 260 ms, ≤ 1 s, > 1. Where the time unit represents the upper limit of that bin and the lower limit is the upper limit of the bin before it (or 0 for the first bin). Each bar representing the percent of latencies that fall within that bins range. With the y-axis representing the percentage for each bin.
 
-If we look at our example below we can see that roughly 75% of our latencies for all messages processed within the last 5 minutes for the Celsius Conversion Pipeline are greater than 1 microsecond but less than or equal to half a millisecond.
+If we look at our example below we can see that roughly 75% of our latencies for all messages processed within the last 5 minutes for the Alerts Pipeline are greater than 1 microsecond but less than or equal to half a millisecond.
 
 ![Percent by Latency Graph](/book/metrics/images/percent-by-latency-graph.png)
 
@@ -148,28 +148,28 @@ The remaining sections on a `Detailed Metrics` page differ depending on the cate
 
 ![Pipeline Detailed Metrics page](/book/metrics/images/pipeline-detailed-metrics-page.png)
 
-Continuing to look at the detailed metrics page for our `Celsius Conversion` pipeline, we'll see that we have two additional tables below our graphs section.
+Continuing to look at the detailed metrics page for our `Alerts` pipeline, we'll see that we have two additional tables below our graphs section.
 
 #### Pipeline by Worker Table
 
 ![Pipeline by Worker Table](/book/metrics/images/pipeline-by-worker-table.png)
 
-The first table is our `Pipeline by Worker` table, which in this case is titled `Celsius Conversion by Worker`. This table lists all of the workers which contribute to our Pipeline in order for us to get our metrics. The aggregation of the stats represented by each worker here will give us the total Pipeline stats that we saw above in the Stats Overview Section. Since we're running a single worker, the `Celsius Conversion` Pipeline stats and the `Celsius Conversion by Worker` stats for the `Initializer` will be exactly the same. Clicking on the `Initializer` link on this table will take us to the `Pipeline by Worker` detailed metrics page but we won't do that just yet.
+The first table is our `Pipeline by Worker` table, which in this case is titled `Alerts by Worker`. This table lists all of the workers which contribute to our Pipeline in order for us to get our metrics. The aggregation of the stats represented by each worker here will give us the total Pipeline stats that we saw above in the Stats Overview Section. Since we're running a single worker, the `Alerts` Pipeline stats and the `Alerts by Worker` stats for the `Initializer` will be exactly the same. Clicking on the `Initializer` link on this table will take us to the `Pipeline by Worker` detailed metrics page but we won't do that just yet.
 
 #### Computations for Pipeline Table
 
 ![Computations for Pipeline Table](/book/metrics/images/computations-for-pipeline-table.png)
 
-The second table is our `Computations for Pipeline` table, which in this case is titled `Computations for Celsius Conversion`. This section lists the computations being run for our `Celsius Conversion` pipeline and the `Decode Time in TCP Source` for the data being processed by this pipeline. We can see that we're running `Add 32` and `Multiply by 1.8` as the computations that make up our pipeline. Each computation provides its own stats line. Clicking on the title for each will take us to the `Detailed Metrics` page for that `Computation`.
+The second table is our `Computations for Pipeline` table, which in this case is titled `Computations for Alerts`. This section lists the computations being run for our `Alerts` pipeline. We can see that we're running `CheckTransaction` as the computation that makes up our pipeline. Each computation provides its own stats line. Clicking on the title for each will take us to the `Detailed Metrics` page for that `Computation`.
 
-Now that we have an overview of the additional sections for our Pipeline Detailed Metrics page, let's go ahead and click on `Initializer` in our `Celsius Conversion by Worker` table to get to the `Pipeline by Worker Detailed Metrics `page.
+Now that we have an overview of the additional sections for our Pipeline Detailed Metrics page, let's go ahead and click on `Initializer` in our `Alerts by Worker` table to get to the `Pipeline by Worker Detailed Metrics `page.
 
 ### Pipeline by Worker Detailed Metrics
 
 ![Pipeline by Worker Detailed Metrics page](/book/metrics/images/pipeline-by-worker-detailed-metrics-page.png)
 
 As we can see above, the `Pipeline by Worker` detailed metrics page includes our two main sections: Stats Overview Section and Graphs Section.
-One thing that is unique is that `Celsius Conversion on Initializer` title is broken into links where `Celsius Conversion` will direct us to our `Pipeline Detailed Metrics` page and `Initializer` will direct us to our `Worker Detailed Metrics` page so we don't have to navigate back to our `Application Dashboard` page in order to see the performance for those elements within their sections.
+One thing that is unique is that `Alerts on Initializer` title is broken into links where `Alerts` will direct us to our `Pipeline Detailed Metrics` page and `Initializer` will direct us to our `Worker Detailed Metrics` page so we don't have to navigate back to our `Application Dashboard` page in order to see the performance for those elements within their sections.
 
 The other unique section on this page is the `Computations for Pipeline on Worker` table.
 
@@ -177,13 +177,13 @@ The other unique section on this page is the `Computations for Pipeline on Worke
 
 ![Computations for Pipeline on Worker Table](/book/metrics/images/computations-for-pipeline-on-worker-table.png)
 
-The only additional table present on this page is our `Computations for Pipeline on Worker` table, which in this case is titled `Computations for Celsius Conversion on Initializer`. This table lists all of the computations which contribute to our `Celsius Conversion` pipeline that is running on the `Initializer` worker. Since this application is running as a single worker, we'll see that all of our computations for `Celsius Conversion` are running on this worker. We'll see the common stats lines that we expect for our tables. Clicking on the title of each computation will take us to our `Computation by Worker` page. So let's click on `Add 32` and have a look.
+The only additional table present on this page is our `Computations for Pipeline on Worker` table, which in this case is titled `Computations for Alerts on Initializer`. This table lists all of the computations which contribute to our `Alerts` pipeline that is running on the `Initializer` worker. Since this application is running as a single worker, we'll see that all of our computations for `Alerts` are running on this worker. We'll see the common stats lines that we expect for our tables. Clicking on the title of each computation will take us to our `Computation by Worker` page. So let's click on `Add 32` and have a look.
 
 ### Computation by Worker Detailed Metrics
 
 ![Computation by Worker Detailed Metrics page](/book/metrics/images/computation-by-worker-detailed-metrics-page.png)
 
-Above we can see the `Computation by Worker` detailed metrics page for our `Add 32` computation running on our `Initializer` worker. Like our `Pipeline by Worker Detailed Metrics` page, our title will link us up to the `Computation Detailed Metrics` page and the `Worker Detailed Metrics` page. In this case, `Add 32` and `Initializer` respectively.
+Above we can see the `Computation by Worker` detailed metrics page for our `CheckTransaction` computation running on our `Initializer` worker. Like our `Pipeline by Worker Detailed Metrics` page, our title will link us up to the `Computation Detailed Metrics` page and the `Worker Detailed Metrics` page. In this case, `CheckTransaction` and `Initializer` respectively.
 
 Since we've drilled down far as we can go for our metrics for a computation, there are no additional sections on this page.
 
@@ -199,22 +199,22 @@ Above we can see the `Worker` detailed metrics page for our `Initializer` worker
 
 ![Pipelines on Worker Table](/book/metrics/images/pipelines-on-worker-table.png)
 
-The first table is our `Pipelines on Worker` table, which in this case is titled `Pipelines on Initializer`. This table lists all of the pipelines which contribute to our worker in order for us to get our metrics. The aggregation of the stats represented by each pipeline here will give us the total worker stats that we see above in the Stats Overview Section. Since we're running a single pipeline for this application, the `Initializer` stats in the Stats Overview Section and the `Pipelines on Initializer` stats for the `Celsius Conversion` pipeline will be exactly the same. Clicking on the `Celsius Conversion` link on this table will take us to the `Worker by Pipeline` detailed metrics page but we won't do that just yet.
+The first table is our `Pipelines on Worker` table, which in this case is titled `Pipelines on Initializer`. This table lists all of the pipelines which contribute to our worker in order for us to get our metrics. The aggregation of the stats represented by each pipeline here will give us the total worker stats that we see above in the Stats Overview Section. Since we're running a single pipeline for this application, the `Initializer` stats in the Stats Overview Section and the `Pipelines on Initializer` stats for the `Alerts` pipeline will be exactly the same. Clicking on the `Alerts` link on this table will take us to the `Worker by Pipeline` detailed metrics page but we won't do that just yet.
 
 #### Computations on Worker Table
 
 ![Computations on Worker Table](/book/metrics/images/computations-on-worker-table.png)
 
-The second table is our `Computations on Worker` table, which in this case is titled `Computations on Initializer`. This section lists the computations being run for all pipelines on the `Initializer` worker. We can see that we're running `Add 32`, `Decode Time in TCP Source`, and  `Multiply by 1.8` as the computations that make up our `Celsius Conversion` pipeline. If we were to have any other pipelines running for a given application, they will show up here as well if running on this worker. Clicking on the title for each will take us to the `Detailed Metrics` page for that `Computation`.
+The second table is our `Computations on Worker` table, which in this case is titled `Computations on Initializer`. This section lists the computations being run for all pipelines on the `Initializer` worker. We can see that we're running `CheckTransaction` as the computation that makes up our `Alerts` pipeline. If we were to have any other pipelines running for a given application, they will show up here as well if running on this worker. Clicking on the title for each will take us to the `Detailed Metrics` page for that `Computation`.
 
-Now that we have an overview of the additional sections for our `Worker Detailed Metrics` page, let's go ahead and click on `Celsius Conversion` in our `Pipelines on Initializer` table to get to the `Worker by Pipeline Detailed Metrics` page.
+Now that we have an overview of the additional sections for our `Worker Detailed Metrics` page, let's go ahead and click on `Alerts` in our `Pipelines on Initializer` table to get to the `Worker by Pipeline Detailed Metrics` page.
 
 ### Worker by Pipeline Detailed Metrics
 
 ![Worker by Pipeline Detailed Metrics page](/book/metrics/images/worker-by-pipeline-detailed-metrics-page.png)
 
 Like all other detailed metrics pages, we include our common sections.
-Additionally, our `Celsius Conversion on Initializer` title is broken into links where `Celsius Conversion` will direct us to our `Pipeline Detailed Metrics` page and `Initializer` will direct us to our `Worker Detailed Metrics` page.
+Additionally, our `Alerts on Initializer` title is broken into links where `Alerts` will direct us to our `Pipeline Detailed Metrics` page and `Initializer` will direct us to our `Worker Detailed Metrics` page.
 
 There is a single additional section for this page.
 
@@ -222,9 +222,9 @@ There is a single additional section for this page.
 
 ![Computations for Pipeline on Worker Table](/book/metrics/images/computations-for-pipeline-on-worker-table1.png)
 
-The only table on our page is our `Computations for Pipeline on Worker` table, which in this case is titled `Computations for Celsius Conversion on Initializer`. This table lists all of the computations which contribute to our `Celsius Conversion` pipeline that is running on the `Initializer` worker. As mentioned previously, since this application is running as a single worker, we'll see that all of our computations for `Celsius Conversion` are running on this worker.
+The only table on our page is our `Computations for Pipeline on Worker` table, which in this case is titled `Computations for Alerts on Initializer`. This table lists all of the computations which contribute to our `Alerts` pipeline that is running on the `Initializer` worker. As mentioned previously, since this application is running as a single worker, we'll see that all of our computations for `Alerts` are running on this worker.
 
-Since we've  already visited the `Computation by Worker Detailed Metrics` page above, let's use the navbar to visit the `Add 32` `Computation Detailed Metrics` page.
+Since we've  already visited the `Computation by Worker Detailed Metrics` page above, let's use the navbar to visit the `CheckTransaction` `Computation Detailed Metrics` page.
 
 ![Navbar](/book/metrics/images/navbar.png)
 
@@ -238,7 +238,7 @@ Above we can see the `Computation Detailed Metrics` page for our `Add 32` comput
 
 ![Computation on Worker Table](/book/metrics/images/computation-on-worker-table.png)
 
-The only table on our page is our `Computation on Worker` table, which in this case is titled `Add 32 on Worker`. This table lists all of the workers which contribute to our `Add 32` computation. Since we're only running a single worker for this application, we'll only see `Initializer` in this list. The stats reported in the Stats Overview Section for our `Computation Detailed Metrics` page are a direct aggregation of each element in the `Computations on Worker` table. Since we only have one worker we can note that the stats are exactly the same.
+The only table on our page is our `Computation on Worker` table, which in this case is titled `CheckTransaction on Worker`. This table lists all of the workers which contribute to our `CheckTransaction` computation. Since we're only running a single worker for this application, we'll only see `Initializer` in this list. The stats reported in the Stats Overview Section for our `Computation Detailed Metrics` page are a direct aggregation of each element in the `Computations on Worker` table. Since we only have one worker we can note that the stats are exactly the same.
 
 ## Limitations
 

@@ -47,16 +47,16 @@ def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
 
     orders = wallaroo.source("Orders",
-        wallaroo.TCPSourceConfig(order_host, order_port, order_decoder))
+        wallaroo.TCPSourceConfig(order_host, order_port, decode_order))
 
     market_data = wallaroo.source("Market Data",
-        wallaroo.TCPSourceConfig(nbbo_host, nbbo_port, market_data_decoder))
+        wallaroo.TCPSourceConfig(nbbo_host, nbbo_port, decode_market_data))
 
     pipeline = (orders.merge(market_data)
         .key_by(extract_symbol)
         .to(check_market_data)
         .to_sink(wallaroo.TCPSinkConfig(out_host, out_port,
-                                        order_result_encoder)))
+                                        encode_order_result)))
 
     return wallaroo.build_application("Market Spread", pipeline)
 
@@ -112,7 +112,7 @@ class MarketDataMessage(object):
         self.mid = (bid + offer) / 2.0
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def order_decoder(bs):
+def decode_order(bs):
     """
     0 -  1b - FixType (U8)
     1 -  1b - side (U8)
@@ -139,7 +139,7 @@ def order_decoder(bs):
                  transact_time)
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def market_data_decoder(bs):
+def decode_market_data(bs):
     """
     0 -  1b - FixType (U8)
     1 -  4b - symbol (String)
@@ -165,16 +165,16 @@ class OrderResult(object):
         self.timestamp = timestamp
 
 @wallaroo.encoder
-def order_result_encoder(data):
+def encode_order_result(order_result):
     p = struct.pack(">BI6s4sddddQ",
-                    data.order.side,
-                    data.order.account,
-                    data.order.order_id,
-                    data.order.symbol,
-                    data.order.qty,
-                    data.order.price,
-                    data.bid,
-                    data.offer,
-                    data.timestamp)
+                    order_result.order.side,
+                    order_result.order.account,
+                    order_result.order.order_id,
+                    order_result.order.symbol,
+                    order_result.order.qty,
+                    order_result.order.price,
+                    order_result.bid,
+                    order_result.offer,
+                    order_result.timestamp)
     out = struct.pack(">I{}s".format(len(p)), len(p), p)
     return out

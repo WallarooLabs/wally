@@ -12,7 +12,8 @@ objects.
 
 ### Processing
 
-We examine each transaction at a state computation. If the total transaction amount is higher than a certain positive threshold, we create a deposit alert. If it's lower than a certain negative threshold, we create a withdrawal alert. 
+We examine each transaction at a stateless computation. If the amount is higher
+than a certain positive threshold, we create a deposit alert. If it's lower than a certain negative threshold, we create a withdrawal alert.
 
 ### Output
 
@@ -67,10 +68,10 @@ data_receiver --ponythreads=1 --ponynoblock --listen 127.0.0.1:7002
 Run `machida` with `--application-module alerts`:
 
 ```bash
-machida --application-module alerts --out 127.0.0.1:7002 \
+alerts_stateless --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
   --name worker-name --external 127.0.0.1:5050 --cluster-initializer \
-  --ponythreads=1 --ponynoblock
+  --ponynoblock
 ```
 
 Because we're using a generator source, Wallaroo will start processing the input stream as soon as the application connects to the sink and finishes

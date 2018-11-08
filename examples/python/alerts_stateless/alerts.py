@@ -22,58 +22,60 @@ import wallaroo
 
 def application_setup(args):
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
-    print("!@0")
 
     gen_source = wallaroo.GenSourceConfig(TransactionsGenerator())
 
-    print("!@1")
     transactions = wallaroo.source("Alerts (stateless)", gen_source)
-    print("!@2")
     pipeline = (transactions
         .to(check_transaction)
-        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
-    print("!@3")
+        .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode_alert)))
 
     return wallaroo.build_application("Alerts (stateless)", pipeline)
 
 class Transaction(object):
-    def __init__(self, amount):
+    def __init__(self, tid, amount):
+        self.id = tid
         self.amount = amount
 
 class DepositAlert(object):
-    def __init__(self, amount):
+    def __init__(self, tid, amount):
+        self.id = tid
         self.amount = amount
 
     def __str__(self):
-        return "Deposit Alert: " + str(self.amount)
+        return "Deposit Alert for " + str(self.id) + ": " + str(self.amount)
 
 class WithdrawalAlert(object):
-    def __init__(self, amount):
+    def __init__(self, tid, amount):
+        self.id = tid
         self.amount = amount
 
     def __str__(self):
-        return "Withdrawal Alert: " + str(self.amount)
+        return "Withdrawal Alert for " + str(self.id) + ": " + str(self.amount)
 
 @wallaroo.computation(name="check transaction")
 def check_transaction(transaction):
     if transaction.amount > 1000:
-        return DepositAlert(transaction.amount)
+        return DepositAlert(transaction.id, transaction.amount)
     elif transaction.amount < -1000:
-        return WithdrawalAlert(transaction.amount)
+        return WithdrawalAlert(transaction.id, transaction.amount)
 
 @wallaroo.encoder
-def encoder(alert):
-    return str(alert) + "\n"
+def encode_alert(alert):
+    return (str(alert) + "\n").encode()
 
 ############################################
 # DEFINE A GENERATOR FOR ALERTS TEST INPUTS
 ############################################
 class TransactionsGenerator(object):
+    tid = 0
+
     def initial_value(self):
-        return Transaction(1)
+        return Transaction(0, 1)
 
     def apply(self, v):
         # A simplistic way to get some numbers above, below, and within our
         # thresholds.
         amount = ((((v.amount * 2305843009213693951) + 7) % 2500) - 1250)
-        return Transaction(amount)
+        self.tid = self.tid + 1
+        return Transaction(self.tid, amount)

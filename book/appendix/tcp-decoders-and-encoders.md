@@ -6,11 +6,11 @@ Earlier, we spoke of [sources and sinks](/book/core-concepts/core-concepts.md) a
 
 ### Source
 
-Input point for data from external systems into an application.
+Ingress point for inputs from external systems into a Wallaroo application.
 
 ### Sink
 
-Output point from an application to external systems.
+Egress point for outputs from a Wallaroo application to external systems.
 
 ### Decoder
 
@@ -56,11 +56,11 @@ Let's make that a bit more concrete. Let's say we are sending in two messages; e
 
 ## Creating a Decoder
 
-Wallaroo's `TCPSource` takes a decoder _function_ that can process a framed message protocol. You'll need to implement three methods. Below is a decoder that we can use to process our stream of strings that we layed out in the previous section.
+Wallaroo's `TCPSource` takes a decoder _function_ that can process a framed message protocol. You'll need to implement three methods. Below is a decoder that we can use to process a stream of strings for a word count application.
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decode(self, bs):
+def decode_lines(bs):
     return bs.decode("utf-8")
 ```
 
@@ -68,14 +68,15 @@ def decode(self, bs):
 
 `length_fmt` is used internally to decode our message header to determine how long the payload is going to be. We rely on the Python `struct` package to decode the bytes. If you aren't familiar with `struct`, you can check out [the documentation](https://docs.python.org/2/library/struct.html) to learn more. Remember, when using `struct`, don't forget to import it!
 
-`decode` takes a series of bytes that represent your payload and turns it into an application message. In this case, our application message is a string, so we take the incoming byte stream `bs` and convert it to UTF-8 Python string.
+`decode_lines` takes a series of bytes that represent your payload and turns it into an application message. In this case, our application message is a string, so we take the incoming byte stream `bs` and convert it to UTF-8 Python string.
 
 Here's a slightly more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet).
 
 ```python
 @wallaroo.decoder(header_length=4, length_fmt=">I")
-def decode(self, bs):
+def decode_votes(bs):
     (letter, vote_count) = struct.unpack(">sI", bs)
+    letter = letter.decode("utf-8")  # for Python3 comptibility
     return Votes(letter, vote_count)
 ```
 
@@ -85,13 +86,7 @@ Like we did in our previous example, we're using a 4-byte integer payload length
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 ```
 
-But this time, we are doing something slightly more complicated in our payload. Our payload is two items, a string representing a letter and some votes for that letter. We'll unpack those using `struct` and create a domain specific object `Votes` to return.
-
-```python
-def decode(self, bs):
-    (letter, vote_count) = struct.unpack(">sI", bs)
-    return Votes(letter, vote_count)
-```
+But this time, we are doing something slightly more complicated in our payload. Our payload is two items, a string representing a letter and some votes for that letter. We unpack those using `struct` and create a domain specific object `Votes` to return.
 
 ## Creating an Encoder
 
@@ -101,12 +96,12 @@ Here's a quick example encoder:
 
 ```python
 @wallaroo.encoder
-def encode(self, data):
+def encode_data(data):
     # data is a string
     return data + "\n"
 ```
 
-This is just about the simplest encoder you could have. It's from the [Reverse Word example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/reverse). It takes a string that we want to send to an external system as an input, adds a newline at the end and returns it for sending.
+It takes a string that we want to send to an external system as an input, adds a newline at the end and returns it for sending.
 
 Here's a more complicated example taken from our [Alphabet Popularity Contest example](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/alphabet):
 
@@ -117,9 +112,8 @@ class Votes(object):
         self.votes = votes
 
 @wallaroo.encoder
-def encode(self, data):
-    # data is a Votes
-    return struct.pack(">IsQ", 9, data.letter, data.votes)
+def encode_votes(votes):
+    return struct.pack(">IsQ", 9, votes.letter, votes.votes)
 ```
 
 Let's take a look at what is happening here. First of all, we are once again using the Python `struct` package. In this case, though, we are creating our own packed binary message. It's a framed message with a 4-byte header for the payload length, plus the payload:

@@ -27,7 +27,7 @@ If you have more than one Python version installed, virtualenv may set up the im
 
 ```python
 Traceback (most recent call last):
-  File "wallaroo-{{ book.wallaroo_version }}/examples/python/celsius/celsius.py", line 18, in <module>
+  File "wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateful/alerts.py", line 18, in <module>
     import wallaroo
   File "wallaroo-{{ book.wallaroo_version }}/machida/wallaroo.py", line 16, in <module>
     import argparse
@@ -38,7 +38,7 @@ Traceback (most recent call last):
   File "/usr/local/Cellar/python/2.7.14/Frameworks/Python.framework/Versions/2.7/lib/python2.7/weakref.py", line 14, in <module>
     from _weakref import (
 ImportError: cannot import name _remove_dead_weakref
-Could not load module 'celsius'
+Could not load module 'alerts'
 ```
 
 In order to work correctly, virtualenv needs to be set up with the correct Python path. To do this, use `which` to get the absolute path of your intended Python version:
@@ -95,25 +95,23 @@ To run a Wallaroo application with virtualenv, run it within an activated shell:
 
 {% codetabs name="Python 2.7", type="py" -%}
 source ENV/bin/activate
-export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
-machida --application-module celsius \
-  --in 127.0.0.1:7000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateful"
+machida --application-module alerts \
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker-name \
   --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1 \
   --ponynoblock
 {% language name="Python 3", type="py" -%}
 source ENV/bin/activate
-export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/celsius"
-machida3 --application-module celsius \
-  --in 127.0.0.1:7000 --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/machida/lib:$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateful"
+machida3 --application-module alerts \
+  --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
   --control 127.0.0.1:6000 --data 127.0.0.1:6001 --name worker-name \
   --external 127.0.0.1:5050 --cluster-initializer --ponythreads=1 \
   --ponynoblock
 {%- endcodetabs %}
 
-Please be aware that you'll still need to setup a source and sink as well. To learn more you can look at [Giles Sender](/book/wallaroo-tools/giles-sender.md) for more detailed instructions on building and running Giles.
-
-To run a sink for our example with Data Receiver, run
+Please be aware that you'll still need to setup a sink as well. To run a sink for our example with Data Receiver, run
 
 ```bash
 data_receiver --framed --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock

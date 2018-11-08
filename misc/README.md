@@ -20,7 +20,7 @@ You can run the example tester on any Wallaroo source tree via the following com
 ./example-tester.bash
 ```
 
-It takes two optional positional arguments. Arg1 is which language's examples to test (go/python/pony) and Arg2 is which example to test (celsius/etc). By default, it will run examples for all languages.
+It takes two optional positional arguments. Arg1 is which language's examples to test (go/python/pony) and Arg2 is which example to test (alerts_stateless/etc). By default, it will run examples for all languages.
 
 NOTE: This has only been tested on Linux. It may or may not work on OSX/other environments.
 

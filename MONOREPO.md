@@ -7,15 +7,11 @@ Markdown source used to build http://docs.wallaroolabs.com. http://docs.wallaroo
 
 #### examples/
 
-Wallaroo example applications in a variety of languages. Currently, only the Python and Go API examples are supported.
+Wallaroo example applications in a variety of languages. Currently, only the Python API examples are supported.
 
 #### giles/
 
 TCP utility applications that can stream data over TCP to Wallaroo applications and receive TCP streams from said applications.
-
-#### go_api/
-
-Code for writing Wallaroo applications using Go.
 
 #### lib/
 

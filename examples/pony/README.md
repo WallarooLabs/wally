@@ -8,7 +8,7 @@ To get set up for running examples, you should complete the [setup instructions]
 
 ### Simple Stateless Applications
 
-- [celsius](celsius/): a Celsius-to-Fahrenheit stream application.
+- [alerts_stateless](alerts_stateless/): a transaction alerts stream application.
 
 ### Partitioned Stateful Applicatins
 

@@ -37,7 +37,6 @@
   * [Running a Wallaroo Python Application](book/python/running-a-wallaroo-python-application.md)
   * [Writing Your Own Application](book/python/writing-your-own-application.md)
   * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
-  * [Writing Your Own Partitioned Stateful Application](book/python/writing-your-own-partitioned-stateful-application.md).
   * [Word Count](book/python/word-count.md)
   * [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)
   * [Using Connectors](book/python/using-connectors.md)
@@ -46,7 +45,21 @@
 * Debugging Python Wallaroo Applications
   * [Debugging](book/python/debugging.md)
 
-### Wallaroo with Go
+## Running Wallaroo
+* [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md)
+* [Autoscale](/book/running-wallaroo/autoscale.md)
+* [Resilience](/book/running-wallaroo/resilience.md)
+* [Command line options](/book/running-wallaroo/wallaroo-command-line-options.md)
+
+## Appendix
+* [Wallaroo and Virtualenv](book/appendix/virtualenv.md)
+* [TCP Decoders and Encoders](book/appendix/tcp-decoders-and-encoders.md)
+* [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
+* [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
+* [Wallaroo and Long-Running Data Processing and Other Workflows](book/appendix/wallaroo-and-long-running-data-processing-and-other-workflows.md)
+* [Tips for using Wallaroo in Docker](book/appendix/wallaroo-in-docker-tips.md)
+
+## Wallaroo with Go (frozen at 0.5.4)
 * [Go API Introduction](book/go/intro.md)
 
 * [Setting up Your Environment](book/go/getting-started/setting-up-your-environment.md)
@@ -73,20 +86,6 @@
   * [Interworker Serialization and Resilience](book/go/api/interworker-serialization-and-resilience.md)
   * [Start A Go Project](book/go/api/start-a-project.md)
   * [Wallaroo Go API](book/go/api/api.md)
-
-## Running Wallaroo
-* [Running Wallaroo](/book/running-wallaroo/running-wallaroo.md)
-* [Autoscale](/book/running-wallaroo/autoscale.md)
-* [Resilience](/book/running-wallaroo/resilience.md)
-* [Command line options](/book/running-wallaroo/wallaroo-command-line-options.md)
-
-## Appendix
-* [Wallaroo and Virtualenv](book/appendix/virtualenv.md)
-* [TCP Decoders and Encoders](book/appendix/tcp-decoders-and-encoders.md)
-* [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
-* [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
-* [Wallaroo and Long-Running Data Processing and Other Workflows](book/appendix/wallaroo-and-long-running-data-processing-and-other-workflows.md)
-* [Tips for using Wallaroo in Docker](book/appendix/wallaroo-in-docker-tips.md)
 
 ## Legal
 * [Terms and Conditions](book/legal/terms.md)

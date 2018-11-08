@@ -16,9 +16,6 @@ machida --application-module alphabet --in 127.0.0.1:7010 \
 machida3 --application-module alphabet --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w3 \
   --ponythreads 1
-{%- language name="Go", type="go" -%}
-alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --join 127.0.0.1:12500 --name w3
 {%- endcodetabs %}
 
 The `--in` argument specifies the port that the TCP source will listen on, and the `--out` argument specifies the target address for data output over TCP. `--join` is used to specify the control channel address of the running worker we are contacting in order to join.  `--name` is used to specify the name of the joining worker.
@@ -49,15 +46,6 @@ machida3 --application-module alphabet --in 127.0.0.1:7010 \
 machida3 --application-module alphabet --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --join 127.0.0.1:12500 --name w5 --worker-count 3 \
   --ponythreads 1
-{%- language name="Go", type="go" -%}
-alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --join 127.0.0.1:12500 --name w3 --worker-count 3
-
-alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --join 127.0.0.1:12500 --name w4 --worker-count 3
-
-alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
-  --join 127.0.0.1:12500 --name w5 --worker-count 3
 {%- endcodetabs %}
 
 ## Shrink to Fit

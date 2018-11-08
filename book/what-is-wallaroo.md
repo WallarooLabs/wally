@@ -10,7 +10,7 @@ When we set out to build Wallaroo, we had a few goals in mind. We wanted to impr
 
 ## Wallaroo by example: Market Spread
 
-Let’s start talking about what Wallaroo can do by way of an example. One demo application is one called “Market Spread.” It’s based on a proof-of-concept we did for a large bank that was looking at ways to modernize their infrastructure. Market Spread is an application designed to run alongside a trading system. Its goal is to monitor market data for irregularities around different symbols and potentially withdraw some trades that have been sent to market should certain anomalies occur.
+Let’s start talking about what Wallaroo can do by way of an example. One demo application is called “Market Spread.” It’s based on a proof-of-concept we did for a large bank that was looking at ways to modernize their infrastructure. Market Spread is an application designed to run alongside a trading system. Its goal is to monitor market data for irregularities around different symbols and potentially withdraw some trades that have been sent to market should certain anomalies occur.
 
 When we break the application down into its key components we get:
 
@@ -44,15 +44,15 @@ That’s a lot to tackle and a lot of code to introduce bugs in. Wallaroo is, in
 
 How does one go about building a Wallaroo application? Via our developer framework and its APIs which are the focus of this guide. The core abstractions from our API that we'll touch on in this introduction are:
 
-- Computation
-- StateComputation
+- Stateless Computation
+- State Computation
 - Pipeline
 - Source
 - Sink
 
 The most important of these is a `computation`. Computations come in two varieties: stateless computation and state computation. A stateless computation takes some data as an input and creates some new data as an output. For example, a “double computation” might take in an integer such as 2 and output 4. A state computation is similar to a stateless computation except it takes an additional input: the state it will operate on. An example of a state computation would be a counter that keeps track of the running total of all numbers it has processed.
 
-You can combine computations together using another abstraction we provide: `Pipeline`. A pipeline allows you to say, for example, that the output from computation A will be processed by computation B. A pipeline begins with a `Source` step, which is responsible for receiving and decoding incoming external messages. Likewise, the pipeline may end at a `Sink`, if it has anything to output, which encodes data and sends it to an external receiver. In this way, you can take individual computations and start turning them into applications that take in data from various external sources and ultimately produce outputs that are sent to external systems via sinks.
+You can combine computations together using another abstraction we provide: `Pipeline`. A pipeline allows you to say, for example, that the output from computation A will be processed by computation B. A pipeline begins with a `Source` stage, which is responsible for receiving and decoding incoming external messages. Likewise, the pipeline may end at a `Sink`, if it has anything to output, which encodes data and sends it to an external receiver. In this way, you can take individual computations and start turning them into applications that take in data from various external sources and ultimately produce outputs that are sent to external systems via sinks.
 
 ## Market Spread in Wallaroo
 
@@ -60,7 +60,7 @@ Given these abstractions, what does our Market Spread application look like?
 
 ![Market Spread in Wallaroo](images/market-spread-in-wallaroo.png)
 
-You can see we end up with two pipelines, one for our `NBBO Feed` and another for the `Order Feed,` each with its own corresponding source. We have a single type of state that we are storing (`NBBO State` by symbol), two state computations--one to `Update` state, another to `Check` it--and finally a `Sink` that we send any output to.
+You can see we end up with two pipelines, one for our `NBBO Feed` and another for the `Order Feed,` each with its own corresponding source. We have a single type of state that we are storing (`NBBO State` by symbol), a state computation--to update state and check orders against it--and finally a `Sink` that we send any output to.
 
 ## Market Spread Performance
 
