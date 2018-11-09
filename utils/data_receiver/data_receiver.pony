@@ -127,6 +127,7 @@ class ConnectionNotify is TCPConnectionNotify
       if _read_header then
         try
           let expect = Bytes.to_u32(d(0)?, d(1)?, d(2)?, d(3)?).usize()
+          if expect == 0 then return true end
           c.expect(expect)
           _read_header = false
         else
