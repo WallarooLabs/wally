@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # md5 for validatiing script checksum
-MD5="5865550ca2f2e0548e2ca09c1406e9ec  -"
+MD5="e83a9ded8d8b34f86045e0d65920ff5d  -"
 
 set -eEuo pipefail
 
@@ -799,6 +799,10 @@ create_env_file() {
   log "Please use \"source bin/activate\" in '${WALLAROO_UP_DEST}/${WALLAROO_VERSION_DIRECTORY}' to set up environment for wallaroo."
 }
 
+fix_ownership() {
+  chown -R "$(logname)":"$(logname)" "${WALLAROO_UP_DEST}"
+}
+
 main() {
   check_arch
   get_distribution
@@ -811,6 +815,7 @@ main() {
   do_install
 
   create_env_file
+  fix_ownership
 
   log ""
   log "Successfully configured Wallaroo into '${WALLAROO_UP_DEST}/${WALLAROO_VERSION_DIRECTORY}'!"
