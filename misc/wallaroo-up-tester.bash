@@ -12,9 +12,10 @@ log() {
 }
 
 
-TEST_CUSTOM=${1:-}
-ENV_TO_TEST=${2:-all}
-DISTRO_TO_TEST=${3:-}
+MAX_PARALLEL=${1:-1}
+TEST_CUSTOM=${2:-}
+ENV_TO_TEST=${3:-all}
+DISTRO_TO_TEST=${4:-}
 
 VALID_ENVS="
 all
@@ -182,14 +183,19 @@ echo SUCCESS > ${tmp_for_run}/result
 "
 }
 
-# run docker commands to test a specific distro
+# run docker commands to test a specific distro.
+# run via vagrant to keep various docker stuff isolated
+# so we can run multiple docker distros in parallel
 run_docker() {
-  if ! docker run --rm --net=host -v /var/run/docker.sock:/var/run/docker.sock -v "${WALLAROO_DIR}":"${WALLAROO_DIR}" -w "${tmp_for_run}" --name wally-tester "${docker_distro}" sh -c "${commands_to_run}" 2>&1 | tee -a "$LOG_FILE"; then
-    return
-  fi
-  if ! docker rmi "${docker_distro}"; then
-    return
-  fi
+  commands_to_run="
+curl -fsSL get.docker.com -o /tmp/get-docker.sh && \
+export CHANNEL=stable && \
+sh /tmp/get-docker.sh && \
+sudo groupadd -f docker && \
+sudo usermod -aG docker \"\$USER\" && \
+sg docker -c 'docker run --rm --net=host -v /var/run/docker.sock:/var/run/docker.sock -v \"${WALLAROO_DIR}\":\"${WALLAROO_DIR}\" -w \"${tmp_for_run}\" --name wally-tester \"${docker_distro}\" sh -c \"${commands_to_run}\"'"
+  vagrant_distro="ubuntu/xenial64"
+  run_vagrant
 }
 
 # run vagrant commands to test a specific distro
@@ -231,19 +237,19 @@ run_vagrant() {
   fi
 }
 
-# iterate through all distros to test
-for distro in "${DISTROS_TO_TEST[@]}"
-do
-  # if it's not a distro we're testing then skip it
-  if [[ "${distro}" != *"${DISTRO_TO_TEST}"* ]]; then
-    continue
-  fi
+check_parallelism() {
+  # check to see if we're allowed to run or not
+  while :; do
+    background=( $(jobs -p))
+    if (( ${#background[@]} < MAX_PARALLEL )); then
+      break
+    fi
+    # wait for some background processes to have finished running
+    sleep 15
+  done
+}
 
-  # extract out the docker/vagrant names for this distro
-  IFS="," read -r -a a <<< "$distro"
-  docker_distro="${a[0]}"
-  vagrant_distro="${a[1]}"
-
+run_distro_docker() {
   # if we're testing docker
   if [[ "${DOCKER_TEST}" == "true" ]]; then
     # set and create tmp directory for this test run
@@ -273,7 +279,9 @@ do
     log ""
     popd
   fi
+}
 
+run_distro_vagrant() {
   # if we're testing vagrant
   if [[ "${VAGRANT_TEST}" == "true" ]]; then
     # set and create tmp directory for this test run
@@ -304,7 +312,42 @@ do
     log ""
     popd
   fi
+}
+
+# iterate through all distros to test
+for distro in "${DISTROS_TO_TEST[@]}"
+do
+  # if it's not a distro we're testing then skip it
+  if [[ "${distro}" != *"${DISTRO_TO_TEST}"* ]]; then
+    continue
+  fi
+
+  # extract out the docker/vagrant names for this distro
+  IFS="," read -r -a a <<< "$distro"
+  docker_distro="${a[0]}"
+  vagrant_distro="${a[1]}"
+
+  # if we're testing docker
+  if [[ "${DOCKER_TEST}" == "true" ]]; then
+    # check to see if we're allowed to run or not
+    check_parallelism
+
+    # run in background for docker
+    run_distro_docker &
+  fi
+
+  # if we're testing vagrant
+  if [[ "${VAGRANT_TEST}" == "true" ]]; then
+    # check to see if we're allowed to run or not
+    check_parallelism
+
+    # run in background for vagrant
+    run_distro_vagrant &
+  fi
 done
+
+# wait for all background jobs to finish
+wait
 
 print_results
 
