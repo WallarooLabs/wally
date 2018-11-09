@@ -275,6 +275,7 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
 class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   RollbackableRunner & SerializableStateRunner)
   let _step_group: RoutingId
+  // Used for calling serialization and deserialization methods
   let _canonical_state: S
   let _state_comp: StateComputation[In, Out, S] val
   let _next_runner: Runner

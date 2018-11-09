@@ -44,4 +44,9 @@ trait ref State
       error
     end
 
+trait ref StateWrapper[In: Any val]
+  fun ref apply(input: In, event_ts: U64, wall_time: U64):
+    (Out | Array[Out] val | None)
+  fun ref on_timeout(wall_time: U64): Array[Out] val
+
 class EmptyState is State
