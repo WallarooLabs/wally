@@ -828,17 +828,17 @@ primitive _SourceConfig
       end
 
       KafkaSourceConfig[(PyData val | None)](consume ksco, (env.root as TCPConnectionAuth), decoder)
-    | "connector" =>
+    | "source_connector" =>
       let host = recover val
-        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 1)))
-      end
-
-      let port = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 2)))
       end
 
+      let port = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(source_config_tuple, 3)))
+      end
+
       let decoder = recover val
-        let d = @PyTuple_GetItem(source_config_tuple, 3)
+        let d = @PyTuple_GetItem(source_config_tuple, 5)
         Machida.inc_ref(d)
         PyFramedSourceHandler(d)?
       end
@@ -928,16 +928,16 @@ primitive _SinkConfig
       end
 
       KafkaSinkConfig[PyData val](encoder, consume ksco, (env.root as TCPConnectionAuth))
-    | "connector" =>
+    | "sink_connector" =>
       let host = recover val
-        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 1)))
-      end
-
-      let port = recover val
         String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 2)))
       end
 
-      let encoderp = @PyTuple_GetItem(sink_config_tuple, 3)
+      let port = recover val
+        String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(sink_config_tuple, 3)))
+      end
+
+      let encoderp = @PyTuple_GetItem(sink_config_tuple, 4)
       Machida.inc_ref(encoderp)
       let encoder = recover val
         PyConnectorEncoder(encoderp)

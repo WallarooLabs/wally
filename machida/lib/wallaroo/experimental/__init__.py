@@ -26,55 +26,57 @@ import wallaroo
 
 
 def stream_message_decoder(func):
-    wallaroo._validate_arity_compatability(func, 1)
+    wallaroo._validate_arity_compatability(func.__name__, func, 1)
     C = wallaroo._wallaroo_wrap(func.__name__, func, wallaroo.ConnectorDecoder)
     return C()
 
 
 def stream_message_encoder(func):
-    wallaroo._validate_arity_compatability(func, 1)
+    wallaroo._validate_arity_compatability(func.__name__, func, 1)
     C = wallaroo._wallaroo_wrap(func.__name__, func, wallaroo.ConnectorEncoder)
     return C()
 
 
-class StreamDecoderError(Exception):
-    pass
-
-
 class SourceConnectorConfig(object):
-    def __init__(self, host, port, decoder):
-        self._host = host
-        self._port = port
-        self._decoder = decoder
-
-    def to_tuple(self):
-        return ("connector", self._host, str(self._port), self._decoder)
-
-
-class SinkConnectorConfig(object):
-    def __init__(self, host, port, encoder):
+    def __init__(self, name, encoder, decoder, port, host='127.0.0.1'):
+        self._name = name
         self._host = host
         self._port = port
         self._encoder = encoder
+        self._decoder = decoder
 
     def to_tuple(self):
-        return ("connector", self._host, str(self._port), self._encoder)
+        return ("source_connector", self._name, self._host, str(self._port), self._encoder, self._decoder)
+
+
+class SinkConnectorConfig(object):
+    def __init__(self, name, encoder, decoder, port, host='127.0.0.1'):
+        self._name = name
+        self._host = host
+        self._port = port
+        self._encoder = encoder
+        self._decoder = decoder
+
+    def to_tuple(self):
+        return ("sink_connector", self._name, self._host, str(self._port), self._encoder, self._decoder)
 
 
 class SourceConnector(object):
     def __init__(self, args=None, required_params=[], optional_params=[]):
         params = parse_connector_args(args or sys.argv, required_params, optional_params)
-        wallaroo_app = __import__(params.application)
-        actions = wallaroo_app.application_setup(args or sys.argv)
-        try:
-            (_command, _name, port, encoder, _decoder) = next(
-                action for action in actions
-                if action[0] == "source_connector" and action[1] == params.connector_name)
-        except:
+        wallaroo_mod = __import__(params.application)
+        application = wallaroo_mod.application_setup(args or sys.argv)
+        source = None
+        for stage in application[2]:
+            for step in stage:
+                if step[0] == 'source' and step[2][0] == 'source_connector' and step[2][1] == params.connector_name:
+                    source = step[2]
+        if source is None:
             raise RuntimeError("Unable to find a source connector with the name " + params.connector_name)
+        (_, _name, host, port, encoder, _decoder) = source
         self.params = params
         self._encoder = encoder
-        self._host = '127.0.0.1'
+        self._host = host
         self._port = port
         self._conn = None
 
@@ -91,13 +93,10 @@ class SourceConnector(object):
                 else:
                     raise
 
-    def write(self, message):
-        # Future parameters
-        partition = None
-        sequence = None
+    def write(self, message, event_time=0):
         if self._conn == None:
             raise RuntimeError("Please call connect before writing")
-        payload = self._encoder.encode(message)
+        payload = self._encoder.encode(message, event_time)
         self._conn.sendall(payload)
 
 
@@ -105,17 +104,19 @@ class SinkConnector(object):
 
     def __init__(self, args=None, required_params=[], optional_params=[]):
         params = parse_connector_args(args or sys.argv, required_params, optional_params)
-        wallaroo_app = __import__(params.application)
-        actions = wallaroo_app.application_setup(args or sys.argv)
-        try:
-            (_command, _name, port, _encoder, decoder) = next(
-                action for action in actions
-                if action[0] == "sink_connector" and action[1] == params.connector_name)
-        except:
+        wallaroo_mod = __import__(params.application)
+        application = wallaroo_mod.application_setup(args or sys.argv)
+        sink = None
+        for stage in application[2]:
+            for step in stage:
+                if step[0] == 'to_sink' and step[1][0] == 'sink_connector' and step[1][1] == params.connector_name:
+                    sink = step[1]
+        if sink is None:
             raise RuntimeError("Unable to find a sink connector with the name " + params.connector_name)
+        (_, _name, host, port, _encoder, decoder) = sink
         self.params = params
         self._decoder = decoder
-        self._host = '127.0.0.1'
+        self._host = host
         self._port = port
         self._acceptor = None
         self._connections = []
