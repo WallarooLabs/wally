@@ -61,18 +61,6 @@ def build_application(app_name, pipeline):
     if not pipeline.__is_closed__():
         print("\nAPI_Error: An application must end with to_sink/s.")
         raise WallarooParameterError()
-    base_port = 7100
-    for source in pipeline._sources():
-        config = source[2]
-        if config[0] == 'source_connector' and config[3] is None:
-            config[3] = base_port
-            base_port += 1
-    base_port = 7200
-    for sink in pipeline._sinks():
-        config = sink[1]
-        if config[0] == 'sink_connector' and config[3] is None:
-            config[3] = base_port
-            base_port += 1
     return pipeline.__to_tuple__(app_name)
 
 class Pipeline(object):
