@@ -14,6 +14,7 @@
 
 
 import argparse
+import datetime as dt
 import pickle
 import struct
 import inspect
@@ -71,14 +72,6 @@ class Pipeline(object):
         pipeline_tree = _PipelineTree(("source", name, source_config.to_tuple()))
         return Pipeline(pipeline_tree)
 
-        # !@ We need to improve this when Brian updates connectors API.
-        # if isinstance(source_config, str):
-        #     (port, decoder) = self._connectors[source_config]
-        #     connector = wallaroo.experimental.SourceConnectorConfig(host='localhost', port=port, decoder=decoder)
-        #     self._actions.append(("source", name, connector.to_tuple()))
-        # else:
-        #     self._actions.append(("source", name, source_config.to_tuple()))
-
     def __to_tuple__(self, app_name):
         return self._pipeline_tree.to_tuple(app_name)
 
@@ -99,12 +92,7 @@ class Pipeline(object):
         return self.clone().__to_sink__(sink_config)
 
     def __to_sink__(self, sink_config):
-        if isinstance(sink_config, str):
-            (port, encoder) = self._connectors[sink_config]
-            connector = wallaroo.experimental.SinkConnectorConfig(host='localhost', port=port, encoder=encoder)
-            self._pipeline_tree.add_stage(("to_sink", connector.to_tuple()))
-        else:
-            self._pipeline_tree.add_stage(("to_sink", sink_config.to_tuple()))
+        self._pipeline_tree.add_stage(("to_sink", sink_config.to_tuple()))
         return self
 
     def to_sinks(self, sink_configs):
@@ -113,12 +101,7 @@ class Pipeline(object):
     def __to_sinks__(self, sink_configs):
         sinks = []
         for sc in sink_configs:
-            if isinstance(sc, str):
-                (port, encoder) = self._connectors[sc]
-                connector = wallaroo.experimental.SinkConnectorConfig(host='localhost', port=port, encoder=encoder)
-                sinks.append(connector.to_tuple())
-            else:
-                sinks.append(sc.to_tuple())
+            sinks.append(sc.to_tuple())
         self._pipeline_tree.add_stage(("to_sinks", sinks))
         return self
 
@@ -139,9 +122,15 @@ class Pipeline(object):
     def clone(self):
         return Pipeline(self._pipeline_tree.clone())
 
+    def _sources(self):
+        return self._pipeline_tree.sources()
+
+    def _sinks(self):
+        return self._pipeline_tree.sinks()
+
 def _validate_arity_compatability(name, obj, arity):
     """
-    To assist in proper API use, it's convenient to fail fast with erros as
+    To assist in proper API use, it's convenient to fail fast with errors as
     soon as possible. We use this function to check things we decorate for
     compatibility with our desired number of arguments.
     """
@@ -239,21 +228,24 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
 
     elif base_cls is ConnectorEncoder:
         class C(base_cls):
-            def encode(self, data, partition=None, sequence=None):
+            def encode(self, data, event_time=0):
                 encoded = func(data)
-                if partition:
-                    part = str(partition).encode('utf-8')
-                else:
-                    part = b''
-                if sequence:
-                    seq = int(sequence)
-                else:
-                    seq = -1
-                # struct.calcsize('<q') = 8
-                meta = struct.pack('<H{}sq'.format(len(part)), len(part) + 8, part, seq)
+                if isinstance(event_time, dt.datetime):
+                    # We'll assume naive datetime values should be treated as
+                    # UTC. Python's brain-dead datetime package is mostly
+                    # useless for fixing this without a mountain of caveats
+                    # like improper DST handling. We'll assume the user can
+                    # import a library that handles this better than Python
+                    # does itself.
+                    #
+                    # Convert to an integer number of ms from the floating
+                    # point seconds that Python uses.
+                    event_time = int(event_time.timestamp() * 1000)
                 return struct.pack(
-                    '<I{}s{}s'.format(len(meta), len(encoded)),
-                    len(meta) + len(encoded), meta, encoded)
+                    '<Iq{}s'.format(len(encoded)),
+                    len(encoded) + 8, # total frame size
+                    event_time, # 64bit event_time
+                    encoded) # final payload, variable size as formatted above
 
     # Case 4: Decoder
     elif base_cls is OctetDecoder:
@@ -275,11 +267,9 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
             def payload_length(self, bs):
                 return struct.unpack("<I", bs)[0]
             def decode(self, bs):
-                meta_len = struct.unpack_from('<H', bs)[0]
-                # We dropping the metadata on the floor for now, slice out the
-                # remaining data for message decoding.
-                # struct.calcsize('<H') = 2
-                message_data = bs[2 + meta_len :]
+                # We're dropping event_time for now. Pony will pick this up
+                # itself. Slice bytes off the front: struct.calcsize('<q') = 8
+                message_data = bs[8:]
                 return func(message_data)
             def decoder(self):
                 return func
@@ -342,7 +332,6 @@ def state_computation(name, state):
     def wrapped(func):
         _validate_arity_compatability(name, func, 2)
         C = _wallaroo_wrap(name, func, StateComputation, state=state)
-        # C = _wallaroo_wrap(name, func, StateComputation, state=StateBuilder(state))
         return C()
     return wrapped
 
@@ -588,3 +577,19 @@ class _PipelineTree(object):
         pt.es = new_es
         pt.is_closed = self.is_closed
         return pt
+
+    def sources(self):
+        sources = []
+        for stage in self.vs:
+            for step in stage:
+                if step[0] == "source":
+                    sources.append(step)
+        return sources
+
+    def sinks(self):
+        sinks = []
+        for stage in self.vs:
+            for step in stage:
+                if step[0] == "to_sink":
+                    sinks.append(step)
+        return sinks
