@@ -29,7 +29,7 @@ use "wallaroo_labs/mort"
 
 primitive EmptyWindow
 
-class WindowsBuilder
+class RangeWindowsBuilder
   var _range: U64
   var _slide: U64
   var _delay: U64
@@ -39,7 +39,7 @@ class WindowsBuilder
     _slide = range
     _delay = 0
 
-  fun ref with_delay(delay: U64): WindowsBuilder =>
+  fun ref with_delay(delay: U64): RangeWindowsBuilder =>
     _delay = delay
     this
 
@@ -47,6 +47,17 @@ class WindowsBuilder
     agg: Aggregation[In, Out, S]): StateInitializer[In, Out, S]
   =>
     TumblingWindowsStateInitializer[In, Out, S](agg, _range, _delay)
+
+class CountWindowsBuilder
+  var _count: USize
+
+  new create(count: USize) =>
+    _count = count
+
+  fun ref over[In: Any val, Out: Any val, S: State ref](
+    agg: Aggregation[In, Out, S]): StateInitializer[In, Out, S]
+  =>
+    TumblingCountWindowsStateInitializer[In, Out, S](agg, _count)
 
 trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   StateWrapper[In, Out, Acc]
@@ -117,6 +128,9 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
       recover Array[U8] end
     end
 
+///////////////////////////
+// TUMBLING RANGE WINDOWS
+///////////////////////////
 class val TumblingWindowsStateInitializer[In: Any val, Out: Any val,
   Acc: State ref] is StateInitializer[In, Out, Acc]
   let _agg: Aggregation[In, Out, Acc]
@@ -309,3 +323,90 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
   fun _should_trigger(window_start_ts: U64, current_ts: U64): Bool =>
     (window_start_ts + _range) < (current_ts - _delay)
+
+////////////////////////////
+// TUMBLING COUNT WINDOWS
+////////////////////////////
+class val TumblingCountWindowsStateInitializer[In: Any val, Out: Any val,
+  Acc: State ref] is StateInitializer[In, Out, Acc]
+  let _agg: Aggregation[In, Out, Acc]
+  let _count: USize
+
+  new val create(agg: Aggregation[In, Out, Acc], count: USize) =>
+    _agg = agg
+    _count = count
+
+  fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
+    TumblingCountWindows[In, Out, Acc](key, _agg, _count)
+
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
+    RunnerBuilder
+  =>
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
+
+  fun val decode(in_reader: Reader, auth: AmbientAuth):
+    StateWrapper[In, Out, Acc] ?
+  =>
+    try
+      let data: Array[U8] iso = in_reader.block(in_reader.size())?
+      match Serialised.input(InputSerialisedAuth(auth), consume data)(
+        DeserialiseAuth(auth))?
+      | let tw: TumblingWindows[In, Out, Acc] => tw
+      else
+        error
+      end
+    else
+      error
+    end
+
+  fun name(): String =>
+    _agg.name()
+
+class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
+  Windows[In, Out, Acc]
+  let _key: Key
+  let _agg: Aggregation[In, Out, Acc]
+  let _count_trigger: USize
+  var _acc: Acc
+
+  var _current_count: USize = 0
+
+  new create(key: Key, agg: Aggregation[In, Out, Acc], count: USize) =>
+    _key = key
+    _agg = agg
+    _count_trigger = count
+    _acc = agg.initial_accumulator()
+
+  fun ref apply(input: In, event_ts: U64, wall_time: U64): (Out | None) =>
+    var out: (Out | None) = None
+    _agg.update(input, _acc)
+    _current_count = _current_count + 1
+
+    if _current_count >= _count_trigger then
+      out = _trigger()
+    end
+
+    out
+
+  fun ref on_timeout(wall_time: U64): (Out | None) =>
+    var out: (Out | None) = None
+    if _current_count > 0 then
+      out = _trigger()
+    end
+    out
+
+  fun ref _trigger(): (Out | None) =>
+    var out: (Out | None) = None
+    out = _agg.output(_key, _acc)
+    _acc = _agg.initial_accumulator()
+    _current_count = 0
+    out
+
+  fun ref encode(auth: AmbientAuth): ByteSeq =>
+    try
+      Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(
+        auth))
+    else
+      Fail()
+      recover Array[U8] end
+    end

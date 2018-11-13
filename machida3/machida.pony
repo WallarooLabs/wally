@@ -267,6 +267,15 @@ class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
   fun _final() =>
     Machida.dec_ref(_source_decoder)
 
+class val PyGenSourceHandlerBuilder
+  var _source_generator: Pointer[U8] val
+
+  new create(source_generator: Pointer[U8] val) =>
+    _source_generator = source_generator
+
+  fun apply(): PyGenSourceHandler =>
+    PyGenSourceHandler(_source_generator)
+
 class PyGenSourceHandler is GenSourceGenerator[PyData val]
   var _source_generator: Pointer[U8] val
 
@@ -822,7 +831,7 @@ primitive _SourceConfig
       let gen = recover val
         let g = @PyTuple_GetItem(source_config_tuple, 1)
         Machida.inc_ref(g)
-        PyGenSourceHandler(g)
+        PyGenSourceHandlerBuilder(g)
       end
       GenSourceConfig[PyData val](gen)
     | "tcp" =>
