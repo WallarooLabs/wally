@@ -44,7 +44,7 @@ class val GenSourceListenerBuilder[In: Any val]
   let _layout_initializer: LayoutInitializer
   let _recovering: Bool
   let _target_router: Router
-  let _generator: GenSourceGenerator[In]
+  let _generator: GenSourceGeneratorBuilder[In]
 
   new val create(worker_name: WorkerName, pipeline_name: String,
     runner_builder: RunnerBuilder, partitioner_builder: PartitionerBuilder,
@@ -53,7 +53,8 @@ class val GenSourceListenerBuilder[In: Any val]
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router, generator: GenSourceGenerator[In])
+    recovering: Bool, target_router: Router,
+    generator: GenSourceGeneratorBuilder[In])
   =>
     _worker_name = worker_name
     _pipeline_name = pipeline_name
@@ -78,9 +79,9 @@ class val GenSourceListenerBuilder[In: Any val]
       _layout_initializer, _recovering, _target_router, _generator)
 
 class val GenSourceListenerBuilderBuilder[In: Any val]
-  let _generator: GenSourceGenerator[In]
+  let _generator: GenSourceGeneratorBuilder[In]
 
-  new val create(generator: GenSourceGenerator[In]) =>
+  new val create(generator: GenSourceGeneratorBuilder[In]) =>
     _generator = generator
 
   fun apply(worker_name: String, pipeline_name: String,
