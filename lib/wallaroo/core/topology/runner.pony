@@ -172,14 +172,14 @@ class val StatelessComputationRunnerBuilder[In: Any val, Out: Any val] is
 
 class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   RunnerBuilder
-  let _state_comp: StateComputation[In, Out, S] val
+  let _state_init: StateInitializer[In, Out, S] val
   let _step_group: RoutingId
   let _parallelism: USize
 
-  new val create(state_comp: StateComputation[In, Out, S] val,
+  new val create(state_init: StateInitializer[In, Out, S] val,
     step_group: RoutingId, parallelism': USize)
   =>
-    _state_comp = state_comp
+    _state_init = state_init
     _step_group = step_group
     _parallelism = parallelism'
 
@@ -192,14 +192,14 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
   =>
     match (consume next_runner)
     | let r: Runner iso =>
-      StateRunner[In, Out, S](_step_group, _state_comp, event_log, auth,
+      StateRunner[In, Out, S](_step_group, _state_init, event_log, auth,
         consume r)
     else
-      StateRunner[In, Out, S](_step_group, _state_comp, event_log, auth,
+      StateRunner[In, Out, S](_step_group, _state_init, event_log, auth,
         RouterRunner(partitioner_builder))
     end
 
-  fun name(): String => _state_comp.name()
+  fun name(): String => _state_init.name()
   fun routing_group(): RoutingId => _step_group
   fun parallelism(): USize => _parallelism
   fun is_stateful(): Bool => true

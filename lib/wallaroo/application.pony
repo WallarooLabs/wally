@@ -29,6 +29,7 @@ use "wallaroo/core/source/tcp_source"
 use "wallaroo/core/state"
 use "wallaroo/core/routing"
 use "wallaroo/core/topology"
+use "wallaroo/core/windows"
 use "wallaroo/ent/network"
 use "wallaroo/ent/recovery"
 use "wallaroo_labs/collection_helpers"
@@ -50,7 +51,8 @@ primitive Wallaroo
       FatalUserError("A pipeline must terminate in a sink!")
     end
 
-  // fun window[](range: U64): ... =>
+  fun range_windows(range: U64): WindowsBuilder =>
+    WindowsBuilder(where range = range)
 
 trait BasicPipeline
   fun graph(): this->Dag[Stage]
