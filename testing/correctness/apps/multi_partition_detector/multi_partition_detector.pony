@@ -80,7 +80,7 @@ actor Main
         var p = if gen_source then
           Wallaroo.source[t.Message]("Detector",
             GenSourceConfig[t.Message](
-              MultiPartitionGenerator(partition_count)))
+              MultiPartitionGeneratorBuilder(partition_count)))
         else
           Wallaroo.source[t.Message]("Detector",
             TCPSourceConfig[t.Message]
@@ -103,18 +103,27 @@ actor Main
       env.out.print("Couldn't build topology!")
     end
 
-// TODO: (optional) refactor this out of the detector code and add unit tests
-// Use this with the internal source
-class val MultiPartitionGenerator
+class val MultiPartitionGeneratorBuilder
   let _partitions: USize
 
   new val create(partitions: USize) =>
     _partitions = partitions
 
+  fun apply(): MultiPartitionGenerator =>
+    MultiPartitionGenerator(_partitions)
+
+// TODO: (optional) refactor this out of the detector code and add unit tests
+// Use this with the internal source
+class MultiPartitionGenerator
+  let _partitions: USize
+
+  new create(partitions: USize) =>
+    _partitions = partitions
+
   fun initial_value(): t.Message =>
     t.Message("0", 1)
 
-  fun apply(v: t.Message): t.Message =>
+  fun ref apply(v: t.Message): t.Message =>
     try
       let last_key = v.key().usize()?
       let last_value = v.value()
