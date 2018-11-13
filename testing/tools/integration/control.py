@@ -204,7 +204,7 @@ class TryUntilTimeout(StoppableThread):
             except Exception as err:
                 logging.log(1, "iteration failed...")
                 if time.time() - t0 > self.timeout:
-                    logging.warn("Failed on attempt {} of test: {}..."
+                    logging.warning("Failed on attempt {} of test: {}..."
                           .format(c, get_func_name(self.test)))
                     logging.exception(err)
                     self.stop(err)

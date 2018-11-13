@@ -135,7 +135,7 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
                 logging.info("Run phase complete. Proceeding to validation.")
                 break
             except RunnerHasntStartedError:
-                logging.warn("Runner failed to start properly.")
+                logging.warning("Runner failed to start properly.")
                 if attempt < max_retries:
                     logging.info("Restarting the test!")
                     time.sleep(0.5)
@@ -164,7 +164,7 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
         try:
             save_logs_to_file(base_dir, log_stream, persistent_data)
         except Exception as err:
-            logging.warn("failed to save logs to file")
+            logging.warning("failed to save logs to file")
             logging.exception(err)
         raise
 
