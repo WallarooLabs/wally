@@ -16,11 +16,11 @@ $(abspath $(lastword $(MAKEFILE_LIST)))_UNIT_TEST_COMMAND := false
 
 # `true`/`false` to enable/disable generate pony related targets (build/test/clean) for pony sources in this directory
 # otherwise targets only get created if there are pony sources (*.pony) in this directory.
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONY_TARGET := true
 
 # `true`/`false` to enable/disable generate final file build target using ponyc command for the pony build target so
 # it can be overridden manually
-$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := false
+$(abspath $(lastword $(MAKEFILE_LIST)))_PONYC_TARGET := true
 
 # `true`/`false` to enable/disable generate exs related targets (build/test/clean) for elixir sources in this directory
 # otherwise targets only get created if there are elixir sources (*.exs) in this directory.
@@ -40,18 +40,29 @@ ALERTS_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # standard rules generation makefile
 include $(rules_mk_path)
 
+# integration-tests-examples-pony-alerts_windowed: alerts_windowed_pony_test
 
-build-examples-pony-alerts-stateless: build-machida
-integration-tests-examples-pony-alerts-stateless: build-examples-pony-alerts-stateless
-integration-tests-examples-pony-alerts-stateless: alerts_stateless_test
+# integration-tests-examples-pony-alerts-windowed: alerts_windowed_test
 
-alerts_stateless_test:
-	cd $(ALERTS_PATH) && \
-	integration_test --framed-file-sender \
-	  _test.txt --validation-cmp \
-	  --expected-file _expected.txt \
-		--log-level error \
-		--command 'alerts $(RUN_WITH_RESILIENCE)'
+# alphabet_pony_test:
+# 	cd $(ALPHABET_PONY_PATH) && \
+# 	python _test/gen.py && \
+# 	integration_test --framed-file-sender _test.txt \
+# 		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+# 		--log-level error \
+# 		--batch-size 10 \
+# 		--output 'received.txt' \
+# 		--command './alphabet $(RUN_WITH_RESILIENCE)' \
+# 		--workers 4 \
+# 		--sink-expect 1000
+
+# alerts_windowed_test:
+# 	cd $(ALERTS_PATH) && \
+# 	integration_test --framed-file-sender \
+# 	  _test.txt --validation-cmp \
+# 	  --expected-file _expected.txt \
+# 		--log-level error \
+# 		--command 'alerts $(RUN_WITH_RESILIENCE)'
 #		--sink-mode newlines
 
 endif

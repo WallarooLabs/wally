@@ -19,6 +19,7 @@ Copyright 2017 The Wallaroo Authors.
 use "buffered"
 use "serialise"
 use "wallaroo/core/common"
+use "wallaroo/core/topology"
 use "wallaroo_labs/mort"
 
 trait ref State
@@ -51,7 +52,8 @@ primitive PonySerializeStateEncoderDecoder[S: State ref] is
       error
     end
 
-interface val StateInitializer[In: Any val, Out: Any val, S: State ref]
+interface val StateInitializer[In: Any val, Out: Any val, S: State ref] is
+  Computation[In, Out]
   fun val state_wrapper(key: Key): StateWrapper[In, Out, S]
   fun name(): String
   fun val decode(in_reader: Reader, auth: AmbientAuth):
@@ -60,7 +62,7 @@ interface val StateInitializer[In: Any val, Out: Any val, S: State ref]
 trait ref StateWrapper[In: Any val, Out: Any val, S: State ref]
   fun ref apply(input: In, event_ts: U64, wall_time: U64):
     (Out | Array[Out] val | None)
-  fun ref on_timeout(wall_time: U64): Array[Out] val
+  fun ref on_timeout(wall_time: U64): (Out | Array[Out] val | None)
   fun ref encode(auth: AmbientAuth): ByteSeq
 
 class EmptyState is State

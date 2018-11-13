@@ -16,9 +16,12 @@ Copyright 2018 The Wallaroo Authors.
 
 */
 
-use "wallaroo/state"
+use "wallaroo/core/common"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
+use "wallaroo/core/windows"
 
-interface Aggregation[In: Any val, Out: Any val, Acc: State] is
+interface val Aggregation[In: Any val, Out: Any val, Acc: State ref] is
   Computation[In, Out]
   // Create initial (empty/identity element for combine) accumulator
   fun initial_accumulator(): Acc
@@ -28,12 +31,21 @@ interface Aggregation[In: Any val, Out: Any val, Acc: State] is
 
   // Combine 2 partial aggregations. Must be associative. This function
   // should not modify either accumulator when producing a new one.
-  fun combine(acc1: Acc box, acc2: Acc box): Acc
+  fun combine(acc1: Acc, acc2: Acc): Acc
 
   // Create an output based on an accumulator when the window is triggered.
-  fun output(key: Key, acc: Acc): Out
+  fun output(key: Key, acc: Acc): (Out | None)
 
-  // fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
-  //   RunnerBuilder
-  // =>
-  //   StateRunnerBuilder[In, Out, S](this, step_group_id, parallelization)
+  fun name(): String
+
+  ////////////////////////////
+  // Not implemented by user
+  ////////////////////////////
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
+    RunnerBuilder
+  =>
+    let global_window_initializer = GlobalWindowStateInitializer[In, Out, Acc](
+      this)
+    StateRunnerBuilder[In, Out, Acc](global_window_initializer, step_group_id,
+      parallelization)
+
