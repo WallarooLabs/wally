@@ -17,19 +17,78 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 
+use "buffered"
 use "collections"
 use "time"
 use "serialise"
-use "wallaroo/aggregations"
+use "wallaroo/core/aggregations"
+use "wallaroo/core/common"
+use "wallaroo/core/state"
+use "wallaroo/core/topology"
+use "wallaroo_labs/mort"
 
 primitive EmptyWindow
 
-trait Windows[In: Any val, Out: Any val, Acc: State] is
-  StateWrapper[In, Out, Acc]
-  fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val
-  fun ref on_timeout(wall_time: U64): Array[Out] val
+class WindowsBuilder
+  var _range: U64
+  var _slide: U64
+  var _delay: U64
 
-class GlobalWindow[In: Any val, Out: Any val, Acc: State] is Windows[In, Out]
+  new create(range: U64) =>
+    _range = range
+    _slide = range
+    _delay = 0
+
+  fun ref with_delay(delay: U64): WindowsBuilder =>
+    _delay = delay
+    this
+
+  fun ref over[In: Any val, Out: Any val, S: State ref](
+    agg: Aggregation[In, Out, S]): StateInitializer[In, Out, S]
+  =>
+    TumblingWindowsStateInitializer[In, Out, S](agg, _range, _delay)
+
+trait Windows[In: Any val, Out: Any val, Acc: State ref] is
+  StateWrapper[In, Out, Acc]
+  fun ref apply(input: In, event_ts: U64, wall_time: U64):
+    (Out | Array[Out] val | None)
+  fun ref on_timeout(wall_time: U64): (Out | Array[Out] val | None)
+
+class val GlobalWindowStateInitializer[In: Any val, Out: Any val,
+  Acc: State ref] is StateInitializer[In, Out, Acc]
+  let _agg: Aggregation[In, Out, Acc]
+
+  new val create(agg: Aggregation[In, Out, Acc]) =>
+    _agg = agg
+
+  fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
+    GlobalWindow[In, Out, Acc](key, _agg)
+
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
+    RunnerBuilder
+  =>
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
+
+  fun val decode(in_reader: Reader, auth: AmbientAuth):
+    StateWrapper[In, Out, Acc] ?
+  =>
+    try
+      let data: Array[U8] iso = in_reader.block(in_reader.size())?
+      match Serialised.input(InputSerialisedAuth(auth), consume data)(
+        DeserialiseAuth(auth))?
+      | let gw: GlobalWindow[In, Out, Acc] => gw
+      else
+        error
+      end
+    else
+      error
+    end
+
+  fun name(): String =>
+    _agg.name()
+
+class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
+  Windows[In, Out, Acc]
   let _key: Key
   let _agg: Aggregation[In, Out, Acc]
   let _acc: Acc
@@ -39,17 +98,27 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State] is Windows[In, Out]
     _agg = agg
     _acc = agg.initial_accumulator()
 
-  fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val =>
+  fun ref apply(input: In, event_ts: U64, wall_time: U64):
+    (Out | Array[Out] val | None) =>
     _agg.update(input, _acc)
     // We trigger a result per message
-    recover val [_agg.output(_key, _acc)] end
+    _agg.output(_key, _acc)
 
   fun ref on_timeout(wall_time: U64): Array[Out] val =>
     // We trigger per message, so we do nothing on the timer
     recover val Array[Out] end
 
+  fun ref encode(auth: AmbientAuth): ByteSeq =>
+    try
+      Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(
+        auth))
+    else
+      Fail()
+      recover Array[U8] end
+    end
+
 class val TumblingWindowsStateInitializer[In: Any val, Out: Any val,
-  Acc: State] is StateInitializer[In]
+  Acc: State ref] is StateInitializer[In, Out, Acc]
   let _agg: Aggregation[In, Out, Acc]
   let _range: U64
   let _delay: U64
@@ -61,6 +130,11 @@ class val TumblingWindowsStateInitializer[In: Any val, Out: Any val,
 
   fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
     TumblingWindows[In, Out, Acc](key, _agg, _range, _delay)
+
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
+    RunnerBuilder
+  =>
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
 
   fun val decode(in_reader: Reader, auth: AmbientAuth):
     StateWrapper[In, Out, Acc] ?
@@ -77,8 +151,11 @@ class val TumblingWindowsStateInitializer[In: Any val, Out: Any val,
       error
     end
 
-class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
-  Windows[In, Out]
+  fun name(): String =>
+    _agg.name()
+
+class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
+  Windows[In, Out, Acc]
   let _key: Key
   let _agg: Aggregation[In, Out, Acc]
 
@@ -88,7 +165,8 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
   let _range: U64
   let _delay: U64
 
-  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, delay: U64)
+  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, delay: U64,
+    current_ts: U64 = Time.nanos())
   =>
     _key = key
     _agg = agg
@@ -96,7 +174,8 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
     // Normalize delay to units of range. Since we are using tumbling windows,
     // this simplifies calculations.
     let delay_range_units = (delay.f64() / range.f64()).ceil()
-    _delay = range * range_units.u64()
+    // let delay_range_units = delay / range
+    _delay = range * delay_range_units.u64()
     // Calculate how many windows we need. The delay tells us how long we
     // wait after the close of a window to trigger and clear it. We need
     // enough extra windows to account for this delay.
@@ -105,7 +184,6 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
     _windows = Array[(Acc | EmptyWindow)](window_count)
     _windows_start_ts = Array[U64](window_count)
     _earliest_window_idx = 0
-    let current_ts = Time.nanos()
     var window_start: U64 = current_ts - (range * window_count.u64())
     for i in Range(0, window_count) do
       _windows.push(EmptyWindow)
@@ -114,24 +192,29 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
     end
 
   fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val =>
-    let earliest_ts = _windows_start_ts(_earliest_window_idx)?
-    let end_ts = earliest_ts + (_windows.size().u64 * _range)
-    var applied = false
-    if (event_ts >= earliest_ts) and (event_ts < end_ts) then
-      _apply_input(input, event_ts, earliest_ts)
-      applied = true
+    try
+      let earliest_ts = _windows_start_ts(_earliest_window_idx)?
+      let end_ts = earliest_ts + (_windows.size().u64() * _range)
+      var applied = false
+      if (event_ts >= earliest_ts) and (event_ts < end_ts) then
+        _apply_input(input, event_ts, earliest_ts)
+        applied = true
+      end
+
+      // Check if we need to trigger and clear windows
+      let outs = _attempt_to_trigger(wall_time)
+
+      // If we haven't already applied the input, do it now.
+      if not applied and _is_valid_ts(event_ts, wall_time) then
+        let new_earliest_ts = _windows_start_ts(_earliest_window_idx)?
+        _apply_input(input, event_ts, new_earliest_ts)
+      end
+
+      outs
+    else
+      Fail()
+      recover Array[Out] end
     end
-
-    // Check if we need to trigger and clear windows
-    let outs = _attempt_to_trigger(wall_time)
-
-    // If we haven't already applied the input, do it now.
-    if not applied and _is_valid_ts(event_ts, wall_time) then
-      let new_earliest_ts = _windows_start_ts(_earliest_window_idx)?
-      _apply_input(input, event_ts, new_earliest_ts)
-    end
-
-    outs
 
   fun ref on_timeout(wall_time: U64): Array[Out] val =>
     _attempt_to_trigger(wall_time)
@@ -148,29 +231,48 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
   fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
     // Should we ensure the event_ts is in the correct range?
 
-    let window_idx = ((event_ts - earliest_ts) / _range).usize()
-    match _windows(window_idx)?
-    | let ew: EmptyWindow =>
-      let acc = agg.initial_accumulator()
-      agg.update(first_input, acc)
-      _windows(window_idx) = acc
-    | let acc: Acc =>
-      agg.update(first_input, acc)
+    if event_ts >= earliest_ts then
+      let window_idx_offset = ((event_ts - earliest_ts) / _range).usize()
+      let window_idx =
+        (_earliest_window_idx + window_idx_offset) % _windows.size()
+      try
+        match _windows(window_idx)?
+        | let ew: EmptyWindow =>
+          let acc = _agg.initial_accumulator()
+          _agg.update(input, acc)
+          _windows(window_idx)? = acc
+        | let acc: Acc =>
+          _agg.update(input, acc)
+        end
+      else
+        Fail()
+      end
+    else
+      // !TODO!: Should we keep this debug message? Too-early messages can be
+      // expected.
+      ifdef debug then
+        @printf[I32]("Event ts %s is earlier than earliest window %s. Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring())
+      end
     end
 
   fun ref _attempt_to_trigger(wall_time: U64): Array[Out] val =>
     let outs = recover iso Array[Out] end
-    let earliest_ts = _windows_start_ts(_earliest_window_idx)?
-    let end_ts = earliest_ts + (_windows.size().u64 * _range)
-    // Convert to range units
-    let end_ts_diff = ((wall_time - end_ts).f64() / _range.f64()).ceil().u64()
-    var stopped = false
-    while not stopped do
-      (let next_out, stopped) = _check_first_window(wall_time, end_ts_diff)
-      match next_out
-      | let out: Out =>
-        outs.push(out)
+    try
+      let earliest_ts = _windows_start_ts(_earliest_window_idx)?
+      let end_ts = earliest_ts + (_windows.size().u64() * _range)
+      // Convert to range units
+      let end_ts_diff =
+        ((wall_time - end_ts).f64() / _range.f64()).ceil().u64()
+      var stopped = false
+      while not stopped do
+        (let next_out, stopped) = _check_first_window(wall_time, end_ts_diff)
+        match next_out
+        | let out: Out =>
+          outs.push(out)
+        end
       end
+    else
+      Fail()
     end
     consume outs
 
@@ -179,22 +281,26 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
   =>
     var out: (Out | None) = None
     var stopped: Bool = true
-    let earliest_ts = _windows_start_ts(_earliest_window_idx)?
-    if _should_trigger(earliest_ts) then
-      match _windows(_earliest_window_idx)?
-      | let acc: Acc =>
-        out = _agg.output(_key, acc)
+    try
+      let earliest_ts = _windows_start_ts(_earliest_window_idx)?
+      if _should_trigger(earliest_ts, wall_time) then
+        match _windows(_earliest_window_idx)?
+        | let acc: Acc =>
+          out = _agg.output(_key, acc)
+        end
+        _windows(_earliest_window_idx)? = EmptyWindow
+        let all_window_range = _windows.size().u64() * _range
+        if end_ts_diff > all_window_range then
+          _windows_start_ts(_earliest_window_idx)? = earliest_ts + end_ts_diff
+        else
+          _windows_start_ts(_earliest_window_idx)? = earliest_ts +
+            all_window_range
+        end
+        stopped = false
+        _earliest_window_idx = (_earliest_window_idx + 1) % _windows.size()
       end
-      _windows(_earliest_window_idx) = EmptyWindow
-      let all_window_range = _windows.size().u64() * _range
-      if end_ts_diff > all_window_range then
-        _windows_start_ts(_earliest_window_idx) = earliest_ts + end_ts_diff
-      else
-        _windows_start_ts(_earliest_window_idx) = earliest_ts +
-          all_window_range
-      end
-      stopped = false
-      _earliest_window_idx = (_earliest_window_idx + 1) % _windows.size()
+    else
+      Fail()
     end
     (out, stopped)
 
