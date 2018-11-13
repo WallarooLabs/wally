@@ -17,9 +17,15 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 
+use "collections"
+use "time"
+use "serialise"
+use "wallaroo/aggregations"
+
 primitive EmptyWindow
 
-trait Windows[In: Any val, Out: Any val] is StateWrapper
+trait Windows[In: Any val, Out: Any val, Acc: State] is
+  StateWrapper[In, Out, Acc]
   fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val
   fun ref on_timeout(wall_time: U64): Array[Out] val
 
@@ -42,6 +48,35 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State] is Windows[In, Out]
     // We trigger per message, so we do nothing on the timer
     recover val Array[Out] end
 
+class val TumblingWindowsStateInitializer[In: Any val, Out: Any val,
+  Acc: State] is StateInitializer[In]
+  let _agg: Aggregation[In, Out, Acc]
+  let _range: U64
+  let _delay: U64
+
+  new val create(agg: Aggregation[In, Out, Acc], range: U64, delay: U64) =>
+    _agg = agg
+    _range = range
+    _delay = delay
+
+  fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
+    TumblingWindows[In, Out, Acc](key, _agg, _range, _delay)
+
+  fun val decode(in_reader: Reader, auth: AmbientAuth):
+    StateWrapper[In, Out, Acc] ?
+  =>
+    try
+      let data: Array[U8] iso = in_reader.block(in_reader.size())?
+      match Serialised.input(InputSerialisedAuth(auth), consume data)(
+        DeserialiseAuth(auth))?
+      | let tw: TumblingWindows[In, Out, Acc] => tw
+      else
+        error
+      end
+    else
+      error
+    end
+
 class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
   Windows[In, Out]
   let _key: Key
@@ -53,8 +88,7 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
   let _range: U64
   let _delay: U64
 
-  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64,
-    delay: U64, current_ts: U64, first_input: In, first_event_ts: U64)
+  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, delay: U64)
   =>
     _key = key
     _agg = agg
@@ -71,16 +105,12 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
     _windows = Array[(Acc | EmptyWindow)](window_count)
     _windows_start_ts = Array[U64](window_count)
     _earliest_window_idx = 0
+    let current_ts = Time.nanos()
     var window_start: U64 = current_ts - (range * window_count.u64())
     for i in Range(0, window_count) do
       _windows.push(EmptyWindow)
       _windows_start_ts.push(window_start)
       window_start = window_start + range
-    end
-
-    if _is_valid_ts(first_event_ts, current_ts) then
-      let earliest_ts = _windows_start_ts(_earliest_window_idx)?
-      _apply_input(first_input, first_event_ts, earliest_ts)
     end
 
   fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val =>
@@ -105,6 +135,15 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State] is
 
   fun ref on_timeout(wall_time: U64): Array[Out] val =>
     _attempt_to_trigger(wall_time)
+
+  fun ref encode(auth: AmbientAuth): ByteSeq =>
+    try
+      Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(
+        auth))
+    else
+      Fail()
+      recover Array[U8] end
+    end
 
   fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
     // Should we ensure the event_ts is in the correct range?
