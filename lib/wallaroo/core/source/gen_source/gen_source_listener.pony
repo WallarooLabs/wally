@@ -56,7 +56,7 @@ actor GenSourceListener[In: Any val] is SourceListener
   # GenSourceListener
   """
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
-  let _generator: GenSourceGenerator[In]
+  let _generator: GenSourceGeneratorBuilder[In]
 
   let _env: Env
   let _worker_name: WorkerName
@@ -83,7 +83,8 @@ actor GenSourceListener[In: Any val] is SourceListener
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder] val,
     event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
-    recovering: Bool, target_router: Router, generator: GenSourceGenerator[In])
+    recovering: Bool, target_router: Router,
+    generator: GenSourceGeneratorBuilder[In])
   =>
     _env = env
 
