@@ -275,12 +275,10 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
 class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   RollbackableRunner & SerializableStateRunner)
   let _step_group: RoutingId
-  // Used for calling serialization and deserialization methods
-  let _canonical_state: S
-  let _state_comp: StateComputation[In, Out, S] val
+  let _state_initializer: StateInitializer[In, Out, S] val
   let _next_runner: Runner
 
-  var _state_map: Map[Key, S] = _state_map.create()
+  var _state_map: Map[Key, StateWrapper[In, Out, S]] = _state_map.create()
   let _event_log: EventLog
   let _wb: Writer = Writer
   let _rb: Reader = Reader
@@ -288,12 +286,11 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   var _step_id: (RoutingId | None)
 
   new iso create(step_group': RoutingId,
-    state_comp: StateComputation[In, Out, S] val, event_log: EventLog,
+    state_initializer: StateInitializer[In, Out, S] val, event_log: EventLog,
     auth: AmbientAuth, next_runner: Runner iso)
   =>
     _step_group = step_group'
-    _state_comp = state_comp
-    _canonical_state = _state_comp.initial_state()
+    _state_initializer = state_initializer
     _next_runner = consume next_runner
     _event_log = event_log
     _step_id = None
@@ -313,7 +310,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   =>
     match data
     | let input: In =>
-      let state =
+      let state_wrapper =
         try
           _state_map(key)?
         else
@@ -323,7 +320,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
           else
             Fail()
           end
-          let new_state = _state_comp.initial_state()
+          let new_state = _state_initializer.state_wrapper(key)
           _state_map(key) = new_state
           new_state
         end
@@ -337,7 +334,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         end
 
       let computation_start = Time.nanos()
-      let result = _state_comp(input, state)
+      let result = state_wrapper(input, event_ts, computation_start)
       let computation_end = Time.nanos()
 
       (let is_finished, let last_ts) =
@@ -356,14 +353,14 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         end
 
       let latest_metrics_id = ifdef "detailed-metrics" then
-          metrics_reporter.step_metric(metric_name, _state_comp.name(),
+          metrics_reporter.step_metric(metric_name, _state_initializer.name(),
             metrics_id, latest_ts, computation_start where prefix = "Before")
           metrics_id + 1
         else
           metrics_id
         end
 
-      metrics_reporter.step_metric(metric_name, _state_comp.name(),
+      metrics_reporter.step_metric(metric_name, _state_initializer.name(),
         latest_metrics_id, computation_start, computation_end)
 
       (is_finished, last_ts)
@@ -379,7 +376,7 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     //rotate
     None
 
-  fun name(): String => _state_comp.name()
+  fun name(): String => _state_initializer.name()
 
   fun ref import_key_state(step: Step ref, s_group: RoutingId, key: Key,
     s: ByteSeq val)
@@ -390,92 +387,77 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     if s.size() > 0 then
       try
         _rb.append(s as Array[U8] val)
-        match _canonical_state.read_log_entry(_rb, _auth)?
-        | let state: S =>
-          ifdef "checkpoint_trace" then
-            match state
-            | let st: Stringablike =>
-              (let sec', let ns') = Time.now()
-              let us' = ns' / 1000
-              let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'
-                .string())
-              @printf[I32]("DESERIALIZE (%s): loading new %s on step %s with tag %s\n".cstring(), ts'.cstring(), st.string().cstring(), _step_id.string().cstring(), (digestof this).string().cstring())
-            end
-            @printf[I32]("Successfully imported key %s\n".cstring(),
-              key.cstring())
-          end
-          _state_map(key) = state
-          step.register_key(s_group, key)
-        else
-          Fail()
+        let state_wrapper = _state_initializer.decode(_rb, _auth)?
+        ifdef "checkpoint_trace" then
+          //!@
+          // match state
+          // | let st: Stringablike =>
+          //   (let sec', let ns') = Time.now()
+          //   let us' = ns' / 1000
+          //   let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." + us'
+          //     .string())
+          //   @printf[I32]("DESERIALIZE (%s): loading new %s on step %s with tag %s\n".cstring(), ts'.cstring(), st.string().cstring(), _step_id.string().cstring(), (digestof this).string().cstring())
+          // end
+          @printf[I32]("Successfully imported key %s\n".cstring(),
+            key.cstring())
         end
+        _state_map(key) = state_wrapper
+        step.register_key(s_group, key)
       else
         Fail()
       end
     else
       // We got the key but no accompanying state, so we initialize
       // ourselves.
-      _state_map(key) = _state_comp.initial_state()
+      _state_map(key) = _state_initializer.state_wrapper(key)
       step.register_key(s_group, key)
     end
 
   fun ref export_key_state(step: Step ref, key: Key): ByteSeq val =>
     step.unregister_key(_step_group, key)
-    try
-      let state =
-        try
-          _state_map.remove(key)?._2
-        else
-          _state_comp.initial_state()
-        end
-      Serialised(SerialiseAuth(_auth), state)?
-        .output(OutputSerialisedAuth(_auth))
-    else
-      Fail()
-      recover Array[U8] end
-    end
+    let state_wrapper =
+      try
+        _state_map.remove(key)?._2
+      else
+        _state_initializer.state_wrapper(key)
+      end
+    state_wrapper.encode(_auth)
 
   fun ref serialize_state(): ByteSeq val =>
-    try
-      let bytes = recover iso Array[U8] end
-      for (k, state) in _state_map.pairs() do
-        ifdef "checkpoint_trace" then
-          match state
-          | let s: Stringablike =>
-            (let sec', let ns') = Time.now()
-            let us' = ns' / 1000
-            let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." +
-              us'.string())
-            @printf[I32]("SERIALIZE (%s): %s on step %s with tag %s\n"
-              .cstring(), ts'.cstring(), s.string().cstring(),
-              _step_id.string().cstring(), (digestof this).string().cstring())
-          end
-          @printf[I32]("SERIALIZING KEY %s\n".cstring(), k.cstring())
+    let bytes = recover iso Array[U8] end
+    for (k, state_wrapper) in _state_map.pairs() do
+      ifdef "checkpoint_trace" then
+        match state_wrapper
+        | let s: Stringablike =>
+          (let sec', let ns') = Time.now()
+          let us' = ns' / 1000
+          let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." +
+            us'.string())
+          @printf[I32]("SERIALIZE (%s): %s on step %s with tag %s\n"
+            .cstring(), ts'.cstring(), s.string().cstring(),
+            _step_id.string().cstring(), (digestof this).string().cstring())
         end
+        @printf[I32]("SERIALIZING KEY %s\n".cstring(), k.cstring())
+      end
 
-        let key_size = k.size()
-        _wb.u32_be(key_size.u32())
-        _wb.write(k)
-        let s_bytes = Serialised(SerialiseAuth(_auth), state)?
-          .output(OutputSerialisedAuth(_auth))
-        _wb.u32_be(s_bytes.size().u32())
-        _wb.write(s_bytes)
-      end
-      for bs in _wb.done().values() do
-        match bs
-        | let s: String =>
-          bytes.append(s)
-        | let a: Array[U8] val =>
-          for b in a.values() do
-            bytes.push(b)
-          end
+      let key_size = k.size()
+      _wb.u32_be(key_size.u32())
+      _wb.write(k)
+      let state_bytes = state_wrapper.encode(_auth)
+      _wb.u32_be(state_bytes.size().u32())
+      _wb.write(state_bytes)
+    end
+    for bs in _wb.done().values() do
+      match bs
+      | let s: String =>
+        bytes.append(s)
+      | let a: Array[U8] val =>
+        for b in a.values() do
+          bytes.push(b)
         end
       end
-      consume bytes
-    else
-      Fail()
-      recover val Array[U8] end
     end
+    consume bytes
 
   fun ref replace_serialized_state(payload: ByteSeq val) =>
     _state_map.clear()
@@ -492,24 +474,21 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         bytes_left = bytes_left - 4
         reader.append(_rb.block(state_size)?)
         bytes_left = bytes_left - state_size
-        match _canonical_state.read_log_entry(reader, _auth)?
-        | let state: S =>
-          ifdef "checkpoint_trace" then
-            match state
-            | let st: Stringablike =>
-              (let sec', let ns') = Time.now()
-              let us' = ns' / 1000
-              let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." +
-                us'.string())
-              @printf[I32]("DESERIALIZE (%s): loading new state %s on step %s with tag %s\n".cstring(), ts'.cstring(), st.string().cstring(), _step_id.string().cstring(), (digestof this).string().cstring())
-            end
-            @printf[I32]("OVERWRITING STATE FOR KEY %s\n".cstring(),
-              key.cstring())
-          end
-          _state_map(key) = state
-        else
-          Fail()
+        let state_wrapper = _state_initializer.decode(reader, _auth)?
+        ifdef "checkpoint_trace" then
+          //!@
+          // match state
+          // | let st: Stringablike =>
+          //   (let sec', let ns') = Time.now()
+          //   let us' = ns' / 1000
+          //   let ts' = PosixDate(sec', ns').format("%Y-%m-%d %H:%M:%S." +
+          //     us'.string())
+          //   @printf[I32]("DESERIALIZE (%s): loading new state %s on step %s with tag %s\n".cstring(), ts'.cstring(), st.string().cstring(), _step_id.string().cstring(), (digestof this).string().cstring())
+          // end
+          @printf[I32]("OVERWRITING STATE FOR KEY %s\n".cstring(),
+            key.cstring())
         end
+        _state_map(key) = state_wrapper
       end
     else
       Fail()

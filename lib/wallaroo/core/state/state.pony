@@ -18,25 +18,32 @@ Copyright 2017 The Wallaroo Authors.
 
 use "buffered"
 use "serialise"
+use "wallaroo/core/common"
 use "wallaroo_labs/mort"
 
 trait ref State
-  fun write_log_entry(out_writer: Writer, auth: AmbientAuth) =>
+
+trait val StateEncoderDecoder[S: State ref]
+  fun encode(state: S, auth: AmbientAuth): ByteSeq
+  fun decode(in_reader: Reader, auth: AmbientAuth): S ?
+
+primitive PonySerializeStateEncoderDecoder[S: State ref] is
+  StateEncoderDecoder[S]
+  fun encode(state: S, auth: AmbientAuth): ByteSeq =>
     try
-      let serialized =
-        Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(
-          auth))
-      out_writer.write(serialized)
+      Serialised(SerialiseAuth(auth), state)?.output(OutputSerialisedAuth(
+        auth))
     else
       Fail()
+      recover Array[U8] end
     end
 
-  fun read_log_entry(in_reader: Reader, auth: AmbientAuth): State ? =>
+  fun decode(in_reader: Reader, auth: AmbientAuth): S ? =>
     try
       let data: Array[U8] iso = in_reader.block(in_reader.size())?
       match Serialised.input(InputSerialisedAuth(auth), consume data)(
         DeserialiseAuth(auth))?
-      | let s: State => s
+      | let s: S => s
       else
         error
       end
@@ -44,9 +51,16 @@ trait ref State
       error
     end
 
-trait ref StateWrapper[In: Any val]
+interface val StateInitializer[In: Any val, Out: Any val, S: State ref]
+  fun val state_wrapper(key: Key): StateWrapper[In, Out, S]
+  fun name(): String
+  fun val decode(in_reader: Reader, auth: AmbientAuth):
+    StateWrapper[In, Out, S] ?
+
+trait ref StateWrapper[In: Any val, Out: Any val, S: State ref]
   fun ref apply(input: In, event_ts: U64, wall_time: U64):
     (Out | Array[Out] val | None)
   fun ref on_timeout(wall_time: U64): Array[Out] val
+  fun ref encode(auth: AmbientAuth): ByteSeq
 
 class EmptyState is State
