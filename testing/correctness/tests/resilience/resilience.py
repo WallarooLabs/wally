@@ -303,7 +303,7 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
             try:
                 raise
             except RunnerHasntStartedError as err:
-                logging.warn("Runner failed to start properly.")
+                logging.warning("Runner failed to start properly.")
                 if retry_count > 0:
                     logging.info("Restarting the test!")
                     _test_resilience(
@@ -350,7 +350,7 @@ def _test_resilience(command, ops=[], initial=None, sources=1,
             save_logs_to_file(base_dir, log_stream, persistent_data)
         except Exception as err_inner:
             logging.exception(err_inner)
-            logging.warn("Encountered an error when saving logs files to {}"
+            logging.warning("Encountered an error when saving logs files to {}"
                          .format(base_dir))
         logging.exception(err)
         raise

@@ -562,7 +562,7 @@ def CLI():
                 logging.info("Run phase complete. Proceeding to validation.")
                 break
             except RunnerHasntStartedError:
-                logging.warn("Runner failed to start properly.")
+                logging.warning("Runner failed to start properly.")
                 if attempt < args.max_retries:
                     logging.info("Restarting the test!")
                     time.sleep(0.5)
@@ -579,7 +579,7 @@ def CLI():
         try:
             save_logs_to_file(base_dir, log_stream, persistent_data)
         except Exception as err:
-            logging.warn("failed to save logs to file")
+            logging.warning("failed to save logs to file")
             logging.exception(err)
         parser.exit(1)
 

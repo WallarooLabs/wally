@@ -88,8 +88,8 @@ def _test_restart(command):
             save_logs_to_file(base_dir, log_stream, persistent_data)
         except Exception as err_inner:
             logging.exception(err_inner)
-            logging.warn("Encountered an error when saving logs files to {}"
-                         .format(base_dir))
+            logging.warning("Encountered an error when saving logs files to {}"
+                            .format(base_dir))
         logging.exception(err)
         raise
 
