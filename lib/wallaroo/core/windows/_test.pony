@@ -31,6 +31,7 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     test(_TestTumblingWindows)
+    test(_TestCountWindows)
 
 class iso _TestTumblingWindows is UnitTest
   fun name(): String => "bytes/_TestTumblingWindows"
@@ -79,6 +80,64 @@ class iso _TestTumblingWindows is UnitTest
     h.assert_eq[USize](res(1)?, 100)
 
     true
+
+class iso _TestCountWindows is UnitTest
+  fun name(): String => "bytes/_TestCountWindows"
+
+  fun apply(h: TestHelper) =>
+    let count_trigger: USize = 4
+    let cw = TumblingCountWindows[USize, USize, _Total]("key", _Sum,
+      count_trigger)
+
+    var res: (USize | None) = None
+
+    // First window's data
+    res = cw(2, Seconds(96), Seconds(101))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(3, Seconds(97), Seconds(102))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(4, Seconds(98), Seconds(103))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(5, Seconds(99), Seconds(104))
+    h.assert_eq[Bool](true, _result_is(res, 14))
+
+    // Second window's data
+    res = cw(1, Seconds(105), Seconds(106))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(2, Seconds(106), Seconds(107))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(3, Seconds(107), Seconds(108))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(4, Seconds(108), Seconds(109))
+    h.assert_eq[Bool](true, _result_is(res, 10))
+
+    // Third window's data.
+    res = cw(10, Seconds(110), Seconds(111))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(20, Seconds(111), Seconds(112))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(30, Seconds(112), Seconds(113))
+    h.assert_eq[Bool](true, _result_is(res, None))
+    res = cw(40, Seconds(113), Seconds(114))
+    h.assert_eq[Bool](true, _result_is(res, 100))
+
+    true
+
+  fun _result_is(res: (USize | None), check: (USize | None)): Bool =>
+    match res
+    | let u: USize =>
+      match check
+      | let u2: USize => u == u2
+      else
+        false
+      end
+    | let n: None =>
+      match check
+      | let n2: None => true
+      else
+        false
+      end
+    end
 
 class _Total is State
   var v: USize = 0
