@@ -50,6 +50,8 @@ primitive Wallaroo
       FatalUserError("A pipeline must terminate in a sink!")
     end
 
+  fun window[](range: U64): ... =>
+
 trait BasicPipeline
   fun graph(): this->Dag[Stage]
   fun is_finished(): Bool
