@@ -42,7 +42,7 @@ interface val StatelessComputation[In: Any val, Out: Any val] is
       parallelization)
 
 interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
-  Computation[In, Out]
+  (Computation[In, Out] & StateInitializer[In, Out, S])
   // Return a tuple containing the result of the computation (which is None
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).
@@ -50,8 +50,48 @@ interface val StateComputation[In: Any val, Out: Any val, S: State ref] is
 
   fun initial_state(): S
 
+  fun encoder_decoder(): StateEncoderDecoder[S] =>
+    PonySerializeStateEncoderDecoder[S]
+
+  ////////////////////////////
+  // Not implemented by user
+  ////////////////////////////
   fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
     RunnerBuilder
   =>
     StateRunnerBuilder[In, Out, S](this, step_group_id, parallelization)
 
+  fun val state_wrapper(key: Key): StateWrapper[In, Out, S] =>
+    StateComputationWrapper[In, Out, S](this, initial_state())
+
+  fun val decode(in_reader: Reader, auth: AmbientAuth):
+    StateWrapper[In, Out, S] ?
+  =>
+    let state = encoder_decoder().decode(in_reader, auth)?
+    StateComputationWrapper[In, Out, S](this, state)
+
+class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
+  StateWrapper[In, Out, S]
+  let _comp: StateComputation[In, Out, S]
+  let _encoder_decoder: StateEncoderDecoder[S]
+  let _state: S
+  let _dummy_outs: Array[Out] val = recover val Array[Out] end
+
+  new create(sc: StateComputation[In, Out, S], state: S)
+  =>
+    _comp = sc
+    _encoder_decoder = sc.encoder_decoder()
+    _state = state
+
+  fun ref apply(input: In, event_ts: U64, wall_time: U64):
+    (Out | Array[Out] val | None)
+  =>
+    _comp(input, _state)
+
+  fun ref on_timeout(wall_time: U64): Array[Out] val =>
+    // We don't trigger on timeouts, so we return an empty array to indicate
+    // there are no triggered outputs.
+    _dummy_outs
+
+  fun ref encode(auth: AmbientAuth): ByteSeq =>
+     _encoder_decoder.encode(_state, auth)
