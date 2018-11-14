@@ -270,6 +270,44 @@ class PyFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
   fun _final() =>
     Machida.dec_ref(_source_decoder)
 
+class PyConnectorFramedSourceHandler is FramedSourceHandler[(PyData val | None)]
+  var _source_decoder: Pointer[U8] val
+  let _header_length: USize = 4
+
+  new create(source_decoder: Pointer[U8] val) =>
+    _source_decoder = source_decoder
+
+  fun header_length(): USize =>
+    _header_length
+
+  fun payload_length(data: Array[U8] iso): USize =>
+    try
+      data.read_u32(0)?.usize()
+    else
+      4
+    end
+
+  fun decode(data: Array[U8] val): (PyData val | None) =>
+    let r = Machida.source_decoder_decode(_source_decoder, data.cpointer(),
+        data.size())
+    if not Machida.is_py_none(r) then
+      PyData(r)
+    else
+      None
+    end
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_source_decoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_source_decoder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _source_decoder = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_source_decoder)
+
 class PyGenSourceHandler is GenSourceGenerator[PyData val]
   var _source_generator: Pointer[U8] val
 
@@ -840,7 +878,7 @@ primitive _SourceConfig
       let decoder = recover val
         let d = @PyTuple_GetItem(source_config_tuple, 5)
         Machida.inc_ref(d)
-        PyFramedSourceHandler(d)?
+        PyConnectorFramedSourceHandler(d)
       end
 
       ConnectorSourceConfig[(PyData val | None)](decoder, host, port)
