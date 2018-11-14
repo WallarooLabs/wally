@@ -16,6 +16,7 @@ Copyright 2017 The Wallaroo Authors.
 
 */
 
+use "buffered"
 use "collections"
 use "time"
 use "wallaroo_labs/time"
@@ -45,6 +46,7 @@ class ConnectorSourceNotify[In: Any val]
   var _router: Router
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
+  var _rb: Reader = Reader
 
   new iso create(source_id: RoutingId, pipeline_name: String, env: Env,
     auth: AmbientAuth, handler: FramedSourceHandler[In] val,
@@ -90,9 +92,12 @@ class ConnectorSourceNotify[In: Any val]
 
       (let is_finished, let last_ts) =
         try
+          _rb.append(consume data)
+          let event_source_ts = _rb.i64_le()?
+          let msg_data_size = _rb.size()
           let decoded =
             try
-              _handler.decode(consume data)?
+              _handler.decode(_rb.block(msg_data_size)?)?
             else
               ifdef debug then
                 @printf[I32]("Error decoding message at source\n".cstring())
