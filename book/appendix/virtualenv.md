@@ -19,7 +19,7 @@ virtualenv --python=python2 ENV
 virtualenv --python=python3 ENV
 {%- endcodetabs %}
 
-This will create a directory named `ENV` and set up all of the scripts and dependencies required to run an isolated Python2 virtual environment, located in `ENV`.
+This will create a directory named `ENV` and set up all of the scripts and dependencies required to run an isolated Python 2 virtual environment, located in `ENV`.
 
 ### Import Errors when Loading your Application
 

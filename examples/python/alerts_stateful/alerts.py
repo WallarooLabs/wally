@@ -39,7 +39,8 @@ class Transaction(object):
         self.amount = amount
 
 class TransactionTotal(object):
-    total = 0
+    def __init__(self):
+        self.total = 0
 
 class DepositAlert(object):
     def __init__(self, user, amount):

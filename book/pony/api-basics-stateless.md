@@ -22,7 +22,7 @@ primitive CheckTransaction is StatelessComputation[Transaction, (Alert | None)]
   fun name(): String => "CheckTransaction"
 ```
 
-A few points of interest. First, we are naming our computation `CheckTransaction` and define it as a `primitive`. You can think of a `primitive` as a stateless class. Second, we specify that `CheckTransaction` is a `StatelessComputation` transforming values of type
+A few points of interest. First, we name our computation `CheckTransaction` and define it as a `primitive`. You can think of a `primitive` as a stateless class. Second, we specify that `CheckTransaction` is a `StatelessComputation` transforming values of type
 `Transaction` to values of type `Alert` (or `None` if there is no call for an alert). Third, we define an `apply` method that constitutes the computation logic itself. Finally, all `StatelessComputation` objects must implement a `name` method for performance monitoring purposes, so we include one here.
 
 Our application consists of a simple pipeline which takes a `Transaction`, passes it to a `CheckTransaction`, which optionally passes an `Alert` to a sink for sending to external systems. Here is all the code for defining the application itself (we'll break it down step by step):

@@ -23,7 +23,7 @@ The `decoder` function creates a float from the value represented by the payload
 ## Running Celsius Kafka
 
 In order to run the application you will need Machida, Giles Sender, and the Cluster Shutdown tool. We provide instructions for building these tools yourself and we provide prebuilt binaries within a Docker container. Please visit our [setup](https://docs.wallaroolabs.com/book/getting-started/choosing-an-installation-option.html) instructions to choose one of these options if you have not already done so.
-If you are using Python3, replace all instances of `machida` with `machida3` in your commands.
+If you are using Python 3, replace all instances of `machida` with `machida3` in your commands.
 
 You will also need access to a Kafka cluster.
 

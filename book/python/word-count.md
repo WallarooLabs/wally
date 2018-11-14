@@ -77,7 +77,7 @@ Previously, we've seen our stateless computations wrapped by the `computation` d
 
 Wallaroo's Python API allows a programmer to indicate that the output of a computation is meant to be treated as a single output by using the `compute` method. This allows us, for example, to split some text into words and have that list of words treated as a single item by Wallaroo. In our word splitting case, that isn't what we want. We want each word to be handled individually. `compute_multi` lets us tell Wallaroo that each of these words is a new message and should be handled individually.
 
-By using `computation_multi`, each word will be handled individually. This allows us to then route each one for counting. If you look below, you can see that our word key extractor function is expecting words, not a list fo words, which makes sense.
+By using `computation_multi`, each word will be handled individually. This allows us to then route each one for counting. If you look below, you can see that our word key extractor function is expecting words, not a list of words, which makes sense.
 
 ```python
 @wallaroo.key_extractor

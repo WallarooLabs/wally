@@ -2,7 +2,7 @@
 
 If all of the application state exists in one state object then only one state computation at a time can access that state object. In order to leverage concurrency, that state needs to be divided into multiple distinct state objects. Wallaroo can then automatically distribute these objects in a way that allows them to be accessed by state computations in parallel.
 
-For example, in an application that keeps track of stock prices, the naive application state might be a dictionary where the stock symbol is used to look up the price of the stock.
+For example, in an application that keeps track of stock prices, the naïve application state might be a dictionary where the stock symbol is used to look up the price of the stock.
 
 {% codetabs name="Python", type="py" -%}
 # Message type
@@ -39,7 +39,7 @@ To do this, a _key extractor function_ is used to determine which _state partiti
 
 ### Partitioned State
 
-In order to take advantage of state partitioning, state objects need to be broken down. In the stock example there is already a class that represents an individual stock. However, Wallaroo state must be initialized either without an `__init__` method, or with an `__init__` method that only takes `self` as an argument. This means that we need a way to represent a zero state for a stock. Since we will be partitioning by symbols, and paritition keys are implicit for a state computation, we can represent our state as a simple stock price representation:
+In order to take advantage of state partitioning, state objects need to be broken down. In the stock example there is already a class that represents an individual stock. However, Wallaroo state must be initialized either without an `__init__` method, or with an `__init__` method that only takes `self` as an argument. This means that we need a way to represent a zero state for a stock. Since we will be partitioning by symbols, and partition keys are implicit for a state computation, we can represent our state as a simple stock price representation:
 
 {% codetabs name="Python", type="py" -%}
 class StockPrice(object):
