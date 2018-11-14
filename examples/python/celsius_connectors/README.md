@@ -25,6 +25,3 @@ Once that is done, you can run the application within this directory using:
 ```
 
 See the documentation on [using connectors](https://docs.wallaroolabs.com/book/python/using-connectors.html) for more information on how this example works.
-
-### Python 3
-This example is currently not compatible with Python 3. Python 3 support for the experimental connectors feature is expected to arrive in the next release.
