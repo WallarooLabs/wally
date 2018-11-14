@@ -13,4 +13,5 @@ topic = connector.params.topic
 
 while True:
     key, value = connector.read()
-    producer.send(topic, key=str(key), value=str(value))
+    producer.send(topic, key=str(key).encode('utf-8'),
+                  value=str(value).encode('utf-8'))
