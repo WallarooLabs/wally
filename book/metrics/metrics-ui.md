@@ -122,7 +122,7 @@ Let's click into our `Alerts` pipeline under `Pipeline Stats` to visit its `Deta
 
 #### Stats Overview Section
 
-The `Detailed Metrics` page gives us deeper dive into the stats for a given element within a section. Every `Detailed Metrics` page will include an expanded stats line, also including the `99.9%` and `99.99%` Percentile Bins. Having a look below we can see that `99.99%` of messages processed for the `Alerts` pipeline are less than or equal to 66 milliseconds. We can also see that we have a median throughput of 49k. Both these stats representing the last 5 minutes of processing data from the incoming stream.
+The `Detailed Metrics` page gives us deeper dive into the stats for a given element within a section. Every `Detailed Metrics` page will include an expanded stats line, also including the `99.9%` and `99.99%` Percentile Bins. Having a look below, we can see that `99.99%` of messages processed for the `Alerts` pipeline are less than or equal to 66 milliseconds. We can also see that we have a median throughput of 49k. Both these stats represent the last 5 minutes of processing data from the incoming stream.
 
 ![Stats Overview Section](/book/metrics/images/stats-overview-section.png)
 

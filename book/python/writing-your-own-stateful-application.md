@@ -42,13 +42,14 @@ The state for this application keeps track of a running total of transactions:
 
 ```python
 class TransactionTotal(object):
-    total = 0
+    def __init__(self):
+        self.total = 0
 ```
 
 ### Encoder
-The encoder is going to receive either a `DepositAlert` or `WithdrawalAlert` instance and encode it into a string. Since we only generate alerts when certain conditions are met, not every input into the application results in an output sent to teh sink.
+The encoder is going to receive either a `DepositAlert` or `WithdrawalAlert` instance and encode it into a string. Since we only generate alerts when certain conditions are met, not every input into the application results in an output sent to the sink.
 
-As with our previous stateless example, the sink requires a `bytes` object. In Python 2 this can be the string itself, but in Python3 we need to encode it from unicode to `bytes`. Luckily, we can use `encode()` to get a `bytes` from a string in both versions:
+As with our previous stateless example, the sink requires a `bytes` object. In Python 2 this can be the string itself, but in Python 3 we need to encode it from unicode to `bytes`. Luckily, we can use `encode()` to get a `bytes` from a string in both versions:
 
 ```python
 @wallaroo.encoder

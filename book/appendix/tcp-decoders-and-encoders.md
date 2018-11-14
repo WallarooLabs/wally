@@ -76,7 +76,7 @@ Here's a slightly more complicated example taken from our [Alphabet Popularity C
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decode_votes(bs):
     (letter, vote_count) = struct.unpack(">sI", bs)
-    letter = letter.decode("utf-8")  # for Python3 comptibility
+    letter = letter.decode("utf-8")  # for Python 3 comptibility
     return Votes(letter, vote_count)
 ```
 

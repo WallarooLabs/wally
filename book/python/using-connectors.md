@@ -1,6 +1,6 @@
 # Using Connectors as Sources & Sinks
 
-_Python 3: At this point, Connectors are not supported in our Python3 API. We expect support will be added in the next release._
+_Python 3: At this point, Connectors are not supported in our Python 3 API. We expect support will be added in the next release._
 
 This is a preview release of Wallaroo's connectors feature that allows full customization of sources and sinks. These sources and sinks can be integrated into Wallaroo using libraries you're already familiar with in Python. A number of built-in connectors offer a quick way to get started and hook up common stream types and they're all available for easy customization.
 

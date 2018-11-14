@@ -60,7 +60,7 @@ Given these abstractions, what does our Market Spread application look like?
 
 ![Market Spread in Wallaroo](images/market-spread-in-wallaroo.png)
 
-You can see we end up with two pipelines, one for our `NBBO Feed` and another for the `Order Feed,` each with its own corresponding source. We have a single type of state that we are storing (`NBBO State` by symbol), a state computation--to update state and check orders against it--and finally a `Sink` that we send any output to.
+You can see we end up with two pipelines, one for our `NBBO Feed` and another for the `Order Feed,` each with its own corresponding source. We have a single type of state that we are storing (`NBBO State` by symbol), a state computation--to update state and check orders against it--and finally a `Sink` that we send our outputs to.
 
 ## Market Spread Performance
 

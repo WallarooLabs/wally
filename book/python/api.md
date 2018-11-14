@@ -61,7 +61,7 @@ Our pipeline is now complete:
 Source -> my_computation -> Sink
 ```
 
-Unless a call to `to` using a stateless computation is preceded by a call to `key_by` (which partitions messages by key), there are no guarantees around the order messages will be processed in. That's because Wallaroo might parallelize a stateless computation if that is beneficial for scaling. That means the execution graph for the above pipeline could look like this:
+Unless a call to `to` using a stateless computation is preceded by a call to `key_by` (which partitions messages by key), there are no guarantees around the order in which messages will be processed. That's because Wallaroo might parallelize a stateless computation if that is beneficial for scaling. That means the execution graph for the above pipeline could look like this:
 
 ```
          /-> my_stateless_computation -\
@@ -97,7 +97,7 @@ Source1 -> computation1 ->\
 Source2 -> computation2 ->/
 ```
 
-Again, the hanging arrow indicates we can still add more stages, and that to complete the pipeline we still need one or more sinks. You could also merge this partial pipeline with yet more partial pipelines. When you merge partial pipelines in this way, you are not creating a join in the sense familiar from SQL joins. Instead, you are combining two streams into one, with messages from the first stream interwoven with messages from the second. That combined stream is then passed to the next stage following the hanging arrow.
+Again, the hanging arrow indicates we can still add more stages, and that to complete the pipeline we still need one or more sinks. You could also merge this partial pipeline with additional partial pipelines. When you merge partial pipelines in this way, you are not creating a join in the sense familiar from SQL joins. Instead, you are combining two streams into one, with messages from the first stream interwoven with messages from the second. That combined stream is then passed to the next stage following the hanging arrow.
 
 The following is an example of a complete pipeline including a merge where we first add one more computation before the sink:
 

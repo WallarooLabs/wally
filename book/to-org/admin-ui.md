@@ -10,7 +10,7 @@ The three main componenets of the metrics subssystem are metrics collector, metr
 
 __Mertrics Collector__
 
-Wallaroo is responsible for generating metrics for every message processed.  Uniquely identified computation stages define and application.  You can think of these stages are a graph.  The time spent processing a particular message is measured and logged. These reports are locally staged in buffers and periodically sent to the metrics receiver.  It is important to note that no data is lost due to compression of data between the metrics collector and metrics receiver.
+Wallaroo is responsible for generating metrics for every message processed.  Uniquely identified sources, computations, and sinks define an application.  You can think of these stages as constituting a graph.  The time spent processing a particular message is measured and logged. These reports are locally staged in buffers and periodically sent to the metrics receiver.  It is important to note that no data is lost due to compression of data between the metrics collector and metrics receiver.
 
 __Metrics Reveiver__
 

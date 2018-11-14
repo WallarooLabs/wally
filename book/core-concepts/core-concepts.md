@@ -26,6 +26,9 @@ External   | Wallaroo              /
    B       |                                   
 ```
 
+The outputs of both C2 and C4 are sent along to C5, where they will arrive in a non-deterministic interleaving. The outputs of C5 are then sent to a sink and
+ultimately sent out over TCP to an external system.
+
 ## Concepts
 
 * *State* -- Accumulated result of data stored over the course of time
@@ -42,7 +45,7 @@ into a series of application input types.
 * *Encoder* -- Code that transforms an application output type into bytes for
 sending to an external system.
 * *Pipeline* -- A sequence of computations and/or state computations originating from one or more sources and terminating in a sink.
-* *Stage* -- Any of the individual stages in a pipeline (each stage is either a source, a stateless computation, a state computation, or a sink).
+* *Stage* -- A source, stateless computation, state computation, and sink each represents a single logical stage in a Wallaroo pipeline. The linear pipeline above--starting from a source, going through computations C1, C2, and C3, and terminating at a sink--has 5 logical stages (1 source, 3 computations, and 1 sink). 
 * *Topology* -- A graph of how all sources, sinks, and computations are
 connected within an application.
 * *API* -- Wallaroo provides APIs for implementing all of the above concepts.

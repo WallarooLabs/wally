@@ -35,7 +35,9 @@ actor Main
                 TCPSourceConfigCLIParser(env.args)?(0)?))
 
         values
+          .key_by(Constant)
           .to[F32](Multiply)
+          .key_by(Constant)
           .to[F32](Add)
           .to_sinks([
             TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
@@ -47,6 +49,10 @@ actor Main
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
+
+primitive Constant
+  fun apply(f: F32): String =>
+    "constant"
 
 primitive Multiply is StatelessComputation[F32, F32]
   fun apply(input: F32): F32 =>

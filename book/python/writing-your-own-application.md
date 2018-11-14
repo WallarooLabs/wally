@@ -29,7 +29,7 @@ Note that there is a `print` statement in the `compute` method (and in other met
 
 ### Sink Encoder
 
-Next, we are going to define how the output gets constructed for the sink. It is important to remember that Wallaroo sends its output over the network, so data going through the sink needs to be of type `bytes`. In Python2, this is the same as `str`, but in Python3, strings are Unicode, and need to be converted to `bytes`. Luckily, we can use `encode()` to get a `bytes` from a string in both versions:
+Next, we are going to define how the output gets constructed for the sink. It is important to remember that Wallaroo sends its output over the network, so data going through the sink needs to be of type `bytes`. In Python 2, this is the same as `str`, but in Python 3, strings are Unicode, and need to be converted to `bytes`. Luckily, we can use `encode()` to get a `bytes` from a string in both versions:
 
 ```python
 @wallaroo.encoder
