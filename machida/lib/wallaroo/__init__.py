@@ -51,17 +51,21 @@ def serialize(o):
 def deserialize(bs):
     return pickle.loads(bs)
 
+
 class WallarooParameterError(Exception):
     pass
 
+
 def source(name, source_config):
     return Pipeline.from_source(name, source_config)
+
 
 def build_application(app_name, pipeline):
     if not pipeline.__is_closed__():
         print("\nAPI_Error: An application must end with to_sink/s.")
         raise WallarooParameterError()
     return pipeline.__to_tuple__(app_name)
+
 
 class Pipeline(object):
     def __init__(self, pipeline_tree):
@@ -128,6 +132,7 @@ class Pipeline(object):
     def _sinks(self):
         return self._pipeline_tree.sinks()
 
+
 def _validate_arity_compatability(name, obj, arity):
     """
     To assist in proper API use, it's convenient to fail fast with errors as
@@ -148,6 +153,7 @@ def _validate_arity_compatability(name, obj, arity):
         print("\nAPI_Error: Incompatible function arity, your function {0} must have {1} {2}."
             ).format(name, arity, param_term)
         raise WallarooParameterError()
+
 
 def attach_to_module(cls, cls_name, func):
     # Do some scope mangling to create a uniquely named class based on

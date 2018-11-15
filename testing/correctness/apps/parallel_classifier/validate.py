@@ -7,8 +7,8 @@ n_workers = int(sys.argv[1])
 n_input_items = int(sys.argv[2])
 output_file = open(sys.argv[3])
 
-decoded = filter(lambda x: x!='',
-                 "".join(output_file.readlines()).split("\x00"))
+decoded = list(filter(lambda x: x!='',
+                 "".join(output_file.readlines()).split("\x00")))
 ids_pids = [ item.split(":") for item in decoded ]
 n_output_ids = len([ id_pid[0] for id_pid in ids_pids ])
 n_worker_pids = len(set([ id_pid[1] for id_pid in ids_pids ]))

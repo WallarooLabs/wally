@@ -551,7 +551,7 @@ class Cluster(object):
                 if w.name in complement:
                     address = w.external
                     break
-            leaving = filter(lambda w: w.name in snames, self.workers)
+            leaving = list(filter(lambda w: w.name in snames, self.workers))
         elif isinstance(workers, int):
             if len(self.workers) <= workers:
                 raise ValueError("Can't shrink all workers!")
@@ -706,7 +706,7 @@ class Cluster(object):
     def get_crashed_workers(self,
             func=lambda r: r.poll() not in (None, 0,-9,-15)):
         logging.log(1, "get_crashed_workers()")
-        return filter(func, self.runners)
+        return list(filter(func, self.runners))
 
     #########
     # Sinks #
