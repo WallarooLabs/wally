@@ -210,7 +210,7 @@ def save_logs_to_file(base_dir, log_stream=None, persistent_data={}):
 
         # save core files if they exist
         rex = re.compile('core.*')
-        cores = filter(lambda s: rex.match(s), os.listdir(os.getcwd()))
+        cores = list(filter(lambda s: rex.match(s), os.listdir(os.getcwd())))
         if cores:
             logging.warn("Core files detected: {}".format(cores))
         for core in cores:
