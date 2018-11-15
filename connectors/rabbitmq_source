@@ -54,6 +54,8 @@ class AsyncConsumer(object):
         self.add_on_channel_close_callback()
         if self._exchange:
             self.setup_exchange(self._exchange)
+        else:
+            self.start_consuming()
 
     def add_on_channel_close_callback(self):
         self._channel.add_on_close_callback(self.on_channel_closed)
@@ -99,7 +101,7 @@ class AsyncConsumer(object):
 
     def on_message(self, unused_channel, basic_deliver, properties, body):
         self.acknowledge_message(basic_deliver.delivery_tag)
-        self.handle_message(body)
+        self._handle_message(body)
 
     def acknowledge_message(self, delivery_tag):
         self._channel.basic_ack(delivery_tag)
