@@ -78,4 +78,7 @@ from .observability import (cluster_status_query,
 
 from .stoppable_thread import StoppableThread
 
+from .test_context import (get_caller_name,
+                           LoggingTestContext)
+
 from .typed_list import TypedList

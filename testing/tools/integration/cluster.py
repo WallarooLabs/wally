@@ -572,7 +572,7 @@ class Cluster(object):
                 if w.name in complement:
                     address = w.external
                     break
-            leaving = filter(lambda w: w.name in snames, self.workers)
+            leaving = list(filter(lambda w: w.name in snames, self.workers))
         elif isinstance(workers, int):
             if len(self.workers) <= workers:
                 raise ValueError("Can't shrink all workers!")
