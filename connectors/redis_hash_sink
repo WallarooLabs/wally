@@ -10,5 +10,5 @@ redis = Redis(connector.params.host, int(connector.params.port), connector.param
 hkey = connector.params.key
 
 while True:
-    k, v  = conncetor.read()
+    k, v  = connector.read()
     redis.hset(hkey, k, v)
