@@ -45,7 +45,10 @@ if not sys.stderr.isatty():
 
 
 def serialize(o):
-    return pickle.dumps(o)
+    print("serialize({})".format(o))
+    s = pickle.dumps(o)
+    print("serialized!")
+    return s
 
 
 def deserialize(bs):
@@ -179,11 +182,9 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         # Create the appropriate computation signature
         if base_cls._is_state:
             def comp(self, data, state):
-            # def comp(data, state):
                 return func(data, state)
         else:
             def comp(self, data):
-            # def comp(data):
                 return func(data)
 
         # Create a custom class type for the computation
