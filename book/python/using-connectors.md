@@ -14,26 +14,28 @@ Here is an example of what this looks like:
 
 ```python
 def application_setup(args):
-    ab = wallaroo.ApplicationBuilder("Celsius to Fahrenheit")
-
-    ab.source_connector("celsius_feed",
+celsius_feed = wallaroo.experimental.SourceConnectorConfig(
+        "celsius_feed",
         encoder=encode_feed,
-        decoder=decode_feed)
-
-    ab.sink_connector("fahrenheit_conversion",
+        decoder=decode_feed,
+        port=7100)
+    fahrenheit_conversion = wallaroo.experimental.SinkConnectorConfig(
+        "fahrenheit_conversion",
         encoder=encode_conversion,
-        decoder=decode_conversion)
-
-    ab.new_pipeline("Celsius Conversion", "celsius_feed")
-    ab.to(multiply)
-    ab.to(add)
-    ab.to_sink("fahrenheit_conversion")
-    return ab.build()
+        decoder=decode_conversion,
+        port=7200)
+    pipeline = (
+        wallaroo.source("convert temperature readings", celsius_feed)
+        .to(multiply)
+        .to(add)
+        .to_sink(fahrenheit_conversion)
+    )
+    return wallaroo.build_application("Celsius to Fahrenheit", pipeline)
 ```
 
 You can follow along in this example by going to [github](https://github.com/WallarooLabs/wallaroo/tree/{{ book.wallaroo_version }}/examples/python/celsius_connectors/).
 
-We have introduced two new application builder methods for declaring connectors: `source_connector` and `sink_connector`. These allow you to describe both ends of the connection so the connector script can encode or decode data in a way that's compatible with your application's worker code. Keeping these in one place helps ensure that it's easy to keep them in sync.
+We have introduced two new application builder methods for declaring connectors: `source_connector` and `sink_connector`. These allow you to describe both ends of the connection so the connector script can encode or decode data in a way that's compatible with your application's worker code. Keeping these in one place helps ensure that it's easy to keep them in sync. The port specified here is what the connector script will automatically use when connecting to the initializing worker.
 
 In this example we can look at the celsius feed's encoder and decoder functions:
 
@@ -51,21 +53,24 @@ Here we've defined two functions and use `wallaroo.experimental.stream_message_e
 
 You might ask why the example's encoder function definition is only returning the data. In this case, the example is receiving data that's already a packed floating point number so there is no need to reencode it. This allows the encoder to pass along data as-is when it's already in the correct format.
 
-Returning to the application setup code, we should look at the pipeline definition to understand how all of this comes together. First is the `new_pipeline` call:
+Returning to the application setup code, we should look at the pipeline definition to understand how all of this comes together. First is the pipeline construction:
 
 ```python
-ab.new_pipeline("Celsius Conversion", "celsius_feed")
+pipeline = (
+        wallaroo.source("convert temperature readings", celsius_feed)
+        # ...
 ```
 
-Instead of using something like the `wallaroo.TCPSourceConfig` instance that we might have used before (if not, we explain about how this works in the [details](/book/python/api.md#tcpsource) chapter) for a basic TCP source stream, we now use the name of the connector. This must match the type of connector; in this case, new_pipeline expects a source, so we should declare `"celsius_feed"` using `source_connector`.
+The code sample constructs a source using the celsius_feed connector configuration object defined above. This must match the type of connector; in this case, new_pipeline expects a source, so we should declare `"celsius_feed"` using `SourceConnectorConfig`.
 
 Likewise, our sink has adopted a named connector:
 
 ```python
-ab.to_sink("fahrenheit_conversion")
+    # ...
+    .to_sink(fahrenheit_conversion)
 ```
 
-This matches up with our call to `sink_connector` and it has its own encoder and decoder functions as well.
+This matches up with our call to `SinkConnectorConfig` and it has its own encoder and decoder functions as well.
 
 Notice how we don't couple the specifics of the medium used by the connector and instead focus on how we interpret incoming messages in terms of their serialization. This allows applications to evolve and mix their infrastructure over time.
 
@@ -79,7 +84,7 @@ If we run one of these scripts we'll see there are some required arguments liste
 
 The application module is not quite enough for the script to know what settings to use when connecting to Wallaroo. Since the application may have more than one connector, the `--connector` argument is required for disambiguating which connector in the application setup this script is running as. With this passed as an argument, we can autodetect the most common settings.
 
-Many connector scripts will have their own additional arguments, some may be required and others may be optional. In this case we have two, the host and port. These argument names prefix the connector name to ensure that conflicting argument names do not cause problems. For example, you should be able to pass all your Wallaroo arguments in without conflict.
+Many connector scripts will have their own additional arguments, some may be required and others may be optional. In this case we have two, the host and port (not to be confused with the port that the connector script uses to communicate with the Wallaroo initializer). These argument names prefix the connector name to ensure that conflicting argument names do not cause problems. For example, you should be able to pass all your Wallaroo arguments in without conflict.
 
 To illustrate this, let's look at what the `udp_source` command line parameters might look like:
 
@@ -161,7 +166,7 @@ Once we've constructed this and we're ready to connect to Wallaroo to allow data
 connector.connect()
 ```
 
-We can pass custom `host` and `port` parameters here if the automatically resolved information needs to change. Since we recommend that you run your connector scripts next to the Wallaroo process, the defaults work just fine.
+The connectors library will automatically resolve the port to use for connecting to the Wallaroo initializer. By default the connector runtime assumes you're co-locating the connector and the worker on the same host so the loopback address is used (127.0.0.1). The script can pass custom `host` and `port` parameters here if the automatically resolved information needs to change. Since we recommend that you run your connector scripts next to the Wallaroo process, the defaults work just fine.
 
 Your script can do any other initialization but once it's running, all you need is a call to `write`:
 
