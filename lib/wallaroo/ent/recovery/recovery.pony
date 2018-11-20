@@ -299,6 +299,8 @@ actor Recovery
       // message indicating the application is ready to work will be printed
       // to STDOUT too early.
       lti.report_recovery_ready_to_work()
+      // !TODO!: Do we still want to do this?
+      _event_log.quick_initialize(lti)
     else
       Fail()
     end

@@ -207,6 +207,8 @@ class val LocalTopology
   fun ne(that: box->LocalTopology): Bool => not eq(that)
 
 actor LocalTopologyInitializer is LayoutInitializer
+  var _phase: LocalTopologyInitializerPhase =
+    _ApplicationAwaitingInitializationPhase
   let _app_name: String
   let _worker_name: WorkerName
   let _env: Env
@@ -234,22 +236,12 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _local_keys_file: LocalKeysFile
   let _the_journal: SimpleJournal
   let _do_local_file_io: Bool
-  var _topology_initialized: Bool = false
   var _recovered_worker_names: Array[WorkerName] val =
     recover val Array[WorkerName] end
   var _recovering: Bool = false
   let _is_joining: Bool
 
   let _routing_id_gen: RoutingIdGenerator = RoutingIdGenerator
-
-  // Lifecycle
-  var _created: SetIs[Initializable] = _created.create()
-  var _initialized: SetIs[Initializable] = _initialized.create()
-  var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
-  let _initializables: Initializables = Initializables
-  var _event_log_ready_to_work: Bool = false
-  var _recovery_ready_to_work: Bool = false
-  var _initialization_lifecycle_complete: Bool = false
 
   // Accumulate all SourceListenerBuilders so we can build them
   // once EventLog signals we're ready
@@ -258,6 +250,14 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   // Cluster Management
   var _cluster_manager: (ClusterManager | None) = None
+
+  // LIFECYCLE
+  // !TODO!: These are being treated as special cases right now outside of
+  // the phases. This is because a recovering worker can have its recovery
+  // process overridden at any time by another recovering worker. We need a
+  // way to keep track of this fact no matter what phase we are in.
+  var _recovery_ready_to_work: Bool = false
+  var _event_log_ready_to_work: Bool = false
 
   var _t: USize = 0
 
@@ -298,8 +298,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     _cluster_manager = cluster_manager
     _is_joining = is_joining
     _router_registry.register_local_topology_initializer(this)
-    _initializables.set(_checkpoint_initiator)
-    _initializables.set(_barrier_initiator)
+    _phase.set_initializable(_checkpoint_initiator)
+    _phase.set_initializable(_barrier_initiator)
     _recovery.update_initializer(this)
 
   be update_topology(t: LocalTopology) =>
@@ -320,7 +320,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     // TODO: This no longer captures all boundaries because of boundary per
     // source. Does this matter without backpressure?
     for boundary in bs.values() do
-      _initializables.set(boundary)
+      _phase.set_initializable(boundary)
     end
 
   be create_data_channel_listener(ws: Array[WorkerName] val,
@@ -363,6 +363,20 @@ actor LocalTopologyInitializer is LayoutInitializer
     checkpoint_target: (CheckpointId | None) = None,
     recovering_without_resilience: Bool = false)
   =>
+    let worker_count: (USize | None) =
+      match _topology
+      | let t: LocalTopology => t.worker_names.size()
+      else
+        None
+      end
+    _phase.initialize(this, cluster_initializer, checkpoint_target,
+      recovering_without_resilience, worker_count)
+
+  fun ref _initialize(initializables: Initializables,
+    cluster_initializer: (ClusterInitializer | None) = None,
+    checkpoint_target: (CheckpointId | None) = None,
+    recovering_without_resilience: Bool = false)
+  =>
     _recovering =
       match checkpoint_target
       | let id: CheckpointId =>
@@ -371,22 +385,6 @@ actor LocalTopologyInitializer is LayoutInitializer
       else
         false
       end
-
-    if _topology_initialized then
-      ifdef debug then
-        // Currently, recovery in a single worker cluster is a special case.
-        // We do not need to recover connections to other workers, so we
-        // initialize immediately in Startup. However, we eventually trigger
-        // code in connections.pony where initialize() is called again. For
-        // now, this code simply returns in that scenario to avoid double
-        // initialization.
-        Invariant(
-          try (_topology as LocalTopology).worker_names.size() == 1
-          else false end
-        )
-      end
-      return
-    end
 
     @printf[I32](("------------------------------------------------------" +
       "---\n").cstring())
@@ -636,7 +634,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   router_state_steps_iso.push(next_step)
                   router_state_step_ids_iso(r_id) = next_step
                   data_routes(r_id) = next_step
-                  _initializables.set(next_step)
+                  initializables.set(next_step)
                 end
                 let router_state_steps = consume val router_state_steps_iso
                 let router_state_step_ids =
@@ -683,7 +681,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                   router_stateless_steps_iso.push(next_step)
                   router_stateless_step_ids_iso(next_step) = r_id
                   data_routes(r_id) = next_step
-                  _initializables.set(next_step)
+                  initializables.set(next_step)
                 end
                 let router_stateless_steps =
                   consume val router_stateless_steps_iso
@@ -735,7 +733,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 _outgoing_boundaries)
 
               _connections.register_disposable(sink)
-              _initializables.set(sink)
+              initializables.set(sink)
 
               data_routes(next_id) = sink
 
@@ -763,7 +761,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let sink = sinks(i)?
                 let sink_id = sink_ids(i)?
                 _connections.register_disposable(sink)
-                _initializables.set(sink)
+                initializables.set(sink)
                 data_routes(sink_id) = sink
                 let next_router = DirectRouter(sink_id, sink)
                 routers.push(next_router)
@@ -941,16 +939,10 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         /////////////////////////////////////////
         // Kick off final initialization Phases
-        _initializables.application_begin_reporting(this)
+        _phase = _ApplicationBeginReportingPhase(this, initializables)
+        _phase.begin_reporting()
 
         @printf[I32]("Local topology initialized.\n".cstring())
-        _topology_initialized = true
-
-        if _initializables.size() == 0 then
-          @printf[I32](("Phases I-II skipped (this topology must only have " +
-            "sources.)\n").cstring())
-          _application_ready_to_work()
-        end
 
         if recovering_without_resilience then
           _data_receivers.recovery_complete()
@@ -1029,72 +1021,31 @@ actor LocalTopologyInitializer is LayoutInitializer
 //////////////////////////
 // INITIALIZATION PHASES
 //////////////////////////
-  be initialize_join_initializables() =>
-    _initialize_join_initializables()
-
-  fun ref _initialize_join_initializables() =>
-    // For now we need to keep boundaries out of the initialization
-    // lifecycle stages during join. This is because during a join, all
-    // data channels are muted, so we are not able to connect
-    // over boundaries. This means the boundaries can not
-    // report as initialized until the join is complete, but
-    // the join can't complete until we say we're initialized.
-    _initializables.remove_boundaries()
-    _initializables.application_begin_reporting(this)
-    if _initializables.size() == 0 then
-      _complete_initialization_lifecycle()
-    end
-
   be report_created(initializable: Initializable) =>
-    if not _created.contains(initializable) then
-      _created.set(initializable)
-      if _created.size() == _initializables.size() then
-        @printf[I32]("|~~ INIT PHASE I: Application is created! ~~|\n"
-          .cstring())
-        _initializables.application_created(this)
-      end
-    else
-      @printf[I32]("The same Initializable reported being created twice\n"
-        .cstring())
-      Fail()
-    end
+    _phase.report_created(initializable)
+
+  fun ref _application_created(initializables: Initializables) =>
+    _phase = _ApplicationCreatedPhase(this, initializables)
 
   be report_initialized(initializable: Initializable) =>
-    if not _initialized.contains(initializable) then
-      _initialized.set(initializable)
-      if _initialized.size() == _initializables.size() then
-        @printf[I32]("|~~ INIT PHASE II: Application is initialized! ~~|\n"
-          .cstring())
-        _initializables.application_initialized(this)
-      end
-    else
-      @printf[I32]("The same Initializable reported being initialized twice\n"
-        .cstring())
-      // !TODO!: Bring this back and solve bug
-      // Fail()
-    end
+    _phase.report_initialized(initializable)
+
+  fun ref _application_initialized(initializables: Initializables) =>
+    _phase = _ApplicationInitializedPhase(this, initializables)
 
   be report_ready_to_work(initializable: Initializable) =>
-    if not _ready_to_work.contains(initializable) then
-      _ready_to_work.set(initializable)
-      if (not _initialization_lifecycle_complete) and
-        (_ready_to_work.size() == _initializables.size())
-      then
-        _complete_initialization_lifecycle()
-      end
-    else
-      @printf[I32](("The same Initializable reported being ready to work " +
-        "twice\n").cstring())
-      Fail()
-    end
+    _phase.report_ready_to_work(initializable)
 
-  fun ref _complete_initialization_lifecycle() =>
+  fun ref _initializables_ready_to_work(initializables: Initializables) =>
+    _phase = _InitializablesReadyToWorkPhase(this, initializables,
+      _recovery_ready_to_work, _event_log_ready_to_work)
+
     match _topology
     | let t: LocalTopology =>
       if _recovering then
         _recovery.start_recovery(this, t.worker_names)
       else
-        _recovery_ready_to_work = true
+        _phase.report_recovery_ready_to_work()
         _event_log.quick_initialize(this)
       end
       _router_registry.application_ready_to_work()
@@ -1105,36 +1056,30 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.inform_contacted_worker_of_initialization(
           t.step_group_routing_ids_for(_worker_name))
       end
-      _initialization_lifecycle_complete = true
     else
       Fail()
     end
 
   be report_event_log_ready_to_work() =>
+    // !TODO!: Move handling of this into the phases.
     _event_log_ready_to_work = true
-    Invariant(_ready_to_work.size() == _initializables.size())
 
-    if _recovery_ready_to_work then
-      _application_ready_to_work()
-    end
+    _phase.report_event_log_ready_to_work()
 
   be report_recovery_ready_to_work() =>
+    // !TODO!: Move handling of this into the phases.
     _recovery_ready_to_work = true
-    if _event_log_ready_to_work then
-      _application_ready_to_work()
-    end
 
-  fun ref _application_ready_to_work() =>
-    @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
-      .cstring())
+    _phase.report_recovery_ready_to_work()
+
+  fun ref application_ready_to_work(initializables: Initializables) =>
+    _phase = _ApplicationReadyToWorkPhase(this, initializables)
     _spin_up_source_listeners()
-    _initializables.application_ready_to_work(this)
 
     if _is_initializer then
       match _cluster_initializer
       | let ci: ClusterInitializer =>
         ci.topology_ready("initializer")
-        _is_initializer = false
       else
         @printf[I32](("Need ClusterInitializer to inform that topology is " +
           "ready\n").cstring())
@@ -1142,16 +1087,10 @@ actor LocalTopologyInitializer is LayoutInitializer
     end
 
   fun ref _spin_up_source_listeners() =>
-    if not _topology_initialized then
-      @printf[I32](("ERROR: Tried to spin up source listeners before " +
-        "topology was initialized!\n").cstring())
-    else
-      for builder in sl_builders.values() do
-        let sl = builder(_env)
-        _router_registry.register_source_listener(sl)
-      end
+    for builder in sl_builders.values() do
+      let sl = builder(_env)
+      _router_registry.register_source_listener(sl)
     end
-
 
 ///////////////////////
 // RESILIENCE
@@ -1518,7 +1457,7 @@ actor LocalTopologyInitializer is LayoutInitializer
 
     _outgoing_boundaries = consume bs
     _outgoing_boundary_builders = consume bbs
-    _initializables.set(boundary)
+    _phase.set_initializable(boundary)
 
   be remove_boundary(leaving_worker: WorkerName) =>
     // Boundaries
@@ -1563,16 +1502,18 @@ actor LocalTopologyInitializer is LayoutInitializer
     _router_registry.partition_count_query(conn)
 
   be cluster_status_query(conn: TCPConnection) =>
-    if not _topology_initialized then
-      _router_registry.cluster_status_query_not_initialized(conn)
+    _phase.cluster_status_query(this, conn)
+
+  fun _cluster_status_query_initialized(conn: TCPConnection) =>
+    match _topology
+    | let t: LocalTopology =>
+      _router_registry.cluster_status_query(t.worker_names, conn)
     else
-      match _topology
-      | let t: LocalTopology =>
-        _router_registry.cluster_status_query(t.worker_names, conn)
-      else
-        Fail()
-      end
+      Fail()
     end
+
+  fun _cluster_status_query_not_initialized(conn: TCPConnection) =>
+    _router_registry.cluster_status_query_not_initialized(conn)
 
   be source_ids_query(conn: TCPConnection) =>
     _router_registry.source_ids_query(conn)

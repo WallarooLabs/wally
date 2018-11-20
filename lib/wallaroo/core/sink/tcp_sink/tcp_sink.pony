@@ -282,10 +282,6 @@ actor TCPSink is Sink
     _upstreams.set(producer)
 
   be unregister_producer(id: RoutingId, producer: Producer) =>
-    ifdef debug then
-      Invariant(_upstreams.contains(producer))
-    end
-
     if _inputs.contains(id) then
       try
         _inputs.remove(id)?
