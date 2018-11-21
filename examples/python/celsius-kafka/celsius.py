@@ -41,6 +41,7 @@ def decoder(bs):
     except ValueError as e:
       return 0.0
 
+
 @wallaroo.computation(name="multiply by 1.8")
 def multiply(data):
     return data * 1.8

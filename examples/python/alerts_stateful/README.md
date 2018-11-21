@@ -2,8 +2,7 @@
 
 ## About The Application
 
-This is an example of a stateless application that takes a transaction
-and sends an alert if its value is above or below a threshold.
+This is an example of a stateful application that takes a transaction and updates a running total. It sends an alert if the total is above or below a threshold.
 
 ### Input
 
@@ -12,7 +11,7 @@ objects.
 
 ### Processing
 
-We examine each transaction at a state computation. If the total transaction amount is higher than a certain positive threshold, we create a deposit alert. If it's lower than a certain negative threshold, we create a withdrawal alert. 
+We add the total of each transaction to a running total at a state computation. If that running total is higher than a certain positive threshold, we create a deposit alert. If it's lower than a certain negative threshold, we create a withdrawal alert. 
 
 ### Output
 

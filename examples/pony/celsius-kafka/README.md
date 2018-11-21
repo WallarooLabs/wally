@@ -58,9 +58,9 @@ metrics_reporter_ui start
 
 ### Shell 2: Kafka setup and listener
 
-#### Start kafka and create the `test-in` and `test-out` topics
+#### Start Kafka and create the `test-in` and `test-out` topics
 
-You need kafka running for this example. Ideally you should go to the kafka website (https://kafka.apache.org/) to properly configure kafka for your system and needs. However, the following is a quick/easy way to get kafka running for this example:
+You need Kafka running for this example. Ideally you should go to the Kafka website (https://kafka.apache.org/) to properly configure Kafka for your system and needs. However, the following is a quick/easy way to get Kafka running for this example:
 
 This requires `docker-compose`:
 
@@ -140,9 +140,9 @@ Run `celsius-kafka`:
   --ponynoblock
 ```
 
-`kafka_sink_max_message_size` controls maximum size of message sent to kafka in a single produce request. Kafka will return errors if this is bigger than server is configured to accept.
+`kafka_sink_max_message_size` controls maximum size of message sent to Kafka in a single produce request. Kafka will return errors if this is bigger than server is configured to accept.
 
-`kafka_sink_max_produce_buffer_ms` controls maximum time (in ms) to buffer messages before sending to kafka. Either don't specify it or set it to `0` to disable batching on produce.
+`kafka_sink_max_produce_buffer_ms` controls maximum time (in ms) to buffer messages before sending to Kafka. Either don't specify it or set it to `0` to disable batching on produce.
 
 ### Shell 4: Sender
 
@@ -172,11 +172,11 @@ cluster_shutdown 127.0.0.1:5050
 
 You can shut down the kafkacat consumer by pressing Ctrl-c from its shell.
 
-### Stop kafka
+### Stop Kafka
 
 NOTE: You might need to run with sudo depending on how you set up Docker.
 
-If you followed the commands earlier to start kafka you can stop it by running:
+If you followed the commands earlier to start Kafka you can stop it by running:
 
 ```bash
 cd /tmp/local-kafka-cluster

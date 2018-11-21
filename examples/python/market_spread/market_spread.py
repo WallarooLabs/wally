@@ -60,8 +60,10 @@ def application_setup(args):
 
     return wallaroo.build_application("Market Spread", pipeline)
 
+
 class MarketSpreadError(Exception):
     pass
+
 
 class SymbolData(object):
     def __init__(self, last_bid=0.0, last_offer=0.0, should_reject_trades=True):
@@ -69,9 +71,11 @@ class SymbolData(object):
         self.last_offer = last_offer
         self.should_reject_trades = should_reject_trades
 
+
 @wallaroo.key_extractor
 def extract_symbol(data):
     return data.symbol
+
 
 @wallaroo.state_computation(name="Check Market Data", state=SymbolData)
 def check_market_data(data, state):
@@ -90,6 +94,7 @@ def check_market_data(data, state):
         state.should_reject_trades = should_reject_trades
         return None
 
+
 class Order(object):
     def __init__(self, side, account, order_id, symbol, qty, price,
                  transact_time):
@@ -102,6 +107,7 @@ class Order(object):
         self.price = price
         self.transact_time = transact_time
 
+
 class MarketDataMessage(object):
     def __init__(self, symbol, transact_time, bid, offer):
         self.is_order = False
@@ -110,6 +116,7 @@ class MarketDataMessage(object):
         self.bid = bid
         self.offer = offer
         self.mid = (bid + offer) / 2.0
+
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decode_order(bs):
@@ -138,6 +145,7 @@ def decode_order(bs):
     return Order(side, account, order_id, symbol, qty, price,
                  transact_time)
 
+
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decode_market_data(bs):
     """
@@ -157,12 +165,14 @@ def decode_market_data(bs):
     offer = struct.unpack(">d", bs[34:42])[0]
     return MarketDataMessage(symbol, transact_time, bid, offer)
 
+
 class OrderResult(object):
     def __init__(self, order, last_bid, last_offer, timestamp):
         self.order = order
         self.bid = last_bid
         self.offer = last_offer
         self.timestamp = timestamp
+
 
 @wallaroo.encoder
 def encode_order_result(order_result):

@@ -6,14 +6,13 @@ There are a few Wallaroo support applications that you'll be interacting with fo
 
 - Our Metrics UI allows you to monitor the performance and health of your applications.
 - Data receiver is designed to capture TCP output from Wallaroo applications.
-- Giles sender is used to send test data into Wallaroo applications over TCP.
 - Machida or Machida3, our programs for running Wallaroo Python 2.7 and Python 3.5+ applications, respectively.
 
 You're going to set up our "Alerts" example application. We will use an internal generator source to generate simulated inputs into the system. The data receiver will receive the output, and our Metrics UI will be running so you can observe the overall performance.
 
 The Metrics UI process will be run in the background. The other two processes (data_receiver and Wallaroo) will run in the foreground. We recommend that you run each process in a separate terminal.
 
-For each Shell you're expected to setup, you'd have to run the following to access the Vagrant Box:
+For each shell you're expected to setup, you'd have to run the following to access the Vagrant box:
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/vagrant
@@ -22,7 +21,7 @@ vagrant ssh
 
 Let's get started!
 
-Since Wallaroo is a distributed application, its components need to run separately, and concurrently, so that they may connect to one another to form the application cluster. For this example, you will need 4 separate terminal shells to run the metrics UI, run a sink, run the Alerts application, and eventually, to send a cluster shutdown command.
+Since Wallaroo is a distributed application, its components need to run separately, and concurrently, so that they may connect to one another to form the application cluster. For this example, you will need 4 separate terminal shells to run the metrics UI, run a sink, run the "Alerts" application, and eventually, to send a cluster shutdown command.
 
 ## Shell 1: Start the Metrics UI
 
@@ -67,7 +66,7 @@ Data Receiver will start up and receive data without creating any output. By def
 First, we will need to set up the `PYTHONPATH` environment variable. Machida needs to be able to find the the module that defines the application. In order to do that, set and export the `PYTHONPATH` environment variable like this:
 
 ```bash
-export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateful:$PYTHONPATH"
+export PYTHONPATH="$HOME/wallaroo-tutorial/wallaroo-{{ book.wallaroo_version }}/examples/python/alerts_stateless:$PYTHONPATH"
 ```
 
 Now that we have Machida set up to run the "Alerts" application, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command (remember to use the `machida3` executable instead of `machida` if you are using Python 3.X):

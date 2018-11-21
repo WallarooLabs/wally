@@ -27,7 +27,7 @@ If you are using Python 3, replace all instances of `machida` with `machida3` in
 
 You will also need access to a Kafka cluster.
 
-**NOTE:** If running in Docker, the kafkfa cluster and kafkacat should be run from your host and not within the Docker container.
+**NOTE:** If running in Docker, the Kafka cluster and kafkacat should be run from your host and not within the Docker container.
 
 You will need five separate shells to run this application (please see [starting a new shell](https://docs.wallaroolabs.com/book/getting-started/starting-a-new-shell.html) for details depending on your installation choice). Open each shell and go to the `examples/python/celsius-kafka` directory.
 
@@ -109,7 +109,7 @@ docker pull ryane/kafkacat
 
 Set the Kafka broker IP address:
 
-**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_UP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
+**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_IP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
 
 ```bash
 export KAFKA_IP=$(docker inspect local_kafka_1_1 | grep kafka_ip | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
@@ -125,7 +125,7 @@ docker run --rm -i --name kafkacatconsumer ryane/kafkacat -C -b ${KAFKA_IP}:9092
 
 Set the Kafka broker IP address:
 
-**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_UP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
+**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_IP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
 
 ```bash
 export KAFKA_IP=$(docker inspect local_kafka_1_1 | grep kafka_ip | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
@@ -153,7 +153,7 @@ Send data into Kafka. Again, we use `kafakcat`.
 
 Set the Kafka broker IP address:
 
-**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_UP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
+**NOTE:** If you're running Wallaroo in Docker, you will need to replace the following with `export KAFKA_IP=*IP OUTPUT BY ./cluster up 1 COMMAND*` instead.
 
 ```bash
 export KAFKA_IP=$(docker inspect local_kafka_1_1 | grep kafka_ip | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')

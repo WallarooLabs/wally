@@ -54,6 +54,7 @@ Worker 2
 
 machida --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+  --my-control 127.0.0.1:6503 --my-data 127.0.0.1:6504 \
   --control 127.0.0.1:6500 --name Worker2 --ponythreads 1
 {% language name="Python 3", type="py" -%}
 Worker 1
@@ -67,6 +68,7 @@ Worker 2
 
 machida3 --application-module alerts \
   --out 127.0.0.1:5555 --metrics 127.0.0.1:5001 \
+  --my-control 127.0.0.1:6503 --my-data 127.0.0.1:6504 \
   --control 127.0.0.1:6500 --name Worker2 --ponythreads 1
 {%- endcodetabs %}
 

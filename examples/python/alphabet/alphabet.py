@@ -62,9 +62,11 @@ class AllVotes(object):
         # Return a new Votes instance here!
         return Votes(letter, vbl.votes)
 
+
 @wallaroo.key_extractor
 def extract_letter(data):
     return data.letter
+
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decode_votes(bs):

@@ -204,7 +204,9 @@ actor Connections is Cluster
   fun _send_control(worker: String, data: Array[ByteSeq] val) =>
     try
       _control_conns(worker)?.writev(data)
-      @printf[I32](("Sent control message to " + worker + "\n").cstring())
+      ifdef debug then
+        @printf[I32](("Sent control message to " + worker + "\n").cstring())
+      end
     else
       @printf[I32](("No control connection for worker " + worker + "\n")
         .cstring())
