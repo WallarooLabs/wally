@@ -23,12 +23,8 @@ from integration.test_context import (get_caller_name,
                                       LoggingTestContext)
 
 
-from itertools import cycle
 import os
-import sys
 import json
-from struct import pack
-import tempfile
 import time
 
 INPUT_ITEMS=10
@@ -37,12 +33,6 @@ CMD='machida --application-module dummy'
 # If resilience is on, add --run-with-resilience to commands
 if os.environ.get("resilience") == 'on':
     CMD += ' --run-with-resilience'
-
-
-#!@ REMOVE
-def test_dummy_test():
-    with LoggingTestContext() as ctx:
-        assert(True)
 
 
 def test_partition_query():
@@ -145,9 +135,7 @@ def test_stateless_partition_count_query():
 
 
 def given_data_sent(cluster):
-    reader = Reader(iter_generator(items=[chr(x+65).encode()
-                                          for x in range(INPUT_ITEMS)],
-                                   to_bytes=lambda s: pack('>2sI', s, 1)))
+    reader = Reader(iter_generator([chr(x+65) for x in range(INPUT_ITEMS)]))
     sender = Sender(cluster.source_addrs[0],
                     reader,
                     batch_size=50, interval=0.05, reconnect=True)

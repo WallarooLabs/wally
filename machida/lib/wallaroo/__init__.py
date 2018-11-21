@@ -46,6 +46,11 @@ if not sys.stderr.isatty():
 
 def serialize(o):
     print("serialize({})".format(o))
+    print(dir(o))
+    if isinstance(o, OctetEncoder):
+        print(o.encode)
+    print(dir(o))
+    print(o.__dict__)
     s = pickle.dumps(o)
     print("serialized!")
     return s
@@ -302,6 +307,12 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
     # Attach the new class to the module's global namespace and return it
     c = attach_to_module(C, base_cls.__name__, func)
     print('returning: ', c)
+    print(dir(c))
+    print(c.__dict__)
+    # can we serialize?
+    print("trying to serialize")
+    s = pickle.dumps(c)
+    print("serialized successfully")
     return c
 
 
