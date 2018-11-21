@@ -12,7 +12,19 @@ Since recovery involves a rollback to the last successful checkpoint, any data t
 
 When a crashed worker is restarted, if it can find its resilience files in the path specified by `--resilience-dir`, it will automatically start the recovery process. The simplest way to do this is to rerun the worker using the same command it was originally run with.
 
-For example, if we were running the bundled Python example [word_count_with_dynamic_keys](https://github.com/WallarooLabs/wallaroo/tree/master/examples/python/word_count/), this might look something like:
+For example, if we were running the bundled Python example [word_count](https://github.com/WallarooLabs/wallaroo/tree/master/examples/python/word_count/), this might look something like:
+
+    ```bash
+    machida-resilience --application-module word_count \
+      --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+      --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
+      --my-data 127.0.0.1:6003 --my-control 127.0.0.1:6002 \
+      --external 127.0.0.1:5051 \
+      --name worker1 \
+      --resilience-dir /tmp/resilience-dir \
+      --ponythreads=1 --ponynoblock --run-with-resilience \
+      | tee worker1.log
+    ```
 
 ### Running the resilience example
 

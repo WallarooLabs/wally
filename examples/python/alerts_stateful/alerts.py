@@ -33,14 +33,17 @@ def application_setup(args):
 
     return wallaroo.build_application("Alerts (stateful)", pipeline)
 
+
 class Transaction(object):
     def __init__(self, user, amount):
         self.user = user
         self.amount = amount
 
+
 class TransactionTotal(object):
     def __init__(self):
         self.total = 0
+
 
 class DepositAlert(object):
     def __init__(self, user, amount):
@@ -50,6 +53,7 @@ class DepositAlert(object):
     def __str__(self):
         return "Deposit Alert for " + self.user + ": " + str(self.amount)
 
+
 class WithdrawalAlert(object):
     def __init__(self, user, amount):
         self.user = user
@@ -58,9 +62,11 @@ class WithdrawalAlert(object):
     def __str__(self):
         return "Withdrawal Alert for " + self.user + ": " + str(self.amount)
 
+
 @wallaroo.key_extractor
 def extract_user(transaction):
     return transaction.user
+
 
 @wallaroo.state_computation(name="check transaction total", state=TransactionTotal)
 def check_transaction_total(transaction, state):
@@ -70,9 +76,11 @@ def check_transaction_total(transaction, state):
     elif state.total < -2000:
         return WithdrawalAlert(transaction.user, state.total)
 
+
 @wallaroo.encoder
 def encode_alert(alert):
     return (str(alert) + "\n").encode()
+
 
 ############################################
 # DEFINE A GENERATOR FOR ALERTS TEST INPUTS

@@ -103,7 +103,9 @@ class PendingBarrierHandler is BarrierHandler
     _acked_sinks.set(s)
 
   fun ref worker_ack_barrier_start(w: String) =>
-    @printf[I32]("worker_ack_barrier_start from PendingBarrierHandler\n".cstring())
+    ifdef "checkpoint_trace" then
+      @printf[I32]("worker_ack_barrier_start from PendingBarrierHandler\n".cstring())
+    end
     ifdef debug then
       Invariant(if _is_primary() then
         SetHelpers[String].contains[String](_workers, w) else true end)

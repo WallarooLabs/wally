@@ -189,7 +189,7 @@ You can shut down the cluster with this command at any time:
 cluster_shutdown 127.0.0.1:5050
 ```
 
-You can shut down Giles Sender and Data Receiver by pressing Ctrl-c from their respective shells.
+You can shut down Data Receiver by pressing Ctrl-c from its shell.
 
 You can shut down the Metrics UI with the following command:
 
