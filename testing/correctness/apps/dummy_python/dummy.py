@@ -28,9 +28,11 @@ def application_setup(args):
       .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
     return wallaroo.build_application("Dummy", pipeline)
 
+
 @wallaroo.key_extractor
 def partition(data):
     return str(hash(data))
+
 
 class StateObject(object):
     def __init__(self):
@@ -40,6 +42,7 @@ class StateObject(object):
         self.val = value
         return value
 
+
 class PartitionedStateObject(object):
     def __init__(self):
         self.val = 0
@@ -48,19 +51,23 @@ class PartitionedStateObject(object):
         self.val = value
         return value
 
+
 @wallaroo.state_computation(name="Count State Updates", state=StateObject)
 def count(data, state):
     res = state.update(data)
     return (res, True)
+
 
 @wallaroo.state_computation(name="Count Partitioned State Updates", state=PartitionedStateObject)
 def count_partitioned(data, state):
     res = state.update(data)
     return (res, True)
 
+
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     return bs
+
 
 @wallaroo.encoder
 def encoder(data):

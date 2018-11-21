@@ -36,6 +36,7 @@ def application_setup(args):
 
     return wallaroo.build_application("Counting Sheep", pipeline)
 
+
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def nonce_decoder(bytes):
     """
@@ -88,12 +89,14 @@ partitions = [str(x) for x in range(0, 60)]
 # Set by --delay_ms argument
 delay_ms = 0
 
+
 def parse_delay(args):
     parser = argparse.ArgumentParser(prog='')
     parser.add_argument('--delay_ms', type=int, default=0)
     a, _ = parser.parse_known_args(args)
     global delay_ms
     delay_ms = a.delay_ms
+
 
 def delay(ms):
     """

@@ -40,6 +40,7 @@ def application_setup(args):
 def constant(data):
     return "constant"
 
+
 @wallaroo.key_extractor
 def extract_window(data):
     return str(data % 2)

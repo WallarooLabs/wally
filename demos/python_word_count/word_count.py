@@ -17,6 +17,7 @@ def application_setup(args):
 
     return wallaroo.build_application("Word Count Application", pipeline)
 
+
 @wallaroo.computation_multi(name="split into words")
 def split(lines):
     punctuation = " !\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~"
@@ -31,29 +32,34 @@ def split(lines):
 
     return words
 
+
 class WordTotal(object):
     count = 0
+
 
 @wallaroo.state_computation(name="count word", state=WordTotal)
 def count_word(word, word_total):
     word_total.count = word_total.count + 1
     return WordCount(word, word_total.count)
 
+
 class WordCount(object):
     def __init__(self, word, count):
         self.word = word
         self.count = count
 
+
 @wallaroo.key_extractor
 def extract_word(word):
     return word
+
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decode_line(bs):
     return bs.decode("utf-8")
 
+
 @wallaroo.encoder
 def encode_word_count(data):
     output = data.word + " => " + str(data.count) + "\n"
-    print output
     return output.encode("utf-8")

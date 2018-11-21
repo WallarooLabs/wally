@@ -42,17 +42,21 @@ def application_setup(args):
 
     return wallaroo.build_application("Parallel App", pipeline)
 
+
 # @wallaroo.state_computation(name='Batch single entries, emit batchs', state=RowBatches)
 # def batch_rows(row, row_buffer):
 #     return (row_buffer.update_with(row), True)
+
 
 @wallaroo.computation(name="Classify")
 def classify(x):
     return str(x)+":"+PID
 
+
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decode(bs):
     return bs
+
 
 @wallaroo.encoder
 def encode(thing):
