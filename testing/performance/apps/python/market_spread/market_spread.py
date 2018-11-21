@@ -1,4 +1,4 @@
-# Copyright 2017 The Wallaroo Authors.
+# Copyright 2018 The Wallaroo Authors.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,20 +12,8 @@
 #  implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-"""
-Market Spread is an application designed to run alongside a trading system.
-Its goal is to monitor market data for irregularities around different symbols
-and potentially withdraw some trades that have been sent to market should
-certain anomalies occur.
 
-When we break the application down into its key components we get:
-
-- A stream of market data which we refer to as the "Market Stream"
-- A stream of trades which we refer to as the "Order Stream"
-- State in the form of latest market conditions for various stock symbols
-- A calculation to possibly withdraw the trade based on state for that symbol
-"""
-
+from enum import IntEnum
 import struct
 import time
 
@@ -59,6 +47,90 @@ def application_setup(args):
                                         order_result_encoder)))
 
     return wallaroo.build_application("Market Spread", pipeline)
+
+
+class SerializedTypes(IntEnum):
+    """
+    Define the types of data that can be serialised
+    """
+    CHECKMARKETDATA = 1
+    EXTRACTSYMBOL = 2
+    ORDERRESULTENCODER = 3
+    MARKETDATAMESSAGE = 4
+    MARKETDATADECODER = 5
+    ORDERMESSAGE = 6
+    ORDERDECODER = 7
+    SYMBOLDATA = 8
+
+
+def serialize(o):
+    """
+    Pack objects according to the following schema:
+    0 - 4b object class (SerializedTypes)
+    1 - ?b object data (if required)
+    """
+    if isinstance(o, check_market_data.__class__):
+        s = struct.Struct(">I")
+        return s.pack(SerializedTypes.CHECKMARKETDATA)
+    elif isinstance(o, extract_symbol.__class__):
+        s = struct.Struct(">I")
+        return s.pack(SerializedTypes.EXTRACTSYMBOL)
+    elif isinstance(o, order_result_encoder.__class__):
+        s = struct.Struct(">I")
+        return s.pack(SerializedTypes.ORDERRESULTENCODER)
+    elif isinstance(o, MarketDataMessage):
+        s = struct.Struct(">I4s21sdd")
+        return s.pack(SerializedTypes.MARKETDATAMESSAGE,
+                      o.symbol, o.transact_time, o.bid, o.offer)
+    elif isinstance(o, market_data_decoder.__class__):
+        s = struct.Struct(">I")
+        return s.pack(SerializedTypes.MARKETDATADECODER)
+    elif isinstance(o, Order):
+        s = struct.Struct(">IBI6s4sdd21s")
+        return s.pack(SerializedTypes.ORDERMESSAGE, o.side, o.account,
+                      o.order_id, o.symbol, o.qty, o.price, o.transact_time)
+    elif isinstance(o, order_decoder.__class__):
+        s = struct.Struct(">I")
+        return s.pack(SerializedTypes.ORDERDECODER)
+    elif isinstance(o, SymbolData):
+        s = struct.Struct(">Idd?")
+        return s.pack(SerializedTypes.SYMBOLDATA,
+            o.last_bid, o.last_offer, o.should_reject_trades)
+    else:
+        print("Don't know how to serialize {}".format(type(o).__name__))
+    return None
+
+
+def deserialize(bs):
+    """
+    Unpack objects according to the following schema:
+    0 - 4b object class (SerializedTypes)
+    1 - ?b object data (if required)
+    """
+    (obj_type,), bs = struct.unpack(">I", bs[:4]), bs[4:]
+    if obj_type == SerializedTypes.CHECKMARKETDATA:
+        return check_market_data
+    elif obj_type == SerializedTypes.EXTRACTSYMBOL:
+        return extract_symbol
+    elif obj_type == SerializedTypes.ORDERRESULTENCODER:
+        return order_result_encoder
+    elif obj_type == SerializedTypes.MARKETDATAMESSAGE:
+        (symbol, time, bid, offer) = struct.unpack(">4s21sdd", bs)
+        return MarketDataMessage(symbol, time, bid, offer)
+    elif obj_type == SerializedTypes.MARKETDATADECODER:
+        return market_data_decoder
+    elif obj_type == SerializedTypes.ORDERMESSAGE:
+        (side, acct, oid, symbol, qty, price, t_time) = struct.unpack(
+                ">BI6s4sdd21s", bs)
+        return Order(side, acct, oid, symbol, qty, price, t_time)
+    elif obj_type == SerializedTypes.ORDERDECODER:
+        return order_decoder
+    elif obj_type == SerializedTypes.SYMBOLDATA:
+        (last_bid, last_offer, should_reject_trades) = struct.unpack(">dd?", bs)
+        return SymbolData(last_bid, last_offer, should_reject_trades)
+    else:
+        print("Don't know how to deserialize: {}".format(obj_type))
+    return None
 
 
 class MarketSpreadError(Exception):
@@ -176,7 +248,7 @@ class OrderResult(object):
 
 @wallaroo.encoder
 def order_result_encoder(data):
-    p = struct.pack(">BI6s4sddddQ",
+    p = struct.pack(">HI6s4sddddQ",
                     data.order.side,
                     data.order.account,
                     data.order.order_id,
