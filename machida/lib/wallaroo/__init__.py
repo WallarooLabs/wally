@@ -89,7 +89,7 @@ class Pipeline(object):
         return self.clone().__to__(computation)
 
     def __to__(self, computation):
-        if computation.is_stateful:
+        if isinstance(computation, StateComputation):
             self._pipeline_tree.add_stage(("to_state", computation))
         else:
             self._pipeline_tree.add_stage(("to", computation))
@@ -177,49 +177,61 @@ def attach_to_module(cls, cls_name, func):
 
 
 def _wallaroo_wrap(name, func, base_cls, **kwargs):
+    print("_wallaroo_wrap", name, func, base_cls, kwargs)
     # Case 1: Computations
     if issubclass(base_cls, Computation):
         # Create the appropriate computation signature
-        if base_cls._is_state:
+
+        # Stateful
+        if issubclass(base_cls, StateComputation):
+            state = kwargs.pop('state')  # This is a StateBuilder instance
+            print("state",state)
             def comp(self, data, state):
                 return func(data, state)
+            def build_initial_state(self):
+                return state.initial_state()
+        # Stateless
         else:
             def comp(self, data):
                 return func(data)
+            build_initial_state = None
 
         # Create a custom class type for the computation
         class C(base_cls):
             __doc__ = func.__doc__
             __module__ = __module__
+            initial_state = build_initial_state
             def name(self):
                 return name
 
         # Attach the computation to the class
         # TODO: maybe move this to machida, using PyObject_IsInstance
         # instead of PyObject_HasAttrString
-        if base_cls._is_multi:
+        if issubclass(base_cls, ComputationMulti):
             C.compute_multi = comp
         else:
             C.compute = comp
 
-        if base_cls._is_state:
-            initial_state = kwargs['state']
-            def build_initial_state(self):
-                try:
-                    state = initial_state()
-                    return state
-                except Exception as err:
-                    print(err)
-                    # What should we do here?
 
-            C.initial_state = build_initial_state
-            C.is_stateful = True
-        else:
-            C.is_stateful = False
-
+#        if base_cls._is_state:
+#            initial_state = kwargs.pop('state')
+#            def build_initial_state(self):
+#                try:
+#                    state = self.initial_state()
+#                    return state
+#                except Exception as err:
+#                    print(err)
+#                    # What should we do here?
+#
+#            C.initial_state = build_initial_state
+#            C.is_stateful = True
+#            C.___name = name
+#        else:
+#            C.is_stateful = False
+#
 
     # Case 2: Partition
-    elif base_cls is KeyExtractor:
+    elif issubclass(base_cls, KeyExtractor):
         class C(base_cls):
             def extract_key(self, data):
                 res = func(data)
@@ -228,61 +240,69 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                 return res
 
     # Case 3: Encoder
-    elif base_cls is OctetEncoder:
-        class C(base_cls):
-            def encode(self, data):
-                return func(data)
+    elif issubclass(base_cls, Encoder):
+        # ConnectorEncoder
+        if issubclass(base_cls, ConnectorEncoder):
+            class C(base_cls):
+                def encode(self, data, event_time=0):
+                    encoded = func(data)
+                    if isinstance(event_time, dt.datetime):
+                        # We'll assume naive datetime values should be treated as
+                        # UTC. Python's brain-dead datetime package is mostly
+                        # useless for fixing this without a mountain of caveats
+                        # like improper DST handling. We'll assume the user can
+                        # import a library that handles this better than Python
+                        # does itself.
+                        #
+                        # Convert to an integer number of ms from the floating
+                        # point seconds that Python uses.
+                        event_time = int(event_time.timestamp() * 1000)
+                    return struct.pack(
+                        '<Iq{}s'.format(len(encoded)),
+                        len(encoded) + 8, # total frame size
+                        event_time, # 64bit event_time
+                        encoded) # final payload, variable size as formatted above
 
-    elif base_cls is ConnectorEncoder:
-        class C(base_cls):
-            def encode(self, data, event_time=0):
-                encoded = func(data)
-                if isinstance(event_time, dt.datetime):
-                    # We'll assume naive datetime values should be treated as
-                    # UTC. Python's brain-dead datetime package is mostly
-                    # useless for fixing this without a mountain of caveats
-                    # like improper DST handling. We'll assume the user can
-                    # import a library that handles this better than Python
-                    # does itself.
-                    #
-                    # Convert to an integer number of ms from the floating
-                    # point seconds that Python uses.
-                    event_time = int(event_time.timestamp() * 1000)
-                return struct.pack(
-                    '<Iq{}s'.format(len(encoded)),
-                    len(encoded) + 8, # total frame size
-                    event_time, # 64bit event_time
-                    encoded) # final payload, variable size as formatted above
+        # OctetEncoder
+        elif issubclass(base_cls, OctetEncoder):
+            class C(base_cls):
+                def encode(self, data):
+                    return func(data)
 
     # Case 4: Decoder
-    elif base_cls is OctetDecoder:
-        header_length = kwargs['header_length']
-        length_fmt = kwargs['length_fmt']
-        class C(base_cls):
-            def header_length(self):
-                return header_length
-            def payload_length(self, bs):
-                return struct.unpack(length_fmt, bs)[0]
-            def decode(self, bs):
-                return func(bs)
+    elif issubclass(base_cls, Decoder):
+        # OctetDecoder
+        if issubclass(base_cls, OctetDecoder):
+            header_length = kwargs['header_length']
+            length_fmt = kwargs['length_fmt']
+            class C(base_cls):
+                def header_length(self):
+                    return header_length
+                def payload_length(self, bs):
+                    return struct.unpack(length_fmt, bs)[0]
+                def decode(self, bs):
+                    return func(bs)
 
-    elif base_cls is ConnectorDecoder:
-        class C(base_cls):
-            def header_length(self):
-                # struct.calcsize('<I')
-                return 4
-            def payload_length(self, bs):
-                return struct.unpack("<I", bs)[0]
-            def decode(self, bs):
-                # We're dropping event_time for now. Pony will pick this up
-                # itself. Slice bytes off the front: struct.calcsize('<q') = 8
-                message_data = bs[8:]
-                return func(message_data)
-            def decoder(self):
-                return func
+        # ConnectorDecoder
+        elif issubclass(base_cls, ConnectorDecoder):
+            class C(base_cls):
+                def header_length(self):
+                    # struct.calcsize('<I')
+                    return 4
+                def payload_length(self, bs):
+                    return struct.unpack("<I", bs)[0]
+                def decode(self, bs):
+                    # We're dropping event_time for now. Pony will pick this up
+                    # itself. Slice bytes off the front: struct.calcsize('<q') = 8
+                    message_data = bs[8:]
+                    return func(message_data)
+                def decoder(self):
+                    return func
 
     # Attach the new class to the module's global namespace and return it
-    return attach_to_module(C, base_cls.__name__, func)
+    c = attach_to_module(C, base_cls.__name__, func)
+    print('returning: ', c)
+    return c
 
 
 class BaseWrapped(object):
@@ -292,38 +312,47 @@ class BaseWrapped(object):
 
 class Computation(BaseWrapped):
     _is_multi = False
-    _is_state = False
+    pass
 
 
 class ComputationMulti(Computation):
     _is_multi = True
+    pass
 
 
 class StateComputation(Computation):
-    _is_state = True
+    pass
 
 
-class StateComputationMulti(StateComputation):
-    _is_multi = True
+class StateComputationMulti(StateComputation, ComputationMulti):
+    pass
 
 
 class KeyExtractor(BaseWrapped):
     pass
 
 
-class OctetDecoder(BaseWrapped):
+class Encoder(BaseWrapped):
     pass
 
 
-class OctetEncoder(BaseWrapped):
+class Decoder(BaseWrapped):
     pass
 
 
-class ConnectorDecoder(BaseWrapped):
+class OctetDecoder(Decoder):
     pass
 
 
-class ConnectorEncoder(BaseWrapped):
+class OctetEncoder(Encoder):
+    pass
+
+
+class ConnectorDecoder(Decoder):
+    pass
+
+
+class ConnectorEncoder(Encoder):
     pass
 
 
@@ -338,7 +367,7 @@ def computation(name):
 def state_computation(name, state):
     def wrapped(func):
         _validate_arity_compatability(name, func, 2)
-        C = _wallaroo_wrap(name, func, StateComputation, state=state)
+        C = _wallaroo_wrap(name, func, StateComputation, state=StateBuilder(state))
         return C()
     return wrapped
 
