@@ -27,15 +27,13 @@ def application_setup(args):
       .key_by(partition)
       .to(count_partitioned)
       .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder)))
-    ba = wallaroo.build_application("Dummy", pipeline)
-    print("application setuped!", ba)
-    return ba
+    return wallaroo.build_application("Dummy", pipeline)
 
 
 
 @wallaroo.key_extractor
 def partition(data):
-    print("partition({})".format(data))
+    print("partition({!r})".format(data))
     return str(hash(data))
 
 
@@ -44,8 +42,8 @@ class StateObject(object):
         self.val = 0
 
     def update(self, value):
-        print("StateObject.update({})".format(value))
-        self.val = value.encode()
+        print("StateObject.update({!r})".format(value))
+        self.val = value
         return self.val
 
 
@@ -55,7 +53,7 @@ class PartitionedStateObject(object):
         self.val = 0
 
     def update(self, value):
-        print("PartitionedStateObject.update({})".format(value))
+        print("PartitionedStateObject.update({!r})".format(value))
         self.val = value.encode()
         return self.val
 
@@ -63,26 +61,26 @@ class PartitionedStateObject(object):
 
 @wallaroo.state_computation(name="Count State Updates", state=StateObject)
 def count(data, state):
-    print("count({},{})".format(data, state))
+    print("count({!r},{!r})".format(data, state))
     res = state.update(data)
-    return (res, True)
+    return res
 
 
 @wallaroo.state_computation(name="Count Partitioned State Updates", state=PartitionedStateObject)
 def count_partitioned(data, state):
-    print("count_partitioned({},{})".format(data, state))
+    print("count_partitioned({!r},{!r})".format(data, state))
     res = state.update(data)
-    return (res, True)
+    return res
 
 
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
-    print("decoder({})".format(bs))
-    return bs.encode()
+    print("decoder({!r})".format(bs))
+    return bs.decode('utf-8')
 
 
 
 @wallaroo.encoder
 def encoder(data):
-    print("encoder({})".format(data))
-    return data.encode()
+    print("encoder({!r})".format(data))
+    return data.encode('utf-8')
