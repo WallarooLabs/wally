@@ -51,8 +51,6 @@ extern PyObject *application_setup(PyObject *pModule, PyObject *args)
   pValue = PyObject_CallFunctionObjArgs(pFunc, args, NULL);
   Py_DECREF(pFunc);
 
-  printf("C Tuple Check: %d\n", PyTuple_Check(pValue));
-
   return pValue;
 }
 
