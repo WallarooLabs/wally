@@ -26,6 +26,7 @@ from integration.test_context import (get_caller_name,
 import os
 import json
 import time
+import struct
 
 INPUT_ITEMS=10
 CMD='machida --application-module dummy'
@@ -39,29 +40,26 @@ def test_partition_query():
     with LoggingTestContext() as ctx:
         with ctx.Cluster(command=CMD, workers=3) as cluster:
             q = Query(cluster, "partition-query")
-            got = q.result()
+            got = q.result()['initializer']
 
-#        assert(sorted(["state_partitions","stateless_partitions"]) ==
-#               sorted(got.keys()))
-#        print(got)
-#        for k in got["state_partitions"].keys():
-#          assert("initializer" in got["state_partitions"][k])
+        assert(sorted(["state_partitions","stateless_partitions"]) ==
+               sorted(got.keys()))
+        for k in got["state_partitions"].keys():
+          assert("initializer" in got["state_partitions"][k])
 
 
 def test_partition_count_query():
     with LoggingTestContext() as ctx:
         with ctx.Cluster(command=CMD) as cluster:
             given_data_sent(cluster)
-            got = Query(cluster, "partition-count-query").result()
+            got = Query(cluster, "partition-count-query").result()['initializer']
 
-#        assert(sorted(got.keys()) ==
-#               ["state_partitions", "stateless_partitions"])
-#        assert(got["state_partitions"] ==
-#               {u"DummyState": {u"initializer": 1},
-#                u"PartitionedDummyState": {u"initializer": INPUT_ITEMS}})
-#        for (k, v) in got["stateless_partitions"].items():
-#            assert(int(k))
-#            assert(v == {u"initializer": 1})
+        assert(sorted(got.keys()) ==
+               ["state_partitions", "stateless_partitions"])
+        assert(len(got['stateless_partitions']) == 1)
+        assert(len(got['state_partitions']) == 2)
+        for v in got['state_partitions'].values():
+            assert(v['initializer'] == INPUT_ITEMS)
 
 
 def test_cluster_status_query():
@@ -70,10 +68,11 @@ def test_cluster_status_query():
             q = Query(cluster, "cluster-status-query")
             got = q.result()
 
-#        assert(got ==
-#               {u"processing_messages": True,
-#                u"worker_names": [u"initializer", u"worker1"],
-#                u"worker_count": 2})
+        for w in got.values():
+            assert(w ==
+                   {u"processing_messages": True,
+                    u"worker_names": [u"initializer", u"worker1"],
+                    u"worker_count": 2})
 
 
 def test_source_ids_query():
@@ -82,10 +81,10 @@ def test_source_ids_query():
         with ctx.Cluster(command=CMD, sources=1) as cluster:
             given_data_sent(cluster)
             q = Query(cluster, "source-ids-query")
-            got = q.result()
+            got = q.result()['initializer']
 
-#        assert(list(got.keys()) == ["source_ids"])
-#        assert(len(got["source_ids"]) == HARDCODED_NO_OF_SOURCE_IDS)
+        assert(list(got.keys()) == ["source_ids"])
+        assert(len(got["source_ids"]) == HARDCODED_NO_OF_SOURCE_IDS)
 
 
 def test_state_entity_query():
@@ -94,9 +93,31 @@ def test_state_entity_query():
             given_data_sent(cluster)
             got = Query(cluster, "state-entity-query").result()
 
-#        assert(sorted(got.keys()) == [u'DummyState', u'PartitionedDummyState'])
-#        assert(got[u'DummyState'] == [u'key'])
-#        assert(len(got[u'PartitionedDummyState']) == 7)
+        # Got queries from two workers
+        for k in got:
+            assert(len(got[k].keys()) == 2)
+        # collect state keys from query results
+        part_ids = []
+        single_part_id = None
+        for w in got.values():
+            for v in w.values():
+                try:
+                    if not v:
+                        continue
+                    int(v[0])
+                    part_ids.extend(v)
+                except:
+                    single_part_id = v[0]
+                    continue
+        # Check we have as many state keys as input items
+        assert(len(part_ids) == INPUT_ITEMS)
+        assert(single_part_id == 'single-partition-key')
+        # check that there are two computation ids
+        comp_ids = set()
+        for w in got.values():
+            for key in w:
+                comp_ids.add(key)
+        assert(len(comp_ids) == 2)
 
 
 def test_state_entity_count_query():
@@ -106,8 +127,12 @@ def test_state_entity_count_query():
             q = Query(cluster, "state-entity-count-query")
             got = q.result()
 
-#        assert(got == {u'DummyState':1,
-#                              u'PartitionedDummyState':7})
+
+        comps = {}
+        for w in got.values():
+            for k, v in w.items():
+                comps[k] = comps.get(k, 0) + v
+        assert(set(comps.values()) == set((1,10)))
 
 
 def test_stateless_partition_query():
@@ -115,13 +140,11 @@ def test_stateless_partition_query():
         with ctx.Cluster(command=CMD, workers=2) as cluster:
             got = Query(cluster, "stateless-partition-query").result()
 
-#        for (k,v) in got.items():
-#            assert(int(k))
-#            assert(sorted(v.keys()) == [u"initializer", u"worker1"])
-#            assert(len(v[u"initializer"]) == 1)
-#            assert(int((v[u"initializer"])[0]))
-#            assert(len(v[u"worker1"]) == 1)
-#            assert(int((v[u"worker1"])[0]))
+        for w, res in got.items():
+            for k, v in res.items():
+                assert(int(k))
+                assert(w in v.keys())
+                assert(len(v[w]) == INPUT_ITEMS)
 
 
 def test_stateless_partition_count_query():
@@ -129,30 +152,34 @@ def test_stateless_partition_count_query():
         with ctx.Cluster(command=CMD, workers=2) as cluster:
             got = Query(cluster, "stateless-partition-count-query").result()
 
-#        for (k,v) in got.items():
-#            assert(int(k))
-#            assert(v == {u"initializer" : 1, u"worker1": 1})
+        for w, res in got.items():
+            for k, v in res.items():
+                assert(int(k))
+                assert(v == {w : INPUT_ITEMS})
 
 
 def given_data_sent(cluster):
-    reader = Reader(iter_generator([chr(x+65) for x in range(INPUT_ITEMS)]))
+    values = [chr(x+65) for x in range(INPUT_ITEMS)]
+    reader = Reader(iter_generator(values))
     sender = Sender(cluster.source_addrs[0],
                     reader,
                     batch_size=50, interval=0.05, reconnect=True)
     cluster.add_sender(sender, start=True)
-    time.sleep(0.5)
+    await_values = [struct.pack('>I', len(v.encode())) + v.encode() for v in values]
+    cluster.sink_await(await_values)
 
 
 class Query(object):
-    def __init__(self, cluster, type):
+    def __init__(self, cluster, query_type):
         cmd = "external_sender --json --external {} --type {}"
-        self._cmd = cmd.format(cluster.workers[0].external, type)
+        self.cmds = {w.name: cmd.format(w.external, query_type) for w
+                     in cluster.workers}
 
     def result(self):
-        res = run_shell_cmd(self._cmd)
-        if res.success:
+        res = {k: run_shell_cmd(v) for k,v in self.cmds.items()}
+        if all(map(lambda r: r.success, res.values())):
             try:
-                return json.loads(res.output)
+                return {k: json.loads(v.output) for k, v in res.items()}
             except:
                 raise Exception("Failed running parser on {!r}".
                                 format(res.output))
