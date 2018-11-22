@@ -17,6 +17,9 @@ Copyright 2018 The Wallaroo Authors.
 */
 
 trait WallarooOutgoingNetworkActorNotify
+  fun ref update_address(host: String, service: String) =>
+    None
+
   fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32)
     """
     Called if name resolution succeeded for a WallarooOutgoingNetworkActor
