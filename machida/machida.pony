@@ -556,7 +556,6 @@ primitive Machida
     recover val
       let pipeline_tree = PyPipelineTree(application_setup_data, env)
       let pipeline = pipeline_tree.build()?
-      Machida.dec_ref(application_setup_data)
       (pipeline_tree.app_name, pipeline)
     end
 
