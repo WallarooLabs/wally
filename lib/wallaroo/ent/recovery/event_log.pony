@@ -228,12 +228,18 @@ actor EventLog is SimpleJournalAsyncResponseReceiver
   =>
     _phase = _CheckpointEventLogPhase(this, checkpoint_id, promise,
       _resilients)
-    for p in pending_checkpoint_states.values() do
-      ifdef "checkpoint_trace" then
-        @printf[I32]("EventLog: Process pending checkpoint_state for resilient %s for checkpoint %s\n".cstring(),
-          p.resilient_id.string().cstring(), checkpoint_id.string().cstring())
+    if pending_checkpoint_states.size() == 0 then
+      _phase.check_completion()
+    else
+      for p in pending_checkpoint_states.values() do
+        ifdef "checkpoint_trace" then
+          @printf[I32](("EventLog: Process pending checkpoint_state for " +
+            "resilient %s for checkpoint %s\n").cstring(),
+            p.resilient_id.string().cstring(),
+            checkpoint_id.string().cstring())
+        end
+        _phase.checkpoint_state(p.resilient_id, checkpoint_id, p.payload)
       end
-      _phase.checkpoint_state(p.resilient_id, checkpoint_id, p.payload)
     end
 
   fun ref _checkpoint_state(resilient_id: RoutingId,
