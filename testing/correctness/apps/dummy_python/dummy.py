@@ -23,6 +23,7 @@ def application_setup(args):
 
     pipeline = (wallaroo.source("Dummy",
                     wallaroo.TCPSourceConfig(in_host, in_port, decoder))
+      .to(pass_through)
       .to(count)
       .key_by(partition)
       .to(count_partitioned)
@@ -54,9 +55,14 @@ class PartitionedStateObject(object):
 
     def update(self, value):
         print("PartitionedStateObject.update({!r})".format(value))
-        self.val = value.encode()
+        self.val = value
         return self.val
 
+
+@wallaroo.computation(name="Pass through")
+def pass_through(data):
+    print("pass_through({!r})".format(data))
+    return data
 
 
 @wallaroo.state_computation(name="Count State Updates", state=StateObject)
@@ -76,11 +82,11 @@ def count_partitioned(data, state):
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     print("decoder({!r})".format(bs))
-    return bs.decode('utf-8')
+    return bs
 
 
 
 @wallaroo.encoder
 def encoder(data):
     print("encoder({!r})".format(data))
-    return data.encode('utf-8')
+    return struct.pack('>I', len(data)) + data
