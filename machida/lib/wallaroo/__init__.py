@@ -45,14 +45,7 @@ if not sys.stderr.isatty():
 
 
 def serialize(o):
-    print("serialize({})".format(o))
-    print(dir(o))
-    if isinstance(o, OctetEncoder):
-        print(o.encode)
-    print(dir(o))
-    print(o.__dict__)
     s = pickle.dumps(o)
-    print("serialized!")
     return s
 
 
@@ -162,7 +155,6 @@ def _validate_arity_compatability(name, obj, arity):
             ).format(name, arity, param_term)
         raise WallarooParameterError()
 
-
 def attach_to_module(cls, cls_name, func):
     # Do some scope mangling to create a uniquely named class based on
     # the decorated function's name and place it in the wallaroo module's
@@ -182,7 +174,6 @@ def attach_to_module(cls, cls_name, func):
 
 
 def _wallaroo_wrap(name, func, base_cls, **kwargs):
-    print("_wallaroo_wrap", name, func, base_cls, kwargs)
     # Case 1: Computations
     if issubclass(base_cls, Computation):
         # Create the appropriate computation signature
@@ -190,22 +181,24 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
         # Stateful
         if issubclass(base_cls, StateComputation):
             state = kwargs.pop('state')  # This is a StateBuilder instance
-            print("state",state)
             def comp(self, data, state):
                 return func(data, state)
             def build_initial_state(self):
                 return state.initial_state()
+            _is_stateful = True
         # Stateless
         else:
             def comp(self, data):
                 return func(data)
             build_initial_state = None
+            _is_stateful = False
 
         # Create a custom class type for the computation
         class C(base_cls):
             __doc__ = func.__doc__
             __module__ = __module__
             initial_state = build_initial_state
+            is_stateful = _is_stateful
             def name(self):
                 return name
 
@@ -216,24 +209,6 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
             C.compute_multi = comp
         else:
             C.compute = comp
-
-
-#        if base_cls._is_state:
-#            initial_state = kwargs.pop('state')
-#            def build_initial_state(self):
-#                try:
-#                    state = self.initial_state()
-#                    return state
-#                except Exception as err:
-#                    print(err)
-#                    # What should we do here?
-#
-#            C.initial_state = build_initial_state
-#            C.is_stateful = True
-#            C.___name = name
-#        else:
-#            C.is_stateful = False
-#
 
     # Case 2: Partition
     elif issubclass(base_cls, KeyExtractor):
@@ -306,13 +281,6 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
 
     # Attach the new class to the module's global namespace and return it
     c = attach_to_module(C, base_cls.__name__, func)
-    print('returning: ', c)
-    print(dir(c))
-    print(c.__dict__)
-    # can we serialize?
-    print("trying to serialize")
-    s = pickle.dumps(c)
-    print("serialized successfully")
     return c
 
 
