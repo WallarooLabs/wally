@@ -241,4 +241,4 @@ class CrashChecker(StoppableThread):
                 self.cluster.raise_from_error(err)
                 self.stop()
                 break
-            time.sleep(0.5)
+            time.sleep(0.01)

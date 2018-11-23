@@ -54,7 +54,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                   runner_join_timeout=DEFAULT_RUNNER_JOIN_TIMEOUT,
                   resilience_dir=None,
                   spikes={},
-                  persistent_data={}):
+                  persistent_data={},
+                  log_error=True):
     """
     Run a pipeline test without having to instrument everything
     yourself. This only works for 1-source, 1-sink topologies.
@@ -275,10 +276,12 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                              " received {!r}".format(expected,
                                                                      processed))
     except:
-        logging.error("Integration pipeline_test encountered an error")
-        logging.error("The last 10 lines of each worker were:\n\n{}".format(
-            runner_data_format(persistent_data.get('runner_data', []),
-                               from_tail=FROM_TAIL)))
+        if log_error:
+            logging.error("Integration pipeline_test encountered an error")
+            logging.error("The last {} lines of each worker were:\n\n{}".format(
+                FROM_TAIL,
+                runner_data_format(persistent_data.get('runner_data', []),
+                                   from_tail=FROM_TAIL)))
         raise
 
     # Return runner names and outputs if try block didn't have a return

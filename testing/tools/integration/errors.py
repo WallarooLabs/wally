@@ -26,6 +26,10 @@ class ClusterError(StopError):
     pass
 
 
+class ClusterStoppedError(ClusterError):
+    pass
+
+
 class MigrationError(AutoscaleError):
     pass
 
@@ -59,4 +63,8 @@ class RunnerHasntStartedError(Exception):
 
 
 class NotEmptyError(Exception):
+    pass
+
+
+class ValidationError(Exception):
     pass
