@@ -21,19 +21,52 @@ import logging
 import os
 import time
 
+from app_gen import (COMPS,
+                     POST,
+                     PRE)
+
 
 from integration.cluster import runner_data_format
 from integration.end_points import sequence_generator
 from integration.errors import (ClusterError,
-                                RunnerHasntStartedError)
+                                RunnerHasntStartedError,
+                                ValidationError)
 from integration.external import (run_shell_cmd,
                                   save_logs_to_file)
 from integration.integration import pipeline_test
 from integration.logger import add_in_memory_log_stream
 
 
+SINK_EXPECT_MODIFIER = {'filter': 0.5, 'multi': 2}
+
+def get_expect_modifier(topology):
+    last = topology[0]
+    expect_mod = SINK_EXPECT_MODIFIER.get(last, 1)
+    for s in topology[1:]:
+        # successive filters don't reduce because the second filter only
+        # receives input that already passed the first filter
+        if not s in SINK_EXPECT_MODIFIER:
+            continue
+        if s == 'filter' and s == last:
+            continue
+        expect_mod *= SINK_EXPECT_MODIFIER[s]
+        last = s
+    return expect_mod
+
+
+def find_send_and_expect_values(expect_mod, min_expect=20):
+    send = 10
+    while True:
+        if ((int(send * expect_mod) == send * expect_mod) and
+            send * expect_mod >= min_expect):
+            break
+        else:
+            send += 1
+    return (send, int(send * expect_mod))
+
+
 def run_test(api, cmd, validation_cmd, topology, workers=1):
-    max_retries = 5
+    max_retries = 3
     t0 = datetime.datetime.now()
     log_stream = add_in_memory_log_stream(level=logging.DEBUG)
     cwd = os.getcwd()
@@ -58,6 +91,12 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
                           steps=steps_val,
                           output=output))
 
+    expect_mod = get_expect_modifier(topology)
+    logging.info("Expect mod is {} for topology {!r}".format(expect_mod, topology))
+    send, expect = find_send_and_expect_values(expect_mod)
+    logging.info("Sending {} messages per key".format(send))
+    logging.info("Expecting {} final messages per key".format(expect))
+
     # Run the test!
     attempt = 0
     try:
@@ -74,8 +113,8 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
                 logging.debug("Running integration test with the following"
                               " options:")
 
-                gens = [(sequence_generator(10, 0, '>I', 'key_0'), 0),
-                        (sequence_generator(10, 0, '>I', 'key_1'), 0)]
+                gens = [(sequence_generator(send, 0, '>I', 'key_0'), 0),
+                        (sequence_generator(send, 0, '>I', 'key_1'), 0)]
 
                 pipeline_test(
                     generator = gens,
@@ -86,10 +125,11 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
                     sinks = 1,
                     mode = 'framed',
                     batch_size = 1,
-                    sink_expect = 20,
+                    sink_expect = expect * len(gens),
                     sink_stop_timeout = 5,
                     validate_file = output,
-                    persistent_data = persistent_data)
+                    persistent_data = persistent_data,
+                    log_error = False)
                 # Test run was successful, break out of loop and proceed to
                 # validation
                 logging.info("Run phase complete. Proceeding to validation.")
@@ -111,6 +151,11 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
                 logging.error("Worker outputs:\n\n{}\n".format(outputs))
                 raise
             except:
+                outputs = runner_data_format(
+                    persistent_data.get('runner_data', []),
+                    from_tail=20)
+                if outputs:
+                    logging.error("Worker outputs:\n\n{}\n".format(outputs))
                 raise
     except Exception as err:
         logging.exception("Encountered an error while running the test for"
@@ -136,9 +181,8 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
         outputs = runner_data_format(persistent_data.get('runner_data', []))
         if outputs:
             logging.error("Application outputs:\n{}".format(outputs))
-        logging.error("Validation command\n    '%s'\nfailed with the output:\n"
-                      "--\n%s",
-                      ' '.join(res.command), res.output)
+        logging.error("Validation command\n    '{}'\nfailed with the output:\n"
+                      "--\n{}".format(' '.join(res.command), res.output))
         # Save logs to file in case of error
         save_logs_to_file(base_dir, log_stream, persistent_data)
 
@@ -147,10 +191,16 @@ def run_test(api, cmd, validation_cmd, topology, workers=1):
             # in exit message
             print(res.output)
             exit(res.return_code)
+        raise ValidationError()
 
     # Reached the end and nothing broke. Success!
     logging.info("Topology test completed successfully for topology {!r}"
                  .format(topology))
+    del persistent_data
+    log_stream.close()
+    logging.root.handlers.clear()
+    del log_stream
+    time.sleep(0.1)
 
 
 def create_test(api, cmd, validation_cmd, steps, workers=1):
@@ -162,23 +212,8 @@ def create_test(api, cmd, validation_cmd, steps, workers=1):
         run_test(api, cmd, validation_cmd, steps, workers)
     f.__name__ = test_name
     globals()[test_name] = f
+    return f
 
-def remove_key_by_chains(steps):
-    res = []
-    last_step = ''
-    for s in steps:
-        # There should never be two key_by calls in a row.
-        if not ((last_step == 'key-by') and (s == 'key-by')):
-            res.append(s)
-            last_step = s
-    if len(res) == 3:
-        # Real pipelines won't end with 'key_by()'.
-        if res[2] == 'key-by':
-            new_res = []
-            new_res.append(res[0])
-            new_res.append(res[1])
-            res = new_res
-    return res
 
 # Create tests!
 APIS = {'python': {'cmd': 'machida --application-module app_gen',
@@ -193,16 +228,48 @@ if os.environ.get("resilience") == 'on':
     for a in APIS:
         APIS[a]['cmd'] += ' --run-with-resilience'
 
-sizes = [1,2,3]
+
+# Cluster sizes
+sizes = [1, 2, 3]
+# Maximum topology depth
 depth = 3
-# COMPS = ['to', 'to-parallel', 'to-stateful', 'to-state-partition']
-COMPS = ['to-stateless', 'to-state', 'key-by', 'to-stateless', 'to-state', 'key-by']
-# COMPS = ['to', 'key-by']
-# COMPS = ['to']
-for size in sizes:
-    for steps in itertools.chain.from_iterable(
-            (itertools.permutations(COMPS, d)
+
+# Create basis set of steps from fundamental components
+# TODO: enable tests with POST computation modifiers (filter,multi)
+#prods = list(itertools.product(PRE, COMPS, POST))
+prods = list(itertools.product(PRE, COMPS))
+
+# eliminate Nones from individual tuples
+filtered = list(map(tuple, [filter(None, t) for t in prods]))
+# sort by length of tuple, then alphabetical order of tuple members
+basis_steps = list(sorted(filtered, key=lambda v: (len(v), v)))
+
+# Create topology sequences
+sequences = []
+for steps in itertools.chain.from_iterable(
+            (itertools.product(basis_steps, repeat=d)
              for d in range(1, depth+1))):
-        for api in APIS:
+                sequences.append((list(itertools.chain.from_iterable(steps))))
+
+# Create tests for size and api combinations
+tests_count = 0
+for size in sizes:
+    for api in APIS:
+        for seq in sequences:
             create_test(api, APIS[api]['cmd'], APIS[api]['validation_cmd'],
-                        remove_key_by_chains(steps), size)
+                        seq, size)
+            tests_count += 1
+
+
+if __name__ == '__main__':
+    print("Basis steps:")
+    for x in basis_steps:
+        print(x)
+    print('---')
+    print("Number of basis steps: {}".format(len(basis_steps)))
+    print("Cluster sizes: {}".format(sizes))
+    print("Topology depths: {}".format(list(range(1, depth+1))))
+    print("APIs: {}".format(APIS.keys()))
+    print("Number of tests per API: {}".format(len(sequences)))
+    print("Total number of tests: {}".format(len(APIS) * len(sequences) * len(sizes)))
+    print("Actual number of tests: {}".format(tests_count))

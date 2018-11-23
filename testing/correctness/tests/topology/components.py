@@ -80,7 +80,7 @@ def key_extractor(msg):
 
 # Computations
 def Tag(identifier, flow_mod=None):
-    identifier = "tag_{}".format(identifier)
+    identifier = "tag__{}".format(identifier)
     def tag(data, state=None):
         print("{}({})".format(identifier, data))
         data.tag(identifier)
@@ -92,7 +92,7 @@ def Tag(identifier, flow_mod=None):
 
 
 def TagState(identifier, flow_mod=None):
-    identifier = "tagstate_{}".format(identifier)
+    identifier = "tagstate__{}".format(identifier)
     def tagstate(data, state):
         print("{}({}, {})".format(identifier, data, state))
         state.update(data)
@@ -109,19 +109,15 @@ def TagState(identifier, flow_mod=None):
 
 
 # Flow modifiers
-# def OneToN(num):
-#     identifier = "oneton_{}".format(num)
-#     def oneton(func):
-#         def oneton_wrapped(data, state=None):
-#             data = func(data, state)
-#             print("{}({})".format(identifier, data))
-#             if data and state:
-#                 return [data[0].new_from_key(x) for x in range(num)]
-#             elif data:
-#                 return [data.new_from_key(x) for x in range(num)]
-#             return None
-#         return oneton_wrapped
-#     return attach_to_module(oneton, identifier)
+def OneToN(identifier, num):
+    identifier = "oneto{}_{}".format(num, identifier)
+    def oneton(func):
+        def oneton_wrapped(data, state=None):
+            data = func(data, state)
+            print("{}({})".format(identifier, data))
+            return [data.new_from_key(x) for x in range(num)]
+        return oneton_wrapped
+    return attach_to_module(oneton, identifier)
 
 
 def FilterBy(identifier, by=()):
@@ -134,8 +130,9 @@ def FilterBy(identifier, by=()):
         `data.value % 3 == 0 or data.value % 4 == 0`
     """
     identifier = "filterby_{}".format(identifier)
-    def filterby(data):
+    def filterby(func):
         def filterby_wrapped(data, state=None):
+            data = func(data, state)
             if isinstance(by, (tuple,list)):
                 if any((data.value % d == 0) for d in by):
                     print("{}({})".format(identifier, data))
@@ -159,32 +156,32 @@ def test_components():
     ts1(m,s)
     assert(m.value == 1)
     assert(m.key == "1")
-    assert(m.tags == ['tag_1', 'tagstate_1'])
+    assert(m.tags == ['tag__1', 'tagstate__1'])
     assert(m.states == [None, (None, ("1", 1))])
 
 
-# def test_flow_mods():
-#     m = Message(1,1)
-#     s = State()
-#     # one to 2
-#     t1 = Tag(1, OneToN(2))
-#     t2 = Tag(2, FilterBy('filter', lambda d: not d.key.endswith(".0")))
-#     ts1 = TagState(1, OneToN(2))
-#     ts2 = TagState(2, FilterBy('filter', lambda d: not d.key.endswith(".0")))
-#     res_t1 = t1(m)
-#     res_t2 = [t2(v) for v in res_t1]
-#     assert(res_t2[1] is None)
-#     assert(res_t2[0].key == '1.0')
+def test_flow_mods():
+    m = Message(1,1)
+    s = State()
+    # one to 2
+    t1 = Tag(1, OneToN('1', 2))
+    t2 = Tag(2, FilterBy('filter1', lambda d: not d.key.endswith(".0")))
+    ts1 = TagState(1, OneToN('2', 2))
+    ts2 = TagState(2, FilterBy('filter2', lambda d: not d.key.endswith(".0")))
+    res_t1 = t1(m)
+    res_t2 = [t2(v) for v in res_t1]
+    assert(res_t2[1] is None)
+    assert(res_t2[0].key == '1.0')
 
-#     res_ts1 = ts1(res_t2[0], s)
-#     res_ts2 = [ts2(v,s) for v in res_ts1]
-#     assert(res_ts2[1] is None)
-#     assert(res_ts2[0].key == '1.0.0')
-#     assert(len(res_t1) == 2)
-#     assert(len(res_ts1) == 2)
-#     assert(res_ts2[0].value == 1)
-#     assert(res_ts2[0].tags == ['tag_1', 'tagstate_1'])
-#     assert(res_ts2[0].states == [None, (None, ('1.0', 1))])
+    res_ts1 = ts1(res_t2[0], s)
+    res_ts2 = [ts2(v,s) for v in res_ts1]
+    assert(res_ts2[1] is None)
+    assert(res_ts2[0].key == '1.0.0')
+    assert(len(res_t1) == 2)
+    assert(len(res_ts1) == 2)
+    assert(res_ts2[0].value == 1)
+    assert(res_ts2[0].tags == ['tag__1', 'tag__2', 'tagstate__1', 'tagstate__2'])
+    assert(res_ts2[0].states == [None, None, (None, ('1.0', 1)), (('1.0', 1), ('1.0.0', 1))])
 
 
 def test_serialisation():
@@ -197,46 +194,39 @@ def test_serialisation():
     s3 = State()
     s4 = State()
     t1 = Tag(1)
-    # t2 = Tag(2, OneToN(2))
+    t2 = Tag(2, OneToN('1', 2))
     ts1 = TagState(1)
-    # ts2 = TagState(2, OneToN(2))
+    ts2 = TagState(2, OneToN('2', 2))
     wt1 = wallaroo.computation("tag1")(t1)
-    # wt2 = wallaroo.computation("tag2_to2")(t2)
+    wt2 = wallaroo.computation("tag2_to2")(t2)
     wts1 = wallaroo.state_computation("tagstate1", State)(ts1)
-    # wts2 = wallaroo.state_computation("tagstate2_to2", State)(ts2)
-    res = wt1.compute(m1)  # returns data
-    res = wts1.compute(res, s1)  # returns (data, flag)
-    # res = wt2.compute(res[0])  # returns [data]
-    # res = wts2.compute(res[0], s2)  # returns ([data], flag)
-    # r1 = res[0]
-    r1 = res
-    print('r1', str(r1))
+    wts2 = wallaroo.state_computation("tagstate2_to2", State)(ts2)
+    res = wt1.compute(m1)
+    res = wts1.compute(res, s1)
+    res = wt2.compute(res) # returns list of [message, message,...]
+    res = res[0] # choose first message
+    res = wts2.compute(res, s2) # returns list of [message, message,...]
+    r1 = res[0] # choose first message
     assert(r1.value == 1)
-    # assert(r1.key == "1.0.0")
-    assert(r1.key == "1")
-    # assert(r1.tags == ['tag_1', 'tagstate_1', 'tag_2', 'tagstate_2'])
-    assert(r1.tags == ['tag_1', 'tagstate_1'])
-    # assert(r1.states == [None, (None, ("1", 1)), None, (None, ('1.0', 1))])
-    assert(r1.states == [None, (None, ("1", 1))])
+    assert(r1.key == "1.0.0")
+    assert(r1.tags == ['tag__1', 'tagstate__1', 'tag__2', 'tagstate__2'])
+    assert(r1.states == [None, (None, ("1", 1)), None, (None, ('1.0', 1))])
 
     # serialise, deserialse, then run again
     ds_wt1 = loads(dumps(wt1))
-    # ds_wt2 = loads(dumps(wt2))
+    ds_wt2 = loads(dumps(wt2))
     ds_wts1 = loads(dumps(wts1))
-    # ds_wts2 = loads(dumps(wts2))
-    res = ds_wt1.compute(m2)  # returns data
-    res = ds_wts1.compute(res, s3)  # returns (data, flag)
-    # res = ds_wt2.compute(res[0])  # returns [data]
-    # res = ds_wts2.compute(res[0], s4)  # returns ([data], flag)
-    # r2 = res[0]
-    r2 = res
+    ds_wts2 = loads(dumps(wts2))
+    res = ds_wt1.compute(m2)
+    res = ds_wts1.compute(res, s3)
+    res = ds_wt2.compute(res) # returns list of [message, message, ...]
+    res = res[0] # choose first message
+    res = ds_wts2.compute(res, s4) # returns list of [message, message, ...]
+    r2 = res[0] # choose first message
     assert(r2.value == 1)
-    # assert(r2.key == "1.0.0")
-    assert(r2.key == "1")
-    # assert(r2.tags == ['tag_1', 'tagstate_1', 'tag_2', 'tagstate_2'])
-    assert(r2.tags == ['tag_1', 'tagstate_1'])
-    # assert(r2.states == [None, (None, ("1", 1)), None, (None, ('1.0', 1))])
-    assert(r2.states == [None, (None, ("1", 1))])
+    assert(r2.key == "1.0.0")
+    assert(r2.tags == ['tag__1', 'tagstate__1', 'tag__2', 'tagstate__2'])
+    assert(r2.states == [None, (None, ("1", 1)), None, (None, ('1.0', 1))])
 
 
 def test_state():

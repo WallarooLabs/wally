@@ -121,8 +121,8 @@ class SingleSocketReceiver(StoppableThread):
                 self.append(b''.join((header, data)))
                 time.sleep(0.000001)
 
-    def stop(self):
-        super(self.__class__, self).stop()
+    def stop(self, *args, **kwargs):
+        super(self.__class__, self).stop(*args, **kwargs)
         self.sock.close()
 
 
@@ -188,18 +188,24 @@ class TCPReceiver(StoppableThread):
             while not self.stopped():
                 try:
                     (clientsocket, address) = self.sock.accept()
-                except OSError as err:
-                    if err.errno == 53:
-                        # [ECONNABORTED] A connection arrived, but it was
-                        # closed while waiting on the listen queue.
-                        # This happens on macOS during normal
-                        # harness shutdown.
-                        return
-                    else:
-                        logging.error("socket accept errno {}"
-                            .format(err.errno))
-                        self.err = err
-                        raise
+                except Exception as err:
+                    try:
+                        if self.stopped():
+                            break
+                        else:
+                            raise err
+                    except OSError as err:
+                        if err.errno == 53:
+                            # [ECONNABORTED] A connection arrived, but it was
+                            # closed while waiting on the listen queue.
+                            # This happens on macOS during normal
+                            # harness shutdown.
+                            return
+                        else:
+                            logging.error("socket accept errno {}"
+                                .format(err.errno))
+                            self.err = err
+                            raise
                 cl = SingleSocketReceiver(clientsocket, self.data, self.mode,
                                           self.header_fmt,
                                           name='{}-{}'.format(
@@ -215,11 +221,13 @@ class TCPReceiver(StoppableThread):
             self.err = err
             raise
 
-    def stop(self):
-        super(TCPReceiver, self).stop()
-        self.sock.close()
-        for cl in self.clients:
-            cl.stop()
+    def stop(self, *args, **kwargs):
+        if not self.stopped():
+            super(TCPReceiver, self).stop(*args, **kwargs)
+            self.sock.shutdown(socket.SHUT_RDWR)
+            self.sock.close()
+            for cl in self.clients:
+                cl.stop()
 
     def save(self, path, mode=None):
         c = 0
@@ -370,9 +378,10 @@ class Sender(StoppableThread):
         if not self.batch:
             self.stop()
 
-    def stop(self, error=None):
-        logging.log(INFO2, "Sender received stop instruction.")
-        super(Sender, self).stop(error)
+    def stop(self, *args, **kwargs):
+        if not self.stopped():
+            logging.log(INFO2, "Sender received stop instruction.")
+        super(Sender, self).stop(*args, **kwargs)
         if self.batch:
             logging.warn("Sender stopped, but send buffer size is {}"
                          .format(len(self.batch)))

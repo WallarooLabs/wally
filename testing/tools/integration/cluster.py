@@ -341,8 +341,12 @@ def start_runners(runners, command, source_addrs, sink_addrs, metrics_addr,
     for idx, r in enumerate(runners):
         try:
             assert(r.is_alive())
-        except RunnerHasntStartedError:
-            raise
+        except RunnerHasntStartedError as err:
+            try:
+                time.sleep(0.2)
+                assert(r.is_alive())
+            except:
+                raise err
         except Exception as err:
             stdout = r.get_output()
             raise ClusterError(
@@ -470,18 +474,21 @@ class Cluster(object):
         self._stoppables = set()
         self.crash_checker = CrashChecker(self)
         self.crash_checker.start()
+        self._stoppables.add(self.crash_checker)
 
         # Try to start everything... clean up on exception
         try:
             setup_resilience_path(self.res_dir)
 
             self.metrics.start()
+            self._stoppables.add(self.metrics)
             self.metrics_addr = ":".join(
                 map(str, self.metrics.get_connection_info()))
 
             for s in range(sinks):
                 self.sinks.append(Sink(host, mode=sink_mode))
                 self.sinks[-1].start()
+                self._stoppables.add(self.sinks[-1])
                 if self.sinks[-1].err is not None:
                     raise self.sinks[-1].err
 
@@ -507,14 +514,16 @@ class Cluster(object):
             # This makes these errors show faster.
             time.sleep(0.25)
             # Wait for all runners to report ready to process
-            self.wait_to_resume_processing(self.is_ready_timeout)
+            if not self._raised:
+                self.wait_to_resume_processing(self.is_ready_timeout)
             # make sure `workers` runners are active and listed in the
             # cluster status query
-            logging.log(1, "Testing cluster size via obs query")
-            self.query_observability(cluster_status_query,
-                                     self.runners[0].external,
-                                     tests=[(worker_count_matches, [workers])])
-            # start the crash checker
+            # But first check that we haven't already crashed!
+            if not self._raised:
+                logging.log(1, "Testing cluster size via obs query")
+                self.query_observability(cluster_status_query,
+                                         self.runners[0].external,
+                                         tests=[(worker_count_matches, [workers])])
         except Exception as err:
             logging.error("Encountered and error when starting up the cluster")
             logging.exception(err)
@@ -751,6 +760,7 @@ class Cluster(object):
         self._stoppables.discard(t)
         if t.error:
             raise t.error
+        logging.debug("sink_await completed successfully")
         return sink
 
     def sink_expect(self, expected, timeout=30, sink=-1, allow_more=False):
@@ -767,6 +777,7 @@ class Cluster(object):
         self._stoppables.discard(t)
         if t.error:
             raise t.error
+        logging.debug("sink_expect completed successfully")
         return sink
 
     ###########
@@ -879,9 +890,9 @@ class Cluster(object):
         logging.log(1, "raise_from_error({})".format(error))
         if self._raised:
             return
+        self._raised = True
         self.stop_background_threads(error)
         self.__exit__(type(error), error, None)
-        self._raised = True
 
     def __exit__(self, _type, _value, _traceback):
         logging.log(1, "__exit__({}, {}, {})"
