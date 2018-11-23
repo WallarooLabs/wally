@@ -129,7 +129,9 @@ actor RecoveryReconnecter
 
     try
       let msg = ChannelMsgEncoder.request_boundary_count(_worker_name, _auth)?
-      _cluster.send_control_to_cluster(msg)
+      for w in expected_workers.values() do
+        _cluster.send_control(w, msg)
+      end
     else
       Fail()
     end
@@ -167,6 +169,7 @@ actor RecoveryReconnecter
       .cstring())
     _reconnect_phase = _WaitForReconnections(expected_boundaries,
       reconnected_boundaries, this)
+    _reconnect_phase.check_completion()
     try
       let msg = ChannelMsgEncoder.reconnect_data_port(_worker_name,
         _data_service, _auth)?
@@ -211,6 +214,10 @@ trait _ReconnectPhase
   fun ref add_boundary_reconnect_complete(worker: WorkerName,
     boundary_id: RoutingId)
   =>
+    _invalid_call()
+    Fail()
+
+  fun ref check_completion() =>
     _invalid_call()
     Fail()
 
@@ -304,9 +311,6 @@ class _WaitForReconnections is _ReconnectPhase
     _expected_boundaries = expected_boundaries
     _reconnected_boundaries = reconnected_boundaries
     _reconnecter = reconnecter
-    if _all_boundaries_reconnected() then
-      _reconnecter._reconnect_complete()
-    end
 
   fun name(): String => "Wait for Reconnections Phase"
 
@@ -314,24 +318,27 @@ class _WaitForReconnections is _ReconnectPhase
     boundary_id: RoutingId) ?
   =>
     _reconnected_boundaries(worker)?.set(boundary_id)
+    check_completion()
+
+  fun ref check_completion() =>
     if _all_boundaries_reconnected() then
       _reconnecter._reconnect_complete()
     end
 
   fun _all_boundaries_reconnected(): Bool =>
-    CheckCounts[RoutingId](_expected_boundaries, _reconnected_boundaries)
+    CheckCounts(_expected_boundaries, _reconnected_boundaries)
 
-primitive CheckCounts[Counted]
-  fun apply(expected_counts: Map[Key, USize] box,
-    counted: Map[Key, SetIs[Counted]] box): Bool
+primitive CheckCounts
+  fun apply(expected_counts: Map[WorkerName, USize] box,
+    counted: Map[WorkerName, SetIs[RoutingId]] box): Bool
   =>
     try
-      for (key, count) in expected_counts.pairs() do
+      for (w, count) in expected_counts.pairs() do
         // !TODO!: Is it safe to allow this invariant to be violated?
         // ifdef debug then
         //   Invariant(counted(key)?.size() <= count)
         // end
-        if counted(key)?.size() < count then
+        if counted(w)?.size() < count then
           return false
         end
       end
