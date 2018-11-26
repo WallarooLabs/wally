@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "options"
 use "wallaroo"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/source"
 
 primitive ConnectorSourceConfigCLIParser
@@ -84,3 +85,6 @@ class val ConnectorSourceConfig[In: Any val]
   fun source_listener_builder_builder(): ConnectorSourceListenerBuilderBuilder[In] =>
     ConnectorSourceListenerBuilderBuilder[In](_host, _service, _parallelism,
       _handler)
+
+  fun default_partitioner_builder(): PartitionerBuilder =>
+    PassthroughPartitionerBuilder

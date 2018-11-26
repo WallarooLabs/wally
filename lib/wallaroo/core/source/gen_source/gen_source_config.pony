@@ -18,6 +18,7 @@ Copyright 2017 The Wallaroo Authors.
 
 use "options"
 use "wallaroo"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/source"
 
 class val GenSourceConfig[In: Any val]
@@ -28,3 +29,6 @@ class val GenSourceConfig[In: Any val]
 
   fun source_listener_builder_builder(): GenSourceListenerBuilderBuilder[In] =>
     GenSourceListenerBuilderBuilder[In](_gen)
+
+  fun default_partitioner_builder(): PartitionerBuilder =>
+    RandomPartitionerBuilder

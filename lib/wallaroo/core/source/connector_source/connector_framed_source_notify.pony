@@ -109,10 +109,18 @@ class ConnectorSourceNotify[In: Any val]
             @printf[I32](("Msg decoded at " + _pipeline_name +
               " source\n").cstring())
           end
+
+          let msg_uid = _msg_id_gen()
+
+          // TODO: We need a way to determine the key based on the policy
+          // for any particular connector. For example, the Kafka connector
+          // needs a way to provide the Kafka key here.
+          let initial_key = msg_uid.string()
+
           if decoded isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              "connector-source-key", _source_id, source, _router,
-              _msg_id_gen(), None, decode_end_ts,
+              consume initial_key, _source_id, source, _router,
+              msg_uid, None, decode_end_ts,
               latest_metrics_id, ingest_ts, _metrics_reporter)
           else
             (true, ingest_ts)
