@@ -125,8 +125,8 @@ checkout_and_pull_release_branch() {
 
 merge_rc_branch_into_release() {
   echo "Merging $rc_branch_name with release branch..."
-  merge_result=$(git merge "origin/$rc_branch_name")
-  if ! $merge_result; then
+  git merge "origin/$rc_branch_name"
+  if ! git status | grep -q "working directory clean"; then
     printf "There was a merge conflict, please resolve manually and push to"
     printf "the \`release\` branch once resolved."
     exit 1
