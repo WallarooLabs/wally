@@ -1,3 +1,5 @@
 The open source community is very important to Wallaroo Labs. We would like to thank the members of the community who have helped with the development of Wallaroo:
 
 * [caj-larsson](https://github.com/caj-larsson) -- Contributed to Python 3 support in 0.5.4.
+* [ChristianWitts](https://github.com/ChristianWitts) -- Contributed fix to internal docker-release script
+* [cristaloleg](https://github.com/cristaloleg) -- Contributed fix to the Python Word Count app link in the README
