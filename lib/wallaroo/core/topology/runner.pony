@@ -61,7 +61,7 @@ trait val RunnerBuilder
   fun apply(event_log: EventLog, auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    partitioner_builder: PartitionerBuilder = SinglePartitionerBuilder):
+    partitioner_builder: PartitionerBuilder = PassthroughPartitionerBuilder):
     Runner iso^
 
   fun name(): String
@@ -90,7 +90,7 @@ class val RunnerSequenceBuilder is RunnerBuilder
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    partitioner_builder: PartitionerBuilder = SinglePartitionerBuilder):
+    partitioner_builder: PartitionerBuilder = PassthroughPartitionerBuilder):
     Runner iso^
   =>
     var remaining: USize = _runner_builders.size()
@@ -155,7 +155,7 @@ class val StatelessComputationRunnerBuilder[In: Any val, Out: Any val] is
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    partitioner_builder: PartitionerBuilder = SinglePartitionerBuilder):
+    partitioner_builder: PartitionerBuilder = PassthroughPartitionerBuilder):
     Runner iso^
   =>
     match (consume next_runner)
@@ -187,7 +187,7 @@ class val StateRunnerBuilder[In: Any val, Out: Any val, S: State ref] is
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router | None) = None,
-    partitioner_builder: PartitionerBuilder = SinglePartitionerBuilder):
+    partitioner_builder: PartitionerBuilder = PassthroughPartitionerBuilder):
     Runner iso^
   =>
     match (consume next_runner)
@@ -529,7 +529,7 @@ class iso RouterRunner is Runner
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
-    let new_key = _partitioner[D](data)
+    let new_key = _partitioner[D](data, key)
     router.route[D](metric_name, pipeline_time_spent, data, new_key,
       producer_id, producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
       worker_ingress_ts)

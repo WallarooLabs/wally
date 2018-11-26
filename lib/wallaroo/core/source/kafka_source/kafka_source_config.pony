@@ -20,6 +20,7 @@ use "net"
 use "options"
 use "pony-kafka"
 use "pony-kafka/customlogger"
+use "wallaroo/core/partitioning"
 use "wallaroo/core/source"
 
 
@@ -43,3 +44,6 @@ class val KafkaSourceConfig[In: Any val] is SourceConfig
   fun source_listener_builder_builder(): KafkaSourceListenerBuilderBuilder[In]
   =>
     KafkaSourceListenerBuilderBuilder[In](_ksco, _handler, _auth)
+
+  fun default_partitioner_builder(): PartitionerBuilder =>
+    PassthroughPartitionerBuilder

@@ -31,6 +31,7 @@ use "wallaroo/core/topology"
 
 
 interface val SourceConfig
+  fun default_partitioner_builder(): PartitionerBuilder
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
 
 interface val TypedSourceConfig[In: Any val] is SourceConfig
