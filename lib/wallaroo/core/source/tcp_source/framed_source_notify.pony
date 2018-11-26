@@ -108,6 +108,7 @@ class TCPSourceNotify[In: Any val]
             @printf[I32](("Msg decoded at " + _pipeline_name +
               " source\n").cstring())
           end
+
           if decoded isnt None then
             _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
               "tcp-source-key", _source_id, source, _router,

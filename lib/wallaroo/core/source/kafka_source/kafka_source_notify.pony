@@ -116,9 +116,17 @@ class KafkaSourceNotify[In: Any val]
           @printf[I32](("Msg decoded at " + _pipeline_name +
             " source\n").cstring())
         end
+
+        let msg_id = _msg_id_gen()
+
+        let initial_key =
+          match kafka_msg_key
+          | let a: Array[U8] val => String.from_array(a)
+          else msg_id.string() end
+
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          "kafka-source-key", _source_id, source, _router,
-          _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
+          consume initial_key, _source_id, source, _router,
+          msg_id, None, decode_end_ts, latest_metrics_id, ingest_ts,
           _metrics_reporter)
       else
         @printf[I32](("Unable to decode message at " + _pipeline_name +

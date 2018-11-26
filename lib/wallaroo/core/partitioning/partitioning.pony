@@ -27,19 +27,29 @@ use "wallaroo_labs/mort"
 interface val KeyExtractor[In: Any val]
   fun apply(input: In): Key
 
+trait Partitioner
+  // Takes an input and the current key associated with that input.
+  // Based on a new partitioning scheme, it might replace this old key with
+  // a new one.
+  fun ref apply[D: Any val](d: D, current_key: Key): Key
 
 trait val PartitionerBuilder
   fun apply(): Partitioner
 
-trait Partitioner
-  fun ref apply[D: Any val](d: D): Key
+primitive PassthroughPartitionerBuilder is PartitionerBuilder
+  fun apply(): PassthroughPartitioner =>
+    PassthroughPartitioner
+
+class PassthroughPartitioner is Partitioner
+  fun ref apply[D: Any val](d: D, current_key: Key): Key =>
+    current_key
 
 primitive SinglePartitionerBuilder is PartitionerBuilder
   fun apply(): SinglePartitioner =>
     SinglePartitioner
 
 class SinglePartitioner is Partitioner
-  fun ref apply[D: Any val](d: D): Key =>
+  fun ref apply[D: Any val](d: D, current_key: Key): Key =>
     "single-partition-key"
 
 primitive RandomPartitionerBuilder is PartitionerBuilder
@@ -52,7 +62,7 @@ class RandomPartitioner is Partitioner
   new create(seed: U64 = Time.nanos()) =>
     _rand = MT(seed)
 
-  fun ref apply[D: Any val](d: D): Key =>
+  fun ref apply[D: Any val](d: D, current_key: Key): Key =>
     _rand.next().string()
 
 trait val KeyPartitionerBuilder is PartitionerBuilder
@@ -68,7 +78,7 @@ class val TypedKeyPartitionerBuilder[In: Any val] is KeyPartitionerBuilder
     TypedKeyPartitioner[In](key_extractor)
 
 trait KeyPartitioner is Partitioner
-  fun ref apply[D: Any val](d: D): Key
+  fun ref apply[D: Any val](d: D, current_key: Key): Key
 
 class TypedKeyPartitioner[In: Any val] is KeyPartitioner
   let key_extractor: KeyExtractor[In]
@@ -76,7 +86,7 @@ class TypedKeyPartitioner[In: Any val] is KeyPartitioner
   new create(ke: KeyExtractor[In]) =>
     key_extractor = ke
 
-  fun ref apply[D: Any val](d: D): Key =>
+  fun ref apply[D: Any val](d: D, current_key: Key): Key =>
     match d
     | let i: In =>
       key_extractor(i)

@@ -144,15 +144,13 @@ actor ApplicationDistributor is Distributor
             if partitioner_builders.contains(node.id) then
               partitioner_builders(node.id)?
             else
-              SinglePartitionerBuilder
+              PassthroughPartitionerBuilder
             end
 
-          // We initially set this to RandomPartitionerBuilder. If this is a stateless
-          // computation then we'll use RandomPartitionerBuilder. If it's a state computation
+          // We initially set this to None. If it's a state computation
           // and there's no prior key_by, then we use direct routing, set
-          // later by using None.
-          var input_partitioner_builder: PartitionerBuilder =
-            RandomPartitionerBuilder
+          // later on.
+          var input_partitioner_builder: (PartitionerBuilder | None) = None
 
           // Create the StepBuilder for this stage. If the stage is a state
           // computation, then we can simply create it. If the stage is
@@ -161,7 +159,8 @@ actor ApplicationDistributor is Distributor
           let s_builder =
             if rb.is_stateful() then
               // If this stage is preceded by a key_by, this will be
-              // ignored. If not, then this default will be used.
+              // ignored. If not, then this default will be used so that
+              // all non-partitioned messages go to the same state.
               input_partitioner_builder = SinglePartitionerBuilder
               StepBuilder(_app_name, rb, node.id, rb.routing_group(),
                 partitioner_builder, rb.is_stateful())
@@ -269,7 +268,10 @@ actor ApplicationDistributor is Distributor
             // TODO: Does this check make sense, or should we override
             // sometimes?
             if not partitioner_builders.contains(i_node.id) then
-              partitioner_builders(i_node.id) = input_partitioner_builder
+              match input_partitioner_builder
+              | let pb: PartitionerBuilder =>
+                partitioner_builders(i_node.id) = pb
+              end
             end
 
             if not frontier.contains(i_node.id) and
@@ -320,7 +322,7 @@ actor ApplicationDistributor is Distributor
             if partitioner_builders.contains(node.id) then
               partitioner_builders(node.id)?
             else
-              SinglePartitionerBuilder
+              sc.default_partitioner_builder()
             end
 
           let r_builder = RunnerSequenceBuilder(
