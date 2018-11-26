@@ -87,7 +87,7 @@ partial_pipeline2 = inputs2.to(computation2)
 partial_pipeline = inputs1.merge(inputs2)
 ```
 
-The resulting partial pipeline could be 
+The resulting partial pipeline could be
 
 ```
 Source1 -> computation1 ->\
@@ -126,7 +126,7 @@ For a simple application with a decoder, computation, and encoder, the `applicat
 ```python
 def application_setup(args):
     inputs = wallaroo.source("Source Name", source_config)
-    
+
     pipeline = (inputs
         .to(computation)
         .to_sink(sink_config))
@@ -140,7 +140,7 @@ Since the application is run in an embedded Python runtime, it does not have sta
 
 ### `wallaroo`
 
-The `wallaroo` library provides two functions that are needed to define a Wallaroo application, `source` and `build_application`.  
+The `wallaroo` library provides two functions that are needed to define a Wallaroo application, `source` and `build_application`.
 
 ####`wallaroo.source(name, source_config)`
 
@@ -150,7 +150,7 @@ Create a partial pipeline originating at a source.
 
 `source_config` must be one of the [SourceConfig](#source) classes.
 
-There are number of methods you can call on a partial pipeline object (such as the one returned by `source`). 
+There are number of methods you can call on a partial pipeline object (such as the one returned by `source`).
 
 ##### `to(computation)`
 
@@ -178,7 +178,7 @@ At the moment, the same pipeline output is sent via all sinks. The ability to de
 
 #### `wallaroo.build_application(application_name, pipeline)`
 
-Returns the topology structure Wallaroo requires in order to construct the topology connecting all of the application components. 
+Returns the topology structure Wallaroo requires in order to construct the topology connecting all of the application components.
 
 `application_name` must be a string.
 
@@ -331,7 +331,7 @@ class MaxLength
         if v > max:
             max = v
 
-@wallaroo.state_computation(name='Longest Sentence and Split Words', 
+@wallaroo.state_computation(name='Longest Sentence and Split Words',
     state=MaxLength):
 def longest_sentence_and_split_words(data, state):
     before = state.max
@@ -444,7 +444,8 @@ A complete `KafkaSink` encoder example that takes a word and sends it to the par
 @wallaroo.encoder
 def kafka_encode(data):
     word = data[:]
-    letter_key = data[0]
+    # explicitly get a substring because `[0]` in Python 3 returns an int
+    letter_key = data[0:1]
     return (word, letter_key)
 ```
 
