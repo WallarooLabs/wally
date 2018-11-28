@@ -40,6 +40,7 @@ cli_tests: CUSTOM_PYTHONPATH = $(CLI_PATH):$(DUMMY_PYTHON_PATH)
 include $(rules_mk_path)
 
 build-testing-correctness-tests-cli_tests: build-machida
+build-testing-correctness-tests-cli_tests: build-machida3
 integration-tests-testing-correctness-tests-cli_tests: cli_tests
 
 cli_tests:
