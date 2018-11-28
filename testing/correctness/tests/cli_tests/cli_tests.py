@@ -29,16 +29,18 @@ import time
 import struct
 
 INPUT_ITEMS=10
-CMD='machida --application-module dummy'
+APIS = {'python': 'machida --application-module dummy',
+        'python3': 'machida3 --application-module dummy'}
 
 # If resilience is on, add --run-with-resilience to commands
 if os.environ.get("resilience") == 'on':
-    CMD += ' --run-with-resilience'
+    for api in APIS:
+        APIS[api] += ' --run-with-resilience'
 
 
-def test_partition_query():
+def _test_partition_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=CMD, workers=3) as cluster:
+        with ctx.Cluster(command=command, workers=3) as cluster:
             q = Query(cluster, "partition-query")
             got = q.result()['initializer']
 
@@ -48,9 +50,9 @@ def test_partition_query():
           assert("initializer" in got["state_partitions"][k])
 
 
-def test_partition_count_query():
+def _test_partition_count_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=CMD) as cluster:
+        with ctx.Cluster(command=command) as cluster:
             given_data_sent(cluster)
             got = Query(cluster, "partition-count-query").result()['initializer']
 
@@ -62,9 +64,9 @@ def test_partition_count_query():
             assert(v['initializer'] == INPUT_ITEMS)
 
 
-def test_cluster_status_query():
+def _test_cluster_status_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=CMD, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2) as cluster:
             q = Query(cluster, "cluster-status-query")
             got = q.result()
 
@@ -75,10 +77,10 @@ def test_cluster_status_query():
                     u"worker_count": 2})
 
 
-def test_source_ids_query():
+def _test_source_ids_query(command):
     HARDCODED_NO_OF_SOURCE_IDS = 10
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=CMD, sources=1) as cluster:
+        with ctx.Cluster(command=command, sources=1) as cluster:
             given_data_sent(cluster)
             q = Query(cluster, "source-ids-query")
             got = q.result()['initializer']
@@ -87,9 +89,9 @@ def test_source_ids_query():
         assert(len(got["source_ids"]) == HARDCODED_NO_OF_SOURCE_IDS)
 
 
-def test_state_entity_query():
+def _test_state_entity_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=CMD, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2) as cluster:
             given_data_sent(cluster)
             got = Query(cluster, "state-entity-query").result()
 
@@ -120,9 +122,9 @@ def test_state_entity_query():
         assert(len(comp_ids) == 2)
 
 
-def test_state_entity_count_query():
+def _test_state_entity_count_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=CMD, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2) as cluster:
             given_data_sent(cluster)
             q = Query(cluster, "state-entity-count-query")
             got = q.result()
@@ -135,9 +137,9 @@ def test_state_entity_count_query():
         assert(set(comps.values()) == set((1,10)))
 
 
-def test_stateless_partition_query():
+def _test_stateless_partition_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=CMD, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2) as cluster:
             got = Query(cluster, "stateless-partition-query").result()
 
         for w, res in got.items():
@@ -147,9 +149,9 @@ def test_stateless_partition_query():
                 assert(len(v[w]) == INPUT_ITEMS)
 
 
-def test_stateless_partition_count_query():
+def _test_stateless_partition_count_query(command):
     with LoggingTestContext() as ctx:
-        with ctx.Cluster(command=CMD, workers=2) as cluster:
+        with ctx.Cluster(command=command, workers=2) as cluster:
             got = Query(cluster, "stateless-partition-count-query").result()
 
         for w, res in got.items():
@@ -186,3 +188,20 @@ class Query(object):
         else:
             raise Exception("Failed running cmd: {!r} with {!r}".
                             format(self._cmd, res.output))
+
+
+def create_test(api, cmd, test_func):
+    test_name = 'test_{api}_{test_name}'.format(
+        api=api,
+        test_name=test_func.__name__[len('_test_'):])
+    def f():
+        test_func(cmd)
+    f.__name__ = test_name
+    globals()[test_name] = f
+
+
+# Create tests for each API
+funcs = {n: f for n, f in globals().items() if n.startswith('_test')}
+for api, cmd in APIS.items():
+    for f in funcs.values():
+        create_test(api, cmd, f)
