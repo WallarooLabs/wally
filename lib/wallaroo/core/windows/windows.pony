@@ -46,7 +46,11 @@ class RangeWindowsBuilder
   fun ref over[In: Any val, Out: Any val, S: State ref](
     agg: Aggregation[In, Out, S]): StateInitializer[In, Out, S]
   =>
-    TumblingWindowsStateInitializer[In, Out, S](agg, _range, _delay)
+    if _slide == _range then
+      TumblingWindowsStateInitializer[In, Out, S](agg, _range, _delay)
+    else
+      SlidingWindowsStateInitializer[In, Out, S](agg, _range, _slide, _delay)
+    end
 
 class CountWindowsBuilder
   var _count: USize
@@ -320,6 +324,213 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
 
   fun _is_valid_ts(event_ts: U64, current_ts: U64): Bool =>
     event_ts > (current_ts - (_delay + _range))
+
+  fun _should_trigger(window_start_ts: U64, current_ts: U64): Bool =>
+    (window_start_ts + _range) < (current_ts - _delay)
+
+///////////////////////////
+// SLIDING RANGE WINDOWS
+///////////////////////////
+class val SlidingWindowsStateInitializer[In: Any val, Out: Any val,
+  Acc: State ref] is StateInitializer[In, Out, Acc]
+  let _agg: Aggregation[In, Out, Acc]
+  let _range: U64
+  let _slide: U64
+  let _delay: U64
+
+  new val create(agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
+    delay: U64)
+  =>
+    _agg = agg
+    _range = range
+    _slide = slide
+    _delay = delay
+
+  fun state_wrapper(key: Key): StateWrapper[In, Out, Acc] =>
+    SlidingWindows[In, Out, Acc](key, _agg, _range, _slide, _delay)
+
+  fun val runner_builder(step_group_id: RoutingId, parallelization: USize):
+    RunnerBuilder
+  =>
+    StateRunnerBuilder[In, Out, Acc](this, step_group_id, parallelization)
+
+  fun val decode(in_reader: Reader, auth: AmbientAuth):
+    StateWrapper[In, Out, Acc] ?
+  =>
+    try
+      let data: Array[U8] iso = in_reader.block(in_reader.size())?
+      match Serialised.input(InputSerialisedAuth(auth), consume data)(
+        DeserialiseAuth(auth))?
+      | let sw: SlidingWindows[In, Out, Acc] => sw
+      else
+        error
+      end
+    else
+      error
+    end
+
+  fun name(): String =>
+    _agg.name()
+
+class SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
+  Windows[In, Out, Acc]
+  let _windows: _SlidingWindows[In, Out, Acc]
+
+  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
+    delay: U64, current_ts: U64 = Time.nanos())
+  =>
+    // Check if range divides evenly by slide.  Otherwise complain and Fail().
+    _windows = _SlidingWindows[In, Out, Acc](key, agg, range, slide, delay,
+      current_ts)
+
+  fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val =>
+    _windows(input, event_ts, wall_time)
+
+  fun ref on_timeout(wall_time: U64): Array[Out] val =>
+    _attempt_to_trigger(wall_time)
+
+  fun ref encode(auth: AmbientAuth): ByteSeq =>
+    try
+      Serialised(SerialiseAuth(auth), this)?.output(OutputSerialisedAuth(
+        auth))
+    else
+      Fail()
+      recover Array[U8] end
+    end
+
+  fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
+    _windows.apply_input(input, event_ts, earliest_ts)
+
+  fun ref _attempt_to_trigger(wall_time: U64): Array[Out] val =>
+    _windows.attempt_to_trigger(wall_time)
+
+class _SlidingWindows
+  """
+  An inefficient sliding windows implementation that always recalculates
+  the combination of all lowest level partial aggregations stored in panes.
+  """
+  let _panes: Array[Acc]
+  let _panes_start_ts: Array[U64]
+  let _panes_start_idxs: Array[USize]
+  let _panes_per_window: USize
+
+  let _key: Key
+  let _agg: Aggregation[In, Out, Acc]
+  let _identity_acc: Acc
+  let _range: U64
+  let _slide: U64
+  let _delay: U64
+
+  new create(key: Key, agg: Aggregation[In, Out, Acc], range: U64, slide: U64,
+    delay: U64, current_ts: U64 = Time.nanos())
+  =>
+    // Invariant that range divides evenly by slide
+
+    _key = key
+    _agg = agg
+    _range = range
+    _slide = slide
+    _identity_acc = _agg.initial_accumulator()
+    // Normalize delay to units of slide.
+    let delay_range_units = (delay.f64() / slide.f64()).ceil()
+    _delay = slide * delay_range_units.u64()
+
+    _panes_per_window = range / slide
+
+    // Calculate how many windows we need. The delay tells us how long we
+    // wait after the close of a window to trigger and clear it. We need
+    // enough extra panes to account for this delay.
+    let extra_panes = delay_range_units.usize()
+    let pane_count = _panes_per_window + extra_panes
+
+    let total_length = pane_count * slide
+    let last_window_start = total_length - range
+    let window_count = (last_window_start / slide) + 1
+
+    _panes = Array[Acc](pane_count)
+    _panes_start_ts = Array[U64](pane_count)
+    _panes_start_idxs = Array[U64](pane_count)
+    _earliest_window_idx = 0
+    _last_window_idx = window_count - 1
+    var pane_start: U64 = current_ts - (slide * pane_count.u64())
+    for i in Range(0, pane_count) do
+      _panes.push(_identity_acc)
+      _panes_start_ts.push(pane_start)
+      pane_start = pane_start + slide
+    end
+
+  fun ref apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
+    // Should we ensure the event_ts is in the correct range?
+
+    if event_ts >= earliest_ts then
+      let pane_idx_offset = ((event_ts - earliest_ts) / _slide).usize()
+      let pane_idx =
+        (_earliest_window_idx + pane_idx_offset) % _panes.size()
+      try
+        _agg.update(input, _panes(pane_idx)?)
+      else
+        Fail()
+      end
+    else
+      // !TODO!: Should we keep this debug message? Too-early messages can be
+      // expected.
+      ifdef debug then
+        @printf[I32]("Event ts %s is earlier than earliest window %s. Ignoring\n".cstring(), event_ts.string().cstring(), earliest_ts.string().cstring())
+      end
+    end
+
+  fun ref attempt_to_trigger(wall_time: U64): Array[Out] val =>
+    let outs = recover iso Array[Out] end
+    try
+      let earliest_ts = _panes_start_ts(_earliest_window_idx)?
+      let end_ts = earliest_ts + (_panes.size().u64() * _slide)
+      // Convert to range units
+      let end_ts_diff =
+        ((wall_time - end_ts).f64() / _slide.f64()).ceil().u64()
+      var stopped = false
+      while not stopped do
+        (let next_out, stopped) = _check_first_window(wall_time, end_ts_diff)
+        match next_out
+        | let out: Out =>
+          outs.push(out)
+        end
+      end
+    else
+      Fail()
+    end
+    consume outs
+
+  fun ref _check_first_window(wall_time: U64, end_ts_diff: U64):
+    ((Out | None), Bool)
+  =>
+    var out: (Out | None) = None
+    var stopped: Bool = true
+    try
+      let earliest_ts = _panes_start_ts(_earliest_window_idx)?
+      if _should_trigger(earliest_ts, wall_time) then
+        var running_acc = _identity_acc
+        var pane_idx = _earliest_window_idx
+        for i in Range(0, _panes_per_window) do
+          let next_acc = _panes(pane_idx)?
+          running_acc = _agg.combine(running_acc, next_acc)
+          pane_idx = (pane_idx + 1) % _panes.size()
+        end
+        out = _agg.output(_key, running_acc)
+        _panes(_earliest_window_idx) = _identity_acc
+        let all_pane_range = _panes.size().u64() * _slide
+        if end_ts_diff > all_pane_range then
+          _panes_start_ts(_earliest_window_idx)? = earliest_ts + end_ts_diff
+        else
+          _panes_start_ts(_earliest_window_idx)? = earliest_ts +
+            all_pane_range
+        end
+        stopped = false
+        _earliest_window_idx = (_earliest_window_idx + 1) % _panes.size()
+      end
+    else
+      Fail()
+    end
+    (out, stopped)
 
   fun _should_trigger(window_start_ts: U64, current_ts: U64): Bool =>
     (window_start_ts + _range) < (current_ts - _delay)
