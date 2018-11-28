@@ -71,7 +71,7 @@ class ExternalChannelListenNotifier is TCPListenNotify
       _recovery_file_cleaner, _local_topology_initializer)
 
   fun ref closed(listen: TCPListener ref) =>
-    @printf[I32]("&s external: listener closed\n".cstring(),
+    @printf[I32]("%s external: listener closed\n".cstring(),
       _worker_name.cstring())
 
 class ExternalChannelConnectNotifier is TCPConnectionNotify
