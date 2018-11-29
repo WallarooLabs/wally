@@ -59,7 +59,11 @@ You can get help using GitHub via [the official documentation](https://help.gith
 
 *Note*: You must sign our [Contributor License Agreement](https://gist.github.com/WallarooLabsTeam/e06d4fed709e0e7035fdaa7249bf88fb) (CLA) before your pull request can be accepted. You can [sign the CLA now](https://cla-assistant.io/wallaroolabs/wallaroo), or you can wait until you submit a pull request, at which point you will be prompted to sign it. Your pull request cannot be accepted until you have signed the CLA.
 
-Before issuing a pull request, we ask that you squash all your commits into a single logical commit. While your PR is in review, we may ask for additional changes, please do not squash those commits while the review is underway. Once everything is good, we'll then ask you to further squash those commits before merging. We ask that you not squash while a review is underway as it can make it hard to follow what is going on. Additionally, we ask that you:
+Before issuing a pull request, we ask that you squash all your commits into a single logical commit. While your PR is in review, we may ask for additional changes, please do not squash those commits while the review is underway. Once everything is good, we'll then ask you to further squash those commits before merging. We ask that you not squash while a review is underway as it can make it hard to follow what is going on. 
+
+If you are making an extensive change, please ensure that an [issue has been created](https://github.com/wallaroolabs/wallaroo/issues) for the work first. If there isn't one, please [create an issue](https://github.com/WallarooLabs/wallaroo/issues/new) before you start. 
+
+Additionally, we ask that you:
 
 * [Write a good commit message](http://chris.beams.io/posts/git-commit/)
 * Issue 1 Pull Request per feature. Don't lump unrelated changes together.
