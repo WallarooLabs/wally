@@ -14,6 +14,7 @@
 
 
 import argparse
+from collections import Counter
 import datetime as dt
 import pickle
 import struct
@@ -155,12 +156,15 @@ def _validate_arity_compatability(name, obj, arity):
             ).format(name, arity, param_term)
         raise WallarooParameterError()
 
-def attach_to_module(cls, cls_name, func):
+def attach_to_module(cls, cls_name, func, idx=None):
     # Do some scope mangling to create a uniquely named class based on
     # the decorated function's name and place it in the wallaroo module's
     # namespace so that pickle can find it.
 
-    name = cls_name + '__' + func.__name__
+    name = '{cls}{idx}__{func}'.format(
+        cls = cls_name,
+        idx = '_{}'.format(idx) if idx else '',
+        func = func.__name__)
 
     # Python2: use __name__
     if sys.version_info.major == 2:
@@ -173,6 +177,7 @@ def attach_to_module(cls, cls_name, func):
     return globals()[name]
 
 
+_C = Counter()
 def _wallaroo_wrap(name, func, base_cls, **kwargs):
     # Case 1: Computations
     if issubclass(base_cls, Computation):
@@ -280,7 +285,9 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
                     return func
 
     # Attach the new class to the module's global namespace and return it
-    c = attach_to_module(C, base_cls.__name__, func)
+    global _C
+    _C[base_cls] += 1
+    c = attach_to_module(C, base_cls.__name__, func, _C[base_cls])
     return c
 
 

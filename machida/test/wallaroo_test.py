@@ -24,9 +24,9 @@ def test_my_computation():
     assert(my_computation2.name() == "My Computation 2")
     assert(my_computation2.compute("abcd") == "abcdabcd")
     assert(isinstance(my_computation, wallaroo.Computation))
-    assert(isinstance(my_computation, wallaroo.Computation__my_computation))
+    assert(isinstance(my_computation, wallaroo.Computation_1__my_computation))
     assert(isinstance(my_computation2, wallaroo.Computation))
-    assert(isinstance(my_computation2, wallaroo.Computation__my_computation2))
+    assert(isinstance(my_computation2, wallaroo.Computation_2__my_computation2))
     assert(not isinstance(my_computation, wallaroo.StateComputation))
 
 
@@ -35,13 +35,13 @@ def test_my_computation_serialization():
     deserialized = pickle.loads(serialized)
     assert(deserialized.name() == "My Computation")
     assert(deserialized.compute("abcd") == "abcd")
-    assert(isinstance(deserialized, wallaroo.Computation__my_computation))
+    assert(isinstance(deserialized, wallaroo.Computation_1__my_computation))
 
     serialized2 = pickle.dumps(my_computation2)
     deserialized2 = pickle.loads(serialized2)
     assert(deserialized2.name() == "My Computation 2")
     assert(deserialized2.compute("abcd") == "abcdabcd")
-    assert(isinstance(deserialized2, wallaroo.Computation__my_computation2))
+    assert(isinstance(deserialized2, wallaroo.Computation_2__my_computation2))
 
 
 #
