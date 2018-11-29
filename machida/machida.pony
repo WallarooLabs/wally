@@ -718,20 +718,20 @@ primitive Machida
   fun user_serialization_get_size(o: Pointer[U8] tag): USize =>
     let r = @user_serialization_get_size(o)
     if (print_errors()) then
-      @printf[U32]("Serialization failed\n".cstring())
+      FatalUserError("Serialization failed")
     end
     r
 
   fun user_serialization(o: Pointer[U8] tag, bs: Pointer[U8] tag) =>
     @user_serialization(o, bs)
     if (print_errors()) then
-      @printf[U32]("Serialization failed\n".cstring())
+      FatalUserError("Serialization failed")
     end
 
   fun user_deserialization(bs: Pointer[U8] tag): Pointer[U8] val =>
     let r = @user_deserialization(bs)
     if (print_errors()) then
-      @printf[U32]("Deserialization failed\n".cstring())
+      FatalUserError("Deserialization failed")
     end
     r
 
