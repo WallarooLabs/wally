@@ -593,7 +593,7 @@ actor Connections is Cluster
         try
           _control_conns(target_name)?
         else
-          Fail(); ControlConnection(this)
+          Unreachable(); ControlConnection(this)
         end
       else
         ControlConnection(this)
@@ -601,7 +601,8 @@ actor Connections is Cluster
     _control_conns(target_name) = tcp_conn_wrapper
     _register_disposable(tcp_conn_wrapper)
     let control_notifier: TCPConnectionNotify iso =
-      ControlSenderConnectNotifier(_auth, target_name, tcp_conn_wrapper)
+      ControlSenderConnectNotifier(_auth, target_name, host, service,
+        tcp_conn_wrapper, this)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
 
