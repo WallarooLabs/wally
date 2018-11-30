@@ -6,12 +6,20 @@ All notable changes to Wallaroo will be documented in this file.
 
 ### Fixed
 
+- Gradually back off when attempting to reconnect on data channel
+- There is no longer a problem when using more workers than there are partitions
+- No longer treat state computation stages as a special case. This results in fewer allocations and better performance
 
 ### Added
 
+- Python 3 Support for Connectors
+- Add parallel stateless steps to joining workers
 
 ### Changed
 
+- Streamlined Wallaroo Python API
+- Connectors API Update
+- Simplify the Python API for adding a computation to a pipeline
 
 ## [0.5.4] - 2018-10-31
 
