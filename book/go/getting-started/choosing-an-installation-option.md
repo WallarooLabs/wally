@@ -32,10 +32,10 @@ Installing with Vagrant provides the benefit of needing to install only two syst
 
 We recommend this process if you would prefer to use your development environment and do not mind the additional system requirements necessary for Wallaroo to be installed and running on your machine. The Wallaroo Up script automatically takes care of installing everything for setting up a Wallaroo development environment.
 
-This process requires installing several system libraries which may conflict with requirements of other tools in your development environment. We recommmend reviewing the process before proceeding.
+This process requires installing several system libraries which may conflict with requirements of other tools in your development environment. We recommend reviewing the process before proceeding.
 
 ## Installing from Source
 
 We recommend this process if you would prefer to use your development environment and do not mind the additional set up necessary for Wallaroo to be running on your machine.
 
-This process requires installing several system libraries which may conflict with requirements of other tools in your development environment. We recommmend reviewing the process before proceeding.
+This process requires installing several system libraries which may conflict with requirements of other tools in your development environment. We recommend reviewing the process before proceeding.

@@ -32,7 +32,7 @@ State objects can be arbitrarily complex. Our example is two fields. If your app
 
 ## Wallaroo, state, and parallelization
 
-In our stock market example, we can read from and write to each state object independently. Our state objects are a unit of parallelization. If we have 3,000 different state objects and 3,000 CPUS then we can update all our state objects concurrently. Odds are, we are going to have more state objects than we have CPUs. Wallaroo handles all parallelization and routing of messages to state objects.
+In our stock market example, we can read from and write to each state object independently. Our state objects are a unit of parallelization. If we have 3,000 different state objects and 3,000 CPUs then we can update all our state objects concurrently. Odds are, we are going to have more state objects than we have CPUs. Wallaroo handles all parallelization and routing of messages to state objects.
 
 The Wallaroo API features a concept called a "key extractor function" that allows you to examine a message and return a key that will be used for partitioning state. For example, imagine a message in our stock market application is:
 

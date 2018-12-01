@@ -178,7 +178,7 @@ sender --host 127.0.0.1:7000 --messages 100 --u64 --start-from 100 \
 
 1. newline delimited text
 2. fixed-length binary
-3. variable-lengh binary
+3. variable-length binary
 
 To create a data file for the first case, store your records separated by newlines in a file.
 To create data for the binary cases, follow the [framing protocol](/book/appendix/tcp-decoders-and-encoders.md#framed-message-protocols).

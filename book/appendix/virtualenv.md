@@ -1,4 +1,4 @@
-# Walaroo and Virtualenv
+# Wallaroo and Virtualenv
 
 We recommend using [virtualenv](https://virtualenv.pypa.io/en/stable/) to handle your application's dependencies.
 

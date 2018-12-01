@@ -35,7 +35,7 @@ If we could break the state into pieces and tell Wallaroo about those pieces, th
 ## State Partitioning
 
 Wallaroo supports parallel execution by way of _state partitioning_. The state is broken up into distinct parts, and Wallaroo manages access to each part so that they can be accessed in parallel.
-To do this, a _key extractor function_ is used to determine which _state partitition_ a particular message should be sent to. Once the _partition_ is determined, the message and the associated _state partition_ are passed to a state computation to perform the update logic.
+To do this, a _key extractor function_ is used to determine which _state partition_ a particular message should be sent to. Once the _partition_ is determined, the message and the associated _state partition_ are passed to a state computation to perform the update logic.
 
 ### Partitioned State
 

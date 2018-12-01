@@ -1,1 +1,1 @@
-# Contrubute to Wallaroo
+# Contribute to Wallaroo

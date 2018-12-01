@@ -66,7 +66,7 @@ Because a message can generate one or more outgoing messages, there are two thro
 	1. Ingestion throughput, defined as how many messages entered a pipeline per second.
 	2. Outbound throughput, defined as how many messages were processed by a pipeline per second.
 
-For categories that display both ingestion throughput and outbount throughput, throughputs would be displayed preceding and following the `-|<` symbol respectively.
+For categories that display both ingestion throughput and outbound throughput, throughputs would be displayed preceding and following the `-|<` symbol respectively.
 
 A pipelines total stats is an aggregation of each worker reporting stats for said pipeline.
 
