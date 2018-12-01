@@ -1,10 +1,10 @@
 # Wallaroo Go API Classes
 
-The Wallaro Go API allows developers to create Wallaroo applications in Go.
+The Wallaroo Go API allows developers to create Wallaroo applications in Go.
 
 ## Overview
 
-In order to create a Wallaroo application in Go, developers need to create classes that provide the required interfaces for each step in their pipline, and then connect them together in a topology structure that is returned by the entry-point function `ApplicationSetup`.
+In order to create a Wallaroo application in Go, developers need to create classes that provide the required interfaces for each step in their pipeline, and then connect them together in a topology structure that is returned by the entry-point function `ApplicationSetup`.
 
 ### Application Setup
 
@@ -255,7 +255,7 @@ The `FramedDecoder` is responsible for two tasks:
 
 ##### `HeaderLength() uint64`
 
-Return a `uint64` representing the number of byts from the beginning of an incoming message to return to the function that reads the payload length.
+Return a `uint64` representing the number of bytes from the beginning of an incoming message to return to the function that reads the payload length.
 
 ##### `PayloadLength(b []byte) uint64`
 
@@ -359,7 +359,7 @@ func (d *Decoder) Decode(b []byte) interface{} {
 
 ### State
 
-State is an object that is passed to the StateCompution's `Compute` method. It is a plain Go object and can be as simple or as complex as you would like it to be.
+State is an object that is passed to the StateComputation's `Compute` method. It is a plain Go object and can be as simple or as complex as you would like it to be.
 
 A common issue that arises with asynchronous execution is that when references to mutable objects are passed to the next step, if another update to the state precedes the execution of the next step, it will then execute with the latest state (that is, it will execute with the "wrong" state). Therefore, anything returned by a StateComputation that is based on data from the state object should use a copy of that data rather than a reference to something in the state object itself.
 

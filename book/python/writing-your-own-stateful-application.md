@@ -58,7 +58,7 @@ def encode_alert(alert):
 ```
 
 ### Partitioning
-In our stateless example, we looked at each transaction input in isolation and generated an alert based on its properties. This meant that Wallaroo could process all of these transactions in parallel without concern for how they were related to each other. But in our stateful example, we are accumulating totals. What do these totals refer to? For this applicaiton, they are the running totals per user. So each transaction object is associated with a particular user.
+In our stateless example, we looked at each transaction input in isolation and generated an alert based on its properties. This meant that Wallaroo could process all of these transactions in parallel without concern for how they were related to each other. But in our stateful example, we are accumulating totals. What do these totals refer to? For this application, they are the running totals per user. So each transaction object is associated with a particular user.
 
 This means that a natural way to partition the work is by user. We accomplish this by defining a function for extracting keys from our input messages:
 

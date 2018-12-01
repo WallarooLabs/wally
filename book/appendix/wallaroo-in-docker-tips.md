@@ -1,6 +1,6 @@
 # Tips for using Wallaroo in Docker
 
-In this section, we will cover some tips that can help faciliate the development process for users of the Wallaroo Docker image.
+In this section, we will cover some tips that can help facilitate the development process for users of the Wallaroo Docker image.
 
 ## Editing Wallaroo files within the Wallaroo Docker container
 

@@ -18,7 +18,7 @@ ___
 
 ## DEFINITIONS
 
-**Node** A machine that is a member of a couster
+**Node** A machine that is a member of a cluster
 
 **Cluster** A group of nodes used for processing
 
@@ -47,4 +47,4 @@ ___
 
 Wallaroo provides application developers with integrated state management.  These are in-memory and resilient.  State recovery is handled by the system.  In the recovery procedure of a process or node failure, state is restored trough snapshot recovery and message replay.
 
-There are additional controls in place to distribute any stateful fata structures across the cluster to achieve appropriate SLAs.
+There are additional controls in place to distribute any stateful data structures across the cluster to achieve appropriate SLAs.
