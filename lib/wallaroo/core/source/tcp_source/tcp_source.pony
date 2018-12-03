@@ -101,7 +101,7 @@ actor TCPSource[In: Any val] is Source
   var _muted: Bool = true
   var _disposed: Bool = false
   var _expect_read_buf: Reader = Reader
-  var _max_received_count: U8 = 50
+  var _max_received_count: USize = 1500
   let _muted_by: SetIs[Any tag] = _muted_by.create()
 
   var _is_pending: Bool = true
@@ -686,7 +686,7 @@ actor TCPSource[In: Any val] is Source
     """
     try
       var sum: USize = 0
-      var received_count: U8 = 0
+      var received_count: USize = 0
       _reading = true
 
       while _readable and not _shutdown_peer do
