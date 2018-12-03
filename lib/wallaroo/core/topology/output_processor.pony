@@ -24,9 +24,9 @@ use "wallaroo/core/routing"
 primitive OutputProcessor
   fun apply[Out: Any val](next_runner: Runner, metric_name: String,
     pipeline_time_spent: U64, output: (Out | Array[Out] val), key: Key,
-    producer_id: RoutingId, producer: Producer ref, router: Router,
-    i_msg_uid: MsgId, frac_ids: FractionalMessageId, computation_end: U64,
-    metrics_id: U16, worker_ingress_ts: U64,
+    event_ts: U64, producer_id: RoutingId, producer: Producer ref,
+    router: Router, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
+    computation_end: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
     """
@@ -36,7 +36,7 @@ primitive OutputProcessor
     """
     match output
     | let o: Out val =>
-      next_runner.run[Out](metric_name, pipeline_time_spent, o, key,
+      next_runner.run[Out](metric_name, pipeline_time_spent, o, key, event_ts,
         producer_id, producer, router, i_msg_uid, frac_ids,
         computation_end, metrics_id, worker_ingress_ts, metrics_reporter)
     | let os: Array[Out] val =>
@@ -63,7 +63,7 @@ primitive OutputProcessor
         // !TODO!: Is this using the correct metrics_id?  Or should we be
         // generating a new one here?
         (let f, let ts) = next_runner.run[Out](metric_name,
-          pipeline_time_spent, o, key, producer_id, producer, router,
+          pipeline_time_spent, o, key, event_ts, producer_id, producer, router,
           i_msg_uid, o_frac_ids, computation_end,
           metrics_id, worker_ingress_ts, metrics_reporter)
 

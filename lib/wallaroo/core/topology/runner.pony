@@ -40,10 +40,10 @@ trait Runner
   // and a U64 indicating the last timestamp for calculating the duration of
   // the computation
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, producer_id: RoutingId, producer: Producer ref,
-    router: Router, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    data: D, key: Key, event_ts: U64, producer_id: RoutingId,
+    producer: Producer ref, router: Router, i_msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64, metrics_reporter: MetricsReporter ref): (Bool, U64)
   fun name(): String
 
 trait SerializableStateRunner
@@ -217,10 +217,10 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
     _next = consume next
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, producer_id: RoutingId, producer: Producer ref,
-    router: Router, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    data: D, key: Key, event_ts: U64, producer_id: RoutingId,
+    producer: Producer ref, router: Router, i_msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64, metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
     match data
     | let input: In =>
@@ -241,12 +241,12 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
         | None => (true, computation_end)
         | let o: Out =>
           OutputProcessor[Out](_next, metric_name, pipeline_time_spent, o,
-            key, producer_id, producer, router, i_msg_uid,
+            key, event_ts, producer_id, producer, router, i_msg_uid,
             frac_ids, computation_end, new_metrics_id, worker_ingress_ts,
             metrics_reporter)
         | let os: Array[Out] val =>
           OutputProcessor[Out](_next, metric_name, pipeline_time_spent, os,
-            key, producer_id, producer, router, i_msg_uid,
+            key, event_ts, producer_id, producer, router, i_msg_uid,
             frac_ids, computation_end, new_metrics_id, worker_ingress_ts,
             metrics_reporter)
         end
@@ -305,10 +305,10 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
     replace_serialized_state(payload)
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, producer_id: RoutingId, producer: Producer ref,
-    router: Router, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    data: D, key: Key, event_ts: U64, producer_id: RoutingId,
+    producer: Producer ref, router: Router, i_msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64, metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
     match data
     | let input: In =>
@@ -344,13 +344,13 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
         | None => (true, computation_end)
         | let o: Out =>
           OutputProcessor[Out](_next_runner, metric_name,
-            pipeline_time_spent, o, key, producer_id, producer, router,
-            i_msg_uid, frac_ids, computation_end, new_metrics_id,
+            pipeline_time_spent, o, key, event_ts, producer_id, producer,
+            router, i_msg_uid, frac_ids, computation_end, new_metrics_id,
             worker_ingress_ts, metrics_reporter)
         | let os: Array[Out] val =>
           OutputProcessor[Out](_next_runner, metric_name,
-            pipeline_time_spent, os, key, producer_id, producer, router,
-            i_msg_uid, frac_ids, computation_end, new_metrics_id,
+            pipeline_time_spent, os, key, event_ts, producer_id, producer,
+            router, i_msg_uid, frac_ids, computation_end, new_metrics_id,
             worker_ingress_ts, metrics_reporter)
         end
 
@@ -524,13 +524,13 @@ class iso RouterRunner is Runner
     _partitioner = pb()
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, producer_id: RoutingId, producer: Producer ref,
-    router: Router, i_msg_uid: MsgId, frac_ids: FractionalMessageId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    metrics_reporter: MetricsReporter ref): (Bool, U64)
+    data: D, key: Key, event_ts: U64, producer_id: RoutingId,
+    producer: Producer ref, router: Router, i_msg_uid: MsgId,
+    frac_ids: FractionalMessageId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64, metrics_reporter: MetricsReporter ref): (Bool, U64)
   =>
     let new_key = _partitioner[D](data, key)
-    router.route[D](metric_name, pipeline_time_spent, data, new_key,
+    router.route[D](metric_name, pipeline_time_spent, data, new_key, event_ts,
       producer_id, producer, i_msg_uid, frac_ids, latest_ts, metrics_id,
       worker_ingress_ts)
 

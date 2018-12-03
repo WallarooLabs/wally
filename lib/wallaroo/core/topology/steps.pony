@@ -265,21 +265,22 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64)
+    key: Key, event_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
     _step_message_processor.run[D](metric_name, pipeline_time_spent, data, key,
-      i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id, latest_ts,
-      metrics_id, worker_ingress_ts)
+      event_ts, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
+      latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
-    pipeline_time_spent: U64, data: D, key: Key, i_producer_id: RoutingId,
-    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
-    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
+    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
+    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_id()
 
@@ -303,7 +304,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
-      pipeline_time_spent, data, key, _id, this, _router,
+      pipeline_time_spent, data, key, event_ts, _id, this, _router,
       msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
       _metrics_reporter)
 
