@@ -725,7 +725,7 @@ actor OutgoingBoundary is Consumer
 
   fun ref _schedule_reconnect() =>
     // Gradually back off
-    if _reconnect_pause < 8_000_000 then
+    if _reconnect_pause < 8_000_000_000 then
       _reconnect_pause = _reconnect_pause * 2
     end
 
