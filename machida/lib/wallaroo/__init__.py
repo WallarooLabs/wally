@@ -719,17 +719,41 @@ class _PipelineTree(object):
 class RangeWindowsBuilder(object):
     def __init__(self, wrange):
         self.range = wrange
-        self.slide = self.range
-        self.delay = 0
-        print("!@ init RangeWindowsBuilder")
+        self.slide = None
+        self.delay = None
+        self.default_slide = self.range
+        self.default_delay = 0
+
+    def with_slide(self, slide):
+        if self.slide == None:
+            self.slide = slide
+        else:
+            print("API_Error: Only call `with_slide()` once per window specification.")
+            raise WallarooParameterError()
+        return self
 
     def with_delay(self, delay):
-        print("!@ called with_delay")
-        self.delay = delay
+        if self.delay == None:
+            self.delay = delay
+        else:
+            print("API_Error: Only call `with_delay()` once per window specification.")
+            raise WallarooParameterError()
+        return self
 
     def over(self, aggregation):
-        print("!@ called over")
-        return RangeWindows(self.range, self.slide, self.delay, aggregation)
+        if self.slide == None:
+            slide = self.range
+        else:
+            slide = self.slide
+
+        if self.delay == None:
+            delay = 0
+        else:
+            delay = self.delay
+
+        print("!@Creating RangeWindows: " + str(self.range) + "," + str(slide) + "," + str(delay))
+
+        return RangeWindows(self.range, slide, delay, aggregation)
 
 
 class RangeWindows(object):
