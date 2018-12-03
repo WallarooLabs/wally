@@ -125,7 +125,7 @@ class KafkaSourceNotify[In: Any val]
           else msg_id.string() end
 
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          consume initial_key, _source_id, source, _router,
+          consume initial_key, ingest_ts, _source_id, source, _router,
           msg_id, None, decode_end_ts, latest_metrics_id, ingest_ts,
           _metrics_reporter)
       else

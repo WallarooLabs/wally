@@ -839,12 +839,14 @@ trait val DeliveryMsg is ChannelMsg
     consumer_ids: MapIs[Consumer, RoutingId] val) ?
   fun metric_name(): String
   fun msg_uid(): U128
+  fun event_ts(): U64
 
 class val ForwardMsg[D: Any val] is DeliveryMsg
   let _target_id: RoutingId
   let _sender_name: String
   let _data: D
   let _key: Key
+  let _event_ts: U64
   let _metric_name: String
   let _proxy_address: ProxyAddress
   let _msg_uid: MsgId
@@ -854,15 +856,17 @@ class val ForwardMsg[D: Any val] is DeliveryMsg
   fun metric_name(): String => _metric_name
   fun msg_uid(): U128 => _msg_uid
   fun frac_ids(): FractionalMessageId => _frac_ids
+  fun event_ts(): U64 => _event_ts
 
   new val create(t_id: RoutingId, from: String,
-    m_data: D, k: Key, m_name: String, proxy_address: ProxyAddress,
+    m_data: D, k: Key, e_ts: U64, m_name: String, proxy_address: ProxyAddress,
     msg_uid': MsgId, frac_ids': FractionalMessageId)
   =>
     _target_id = t_id
     _sender_name = from
     _data = m_data
     _key = k
+    _event_ts = e_ts
     _metric_name = m_name
     _proxy_address = proxy_address
     _msg_uid = msg_uid'
@@ -883,7 +887,7 @@ class val ForwardMsg[D: Any val] is DeliveryMsg
     end
 
     target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
+      _event_ts, producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
 class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
@@ -891,6 +895,7 @@ class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
   let _target_key: Key
   let _sender_name: String
   let _data: D
+  let _event_ts: U64
   let _metric_name: String
   let _msg_uid: MsgId
   let _frac_ids: FractionalMessageId
@@ -899,14 +904,16 @@ class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
   fun metric_name(): String => _metric_name
   fun msg_uid(): U128 => _msg_uid
   fun frac_ids(): FractionalMessageId => _frac_ids
+  fun event_ts(): U64 => _event_ts
 
   new val create(step_group: RoutingId, from: String, m_data: D, k: Key,
-    m_name: String, msg_uid': MsgId, frac_ids': FractionalMessageId)
+    e_ts: U64, m_name: String, msg_uid': MsgId, frac_ids': FractionalMessageId)
   =>
     _target_step_group = step_group
     _target_key = k
     _sender_name = from
     _data = m_data
+    _event_ts = e_ts
     _metric_name = m_name
     _msg_uid = msg_uid'
     _frac_ids = frac_ids'
@@ -931,7 +938,7 @@ class val ForwardStatePartitionMsg[D: Any val] is DeliveryMsg
     let target_id = consumer_ids(target_step)?
 
     target_step.run[D](_metric_name, pipeline_time_spent, _data, _target_key,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
+      _event_ts, producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
 class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
@@ -939,6 +946,7 @@ class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
   let _key: Key
   let _sender_name: String
   let _data: D
+  let _event_ts: U64
   let _metric_name: String
   let _msg_uid: MsgId
   let _frac_ids: FractionalMessageId
@@ -947,14 +955,16 @@ class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
   fun metric_name(): String => _metric_name
   fun msg_uid(): U128 => _msg_uid
   fun frac_ids(): FractionalMessageId => _frac_ids
+  fun event_ts(): U64 => _event_ts
 
   new val create(target_p_id: RoutingId, from: String, m_data: D, k: Key,
-    m_name: String, msg_uid': MsgId, frac_ids': FractionalMessageId)
+    e_ts: U64, m_name: String, msg_uid': MsgId, frac_ids': FractionalMessageId)
   =>
     _target_partition_id = target_p_id
     _key = k
     _sender_name = from
     _data = m_data
+    _event_ts = e_ts
     _metric_name = m_name
     _msg_uid = msg_uid'
     _frac_ids = frac_ids'
@@ -979,7 +989,7 @@ class val ForwardStatelessPartitionMsg[D: Any val] is DeliveryMsg
     let target_id = consumer_ids(target_step)?
 
     target_step.run[D](_metric_name, pipeline_time_spent, _data, _key,
-      producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
+      _event_ts, producer_id, producer, _msg_uid, _frac_ids, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
 
 class val RequestRecoveryInfoMsg is ChannelMsg
