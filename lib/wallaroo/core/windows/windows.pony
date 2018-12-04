@@ -40,6 +40,11 @@ class RangeWindowsBuilder
     _slide = range
     _delay = 0
 
+  fun ref with_slide(slide: U64): RangeWindowsBuilder =>
+    //!@ Check that slide divides evenly into range
+    _slide = slide
+    this
+
   fun ref with_delay(delay: U64): RangeWindowsBuilder =>
     _delay = delay
     this
