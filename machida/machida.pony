@@ -701,25 +701,36 @@ primitive Machida
     r
 
   fun initial_state(computation: Pointer[U8] val): PyState =>
-    PyState(@initial_state(computation))
+    let s = @initial_state(computation)
+    print_errors()
+    if s.is_null() then Fail() end
+    PyState(consume s)
 
   fun initial_accumulator(aggregation: Pointer[U8] val): PyState =>
-    PyState(@initial_accumulator(aggregation))
+    let s = @initial_accumulator(aggregation)
+    if print_errors() then Fail() end
+    PyState(consume s)
 
   fun aggregation_update(aggregation: Pointer[U8] val, data: Pointer[U8] val,
     acc: Pointer[U8] val)
   =>
     @aggregation_update(aggregation, data, acc)
+    if print_errors() then Fail() end
+    None
 
   fun aggregation_combine(aggregation: Pointer[U8] val, acc1: Pointer[U8] val,
     acc2: Pointer[U8] val): PyState
   =>
-    PyState(@aggregation_combine(aggregation, acc1, acc2))
+    let s = @aggregation_combine(aggregation, acc1, acc2)
+    if print_errors() then Fail() end
+    PyState(consume s)
 
   fun aggregation_output(aggregation: Pointer[U8] val, key: Pointer[U8] tag,
     acc: Pointer[U8] val): Pointer[U8] val
   =>
-    @aggregation_output(aggregation, key, acc)
+    let s = @aggregation_output(aggregation, key, acc)
+    if print_errors() then Fail() end
+    s
 
   fun key_hash(key: Pointer[U8] val): USize =>
     let r = @key_hash(key)
