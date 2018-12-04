@@ -57,7 +57,9 @@ alerts_windowed_py_test:
 		--log-level error \
 		--command 'machida --application-module alerts $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
-		--sink-expect 5
+		--sink-expect 5 \
+		--sink-expect-allow-more \
+		--workers 2
 
 alerts_windowed_py3_test:
 	cd $(ALERTS_PY_PATH) && \
