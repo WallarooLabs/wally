@@ -82,6 +82,8 @@ actor Step is (Producer & Consumer & BarrierProcessor)
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
 
+  let _timers: Timers = Timers
+
   new create(auth: AmbientAuth, runner: Runner iso,
     metrics_reporter': MetricsReporter iso,
     id: U128, event_log: EventLog,
@@ -115,6 +117,11 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
     _step_message_processor = NormalStepMessageProcessor(this)
     _barrier_forwarder = BarrierStepForwarder(_id, this)
+
+    match _runner
+    | let tr: TimeoutTriggeringRunner =>
+      tr.set_trigger(StepTimeoutTrigger(this))
+    end
 
   //
   // Application startup lifecycle event
@@ -403,6 +410,7 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       @printf[I32]("Disposing Step %s\n".cstring(), _id.string().cstring())
       _event_log.unregister_resilient(_id, this)
       _unregister_all_outputs()
+      _timers.dispose()
       _step_message_processor = DisposedStepMessageProcessor
     end
 
@@ -555,3 +563,17 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       StepRollbacker(payload, _runner)
     end
     event_log.ack_rollback(_id)
+
+  /////////////
+  // TIMEOUTS
+  /////////////
+  fun ref set_timeout(t: U64) =>
+    _timers(Timer(StepTimeoutNotify(this), t))
+
+  be trigger_timeout() =>
+    match _runner
+    | let tr: TimeoutTriggeringRunner =>
+      tr.on_timeout(_id, this, _router, _metrics_reporter)
+    else
+      Fail()
+    end

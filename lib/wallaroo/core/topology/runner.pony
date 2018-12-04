@@ -273,7 +273,7 @@ class StatelessComputationRunner[In: Any val, Out: Any val] is Runner
   fun name(): String => _computation.name()
 
 class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
-  RollbackableRunner & SerializableStateRunner)
+  RollbackableRunner & SerializableStateRunner & TimeoutTriggeringRunner)
   let _step_group: RoutingId
   let _state_initializer: StateInitializer[In, Out, S] val
   let _next_runner: Runner
@@ -284,6 +284,10 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
   let _rb: Reader = Reader
   let _auth: AmbientAuth
   var _step_id: (RoutingId | None)
+
+  // Timeouts
+  var _step_timeout_trigger: (StepTimeoutTrigger | None) = None
+  let _msg_id_gen: MsgIdGenerator = MsgIdGenerator
 
   new iso create(step_group': RoutingId,
     state_initializer: StateInitializer[In, Out, S] val, event_log: EventLog,
@@ -301,6 +305,57 @@ class StateRunner[In: Any val, Out: Any val, S: State ref] is (Runner &
 
   fun ref rollback(payload: ByteSeq val) =>
     replace_serialized_state(payload)
+
+  fun ref set_trigger(stt: StepTimeoutTrigger) =>
+    _step_timeout_trigger = stt
+    //!@ Where do we first set the trigger?
+    stt.set_timeout(5_000_000_000)
+
+  fun ref on_timeout(producer_id: RoutingId, producer: Producer ref,
+    router: Router, metrics_reporter: MetricsReporter ref)
+  =>
+    @printf[I32]("!@ on_timeout called on StateRunner\n".cstring())
+    let current_ts = Time.nanos()
+    for (key, sw) in _state_map.pairs() do
+      let out = sw.on_timeout(current_ts)
+      let new_i_msg_uid = _msg_id_gen()
+      match out
+      | let o: Out =>
+        OutputProcessor[Out](
+          //!@ real
+          _next_runner,
+          //!@ fake values
+          "", 0,
+          //!@ real
+          o, key, current_ts, producer_id, producer, router,
+          //!@ fake values
+          new_i_msg_uid, None, current_ts, 0, 0,
+          //!@ real
+          metrics_reporter)
+      | let os: Array[Out] val =>
+        OutputProcessor[Out](
+          //!@ real
+          _next_runner,
+          //!@ fake values
+          "", 0,
+          //!@ real
+          os, key, current_ts, producer_id, producer, router,
+          //!@ fake values
+          new_i_msg_uid, None, current_ts, 0, 0,
+          //!@ real
+          metrics_reporter)
+      end
+    end
+    //!@ How do we configure this timeout and where does this go?
+    match _step_timeout_trigger
+    | let stt: StepTimeoutTrigger =>
+      stt.set_timeout(5_000_000_000)
+    else
+      ifdef debug then
+        @printf[I32](("StateRunner: on_timeout was called but we have no " +
+          "StepTimeoutTrigger\n").cstring())
+      end
+    end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, key: Key, event_ts: U64, producer_id: RoutingId,
