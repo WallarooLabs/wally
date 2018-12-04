@@ -75,7 +75,6 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
   let _comp: StateComputation[In, Out, S]
   let _encoder_decoder: StateEncoderDecoder[S]
   let _state: S
-  let _dummy_outs: Array[Out] val = recover val Array[Out] end
 
   new create(sc: StateComputation[In, Out, S], state: S)
   =>
@@ -88,10 +87,8 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
   =>
     _comp(input, _state)
 
-  fun ref on_timeout(wall_time: U64): Array[Out] val =>
-    // We don't trigger on timeouts, so we return an empty array to indicate
-    // there are no triggered outputs.
-    _dummy_outs
+  fun ref on_timeout(wall_time: U64): None =>
+    None
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
      _encoder_decoder.encode(_state, auth)
