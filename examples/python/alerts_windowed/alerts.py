@@ -29,7 +29,7 @@ def application_setup(args):
     pipeline = (transactions
         .key_by(extract_user)
         .to(wallaroo.range_windows(wallaroo.seconds(5))
-            .over(TotalAggregation))
+            .over(TotalAggregation()))
         .to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encode_alert)))
 
     return wallaroo.build_application("Alerts (windowed)", pipeline)
@@ -69,8 +69,12 @@ def extract_user(transaction):
     return transaction.user
 
 
-@wallaroo.aggregation(name="Total Aggregation")
-class TotalAggregation(object):
+#@wallaroo.aggregation(name="Total Aggregation")
+class TotalAggregation(wallaroo.Aggregation):
+    def name(self):
+        #return self.__class__.__name__
+        return "Total Aggregation"
+
     def initial_accumulator(self):
         return TransactionTotal()
 
