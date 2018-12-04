@@ -1197,6 +1197,7 @@ class val PyPipelineTree
       let aggregation = PyAggregation(raw_aggregation)
       Machida.inc_ref(raw_aggregation)
       let windows = Wallaroo.range_windows(range)
+                              .with_slide(slide)
                               .with_delay(delay)
                               .over[PyData val, PyData val, PyState](
                                 aggregation)
