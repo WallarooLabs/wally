@@ -366,7 +366,8 @@ class StateComputationMulti(StateComputation, ComputationMulti):
 
 
 class Aggregation(BaseWrapped):
-    pass
+    def name(self):
+        return self.__class__.__name__
 
 
 class KeyExtractor(BaseWrapped):
@@ -430,30 +431,32 @@ def state_computation_multi(name, state):
     return wrapped
 
 
-def aggregation(name):
-    def wrapped(agg_class):
-        _validate_aggregation(agg_class)
-
-        class C(Aggregation):
-            def __init__(self, agg_class):
-                self.agg = agg_class()
-
-            def name(self):
-                return name
-
-            def initial_accumulator(self):
-                return self.agg.initial_accumulator()
-
-            def update(self, data, acc):
-                return self.agg.update(data, acc)
-
-            def combine(self, acc1, acc2):
-                return self.agg.combine(acc1, acc2)
-
-            def output(self, key, acc):
-                return self.agg.output(key, acc)
-        return C(agg_class)
-    return wrapped
+#def aggregation(name):
+#    def wrapped(agg_class):
+#        _validate_aggregation(agg_class)
+#
+#        class C(Aggregation):
+#            def __init__(self, agg_class):
+#                self.agg = agg_class()
+#
+#            def name(self):
+#                return name
+#
+#            def initial_accumulator(self):
+#                print("NNN")
+#                print(self.agg)
+#                return self.agg.initial_accumulator()
+#
+#            def update(self, data, acc):
+#                return self.agg.update(data, acc)
+#
+#            def combine(self, acc1, acc2):
+#                return self.agg.combine(acc1, acc2)
+#
+#            def output(self, key, acc):
+#                return self.agg.output(key, acc)
+#        return C(agg_class)
+#    return wrapped
 
 
 def key_extractor(func):
