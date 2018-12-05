@@ -440,6 +440,8 @@ def CLI():
     parser.add_argument('--batch-size', type=int, default=1,
                         help=("The batch size to use in the senders. "
                               "The same batch size is used in all senders."))
+    parser.add_argument('--sender-interval', type=float, default=0.001,
+                        help=("The interval between batch sends in the sender"))
     parser.add_argument('--resilience-dir', type=str, default=None,
                         help=("The path of the resilience data files. "
                               "(default=random directory in /tmp created by "
@@ -544,6 +546,7 @@ def CLI():
                     sinks = args.sinks,
                     mode = args.sink_mode,
                     batch_size = args.batch_size,
+                    sender_interval = args.sender_interval,
                     sink_expect = args.sink_expect,
                     sink_expect_allow_more = args.sink_expect_allow_more,
                     sink_stop_timeout = args.sink_stop_timeout,

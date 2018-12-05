@@ -45,7 +45,8 @@ FROM_TAIL = int(os.environ.get("FROM_TAIL", 10))
 
 def pipeline_test(generator, expected, command, workers=1, sources=1,
                   mode='framed', sinks=1, decoder=None, pre_processor=None,
-                  batch_size=1, sink_expect=None, sink_expect_allow_more=False,
+                  batch_size=1, sender_interval=0.001,
+                  sink_expect=None, sink_expect_allow_more=False,
                   sink_stop_timeout=DEFAULT_SINK_STOP_TIMEOUT,
                   sink_await=None, delay=30,
                   validate_file=None, giles_mode=False,
@@ -85,6 +86,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
         output set before comparing it against the expected data set.
         Default: None, assume output data is directly comparable.
     - `batch_size`: the batch size to use in the sender. Default: 1
+    - `sender_interval`: the interval between batch sends in the sender. Default 0.001
     - `sink_expect`: the number of messages to expect at the sink. This allows
         directly relying on received output for timing control. Default: None
         Should be a list of `len(sinks)`.
@@ -161,7 +163,8 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                 for gen, idx in generator:
                     reader = Reader(gen)
                     sender = Sender(cluster.source_addrs[idx], reader,
-                                    batch_size=batch_size)
+                                    batch_size=batch_size,
+                                    interval=sender_interval)
                     cluster.add_sender(sender)
 
             # start each sender and await its completion before starting the next
