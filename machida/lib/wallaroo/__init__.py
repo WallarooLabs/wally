@@ -188,6 +188,10 @@ def _validate_arity_compatability(name, obj, arity):
 
 
 def _validate_aggregation(agg_cls):
+    ## TODO: add arity validation on these methods
+    if not hasattr(agg_cls, 'name'):
+        print("\nAPI_Error: Aggregation must have method 'name'.")
+        raise WallarooParameterError()
     if not hasattr(agg_cls, 'initial_accumulator'):
         print("\nAPI_Error: Aggregation must have method 'initial_accumulator'.")
         raise WallarooParameterError()
@@ -266,27 +270,6 @@ def _wallaroo_wrap(name, func, base_cls, **kwargs):
             C.compute_multi = comp
         else:
             C.compute = comp
-
-    # !@
-    # elif issubclass(base_cls, Aggregation):
-    #     class C(base_cls):
-    #         def __init__(self, agg_class):
-    #             self.agg = agg_class()
-
-    #         def name(self):
-    #             return name
-
-    #         def initial_accumulator(self):
-    #             return self.agg.initial_accumulator()
-
-    #         def update(self, data, acc):
-    #             return self.agg.update(data, acc)
-
-    #         def combine(self, acc1, acc2):
-    #             return self.agg.combine(acc1, acc2)
-
-    #         def output(self, key, acc):
-    #             return self.agg.output(key, acc)
 
     # Case 2: Partition
     elif issubclass(base_cls, KeyExtractor):
@@ -458,34 +441,6 @@ def state_computation_multi(name, state):
                            state_class=state)
         return C()
     return wrapped
-
-
-#def aggregation(name):
-#    def wrapped(agg_class):
-#        _validate_aggregation(agg_class)
-#
-#        class C(Aggregation):
-#            def __init__(self, agg_class):
-#                self.agg = agg_class()
-#
-#            def name(self):
-#                return name
-#
-#            def initial_accumulator(self):
-#                print("NNN")
-#                print(self.agg)
-#                return self.agg.initial_accumulator()
-#
-#            def update(self, data, acc):
-#                return self.agg.update(data, acc)
-#
-#            def combine(self, acc1, acc2):
-#                return self.agg.combine(acc1, acc2)
-#
-#            def output(self, key, acc):
-#                return self.agg.output(key, acc)
-#        return C(agg_class)
-#    return wrapped
 
 
 def key_extractor(func):
