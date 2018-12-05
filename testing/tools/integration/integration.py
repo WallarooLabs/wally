@@ -274,7 +274,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                     except:
                         raise AssertionError("Validation failed. Expected {!r} but"
                                              " received {!r}".format(expected,
-                                                                     processed))
+                                                                     flattened))
     except:
         if log_error:
             logging.error("Integration pipeline_test encountered an error")
