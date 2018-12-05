@@ -42,18 +42,18 @@ include $(rules_mk_path)
 
 
 build-examples-python-alerts_windowed: build-machida
-#build-examples-python-alerts_windowed: build-machida3
+build-examples-python-alerts_windowed: build-machida3
 integration-tests-examples-python-alerts_windowed: build-examples-python-alerts_windowed
 
 integration-tests-examples-python-alerts_windowed: alerts_windowed_py_test
-#integration-tests-examples-python-alerts_windowed: alerts_windowed_py3_test
+integration-tests-examples-python-alerts_windowed: alerts_windowed_py3_test
 
 alerts_windowed_py_test:
 	cd $(ALERTS_PY_PATH) && \
 	integration_test \
 		--sources 0 \
-		--validation-cmp \
-		--expected-csv '1,2,3,4,5' \
+		--validation-cmd 'python _validate.py --output' \
+		--output received.txt \
 		--log-level error \
 		--command 'machida --application-module alerts $(RUN_WITH_RESILIENCE)' \
 		--sink-mode newlines \
@@ -65,9 +65,13 @@ alerts_windowed_py3_test:
 	cd $(ALERTS_PY_PATH) && \
 	integration_test \
 		--sources 0 \
-		--validation-cmp \
-		--expected-file _expected.txt \
+		--validation-cmd 'python _validate.py --output' \
+		--output received.txt \
 		--log-level error \
 		--command 'machida3 --application-module alerts $(RUN_WITH_RESILIENCE)' \
-		--sink-mode newlines
+		--sink-mode newlines \
+		--sink-expect 5 \
+		--sink-expect-allow-more \
+		--workers 2
+
 endif
