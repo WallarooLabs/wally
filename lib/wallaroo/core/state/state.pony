@@ -60,9 +60,11 @@ interface val StateInitializer[In: Any val, Out: Any val, S: State ref] is
     StateWrapper[In, Out, S] ?
 
 trait ref StateWrapper[In: Any val, Out: Any val, S: State ref]
-  fun ref apply(input: In, event_ts: U64, wall_time: U64):
-    (Out | Array[Out] val | None)
-  fun ref on_timeout(wall_time: U64): (Out | Array[Out] val | None)
+  // Return (output, output_watermark_ts)
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    ((Out | Array[Out] val | None), U64)
+  fun ref on_timeout(wall_time: U64):
+    ((Out | Array[Out] val | None), U64)
   fun ref encode(auth: AmbientAuth): ByteSeq
 
 class EmptyState is State

@@ -29,9 +29,10 @@ use "wallaroo/core/topology"
 
 primitive Route
   fun run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, key: Key, event_ts: U64, cfp_id: RoutingId, cfp: Producer ref,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64, consumer: Consumer)
+    data: D, key: Key, event_ts: U64, watermark_ts: U64, cfp_id: RoutingId,
+    cfp: Producer ref, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    consumer: Consumer)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
@@ -51,8 +52,8 @@ primitive Route
       end
 
     consumer.run[D](metric_name, pipeline_time_spent, data, key, event_ts,
-      cfp_id, cfp, msg_uid, frac_ids, o_seq_id, my_latest_ts, new_metrics_id,
-      worker_ingress_ts)
+      watermark_ts, cfp_id, cfp, msg_uid, frac_ids, o_seq_id, my_latest_ts,
+      new_metrics_id, worker_ingress_ts)
 
   fun forward(delivery_msg: DeliveryMsg,
     pipeline_time_spent: U64, producer_id: RoutingId, cfp: Producer ref,
