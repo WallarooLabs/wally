@@ -339,3 +339,12 @@ actor BarrierSource is Source
 
   fun ref current_sequence_id(): SeqId =>
     _seq_id
+
+  ///////////////
+  // WATERMARKS
+  ///////////////
+  fun ref check_effective_input_watermark(current_ts: U64): U64 =>
+    current_ts
+
+  fun ref update_output_watermark(w: U64): (U64, U64) =>
+    (w, w)

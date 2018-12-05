@@ -28,6 +28,7 @@ use "wallaroo_labs/time"
 use "wallaroo/core/boundary"
 use "wallaroo/core/common"
 use "wallaroo/core/state"
+use "wallaroo/core/windows"
 use "wallaroo/ent/barrier"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/ent/network"
@@ -81,6 +82,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
 
   // Checkpoint
   var _next_checkpoint_id: CheckpointId = 1
+
+  // Watermarks
+  let _watermarks: StageWatermarks = _watermarks.create()
 
   let _timers: Timers = Timers
 
@@ -272,27 +276,31 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     None
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    key: Key, event_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
-    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    key: Key, event_ts: U64, watermark_ts: U64, i_producer_id: RoutingId,
+    i_producer: Producer, msg_uid: MsgId, frac_ids: FractionalMessageId,
+    i_seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Received msg at Step\n".cstring())
     end
     _step_message_processor.run[D](metric_name, pipeline_time_spent, data, key,
-      event_ts, i_producer_id, i_producer, msg_uid, frac_ids, i_seq_id,
-      latest_ts, metrics_id, worker_ingress_ts)
+      event_ts, watermark_ts, i_producer_id, i_producer, msg_uid, frac_ids,
+      i_seq_id, latest_ts, metrics_id, worker_ingress_ts)
 
   fun ref process_message[D: Any val](metric_name: String,
     pipeline_time_spent: U64, data: D, key: Key, event_ts: U64,
-    i_producer_id: RoutingId, i_producer: Producer, msg_uid: MsgId,
-    frac_ids: FractionalMessageId, i_seq_id: SeqId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64)
+    watermark_ts: U64, i_producer_id: RoutingId, i_producer: Producer,
+    msg_uid: MsgId, frac_ids: FractionalMessageId, i_seq_id: SeqId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_id()
+    let process_ts = Time.nanos()
+
+    let input_watermark_ts =
+      _watermarks.receive_watermark(i_producer_id, watermark_ts, process_ts)
 
     let my_latest_ts = ifdef "detailed-metrics" then
-        Time.nanos()
+        process_ts
       else
         latest_ts
       end
@@ -311,9 +319,9 @@ actor Step is (Producer & Consumer & BarrierProcessor)
     end
 
     (let is_finished, let last_ts) = _runner.run[D](metric_name,
-      pipeline_time_spent, data, key, event_ts, _id, this, _router,
-      msg_uid, frac_ids, my_latest_ts, my_metrics_id, worker_ingress_ts,
-      _metrics_reporter)
+      pipeline_time_spent, data, key, event_ts, input_watermark_ts, _id, this,
+      _router, msg_uid, frac_ids, my_latest_ts, my_metrics_id,
+      worker_ingress_ts, _metrics_reporter)
 
     if is_finished then
       ifdef "trace" then
@@ -563,6 +571,15 @@ actor Step is (Producer & Consumer & BarrierProcessor)
       StepRollbacker(payload, _runner)
     end
     event_log.ack_rollback(_id)
+
+  ///////////////
+  // WATERMARKS
+  ///////////////
+  fun ref check_effective_input_watermark(current_ts: U64): U64 =>
+    _watermarks.check_effective_input_watermark(current_ts)
+
+  fun ref update_output_watermark(w: U64): (U64, U64) =>
+    _watermarks.update_output_watermark(w)
 
   /////////////
   // TIMEOUTS

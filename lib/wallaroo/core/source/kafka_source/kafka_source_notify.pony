@@ -124,9 +124,11 @@ class KafkaSourceNotify[In: Any val]
           | let a: Array[U8] val => String.from_array(a)
           else msg_id.string() end
 
+        let watermark_ts = ingest_ts
+
         _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-          consume initial_key, ingest_ts, _source_id, source, _router,
-          msg_id, None, decode_end_ts, latest_metrics_id, ingest_ts,
+          consume initial_key, ingest_ts, watermark_ts, _source_id, source,
+          _router, msg_id, None, decode_end_ts, latest_metrics_id, ingest_ts,
           _metrics_reporter)
       else
         @printf[I32](("Unable to decode message at " + _pipeline_name +

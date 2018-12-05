@@ -82,13 +82,14 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref] is
     _encoder_decoder = sc.encoder_decoder()
     _state = state
 
-  fun ref apply(input: In, event_ts: U64, wall_time: U64):
-    (Out | Array[Out] val | None)
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    ((Out | Array[Out] val | None), U64)
   =>
-    _comp(input, _state)
+    let res = _comp(input, _state)
+    (res, watermark_ts)
 
-  fun ref on_timeout(wall_time: U64): None =>
-    None
+  fun ref on_timeout(watermark_ts: U64): (None, U64) =>
+    (None, watermark_ts)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
      _encoder_decoder.encode(_state, auth)

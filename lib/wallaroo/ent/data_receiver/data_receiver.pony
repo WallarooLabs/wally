@@ -382,6 +382,15 @@ actor DataReceiver is Producer
     _next_checkpoint_id = checkpoint_id + 1
     event_log.ack_rollback(_id)
 
+  ///////////////
+  // WATERMARKS
+  ///////////////
+  fun ref check_effective_input_watermark(current_ts: U64): U64 =>
+    current_ts
+
+  fun ref update_output_watermark(w: U64): (U64, U64) =>
+    (w, w)
+
   /////////////////////////////////////////////////////////////////////////////
   // PRODUCER
   /////////////////////////////////////////////////////////////////////////////

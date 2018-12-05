@@ -83,6 +83,13 @@ actor DummyProducer is Producer
   fun ref metrics_reporter(): MetricsReporter =>
     MetricsReporter("", "", _NullMetricsSink)
 
+  // Watermarks
+  fun ref check_effective_input_watermark(current_ts: U64): U64 =>
+    current_ts
+
+  fun ref update_output_watermark(w: U64): (U64, U64) =>
+    (w, w)
+
 actor _NullMetricsSink
   be send_metrics(metrics: MetricDataList val) =>
     None
