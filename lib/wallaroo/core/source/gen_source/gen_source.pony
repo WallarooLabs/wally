@@ -173,6 +173,8 @@ actor GenSource[V: Any val] is Source
     let pipeline_time_spent: U64 = 0
     var latest_metrics_id: U16 = 1
 
+    let watermark_ts = ingest_ts
+
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
     end
@@ -189,7 +191,7 @@ actor GenSource[V: Any val] is Source
       _cur_value = _generator(next')
       (let is_finished, let last_ts) =
         _runner.run[V](_pipeline_name, pipeline_time_spent, next',
-          "gen-source-key", ingest_ts, _source_id, this, _router,
+          "gen-source-key", ingest_ts, watermark_ts, _source_id, this, _router,
           _msg_id_gen(), None, decode_end_ts, latest_metrics_id, ingest_ts,
           _metrics_reporter)
 
@@ -531,6 +533,15 @@ actor GenSource[V: Any val] is Source
     else
       error
     end
+
+  ///////////////
+  // WATERMARKS
+  ///////////////
+  fun ref check_effective_input_watermark(current_ts: U64): U64 =>
+    current_ts
+
+  fun ref update_output_watermark(w: U64): (U64, U64) =>
+    (w, w)
 
   //////////
   // MUTING

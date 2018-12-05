@@ -80,9 +80,9 @@ class CountWindowsBuilder
 
 trait Windows[In: Any val, Out: Any val, Acc: State ref] is
   StateWrapper[In, Out, Acc]
-  fun ref apply(input: In, event_ts: U64, wall_time: U64):
-    (Out | Array[Out] val | None)
-  fun ref on_timeout(wall_time: U64): (Out | Array[Out] val | None)
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    ((Out | Array[Out] val | None), U64)
+  fun ref on_timeout(wall_time: U64): ((Out | Array[Out] val | None), U64)
 
 class val GlobalWindowStateInitializer[In: Any val, Out: Any val,
   Acc: State ref] is StateInitializer[In, Out, Acc]
@@ -128,15 +128,17 @@ class GlobalWindow[In: Any val, Out: Any val, Acc: State ref] is
     _agg = agg
     _acc = agg.initial_accumulator()
 
-  fun ref apply(input: In, event_ts: U64, wall_time: U64):
-    (Out | Array[Out] val | None) =>
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    ((Out | Array[Out] val | None), U64)
+  =>
     _agg.update(input, _acc)
     // We trigger a result per message
-    _agg.output(_key, _acc)
+    let res = _agg.output(_key, _acc)
+    (res, watermark_ts)
 
-  fun ref on_timeout(wall_time: U64): Array[Out] val =>
+  fun ref on_timeout(watermark_ts: U64): (Array[Out] val, U64) =>
     // We trigger per message, so we do nothing on the timer
-    recover val Array[Out] end
+    (recover val Array[Out] end, watermark_ts)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -217,14 +219,16 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
     _windows = Array[(Acc | EmptyWindow)](window_count)
     _windows_start_ts = Array[U64](window_count)
     _earliest_window_idx = 0
-    var window_start: U64 = current_ts - (range * window_count.u64())
+    var window_start: U64 = 0//current_ts - (range * window_count.u64())
     for i in Range(0, window_count) do
       _windows.push(EmptyWindow)
       _windows_start_ts.push(window_start)
       window_start = window_start + range
     end
 
-  fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val =>
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    (Array[Out] val, U64)
+  =>
     try
       let earliest_ts = _windows_start_ts(_earliest_window_idx)?
       let end_ts = earliest_ts + (_windows.size().u64() * _range)
@@ -235,22 +239,22 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
 
       // Check if we need to trigger and clear windows
-      let outs = _attempt_to_trigger(wall_time)
+      (let outs, let output_watermark_ts) = _attempt_to_trigger(watermark_ts)
 
       // If we haven't already applied the input, do it now.
-      if not applied and _is_valid_ts(event_ts, wall_time) then
+      if not applied and _is_valid_ts(event_ts, watermark_ts) then
         let new_earliest_ts = _windows_start_ts(_earliest_window_idx)?
         _apply_input(input, event_ts, new_earliest_ts)
       end
 
-      outs
+      (outs, output_watermark_ts)
     else
       Fail()
-      recover Array[Out] end
+      (recover Array[Out] end, watermark_ts)
     end
 
-  fun ref on_timeout(wall_time: U64): Array[Out] val =>
-    _attempt_to_trigger(wall_time)
+  fun ref on_timeout(watermark_ts: U64): (Array[Out] val, U64) =>
+    _attempt_to_trigger(watermark_ts)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -288,17 +292,23 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
       end
     end
 
-  fun ref _attempt_to_trigger(wall_time: U64): Array[Out] val =>
+  fun ref _attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64)
+  =>
     let outs = recover iso Array[Out] end
+    var output_watermark_ts: U64 = 0
     try
       let earliest_ts = _windows_start_ts(_earliest_window_idx)?
       let end_ts = earliest_ts + (_windows.size().u64() * _range)
       // Convert to range units
       let end_ts_diff =
-        ((wall_time - end_ts).f64() / _range.f64()).ceil().u64()
+        ((watermark_ts - end_ts).f64() / _range.f64()).ceil().u64()
       var stopped = false
       while not stopped do
-        (let next_out, stopped) = _check_first_window(wall_time, end_ts_diff)
+        (let next_out, let next_output_watermark_ts, stopped) =
+          _check_first_window(watermark_ts, end_ts_diff)
+        if next_output_watermark_ts > output_watermark_ts then
+          output_watermark_ts = next_output_watermark_ts
+        end
         match next_out
         | let out: Out =>
           outs.push(out)
@@ -307,16 +317,18 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
     else
       Fail()
     end
-    consume outs
+    (consume outs, output_watermark_ts)
 
-  fun ref _check_first_window(wall_time: U64, end_ts_diff: U64):
-    ((Out | None), Bool)
+  fun ref _check_first_window(watermark_ts: U64, end_ts_diff: U64):
+    ((Out | None), U64, Bool)
   =>
     var out: (Out | None) = None
+    var output_watermark_ts: U64 = 0
     var stopped: Bool = true
     try
       let earliest_ts = _windows_start_ts(_earliest_window_idx)?
-      if _should_trigger(earliest_ts, wall_time) then
+      let window_end_ts = earliest_ts + _range
+      if _should_trigger(earliest_ts, watermark_ts) then
         match _windows(_earliest_window_idx)?
         | let acc: Acc =>
           out = _agg.output(_key, acc)
@@ -324,23 +336,20 @@ class TumblingWindows[In: Any val, Out: Any val, Acc: State ref] is
         _windows(_earliest_window_idx)? = EmptyWindow
         let all_window_range = _windows.size().u64() * _range
         if end_ts_diff > all_window_range then
-          _windows_start_ts(_earliest_window_idx)? = earliest_ts + end_ts_diff
+          _windows_start_ts(_earliest_window_idx)? = window_end_ts
         else
           _windows_start_ts(_earliest_window_idx)? = earliest_ts +
             all_window_range
         end
+        output_watermark_ts = window_end_ts
         stopped = false
         _earliest_window_idx = (_earliest_window_idx + 1) % _windows.size()
       end
     else
       Fail()
     end
-    (out, stopped)
+    (out, output_watermark_ts, stopped)
 
-  //!@ This means that even if there's a window open that's prior to
-  //current_ts - (delay + range) then we'll drop the message that we could
-  //have put in there. It's probably preferable to check that the event_ts
-  //is greater than the earliest window start_ts we have available instead.
   fun _is_valid_ts(event_ts: U64, current_ts: U64): Bool =>
     event_ts > (current_ts - (_delay + _range))
 
@@ -402,11 +411,13 @@ class SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
     _windows = _SlidingWindows[In, Out, Acc](key, agg, range, slide, delay,
       current_ts)
 
-  fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val =>
-    _windows(input, event_ts, wall_time)
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    (Array[Out] val, U64)
+  =>
+    _windows(input, event_ts, watermark_ts)
 
-  fun ref on_timeout(wall_time: U64): Array[Out] val =>
-    _attempt_to_trigger(wall_time)
+  fun ref on_timeout(watermark_ts: U64): (Array[Out] val, U64) =>
+    _attempt_to_trigger(watermark_ts)
 
   fun ref encode(auth: AmbientAuth): ByteSeq =>
     try
@@ -417,8 +428,8 @@ class SlidingWindows[In: Any val, Out: Any val, Acc: State ref] is
       recover Array[U8] end
     end
 
-  fun ref _attempt_to_trigger(wall_time: U64): Array[Out] val =>
-    _windows.attempt_to_trigger(wall_time)
+  fun ref _attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64) =>
+    _windows.attempt_to_trigger(watermark_ts)
 
 class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref]
   """
@@ -466,14 +477,16 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref]
     _panes = Array[(Acc | EmptyPane)](pane_count)
     _panes_start_ts = Array[U64](pane_count)
     _earliest_window_idx = 0
-    var pane_start: U64 = current_ts - (slide * pane_count.u64())
+    var pane_start: U64 = 0 //current_ts - (slide * pane_count.u64())
     for i in Range(0, pane_count) do
       _panes.push(EmptyPane)
       _panes_start_ts.push(pane_start)
       pane_start = pane_start + slide
     end
 
-  fun ref apply(input: In, event_ts: U64, wall_time: U64): Array[Out] val =>
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    (Array[Out] val, U64)
+  =>
     try
       let earliest_ts = _panes_start_ts(_earliest_window_idx)?
       let end_ts = earliest_ts + (_panes.size().u64() * _slide)
@@ -484,18 +497,18 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref]
       end
 
       // Check if we need to trigger and clear windows
-      let outs = attempt_to_trigger(wall_time)
+      (let outs, let output_watermark_ts) = attempt_to_trigger(watermark_ts)
 
       // If we haven't already applied the input, do it now.
-      if not applied and _is_valid_ts(event_ts, wall_time) then
+      if not applied and _is_valid_ts(event_ts, watermark_ts) then
         let new_earliest_ts = _panes_start_ts(_earliest_window_idx)?
         _apply_input(input, event_ts, new_earliest_ts)
       end
 
-      outs
+      (outs, output_watermark_ts)
     else
       Fail()
-      recover Array[Out] end
+      (recover Array[Out] end, 0)
     end
 
   fun ref _apply_input(input: In, event_ts: U64, earliest_ts: U64) =>
@@ -525,17 +538,22 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref]
       end
     end
 
-  fun ref attempt_to_trigger(wall_time: U64): Array[Out] val =>
+  fun ref attempt_to_trigger(watermark_ts: U64): (Array[Out] val, U64) =>
     let outs = recover iso Array[Out] end
+    var output_watermark_ts: U64 = 0
     try
       let earliest_ts = _panes_start_ts(_earliest_window_idx)?
       let end_ts = earliest_ts + (_panes.size().u64() * _slide)
       // Convert to range units
-      let end_ts_diff = wall_time - end_ts
+      let end_ts_diff = watermark_ts - end_ts
         // ((wall_time - end_ts).f64() / _slide.f64()).ceil().u64()
       var stopped = false
       while not stopped do
-        (let next_out, stopped) = _check_first_window(wall_time, end_ts_diff)
+        (let next_out, let next_output_watermark_ts, stopped) =
+          _check_first_window(watermark_ts, end_ts_diff)
+        if next_output_watermark_ts > output_watermark_ts then
+          output_watermark_ts = next_output_watermark_ts
+        end
         match next_out
         | let out: Out =>
           outs.push(out)
@@ -544,16 +562,18 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref]
     else
       Fail()
     end
-    consume outs
+    (consume outs, output_watermark_ts)
 
-  fun ref _check_first_window(wall_time: U64, end_ts_diff: U64):
-    ((Out | None), Bool)
+  fun ref _check_first_window(watermark_ts: U64, end_ts_diff: U64):
+    ((Out | None), U64, Bool)
   =>
     var out: (Out | None) = None
+    var output_watermark_ts: U64 = 0
     var stopped: Bool = true
     try
       let earliest_ts = _panes_start_ts(_earliest_window_idx)?
-      if _should_trigger(earliest_ts, wall_time) then
+      let window_end_ts = earliest_ts + _range
+      if _should_trigger(earliest_ts, watermark_ts) then
         var running_acc = _identity_acc
         var pane_idx = _earliest_window_idx
         for i in Range(0, _panes_per_window) do
@@ -572,6 +592,7 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref]
           _panes_start_ts(_earliest_window_idx)? = earliest_ts +
             all_pane_range
         end
+        output_watermark_ts = window_end_ts
         stopped = false
         _panes(_earliest_window_idx)? = EmptyPane
         _earliest_window_idx = (_earliest_window_idx + 1) % _panes.size()
@@ -579,17 +600,13 @@ class _SlidingWindows[In: Any val, Out: Any val, Acc: State ref]
     else
       Fail()
     end
-    (out, stopped)
+    (out, output_watermark_ts, stopped)
 
-  //!@ This means that even if there's a window open that's prior to
-  //current_ts - (delay + range) then we'll drop the message that we could
-  //have put in there. It's probably preferable to check that the event_ts
-  //is greater than the earliest pane start_ts we have available instead.
-  fun _is_valid_ts(event_ts: U64, current_ts: U64): Bool =>
-    event_ts > (current_ts - (_delay + _range))
+  fun _is_valid_ts(event_ts: U64, watermark_ts: U64): Bool =>
+    event_ts > (watermark_ts - (_delay + _range))
 
-  fun _should_trigger(window_start_ts: U64, current_ts: U64): Bool =>
-    (window_start_ts + _range) < (current_ts - _delay)
+  fun _should_trigger(window_start_ts: U64, watermark_ts: U64): Bool =>
+    (window_start_ts + _range) < (watermark_ts - _delay)
 
 ////////////////////////////
 // TUMBLING COUNT WINDOWS
@@ -644,7 +661,9 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
     _count_trigger = count
     _acc = agg.initial_accumulator()
 
-  fun ref apply(input: In, event_ts: U64, wall_time: U64): (Out | None) =>
+  fun ref apply(input: In, event_ts: U64, watermark_ts: U64):
+    ((Out | None), U64)
+  =>
     var out: (Out | None) = None
     _agg.update(input, _acc)
     _current_count = _current_count + 1
@@ -653,14 +672,14 @@ class TumblingCountWindows[In: Any val, Out: Any val, Acc: State ref] is
       out = _trigger()
     end
 
-    out
+    (out, watermark_ts)
 
-  fun ref on_timeout(wall_time: U64): (Out | None) =>
+  fun ref on_timeout(watermark_ts: U64): ((Out | None), U64) =>
     var out: (Out | None) = None
     if _current_count > 0 then
       out = _trigger()
     end
-    out
+    (out, watermark_ts)
 
   fun ref _trigger(): (Out | None) =>
     var out: (Out | None) = None
