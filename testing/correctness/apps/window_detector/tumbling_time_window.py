@@ -34,6 +34,7 @@ def application_setup(args):
     p = p.key_by(extract_key)
     p = p.to(wallaroo.range_windows(wallaroo.milliseconds(50))
              .over(Collect()))
+    p = p.to(split_accumulated)
 
     out_host, out_port = wallaroo.tcp_parse_output_addrs(args)[0]
     p = p.to_sink(wallaroo.TCPSinkConfig(out_host, out_port, encoder))
@@ -106,6 +107,12 @@ class Collect(wallaroo.Aggregation):
         return (key, values)
 
 
+@wallaroo.computation_multi(name="Split Accumulated")
+def split_accumulated(data):
+    key, values = data
+    return [(key, v) for v in values]
+
+
 @wallaroo.decoder(header_length=4, length_fmt=">I")
 def decoder(bs):
     # Expecting a 64-bit unsigned int in big endian followed by a string
@@ -116,5 +123,5 @@ def decoder(bs):
 
 @wallaroo.encoder
 def encoder(msg):
-    s = json.dumps({'key': msg[0], 'values': msg[1]})
+    s = json.dumps({'key': msg[0], 'value': msg[1]})
     return struct.pack(">I{}s".format(len(s)), len(s), s)

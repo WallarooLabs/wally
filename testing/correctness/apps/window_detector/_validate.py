@@ -33,7 +33,7 @@ while True:
     payload = f.read(header)
     assert(len(payload) > 0)
     obj = loads(payload)
-    sequences.setdefault(obj['key'], []).extend(obj['values'])
+    sequences.setdefault(obj['key'], []).append(obj['value'])
 
 for k, v in sequences.items():
     print("key: {}".format(k))
